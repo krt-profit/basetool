@@ -504,7 +504,8 @@ class JobOrderItemProductionServiceTest {
     org.mockito.InOrder callOrder = inOrder(inventoryItemRepository, inventoryCheckoutService);
     callOrder.verify(inventoryItemRepository).save(stockRow);
     callOrder.verify(inventoryCheckoutService).mergeStockIfRequested(stockRow, false);
-    // The audit event carries the ids-only details payload (REQ-AUDIT-001).
+    // The audit event carries the PII-free details payload — the order's #displayId ref (matching
+    // the sibling consumption events) plus raw ids (REQ-AUDIT-001).
     org.mockito.ArgumentCaptor<CharSequence> details =
         org.mockito.ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)
@@ -515,7 +516,7 @@ class JobOrderItemProductionServiceTest {
             eq(ownerId),
             details.capture());
     assertThat(details.getValue().toString())
-        .contains("jobOrderId=" + orderId)
+        .contains("jobOrder=#42")
         .contains("gameItemId=" + gameItem.getId())
         .contains("amount=2")
         .contains("locationId=" + locationId);

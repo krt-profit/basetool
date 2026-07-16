@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Lager: Items (Gegenstände mit Blueprint) sind jetzt als eigener Bestand im Lager erfassbar (Backend/API).** Lagereinträge tragen entweder ein Material (mit Qualität) oder ein Item (ohne Qualität, ganze Stückzahlen); Item-Einträge lassen sich nur Item-Aufträgen zuordnen, die das Item anfordern, und nie Missionen (REQ-INV-029…031, Migration V220, ADR-0100). Die Lager-Ansichten im Frontend folgen in einer separaten PR.
+- **Lager: Items (Gegenstände mit Blueprint) sind jetzt als eigener Bestand im Lager erfassbar (Backend/API).** Lagereinträge tragen entweder ein Material (mit Qualität) oder ein Item (ohne Qualität, ganze Stückzahlen); Item-Einträge lassen sich nur Item-Aufträgen zuordnen, die das Item anfordern, und nie Missionen (REQ-INV-029…031, Migration V220, ADR-0101). Die Lager-Ansichten im Frontend folgen in einer separaten PR.
 
 - **Aufträge: Beim Erfassen einer Herstellung können die produzierten Items direkt ins Lager eingebucht werden.** Die Buchung nennt Ort und Eigentümer (inkl. Org-Einheit) und ordnet den Bestand standardmäßig dem Auftrag zu; das Einlagern wird als eigenes Audit-Ereignis („Aus Herstellung eingelagert") protokolliert (REQ-INV-032, REQ-ORDERS-025). Ohne Angabe verhält sich die Buchung wie bisher, bis der Herstellen-Dialog das Feld mitsendet.
 

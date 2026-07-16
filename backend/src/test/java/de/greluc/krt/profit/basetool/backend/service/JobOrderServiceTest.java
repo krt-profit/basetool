@@ -1113,6 +1113,83 @@ class JobOrderServiceTest {
   }
 
   @Test
+  void updateItemJobOrderAsRequester_rebuildsUnlinksRemovedGameItemNotifiesAndAudits() {
+    // Game-item sibling of the removed-material unlink (REQ-INV-031): rebuild the lines and
+    // saveAndFlush FIRST, THEN drop the order's allocation slices for exactly the game item the
+    // rebuilt line set no longer requests — a surviving line's game item is never unlinked, and the
+    // material-side unlink stays untouched when no material was removed.
+    JobOrder itemOrder = new JobOrder();
+    itemOrder.setId(orderId);
+    itemOrder.setType(JobOrderType.ITEM);
+    itemOrder.setVersion(1L);
+    itemOrder.setHandle("Tester");
+    // The requester-update notification reads the responsible + requesting org-unit refs, so stamp
+    // both (a bare order would NPE in publishJobOrderUpdatedByRequester).
+    Squadron responsibleUnit = new Squadron();
+    responsibleUnit.setId(UUID.randomUUID());
+    responsibleUnit.setShorthand("RESP");
+    Squadron requestingUnit = new Squadron();
+    requestingUnit.setId(UUID.randomUUID());
+    requestingUnit.setShorthand("REQ");
+    itemOrder.setResponsibleOrgUnit(responsibleUnit);
+    itemOrder.setRequestingOrgUnit(requestingUnit);
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(itemOrder));
+    when(jobOrderItemService.buildItemLine(any()))
+        .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.model.JobOrderItem());
+    UUID keptGameItem = UUID.randomUUID();
+    UUID removedGameItem = UUID.randomUUID();
+    // requiredGameItemIds: {kept, removed} before the rebuild, {kept} after -> `removed` is
+    // unlinked. requiredMaterialIds stays unstubbed (empty both times), so the material unlink
+    // loop never runs. Chained thenReturn (not varargs) to avoid the unchecked generic-array
+    // varargs warning.
+    when(jobOrderItemService.requiredGameItemIds(itemOrder))
+        .thenReturn(java.util.Set.of(keptGameItem, removedGameItem))
+        .thenReturn(java.util.Set.of(keptGameItem));
+    when(jobOrderMapper.toDto(itemOrder)).thenReturn(baseJobOrderDto);
+    when(jobOrderItemService.toItemDtos(itemOrder)).thenReturn(List.of());
+    when(jobOrderItemService.aggregateMaterials(itemOrder)).thenReturn(List.of());
+
+    de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto dto =
+        new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto(
+            null,
+            null,
+            "requester item note",
+            null,
+            List.of(
+                new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+                    UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null)),
+            1L);
+
+    jobOrderService.updateItemJobOrderAsRequester(orderId, dto);
+
+    org.mockito.InOrder inOrder =
+        org.mockito.Mockito.inOrder(jobOrderRepository, inventoryItemRepository);
+    inOrder.verify(jobOrderRepository).saveAndFlush(itemOrder);
+    inOrder
+        .verify(inventoryItemRepository)
+        .deleteJobOrderAllocationsByJobOrderAndGameItem(orderId, removedGameItem);
+    // Exactly ONE game-item unlink runs — for the removed game item, never the surviving one.
+    verify(inventoryItemRepository, times(1))
+        .deleteJobOrderAllocationsByJobOrderAndGameItem(any(), any());
+    verify(inventoryItemRepository, never())
+        .deleteJobOrderAllocationsByJobOrderAndGameItem(orderId, keptGameItem);
+    // No material vanished from the requirement set, so the material-side unlink is untouched.
+    verify(inventoryItemRepository, never())
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(any(), any());
+    verify(materialClaimService).withdrawOrphanedClaimsWithinTransaction(itemOrder);
+    verify(eventPublisher)
+        .publishEvent(
+            any(de.greluc.krt.profit.basetool.backend.event.JobOrderUpdatedByRequesterEvent.class));
+    verify(auditService)
+        .record(
+            eq(de.greluc.krt.profit.basetool.backend.model.AuditEventType.JOB_ORDER_ITEM_UPDATED),
+            eq(orderId),
+            any(),
+            any(),
+            any());
+  }
+
+  @Test
   void
       completeJobOrderWithinTransaction_ShouldFlushBeforeLockQuery_ToAvoidOptimisticLockConflict() {
     // Given — reproduces the root cause of the 409 bug:
@@ -1509,6 +1586,71 @@ class JobOrderServiceTest {
     assertEquals(1, result.size(), "only the non-required (orphaned) link is returned");
     assertEquals(orphanDto.id(), result.get(0).id());
     verify(inventoryItemMapper, never()).toDto(requiredItem);
+  }
+
+  @Test
+  void getOrphanedLinkedInventoryReturnsOnlyItemEarmarksWhoseGameItemIsNotRequested() {
+    // REQ-INV-031: of the item stock earmarked to an ITEM order, only the row whose game item no
+    // line of the order requests anymore is flagged orphaned — the game-item sibling of the
+    // REQ-ORDERS-019 material case, loaded through its own dedicated repository seam.
+    UUID orderId = UUID.randomUUID();
+    UUID requestedGameItemId = UUID.randomUUID();
+    UUID orphanGameItemId = UUID.randomUUID();
+
+    de.greluc.krt.profit.basetool.backend.model.JobOrder order =
+        new de.greluc.krt.profit.basetool.backend.model.JobOrder();
+    order.setId(orderId);
+    order.setType(JobOrderType.ITEM);
+
+    de.greluc.krt.profit.basetool.backend.model.GameItem requestedGameItem =
+        new de.greluc.krt.profit.basetool.backend.model.GameItem();
+    requestedGameItem.setId(requestedGameItemId);
+    de.greluc.krt.profit.basetool.backend.model.GameItem orphanGameItem =
+        new de.greluc.krt.profit.basetool.backend.model.GameItem();
+    orphanGameItem.setId(orphanGameItemId);
+
+    de.greluc.krt.profit.basetool.backend.model.InventoryItem requestedRow =
+        new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
+    requestedRow.setId(UUID.randomUUID());
+    requestedRow.setGameItem(requestedGameItem);
+    de.greluc.krt.profit.basetool.backend.model.InventoryItem orphanRow =
+        new de.greluc.krt.profit.basetool.backend.model.InventoryItem();
+    orphanRow.setId(UUID.randomUUID());
+    orphanRow.setGameItem(orphanGameItem);
+
+    // A game-item row carries no material and no quality (REQ-INV-029).
+    InventoryItemDto orphanDto =
+        new InventoryItemDto(
+            orphanRow.getId(),
+            null,
+            null,
+            null,
+            null,
+            null,
+            2.0,
+            false,
+            java.util.List.of(),
+            0.0,
+            java.util.List.of(),
+            0.0,
+            null,
+            null,
+            1L,
+            null);
+
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    // The order's lines request only game item A; the material seam stays empty (unstubbed).
+    when(jobOrderItemService.requiredGameItemIds(order))
+        .thenReturn(java.util.Set.of(requestedGameItemId));
+    when(inventoryItemRepository.findGameItemRowsByJobOrderIdOrdered(orderId))
+        .thenReturn(List.of(requestedRow, orphanRow));
+    when(inventoryItemMapper.toDto(orphanRow)).thenReturn(orphanDto);
+
+    List<InventoryItemDto> result = jobOrderQueryService.getOrphanedLinkedInventory(orderId);
+
+    assertEquals(1, result.size(), "only the no-longer-requested item earmark is flagged");
+    assertEquals(orphanDto.id(), result.get(0).id());
+    verify(inventoryItemMapper, never()).toDto(requestedRow);
   }
 
   // ---------------------------------------------------------------

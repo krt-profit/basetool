@@ -50,7 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Data-level regressions for the §4.4 remediation list of the item-inventory design (V220,
- * REQ-INV-029, ADR-0100) against the real Postgres test schema: with {@code material_id} nullable,
+ * REQ-INV-029, ADR-0101) against the real Postgres test schema: with {@code material_id} nullable,
  * every historically material-only read seam must exclude game-item rows explicitly, and the
  * runtime {@code material.name} sort — smuggled in via the Pageable rather than the JPQL — must not
  * decide row visibility through its implicit-join trap. Each test seeds a NULL-material (item) row

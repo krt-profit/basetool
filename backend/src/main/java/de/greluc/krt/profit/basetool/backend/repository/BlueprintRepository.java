@@ -227,7 +227,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    * {@code manufacturer} is eager-fetched because the Lager item reference DTO renders its name.
    *
    * @param q case-insensitive item-name substring; must be non-null ({@code ""} = no filter)
-   * @param pageable page request (whitelisted {@code name} sort)
+   * @param pageable page request (whitelisted {@code name} / {@code id} sort — {@code id} is the
+   *     controller default's tiebreaker for equal-named UEX variants)
    * @return a page of game items with at least one active blueprint
    */
   // Mirrors findOrderableItems: GameItem is the query ROOT so the whitelisted `name` sort

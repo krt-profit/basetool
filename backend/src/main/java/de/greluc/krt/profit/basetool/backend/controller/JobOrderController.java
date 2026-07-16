@@ -183,9 +183,16 @@ public class JobOrderController {
    * required per-material demand; a mismatch is a 422 (code {@code PRODUCTION_ALLOCATION}), a stale
    * line/entry version a 409 (code {@code OPTIMISTIC_LOCK}).
    *
+   * <p>An optional {@code bookIn} block additionally lands the produced units as Lager item stock
+   * in the same transaction (REQ-INV-032): it names the target location and owner user, stamps the
+   * owning org unit via the picker resolver, and by default earmarks the new stock for this order.
+   * {@code personal = true} combined with the order earmark is contradictory and a 400; an unknown
+   * book-in owner or location is a 404. {@code bookIn = null} keeps the exact legacy behaviour
+   * (transitional until the Herstellen dialog ships the block).
+   *
    * @param id job-order id
    * @param itemId ordered item-line id
-   * @param dto production payload (amount, line version, per-entry consumption)
+   * @param dto production payload (amount, line version, per-entry consumption, optional book-in)
    * @return the refreshed ordered item-line DTO
    */
   @PostMapping("/{id}/items/{itemId}/production")
@@ -195,14 +202,21 @@ public class JobOrderController {
       description =
           "Records how many units of an ordered item were manufactured and reduces the linked"
               + " inventory consumed. The consumption must exactly cover the required material"
-              + " demand.")
+              + " demand. An optional bookIn block additionally books the produced units into the"
+              + " Lager as item stock (location, owner, owning org unit) in the same transaction,"
+              + " by default earmarked for this order; without it the booking behaves exactly as"
+              + " before.")
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Production booked."),
-    @ApiResponse(responseCode = "400", description = "Not an item order / invalid consumption."),
+    @ApiResponse(
+        responseCode = "400",
+        description =
+            "Not an item order / invalid consumption / invalid book-in (personal combined with the"
+                + " order earmark, or an org-unit picker output that is invalid for the owner)."),
     @ApiResponse(responseCode = "403", description = "Forbidden – insufficient role."),
     @ApiResponse(
         responseCode = "404",
-        description = "Order, item line, or inventory entry not found."),
+        description = "Order, item line, inventory entry, or book-in owner/location not found."),
     @ApiResponse(
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)."),

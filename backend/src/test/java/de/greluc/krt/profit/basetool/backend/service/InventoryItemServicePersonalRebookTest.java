@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
+import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
@@ -491,10 +492,104 @@ class InventoryItemServicePersonalRebookTest {
     item.setGameItem(gameItem);
     when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-    // When / Then — a fractional rebook amount is rejected before any split
-    assertThrows(
-        BadRequestException.class,
-        () -> service.rebookPersonal(ITEM_ID, dto(1.5, 1L, null), OWNER_ID, false));
+    // When / Then — a fractional rebook amount is rejected before any split, and the 400 detail
+    // names the row's actual catalog kind (item stock, not PIECE materials)
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () -> service.rebookPersonal(ITEM_ID, dto(1.5, 1L, null), OWNER_ID, false));
+    assertEquals("Amount must be a whole number for item stock", ex.getMessage());
+    verify(inventoryItemRepository, never()).save(any());
+    verify(inventoryItemRepository, never()).delete(any());
+  }
+
+  // covers REQ-INV-029 (full-depletion escape: a legacy fractional item row can leave its pool)
+  @Test
+  void rebook_itemRow_legacyFractionalRow_fullDepletion_isAllowed() {
+    // Given a shared game-item row holding a legacy fractional amount (only reachable via legacy
+    // data, but the guard is row-kind driven, so the escape must hold here too)
+    InventoryItem item = newItem(1.5, 1L, false);
+    item.setMaterial(null);
+    item.setQuality(null);
+    de.greluc.krt.profit.basetool.backend.model.GameItem gameItem =
+        new de.greluc.krt.profit.basetool.backend.model.GameItem();
+    gameItem.setId(UUID.randomUUID());
+    item.setGameItem(gameItem);
+    when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+    // When — rebook the row's EXACT remaining amount into the personal pool
+    InventoryItemDto result = service.rebookPersonal(ITEM_ID, dto(1.5, 1L, null), OWNER_ID, false);
+
+    // Then — the fractional amount is exempt (full depletion): the split row carries 1.5 and the
+    // depleted source is deleted, never flushed
+    assertSame(SENTINEL, result);
+    ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository).save(captor.capture());
+    assertEquals(1.5, captor.getValue().getAmount());
+    verify(inventoryItemRepository).delete(item);
+    verify(inventoryItemRepository, never()).saveAndFlush(any());
+  }
+
+  // covers REQ-INV-029 (a PARTIAL fractional rebook off a fractional item row still 400s)
+  @Test
+  void rebook_itemRow_legacyFractionalRow_partialFractionalAmount_throwsBadRequest() {
+    // Given the same legacy fractional item row
+    InventoryItem item = newItem(1.5, 1L, false);
+    item.setMaterial(null);
+    item.setQuality(null);
+    de.greluc.krt.profit.basetool.backend.model.GameItem gameItem =
+        new de.greluc.krt.profit.basetool.backend.model.GameItem();
+    gameItem.setId(UUID.randomUUID());
+    item.setGameItem(gameItem);
+    when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+    // When / Then — 0.5 is fractional AND does not deplete the row, so the guard still fires
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () -> service.rebookPersonal(ITEM_ID, dto(0.5, 1L, null), OWNER_ID, false));
+    assertEquals("Amount must be a whole number for item stock", ex.getMessage());
+    verify(inventoryItemRepository, never()).save(any());
+    verify(inventoryItemRepository, never()).delete(any());
+  }
+
+  // covers REQ-INV-029 (full-depletion escape: a legacy fractional PIECE row can leave its pool)
+  @Test
+  void rebook_pieceMaterial_legacyFractionalRow_fullDepletion_isAllowed() {
+    // Given a shared PIECE-material row holding a legacy fractional amount (created before the
+    // whole-unit guard existed) — without the escape that remainder could never change pools
+    InventoryItem item = newItem(1.5, 1L, false);
+    item.getMaterial().setQuantityType(QuantityType.PIECE);
+    item.setOwningOrgUnit(sourceOrgUnit);
+    when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+    // When — rebook the row's EXACT remaining amount into the personal pool
+    InventoryItemDto result = service.rebookPersonal(ITEM_ID, dto(1.5, 1L, null), OWNER_ID, false);
+
+    // Then — exempt from the whole-unit rule: the split row carries 1.5, the source is deleted
+    assertSame(SENTINEL, result);
+    ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository).save(captor.capture());
+    assertEquals(1.5, captor.getValue().getAmount());
+    assertTrue(captor.getValue().getPersonal(), "the split row flips to the personal pool");
+    verify(inventoryItemRepository).delete(item);
+    verify(inventoryItemRepository, never()).saveAndFlush(any());
+  }
+
+  // covers REQ-INV-029 (a PARTIAL fractional rebook off a fractional PIECE row still 400s)
+  @Test
+  void rebook_pieceMaterial_legacyFractionalRow_partialFractionalAmount_throwsBadRequest() {
+    // Given the same legacy fractional PIECE row
+    InventoryItem item = newItem(1.5, 1L, false);
+    item.getMaterial().setQuantityType(QuantityType.PIECE);
+    when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+    // When / Then — 0.5 is fractional AND does not deplete the row, so the guard still fires
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () -> service.rebookPersonal(ITEM_ID, dto(0.5, 1L, null), OWNER_ID, false));
+    assertEquals("Amount must be a whole number for PIECE materials", ex.getMessage());
     verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository, never()).delete(any());
   }

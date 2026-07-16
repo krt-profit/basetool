@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
  * Data transfer record carrying one row of the aggregated Lager overview ({@code GET
- * /api/v1/inventory/aggregated}). Catalog-discriminated since V220 (REQ-INV-029, ADR-0100): a
+ * /api/v1/inventory/aggregated}). Catalog-discriminated since V220 (REQ-INV-029, ADR-0101): a
  * {@code catalog=MATERIAL} row aggregates one material with its quality figures and {@code gameItem
  * == null}; a {@code catalog=ITEM} row aggregates one game item with {@code material == null} and
  * {@code null} quality columns (game items carry no quality dimension, REQ-INV-028).

@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-16.
-> **Owner area:** INV / ORDERS · **Related ADRs:** ADR-0100 (builds on ADR-0098/0099); design
+> **Owner area:** INV / ORDERS · **Related ADRs:** ADR-0101 (builds on ADR-0098/0099); design
 > context in [`docs/DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md).
 
 # Inventory — game-item stock rows (Items im Lager)
@@ -46,6 +46,9 @@ semantics are identical to material rows.
 
 ### REQ-INV-030 — Separate Material / Items views on the Lager surfaces
 
+**Status:** the API `catalog` contract (last sentence and the API acceptance items) is
+live; the view-switch UI described here ships with the follow-up frontend PR (PR 3).
+
 `/inventory`, `/inventory/my` and `/inventory/all` offer a Material ↔ Items view switch
 (`view=items` riding the page's query state); the item view mirrors the material tree
 (GameItem → stack → lazy entries, REQ-INV-002/005 semantics) without quality or mission
@@ -54,7 +57,9 @@ columns and with view-scoped expansion persistence. Drilldowns are per-catalog p
 view's gameItem filter is populated only with gameItems that currently have stock rows
 in the viewer's scope — never the full catalog. The API read family carries a
 `catalog=MATERIAL|ITEM` discriminator (default `MATERIAL` — existing clients
-unaffected); the ITEM variant rejects `minQuality`/`missionIds` (400).
+unaffected); a catalog-mismatched filter is rejected with 400 and never silently
+ignored (`minQuality`/`missionIds`/`materialIds` under `ITEM`, `gameItemIds` under
+`MATERIAL`).
 
 **Acceptance**
 

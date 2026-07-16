@@ -19827,7 +19827,7 @@
       "post" : {
         "tags" : [ "Orders" ],
         "summary" : "Book production for an item line",
-        "description" : "Records how many units of an ordered item were manufactured and reduces the linked inventory consumed. The consumption must exactly cover the required material demand.",
+        "description" : "Records how many units of an ordered item were manufactured and reduces the linked inventory consumed. The consumption must exactly cover the required material demand. An optional bookIn block additionally books the produced units into the Lager as item stock (location, owner, owning org unit) in the same transaction, by default earmarked for this order; without it the booking behaves exactly as before.",
         "operationId" : "bookProduction",
         "parameters" : [ {
           "name" : "id",
@@ -45901,7 +45901,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "default" : "name,asc"
+            "default" : "name,asc;id,asc"
           }
         } ],
         "responses" : {

@@ -44,7 +44,7 @@ import java.util.UUID;
  *     (the service substitutes the JWT subject).
  * @param materialId Material UUID for a material row; exactly one of {@code materialId} / {@code
  *     gameItemId} must be set (REQ-INV-029).
- * @param gameItemId GameItem UUID for a game-item stock row (REQ-INV-029, ADR-0100); mutually
+ * @param gameItemId GameItem UUID for a game-item stock row (REQ-INV-029, ADR-0101); mutually
  *     exclusive with {@code materialId}. A game-item row carries no quality, holds positive
  *     whole-unit amounts and rejects mission references.
  * @param locationId Storage location UUID; required.

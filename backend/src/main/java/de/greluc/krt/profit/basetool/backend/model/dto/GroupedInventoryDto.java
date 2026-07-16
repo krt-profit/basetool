@@ -27,7 +27,7 @@ import java.util.List;
  * one stack per distinct stock identity. The stacks in turn hold the individual append-only
  * entries, so the UI renders Material/Item → Stack → Entries.
  *
- * <p>Catalog-discriminated since V220 (REQ-INV-029, ADR-0100): a {@code catalog=MATERIAL} group
+ * <p>Catalog-discriminated since V220 (REQ-INV-029, ADR-0101): a {@code catalog=MATERIAL} group
  * carries {@code material} with the quality aggregates and {@code gameItem == null}; a {@code
  * catalog=ITEM} group carries {@code gameItem} with {@code material == null} and {@code null}
  * quality aggregates (game items have no quality dimension). Exactly one of the two references is

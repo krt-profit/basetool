@@ -1,4 +1,4 @@
-# ADR-0100 — Track game items as catalog-discriminated inventory rows
+# ADR-0101 — Track game items as catalog-discriminated inventory rows
 
 - **Status:** Accepted
 - **Date:** 2026-07-16

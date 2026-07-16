@@ -1204,6 +1204,160 @@ class InventoryItemServiceTest {
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
+  // --- service-level catalog belts behind the DTO guards (V220, REQ-INV-029) --
+
+  // covers REQ-INV-029 (service belt: both catalog references -> 400, not an opaque V220 CHECK 500)
+  @Test
+  void createInventoryItem_bothCatalogReferences_throwsBadRequest() {
+    // Given a crafted payload carrying BOTH materialId and gameItemId (as a client that bypassed
+    // the DTO's @AssertTrue XOR guard would send); entity resolution runs BEFORE the belts, so
+    // every referenced id must resolve
+    UUID userId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            materialId,
+            gameItemId,
+            locationId,
+            100,
+            5.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+
+    User user = new User();
+    user.setId(userId);
+    Material material = new Material();
+    material.setId(materialId);
+    GameItem gameItem = new GameItem();
+    gameItem.setId(gameItemId);
+    Location location = new Location();
+    location.setId(locationId);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(gameItemRepository.findById(gameItemId)).thenReturn(Optional.of(gameItem));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+
+    // When / Then
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    assertEquals("Exactly one of materialId and gameItemId must be set", ex.getMessage());
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  // covers REQ-INV-029 (service belt: neither catalog reference -> 400)
+  @Test
+  void createInventoryItem_neitherCatalogReference_throwsBadRequest() {
+    // Given a crafted payload carrying neither materialId nor gameItemId — only the user and the
+    // location resolve (the null catalog ids skip both catalog lookups)
+    UUID userId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId, null, null, locationId, null, 5.0, false, null, null, null, null, null, null);
+
+    User user = new User();
+    user.setId(userId);
+    Location location = new Location();
+    location.setId(locationId);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+
+    // When / Then — neither catalog repository is consulted, the belt 400s
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    assertEquals("Exactly one of materialId and gameItemId must be set", ex.getMessage());
+    verify(materialRepository, never()).findById(any());
+    verify(gameItemRepository, never()).findById(any());
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  // covers REQ-INV-029 (service belt: a material row must carry a quality)
+  @Test
+  void createInventoryItem_materialWithoutQuality_throwsBadRequest() {
+    // Given a material payload whose quality is missing (the V220 quality-by-kind CHECK shape)
+    UUID userId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            materialId,
+            null,
+            locationId,
+            null,
+            5.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+
+    User user = new User();
+    user.setId(userId);
+    Material material = new Material();
+    material.setId(materialId);
+    Location location = new Location();
+    location.setId(locationId);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+
+    // When / Then
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    assertEquals("Material stock requires a quality", ex.getMessage());
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  // covers REQ-INV-029 (service belt: a game-item row carries no quality)
+  @Test
+  void createInventoryItem_gameItemWithQuality_throwsBadRequest() {
+    // Given a game-item payload that illegally carries a quality
+    UUID userId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            null,
+            gameItemId,
+            locationId,
+            100,
+            5.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+    stubItemCreateResolution(userId, gameItemId, locationId);
+
+    // When / Then
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    assertEquals("Game-item stock carries no quality", ex.getMessage());
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
   @Test
   void bookOutInventoryItem_shouldSubtractAmount_whenNotDepleted() {
     UUID itemId = UUID.randomUUID();

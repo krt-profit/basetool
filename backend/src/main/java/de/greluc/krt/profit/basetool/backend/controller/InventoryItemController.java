@@ -76,7 +76,7 @@ import org.springframework.web.bind.annotation.RestController;
  * AuthHelperService#isLogisticianOrAbove()} and are passed as a boolean to the service — the
  * service stays free of {@code SecurityContextHolder} reads (ArchUnit rule).
  *
- * <p>Catalog discrimination (V220, REQ-INV-029, ADR-0100): the grouped / aggregated / flat /
+ * <p>Catalog discrimination (V220, REQ-INV-029, ADR-0101): the grouped / aggregated / flat /
  * stack-entry reads carry a {@code catalog} query parameter defaulting to {@link
  * InventoryCatalog#MATERIAL}, so pre-item clients are untouched. The {@code MATERIAL} paths keep
  * delegating through {@link InventoryItemService} (the historical facade); the {@code ITEM} paths
@@ -109,6 +109,12 @@ public class InventoryItemController {
   /** Sort whitelist of the game-item flat lists — no quality key (REQ-INV-029). */
   private static final Set<String> ITEM_FLAT_SORT_FIELDS = Set.of("amount", "id", "gameItem.name");
 
+  /** Default sort of the aggregated game-item view ({@code catalog=ITEM}). */
+  private static final String ITEM_AGGREGATED_DEFAULT_SORT = "gameItem.name,asc;amount,desc";
+
+  /** Sort whitelist of the aggregated game-item view — grouped rows carry no id or quality. */
+  private static final Set<String> ITEM_AGGREGATED_SORT_FIELDS = Set.of("amount", "gameItem.name");
+
   private final InventoryItemService inventoryItemService;
   private final InventoryAggregationService inventoryAggregationService;
   private final InventoryItemCatalogService inventoryItemCatalogService;
@@ -139,8 +145,8 @@ public class InventoryItemController {
           PaginationUtil.createPageRequest(
               page,
               size,
-              sort != null ? sort : "gameItem.name,asc;amount,desc",
-              Set.of("amount", "gameItem.name"),
+              sort != null ? sort : ITEM_AGGREGATED_DEFAULT_SORT,
+              ITEM_AGGREGATED_SORT_FIELDS,
               "gameItem.name");
       return PageResponse.of(inventoryAggregationService.getAggregatedItemInventory(pageable));
     }
@@ -262,9 +268,10 @@ public class InventoryItemController {
    *     defaults to {@code false} and is mutually exclusive with {@code personalOnly}
    * @param catalog which stock catalog to group; defaults to {@code MATERIAL}. {@code ITEM} groups
    *     GameItem → Stack over the quality-less item stack key, filters by {@code gameItemIds} /
-   *     {@code jobOrderIds}, and rejects {@code minQuality} / {@code missionIds} with 400
-   *     (REQ-INV-029/031)
-   * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only)
+   *     {@code jobOrderIds}, and rejects {@code minQuality} / {@code missionIds} / {@code
+   *     materialIds} with 400 (REQ-INV-029/031); {@code MATERIAL} rejects {@code gameItemIds} the
+   *     same way — a catalog-mismatched filter is a contract error, never silently ignored
+   * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only; 400 otherwise)
    * @return grouped DTOs
    */
   @GetMapping("/my-inventory/grouped")
@@ -281,7 +288,7 @@ public class InventoryItemController {
           @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly,
           @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
     if (catalog == InventoryCatalog.ITEM) {
-      rejectMaterialOnlyFilters(minQuality, missionIds);
+      rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
       return inventoryAggregationService.getMyAggregatedItemInventory(
           userService.getUserIdFromJwt(jwt),
           gameItemIds,
@@ -289,6 +296,7 @@ public class InventoryItemController {
           personalOnly,
           nonPersonalOnly);
     }
+    rejectItemOnlyFilters(gameItemIds);
     return inventoryItemService.getMyAggregatedInventory(
         userService.getUserIdFromJwt(jwt),
         materialIds,
@@ -301,12 +309,13 @@ public class InventoryItemController {
 
   /**
    * Squadron-wide flat inventory list (admin/logistician view). {@code catalog=MATERIAL} (the
-   * default) keeps the historical material contract; {@code catalog=ITEM} lists game-item rows,
-   * filters by {@code gameItemIds} / {@code jobOrderIds} and rejects {@code minQuality} / {@code
-   * missionIds} with 400 (REQ-INV-029/031).
+   * default) keeps the historical material contract; {@code catalog=ITEM} lists game-item rows and
+   * filters by {@code gameItemIds} / {@code jobOrderIds}. A catalog-mismatched filter ({@code
+   * minQuality} / {@code missionIds} / {@code materialIds} under {@code ITEM}, {@code gameItemIds}
+   * under {@code MATERIAL}) is rejected with 400 (REQ-INV-029/031), never silently ignored.
    *
-   * @param materialIds optional material filter ({@code catalog=MATERIAL} only)
-   * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only)
+   * @param materialIds optional material filter ({@code catalog=MATERIAL} only; 400 otherwise)
+   * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only; 400 otherwise)
    * @param minQuality optional quality floor; rejected for {@code catalog=ITEM}
    * @param jobOrderIds optional job-order filter (both catalogs)
    * @param missionIds optional mission filter; rejected for {@code catalog=ITEM}
@@ -329,7 +338,7 @@ public class InventoryItemController {
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
     if (catalog == InventoryCatalog.ITEM) {
-      rejectMaterialOnlyFilters(minQuality, missionIds);
+      rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
       Pageable pageable =
           PaginationUtil.createPageRequest(
               page,
@@ -340,6 +349,7 @@ public class InventoryItemController {
       return PageResponse.of(
           inventoryAggregationService.getAllItemInventory(gameItemIds, jobOrderIds, pageable));
     }
+    rejectItemOnlyFilters(gameItemIds);
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -373,11 +383,13 @@ public class InventoryItemController {
 
   /**
    * Squadron-wide grouped variant — same shape as {@link #getMyGroupedInventory} but scoped to all
-   * users. {@code catalog=ITEM} groups GameItem → Stack, filters by {@code gameItemIds} / {@code
-   * jobOrderIds}, and rejects {@code minQuality} / {@code missionIds} with 400 (REQ-INV-029/031).
+   * users. {@code catalog=ITEM} groups GameItem → Stack and filters by {@code gameItemIds} / {@code
+   * jobOrderIds}. A catalog-mismatched filter ({@code minQuality} / {@code missionIds} / {@code
+   * materialIds} under {@code ITEM}, {@code gameItemIds} under {@code MATERIAL}) is rejected with
+   * 400 (REQ-INV-029/031), never silently ignored.
    *
-   * @param materialIds optional material filter ({@code catalog=MATERIAL} only)
-   * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only)
+   * @param materialIds optional material filter ({@code catalog=MATERIAL} only; 400 otherwise)
+   * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only; 400 otherwise)
    * @param minQuality optional quality floor; rejected for {@code catalog=ITEM}
    * @param jobOrderIds optional job-order filter (both catalogs)
    * @param missionIds optional mission filter; rejected for {@code catalog=ITEM}
@@ -395,9 +407,10 @@ public class InventoryItemController {
           @RequestParam(required = false) List<UUID> missionIds,
           @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
     if (catalog == InventoryCatalog.ITEM) {
-      rejectMaterialOnlyFilters(minQuality, missionIds);
+      rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
       return inventoryAggregationService.getAllAggregatedItemInventory(gameItemIds, jobOrderIds);
     }
+    rejectItemOnlyFilters(gameItemIds);
     return inventoryItemService.getAllAggregatedInventory(
         materialIds, minQuality, jobOrderIds, missionIds);
   }
@@ -513,7 +526,8 @@ public class InventoryItemController {
    * @param q optional case-insensitive item-name filter
    * @param page zero-based page index
    * @param size page size
-   * @param sort sort spec (only {@code name} is whitelisted)
+   * @param sort sort spec (whitelist: {@code name}, {@code id}; the default appends {@code id} as a
+   *     tiebreaker so equal-named UEX variants keep a stable page order)
    * @return paged bookable game-item references (id, name, manufacturer, kind — no PII)
    */
   @GetMapping("/item-catalog")
@@ -527,8 +541,9 @@ public class InventoryItemController {
       @RequestParam(required = false) String q,
       @RequestParam(required = false, defaultValue = "0") int page,
       @RequestParam(required = false, defaultValue = "20") int size,
-      @RequestParam(required = false, defaultValue = "name,asc") String sort) {
-    Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, Set.of("name"), "name");
+      @RequestParam(required = false, defaultValue = "name,asc;id,asc") String sort) {
+    Pageable pageable =
+        PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
     Page<InventoryGameItemReferenceDto> p =
         inventoryItemCatalogService.findBookableItems(q, pageable);
     return PageResponse.of(p);
@@ -555,21 +570,45 @@ public class InventoryItemController {
 
   /**
    * Rejects the material-only filter parameters on a {@code catalog=ITEM} read (REQ-INV-029/031):
-   * game items carry no quality dimension, so a {@code minQuality} floor is meaningless, and item
-   * rows are never mission-allocated, so a {@code missionIds} filter could only ever return the
-   * empty set — both are contract errors, surfaced as RFC 7807 400 rather than silently ignored.
+   * game items carry no quality dimension, so a {@code minQuality} floor is meaningless; item rows
+   * are never mission-allocated, so a {@code missionIds} filter could only ever return the empty
+   * set; and item rows carry no material, so a {@code materialIds} filter cannot apply either — all
+   * three are contract errors, surfaced as RFC 7807 400 rather than silently ignored (a silently
+   * dropped filter returns plausible-looking but unfiltered data).
    *
    * @param minQuality the quality floor parameter; must be {@code null} for the item catalog
    * @param missionIds the mission filter parameter; must be {@code null} or empty for the item
    *     catalog
-   * @throws BadRequestException when either material-only filter is present
+   * @param materialIds the material filter parameter; must be {@code null} or empty for the item
+   *     catalog
+   * @throws BadRequestException when any material-only filter is present
    */
-  private static void rejectMaterialOnlyFilters(Integer minQuality, List<UUID> missionIds) {
+  private static void rejectMaterialOnlyFilters(
+      Integer minQuality, List<UUID> missionIds, List<UUID> materialIds) {
     if (minQuality != null) {
       throw new BadRequestException("minQuality is not supported for catalog=ITEM");
     }
     if (missionIds != null && !missionIds.isEmpty()) {
       throw new BadRequestException("missionIds is not supported for catalog=ITEM");
+    }
+    if (materialIds != null && !materialIds.isEmpty()) {
+      throw new BadRequestException("materialIds is not supported for catalog=ITEM");
+    }
+  }
+
+  /**
+   * Rejects the item-only filter parameter on a {@code catalog=MATERIAL} read — the mirror of
+   * {@link #rejectMaterialOnlyFilters(Integer, List, List)}: material rows carry no game item, so a
+   * {@code gameItemIds} filter is a contract error, surfaced as RFC 7807 400 rather than silently
+   * ignored.
+   *
+   * @param gameItemIds the game-item filter parameter; must be {@code null} or empty for the
+   *     material catalog
+   * @throws BadRequestException when the item-only filter is present
+   */
+  private static void rejectItemOnlyFilters(List<UUID> gameItemIds) {
+    if (gameItemIds != null && !gameItemIds.isEmpty()) {
+      throw new BadRequestException("gameItemIds is not supported for catalog=MATERIAL");
     }
   }
 

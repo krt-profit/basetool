@@ -302,13 +302,15 @@ class InventoryItemServiceAllocationTest {
     item.getMaterial().setQuantityType(QuantityType.PIECE);
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
 
-    assertThrows(
-        BadRequestException.class,
-        () ->
-            service.addAllocation(
-                itemId,
-                new InventoryAllocationWriteDto(
-                    InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 1.5, 1L)));
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                service.addAllocation(
+                    itemId,
+                    new InventoryAllocationWriteDto(
+                        InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 1.5, 1L)));
+    assertEquals("A PIECE allocation amount must be a whole number", ex.getMessage());
   }
 
   // --- game-item rows (V220, REQ-INV-029/031) --------------------------------
@@ -428,14 +430,16 @@ class InventoryItemServiceAllocationTest {
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
 
     // When / Then — item rows restrict amounts to whole numbers like PIECE materials, without any
-    // material dereference (the row's material is null)
-    assertThrows(
-        BadRequestException.class,
-        () ->
-            service.addAllocation(
-                itemId,
-                new InventoryAllocationWriteDto(
-                    InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 1.5, 1L)));
+    // material dereference (the row's material is null); the 400 detail names the item kind
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                service.addAllocation(
+                    itemId,
+                    new InventoryAllocationWriteDto(
+                        InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 1.5, 1L)));
+    assertEquals("An item allocation amount must be a whole number", ex.getMessage());
     verify(inventoryItemRepository, never()).saveAndFlush(any());
   }
 

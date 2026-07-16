@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
- * Catalog discriminator of the {@code /api/v1/inventory} read family (REQ-INV-029, ADR-0100). Since
+ * Catalog discriminator of the {@code /api/v1/inventory} read family (REQ-INV-029, ADR-0101). Since
  * V220 an {@code InventoryItem} row stocks either a material or a game item (XOR); the read
  * endpoints select which population they serve via a {@code catalog} query parameter that defaults
  * to {@link #MATERIAL}, so pre-item clients keep receiving exactly the rows they always did.

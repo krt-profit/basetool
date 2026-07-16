@@ -1,8 +1,11 @@
-> **Doc type:** Design spec (pre-implementation) — the agreed blueprint for the item-stock
-> feature. Once implementation ships, its requirements move into `docs/specs/` (new
-> `inventory-items.md` + amendments) and this document is frozen as a historical plan.
+> **Doc type:** Design spec (partially shipped) — the agreed blueprint for the item-stock
+> feature. The backend/API scope (PR 2) has shipped: REQ-INV-029…032 live in
+> [`docs/specs/inventory-items.md`](specs/inventory-items.md) and ADR-0101 is accepted —
+> those are the living truth for the shipped parts. The frontend item views/flows (PR 3)
+> and the Börse phase (§8) still implement against this document; it freezes as a
+> historical plan once they ship.
 > **Owner area:** INV / ORDERS / MARKET / UI / FE · **Related ADRs:** ADR-0053, ADR-0087,
-> ADR-0098, ADR-0099 (existing); proposes ADR-0100.
+> ADR-0098, ADR-0099 (existing); ADR-0101 (accepted with the backend PR).
 
 # Design — Item stock tracking in the Lager (warehouse)
 
@@ -67,7 +70,7 @@ blueprint) trackable in the Lager:
   `.claude/skills/das-kartell-design` submodule as visual source of truth) — see the
   binding note at the top of §6.
 
-## 3. Key decision — one aggregate, catalog-discriminated (proposed ADR-0100)
+## 3. Key decision — one aggregate, catalog-discriminated (proposed ADR-0101)
 
 **Decision: extend `InventoryItem` with a nullable `gameItem` reference (XOR with
 `material`) instead of building a parallel item-inventory aggregate.**
@@ -617,7 +620,7 @@ New keys under `inventory.items.*` (view switch, tree, filters), `inventory.form
   inventory-room prose gains the new receiving surfaces (item views, gameItem drilldown)
   and the new cross-publisher (production booking on the order page → `inventory`/
   `stock`); ADR-0053 gets a follow-up note).
-- **New ADR-0100** — "Track game items as catalog-discriminated inventory rows" (records
+- **New ADR-0101** — "Track game items as catalog-discriminated inventory rows" (records
   §3, the production book-in decision, and the §8 forward-compatibility, building on
   ADR-0098/0099).
 - README feature overview, CHANGELOG, and the German wiki pages (Lager, Aufträge — later
@@ -713,7 +716,7 @@ the core feature stays forward-compatible:
 2. **PR 2 — Backend item stock domain**: V220, entity/DTO/validator changes, the §4.4
    remediation list, read family (`catalog` param incl. flat lists), item-catalog
    endpoint, allocation gate (§5.5), production book-in (transitional optional `bookIn`)
-   + OpenAPI + specs (REQ-INV-029/031/032, ADR-0100). **Spans both modules for the audit
+   + OpenAPI + specs (REQ-INV-029/031/032, ADR-0101). **Spans both modules for the audit
      surface** (§7.2: event type + record call + viewer filter + DE/EN labels + coverage
      list in one PR). `BE`/`INV`/`ORDERS`.
 3. **PR 3 — Frontend item views & flows**: view switch, item tree/drilldown, Einbuchen
@@ -762,7 +765,7 @@ Still deliberately out of scope:
    `GameItem` rows with org visibility, allocations and booking flows; Mein Inventar =
    free-text personal records** (blueprints V3, no catalog link, no allocations). A
    Lager item row with `personal = true` is still catalog-linked org data, not a Mein-
-   Inventar entry. ADR-0100 records this boundary (and that no consolidation is
+   Inventar entry. ADR-0101 records this boundary (and that no consolidation is
    intended for now); the wiki pages for Lager and Mein Inventar cross-link it so end
    users know which surface to use.
 

@@ -379,7 +379,8 @@ public class JobOrderItemProductionService {
    * {@link InventoryCheckoutService#mergeStockIfRequested} — slice-first-then-merge, so {@code
    * InventoryAllocations.unionInto} folds a same-order slice of an absorbed sibling correctly; item
    * rows always auto-merge (PIECE rule, REQ-INV-026) — and audited as {@code
-   * INVENTORY_RECEIVED_FROM_PRODUCTION} with ids-only details (REQ-AUDIT-001).
+   * INVENTORY_RECEIVED_FROM_PRODUCTION} with PII-free details (the order's {@code #displayId} ref —
+   * matching the sibling consumption events of this flow — plus raw ids, REQ-AUDIT-001).
    *
    * <p>Concurrency (CLAUDE.md landmines): the fresh row is transient, so {@code save()} dispatches
    * to {@code persist()} — no merge, no double {@code @Version} bump; the merge helper joins this
@@ -454,7 +455,7 @@ public class JobOrderItemProductionService {
         merged.getId(),
         InventoryAuditLabels.label(merged),
         owner.getId(),
-        AuditDetails.of("jobOrderId", jobOrder.getId())
+        AuditDetails.of("jobOrder", "#" + jobOrder.getDisplayId())
             .with("gameItemId", line.getGameItem().getId())
             .with("amount", amount)
             .with("locationId", location.getId()));
