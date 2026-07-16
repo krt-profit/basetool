@@ -49,4 +49,16 @@ public interface QuantityAware {
    *     fired yet
    */
   Double amount();
+
+  /**
+   * Returns the UUID of the referenced {@link de.greluc.krt.profit.basetool.backend.model.GameItem}
+   * for a game-item payload (REQ-INV-029), or {@code null} for a material payload. Game-item
+   * amounts are unconditionally positive whole units, so the validator needs no catalog lookup for
+   * them. Default {@code null} keeps every existing material-only implementor source-compatible.
+   *
+   * @return the referenced game-item id, or {@code null} when the payload targets a material
+   */
+  default UUID gameItemId() {
+    return null;
+  }
 }

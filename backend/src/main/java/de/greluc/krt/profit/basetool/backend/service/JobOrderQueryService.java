@@ -203,7 +203,10 @@ public class JobOrderQueryService {
                     // Both order kinds: ITEM orders have no job_order_material rows, so the picker
                     // must use the kind-agnostic required-material set to filter correctly (#71
                     // orphan-link fix, REQ-ORDERS-018).
-                    List.copyOf(jobOrderItemService.requiredMaterialIds(o))))
+                    List.copyOf(jobOrderItemService.requiredMaterialIds(o)),
+                    // Game-item sibling (REQ-INV-031): the Lager item-mode picker filters orders
+                    // on the requested game items; empty for MATERIAL orders.
+                    List.copyOf(jobOrderItemService.requiredGameItemIds(o))))
         .toList();
   }
 
@@ -276,17 +279,22 @@ public class JobOrderQueryService {
   }
 
   /**
-   * Returns the inventory items linked to the order whose material the order does <em>not</em>
+   * Returns the inventory items linked to the order whose catalog entry the order does <em>not</em>
    * require — "orphaned" links (REQ-ORDERS-019). Because an order's material view is built only
    * from its requirements, such a link binds stock to the order while staying invisible in every
    * material row; surfacing it lets a logistician spot and undo a mis-assignment (e.g. a material
-   * linked from the Lager before the link gate of REQ-ORDERS-018 existed). Each linked item's
-   * material is compared against the kind-agnostic required-material set ({@link
-   * JobOrderItemService#requiredMaterialIds(JobOrder)}), so it is correct for ITEM orders too.
+   * linked from the Lager before the link gate of REQ-ORDERS-018 existed). Material rows are
+   * compared against the kind-agnostic required-material set ({@link
+   * JobOrderItemService#requiredMaterialIds(JobOrder)}), so it is correct for ITEM orders too;
+   * game-item rows (V220, REQ-INV-029) are compared against the requested-game-item set ({@link
+   * JobOrderItemService#requiredGameItemIds(JobOrder)}), so an item earmark whose ITEM order no
+   * longer requests the game item is flagged as well — the two kinds load through their own
+   * dedicated seams because the material seam deliberately excludes item rows.
    *
    * @param jobOrderId the order to inspect.
-   * @return the orphaned linked inventory items as DTOs, ordered like the per-material drill-down;
-   *     empty when every linked item matches a requirement.
+   * @return the orphaned linked inventory items as DTOs — material rows (ordered like the
+   *     per-material drill-down) followed by game-item rows; empty when every linked item matches a
+   *     requirement.
    * @throws NotFoundException when the order does not exist.
    */
   public List<de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto>
@@ -295,10 +303,19 @@ public class JobOrderQueryService {
         jobOrderRepository
             .findById(jobOrderId)
             .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
-    Set<UUID> required = jobOrderItemService.requiredMaterialIds(jobOrder);
-    return inventoryItemRepository.findByJobOrderIdOrdered(jobOrderId).stream()
-        .filter(
-            item -> item.getMaterial() == null || !required.contains(item.getMaterial().getId()))
+    Set<UUID> requiredMaterials = jobOrderItemService.requiredMaterialIds(jobOrder);
+    Set<UUID> requiredGameItems = jobOrderItemService.requiredGameItemIds(jobOrder);
+    return java.util.stream.Stream.concat(
+            inventoryItemRepository.findByJobOrderIdOrdered(jobOrderId).stream()
+                .filter(
+                    item ->
+                        item.getMaterial() == null
+                            || !requiredMaterials.contains(item.getMaterial().getId())),
+            inventoryItemRepository.findGameItemRowsByJobOrderIdOrdered(jobOrderId).stream()
+                .filter(
+                    item ->
+                        item.getGameItem() == null
+                            || !requiredGameItems.contains(item.getGameItem().getId())))
         .map(inventoryItemMapper::toDto)
         .toList();
   }

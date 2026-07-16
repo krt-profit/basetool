@@ -122,6 +122,7 @@ public class InventoryWriteController {
           new InventoryItemCreateDto(
               Boolean.TRUE.equals(form.getIsGlobal()) ? form.getUserId() : null,
               form.getMaterialId(),
+              null,
               form.getLocationId(),
               form.getQuality(),
               form.getAmount(),
@@ -187,6 +188,7 @@ public class InventoryWriteController {
           new InventoryItemCreateDto(
               Boolean.TRUE.equals(form.getIsGlobal()) ? form.getUserId() : null,
               form.getMaterialId(),
+              null,
               form.getLocationId(),
               form.getQuality(),
               form.getAmount(),

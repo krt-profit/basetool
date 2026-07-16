@@ -29,10 +29,14 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
+import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
@@ -116,6 +120,7 @@ class InventoryCheckoutServiceAuditTest {
                 null,
                 null,
                 null,
+                null,
                 java.util.List.of(),
                 0.0,
                 java.util.List.of(),
@@ -156,5 +161,55 @@ class InventoryCheckoutServiceAuditTest {
     String rendered = details.getValue().toString();
     assertTrue(rendered.contains("removed=42"), "audit details carry the removed count");
     assertTrue(rendered.contains("scope=adminAll"), "audit details carry the wipe scope");
+  }
+
+  // covers REQ-INV-029 / REQ-AUDIT-001 (item book-out audits render the gameItem name, never "—")
+  @Test
+  void bookOut_gameItemRow_recordsConsumedAuditWithGameItemNameLabelAndDetail() {
+    // Given a game-item stock row (material == null) consumed in full
+    UUID itemId = UUID.randomUUID();
+    UUID ownerId = UUID.randomUUID();
+    User owner = new User();
+    owner.setId(ownerId);
+    Location location = new Location();
+    location.setId(UUID.randomUUID());
+    location.setName("ARC-L1");
+    GameItem gameItem = new GameItem();
+    gameItem.setId(UUID.randomUUID());
+    gameItem.setName("Quantum Drive");
+
+    InventoryItem item = new InventoryItem();
+    item.setId(itemId);
+    item.setVersion(1L);
+    item.setUser(owner);
+    item.setLocation(location);
+    item.setGameItem(gameItem);
+    item.setAmount(3.0);
+    item.setPersonal(false);
+    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
+
+    // When — a whole-unit DISCARD that depletes the row
+    service.bookOutInventoryItem(
+        itemId,
+        new InventoryItemBookOutDto(
+            3.0, null, null, CheckoutType.DISCARD, null, null, 1L, null, null, null, null),
+        ownerId,
+        false);
+
+    // Then — the subject label and the material detail both render the game-item name; without
+    // the catalog fallback every reused audit event on item stock would log "— @ <location>".
+    ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.INVENTORY_ITEM_CONSUMED),
+            eq(itemId),
+            eq("Quantum Drive @ ARC-L1"),
+            eq(ownerId),
+            details.capture());
+    String rendered = details.getValue().toString();
+    assertTrue(
+        rendered.contains("material=Quantum Drive"),
+        "the catalog-name detail falls back to the game-item name for item rows");
+    assertTrue(rendered.contains("depleted=true"), "the depleted marker is carried");
   }
 }

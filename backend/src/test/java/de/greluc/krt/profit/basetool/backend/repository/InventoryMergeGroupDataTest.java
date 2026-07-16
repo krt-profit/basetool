@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -71,6 +72,7 @@ class InventoryMergeGroupDataTest {
   @Autowired private InventoryItemRepository inventoryItemRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private MaterialRepository materialRepository;
+  @Autowired private GameItemRepository gameItemRepository;
   @Autowired private LocationRepository locationRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private MaterialExchangeOfferRepository offerRepository;
@@ -177,6 +179,96 @@ class InventoryMergeGroupDataTest {
     // The offer-backed sibling is excluded by the NOT EXISTS, so a merge never folds (and deletes)
     // a row the Materialbörse still references (ON DELETE CASCADE, V210).
     assertThat(group).extracting(InventoryItem::getId).containsExactly(plain.getId());
+  }
+
+  // --- game-item merge groups (V220, REQ-INV-029) ---------------------------
+
+  // covers REQ-INV-029 (item merge key: NULL material AND NULL quality branches must match)
+  @Test
+  void gameItemGroup_matchesNullMaterialAndNullQualityRows_only() {
+    // Given two item rows of the same game item, one of a different game item, and a material
+    // sibling at the same location — the NULL-branches must group exactly the same-item rows.
+    // Without them the former plain equalities matched nothing for item rows, silently
+    // degenerating the item merge to a permanent no-op (the REQ-INV-029 regression).
+    GameItem drive = persistGameItem("Quantum Drive");
+    GameItem cooler = persistGameItem("Cooler");
+    InventoryItem a = persistItemRow(drive, 3.0, false);
+    InventoryItem b = persistItemRow(drive, 2.0, false);
+    persistItemRow(cooler, 1.0, false);
+    persistRow(5.0, QUALITY, false, null); // material sibling, same user/location
+    entityManager.flush();
+
+    List<InventoryItem> group =
+        inventoryItemRepository.findMergeGroupForUpdate(
+            user.getId(), null, drive.getId(), location.getId(), null, false, null);
+
+    assertThat(group)
+        .extracting(InventoryItem::getId)
+        .containsExactlyInAnyOrder(a.getId(), b.getId());
+  }
+
+  // covers REQ-INV-029 (the material overload keeps excluding item rows — pre-V220 behaviour)
+  @Test
+  void materialGroup_excludesGameItemRows() {
+    // Given a material row and an item row sharing user/location
+    InventoryItem materialRow = persistRow(5.0, QUALITY, false, null);
+    persistItemRow(persistGameItem("Quantum Drive"), 3.0, false);
+    entityManager.flush();
+
+    // When querying through the six-argument material overload (gameItemId = null)
+    List<InventoryItem> group =
+        inventoryItemRepository.findMergeGroupForUpdate(
+            user.getId(), material.getId(), location.getId(), QUALITY, false, null);
+
+    // Then the item row never joins a material merge group
+    assertThat(group).extracting(InventoryItem::getId).containsExactly(materialRow.getId());
+  }
+
+  // covers REQ-INV-029 (item stack identity: personal is a key dimension for item rows too)
+  @Test
+  void gameItemGroup_excludesRowsDifferingInPersonalFlag() {
+    // Given a shared and a personal item row of the same game item
+    GameItem drive = persistGameItem("Quantum Drive");
+    InventoryItem shared = persistItemRow(drive, 3.0, false);
+    persistItemRow(drive, 2.0, true);
+    entityManager.flush();
+
+    List<InventoryItem> group =
+        inventoryItemRepository.findMergeGroupForUpdate(
+            user.getId(), null, drive.getId(), location.getId(), null, false, null);
+
+    assertThat(group).extracting(InventoryItem::getId).containsExactly(shared.getId());
+  }
+
+  /**
+   * Persists a bookable game item with the given display name (kind/source defaults apply).
+   *
+   * @param name the item's display name.
+   * @return the saved game item.
+   */
+  private GameItem persistGameItem(String name) {
+    GameItem gameItem = new GameItem();
+    gameItem.setName(name + "-" + UUID.randomUUID());
+    return gameItemRepository.save(gameItem);
+  }
+
+  /**
+   * Persists one game-item stock row sharing the fixture user / location, with {@code material} and
+   * {@code quality} {@code NULL} (the V220 catalog shape) and no owning org unit.
+   *
+   * @param gameItem the stocked game item.
+   * @param amount the row's quantity.
+   * @param personal whether the row is a private entry.
+   * @return the saved row.
+   */
+  private InventoryItem persistItemRow(GameItem gameItem, double amount, boolean personal) {
+    InventoryItem item = new InventoryItem();
+    item.setUser(user);
+    item.setGameItem(gameItem);
+    item.setLocation(location);
+    item.setAmount(amount);
+    item.setPersonal(personal);
+    return inventoryItemRepository.save(item);
   }
 
   /**

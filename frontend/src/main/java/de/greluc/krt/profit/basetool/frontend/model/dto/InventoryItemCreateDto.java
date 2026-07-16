@@ -38,10 +38,15 @@ import java.util.UUID;
  * split-at-check-in payload (REQ-INV-027, R4): earmark parts of the new entry to several job orders
  * / missions with their own amounts. When non-empty they supersede the single {@code jobOrderId} /
  * {@code missionId}; {@code null}/empty falls back to the single scalar.
+ *
+ * <p>{@code gameItemId} is the V220 catalog discriminator (REQ-INV-029): exactly one of {@code
+ * materialId} / {@code gameItemId} is set. The material-only Einbuchen form always sends {@code
+ * null} until the item mode ships (PR 3).
  */
 public record InventoryItemCreateDto(
     UUID userId,
     UUID materialId,
+    UUID gameItemId,
     UUID locationId,
     Integer quality,
     Double amount,

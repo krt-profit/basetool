@@ -41,6 +41,11 @@ import java.util.UUID;
  *     order kinds (ITEM-derived materials included). Unlike {@code materials} this is never empty
  *     for an ITEM order, so the Lager picker and the refinery-order store picker can correctly hide
  *     an order whose requirements do not include a given row's material (REQ-ORDERS-018).
+ * @param requiredGameItemIds the distinct game-item ids an ITEM order's lines request — the
+ *     game-item sibling of {@code requiredMaterialIds} (REQ-INV-031): the Lager item-mode picker
+ *     hides orders that do not request a row's game item. Always empty for a MATERIAL order (which
+ *     accepts no item-stock link); a parallel set, not a replacement — material rows stay linkable
+ *     to ITEM orders through {@code requiredMaterialIds}.
  */
 public record JobOrderReferenceDto(
     UUID id,
@@ -49,4 +54,5 @@ public record JobOrderReferenceDto(
     JobOrderStatus status,
     SquadronReferenceDto requestingOrgUnit,
     List<JobOrderMaterialDto> materials,
-    List<UUID> requiredMaterialIds) {}
+    List<UUID> requiredMaterialIds,
+    List<UUID> requiredGameItemIds) {}

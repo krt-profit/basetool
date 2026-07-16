@@ -21,12 +21,14 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.projection.InventoryItemStackAggregate;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -36,6 +38,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -73,6 +78,7 @@ class InventoryItemStackQueryDataTest {
   @Autowired private InventoryItemRepository inventoryItemRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private MaterialRepository materialRepository;
+  @Autowired private GameItemRepository gameItemRepository;
   @Autowired private LocationRepository locationRepository;
   @Autowired private SquadronRepository squadronRepository;
 
@@ -239,5 +245,194 @@ class InventoryItemStackQueryDataTest {
     assertThat(all)
         .as("both toggles false must return the personal and the shared stack")
         .hasSize(2);
+  }
+
+  // --- game-item stock rows (V220, REQ-INV-029) ------------------------------
+
+  /**
+   * With {@code material_id} nullable since V220, the material stack projections must exclude
+   * game-item rows explicitly ({@code i.material IS NOT NULL}): an item row surfacing as a
+   * null-material group would NPE the grouped assembly in {@code InventoryAggregationService}
+   * (design §4.4). The item stack siblings serve those rows instead, keyed without the quality
+   * dimension. Seeds one material and one game-item row for the same owner/location and pins each
+   * projection to exactly its own catalog population.
+   */
+  // covers REQ-INV-029 (material stacks exclude NULL-material rows; item stacks serve them)
+  @Test
+  void materialAndItemStackProjections_splitByCatalog_withAnItemRowPresent() {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername("u-" + UUID.randomUUID());
+    userRepository.save(user);
+
+    Location location = new Location();
+    location.setName("Hub-" + UUID.randomUUID());
+    locationRepository.save(location);
+
+    Material material = new Material();
+    material.setName("Quantanium-" + UUID.randomUUID());
+    material.setType(MaterialType.RAW);
+    materialRepository.save(material);
+
+    GameItem gameItem = new GameItem();
+    gameItem.setName("Quantum-Drive-" + UUID.randomUUID());
+    gameItemRepository.save(gameItem);
+
+    InventoryItem materialRow = new InventoryItem();
+    materialRow.setUser(user);
+    materialRow.setLocation(location);
+    materialRow.setMaterial(material);
+    materialRow.setQuality(800);
+    materialRow.setAmount(100.0);
+    materialRow.setPersonal(false);
+    inventoryItemRepository.save(materialRow);
+
+    InventoryItem itemRow = new InventoryItem();
+    itemRow.setUser(user);
+    itemRow.setLocation(location);
+    itemRow.setGameItem(gameItem);
+    itemRow.setAmount(3.0);
+    itemRow.setPersonal(false);
+    inventoryItemRepository.save(itemRow);
+    entityManager.flush();
+
+    // The user-scoped material stacks return ONLY the material stack — never a null-material
+    // group for the item row.
+    List<InventoryStackAggregate> materialStacks =
+        inventoryItemRepository.findUserStacks(
+            user.getId(), false, null, null, false, null, false, null, false, false);
+    assertThat(materialStacks)
+        .as("the item row must not surface as a (null-material) stack in the material view")
+        .hasSize(1);
+    assertThat(materialStacks.get(0).material().getId()).isEqualTo(material.getId());
+
+    // The global material stacks carry no null-material group either (admin all-scope sweep).
+    List<InventoryStackAggregate> globalStacks =
+        inventoryItemRepository.findGlobalStacks(
+            false, null, null, false, null, false, null, true, null, Set.of());
+    assertThat(globalStacks)
+        .as("no global material stack may carry a null material with an item row present")
+        .allSatisfy(stack -> assertThat(stack.material()).isNotNull());
+
+    // The item stack siblings serve the game-item population, keyed without a quality dimension.
+    List<InventoryItemStackAggregate> userItemStacks =
+        inventoryItemRepository.findUserItemStacks(
+            user.getId(), false, null, false, null, false, false);
+    assertThat(userItemStacks).hasSize(1);
+    assertThat(userItemStacks.get(0).gameItem().getId()).isEqualTo(gameItem.getId());
+    assertThat(userItemStacks.get(0).totalAmount()).isEqualTo(3.0);
+
+    List<InventoryItemStackAggregate> globalItemStacks =
+        inventoryItemRepository.findGlobalItemStacks(
+            true, List.of(gameItem.getId()), false, null, true, null, Set.of());
+    assertThat(globalItemStacks).hasSize(1);
+    assertThat(globalItemStacks.get(0).gameItem().getId()).isEqualTo(gameItem.getId());
+  }
+
+  /**
+   * Executes {@link InventoryItemRepository#getAggregatedItemInventory} against real Postgres under
+   * the exact multi-key sort the controller drives it with ({@code gameItem.name,asc;amount,desc},
+   * REQ-INV-028/029). Spring Data appends that sort to the GROUP-BY query at render time; the query
+   * deliberately keeps the implicit {@code i.gameItem} root path because an explicit join alias
+   * would make the appended {@code gameItem.name} key spawn a second, ungrouped join and fail
+   * PostgreSQL's functional-dependency check — a regression only a real database catches (the
+   * mocked unit never renders the appended ORDER BY). Seeds two rows of one game item (must
+   * collapse into a single SUM tuple), one row of a second item, and one material row (must be
+   * excluded by {@code i.gameItem IS NOT NULL} — surfacing as a null-gameItem tuple would NPE the
+   * grouped assembly downstream).
+   */
+  // covers REQ-INV-028/029 (aggregated item view renders the appended gameItem.name sort on
+  // Postgres)
+  @Test
+  void getAggregatedItemInventory_aggregatesPerItem_sortsByName_andExcludesMaterialRows() {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername("u-" + UUID.randomUUID());
+    userRepository.save(user);
+
+    Location location = new Location();
+    location.setName("Hub-" + UUID.randomUUID());
+    locationRepository.save(location);
+
+    Material material = new Material();
+    material.setName("Quantanium-" + UUID.randomUUID());
+    material.setType(MaterialType.RAW);
+    materialRepository.save(material);
+
+    GameItem couplingItem = new GameItem();
+    couplingItem.setName("AAA-Coupling-" + UUID.randomUUID());
+    gameItemRepository.save(couplingItem);
+
+    GameItem shieldItem = new GameItem();
+    shieldItem.setName("BBB-Shield-" + UUID.randomUUID());
+    gameItemRepository.save(shieldItem);
+
+    InventoryItem couplingRowOne = new InventoryItem();
+    couplingRowOne.setUser(user);
+    couplingRowOne.setLocation(location);
+    couplingRowOne.setGameItem(couplingItem);
+    couplingRowOne.setAmount(2.0);
+    couplingRowOne.setPersonal(false);
+    inventoryItemRepository.save(couplingRowOne);
+
+    InventoryItem couplingRowTwo = new InventoryItem();
+    couplingRowTwo.setUser(user);
+    couplingRowTwo.setLocation(location);
+    couplingRowTwo.setGameItem(couplingItem);
+    couplingRowTwo.setAmount(3.0);
+    couplingRowTwo.setPersonal(false);
+    inventoryItemRepository.save(couplingRowTwo);
+
+    InventoryItem shieldRow = new InventoryItem();
+    shieldRow.setUser(user);
+    shieldRow.setLocation(location);
+    shieldRow.setGameItem(shieldItem);
+    shieldRow.setAmount(7.0);
+    shieldRow.setPersonal(false);
+    inventoryItemRepository.save(shieldRow);
+
+    InventoryItem materialRow = new InventoryItem();
+    materialRow.setUser(user);
+    materialRow.setLocation(location);
+    materialRow.setMaterial(material);
+    materialRow.setQuality(800);
+    materialRow.setAmount(100.0);
+    materialRow.setPersonal(false);
+    inventoryItemRepository.save(materialRow);
+    entityManager.flush();
+
+    // Drive the query exactly like InventoryAggregationService.getAggregatedItemInventory does
+    // for an admin all-scope caller under the controller's ITEM_AGGREGATED_DEFAULT_SORT.
+    Page<Object[]> page =
+        inventoryItemRepository.getAggregatedItemInventory(
+            true,
+            null,
+            Set.of(),
+            PageRequest.of(
+                0, 20, Sort.by(Sort.Order.asc("gameItem.name"), Sort.Order.desc("amount"))));
+
+    assertThat(page.getContent())
+        .as("every aggregated tuple must carry a game item — material rows are excluded")
+        .allSatisfy(tuple -> assertThat(tuple[0]).isNotNull());
+
+    List<Object[]> seeded =
+        page.getContent().stream()
+            .filter(
+                tuple -> {
+                  UUID id = ((GameItem) tuple[0]).getId();
+                  return id.equals(couplingItem.getId()) || id.equals(shieldItem.getId());
+                })
+            .toList();
+    assertThat(seeded)
+        .as("each seeded game item must yield exactly one aggregated tuple")
+        .hasSize(2);
+    assertThat(((GameItem) seeded.get(0)[0]).getId())
+        .as("gameItem.name asc puts the AAA item before the BBB item")
+        .isEqualTo(couplingItem.getId());
+    assertThat(((Number) seeded.get(0)[1]).doubleValue())
+        .as("the two coupling rows must collapse into one SUM(amount) tuple")
+        .isEqualTo(5.0);
+    assertThat(((GameItem) seeded.get(1)[0]).getId()).isEqualTo(shieldItem.getId());
+    assertThat(((Number) seeded.get(1)[1]).doubleValue()).isEqualTo(7.0);
   }
 }

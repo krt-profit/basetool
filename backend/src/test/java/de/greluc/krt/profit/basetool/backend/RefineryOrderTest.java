@@ -535,7 +535,7 @@ class RefineryOrderTest {
 
     java.util.List<InventoryItem> items =
         inventoryItemRepository
-            .findByUser(user1, org.springframework.data.domain.Pageable.unpaged())
+            .findMaterialRowsByUser(user1, org.springframework.data.domain.Pageable.unpaged())
             .getContent();
     boolean found = items.stream().anyMatch(i -> i.getAmount().equals(32.543));
     assertTrue(found, "Decimal amount should be stored correctly in inventory");
@@ -592,7 +592,7 @@ class RefineryOrderTest {
     // angepasst
     java.util.List<InventoryItem> items =
         inventoryItemRepository
-            .findByUser(user1, org.springframework.data.domain.Pageable.unpaged())
+            .findMaterialRowsByUser(user1, org.springframework.data.domain.Pageable.unpaged())
             .getContent();
     InventoryItem persisted =
         items.stream()

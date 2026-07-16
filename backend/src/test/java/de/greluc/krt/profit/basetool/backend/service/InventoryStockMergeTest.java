@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,6 +32,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -237,6 +239,74 @@ class InventoryStockMergeTest {
     verify(inventoryItemRepository, never()).deleteAll(any());
     verify(inventoryItemRepository, never()).saveAndFlush(any());
     verifyNoInteractions(auditService);
+  }
+
+  /**
+   * Builds a game-item stock row sharing the fixed identity dimensions of {@link #row}, but with
+   * the item catalog shape (V220, REQ-INV-029): gameItem set, material and quality {@code null}.
+   *
+   * @param id the row id.
+   * @param gameItem the stocked game item.
+   * @param amount the row's amount.
+   * @return the assembled item row.
+   */
+  private static InventoryItem itemRow(UUID id, GameItem gameItem, double amount) {
+    User user = new User();
+    user.setId(USER_ID);
+    Location location = new Location();
+    location.setId(LOCATION_ID);
+    InventoryItem item = new InventoryItem();
+    item.setId(id);
+    item.setUser(user);
+    item.setGameItem(gameItem);
+    item.setLocation(location);
+    item.setPersonal(false);
+    item.setAmount(amount);
+    return item;
+  }
+
+  // covers REQ-INV-029 (item rows always auto-merge, keyed through the 7-arg NULL-branch query)
+  @Test
+  void gameItemRow_alwaysAutoMerges_viaSevenArgumentNullBranchQuery() {
+    // Given a fresh item row and one matching sibling behind the catalog-discriminated merge key
+    GameItem gameItem = new GameItem();
+    gameItem.setId(UUID.randomUUID());
+    gameItem.setName("Quantum Drive");
+    UUID survivorId = UUID.randomUUID();
+    InventoryItem survivor = itemRow(survivorId, gameItem, 3.0);
+    InventoryItem victim = itemRow(UUID.randomUUID(), gameItem, 2.0);
+    when(materialExchangeOfferRepository.existsByInventoryItemId(survivorId)).thenReturn(false);
+    when(inventoryItemRepository.findMergeGroupForUpdate(
+            USER_ID, null, gameItem.getId(), LOCATION_ID, null, false, null))
+        .thenReturn(List.of(survivor, victim));
+    when(inventoryItemRepository.saveAndFlush(survivor)).thenReturn(survivor);
+
+    // When — the client merge flag is false: irrelevant for item rows, which follow the PIECE
+    // auto-merge rule
+    InventoryItem result = service.mergeStockIfRequested(survivor, false);
+
+    // Then — the group is loaded through the full seven-argument query with the NULL material AND
+    // NULL quality branches (the pre-fix plain equalities matched nothing for item rows, silently
+    // degenerating their merge to a permanent no-op), and the sibling folds into the survivor.
+    assertSame(survivor, result);
+    assertEquals(5.0, survivor.getAmount(), 1e-9, "item amounts of all folded rows are summed");
+    ArgumentCaptor<UUID> materialKey = ArgumentCaptor.forClass(UUID.class);
+    ArgumentCaptor<Integer> qualityKey = ArgumentCaptor.forClass(Integer.class);
+    verify(inventoryItemRepository)
+        .findMergeGroupForUpdate(
+            eq(USER_ID),
+            materialKey.capture(),
+            eq(gameItem.getId()),
+            eq(LOCATION_ID),
+            qualityKey.capture(),
+            eq(false),
+            eq((UUID) null));
+    assertNull(materialKey.getValue(), "an item stack keys with materialId = null");
+    assertNull(qualityKey.getValue(), "an item stack keys with quality = null");
+    verify(inventoryItemRepository).deleteAll(List.of(victim));
+    verify(auditService)
+        .record(
+            eq(AuditEventType.INVENTORY_ITEM_MERGED), eq(survivorId), any(), eq(USER_ID), any());
   }
 
   @Test

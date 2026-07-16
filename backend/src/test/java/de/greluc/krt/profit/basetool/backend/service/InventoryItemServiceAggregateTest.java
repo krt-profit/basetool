@@ -368,6 +368,7 @@ class InventoryItemServiceAggregateTest {
                   m != null
                       ? new MaterialReferenceDto(m.getId(), m.getName(), m.getQuantityType())
                       : null,
+                  null,
                   l != null ? new LocationReferenceDto(l.getId(), l.getName()) : null,
                   probe.getQuality(),
                   null,

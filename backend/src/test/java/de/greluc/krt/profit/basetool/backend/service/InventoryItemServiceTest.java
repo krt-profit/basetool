@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -41,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.*;
+import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
@@ -74,6 +76,7 @@ class InventoryItemServiceTest {
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private UserRepository userRepository;
   @Mock private MaterialRepository materialRepository;
+  @Mock private GameItemRepository gameItemRepository;
   @Mock private LocationRepository locationRepository;
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private MissionRepository missionRepository;
@@ -105,6 +108,7 @@ class InventoryItemServiceTest {
             inventoryItemRepository,
             userRepository,
             materialRepository,
+            gameItemRepository,
             jobOrderRepository,
             inventoryItemMapper,
             materialMapper,
@@ -191,7 +195,7 @@ class InventoryItemServiceTest {
   void getUserInventory_shouldReturnPage() {
     UUID userId = UUID.randomUUID();
     when(userRepository.findById(userId)).thenReturn(Optional.of(new User()));
-    when(inventoryItemRepository.findByUser(any(), any()))
+    when(inventoryItemRepository.findMaterialRowsByUser(any(), any()))
         .thenReturn(new PageImpl<>(List.of(new InventoryItem())));
     when(inventoryItemMapper.toDto(any())).thenReturn(null);
 
@@ -491,7 +495,19 @@ class InventoryItemServiceTest {
 
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
-            userId, materialId, locationId, 100, 10.0, false, null, null, null, null, null, null);
+            userId,
+            materialId,
+            null,
+            locationId,
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
 
     User user = new User();
     user.setId(userId);
@@ -512,6 +528,7 @@ class InventoryItemServiceTest {
     InventoryItemDto expectedDto =
         new InventoryItemDto(
             UUID.randomUUID(),
+            null,
             null,
             null,
             null,
@@ -549,6 +566,7 @@ class InventoryItemServiceTest {
         new InventoryItemCreateDto(
             userId,
             materialId,
+            null,
             locationId,
             100,
             10.0,
@@ -615,6 +633,7 @@ class InventoryItemServiceTest {
         new InventoryItemCreateDto(
             userId,
             materialId,
+            null,
             locationId,
             100,
             10.0,
@@ -664,6 +683,7 @@ class InventoryItemServiceTest {
         new InventoryItemCreateDto(
             userId,
             materialId,
+            null,
             locationId,
             100,
             10.0,
@@ -709,6 +729,7 @@ class InventoryItemServiceTest {
         new InventoryItemCreateDto(
             userId,
             materialId,
+            null,
             locationId,
             100,
             10.0,
@@ -751,6 +772,7 @@ class InventoryItemServiceTest {
         new InventoryItemCreateDto(
             userId,
             materialId,
+            null,
             locationId,
             100,
             10.0,
@@ -796,6 +818,7 @@ class InventoryItemServiceTest {
         new InventoryItemCreateDto(
             userId,
             materialId,
+            null,
             locationId,
             100,
             10.0,
@@ -847,6 +870,7 @@ class InventoryItemServiceTest {
         new InventoryItemCreateDto(
             userId,
             materialId,
+            null,
             locationId,
             100,
             inputAmount,
@@ -892,6 +916,7 @@ class InventoryItemServiceTest {
         new InventoryItemCreateDto(
             targetUserId,
             UUID.randomUUID(),
+            null,
             UUID.randomUUID(),
             100,
             10.0,
@@ -906,6 +931,431 @@ class InventoryItemServiceTest {
     assertThrows(
         AccessDeniedException.class,
         () -> inventoryItemService.createInventoryItem(dto, currentUserId, false));
+  }
+
+  // --- game-item stock rows (V220, REQ-INV-029/031) --------------------------
+
+  /**
+   * Builds a game-item create payload for the fixed owner/location pair with the given job-order /
+   * mission references (quality {@code null}, amount 5.0, non-personal — the well-formed item
+   * shape).
+   *
+   * @param userId the target owner
+   * @param gameItemId the game-item reference
+   * @param locationId the storage location
+   * @param missionId the legacy single mission reference, or {@code null}
+   * @param jobOrderAllocations the job-order split list, or {@code null}
+   * @param missionAllocations the mission split list, or {@code null}
+   * @return the assembled payload
+   */
+  private static InventoryItemCreateDto itemCreateDto(
+      UUID userId,
+      UUID gameItemId,
+      UUID locationId,
+      UUID missionId,
+      List<InventoryAllocationInput> jobOrderAllocations,
+      List<InventoryAllocationInput> missionAllocations) {
+    return new InventoryItemCreateDto(
+        userId,
+        null,
+        gameItemId,
+        locationId,
+        null,
+        5.0,
+        false,
+        missionId,
+        null,
+        null,
+        null,
+        jobOrderAllocations,
+        missionAllocations);
+  }
+
+  /**
+   * Stubs the owner / game-item / location resolution for an item-row create and returns the
+   * resolved {@link GameItem}.
+   *
+   * @param userId the target owner id
+   * @param gameItemId the game-item id
+   * @param locationId the location id
+   * @return the stubbed game item
+   */
+  private GameItem stubItemCreateResolution(UUID userId, UUID gameItemId, UUID locationId) {
+    User user = new User();
+    user.setId(userId);
+    GameItem gameItem = new GameItem();
+    gameItem.setId(gameItemId);
+    gameItem.setName("Quantum Drive");
+    Location location = new Location();
+    location.setId(locationId);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(gameItemRepository.findById(gameItemId)).thenReturn(Optional.of(gameItem));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+    return gameItem;
+  }
+
+  // covers REQ-INV-029 (item create resolves the gameItem and stamps it, material stays null)
+  @Test
+  void createInventoryItem_gameItemRow_resolvesGameItemAndLeavesMaterialNull() {
+    // Given a gameItem-only payload
+    UUID userId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemCreateDto dto = itemCreateDto(userId, gameItemId, locationId, null, null, null);
+    GameItem gameItem = stubItemCreateResolution(userId, gameItemId, locationId);
+    when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
+    when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
+
+    // When
+    inventoryItemService.createInventoryItem(dto, userId, false);
+
+    // Then — the saved row is a catalog-consistent item row: gameItem set, material and quality
+    // null (the XOR the DB CHECK chk_inventory_item_catalog_xor enforces), whole-unit amount.
+    org.mockito.ArgumentCaptor<InventoryItem> captor =
+        org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository).save(captor.capture());
+    assertSame(gameItem, captor.getValue().getGameItem());
+    assertNull(captor.getValue().getMaterial());
+    assertNull(captor.getValue().getQuality());
+    assertEquals(5.0, captor.getValue().getAmount());
+    verify(materialRepository, never()).findById(any());
+  }
+
+  // covers REQ-INV-029 (unknown gameItem id -> 404)
+  @Test
+  void createInventoryItem_unknownGameItem_throwsNotFound() {
+    // Given a payload naming a game item that does not exist
+    UUID userId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        itemCreateDto(userId, gameItemId, UUID.randomUUID(), null, null, null);
+    User user = new User();
+    user.setId(userId);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(gameItemRepository.findById(gameItemId)).thenReturn(Optional.empty());
+
+    // When / Then
+    assertThrows(
+        NotFoundException.class,
+        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  // covers REQ-INV-031 (service belt: item rows carry no mission dimension — single missionId)
+  @Test
+  void createInventoryItem_gameItemWithMissionId_throwsBadRequest() {
+    // Given a game-item payload carrying the legacy single mission reference (as a crafted payload
+    // that bypassed the DTO's @AssertTrue guard would)
+    UUID userId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        itemCreateDto(userId, gameItemId, locationId, UUID.randomUUID(), null, null);
+    stubItemCreateResolution(userId, gameItemId, locationId);
+
+    // When / Then
+    assertThrows(
+        BadRequestException.class,
+        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  // covers REQ-INV-031 (service belt: item rows carry no mission dimension — split list)
+  @Test
+  void createInventoryItem_gameItemWithMissionAllocations_throwsBadRequest() {
+    // Given a game-item payload with a Variante-C mission split
+    UUID userId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        itemCreateDto(
+            userId,
+            gameItemId,
+            locationId,
+            null,
+            null,
+            java.util.List.of(new InventoryAllocationInput(UUID.randomUUID(), 2.0)));
+    stubItemCreateResolution(userId, gameItemId, locationId);
+
+    // When / Then
+    assertThrows(
+        BadRequestException.class,
+        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  // covers REQ-INV-031 (check-in slice loop gates item rows on the order's requested game items)
+  @Test
+  void createInventoryItem_gameItemSlice_orderNotRequestingItem_throwsBadRequest() {
+    // Given an ITEM order that requests a DIFFERENT game item than the one being booked in
+    UUID userId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        itemCreateDto(
+            userId,
+            gameItemId,
+            locationId,
+            null,
+            java.util.List.of(new InventoryAllocationInput(jobOrderId, 2.0)),
+            null);
+    stubItemCreateResolution(userId, gameItemId, locationId);
+    JobOrder jobOrder = new JobOrder();
+    jobOrder.setId(jobOrderId);
+    when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(jobOrder));
+    when(jobOrderItemService.requiredGameItemIds(jobOrder)).thenReturn(Set.of(UUID.randomUUID()));
+
+    // When / Then
+    assertThrows(
+        BadRequestException.class,
+        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  // covers REQ-INV-031 (a MATERIAL order requests no game items -> item earmark rejected)
+  @Test
+  void createInventoryItem_gameItemSlice_materialOrder_throwsBadRequest() {
+    // Given a MATERIAL order: requiredGameItemIds is the empty set by contract, so no item stock
+    // may ever be earmarked to it
+    UUID userId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        itemCreateDto(
+            userId,
+            gameItemId,
+            locationId,
+            null,
+            java.util.List.of(new InventoryAllocationInput(jobOrderId, 2.0)),
+            null);
+    stubItemCreateResolution(userId, gameItemId, locationId);
+    JobOrder materialOrder = new JobOrder();
+    materialOrder.setId(jobOrderId);
+    when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(materialOrder));
+    when(jobOrderItemService.requiredGameItemIds(materialOrder)).thenReturn(Set.of());
+
+    // When / Then
+    assertThrows(
+        BadRequestException.class,
+        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  // covers REQ-INV-031 (qualifying ITEM order -> slice written through the gameItem gate)
+  @Test
+  void createInventoryItem_gameItemSlice_qualifyingItemOrder_writesSlice() {
+    // Given an ITEM order that requests exactly the booked game item
+    UUID userId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        itemCreateDto(
+            userId,
+            gameItemId,
+            locationId,
+            null,
+            java.util.List.of(new InventoryAllocationInput(jobOrderId, 2.0)),
+            null);
+    stubItemCreateResolution(userId, gameItemId, locationId);
+    JobOrder itemOrder = new JobOrder();
+    itemOrder.setId(jobOrderId);
+    when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(itemOrder));
+    when(jobOrderItemService.requiredGameItemIds(itemOrder)).thenReturn(Set.of(gameItemId));
+    when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
+    when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
+
+    // When
+    inventoryItemService.createInventoryItem(dto, userId, false);
+
+    // Then — the slice is written via the gameItem gate; the material gate is never consulted
+    // (an item row has no material to check).
+    org.mockito.ArgumentCaptor<InventoryItem> captor =
+        org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository).save(captor.capture());
+    assertSame(itemOrder, captor.getValue().getJobOrderAllocations().get(0).getJobOrder());
+    assertEquals(2.0, captor.getValue().getJobOrderAllocations().get(0).getAmount());
+    verify(jobOrderItemService, never()).requiredMaterialIds(any(JobOrder.class));
+  }
+
+  // covers REQ-INV-029 (item allocation slices are whole units)
+  @Test
+  void createInventoryItem_gameItemFractionalSliceAmount_throwsBadRequest() {
+    // Given an item payload whose job-order slice is fractional
+    UUID userId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        itemCreateDto(
+            userId,
+            gameItemId,
+            locationId,
+            null,
+            java.util.List.of(new InventoryAllocationInput(UUID.randomUUID(), 2.5)),
+            null);
+    stubItemCreateResolution(userId, gameItemId, locationId);
+
+    // When / Then — the whole-unit rule fires before the order lookup, mirroring PIECE materials
+    assertThrows(
+        BadRequestException.class,
+        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  // --- service-level catalog belts behind the DTO guards (V220, REQ-INV-029) --
+
+  // covers REQ-INV-029 (service belt: both catalog references -> 400, not an opaque V220 CHECK 500)
+  @Test
+  void createInventoryItem_bothCatalogReferences_throwsBadRequest() {
+    // Given a crafted payload carrying BOTH materialId and gameItemId (as a client that bypassed
+    // the DTO's @AssertTrue XOR guard would send); entity resolution runs BEFORE the belts, so
+    // every referenced id must resolve
+    UUID userId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            materialId,
+            gameItemId,
+            locationId,
+            100,
+            5.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+
+    User user = new User();
+    user.setId(userId);
+    Material material = new Material();
+    material.setId(materialId);
+    GameItem gameItem = new GameItem();
+    gameItem.setId(gameItemId);
+    Location location = new Location();
+    location.setId(locationId);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(gameItemRepository.findById(gameItemId)).thenReturn(Optional.of(gameItem));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+
+    // When / Then
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    assertEquals("Exactly one of materialId and gameItemId must be set", ex.getMessage());
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  // covers REQ-INV-029 (service belt: neither catalog reference -> 400)
+  @Test
+  void createInventoryItem_neitherCatalogReference_throwsBadRequest() {
+    // Given a crafted payload carrying neither materialId nor gameItemId — only the user and the
+    // location resolve (the null catalog ids skip both catalog lookups)
+    UUID userId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId, null, null, locationId, null, 5.0, false, null, null, null, null, null, null);
+
+    User user = new User();
+    user.setId(userId);
+    Location location = new Location();
+    location.setId(locationId);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+
+    // When / Then — neither catalog repository is consulted, the belt 400s
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    assertEquals("Exactly one of materialId and gameItemId must be set", ex.getMessage());
+    verify(materialRepository, never()).findById(any());
+    verify(gameItemRepository, never()).findById(any());
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  // covers REQ-INV-029 (service belt: a material row must carry a quality)
+  @Test
+  void createInventoryItem_materialWithoutQuality_throwsBadRequest() {
+    // Given a material payload whose quality is missing (the V220 quality-by-kind CHECK shape)
+    UUID userId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            materialId,
+            null,
+            locationId,
+            null,
+            5.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+
+    User user = new User();
+    user.setId(userId);
+    Material material = new Material();
+    material.setId(materialId);
+    Location location = new Location();
+    location.setId(locationId);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+
+    // When / Then
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    assertEquals("Material stock requires a quality", ex.getMessage());
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  // covers REQ-INV-029 (service belt: a game-item row carries no quality)
+  @Test
+  void createInventoryItem_gameItemWithQuality_throwsBadRequest() {
+    // Given a game-item payload that illegally carries a quality
+    UUID userId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            null,
+            gameItemId,
+            locationId,
+            100,
+            5.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+    stubItemCreateResolution(userId, gameItemId, locationId);
+
+    // When / Then
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () -> inventoryItemService.createInventoryItem(dto, userId, false));
+    assertEquals("Game-item stock carries no quality", ex.getMessage());
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
   @Test
@@ -1371,8 +1821,8 @@ class InventoryItemServiceTest {
   private static de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto
       minimalInventoryDto(UUID id) {
     return new de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto(
-        id, null, null, null, null, null, null, List.of(), 0.0, List.of(), 0.0, null, null, 1L,
-        null);
+        id, null, null, null, null, null, null, null, List.of(), 0.0, List.of(), 0.0, null, null,
+        1L, null);
   }
 
   /**
@@ -1541,6 +1991,7 @@ class InventoryItemServiceTest {
         new InventoryItemCreateDto(
             userId,
             UUID.randomUUID(),
+            null,
             UUID.randomUUID(),
             100,
             10.0,
@@ -1584,6 +2035,7 @@ class InventoryItemServiceTest {
         new InventoryItemCreateDto(
             userId,
             UUID.randomUUID(),
+            null,
             UUID.randomUUID(),
             100,
             10.0,
@@ -1623,6 +2075,7 @@ class InventoryItemServiceTest {
         new InventoryItemCreateDto(
             userId,
             materialId,
+            null,
             locationId,
             100,
             10.0,
