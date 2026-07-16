@@ -701,6 +701,9 @@ function toggleBookOutTypeFields() {
 // ===================== Umbuchen (rebooking) modal — REQ-INV-007 =====================
 // The item the open Umbuchen modal targets, plus an in-flight guard mirroring the book-out one.
 let umbuchenItemId = null;
+// #1328: the row's current owning org-unit id, used to preset both Umbuchen org-unit pickers so a
+// submit that does not touch the picker keeps the stock in its current unit (null = ownerless row).
+let umbuchenCurrentOwningOrgUnitId = null;
 let umbuchenInFlight = false;
 
 function updateUmbuchenAmountFromTarget() {
@@ -731,8 +734,10 @@ function updateUmbuchenTargetFromAmount() {
 
 /**
  * LOCATION-mode picker: re-populate the target-OrgUnit picker when the destination user changes
- * (the relocated book-out transfer picker). Hidden when the destination user has ≤1 membership —
- * the backend then stamps the single membership (or the home Staffel) automatically.
+ * (the relocated book-out transfer picker). Offers the destination user's direct memberships across
+ * all four org-unit kinds (Staffel + SK + Bereich + OL), preset to the row's current owning org unit
+ * (or the target's primary unit otherwise). Shown whenever the destination user has at least one
+ * membership; hidden only for a membershipless target (the moved row is then ownerless).
  */
 function refreshUmbuchenTransferOrgUnitPicker() {
     const wrapper = document.getElementById('umbuchenTargetOwningOrgUnitWrapper');
@@ -740,13 +745,15 @@ function refreshUmbuchenTransferOrgUnitPicker() {
     const userSelect = document.getElementById('umbuchenTargetUserId');
     if (!wrapper || !select || !userSelect) return;
     const targetUserId = userSelect.value;
-    while (select.options.length > 1) select.remove(1);
-    select.value = '';
+    select.innerHTML = '';
     if (!targetUserId) {
         wrapper.style.display = 'none';
         return;
     }
-    fetch('/api/v1/users/' + encodeURIComponent(targetUserId) + '/memberships', {
+    // #1328: ?allKinds=true surfaces the target user's Bereich/OL memberships too (not just
+    // Staffel/SK — the endpoint default), mirroring the bank counterparty picker (REQ-BANK-044).
+    // The backend resolver already accepts a Bereich/OL owner.
+    fetch('/api/v1/users/' + encodeURIComponent(targetUserId) + '/memberships?allKinds=true', {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
     })
@@ -754,7 +761,12 @@ function refreshUmbuchenTransferOrgUnitPicker() {
             return r.ok ? r.json() : [];
         })
         .then(function (memberships) {
-            if (!Array.isArray(memberships) || memberships.length <= 1) {
+            // #1328: always show the picker when the target has at least one membership and preset
+            // it to the row's current owning org unit (or the target's primary when that unit is not
+            // one of the target's memberships — e.g. a cross-user transfer), so submitting without
+            // changing it keeps the stock in its current unit. Hidden only for a membershipless
+            // target: the row is then ownerless and there is nothing to pick.
+            if (!Array.isArray(memberships) || memberships.length < 1) {
                 wrapper.style.display = 'none';
                 return;
             }
@@ -764,6 +776,14 @@ function refreshUmbuchenTransferOrgUnitPicker() {
                 o.textContent = opt.orgUnitName;
                 select.appendChild(o);
             });
+            if (
+                umbuchenCurrentOwningOrgUnitId &&
+                memberships.some(function (m) {
+                    return m.orgUnitId === umbuchenCurrentOwningOrgUnitId;
+                })
+            ) {
+                select.value = umbuchenCurrentOwningOrgUnitId;
+            }
             wrapper.style.display = 'block';
         })
         .catch(function () {
@@ -772,10 +792,10 @@ function refreshUmbuchenTransferOrgUnitPicker() {
 }
 
 /**
- * PERSONAL de-personalize picker: populate the org-unit picker with the row owner's memberships.
- * Shown only when the owner has ≥2 memberships — a real choice exists and the backend would
- * otherwise reject a null pick with 400; with ≤1 membership it stays hidden and the backend
- * auto-stamps the single membership (or leaves the row ownerless for a membershipless user).
+ * PERSONAL de-personalize picker: populate the org-unit picker with the row owner's memberships
+ * across all four org-unit kinds (Staffel + SK + Bereich + OL), preset to the row's current owning
+ * org unit (or the owner's primary unit when the row has none). Shown whenever the owner has at
+ * least one membership; hidden only for a membershipless owner (the shared row is then ownerless).
  */
 function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
     const wrapper = document.getElementById('umbuchenPersonalOrgUnitWrapper');
@@ -784,7 +804,10 @@ function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
     select.innerHTML = '';
     wrapper.style.display = 'none';
     if (!ownerId) return;
-    fetch('/api/v1/users/' + encodeURIComponent(ownerId) + '/memberships', {
+    // #1328: ?allKinds=true so a Bereich/OL-member owner can de-personalize into their Bereich/OL
+    // pool, not only Staffel/SK (the endpoint default). Mirrors the bank counterparty picker
+    // (REQ-BANK-044).
+    fetch('/api/v1/users/' + encodeURIComponent(ownerId) + '/memberships?allKinds=true', {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
     })
@@ -792,13 +815,24 @@ function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
             return r.ok ? r.json() : [];
         })
         .then(function (memberships) {
-            if (!Array.isArray(memberships) || memberships.length <= 1) return;
+            // #1328: show whenever the owner has ≥1 membership and preset the row's current owning
+            // org unit (else the owner's primary), so de-personalizing keeps the current unit unless
+            // the owner changes it. Hidden only for a membershipless owner (ownerless shared row).
+            if (!Array.isArray(memberships) || memberships.length < 1) return;
             memberships.forEach(function (opt) {
                 const o = document.createElement('option');
                 o.value = opt.orgUnitId;
                 o.textContent = opt.orgUnitName;
                 select.appendChild(o);
             });
+            if (
+                umbuchenCurrentOwningOrgUnitId &&
+                memberships.some(function (m) {
+                    return m.orgUnitId === umbuchenCurrentOwningOrgUnitId;
+                })
+            ) {
+                select.value = umbuchenCurrentOwningOrgUnitId;
+            }
             wrapper.style.display = 'block';
         })
         .catch(function () {
@@ -841,8 +875,10 @@ function openUmbuchenModal(
     quantityType,
     personal,
     hasAssoc,
+    owningOrgUnitId,
 ) {
     umbuchenItemId = id;
+    umbuchenCurrentOwningOrgUnitId = owningOrgUnitId || null;
     const isScu = quantityType !== 'PIECE';
     const amountEl = document.getElementById('umbuchenAmount');
     const targetEl = document.getElementById('umbuchenTargetAmount');
@@ -904,7 +940,10 @@ function openUmbuchenModal(
 
     document.querySelector('input[name="umbuchenMode"][value="LOCATION"]').checked = true;
     toggleUmbuchenMode();
-    document.getElementById('umbuchenModal').style.display = 'block';
+    // `.modal` centres its content via `display:flex`; opening with inline `flex` (not `block`)
+    // preserves that centring — inline `block` would override the stylesheet flex and pin the
+    // dialog to the top of the viewport (matches the canonical .krtm-modal-open = flex, #1328).
+    document.getElementById('umbuchenModal').style.display = 'flex';
     // Variante C (REQ-INV-027): build the transfer "Herkunft" picker (the moved row inherits the
     // reduced tags). It lives inside the LOCATION-only transfer fields, so it self-hides in PERSONAL
     // mode; populate after the modal is shown so its initial validity gates the submit button.
@@ -1189,7 +1228,8 @@ function openBookOutModal(id, amount, version, materialId, userId, locationId, q
         if (sellNotPossibleReason) sellNotPossibleReason.style.display = 'inline';
     }
 
-    document.getElementById('bookOutModal').style.display = 'block';
+    // Inline `flex` (not `block`) so `.modal`'s flex centring is preserved (see openUmbuchenModal).
+    document.getElementById('bookOutModal').style.display = 'flex';
     // Variante C (REQ-INV-027): build the "Herkunft" (deduct-from) picker from this entry's chips
     // now that the modal is shown, so its initial validity gates the submit button.
     if (window.krtHerkunft) {
@@ -1602,6 +1642,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             el.getAttribute('data-quantity-type'),
             el.getAttribute('data-personal') === 'true',
             el.getAttribute('data-has-assoc') === 'true',
+            el.getAttribute('data-owning-org-unit-id'),
         );
     });
     window.krtEvents.on('click', 'inv-my-open-note', function (el) {

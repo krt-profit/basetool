@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -514,6 +515,56 @@ class OrgUnitMembershipQueryServiceTest {
     assertEquals(OrgUnitKind.BEREICH, options.get(0).kind(), "Bereich sorts before Staffel");
     assertEquals(bereichId, options.get(0).orgUnitId());
     assertEquals(OrgUnitKind.SQUADRON, options.get(1).kind());
+  }
+
+  @Test
+  void listDirectMembershipOptions_surfacesAllFourKindsIncludingOl() {
+    // #1328 (mirrors REQ-BANK-044): the inventory Umbuchen owning-org-unit picker requests
+    // ?allKinds=true, which routes here. Assert the option/wire path surfaces a direct
+    // Organisationsleitung (OL) membership — not just Bereich — and that all four kinds sort
+    // top-down (OL -> Bereich -> Staffel -> SK), so the first option is the owner's primary unit.
+    UUID olId = UUID.randomUUID();
+    UUID bereichId = UUID.randomUUID();
+    UUID squadronId = UUID.randomUUID();
+    UUID skId = UUID.randomUUID();
+    OrgUnitMembership olRow = new OrgUnitMembership();
+    olRow.setId(new OrgUnitMembershipId(userId, olId));
+    OrgUnitMembership bereichRow = new OrgUnitMembership();
+    bereichRow.setId(new OrgUnitMembershipId(userId, bereichId));
+    OrgUnitMembership squadronRow = new OrgUnitMembership();
+    squadronRow.setId(new OrgUnitMembershipId(userId, squadronId));
+    OrgUnitMembership skRow = new OrgUnitMembership();
+    skRow.setId(new OrgUnitMembershipId(userId, skId));
+    when(membershipRepository.findAllByIdUserId(userId))
+        .thenReturn(List.of(olRow, bereichRow, squadronRow, skRow));
+    Organisationsleitung ol = new Organisationsleitung();
+    ol.setId(olId);
+    ol.setName("Organisationsleitung");
+    ol.setShorthand("OL");
+    Bereich bereich = new Bereich();
+    bereich.setId(bereichId);
+    bereich.setName("Bereich Logistik");
+    bereich.setShorthand("LOG");
+    Squadron squadron = new Squadron();
+    squadron.setId(squadronId);
+    squadron.setName("Staffel Rot");
+    squadron.setShorthand("ROT");
+    SpecialCommand sk = new SpecialCommand();
+    sk.setId(skId);
+    sk.setName("Spezialkommando Alpha");
+    sk.setShorthand("ALF");
+    // Return in an unsorted order to prove the service imposes the top-down kind order.
+    when(orgUnitRepository.findAllById(any())).thenReturn(List.of(squadron, sk, ol, bereich));
+
+    List<OrgUnitMembershipOptionDto> options = queryService.listDirectMembershipOptions(userId);
+
+    assertEquals(4, options.size());
+    assertEquals(
+        OrgUnitKind.ORGANISATIONSLEITUNG, options.get(0).kind(), "OL sorts first (top-down)");
+    assertEquals(olId, options.get(0).orgUnitId());
+    assertEquals(OrgUnitKind.BEREICH, options.get(1).kind());
+    assertEquals(OrgUnitKind.SQUADRON, options.get(2).kind());
+    assertEquals(OrgUnitKind.SPECIAL_COMMAND, options.get(3).kind());
   }
 
   @Test

@@ -206,6 +206,7 @@
                         th:data-location-id="${entry.location.id}"
                         th:data-personal="${entry.personal}"
                         th:data-has-assoc="${!#lists.isEmpty(entry.jobOrderAllocations) or !#lists.isEmpty(entry.missionAllocations)}"
+                        th:data-owning-org-unit-id="${entry.owningSquadron != null ? entry.owningSquadron.id : null}"
                         data-trigger="inv-my-umbuchen"
                         th:title="#{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>
@@ -438,6 +439,7 @@
                         th:data-quantity-type="${entry.material.quantityType}"
                         th:data-user-id="${entry.user.id}"
                         th:data-location-id="${entry.location.id}"
+                        th:data-owning-org-unit-id="${entry.owningSquadron != null ? entry.owningSquadron.id : null}"
                         data-trigger="inv-admin-umbuchen"
                         th:title="#{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>

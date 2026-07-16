@@ -240,7 +240,11 @@ the source row's current flag, never from the client:
   `OwnerScopeService.resolveOrgUnitForPickerOutputNullable` — the same create-time stamping matrix as
   [`org-unit-tenancy.md`](org-unit-tenancy.md) REQ-ORG-004 (the owner picks the pool when they belong
   to more than one org unit; a sole membership auto-stamps; a membershipless owner yields an
-  ownerless shared row the reconciler promotes later, REQ-INV-004).
+  ownerless shared row the reconciler promotes later, REQ-INV-004). The owner's picker lists their
+  direct memberships across **all four org-unit kinds** (Staffel + SK + Bereich + OL) via
+  `GET /api/v1/users/{id}/memberships?allKinds=true`, mirroring the bank counterparty picker
+  (REQ-BANK-044); the resolver already accepts a Bereich/OL pool (REQ-ORG-016), so a Bereich/OL-member
+  owner can book into their Bereich/OL pool, not only their Staffel/SK.
 - **shared → personal** (personalisieren): the moved quantity becomes the owner's private stock
   (`personal = true`), carrying the source row's existing `owningOrgUnit` over. A source row bound to
   a job order or mission is **refused** (HTTP 400) — a personal row may never carry either
@@ -258,7 +262,16 @@ In the UI the action is the per-entry **Umbuchen** row action (`krt-icon-rebook`
 its modal also hosts the relocated location/user transfer (the former book-out `TRANSFER` mode), so
 **Ausbuchen** is now consume/sell only and **Umbuchen** owns every rebooking. The squadron-wide
 `/inventory/all` view exposes the Umbuchen action for the location/user transfer only (the
-personal↔shared toggle is owner-scoped and lives on `/my`).
+personal↔shared toggle is owner-scoped and lives on `/my`). Both owning-org-unit pickers — the
+de-personalize picker (keyed on the row owner) and the location/user transfer picker (keyed on the
+destination user) — offer the selected owner's direct memberships across all four org-unit kinds
+(Staffel + SK + Bereich + OL). Each picker is **shown whenever that owner has at least one
+membership** and is **preset to the row's current owning org unit** (or the owner's primary unit
+when the current unit is not one of the owner's memberships, e.g. a cross-user transfer), so a submit
+that does not touch the picker keeps the stock in its current unit rather than silently reassigning
+it. A picker is hidden only for a membershipless owner — the moved/shared row is then ownerless.
+There is no "keep home unit" placeholder: the picker always carries a concrete preselected unit
+(#1328).
 
 **Acceptance**
 
@@ -267,6 +280,12 @@ personal↔shared toggle is owner-scoped and lives on `/my`).
 - [ ] Rebooking the whole row deletes the depleted source and leaves exactly the new row.
 - [ ] A de-personalize stamps the new shared row on the picked org-unit pool (or the owner's sole
   membership, or `null` when membershipless), consistent with REQ-ORG-004.
+- [ ] The owning-org-unit picker (de-personalize and location/user transfer) lists the selected
+  owner's direct memberships across all four kinds (Staffel + SK + Bereich + OL, via
+  `?allKinds=true`); a Bereich/OL-member owner can book into their Bereich/OL pool.
+- [ ] The picker is visible whenever the owner has ≥1 membership (not only ≥2) and is preset to the
+  row's current owning org unit, so submitting without changing it keeps the current unit; it is
+  hidden only for a membershipless owner.
 - [ ] A personalize carries the source row's `owningOrgUnit` over and refuses a source bound to a
   job order or mission with HTTP 400.
 - [ ] A stale `version` yields HTTP 409; a non-owner without an admin/logistician grant yields 403.
@@ -275,7 +294,7 @@ personal↔shared toggle is owner-scoped and lives on `/my`).
 **Enforced by:** `InventoryItemServicePersonalRebookTest`, `InventoryItemControllerTest` ·
 **Code:** `InventoryItemService#rebookPersonal`, `InventoryItemController#rebookPersonal`,
 `InventoryItemPersonalRebookDto`, `inventory-my.html`, `inventory-admin.html`,
-`fragments/inventory-stack-entries.html` · **Issues:** —
+`fragments/inventory-stack-entries.html` · **Issues:** #1328
 
 ### REQ-INV-025 — Book-out validates the CheckoutType; a target-less TRANSFER is rejected
 
