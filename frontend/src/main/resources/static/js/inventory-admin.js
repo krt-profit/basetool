@@ -667,7 +667,14 @@ function refreshUmbuchenTransferOrgUnitPicker() {
         wrapper.style.display = 'none';
         return;
     }
-    fetch('/api/v1/users/' + encodeURIComponent(targetUserId) + '/memberships', {
+    // #1328: offer the selected owner's (target user's) direct memberships across ALL FOUR
+    // org-unit kinds — Staffel + SK + Bereich + OL — via ?allKinds=true (mirrors the bank
+    // counterparty picker, REQ-BANK-044). The default (allKinds=false) returns only Staffel/SK, so
+    // a Bereich/OL-member target could not be booked into their Bereich/OL pool even though the
+    // backend resolver (resolveOrgUnitForPickerOutputNullable) accepts it. It also aligns the
+    // membership count with the backend's all-kinds count, so the <=1 hide-gate below no longer
+    // under-counts a Bereich/OL member and silently submits a null the resolver would reject (400).
+    fetch('/api/v1/users/' + encodeURIComponent(targetUserId) + '/memberships?allKinds=true', {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
     })

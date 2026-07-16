@@ -731,8 +731,9 @@ function updateUmbuchenTargetFromAmount() {
 
 /**
  * LOCATION-mode picker: re-populate the target-OrgUnit picker when the destination user changes
- * (the relocated book-out transfer picker). Hidden when the destination user has ≤1 membership —
- * the backend then stamps the single membership (or the home Staffel) automatically.
+ * (the relocated book-out transfer picker). Offers the destination user's direct memberships across
+ * all four org-unit kinds (Staffel + SK + Bereich + OL). Hidden when the destination user has ≤1
+ * membership — the backend then stamps the single membership (or the home org unit) automatically.
  */
 function refreshUmbuchenTransferOrgUnitPicker() {
     const wrapper = document.getElementById('umbuchenTargetOwningOrgUnitWrapper');
@@ -746,7 +747,12 @@ function refreshUmbuchenTransferOrgUnitPicker() {
         wrapper.style.display = 'none';
         return;
     }
-    fetch('/api/v1/users/' + encodeURIComponent(targetUserId) + '/memberships', {
+    // #1328: ?allKinds=true surfaces the target user's Bereich/OL memberships too (not just
+    // Staffel/SK — the endpoint default), mirroring the bank counterparty picker (REQ-BANK-044).
+    // The backend resolver already accepts a Bereich/OL owner; this also makes the <=1 hide-gate
+    // count all kinds, matching the backend so a Bereich/OL member no longer slips through hidden
+    // and submits a null the resolver would reject (400).
+    fetch('/api/v1/users/' + encodeURIComponent(targetUserId) + '/memberships?allKinds=true', {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
     })
@@ -772,10 +778,11 @@ function refreshUmbuchenTransferOrgUnitPicker() {
 }
 
 /**
- * PERSONAL de-personalize picker: populate the org-unit picker with the row owner's memberships.
- * Shown only when the owner has ≥2 memberships — a real choice exists and the backend would
- * otherwise reject a null pick with 400; with ≤1 membership it stays hidden and the backend
- * auto-stamps the single membership (or leaves the row ownerless for a membershipless user).
+ * PERSONAL de-personalize picker: populate the org-unit picker with the row owner's memberships
+ * across all four org-unit kinds (Staffel + SK + Bereich + OL). Shown only when the owner has ≥2
+ * memberships — a real choice exists and the backend would otherwise reject a null pick with 400;
+ * with ≤1 membership it stays hidden and the backend auto-stamps the single membership (or leaves
+ * the row ownerless for a membershipless user).
  */
 function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
     const wrapper = document.getElementById('umbuchenPersonalOrgUnitWrapper');
@@ -784,7 +791,10 @@ function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
     select.innerHTML = '';
     wrapper.style.display = 'none';
     if (!ownerId) return;
-    fetch('/api/v1/users/' + encodeURIComponent(ownerId) + '/memberships', {
+    // #1328: ?allKinds=true so a Bereich/OL-member owner can de-personalize into their Bereich/OL
+    // pool, not only Staffel/SK (the endpoint default). Aligns the ≥2 gate with the backend's
+    // all-kinds membership count (mirrors the bank counterparty picker, REQ-BANK-044).
+    fetch('/api/v1/users/' + encodeURIComponent(ownerId) + '/memberships?allKinds=true', {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
     })
