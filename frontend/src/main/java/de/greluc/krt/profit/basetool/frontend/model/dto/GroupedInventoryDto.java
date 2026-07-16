@@ -34,4 +34,21 @@ public record GroupedInventoryDto(
     Double totalAmount,
     Double averageQuality,
     Integer maxQuality,
-    List<InventoryStackDto> stacks) {}
+    List<InventoryStackDto> stacks) {
+
+  /**
+   * Counts the distinct owning users across this group's stacks, for the grouped Lager row's
+   * context line ("{n} Nutzer / {m} Stacks") on the squadron-wide {@code /inventory/all} view.
+   *
+   * @return the number of distinct users owning at least one stack of this catalog entry
+   */
+  public int userCount() {
+    return (int)
+        stacks.stream()
+            .map(InventoryStackDto::user)
+            .filter(java.util.Objects::nonNull)
+            .map(UserReferenceDto::id)
+            .distinct()
+            .count();
+  }
+}

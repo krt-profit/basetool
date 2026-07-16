@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import de.greluc.krt.profit.basetool.frontend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryStackDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
@@ -52,11 +51,13 @@ import org.springframework.web.bind.annotation.RequestParam;
  * Spring MVC controller for the inventory read pages ({@code /inventory}, {@code /inventory/my},
  * {@code /inventory/all}, and the {@code /inventory/input} create form).
  *
- * <p>Four read views: aggregated (sum per material across the squadron), per-material drilldown,
- * personal ({@code /my}), and admin-all ({@code /all}). All four list endpoints accept the same
- * filter dimensions (material ids, min quality, job order, mission) and support a {@code
- * fragment=true} flag that returns just the table fragment so AJAX filter changes do not reload the
- * page.
+ * <p>Read views: aggregated (sum per catalog entry across the squadron), per-material and
+ * per-game-item drilldowns, personal ({@code /my}), and admin-all ({@code /all}). The aggregated,
+ * personal and admin views carry a Material ↔ Items switch (REQ-INV-030, {@code view=items}): the
+ * material variant filters by material ids, min quality, job order and mission, the item variant by
+ * gameItem ids and job order (item rows have no quality or mission dimension). All list endpoints
+ * support a {@code fragment=true} flag that returns just the table fragment so AJAX filter changes
+ * do not reload the page.
  *
  * <p>Since the #924 read/write controller split (L5) this class owns only the read (GET) half of
  * the area; every mutating {@code /inventory} endpoint (create, book-out consume/transfer/sell,
@@ -89,6 +90,19 @@ public class InventoryPageController {
   /** Response type for the Materialbörse released-item-ids lookup (the "Auf Börse" flags). */
   private static final ParameterizedTypeReference<List<UUID>> UUID_LIST =
       new ParameterizedTypeReference<List<UUID>>() {};
+
+  /**
+   * Response type for the bookable-item catalog search ({@code GET /api/v1/inventory/item-catalog})
+   * backing the {@code remote-game-items} combobox source's {@code /inventory/item-search} proxy.
+   */
+  private static final ParameterizedTypeReference<
+          PageResponse<
+              de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto>>
+      GAME_ITEM_REFERENCE_PAGE =
+          new ParameterizedTypeReference<
+              PageResponse<
+                  de.greluc.krt.profit.basetool.frontend.model.dto
+                      .InventoryGameItemReferenceDto>>() {};
 
   /**
    * Response type for the grouped {@code /my} and {@code /all} list views ({@code .../grouped}),
@@ -161,10 +175,13 @@ public class InventoryPageController {
   private final ParallelPageLoader parallelPageLoader;
 
   /**
-   * Renders the squadron-wide aggregated inventory view ({@code /inventory}). Sort is fixed to
-   * material name asc, quality desc, amount desc — operators look for the highest-quality stock
-   * first.
+   * Renders the squadron-wide aggregated inventory view ({@code /inventory}). The {@code view}
+   * query parameter picks the catalog (REQ-INV-030): the default Material view keeps its fixed sort
+   * — material name asc, quality desc, amount desc, the order operators actually want — while
+   * {@code view=items} relays {@code catalog=ITEM} to the backend (whose default sort is game-item
+   * name asc, amount desc; there are no quality columns to sort by).
    *
+   * @param view {@code "items"} for the game-item catalog, anything else (or absent) for material
    * @param page zero-based page index
    * @param size page size
    * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
@@ -175,10 +192,12 @@ public class InventoryPageController {
    */
   @GetMapping
   public String viewAggregatedInventory(
+      @RequestParam(required = false) String view,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String fragment,
       Model model) {
+    boolean itemsView = isItemsView(view);
     List<AggregatedInventoryDto> aggregated = new ArrayList<>();
     try {
       StringBuilder uri = new StringBuilder("/api/v1/inventory/aggregated?");
@@ -188,7 +207,13 @@ public class InventoryPageController {
       if (size != null) {
         uri.append("size=").append(size).append("&");
       }
-      uri.append("sort=material.name,asc;quality,desc;amount,desc");
+      if (itemsView) {
+        // catalog=ITEM has its own backend sort whitelist (gameItem.name / amount) and default;
+        // the material sort spec would be rejected there, so it is simply not sent.
+        uri.append("catalog=ITEM");
+      } else {
+        uri.append("sort=material.name,asc;quality,desc;amount,desc");
+      }
 
       PageResponse<AggregatedInventoryDto> p =
           backendApiClient.get(uri.toString(), AGGREGATED_INVENTORY_PAGE);
@@ -204,14 +229,28 @@ public class InventoryPageController {
     }
 
     List<de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto> materials =
-        fetchMaterials();
+        itemsView ? List.of() : fetchMaterials();
 
+    model.addAttribute("view", itemsView ? "items" : "material");
     model.addAttribute("aggregated", aggregated);
     model.addAttribute("materials", materials);
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
       return "inventory-index :: inventoryResults";
     }
     return "inventory-index";
+  }
+
+  /**
+   * Resolves the Lager view-switch query parameter (REQ-INV-030): {@code view=items} selects the
+   * game-item catalog, every other value — including absence — falls back to the material view, so
+   * existing bookmarks and the write controller's parameterless inline re-renders keep rendering
+   * the historical material tree.
+   *
+   * @param view the raw {@code view} query parameter, may be {@code null}
+   * @return {@code true} when the items view was requested
+   */
+  private static boolean isItemsView(String view) {
+    return "items".equalsIgnoreCase(view);
   }
 
   /**
@@ -254,53 +293,110 @@ public class InventoryPageController {
   }
 
   /**
-   * Per-material grouping wrapper for the {@code /my} and {@code /all} list views.
+   * Renders the per-game-item drilldown ({@code /inventory/game-item/{gameItemId}}, REQ-INV-030) —
+   * the item sibling of {@link #viewMaterialInventory}: every individual non-personal stock row of
+   * the given game item (up to 1000 in one page), with no quality column. Unlike the material page
+   * it deliberately loads no navigate catalog (the item catalog is thousands of entries; a preload
+   * is off the table and the remote search picker ships with the Einbuchen pass, design §6.6). The
+   * item's display name is taken from the first returned row's {@code gameItem} reference.
    *
-   * <p>The backend's {@code /grouped} endpoint returns this shape directly so the page renders an
-   * outer "material" row with summary stats (total amount, average + max quality) and an inner list
-   * of {@link InventoryStackDto} stacks, each of which expands to the individual append-only
-   * entries (Material → Stack → Entries).
-   *
-   * @param material the grouping material
-   * @param totalAmount sum across all stacks of this material
-   * @param averageQuality weighted average quality across all stacks
-   * @param maxQuality the highest quality value seen in the group
-   * @param stacks the per-stock-identity stacks this material breaks down into
+   * @param gameItemId game item to drill into
+   * @param fragment when {@code "results"}, only the results-table fragment is rendered for the
+   *     live-sync in-place swap (REQ-FE-015)
+   * @param model Thymeleaf model populated with the rows and the resolved item display name
+   * @return the {@code inventory-game-item} view name, or its {@code inventoryGameItemResults}
+   *     fragment selector
    */
-  public record GroupedInventoryDto(
-      de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto material,
-      Double totalAmount,
-      Double averageQuality,
-      Integer maxQuality,
-      List<InventoryStackDto> stacks) {
+  @GetMapping("/game-item/{gameItemId}")
+  public String viewGameItemInventory(
+      @PathVariable @NotNull UUID gameItemId,
+      @RequestParam(required = false) String fragment,
+      Model model) {
+    List<InventoryItemDto> items = new ArrayList<>();
+    try {
+      PageResponse<InventoryItemDto> p =
+          backendApiClient.get(
+              "/api/v1/inventory/game-item/" + gameItemId + "?size=1000", INVENTORY_ITEM_PAGE);
+      if (p != null && p.content() != null) {
+        items = new ArrayList<>(p.content());
+      }
+    } catch (Exception e) {
+      log.error("Failed to fetch game-item inventory", e);
+      model.addAttribute("error", "error.inventory.gameItem.load");
+    }
 
-    /**
-     * Counts the distinct owning users across this material's stacks, for the grouped Lager row's
-     * context line ("{n} Nutzer / {m} Stacks").
-     *
-     * @return the number of distinct users owning at least one stack of this material
-     */
-    public int userCount() {
-      return (int)
-          stacks.stream()
-              .map(InventoryStackDto::user)
-              .filter(java.util.Objects::nonNull)
-              .map(u -> u.id())
-              .distinct()
-              .count();
+    model.addAttribute("items", items);
+    model.addAttribute("selectedGameItemId", gameItemId);
+    model.addAttribute(
+        "gameItemName",
+        items.stream()
+            .map(InventoryItemDto::gameItem)
+            .filter(java.util.Objects::nonNull)
+            .map(
+                de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto
+                    ::name)
+            .findFirst()
+            .orElse(null));
+    if (fragment != null && "results".equalsIgnoreCase(fragment)) {
+      return "inventory-game-item :: inventoryGameItemResults";
+    }
+    return "inventory-game-item";
+  }
+
+  /**
+   * JSON proxy for the {@code remote-game-items} combobox source (design §6.6, REQ-FE-016): looks
+   * up bookable game items — the output of at least one active blueprint — by a free-text term and
+   * unwraps the backend page into a flat list. Relays with the <em>token-carrying</em> {@link
+   * BackendApiClient#get} (never {@code getPublic}): the backend {@code
+   * /api/v1/inventory/item-catalog} sits under the role-gated {@code /api/v1/inventory/**}
+   * umbrella, unlike the deliberately anonymous {@code /orders/item-search} sibling (design §5.3).
+   * The page size is capped at 50 — the combobox renders at most its {@code maxResults} default of
+   * 50 rows — sorted by {@code name} (the backend's sole whitelisted sort field). An empty list on
+   * backend failure keeps the picker on "no matches" instead of surfacing the error.
+   *
+   * @param q the case-insensitive item-name search term; {@code null}/blank matches all (the
+   *     combobox's browse-mode empty fetch)
+   * @return up to 50 matching bookable game-item references, never {@code null}
+   */
+  @GetMapping("/item-search")
+  @org.springframework.web.bind.annotation.ResponseBody
+  public List<de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto>
+      itemSearch(@RequestParam(required = false) String q) {
+    // Build the URI via UriComponentsBuilder so a crafted `&` in the term cannot inject extra
+    // query parameters — the same L-1 hardening as UserProxyController.forwardSearch.
+    String uri =
+        org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/inventory/item-catalog")
+            .queryParam("q", q == null ? "" : q)
+            .queryParam("size", 50)
+            .queryParam("sort", "name,asc")
+            .toUriString();
+    try {
+      PageResponse<de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto>
+          page = backendApiClient.get(uri, GAME_ITEM_REFERENCE_PAGE);
+      return page != null && page.content() != null ? page.content() : List.of();
+    } catch (Exception e) {
+      log.error("Failed to search bookable game items", e);
+      return List.of();
     }
   }
 
   /**
    * Renders the personal inventory list ({@code /inventory/my}). Filters are URL-driven so a user
    * can share a filtered link. {@code fragment=true} returns just the table fragment for AJAX
-   * filter changes. The Umbuchen modal's target-location picker searches locations server-side
-   * (remote-locations combobox), so no locations catalog is added to the model.
+   * filter changes. The {@code view} parameter switches between the Material tree (default) and the
+   * game-item tree (REQ-INV-030, {@code view=items}): the items view relays {@code catalog=ITEM}
+   * plus the {@code gameItemIds} / {@code jobOrderIds} / personal-flag filters (there is no quality
+   * or mission dimension on item rows) and populates its gameItem filter only from items that
+   * currently have stock in the caller's scope — never the full catalog. In both views the Umbuchen
+   * modal's target-location picker searches locations server-side (remote-locations combobox), so
+   * no locations catalog is added to the model.
    *
-   * @param materialIds optional material id filter (multi)
-   * @param minQuality optional minimum-quality filter
-   * @param jobOrderIds optional job-order id filter (multi)
-   * @param missionIds optional mission id filter (multi)
+   * @param view {@code "items"} for the game-item view, anything else (or absent) for material
+   * @param materialIds optional material id filter (multi; material view only)
+   * @param minQuality optional minimum-quality filter (material view only)
+   * @param jobOrderIds optional job-order id filter (multi; both views)
+   * @param missionIds optional mission id filter (multi; material view only)
+   * @param gameItemIds optional game-item id filter (multi; items view only)
    * @param personalOnly when true, show only the caller's personal entries ({@code personal =
    *     true})
    * @param nonPersonalOnly when true, show only the caller's non-personal (shared) entries ({@code
@@ -312,10 +408,12 @@ public class InventoryPageController {
    */
   @GetMapping("/my")
   public String viewMyInventory(
+      @RequestParam(required = false) String view,
       @RequestParam(required = false) List<UUID> materialIds,
       @RequestParam(required = false) Integer minQuality,
       @RequestParam(required = false) List<UUID> jobOrderIds,
       @RequestParam(required = false) List<UUID> missionIds,
+      @RequestParam(required = false) List<UUID> gameItemIds,
       @RequestParam(required = false, defaultValue = "false") boolean personalOnly,
       @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly,
       @RequestParam(required = false, defaultValue = "false") boolean fragment,
@@ -327,6 +425,50 @@ public class InventoryPageController {
       model.addAttribute(
           "inventoryBookOutForm",
           new de.greluc.krt.profit.basetool.frontend.model.form.InventoryBookOutForm());
+    }
+    boolean itemsView = isItemsView(view);
+    model.addAttribute("view", itemsView ? "items" : "material");
+
+    if (itemsView) {
+      List<GroupedInventoryDto> groupedItems = new ArrayList<>();
+      try {
+        List<GroupedInventoryDto> res =
+            fetchGroupedItemInventory(
+                "/api/v1/inventory/my-inventory/grouped",
+                gameItemIds,
+                jobOrderIds,
+                personalOnly,
+                nonPersonalOnly);
+        if (res != null) {
+          groupedItems = res;
+        }
+      } catch (Exception e) {
+        log.error("Failed to fetch my grouped item inventory", e);
+        model.addAttribute("error", "error.inventory.personal.load");
+      }
+      model.addAttribute("groupedItems", groupedItems);
+      model.addAttribute("items", new ArrayList<>());
+      model.addAttribute(
+          "gameItems",
+          resolveGameItemFilterOptions(
+              "/api/v1/inventory/my-inventory/grouped",
+              groupedItems,
+              fragment,
+              gameItemIds,
+              jobOrderIds,
+              personalOnly || nonPersonalOnly));
+      model.addAttribute("jobOrders", fetchActiveJobOrders());
+      model.addAttribute("users", fetchUsers());
+      model.addAttribute("selectedGameItemIds", gameItemIds);
+      model.addAttribute("selectedJobOrderIds", jobOrderIds);
+      model.addAttribute("selectedPersonalOnly", personalOnly);
+      model.addAttribute("selectedNonPersonalOnly", nonPersonalOnly);
+      model.addAttribute("authUserId", currentAuthName());
+      model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
+      if (fragment) {
+        return "inventory-my :: inventoryTableFragment";
+      }
+      return "inventory-my";
     }
 
     List<GroupedInventoryDto> groupedItems = new ArrayList<>();
@@ -394,24 +536,120 @@ public class InventoryPageController {
   }
 
   /**
-   * Renders the squadron-wide inventory list ({@code /inventory/all}). Same shape as {@link
-   * #viewMyInventory} but the backend endpoint scopes to all users (gated by role at the backend);
-   * like {@code /my}, the Umbuchen target-location picker searches server-side, so no locations
-   * catalog is added to the model.
+   * Fetches one grouped item-inventory result ({@code catalog=ITEM}, REQ-INV-030) from the given
+   * backend grouped endpoint, relaying the item view's filter dimensions (gameItems, job orders and
+   * — on {@code /my} — the personal flags). Quality and mission filters do not exist for item rows
+   * and are never sent.
    *
-   * @param materialIds optional material id filter (multi)
-   * @param minQuality optional minimum-quality filter
-   * @param jobOrderIds optional job-order id filter (multi)
-   * @param missionIds optional mission id filter (multi)
+   * @param basePath the backend grouped path ({@code …/my-inventory/grouped} or {@code
+   *     …/all/grouped})
+   * @param gameItemIds optional game-item filter
+   * @param jobOrderIds optional job-order filter
+   * @param personalOnly relay {@code personalOnly=true} (only meaningful on {@code /my})
+   * @param nonPersonalOnly relay {@code nonPersonalOnly=true} (only meaningful on {@code /my})
+   * @return the grouped result as returned by the backend, may be {@code null}
+   */
+  private List<GroupedInventoryDto> fetchGroupedItemInventory(
+      @NotNull String basePath,
+      List<UUID> gameItemIds,
+      List<UUID> jobOrderIds,
+      boolean personalOnly,
+      boolean nonPersonalOnly) {
+    org.springframework.web.util.UriComponentsBuilder uriBuilder =
+        org.springframework.web.util.UriComponentsBuilder.fromPath(basePath)
+            .queryParam("catalog", "ITEM");
+    if (gameItemIds != null && !gameItemIds.isEmpty()) {
+      for (UUID id : gameItemIds) {
+        uriBuilder.queryParam("gameItemIds", id.toString());
+      }
+    }
+    if (jobOrderIds != null && !jobOrderIds.isEmpty()) {
+      for (UUID id : jobOrderIds) {
+        uriBuilder.queryParam("jobOrderIds", id.toString());
+      }
+    }
+    if (personalOnly) {
+      uriBuilder.queryParam("personalOnly", true);
+    }
+    if (nonPersonalOnly) {
+      uriBuilder.queryParam("nonPersonalOnly", true);
+    }
+    return backendApiClient.get(uriBuilder.build().toUriString(), GROUPED_INVENTORY_LIST);
+  }
+
+  /**
+   * Resolves the item view's gameItem filter options — only gameItems that currently have stock
+   * rows in the viewer's scope, never the full catalog (REQ-INV-030, design §6.1: the grouped
+   * query's key set). For an unfiltered render the already-fetched grouped result IS that key set;
+   * when the full page is (deep-link) rendered with active filters, the displayed groups are a
+   * narrowed subset, so one extra unfiltered grouped call restores the complete option list.
+   * Fragment renders never need options (the filter form lives outside the swapped container), and
+   * a failed lookup degrades to the displayed groups' keys.
+   *
+   * @param basePath the backend grouped path the page's table was fetched from
+   * @param groupedItems the (possibly filtered) grouped result already fetched for the table
+   * @param fragment whether this render is the table-fragment swap (options unused there)
+   * @param gameItemIds the active gameItem filter, if any
+   * @param jobOrderIds the active job-order filter, if any
+   * @param personalFlagActive whether a personal/non-personal narrowing flag is active
+   * @return the distinct gameItem references to offer in the filter multi-select
+   */
+  private List<de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto>
+      resolveGameItemFilterOptions(
+          @NotNull String basePath,
+          @NotNull List<GroupedInventoryDto> groupedItems,
+          boolean fragment,
+          List<UUID> gameItemIds,
+          List<UUID> jobOrderIds,
+          boolean personalFlagActive) {
+    boolean anyFilterActive =
+        (gameItemIds != null && !gameItemIds.isEmpty())
+            || (jobOrderIds != null && !jobOrderIds.isEmpty())
+            || personalFlagActive;
+    List<GroupedInventoryDto> source = groupedItems;
+    if (!fragment && anyFilterActive) {
+      try {
+        List<GroupedInventoryDto> unfiltered =
+            fetchGroupedItemInventory(basePath, null, null, false, false);
+        if (unfiltered != null) {
+          source = unfiltered;
+        }
+      } catch (Exception e) {
+        log.warn("Failed to fetch unfiltered item groups for the gameItem filter options", e);
+      }
+    }
+    return source.stream()
+        .map(GroupedInventoryDto::gameItem)
+        .filter(java.util.Objects::nonNull)
+        .distinct()
+        .toList();
+  }
+
+  /**
+   * Renders the squadron-wide inventory list ({@code /inventory/all}). Same shape as {@link
+   * #viewMyInventory} but the backend endpoint scopes to all users (gated by role at the backend).
+   * {@code view=items} renders the game-item tree (REQ-INV-030) with the {@code gameItemIds} /
+   * {@code jobOrderIds} filters; the personal flags stay a {@code /my}-only dimension (the global
+   * Lager is non-personal by definition). Like {@code /my}, the Umbuchen target-location picker
+   * searches server-side, so no locations catalog is added to the model.
+   *
+   * @param view {@code "items"} for the game-item view, anything else (or absent) for material
+   * @param materialIds optional material id filter (multi; material view only)
+   * @param minQuality optional minimum-quality filter (material view only)
+   * @param jobOrderIds optional job-order id filter (multi; both views)
+   * @param missionIds optional mission id filter (multi; material view only)
+   * @param gameItemIds optional game-item id filter (multi; items view only)
    * @param fragment when true, return the table fragment
    * @return either the full {@code inventory-admin} view or its fragment
    */
   @GetMapping("/all")
   public String viewAllInventory(
+      @RequestParam(required = false) String view,
       @RequestParam(required = false) List<UUID> materialIds,
       @RequestParam(required = false) Integer minQuality,
       @RequestParam(required = false) List<UUID> jobOrderIds,
       @RequestParam(required = false) List<UUID> missionIds,
+      @RequestParam(required = false) List<UUID> gameItemIds,
       @RequestParam(required = false, defaultValue = "false") boolean fragment,
       Model model) {
     if (!model.containsAttribute("inventoryForm")) {
@@ -421,6 +659,43 @@ public class InventoryPageController {
       model.addAttribute(
           "inventoryBookOutForm",
           new de.greluc.krt.profit.basetool.frontend.model.form.InventoryBookOutForm());
+    }
+    boolean itemsView = isItemsView(view);
+    model.addAttribute("view", itemsView ? "items" : "material");
+
+    if (itemsView) {
+      List<GroupedInventoryDto> groupedItems = new ArrayList<>();
+      try {
+        List<GroupedInventoryDto> res =
+            fetchGroupedItemInventory(
+                "/api/v1/inventory/all/grouped", gameItemIds, jobOrderIds, false, false);
+        if (res != null) {
+          groupedItems = res;
+        }
+      } catch (Exception e) {
+        log.error("Failed to fetch all grouped item inventory", e);
+        model.addAttribute("error", "error.inventory.global.load");
+      }
+      model.addAttribute("groupedItems", groupedItems);
+      model.addAttribute("items", new ArrayList<>());
+      model.addAttribute(
+          "gameItems",
+          resolveGameItemFilterOptions(
+              "/api/v1/inventory/all/grouped",
+              groupedItems,
+              fragment,
+              gameItemIds,
+              jobOrderIds,
+              false));
+      model.addAttribute("jobOrders", fetchActiveJobOrders());
+      model.addAttribute("selectedGameItemIds", gameItemIds);
+      model.addAttribute("selectedJobOrderIds", jobOrderIds);
+      model.addAttribute("authUserId", currentAuthName());
+      model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
+      if (fragment) {
+        return "inventory-admin :: inventoryTableFragment";
+      }
+      return "inventory-admin";
     }
 
     List<GroupedInventoryDto> groupedItems = new ArrayList<>();
@@ -531,8 +806,57 @@ public class InventoryPageController {
     if (size != null) {
       uriBuilder.queryParam("size", size);
     }
-    fetchStackEntriesIntoModel(uriBuilder.build().toUriString(), model);
+    fetchStackEntriesIntoModel(uriBuilder.build().toUriString(), model, true);
     addReleasedItemIds(model);
+    return "fragments/inventory-stack-entries :: stackEntriesMy";
+  }
+
+  /**
+   * Item-view sibling of {@link #viewMyStackEntries} (REQ-INV-030): lazily renders one page of a
+   * personal game-item stack's entries. The stack is addressed by {@code gameItemId} instead of
+   * {@code materialId}+{@code quality} — item stacks carry no quality dimension (REQ-INV-029) — and
+   * the proxy relays {@code catalog=ITEM} to the backend's {@code
+   * /api/v1/inventory/my-inventory/stack/entries}. Renders the same {@code stackEntriesMy}
+   * fragment, whose rows branch per row kind (an item entry renders without quality or mission
+   * split and with whole amounts). No mission catalog is loaded (item rows cannot carry mission
+   * allocations, REQ-INV-031) and no Materialbörse released-ids lookup runs (item rows cannot back
+   * an offer yet, design §8).
+   *
+   * @param gameItemId the stack's game item (from the enclosing group)
+   * @param locationId the stack's storage location
+   * @param personal whether the stack holds the caller's private stock
+   * @param owningOrgUnitId the stack's owning org-unit pool, or {@code null}
+   * @param page zero-based page index, or {@code null} for the first page
+   * @param size page size, or {@code null} for the backend default
+   * @param model Thymeleaf model populated with the entries page and the job-order catalog
+   * @return the {@code fragments/inventory-stack-entries :: stackEntriesMy} fragment view name
+   */
+  @GetMapping("/my/game-item-stack/entries")
+  public String viewMyGameItemStackEntries(
+      @RequestParam @NotNull UUID gameItemId,
+      @RequestParam @NotNull UUID locationId,
+      @RequestParam(required = false, defaultValue = "false") boolean personal,
+      @RequestParam(required = false) UUID owningOrgUnitId,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      Model model) {
+    org.springframework.web.util.UriComponentsBuilder uriBuilder =
+        org.springframework.web.util.UriComponentsBuilder.fromPath(
+                "/api/v1/inventory/my-inventory/stack/entries")
+            .queryParam("catalog", "ITEM")
+            .queryParam("gameItemId", gameItemId)
+            .queryParam("locationId", locationId)
+            .queryParam("personal", personal);
+    if (owningOrgUnitId != null) {
+      uriBuilder.queryParam("owningOrgUnitId", owningOrgUnitId);
+    }
+    if (page != null) {
+      uriBuilder.queryParam("page", page);
+    }
+    if (size != null) {
+      uriBuilder.queryParam("size", size);
+    }
+    fetchStackEntriesIntoModel(uriBuilder.build().toUriString(), model, false);
     return "fragments/inventory-stack-entries :: stackEntriesMy";
   }
 
@@ -618,13 +942,59 @@ public class InventoryPageController {
     if (size != null) {
       uriBuilder.queryParam("size", size);
     }
-    fetchStackEntriesIntoModel(uriBuilder.build().toUriString(), model);
+    fetchStackEntriesIntoModel(uriBuilder.build().toUriString(), model, true);
     return "fragments/inventory-stack-entries :: stackEntriesAdmin";
   }
 
   /**
-   * Shared backend call + model population for the two stack-entries drill-down endpoints. Fetches
-   * the paginated entries page from the given backend URI and the job-order / mission catalogs the
+   * Item-view sibling of {@link #viewAllStackEntries} (REQ-INV-030): lazily renders one page of a
+   * squadron-wide game-item stack's entries. A global stack is per-owner, so the key carries the
+   * owning {@code userId}; the stack itself is addressed by {@code gameItemId} (no quality
+   * dimension, REQ-INV-029) and the proxy relays {@code catalog=ITEM} to the backend's {@code
+   * /api/v1/inventory/all/stack/entries}. Renders the same per-row-kind-branching {@code
+   * stackEntriesAdmin} fragment; no mission catalog is loaded (REQ-INV-031).
+   *
+   * @param gameItemId the stack's game item (from the enclosing group)
+   * @param userId the stack's owning user
+   * @param locationId the stack's storage location
+   * @param owningOrgUnitId the stack's owning org-unit pool, or {@code null}
+   * @param page zero-based page index, or {@code null} for the first page
+   * @param size page size, or {@code null} for the backend default
+   * @param model Thymeleaf model populated with the entries page and the job-order catalog
+   * @return the {@code fragments/inventory-stack-entries :: stackEntriesAdmin} fragment view name
+   */
+  @GetMapping("/all/game-item-stack/entries")
+  public String viewAllGameItemStackEntries(
+      @RequestParam @NotNull UUID gameItemId,
+      @RequestParam @NotNull UUID userId,
+      @RequestParam @NotNull UUID locationId,
+      @RequestParam(required = false) UUID owningOrgUnitId,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      Model model) {
+    org.springframework.web.util.UriComponentsBuilder uriBuilder =
+        org.springframework.web.util.UriComponentsBuilder.fromPath(
+                "/api/v1/inventory/all/stack/entries")
+            .queryParam("catalog", "ITEM")
+            .queryParam("gameItemId", gameItemId)
+            .queryParam("userId", userId)
+            .queryParam("locationId", locationId);
+    if (owningOrgUnitId != null) {
+      uriBuilder.queryParam("owningOrgUnitId", owningOrgUnitId);
+    }
+    if (page != null) {
+      uriBuilder.queryParam("page", page);
+    }
+    if (size != null) {
+      uriBuilder.queryParam("size", size);
+    }
+    fetchStackEntriesIntoModel(uriBuilder.build().toUriString(), model, false);
+    return "fragments/inventory-stack-entries :: stackEntriesAdmin";
+  }
+
+  /**
+   * Shared backend call + model population for the stack-entries drill-down endpoints. Fetches the
+   * paginated entries page from the given backend URI and the job-order / mission catalogs the
    * per-entry association dropdowns render. A backend failure degrades to an empty entries list
    * plus an {@code error} flag so the fragment still renders a (empty) container instead of
    * throwing.
@@ -632,8 +1002,12 @@ public class InventoryPageController {
    * @param uri the fully-built backend stack-entries URI (path + query)
    * @param model the Thymeleaf model to populate with {@code entries}, {@code entriesPage}, {@code
    *     jobOrders} and {@code missions}
+   * @param includeMissions whether to load the mission catalog — {@code true} on the material
+   *     endpoints (mission allocation chips), {@code false} on the item endpoints, where mission
+   *     allocations are rejected (REQ-INV-031) and the model gets an empty list instead
    */
-  private void fetchStackEntriesIntoModel(@NotNull String uri, Model model) {
+  private void fetchStackEntriesIntoModel(
+      @NotNull String uri, Model model, boolean includeMissions) {
     PageResponse<InventoryItemDto> p = null;
     try {
       p = backendApiClient.get(uri, INVENTORY_ITEM_PAGE);
@@ -646,7 +1020,11 @@ public class InventoryPageController {
     model.addAttribute("entries", entries);
     model.addAttribute("entriesPage", p);
     model.addAttribute("jobOrders", fetchActiveJobOrders());
-    model.addAttribute("missions", fetchMissions());
+    model.addAttribute(
+        "missions",
+        includeMissions
+            ? fetchMissions()
+            : List.<de.greluc.krt.profit.basetool.frontend.model.dto.MissionReferenceDto>of());
   }
 
   /**

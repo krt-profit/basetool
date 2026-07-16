@@ -428,10 +428,10 @@ disabling the inactive form so its `required` fields don't block submit). Item m
   TRANSFER/Umbuchen modals in §6.3.
 - **Location/owner/org-unit/personal:** unchanged fragments (`fragments/owner-picker`).
   **Owner decision (2026-07-16):** the location selects in the booking flows (Einbuchen,
-  Umbuchen target location, production book-in) become **local-filter comboboxes** (bare
-  `data-krt-combobox`) — not required by scale (the catalog is a curated ~50–100 rows,
-  verified) but chosen for consistent picker UX across all booking forms. Each site runs
-  the §6.6 binding grep checklist before conversion.
+  Umbuchen target location, production book-in) become searchable comboboxes — originally
+  planned as local-filter mode, since **superseded by ADR-0100**: they ship as
+  server-searched `remote-locations` comboboxes (no preloaded catalog), like every other
+  catalog picker. Each site runs the §6.6 binding grep checklist before conversion.
 - **Allocation rows:** same preload-and-filter mechanism as material mode (verified: the
   hidden `<template>` rows carry the scoped OPEN/IN_PROGRESS order list and material
   relevance is a client-side `data-materials` CSV filter). Item mode mirrors it: the
@@ -458,7 +458,8 @@ submit via the conflict-aware `krtOrderWrite` wrapper). The new book-in section 
 inside `#production-form` between `#production-materials` and the actions row, following
 the `production-*` id / `data-prod-*` role conventions:
 
-- location picker (local-filter combobox per the §6.2 owner decision), owner combobox
+- location picker (server-searched `remote-locations` combobox per the §6.2 owner
+  decision as superseded by ADR-0100), owner combobox
   (`remote-users`, default: acting user), org-unit picker, personal checkbox,
   "dem Auftrag zuordnen" checkbox (default on; disabled + cleared while "persönlich" is
   checked, §5.6).
@@ -750,8 +751,9 @@ The former open items were decided by the owner on 2026-07-16 (recorded in §10)
    the §4.4 material-only guards keep the order pages correct in the interim.
 3. **Materialbörse stock-backed item offers — DECIDED: directly after the core PRs**
    (§8, §10 Phase 5), including the kind-aware `updateOffer` defect fix.
-4. **Location pickers — DECIDED: converted to local-filter comboboxes** in the booking
-   flows (§6.2/§6.6) despite the small catalog, for consistent picker UX.
+4. **Location pickers — DECIDED: converted to searchable comboboxes** in the booking
+   flows (§6.2/§6.6) despite the small catalog, for consistent picker UX — shipped as
+   server-searched `remote-locations` comboboxes per ADR-0100.
 
 Still deliberately out of scope:
 

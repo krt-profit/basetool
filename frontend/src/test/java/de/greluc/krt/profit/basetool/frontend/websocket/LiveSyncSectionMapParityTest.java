@@ -152,6 +152,20 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
+  void inventoryGameItemSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
+    // REQ-INV-030: the per-game-item drilldown joins the same `inventory` room (receive-only) —
+    // no new section keys were added for the item views, the single `stock` seam covers both
+    // catalogs.
+    Set<String> jsKeys =
+        seamMapKeys("/static/js/inventory-game-item.js", "INVENTORY_GAME_ITEM_SECTIONS");
+    assertThat(jsKeys)
+        .as(
+            "INVENTORY_GAME_ITEM_SECTIONS keys in inventory-game-item.js vs"
+                + " LiveSyncTopicClass.INVENTORY_ALL")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.INVENTORY_ALL.allowedSections());
+  }
+
+  @Test
   void bankStaffAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
     Set<String> jsKeys = seamMapKeys("/static/js/bank.js", "BANK_ACCOUNT_SECTIONS");
     assertThat(jsKeys)

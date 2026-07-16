@@ -29,6 +29,9 @@
  *   - `data-krt-combobox="remote-materials-joborder"` -> job-order subset (orders material lines)
  *   - `data-krt-combobox="remote-materials-raw"`      -> refinery inputs (RAW or manually raw)
  *   - `data-krt-combobox="remote-locations"`          -> non-hidden locations
+ *   - `data-krt-combobox="remote-game-items"`         -> bookable game items (Lager item mode,
+ *                                                        outputs of at least one active blueprint,
+ *                                                        REQ-INV-029)
  *
  * Material rows carry the picker metadata as the option `data` map: `quantityType` drives the
  * amount-unit mirror (PIECE vs SCU) and `refinedId`/`refinedName` the refinery output display —
@@ -56,6 +59,11 @@
     // Maps a backend LocationReferenceDto to the combobox option shape (no metadata).
     function toLocationOption(row) {
         return { value: row.id, label: row.name };
+    }
+
+    // Maps a backend game-item reference row to the combobox option shape (no metadata).
+    function toGameItemOption(row) {
+        return { value: row.id, label: row.name || row.id };
     }
 
     // Fetches the matching catalog rows for `query` from the given frontend proxy path and maps
@@ -91,5 +99,8 @@
     };
     window.krtComboboxRemoteSources['remote-locations'] = function (query) {
         return fetchCatalog('/catalog/location-search', query, toLocationOption);
+    };
+    window.krtComboboxRemoteSources['remote-game-items'] = function (query) {
+        return fetchCatalog('/inventory/item-search', query, toGameItemOption);
     };
 })();

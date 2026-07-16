@@ -476,6 +476,16 @@ public class JobOrderPageController {
         }
       }
 
+      // Production book-in section (REQ-INV-032, design §6.4): the acting-user seed of the
+      // #production-modal's owner combobox. The modal's location picker searches locations on
+      // demand (remote-locations combobox -> /catalog/location-search, REQ-FE-016), so no
+      // locations catalog is preloaded. Only the full-page render of an ITEM order for a
+      // logistician dereferences the seed — the modal is not a fragment target, so section
+      // swaps skip the lookup.
+      if (canAssign && "ITEM".equals(order.type()) && fragment == null) {
+        model.addAttribute("actingUser", fetchActingUser());
+      }
+
       int yellowDays = 30;
       int redDays = 90;
       try {
@@ -861,6 +871,23 @@ public class JobOrderPageController {
       log.error("Failed to fetch job-order materials", e);
     }
     return new ArrayList<>();
+  }
+
+  /**
+   * Resolves the acting user ({@code GET /api/v1/users/me}) whose id + display name seed the
+   * production modal's owner combobox — the book-in owner defaults to the producer (REQ-INV-032).
+   * {@code null} on failure: the owner picker then starts empty and the backend falls back to the
+   * acting user server-side.
+   *
+   * @return the acting user, or {@code null} when the lookup fails
+   */
+  private UserDto fetchActingUser() {
+    try {
+      return backendApiClient.get("/api/v1/users/me", UserDto.class);
+    } catch (Exception e) {
+      log.warn("Failed to resolve the acting user for the production book-in owner seed", e);
+      return null;
+    }
   }
 
   /**

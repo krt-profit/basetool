@@ -967,20 +967,28 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 
 The `inventory` room is the squadron Lager (#1307/#1309): a single opaque `stock` section stands for
 "the inventory changed". **All** inventory views subscribe and re-pull their own fragment on a peer's
-write — the shared `/inventory/all` and personal `/inventory/my` grouped tables (`filterInventory` /
-`filterMyInventory`, including their lazily-loaded stack entries, so a collapsed stack re-fetches its
-chips on the next expand), the aggregated `/inventory` overview and the per-material
-`/inventory/material/{id}` drilldown (each `krtFetch.swap` its `?fragment=results` container). Every
-inventory write (allocation add/change/remove, book-out, transfer, personal-rebook, bulk-checkout,
-delete-all, note) broadcasts it, from whichever page made it. Because it is a global room but each
-viewer's fragment is owner- and org-unit-scoped, a cross-scope peer refresh (another squadron, or a
-personal-only change seen by a shared view) is a harmless no-op. The same inventory writes also
-cross-publish to the `order:{id}` room (the order material collection tracks the earmark roll-up) and
-the `materialboard` room (a stock-reducing write clamps an offer server-side), so those surfaces
-reflect inventory changes live too. The affected order ids are read off the entry's leaf chips before
-the write; the sole exception is the admin `DELETE /inventory/all` full wipe, which cannot enumerate
-them client-side — its board and inventory rooms are still poked, but an open order collection
-self-heals on the next interaction (an accepted limitation for that rare nuke).
+write — the shared `/inventory/all` and personal `/inventory/my` grouped tables in **both their
+Material and Items views** (REQ-INV-030: `filterInventory` / `filterMyInventory` rebuild the fragment
+URL from the page's own filter state *including the `view=` parameter*, so a peer's change re-renders
+whichever view is active; the lazily-loaded stack entries ride along, so a collapsed stack — material
+or game-item — re-fetches its chips on the next expand), the aggregated `/inventory` overview (both
+catalogs) and the per-catalog `/inventory/material/{id}` and `/inventory/game-item/{gameItemId}`
+drilldowns (each `krtFetch.swap` its `?fragment=results` container). No new section keys were added
+for the item views — the single `stock` seam covers both catalogs, so the three mirror points stay
+untouched. Every inventory write (allocation add/change/remove, book-out, transfer, personal-rebook,
+bulk-checkout, delete-all, note) broadcasts it, from whichever page made it. Because it is a global
+room but each viewer's fragment is owner- and org-unit-scoped, a cross-scope peer refresh (another
+squadron, or a personal-only change seen by a shared view) is a harmless no-op. The same inventory
+writes also cross-publish to the `order:{id}` room (the order material collection tracks the earmark
+roll-up) and the `materialboard` room (a stock-reducing write clamps an offer server-side), so those
+surfaces reflect inventory changes live too. The affected order ids are read off the entry's leaf
+chips before the write; the sole exception is the admin `DELETE /inventory/all` full wipe, which
+cannot enumerate them client-side — its board and inventory rooms are still poked, but an open order
+collection self-heals on the next interaction (an accepted limitation for that rare nuke). A further
+cross-publisher is the production-booking modal on the order detail page: since Herstellung books
+the produced item stock in (REQ-INV-032, the book-in section), its success handler additionally
+pokes `inventory`/`stock` — the existing seam, so Lager viewers see the fresh stock live with no
+seam-map change.
 
 The standalone order **material-collection** page (`/orders/{id}/material-collection`) joins the same
 `order:{id}` room in its own right (#1309): its per-row delivered toggle and owner/location moves
@@ -1093,15 +1101,18 @@ stay deliberately **unbounded** — a fixed bound on a complete-list surface sil
 tail, the defect class that forced the item picker onto server-side search (ADR-0100). The marker
 values are registered in `krt-catalog-search.js`: `remote-materials`,
 `remote-materials-joborder` (orders lines), `remote-materials-raw` (refinery inputs),
-`remote-locations`. Server-rendered edit/redisplay states seed exactly **one** selected
-`<option>` (gated `th:if`) so the label and its metadata survive enhancement; programmatic fills
-use `krtCombobox.setValue(value, label, data?)` — in remote mode a bare `setValue(value)` cannot
-resolve a label and clears the field, so every call site passes the label (or resolves the entry
-via the search relay first). Converted sites: the inventory Einbuchen material + location
-pickers, the job-order create/edit material lines (server-rendered **and** JS-built rows), the
-refinery create/details input-material pickers, the Umbuchen target-location pickers, the
-`/inventory/material` navigate select and the admin material-alias pickers; the orders item
-picker already used the component's `remoteSource` API.
+`remote-locations`, and `remote-game-items` (the inventory item mode's bookable-item picker — the
+one **authenticated** relay, `GET /inventory/item-search`, onto the role-gated backend
+`/api/v1/inventory/item-catalog`, REQ-INV-029). Server-rendered edit/redisplay states seed exactly
+**one** selected `<option>` (gated `th:if`) so the label and its metadata survive enhancement;
+programmatic fills use `krtCombobox.setValue(value, label, data?)` — in remote mode a bare
+`setValue(value)` cannot resolve a label and clears the field, so every call site passes the label
+(or resolves the entry via the search relay first). Converted sites: the inventory Einbuchen
+material + location pickers and its item-mode game-item picker, the job-order create/edit material
+lines (server-rendered **and** JS-built rows), the refinery create/details input-material pickers,
+the Umbuchen target-location pickers, the production modal's book-in location picker
+(REQ-INV-032), the `/inventory/material` navigate select and the admin material-alias pickers; the
+orders item picker already used the component's `remoteSource` API.
 
 **Option-metadata mirror (the load-bearing part).** Enhancing a select **removes** the native
 `<option>` elements, so option-level metadata (`data-quantity-type` on material options,

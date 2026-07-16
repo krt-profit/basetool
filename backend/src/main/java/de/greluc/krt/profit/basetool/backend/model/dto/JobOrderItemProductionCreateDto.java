@@ -43,17 +43,16 @@ import java.util.UUID;
  *     demand is excluded from the coverage check and no linked inventory is consumed for them.
  *     {@code null} is treated as none skipped
  * @param bookIn where and for whom the produced units are booked into the Lager as game-item stock
- *     (REQ-INV-032, design §5.6). <b>Transitional:</b> {@code null} keeps the legacy behaviour (no
- *     stock row is created — the pre-item-stock status quo) so the live Herstellung flow keeps
- *     working until the frontend modal ships the section; the follow-up frontend PR flips this to
- *     required
+ *     (REQ-INV-032, design §5.6); required — the production modal always sends it, and a missing
+ *     block is a 400 validation error (the transitional null-tolerant rollout window closed when
+ *     the modal's book-in section shipped)
  */
 public record JobOrderItemProductionCreateDto(
     @NotNull @Min(1) Integer amount,
     @NotNull Long version,
     @NotNull List<@Valid JobOrderItemProductionConsumptionDto> consumption,
     List<UUID> skippedMaterialIds,
-    @Valid BookInDto bookIn) {
+    @NotNull @Valid BookInDto bookIn) {
 
   /**
    * The production book-in target (REQ-INV-032): the location, owner and org-unit pool the produced

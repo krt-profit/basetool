@@ -1832,6 +1832,8 @@ function openProductionModal(button) {
         container.innerHTML = '';
     }
 
+    _prodResetBookIn();
+
     const modal = document.getElementById('production-modal');
     if (modal) {
         modal.classList.add('krtm-modal-open');
@@ -1967,6 +1969,155 @@ function _renderProdMaterialEntries(card, mat) {
     });
 }
 
+// ===== Production book-in section (REQ-INV-032, design §6.4) =====
+
+// The acting user's id, stamped on #production-form by the server — the owner combobox's seed and
+// the fallback owner when the picker is cleared (the backend defaults a null ownerUserId to the
+// actor; the org-unit picker mirrors that resolution).
+function _prodActingUserId() {
+    const form = document.getElementById('production-form');
+    return form ? form.getAttribute('data-acting-user-id') || '' : '';
+}
+
+// The acting user's display name, stamped alongside the id on #production-form. Passed as the
+// label when re-seeding the owner combobox on reset: remote-users is a server-searched combobox,
+// so a prior search replaces its loaded item set and evicts the server-seeded acting-user option;
+// a bare setValue(id) with no label would then resolve no label and blank the field (REQ-FE-016).
+// Supplying the label makes the reset re-seed the visible name regardless of the picker's item set.
+function _prodActingUserName() {
+    const form = document.getElementById('production-form');
+    return form ? form.getAttribute('data-acting-user-name') || '' : '';
+}
+
+// Sets an enhanced combobox (or its raw-<select> fallback) to a value, syncing the visible label
+// through the supported controller API (REQ-FE-016). The optional label seeds the visible text for
+// a value outside the picker's loaded item set (remote mode / programmatic fill); it is ignored
+// when the value resolves against a loaded option.
+function _prodSetPicker(id, value, label) {
+    const el = document.getElementById(id);
+    if (!el) {
+        return;
+    }
+    if (el.krtCombobox) {
+        el.krtCombobox.setValue(value || '', label);
+    } else {
+        el.value = value || '';
+    }
+}
+
+// Resets the book-in section to its per-open defaults: no location yet (the reconcile gate holds
+// the submit until one is picked), owner = acting user, non-personal, "dem Auftrag zuordnen" on
+// (§5.6), and the org-unit picker repopulated for the resolved owner.
+function _prodResetBookIn() {
+    _prodSetPicker('production-location', '');
+    _prodSetPicker('production-owner', _prodActingUserId(), _prodActingUserName());
+    const personalCb = document.getElementById('production-personal');
+    if (personalCb) {
+        personalCb.checked = false;
+    }
+    const allocateCb = document.getElementById('production-allocate');
+    if (allocateCb) {
+        allocateCb.checked = true;
+        allocateCb.disabled = false;
+    }
+    _prodRefreshOrgUnitPicker();
+}
+
+// Personal stock never carries allocations (§5.6): while "persönlich" is checked the
+// "dem Auftrag zuordnen" checkbox is disabled AND cleared; unchecking restores the default-on
+// earmark (mirrors syncPersonalAllocations on the Einbuchen page).
+function _prodSyncPersonalAllocate() {
+    const personalCb = document.getElementById('production-personal');
+    const allocateCb = document.getElementById('production-allocate');
+    if (!allocateCb) {
+        return;
+    }
+    const personal = !!(personalCb && personalCb.checked);
+    allocateCb.disabled = personal;
+    allocateCb.checked = !personal;
+}
+
+// Repopulates the book-in org-unit picker for the resolved owner — the #1328 Umbuchen semantics
+// (copied from inventory-admin.js refreshUmbuchenTransferOrgUnitPicker, via the UserProxyController
+// route): offer the owner's direct memberships across ALL FOUR org-unit kinds (?allKinds=true),
+// always show the picker when the owner has >=1 membership, preset a concrete default — the
+// order's responsible unit when it is among the owner's memberships, else the first (primary)
+// membership — with no empty placeholder, and hide it only for a membershipless owner. This keeps
+// the REQ-ORG-004 ">1 memberships + no picker output -> 400" branch unreachable from the UI.
+function _prodRefreshOrgUnitPicker() {
+    const wrapper = document.getElementById('production-orgunit-wrapper');
+    const select = document.getElementById('production-orgunit');
+    const ownerEl = document.getElementById('production-owner');
+    if (!wrapper || !select) {
+        return;
+    }
+    const ownerId = (ownerEl && ownerEl.value) || _prodActingUserId();
+    select.innerHTML = '';
+    if (!ownerId) {
+        wrapper.hidden = true;
+        return;
+    }
+    fetch('/users/' + encodeURIComponent(ownerId) + '/memberships?allKinds=true', {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+    })
+        .then(function (r) {
+            return r.ok ? r.json() : [];
+        })
+        .then(function (memberships) {
+            if (!Array.isArray(memberships) || memberships.length < 1) {
+                wrapper.hidden = true;
+                return;
+            }
+            memberships.forEach(function (opt) {
+                const o = document.createElement('option');
+                o.value = opt.orgUnitId;
+                o.textContent = opt.orgUnitName;
+                select.appendChild(o);
+            });
+            const form = document.getElementById('production-form');
+            const responsibleId = form
+                ? form.getAttribute('data-responsible-org-unit-id') || ''
+                : '';
+            if (
+                responsibleId &&
+                memberships.some(function (m) {
+                    return m.orgUnitId === responsibleId;
+                })
+            ) {
+                select.value = responsibleId;
+            }
+            wrapper.hidden = false;
+        })
+        .catch(function () {
+            wrapper.hidden = true;
+        });
+}
+
+// Collects the book-in payload block (REQ-INV-032): the picked location/owner/org-unit and the
+// personal / allocate flags. personal implies allocateToOrder=false (the checkbox is disabled and
+// cleared while personal is checked, but the payload re-derives it so the invariant holds even if
+// the DOM was tampered with).
+function _prodCollectBookIn() {
+    const locEl = document.getElementById('production-location');
+    const ownerEl = document.getElementById('production-owner');
+    const orgUnitWrapper = document.getElementById('production-orgunit-wrapper');
+    const orgUnitEl = document.getElementById('production-orgunit');
+    const personalCb = document.getElementById('production-personal');
+    const allocateCb = document.getElementById('production-allocate');
+    const personal = !!(personalCb && personalCb.checked);
+    return {
+        locationId: (locEl && locEl.value) || null,
+        ownerUserId: (ownerEl && ownerEl.value) || null,
+        owningOrgUnitId:
+            orgUnitWrapper && !orgUnitWrapper.hidden && orgUnitEl && orgUnitEl.value
+                ? orgUnitEl.value
+                : null,
+        personal: personal,
+        allocateToOrder: personal ? false : !!(allocateCb && allocateCb.checked),
+    };
+}
+
 function _prodReconcile() {
     if (!_prodContext) {
         return;
@@ -2022,6 +2173,12 @@ function _prodReconcile() {
             allCovered = false;
         }
     });
+    // Book-in gate (REQ-INV-032): the produced stock needs a location ("wo"), so the submit stays
+    // disabled until one is picked (bookIn.locationId is @NotNull server-side).
+    const locEl = document.getElementById('production-location');
+    if (!locEl || !locEl.value) {
+        allCovered = false;
+    }
     const bookBtn = document.getElementById('production-book-btn');
     if (bookBtn) {
         bookBtn.disabled = !allCovered;
@@ -2079,6 +2236,13 @@ function bookProduction() {
         showFrontendErrorToast(PRODUCTION_I18N.allocError);
         return;
     }
+    // Book-in gate (REQ-INV-032): the reconcile gate already disables the button without a
+    // location; this guards the residual paths (e.g. a queued click racing the gate).
+    const bookIn = _prodCollectBookIn();
+    if (!bookIn.locationId) {
+        showFrontendErrorToast(PRODUCTION_I18N.bookInLocationRequired);
+        return;
+    }
 
     krtOrderWrite({
         method: 'POST',
@@ -2088,6 +2252,7 @@ function bookProduction() {
             version: _prodContext.version ? parseInt(_prodContext.version, 10) : null,
             consumption: consumption,
             skippedMaterialIds: skippedMaterialIds,
+            bookIn: bookIn,
         },
         toast: false,
         errorMessage: PRODUCTION_I18N.allocError,
@@ -2107,6 +2272,13 @@ function bookProduction() {
                     'item-handovers',
                     'item-handover-lines',
                 ]);
+            }
+            // The booking now also books the produced units in as Lager item stock
+            // (REQ-INV-032), so poke the global inventory room's existing `stock` seam — Lager
+            // viewers re-pull their fragments without a reload (design §6.5; the key exists at
+            // all three REQ-FE-010 mirror points, no seam-map change).
+            if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
+                window.krtLiveSync.sendChanged('inventory', ['stock']);
             }
         },
     });
@@ -2156,6 +2328,19 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'od-open-handover', openHandoverModal);
     window.krtEvents.on('click', 'od-open-production', openProductionModal);
     window.krtEvents.on('click', 'od-book-production', bookProduction);
+    // Book-in section (REQ-INV-032): the location pick re-runs the submit gate, an owner change
+    // repopulates the org-unit picker (#1328 semantics), and the personal toggle disables + clears
+    // the order earmark (§5.6). The two comboboxes' data-trigger rides the enhancer's hidden-input
+    // passthrough (REQ-FE-016), so the delegated change handlers keep working after enhancement.
+    window.krtEvents.on('change', 'od-production-bookin-changed', function () {
+        _prodReconcile();
+    });
+    window.krtEvents.on('change', 'od-production-owner-changed', function () {
+        _prodRefreshOrgUnitPicker();
+    });
+    window.krtEvents.on('change', 'od-production-personal-toggle', function () {
+        _prodSyncPersonalAllocate();
+    });
     window.krtEvents.on('click', 'od-toggle-demand', _odToggleDemandRow);
     window.krtEvents.on('click', 'od-download-report', function (el) {
         downloadHandoverReport(el);

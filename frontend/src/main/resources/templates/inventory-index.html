@@ -42,6 +42,18 @@
         <h1>Lagerverwaltung</h1>
     </div>
 
+    <!-- Material <-> Items view switch (REQ-INV-030): server-rendered navigation links in the
+         shared .tab-nav DS pattern (like bank-grants); the view= query parameter picks which
+         catalog the server renders. -->
+    <div class="tab-nav mt-2" role="tablist" th:aria-label="#{inventory.items.view.aria}">
+        <a th:href="@{/inventory}" class="tab" role="tab"
+           th:classappend="${view != 'items'} ? ' active' : ''" th:aria-selected="${view != 'items'}"
+           data-testid="lager-view-material" th:text="#{inventory.items.view.material}">Material</a>
+        <a th:href="@{/inventory(view='items')}" class="tab" role="tab"
+           th:classappend="${view == 'items'} ? ' active' : ''" th:aria-selected="${view == 'items'}"
+           data-testid="lager-view-items" th:text="#{inventory.items.view.items}">Items</a>
+    </div>
+
     <div class="hud-box mt-2">
         <div th:if="${error}" class="hud-box hud-box-error">
             <p th:text="#{__${error}__}">Fehler</p>
@@ -50,8 +62,8 @@
         <div class="krtm-display-flex-justify-content-space-between-a-3a17">
             <h3 class="krtm-font-family-lato-sans-serif-font-weight-700-957b" th:text="#{inventory.overview.aggregated}">Aggregiertes Staffellager</h3>
             <div class="actions-bar krtm-margin-bottom-0-5043">
-                <a th:href="@{/inventory/my}" class="btn btn-outline" th:text="#{inventory.overview.my}">Mein Lager</a>
-                <a th:href="@{/inventory/all}" class="btn btn-outline" th:text="#{inventory.overview.global}">Globales Lager</a>
+                <a th:href="${view == 'items'} ? @{/inventory/my(view='items')} : @{/inventory/my}" class="btn btn-outline" th:text="#{inventory.overview.my}">Mein Lager</a>
+                <a th:href="${view == 'items'} ? @{/inventory/all(view='items')} : @{/inventory/all}" class="btn btn-outline" th:text="#{inventory.overview.global}">Globales Lager</a>
             </div>
         </div>
         <!-- The aggregated view buckets quantities per material across the entire active
@@ -65,6 +77,8 @@
         <div class="overflow-x-auto">
             <div id="inventory-results">
             <th:block th:fragment="inventoryResults">
+            <!-- Material catalog (default view). -->
+            <th:block th:if="${view != 'items'}">
             <div class="table-responsive">
             <table class="krt-table">
                 <thead>
@@ -94,8 +108,45 @@
                 </tbody>
             </table>
             </div>
-            
+
             <div th:replace="~{fragments/pagination :: pagination(pageResponse=${inventoryPage}, baseUrl='/inventory')}"></div>
+            </th:block>
+            <!-- Game-item catalog (REQ-INV-030, view=items): per-item totals, no quality columns,
+                 whole-unit amounts. Rows navigate to the org-wide item tree filtered to the item. -->
+            <th:block th:if="${view == 'items'}">
+            <div class="table-responsive">
+            <table class="krt-table">
+                <thead>
+                    <tr>
+                        <th th:text="#{inventory.items.aggregated.col.item}">Item</th>
+                        <th th:text="#{inventory.items.aggregated.col.manufacturer}">Hersteller</th>
+                        <th th:text="#{inventory.items.aggregated.col.kind}">Art</th>
+                        <th th:text="#{inventory.aggregated.col.totalAmount}">Gesamtmenge</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="item : ${aggregated}"
+                        th:data-href="@{/inventory/all(view='items', gameItemIds=${item.gameItem.id})}"
+                        data-trigger="navigate-href"
+                        class="clickable-row krtm-cursor-pointer-74fa">
+                        <td th:text="${item.gameItem.name}" class="krtm-color-var-color-white-c482">Item</td>
+                        <td th:text="${item.gameItem.manufacturer} ?: '&mdash;'">Hersteller</td>
+                        <td>
+                            <span th:if="${item.gameItem.kind != null}"
+                                  th:with="kindKey=|inventory.items.kind.${item.gameItem.kind}|"
+                                  th:text="${#messages.msgOrNull(kindKey)} ?: ${item.gameItem.kind}">Art</span>
+                        </td>
+                        <td th:text="|${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'} #{material.quantity.piece}|">10 Stück</td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(aggregated)}">
+                        <td colspan="4" class="text-center text-muted" th:text="#{inventory.items.aggregated.empty}">Keine Item-Bestände vorhanden.</td>
+                    </tr>
+                </tbody>
+            </table>
+            </div>
+
+            <div th:replace="~{fragments/pagination :: pagination(pageResponse=${inventoryPage}, baseUrl='/inventory?view=items')}"></div>
+            </th:block>
             </th:block>
             </div>
 

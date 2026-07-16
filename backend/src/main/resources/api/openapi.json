@@ -56221,7 +56221,7 @@
             "$ref" : "#/components/schemas/BookInDto"
           }
         },
-        "required" : [ "amount", "consumption", "version" ]
+        "required" : [ "amount", "bookIn", "consumption", "version" ]
       },
       "JobOrderItemHandoverCreateDto" : {
         "type" : "object",

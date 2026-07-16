@@ -133,16 +133,15 @@ public class JobOrderItemProductionService {
    * remaining-to-manufacture and the consumption against the required per-material demand, reduces
    * the consumed linked inventory, increments {@code manufacturedAmount}, audits the JOB_ORDER
    * booking plus each cross-domain INVENTORY reduction, and finally books the produced units into
-   * the Lager as game-item stock when the payload carries a {@code bookIn} target (REQ-INV-032;
-   * {@code null} keeps the transitional legacy no-stock behaviour — see {@link
-   * #bookProducedStockIn}). Materials the operator listed in {@code dto.skippedMaterialIds} are
-   * excluded from the demand-coverage check and left un-booked-out — no inventory is consumed for
-   * them.
+   * the Lager as game-item stock at the payload's {@code bookIn} target (REQ-INV-032; required —
+   * validated {@code @NotNull} at the API boundary, see {@link #bookProducedStockIn}). Materials
+   * the operator listed in {@code dto.skippedMaterialIds} are excluded from the demand-coverage
+   * check and left un-booked-out — no inventory is consumed for them.
    *
    * @param jobOrderId the item order that owns the line
    * @param jobOrderItemId the ordered item line being produced
    * @param dto the production payload (amount, line version, per-entry consumption, skipped
-   *     materials, optional book-in target)
+   *     materials, book-in target)
    * @return the refreshed ordered-item line DTO (with the advanced {@code manufacturedAmount} and
    *     version)
    * @throws NotFoundException when the order, the line, a consumed inventory entry, or the book-in
@@ -351,8 +350,8 @@ public class JobOrderItemProductionService {
             .with("skipped", skippedRequiredMaterials.size()));
 
     // Book the produced units into the Lager (REQ-INV-032) — appended after the consumption
-    // bookkeeping, flush and offer clamps, in the same transaction. A null bookIn is the
-    // transitional legacy path (no stock row created).
+    // bookkeeping, flush and offer clamps, in the same transaction. bookIn is required (@NotNull
+    // at the API boundary), so every booking creates the produced stock.
     bookProducedStockIn(jobOrder, line, amount, dto.bookIn());
 
     return jobOrderItemService.toItemDtos(jobOrder).stream()
@@ -363,10 +362,10 @@ public class JobOrderItemProductionService {
 
   /**
    * Books the produced units into the Lager as one fresh game-item stock row (REQ-INV-032, design
-   * §5.6), appended to the production transaction after the consumption bookkeeping. A {@code null}
-   * {@code bookIn} keeps the transitional legacy behaviour — no stock row is created (the
-   * pre-item-stock status quo) — so the live Herstellung flow keeps working until the frontend
-   * modal ships the book-in section and the field flips to required.
+   * §5.6), appended to the production transaction after the consumption bookkeeping. The {@code
+   * bookIn} target is required — {@code @NotNull} on the DTO rejects a missing block as a 400 at
+   * the API boundary, so this method never sees {@code null} (the transitional null-tolerant
+   * rollout window closed with the production modal's book-in section).
    *
    * <p>Flow: resolve the owner ({@code ownerUserId}, defaulting to the acting user), stamp the
    * owning org unit through the same create-on-behalf resolution the Einbuchen flow uses ({@link
@@ -391,7 +390,7 @@ public class JobOrderItemProductionService {
    * @param line the produced item line whose {@code gameItem} becomes the stock row's catalog
    *     reference
    * @param amount the produced whole units to book in
-   * @param bookIn the book-in target, or {@code null} for the transitional legacy no-op
+   * @param bookIn the book-in target; never {@code null} (validated at the API boundary)
    * @throws NotFoundException when the book-in owner or location is unknown
    * @throws BadRequestException when {@code personal} is combined with the order earmark, the
    *     acting user cannot be resolved for a defaulted owner, the line carries no game item, or the
@@ -402,9 +401,6 @@ public class JobOrderItemProductionService {
       JobOrderItem line,
       int amount,
       JobOrderItemProductionCreateDto.BookInDto bookIn) {
-    if (bookIn == null) {
-      return;
-    }
     final boolean personal = Boolean.TRUE.equals(bookIn.personal());
     final boolean allocateToOrder = !Boolean.FALSE.equals(bookIn.allocateToOrder());
     if (personal && allocateToOrder) {
