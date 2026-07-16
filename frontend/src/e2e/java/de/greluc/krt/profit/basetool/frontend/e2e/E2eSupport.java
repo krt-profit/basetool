@@ -423,6 +423,29 @@ final class E2eSupport {
   }
 
   /**
+   * Like {@link #selectComboboxByValue(Locator, String)}, but first types {@code searchText} into
+   * the combobox textbox — the real-user flow for a server-side-search picker (REQ-FE-016), whose
+   * open-with-empty-query popup renders only the first response page (25 rows, name ascending). A
+   * seeded entry sorting beyond that window never renders on the empty query, so picking it MUST
+   * narrow the search first; the option click then auto-waits for the debounced fetch to render the
+   * match.
+   *
+   * @param comboInput the visible combobox textbox the enhancer rendered
+   * @param value the option value to pick (matched via {@code data-value})
+   * @param searchText the query to type first, narrowing the server-side result to the wanted entry
+   *     (typically the entry's seeded name)
+   */
+  static void selectComboboxByValue(Locator comboInput, String value, String searchText) {
+    comboInput.click();
+    comboInput.fill(searchText);
+    comboInput
+        .locator("xpath=..")
+        .locator("li[role='option'][data-value='" + value + "']")
+        .first()
+        .click();
+  }
+
+  /**
    * Picks the first real option of a KRT searchable combobox — the equivalent of a native {@code
    * selectOption(new SelectOption().setIndex(1))}, since the combobox does not render its
    * empty-value placeholder as a list option. Opens the popup by focusing the textbox, then clicks
