@@ -241,8 +241,8 @@ public class OrgUnitContextAdvice {
    *
    * <ul>
    *   <li>Admin: still uses {@code /api/v1/squadrons} (Staffel-only today) merged with {@code
-   *       /api/v1/special-commands}. Both calls are paginated to {@code size=1000} which is
-   *       generous for the foreseeable OrgUnit population.
+   *       /api/v1/special-commands}. Both catalogues are page-walked complete inside {@code
+   *       getCached} (REQ-ADMIN-003), so the switcher never silently truncates.
    *   <li>Non-admin: uses the lean {@code /api/v1/users/{id}/memberships} that R5.d.a introduced
    *       for the picker fragment. Reuses the existing wire shape so no new endpoint is needed.
    * </ul>
@@ -265,8 +265,8 @@ public class OrgUnitContextAdvice {
 
   /**
    * Admin path of {@link #availableOrgUnits()} — concatenates the Squadron catalogue with the
-   * SpecialCommand catalogue. Both lists are paginated server-side; we ask for {@code size=1000}
-   * which exceeds the foreseeable OrgUnit count by an order of magnitude.
+   * SpecialCommand catalogue. Both catalogues are assembled complete by the page walk inside {@code
+   * getCached} (REQ-ADMIN-003), so no OrgUnit can drop out of the switcher silently.
    *
    * @return Squadron + SK catalogue, never {@code null}.
    */

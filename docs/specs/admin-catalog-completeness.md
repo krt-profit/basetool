@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-16.
-> **Owner area:** ADMIN · **Related ADRs:** ADR-0102
+> **Owner area:** ADMIN · **Related ADRs:** ADR-0102, ADR-0103
 
 # Admin catalog pages — complete rendering, no silent truncation
 
@@ -15,6 +15,14 @@ counts from the truncated lists, so the counts lied too. This spec pins the fix:
 page assembles the complete catalogue by walking all backend pages, derives displayed totals
 from the backend-reported `totalElements`, and — should the walk ever stop early at its safety
 cap — says so loudly instead of pretending completeness.
+
+The same defect class existed one layer down: the frontend's **cached** reference catalogues
+(`CachedCatalog` / `BackendApiClient.getCached`, FE-CACHE-1 in
+[`data-persistence.md`](data-persistence.md) REQ-DATA-007) pinned single bounded pages
+(`size=1000` / `size=10000` / `size=100000`) for catalogues that pickers, the sidebar org-unit
+switcher and client-side filtered grids consume as "the whole list" — amplified by the cache, which
+would serve one truncated fetch app-wide for a whole TTL. REQ-ADMIN-003 extends the
+no-silent-truncation rule to that layer (ADR-0103).
 
 ## Requirements
 
@@ -76,6 +84,45 @@ totals), `AdminSpecialCommandsPageControllerTest` and `AdminMissionDataPageContr
 (cap-hit → truncation flags) · **Code:** `frontend support.CatalogPages`,
 `AdminUexPageController`, the shared `fragments/components :: alert` banner in the seven admin
 templates · **Issues:** —
+
+### REQ-ADMIN-003 — Cached reference catalogues are assembled complete inside the cache
+
+A paged catalogue in the frontend's `CachedCatalog` allowlist whose consumers treat the cached
+response as "the whole list" MUST be assembled by walking **every** backend page *inside* the
+cached fetch — the cache key is the enum constant, so a walk outside `getCached` would cache only
+page 0. Each constant declares its fetch mode (`Fetch.PAGE_WALK` / `Fetch.SINGLE`);
+`getCached` walks a `PAGE_WALK` catalogue through the shared `CatalogPages.fetchAll`
+(REQ-ADMIN-001's helper; the pinned URI's `size=` is the walk's chunk size) and caches one merged
+`PageResponse`. The `Class`-typed `getCached` overloads MUST reject a `PAGE_WALK` constant, so no
+public API can fetch a bounded single page of a walked catalogue. If the walk stops at the
+`MAX_CATALOG_PAGES` safety cap, a WARN log line naming the catalogue MUST be emitted — these
+catalogues feed pickers, sidebar fragments and advices with no page-level banner surface, so the
+log (not a banner) is the sanctioned loudness here. Deliberate single-page probes are exempt and
+pinned as such (`ITEM_CATALOG`, a `size=1` existence probe); non-paged list / subset / setting
+endpoints are `SINGLE` by shape.
+
+Covered page-walked catalogues: `SQUADRONS`, `SQUADRONS_UNSORTED`, `SPECIAL_COMMANDS`,
+`JOB_TYPES_MISSION`, `JOB_TYPES_CREW`, `MATERIALS`, `MATERIALS_MATRIX`, `LOCATIONS`,
+`SHIP_TYPES`, `SHIP_TYPES_SORTED`, `REFINING_METHODS`, `FREQUENCY_TYPES_ACTIVE`, `TERMINALS`,
+`MANUFACTURERS`. A *new* paged `CachedCatalog` constant falls under this requirement unless it is
+a deliberately-bounded probe documented on the constant.
+
+**Acceptance**
+
+- [ ] With a catalogue larger than one chunk, `getCached` issues `&page=0..n` requests and the
+  cached `PageResponse.content()` contains every row in backend order; with a one-chunk
+  catalogue exactly one request is made.
+- [ ] The merged envelope's `totalElements` is the backend-reported total.
+- [ ] A `Class`-typed `getCached` call on a page-walked constant fails fast without any backend
+  request.
+- [ ] A walk that hits `MAX_CATALOG_PAGES` logs a WARN naming the catalogue; a mid-walk backend
+  failure propagates to the caller and caches nothing.
+
+**Enforced by:** `FrontendCacheSplitTest` (per-constant fetch-mode + URI pins, `&page=`
+appendability), `BackendApiClientHappyPathTest` (merge order, single-request common case,
+`Class`-overload guard, cap-hit WARN), `CatalogPagesTest` · **Code:**
+`frontend service.CachedCatalog` (`Fetch` mode), `BackendApiClient.getCached` /
+`fetchCompleteCatalog` · **Issues:** —
 
 ## Out of scope
 
