@@ -28,16 +28,22 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItemMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
+import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemProductionConsumptionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.QuantityTypeRounding;
 import java.util.ArrayList;
@@ -55,8 +61,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Books production ("Herstellung", REQ-ORDERS-025) against an ordered item line: records how many
- * whole units have been manufactured and atomically reduces the linked inventory the manufacture
- * consumed.
+ * whole units have been manufactured, atomically reduces the linked inventory the manufacture
+ * consumed and — when the payload names a book-in target — books the produced units into the Lager
+ * as game-item stock (REQ-INV-032, {@link #bookProducedStockIn}).
  *
  * <p>The flow is a hybrid of the two handover services. Like {@link JobOrderItemHandoverService} it
  * bumps a per-line integer counter ({@code manufacturedAmount}) via Hibernate dirty checking (no
@@ -95,6 +102,11 @@ public class JobOrderItemProductionService {
   private final MaterialExchangeOfferRepository materialExchangeOfferRepository;
   private final JobOrderItemService jobOrderItemService;
   private final AuditService auditService;
+  private final UserService userService;
+  private final UserRepository userRepository;
+  private final LocationRepository locationRepository;
+  private final OwnerScopeService ownerScopeService;
+  private final InventoryCheckoutService inventoryCheckoutService;
 
   /**
    * One consumed inventory row's scalar snapshot, captured before the row is decremented/deleted so
@@ -119,21 +131,26 @@ public class JobOrderItemProductionService {
   /**
    * Books a production run against one item line: validates the amount against the line's
    * remaining-to-manufacture and the consumption against the required per-material demand, reduces
-   * the consumed linked inventory, increments {@code manufacturedAmount}, and audits the JOB_ORDER
-   * booking plus each cross-domain INVENTORY reduction. Materials the operator listed in {@code
-   * dto.skippedMaterialIds} are excluded from the demand-coverage check and left un-booked-out — no
-   * inventory is consumed for them.
+   * the consumed linked inventory, increments {@code manufacturedAmount}, audits the JOB_ORDER
+   * booking plus each cross-domain INVENTORY reduction, and finally books the produced units into
+   * the Lager as game-item stock when the payload carries a {@code bookIn} target (REQ-INV-032;
+   * {@code null} keeps the transitional legacy no-stock behaviour — see {@link
+   * #bookProducedStockIn}). Materials the operator listed in {@code dto.skippedMaterialIds} are
+   * excluded from the demand-coverage check and left un-booked-out — no inventory is consumed for
+   * them.
    *
    * @param jobOrderId the item order that owns the line
    * @param jobOrderItemId the ordered item line being produced
    * @param dto the production payload (amount, line version, per-entry consumption, skipped
-   *     materials)
+   *     materials, optional book-in target)
    * @return the refreshed ordered-item line DTO (with the advanced {@code manufacturedAmount} and
    *     version)
-   * @throws NotFoundException when the order, the line, or a consumed inventory entry is unknown
-   * @throws BadRequestException when the order is not an item order, or a consumed entry is not
-   *     linked to the order / does not hold the claimed material / breaks the PIECE whole-number
-   *     rule
+   * @throws NotFoundException when the order, the line, a consumed inventory entry, or the book-in
+   *     owner / location is unknown
+   * @throws BadRequestException when the order is not an item order, a consumed entry is not linked
+   *     to the order / does not hold the claimed material / breaks the PIECE whole-number rule, or
+   *     the book-in target is invalid (personal combined with the order earmark, or an org-unit
+   *     picker output outside the owner's memberships)
    * @throws ProductionAllocationException when the amount exceeds the line's
    *     remaining-to-manufacture, or the consumption does not exactly cover every required
    *     material's demand (a well-formed 422, distinct from a stale-version 409)
@@ -333,9 +350,113 @@ public class JobOrderItemProductionService {
             .with("consumed", dto.consumption().size())
             .with("skipped", skippedRequiredMaterials.size()));
 
+    // Book the produced units into the Lager (REQ-INV-032) — appended after the consumption
+    // bookkeeping, flush and offer clamps, in the same transaction. A null bookIn is the
+    // transitional legacy path (no stock row created).
+    bookProducedStockIn(jobOrder, line, amount, dto.bookIn());
+
     return jobOrderItemService.toItemDtos(jobOrder).stream()
         .filter(d -> d.id().equals(jobOrderItemId))
         .findFirst()
         .orElseThrow(() -> new NotFoundException("Item line not found after production booking"));
+  }
+
+  /**
+   * Books the produced units into the Lager as one fresh game-item stock row (REQ-INV-032, design
+   * §5.6), appended to the production transaction after the consumption bookkeeping. A {@code null}
+   * {@code bookIn} keeps the transitional legacy behaviour — no stock row is created (the
+   * pre-item-stock status quo) — so the live Herstellung flow keeps working until the frontend
+   * modal ships the book-in section and the field flips to required.
+   *
+   * <p>Flow: resolve the owner ({@code ownerUserId}, defaulting to the acting user), stamp the
+   * owning org unit through the same create-on-behalf resolution the Einbuchen flow uses ({@link
+   * OwnerScopeService#resolveOrgUnitForPickerOutputNullable} — validates the picker output against
+   * the <em>owner's</em> memberships and auto-stamps on a single membership, REQ-ORG-004/016), then
+   * create the row ({@code gameItem = line.gameItem}, whole amount, no quality — REQ-INV-029).
+   * Unless {@code personal}, the row is auto-earmarked to the producing order by adding the {@code
+   * InventoryJobOrderAllocation} slice to the cascade list with its back-reference <em>before</em>
+   * the single {@code save(...)} (never a separate pre-save). The saved row is folded through
+   * {@link InventoryCheckoutService#mergeStockIfRequested} — slice-first-then-merge, so {@code
+   * InventoryAllocations.unionInto} folds a same-order slice of an absorbed sibling correctly; item
+   * rows always auto-merge (PIECE rule, REQ-INV-026) — and audited as {@code
+   * INVENTORY_RECEIVED_FROM_PRODUCTION} with ids-only details (REQ-AUDIT-001).
+   *
+   * <p>Concurrency (CLAUDE.md landmines): the fresh row is transient, so {@code save()} dispatches
+   * to {@code persist()} — no merge, no double {@code @Version} bump; the merge helper joins this
+   * transaction ({@code MANDATORY}) and locks its group {@code FOR UPDATE}; and no
+   * {@code @Modifying(clearAutomatically = true)} query runs anywhere in this flow.
+   *
+   * @param jobOrder the producing order (managed within the production transaction)
+   * @param line the produced item line whose {@code gameItem} becomes the stock row's catalog
+   *     reference
+   * @param amount the produced whole units to book in
+   * @param bookIn the book-in target, or {@code null} for the transitional legacy no-op
+   * @throws NotFoundException when the book-in owner or location is unknown
+   * @throws BadRequestException when {@code personal} is combined with the order earmark, the
+   *     acting user cannot be resolved for a defaulted owner, the line carries no game item, or the
+   *     org-unit picker output is invalid for the owner (see the resolver)
+   */
+  private void bookProducedStockIn(
+      JobOrder jobOrder,
+      JobOrderItem line,
+      int amount,
+      JobOrderItemProductionCreateDto.BookInDto bookIn) {
+    if (bookIn == null) {
+      return;
+    }
+    final boolean personal = Boolean.TRUE.equals(bookIn.personal());
+    final boolean allocateToOrder = !Boolean.FALSE.equals(bookIn.allocateToOrder());
+    if (personal && allocateToOrder) {
+      // Personal stock never carries allocations (the standing assertNotPersonal invariant): the
+      // combination is contradictory, so reject it instead of silently dropping the earmark.
+      throw new BadRequestException("Personal items cannot be assigned to a mission or job order");
+    }
+    if (line.getGameItem() == null) {
+      throw new BadRequestException("Produced item line carries no game item to book in");
+    }
+
+    final User owner =
+        bookIn.ownerUserId() != null
+            ? userRepository
+                .findById(bookIn.ownerUserId())
+                .orElseThrow(() -> new NotFoundException("User not found"))
+            : userService
+                .getCurrentUser()
+                .orElseThrow(
+                    () ->
+                        new BadRequestException(
+                            "No acting user to book the produced stock in for"));
+    final Location location =
+        locationRepository
+            .findById(bookIn.locationId())
+            .orElseThrow(() -> new NotFoundException("Location not found"));
+    final OrgUnit owningOrgUnit =
+        ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, bookIn.owningOrgUnitId());
+
+    InventoryItem stockRow = new InventoryItem();
+    stockRow.setUser(owner);
+    stockRow.setOwningOrgUnit(owningOrgUnit);
+    stockRow.setGameItem(line.getGameItem());
+    stockRow.setLocation(location);
+    stockRow.setAmount((double) amount);
+    stockRow.setPersonal(personal);
+    if (allocateToOrder) {
+      // Auto-earmark through the cascade list + back-reference so the slice persists with the
+      // single save below (design §5.6 step 2 — never a separate pre-save of the allocation).
+      InventoryAllocations.addJobOrder(stockRow, jobOrder, (double) amount, false);
+    }
+    InventoryItem saved = inventoryItemRepository.save(stockRow);
+    // Slice-first-then-merge (transfer-flow precedent): item rows always auto-merge, and the
+    // client merge flag is irrelevant for them, so pass false.
+    InventoryItem merged = inventoryCheckoutService.mergeStockIfRequested(saved, false);
+    auditService.record(
+        AuditEventType.INVENTORY_RECEIVED_FROM_PRODUCTION,
+        merged.getId(),
+        InventoryAuditLabels.label(merged),
+        owner.getId(),
+        AuditDetails.of("jobOrderId", jobOrder.getId())
+            .with("gameItemId", line.getGameItem().getId())
+            .with("amount", amount)
+            .with("locationId", location.getId()));
   }
 }

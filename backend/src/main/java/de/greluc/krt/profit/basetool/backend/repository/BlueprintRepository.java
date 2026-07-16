@@ -216,6 +216,44 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
       @Param("q") String q, Pageable pageable);
 
   /**
+   * Page of distinct game items that are <em>bookable as Lager item stock</em>: the output item of
+   * at least one active (non-soft-deleted) blueprint — the item-catalog predicate of REQ-INV-029
+   * (design §5.4). Deliberately a <strong>superset</strong> of {@link #findOrderableItems(String,
+   * Pageable)}: no resolved-RESOURCE-ingredient requirement, because an item crafted purely from
+   * sub-components is still physical stock worth tracking — such an item may simply have zero
+   * allocatable orders, same as a material no order requests. An optional case-insensitive name
+   * filter narrows the picker; {@code q} must be non-null ({@code ""} = no filter — a {@code null}
+   * bind into {@code LOWER(CONCAT(...))} types as {@code bytea} on PostgreSQL and fails). The
+   * {@code manufacturer} is eager-fetched because the Lager item reference DTO renders its name.
+   *
+   * @param q case-insensitive item-name substring; must be non-null ({@code ""} = no filter)
+   * @param pageable page request (whitelisted {@code name} sort)
+   * @return a page of game items with at least one active blueprint
+   */
+  // Mirrors findOrderableItems: GameItem is the query ROOT so the whitelisted `name` sort
+  // resolves against gi.name, and the EXISTS subquery dedups without DISTINCT. The manufacturer
+  // is eager-fetched via JOIN FETCH rather than @EntityGraph: Spring Data resolves an
+  // @EntityGraph against the repository's domain type (Blueprint), where a `manufacturer`
+  // attribute does not exist, so the annotation form throws at runtime for this foreign-root
+  // query.
+  @Query(
+      value =
+          """
+          SELECT gi FROM de.greluc.krt.profit.basetool.backend.model.GameItem gi
+          LEFT JOIN FETCH gi.manufacturer WHERE EXISTS
+          (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS NULL)
+          AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%'))
+          """,
+      countQuery =
+          """
+          SELECT COUNT(gi) FROM de.greluc.krt.profit.basetool.backend.model.GameItem gi WHERE
+          EXISTS (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS
+          NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%'))
+          """)
+  Page<de.greluc.krt.profit.basetool.backend.model.GameItem> findItemsWithActiveBlueprint(
+      @Param("q") String q, Pageable pageable);
+
+  /**
    * Projection of active (non-soft-deleted) blueprint recipes for the user-facing product search
    * (#327), reduced to the scalars the service needs to group recipes into products: output name,
    * Wiki key, the resolved manufacturer name, and the resolved output-item id (the last two via a

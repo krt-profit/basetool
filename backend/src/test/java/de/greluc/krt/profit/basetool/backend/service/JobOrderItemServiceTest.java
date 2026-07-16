@@ -104,6 +104,52 @@ class JobOrderItemServiceTest {
     assertThat(service.requiredMaterialIds(itemOrder)).containsExactly(iron.getId());
   }
 
+  // covers REQ-INV-031 (requested game-item set: ITEM order -> distinct line game items)
+  @Test
+  void requiredGameItemIdsCollectsDistinctLineGameItemsForItemOrder() {
+    // Given an ITEM order with two lines ordering the same weapon plus one ordering a scope, and a
+    // line whose gameItem is unresolved (null) — the null must be skipped, the duplicate collapsed.
+    GameItem weapon = gameItem("Ballista", GameItemKind.WEAPON);
+    GameItem scope = gameItem("Scope", GameItemKind.WEAPON_ATTACHMENT);
+
+    JobOrder itemOrder = new JobOrder();
+    itemOrder.setType(JobOrderType.ITEM);
+    itemOrder.addItem(line(weapon));
+    itemOrder.addItem(line(weapon));
+    itemOrder.addItem(line(scope));
+    itemOrder.addItem(line(null));
+
+    // When / Then
+    assertThat(service.requiredGameItemIds(itemOrder))
+        .containsExactly(weapon.getId(), scope.getId());
+  }
+
+  // covers REQ-INV-031 (a MATERIAL order requests no game items => no item-stock link possible)
+  @Test
+  void requiredGameItemIdsIsEmptyForMaterialOrder() {
+    // Given a MATERIAL order (it has material lines, never item lines)
+    Material steel = new Material();
+    steel.setId(UUID.randomUUID());
+    JobOrder materialOrder = new JobOrder();
+    materialOrder.addMaterial(JobOrderMaterial.builder().material(steel).amount(5.0).build());
+
+    // When / Then — empty set = the item-stock link gate rejects every game item for this order
+    assertThat(service.requiredGameItemIds(materialOrder)).isEmpty();
+  }
+
+  /**
+   * Builds a bare ordered item line for the given game item — enough for the requested-game-item
+   * collection, which reads only the line's {@code gameItem} reference.
+   *
+   * @param gameItem the ordered game item, or {@code null} for an unresolved line
+   * @return the assembled line
+   */
+  private static JobOrderItem line(GameItem gameItem) {
+    JobOrderItem line = new JobOrderItem();
+    line.setGameItem(gameItem);
+    return line;
+  }
+
   @Test
   void buildItemLineDerivesResourceMaterialsScalingByAmountWithQualityDefaultAndOverride() {
     // Given a weapon blueprint with two RESOURCE ingredients plus an ITEM and an unresolved line.

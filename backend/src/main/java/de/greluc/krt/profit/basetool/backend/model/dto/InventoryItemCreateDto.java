@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import de.greluc.krt.profit.basetool.backend.validation.QuantityAware;
 import de.greluc.krt.profit.basetool.backend.validation.ValidQuantityAmount;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -41,10 +42,15 @@ import java.util.UUID;
  *
  * @param userId target user the inventory row is created for; may be {@code null} for self-entries
  *     (the service substitutes the JWT subject).
- * @param materialId Material UUID; required.
+ * @param materialId Material UUID for a material row; exactly one of {@code materialId} / {@code
+ *     gameItemId} must be set (REQ-INV-029).
+ * @param gameItemId GameItem UUID for a game-item stock row (REQ-INV-029, ADR-0100); mutually
+ *     exclusive with {@code materialId}. A game-item row carries no quality, holds positive
+ *     whole-unit amounts and rejects mission references.
  * @param locationId Storage location UUID; required.
- * @param quality Quality percentage in {@code [0, 1000]}; required.
- * @param amount Quantity; required, non-negative (further constrained per material via {@link
+ * @param quality Quality percentage in {@code [0, 1000]}; required for a material row, forbidden
+ *     for a game-item row.
+ * @param amount Quantity; required, non-negative (further constrained per catalog kind via {@link
  *     de.greluc.krt.profit.basetool.backend.validation.ValidQuantityAmount}).
  * @param personal {@code true} marks the row as a personal entry not visible in the global Lager
  *     view; cannot be combined with mission/job-order references.
@@ -71,9 +77,10 @@ import java.util.UUID;
 @ValidQuantityAmount
 public record InventoryItemCreateDto(
     UUID userId,
-    @NotNull UUID materialId,
+    UUID materialId,
+    UUID gameItemId,
     @NotNull UUID locationId,
-    @NotNull @Min(0) @Max(1000) Integer quality,
+    @Min(0) @Max(1000) Integer quality,
     @NotNull Double amount,
     Boolean personal,
     UUID missionId,
@@ -82,4 +89,45 @@ public record InventoryItemCreateDto(
     Boolean mergeStock,
     @Valid List<InventoryAllocationInput> jobOrderAllocations,
     @Valid List<InventoryAllocationInput> missionAllocations)
-    implements QuantityAware {}
+    implements QuantityAware {
+
+  /**
+   * Bean-validation guard for the catalog XOR (REQ-INV-029): exactly one of {@link #materialId} /
+   * {@link #gameItemId} must be present — mirrors the DB CHECK {@code
+   * chk_inventory_item_catalog_xor} so the violation surfaces as a 400 validation error instead of
+   * a 500 integrity failure.
+   *
+   * @return {@code true} when exactly one catalog reference is set
+   */
+  @AssertTrue(message = "{error.validation.inventory_catalog_xor}")
+  public boolean isCatalogReferenceValid() {
+    return (materialId == null) != (gameItemId == null);
+  }
+
+  /**
+   * Bean-validation guard pairing {@link #quality} with the catalog kind (REQ-INV-029): a material
+   * row requires a quality, a game-item row forbids one. Skipped while the XOR guard above already
+   * fails, so a payload with neither reference reports only the XOR violation.
+   *
+   * @return {@code true} when the quality presence matches the catalog kind
+   */
+  @AssertTrue(message = "{error.validation.inventory_quality_by_kind}")
+  public boolean isQualityConsistentWithCatalog() {
+    if ((materialId == null) == (gameItemId == null)) {
+      return true;
+    }
+    return materialId != null ? quality != null : quality == null;
+  }
+
+  /**
+   * Bean-validation guard rejecting mission references on a game-item payload (REQ-INV-031): item
+   * rows are allocatable only to ITEM job orders, never to missions.
+   *
+   * @return {@code true} when a game-item payload carries no mission reference
+   */
+  @AssertTrue(message = "{error.validation.inventory_item_no_mission}")
+  public boolean isMissionFreeForGameItem() {
+    return gameItemId == null
+        || (missionId == null && (missionAllocations == null || missionAllocations.isEmpty()));
+  }
+}

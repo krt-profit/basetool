@@ -266,6 +266,7 @@ class InventoryPageControllerMvcTest {
             itemId,
             new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
             new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+            null,
             new LocationReferenceDto(locationId, "ARC-L1"),
             90,
             10.0,
@@ -330,6 +331,7 @@ class InventoryPageControllerMvcTest {
             itemId,
             new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
             new MaterialReferenceDto(materialId, "Titanium Bolt", "PIECE"),
+            null,
             new LocationReferenceDto(locationId, "ARC-L1"),
             90,
             10.0,
@@ -394,6 +396,7 @@ class InventoryPageControllerMvcTest {
             itemId,
             new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
             new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+            null,
             new LocationReferenceDto(locationId, "ARC-L1"),
             90,
             10.0,
@@ -411,10 +414,24 @@ class InventoryPageControllerMvcTest {
     // them (the ITEM-order case the old materials-based filter could not handle).
     JobOrderReferenceDto matching =
         new JobOrderReferenceDto(
-            matchingOrderId, 71, "h1", "IN_PROGRESS", null, List.of(), List.of(materialId));
+            matchingOrderId,
+            71,
+            "h1",
+            "IN_PROGRESS",
+            null,
+            List.of(),
+            List.of(materialId),
+            List.of());
     JobOrderReferenceDto unrelated =
         new JobOrderReferenceDto(
-            unrelatedOrderId, 99, "h2", "IN_PROGRESS", null, List.of(), List.of(UUID.randomUUID()));
+            unrelatedOrderId,
+            99,
+            "h2",
+            "IN_PROGRESS",
+            null,
+            List.of(),
+            List.of(UUID.randomUUID()),
+            List.of());
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenAnswer(
@@ -467,6 +484,7 @@ class InventoryPageControllerMvcTest {
             itemId,
             new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
             new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+            null,
             new LocationReferenceDto(locationId, "ARC-L1"),
             90,
             10.0,

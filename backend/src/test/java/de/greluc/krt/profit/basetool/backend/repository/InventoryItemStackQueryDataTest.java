@@ -21,12 +21,14 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.projection.InventoryItemStackAggregate;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -73,6 +75,7 @@ class InventoryItemStackQueryDataTest {
   @Autowired private InventoryItemRepository inventoryItemRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private MaterialRepository materialRepository;
+  @Autowired private GameItemRepository gameItemRepository;
   @Autowired private LocationRepository locationRepository;
   @Autowired private SquadronRepository squadronRepository;
 
@@ -239,5 +242,87 @@ class InventoryItemStackQueryDataTest {
     assertThat(all)
         .as("both toggles false must return the personal and the shared stack")
         .hasSize(2);
+  }
+
+  // --- game-item stock rows (V220, REQ-INV-029) ------------------------------
+
+  /**
+   * With {@code material_id} nullable since V220, the material stack projections must exclude
+   * game-item rows explicitly ({@code i.material IS NOT NULL}): an item row surfacing as a
+   * null-material group would NPE the grouped assembly in {@code InventoryAggregationService}
+   * (design §4.4). The item stack siblings serve those rows instead, keyed without the quality
+   * dimension. Seeds one material and one game-item row for the same owner/location and pins each
+   * projection to exactly its own catalog population.
+   */
+  // covers REQ-INV-029 (material stacks exclude NULL-material rows; item stacks serve them)
+  @Test
+  void materialAndItemStackProjections_splitByCatalog_withAnItemRowPresent() {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername("u-" + UUID.randomUUID());
+    userRepository.save(user);
+
+    Location location = new Location();
+    location.setName("Hub-" + UUID.randomUUID());
+    locationRepository.save(location);
+
+    Material material = new Material();
+    material.setName("Quantanium-" + UUID.randomUUID());
+    material.setType(MaterialType.RAW);
+    materialRepository.save(material);
+
+    GameItem gameItem = new GameItem();
+    gameItem.setName("Quantum-Drive-" + UUID.randomUUID());
+    gameItemRepository.save(gameItem);
+
+    InventoryItem materialRow = new InventoryItem();
+    materialRow.setUser(user);
+    materialRow.setLocation(location);
+    materialRow.setMaterial(material);
+    materialRow.setQuality(800);
+    materialRow.setAmount(100.0);
+    materialRow.setPersonal(false);
+    inventoryItemRepository.save(materialRow);
+
+    InventoryItem itemRow = new InventoryItem();
+    itemRow.setUser(user);
+    itemRow.setLocation(location);
+    itemRow.setGameItem(gameItem);
+    itemRow.setAmount(3.0);
+    itemRow.setPersonal(false);
+    inventoryItemRepository.save(itemRow);
+    entityManager.flush();
+
+    // The user-scoped material stacks return ONLY the material stack — never a null-material
+    // group for the item row.
+    List<InventoryStackAggregate> materialStacks =
+        inventoryItemRepository.findUserStacks(
+            user.getId(), false, null, null, false, null, false, null, false, false);
+    assertThat(materialStacks)
+        .as("the item row must not surface as a (null-material) stack in the material view")
+        .hasSize(1);
+    assertThat(materialStacks.get(0).material().getId()).isEqualTo(material.getId());
+
+    // The global material stacks carry no null-material group either (admin all-scope sweep).
+    List<InventoryStackAggregate> globalStacks =
+        inventoryItemRepository.findGlobalStacks(
+            false, null, null, false, null, false, null, true, null, Set.of());
+    assertThat(globalStacks)
+        .as("no global material stack may carry a null material with an item row present")
+        .allSatisfy(stack -> assertThat(stack.material()).isNotNull());
+
+    // The item stack siblings serve the game-item population, keyed without a quality dimension.
+    List<InventoryItemStackAggregate> userItemStacks =
+        inventoryItemRepository.findUserItemStacks(
+            user.getId(), false, null, false, null, false, false);
+    assertThat(userItemStacks).hasSize(1);
+    assertThat(userItemStacks.get(0).gameItem().getId()).isEqualTo(gameItem.getId());
+    assertThat(userItemStacks.get(0).totalAmount()).isEqualTo(3.0);
+
+    List<InventoryItemStackAggregate> globalItemStacks =
+        inventoryItemRepository.findGlobalItemStacks(
+            true, List.of(gameItem.getId()), false, null, true, null, Set.of());
+    assertThat(globalItemStacks).hasSize(1);
+    assertThat(globalItemStacks.get(0).gameItem().getId()).isEqualTo(gameItem.getId());
   }
 }

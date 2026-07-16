@@ -78,6 +78,14 @@ kind-agnostic `JobOrderReferenceDto.requiredMaterialIds` (served by `/api/v1/ord
 rather than the MATERIAL-only `materials` list; a picker fed by the full order list and filtered
 on `materials` would silently drop every `ITEM` order.
 
+**GameItem sibling (REQ-INV-031).** A **game-item** stock row
+([`inventory-items.md`](inventory-items.md)) may only be linked to an `ITEM` order whose lines
+request that gameItem, gated on `JobOrderItemService.requiredGameItemIds` /
+`JobOrderReferenceDto.requiredGameItemIds` — the gameItem sibling of the material gate above,
+enforced at the same write seams. The material gate itself is unchanged, and material rows
+stay allocatable to `ITEM` orders through their blueprint-derived material requirements — the
+two gates are parallel, not a replacement.
+
 **Acceptance**
 
 - [ ] Creating or updating an inventory item with a job-order link whose material the order does
@@ -103,7 +111,10 @@ future path) discoverable, the order **detail** page MUST surface every inventor
 the order whose material is **not** among the order's requirements, as a warning section listing
 material, owner, location, quality and amount. The list is the order-linked inventory minus the
 required-material set; it is empty (section hidden) when every linked item matches a requirement.
-The link itself is undone from the Lager (setting the entry's "Auftrag" back to none). Computing
+The warning also flags **item earmarks** — game-item allocation slices whose order no longer
+requests that gameItem ([`inventory-items.md`](inventory-items.md) REQ-INV-031) — the gameItem
+sibling of the material check. The link itself is undone from the Lager (setting the entry's
+"Auftrag" back to none). Computing
 the warning MUST NOT add an N+1 to the order **list** endpoint — it is only resolved on the
 detail view.
 

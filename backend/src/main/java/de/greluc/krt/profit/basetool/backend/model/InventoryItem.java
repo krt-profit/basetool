@@ -46,7 +46,13 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
 
-/** Inventory Item JPA entity. */
+/**
+ * Inventory Item JPA entity — one warehouse stock row, discriminated by catalog kind (REQ-INV-029,
+ * ADR-0100): a <em>material</em> row carries {@link #material} + {@link #quality}, a <em>game
+ * item</em> row carries {@link #gameItem} with {@code quality == null} and whole-unit amounts.
+ * Exactly one of the two catalog references is set (DB CHECK {@code
+ * chk_inventory_item_catalog_xor}, V220).
+ */
 @Entity
 @Getter
 @Setter
@@ -69,19 +75,41 @@ public class InventoryItem extends AbstractEntity<UUID> {
   @ToString.Exclude
   private User user;
 
-  @ManyToOne(optional = false, fetch = FetchType.LAZY)
-  @JoinColumn(name = "material_id", nullable = false)
+  /**
+   * The commodity this row stocks, or {@code null} for a game-item row (REQ-INV-029). Nullable
+   * since V220 — note the {@code optional = true} mapping is load-bearing: Hibernate uses it to
+   * decide whether an implicit path join may be optimised to an inner join, so flipping it back
+   * would silently drop NULL-material rows from every query that navigates {@code i.material}.
+   */
+  @ManyToOne(optional = true, fetch = FetchType.LAZY)
+  @JoinColumn(name = "material_id", nullable = true)
   @ToString.Exclude
   private Material material;
+
+  /**
+   * The game item (catalog entry, blueprint output) this row stocks, or {@code null} for a material
+   * row (REQ-INV-029, ADR-0100). Game-item rows carry no {@link #quality} and hold positive
+   * whole-unit amounts; they follow the PIECE auto-merge rule of REQ-INV-026 and may be allocated
+   * only to ITEM job orders requesting this game item (REQ-INV-031).
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "game_item_id", nullable = true)
+  @ToString.Exclude
+  private GameItem gameItem;
 
   @ManyToOne(optional = false, fetch = FetchType.LAZY)
   @JoinColumn(name = "location_id", nullable = false)
   @ToString.Exclude
   private Location location;
 
+  /**
+   * Stock quality (0–1000) of a material row; always {@code null} for a game-item row (items have
+   * no quality dimension, REQ-INV-029). The pairing is DB-enforced via {@code
+   * chk_inventory_item_quality_by_kind} (V220).
+   */
   @Min(0)
   @Max(1000)
-  @Column(nullable = false)
+  @Column(nullable = true)
   private Integer quality;
 
   @Min(0)

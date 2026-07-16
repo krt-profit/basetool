@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
@@ -142,8 +143,8 @@ class InventoryItemServiceAllocationTest {
 
   private InventoryItemDto sentinelDto() {
     return new InventoryItemDto(
-        itemId, null, null, null, 750, 10.0, false, List.of(), 0.0, List.of(), 0.0, null, null, 2L,
-        null);
+        itemId, null, null, null, null, 750, 10.0, false, List.of(), 0.0, List.of(), 0.0, null,
+        null, 2L, null);
   }
 
   // --- add ---------------------------------------------------------------------------------
@@ -308,6 +309,139 @@ class InventoryItemServiceAllocationTest {
                 itemId,
                 new InventoryAllocationWriteDto(
                     InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 1.5, 1L)));
+  }
+
+  // --- game-item rows (V220, REQ-INV-029/031) --------------------------------
+
+  /**
+   * Builds a managed-like game-item stock row sharing the fixture entry shape: gameItem set,
+   * material and quality {@code null} (the V220 catalog XOR), non-personal, version 1.
+   *
+   * @param amount the row's amount.
+   * @param gameItemId the stocked game item's id.
+   * @return the assembled item row.
+   */
+  private InventoryItem itemEntry(double amount, UUID gameItemId) {
+    InventoryItem item = entry(amount);
+    item.setMaterial(null);
+    item.setQuality(null);
+    GameItem gameItem = new GameItem();
+    gameItem.setId(gameItemId);
+    gameItem.setName("Quantum Drive");
+    item.setGameItem(gameItem);
+    return item;
+  }
+
+  // covers REQ-INV-031 (kind dispatch: item rows gate on the order's requested game items)
+  @Test
+  void addAllocation_jobOrder_onItemRow_qualifyingItemOrder_addsSlice() {
+    // Given an item row and an ITEM order requesting exactly its game item
+    UUID gameItemId = UUID.randomUUID();
+    InventoryItem item = itemEntry(10.0, gameItemId);
+    UUID orderId = UUID.randomUUID();
+    JobOrder order = jobOrder(orderId, 42);
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    when(jobOrderItemService.requiredGameItemIds(order)).thenReturn(Set.of(gameItemId));
+    when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
+    when(inventoryItemMapper.toDto(item)).thenReturn(sentinelDto());
+
+    // When
+    service.addAllocation(
+        itemId,
+        new InventoryAllocationWriteDto(InventoryAllocationDimension.JOB_ORDER, orderId, 4.0, 1L));
+
+    // Then — the slice is written via the gameItem gate; the material gate is never consulted
+    // (the row has no material to check — the kind dispatch of REQ-INV-031).
+    assertEquals(1, item.getJobOrderAllocations().size());
+    assertSame(order, item.getJobOrderAllocations().get(0).getJobOrder());
+    verify(jobOrderItemService, never()).requiredMaterialIds(any(JobOrder.class));
+  }
+
+  // covers REQ-INV-031 (item earmark rejected when the order does not request the game item)
+  @Test
+  void addAllocation_jobOrder_onItemRow_orderNotRequestingItem_throwsBadRequest() {
+    // Given an item row and an order requesting a different game item (or a MATERIAL order, whose
+    // requested set is empty by contract — the same rejection)
+    InventoryItem item = itemEntry(10.0, UUID.randomUUID());
+    UUID orderId = UUID.randomUUID();
+    JobOrder order = jobOrder(orderId, 7);
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    when(jobOrderItemService.requiredGameItemIds(order)).thenReturn(Set.of(UUID.randomUUID()));
+
+    // When / Then
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            service.addAllocation(
+                itemId,
+                new InventoryAllocationWriteDto(
+                    InventoryAllocationDimension.JOB_ORDER, orderId, 4.0, 1L)));
+    verify(inventoryItemRepository, never()).saveAndFlush(any());
+  }
+
+  // covers REQ-INV-031 (item rows carry no mission dimension — addAllocation)
+  @Test
+  void addAllocation_mission_onItemRow_throwsBadRequest() {
+    // Given an item row and a mission-dimension write
+    InventoryItem item = itemEntry(10.0, UUID.randomUUID());
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
+
+    // When / Then — 400 (code BAD_REQUEST; 422 stays reserved for over-allocation), before any
+    // mission lookup
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            service.addAllocation(
+                itemId,
+                new InventoryAllocationWriteDto(
+                    InventoryAllocationDimension.MISSION, UUID.randomUUID(), 2.0, 1L)));
+    verify(inventoryItemRepository, never()).saveAndFlush(any());
+    verifyNoMissionLookups();
+  }
+
+  // covers REQ-INV-031 (item rows carry no mission dimension — changeAllocation)
+  @Test
+  void changeAllocation_mission_onItemRow_throwsBadRequest() {
+    // Given an item row and a mission-dimension amount change
+    InventoryItem item = itemEntry(10.0, UUID.randomUUID());
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
+
+    // When / Then
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            service.changeAllocation(
+                itemId,
+                new InventoryAllocationWriteDto(
+                    InventoryAllocationDimension.MISSION, UUID.randomUUID(), 3.0, 1L)));
+    verify(inventoryItemRepository, never()).saveAndFlush(any());
+    verifyNoMissionLookups();
+  }
+
+  // covers REQ-INV-029 (item allocation amounts are whole units)
+  @Test
+  void addAllocation_fractionalAmount_onItemRow_throwsBadRequest() {
+    // Given an item row and a fractional slice amount
+    InventoryItem item = itemEntry(10.0, UUID.randomUUID());
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
+
+    // When / Then — item rows restrict amounts to whole numbers like PIECE materials, without any
+    // material dereference (the row's material is null)
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            service.addAllocation(
+                itemId,
+                new InventoryAllocationWriteDto(
+                    InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 1.5, 1L)));
+    verify(inventoryItemRepository, never()).saveAndFlush(any());
+  }
+
+  /** Asserts the mission repository was never consulted (the item-row guard fires first). */
+  private void verifyNoMissionLookups() {
+    verify(missionRepository, never()).findById(any());
   }
 
   @Test

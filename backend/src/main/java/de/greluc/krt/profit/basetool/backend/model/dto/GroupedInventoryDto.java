@@ -22,20 +22,29 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.List;
 
 /**
- * Per-material roll-up of the Lager for the {@code /grouped} list views. Each material carries its
- * squadron-wide totals ({@code totalAmount}, amount-weighted {@code averageQuality}, {@code
- * maxQuality}) and the list of {@link InventoryStackDto} stacks it breaks down into — one stack per
- * distinct stock identity (owner, location, quality, association, owner pool). The stacks in turn
- * hold the individual append-only entries, so the UI renders Material → Stack → Entries.
+ * Per-catalog-entry roll-up of the Lager for the {@code /grouped} list views. Each group carries
+ * its squadron-wide totals and the list of {@link InventoryStackDto} stacks it breaks down into —
+ * one stack per distinct stock identity. The stacks in turn hold the individual append-only
+ * entries, so the UI renders Material/Item → Stack → Entries.
  *
- * @param material the grouping material
- * @param totalAmount the summed quantity across every stack of this material
- * @param averageQuality the amount-weighted mean quality across every stack
- * @param maxQuality the highest quality value seen across the stacks
- * @param stacks the per-stock-identity stacks this material breaks down into
+ * <p>Catalog-discriminated since V220 (REQ-INV-029, ADR-0100): a {@code catalog=MATERIAL} group
+ * carries {@code material} with the quality aggregates and {@code gameItem == null}; a {@code
+ * catalog=ITEM} group carries {@code gameItem} with {@code material == null} and {@code null}
+ * quality aggregates (game items have no quality dimension). Exactly one of the two references is
+ * set per group.
+ *
+ * @param material the grouping material, or {@code null} for a game-item group
+ * @param gameItem the grouping game item, or {@code null} for a material group
+ * @param totalAmount the summed quantity across every stack of this group
+ * @param averageQuality the amount-weighted mean quality across every stack; {@code null} for a
+ *     game-item group
+ * @param maxQuality the highest quality value seen across the stacks; {@code null} for a game-item
+ *     group
+ * @param stacks the per-stock-identity stacks this group breaks down into
  */
 public record GroupedInventoryDto(
     MaterialReferenceDto material,
+    InventoryGameItemReferenceDto gameItem,
     Double totalAmount,
     Double averageQuality,
     Integer maxQuality,

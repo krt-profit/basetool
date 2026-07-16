@@ -142,6 +142,7 @@ public class AdminAuditLogPageController {
               "INVENTORY_BULK_CHECKED_OUT",
               "INVENTORY_WIPED",
               "INVENTORY_RECEIVED_FROM_REFINERY",
+              "INVENTORY_RECEIVED_FROM_PRODUCTION",
               "INVENTORY_HANDED_OVER",
               "INVENTORY_CONSUMED_BY_PRODUCTION",
               "INVENTORY_ORG_RESTAMPED",

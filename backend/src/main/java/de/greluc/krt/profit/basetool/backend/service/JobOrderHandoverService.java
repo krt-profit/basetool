@@ -217,6 +217,15 @@ public class JobOrderHandoverService {
         throw new IllegalStateException("Inventory item does not belong to this JobOrder");
       }
 
+      if (inventoryItem.getMaterial() == null) {
+        // Game-item stock rows (V220, REQ-INV-029) are never valid material-handover sources: a
+        // material handover fulfils a JobOrderMaterial requirement, which an item row cannot back.
+        // Structurally unreachable through the allocation gate (an item row can only be earmarked
+        // to ITEM orders, and this flow already rejects ITEM orders above), but guarded explicitly
+        // so the material dereferences below can never NPE on a crafted payload (design §4.4).
+        throw new BadRequestException("Handed-over inventory entry does not hold a material");
+      }
+
       if (itemDto.amount() == null || itemDto.amount() <= 0) {
         // Defence in depth behind the DTO's @Positive (now actually cascaded via @Valid, audit
         // M-4): a non-positive amount would pass the "more than available" check, then *increase*

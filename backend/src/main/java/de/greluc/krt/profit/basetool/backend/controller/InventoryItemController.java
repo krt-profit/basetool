@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationWriteDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryCatalog;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
@@ -30,6 +33,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebo
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryAggregationService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryItemCatalogService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
@@ -70,6 +75,14 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Owner-vs-logistician decisions happen at the HTTP boundary via {@link
  * AuthHelperService#isLogisticianOrAbove()} and are passed as a boolean to the service — the
  * service stays free of {@code SecurityContextHolder} reads (ArchUnit rule).
+ *
+ * <p>Catalog discrimination (V220, REQ-INV-029, ADR-0100): the grouped / aggregated / flat /
+ * stack-entry reads carry a {@code catalog} query parameter defaulting to {@link
+ * InventoryCatalog#MATERIAL}, so pre-item clients are untouched. The {@code MATERIAL} paths keep
+ * delegating through {@link InventoryItemService} (the historical facade); the {@code ITEM} paths
+ * dispatch directly to {@link InventoryAggregationService}'s item siblings. {@code catalog=ITEM}
+ * rejects the material-only {@code minQuality} / {@code missionIds} / {@code quality} parameters
+ * with 400 (items carry no quality dimension and are never mission-allocated, REQ-INV-031).
  */
 @RestController
 @RequestMapping("/api/v1/inventory")
@@ -82,26 +95,62 @@ public class InventoryItemController {
   /** Upper bound on a stack-entries page size, clamping the per-request load. */
   private static final int STACK_ENTRIES_MAX_SIZE = 100;
 
+  /** Default multi-key sort of the material flat lists ({@code /my-inventory}, {@code /all}). */
+  private static final String MATERIAL_FLAT_DEFAULT_SORT =
+      "material.name,asc;quality,desc;amount,desc";
+
+  /** Default multi-key sort of the game-item flat lists ({@code catalog=ITEM}). */
+  private static final String ITEM_FLAT_DEFAULT_SORT = "gameItem.name,asc;amount,desc";
+
+  /** Sort whitelist of the material flat lists. */
+  private static final Set<String> MATERIAL_FLAT_SORT_FIELDS =
+      Set.of("amount", "quality", "id", "material.name");
+
+  /** Sort whitelist of the game-item flat lists — no quality key (REQ-INV-029). */
+  private static final Set<String> ITEM_FLAT_SORT_FIELDS = Set.of("amount", "id", "gameItem.name");
+
   private final InventoryItemService inventoryItemService;
+  private final InventoryAggregationService inventoryAggregationService;
+  private final InventoryItemCatalogService inventoryItemCatalogService;
   private final UserService userService;
   private final AuthHelperService authHelperService;
 
   /**
-   * Aggregated per-material inventory view. Default sort favors material name, then quality
-   * descending, then amount — the order operators actually want.
+   * Aggregated per-catalog-entry inventory view. For {@code catalog=MATERIAL} (the default) the
+   * sort favors material name, then quality descending, then amount — the order operators actually
+   * want; {@code catalog=ITEM} aggregates per game item with no quality columns (REQ-INV-028/029)
+   * under a {@code gameItem.name} / {@code amount} whitelist.
    *
+   * @param catalog which stock catalog to aggregate; defaults to {@code MATERIAL}
+   * @param page zero-based page index
+   * @param size page size
+   * @param sort sort spec; {@code null} falls back to the per-catalog default
    * @return paged aggregated DTOs
    */
   @GetMapping("/aggregated")
   @Transactional(readOnly = true)
   public PageResponse<AggregatedInventoryDto> getAggregatedInventory(
+      @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false, defaultValue = "material.name,asc;quality,desc;amount,desc")
-          String sort) {
+      @RequestParam(required = false) String sort) {
+    if (catalog == InventoryCatalog.ITEM) {
+      Pageable pageable =
+          PaginationUtil.createPageRequest(
+              page,
+              size,
+              sort != null ? sort : "gameItem.name,asc;amount,desc",
+              Set.of("amount", "gameItem.name"),
+              "gameItem.name");
+      return PageResponse.of(inventoryAggregationService.getAggregatedItemInventory(pageable));
+    }
     Pageable pageable =
         PaginationUtil.createPageRequest(
-            page, size, sort, Set.of("amount", "quality", "material.name"), "material.name");
+            page,
+            size,
+            sort != null ? sort : MATERIAL_FLAT_DEFAULT_SORT,
+            Set.of("amount", "quality", "material.name"),
+            "material.name");
     Page<AggregatedInventoryDto> p = inventoryItemService.getAggregatedInventory(pageable);
     return PageResponse.of(p);
   }
@@ -128,21 +177,74 @@ public class InventoryItemController {
   }
 
   /**
-   * Calling user's own inventory items. Owner id derived from the JWT — no impersonation.
+   * Per-game-item drilldown — every individual non-personal stock row of the given game item,
+   * parallel to {@link #getInventoryByMaterial(UUID, Integer, Integer, String)} (REQ-INV-029,
+   * design §5.2). No quality sort key — items carry no quality dimension. Inherits the {@code
+   * hasAnyRole(ADMIN, OFFICER, LOGISTICIAN, KRT_MEMBER)} gate from the {@code /api/v1/inventory/**}
+   * URL umbrella in {@code SecurityConfig}, matching the controller's other read handlers (no
+   * method-level annotation needed).
    *
+   * @param gameItemId game item to drill into
+   * @param page zero-based page index
+   * @param size page size
+   * @param sort sort spec (whitelist: {@code location.name}, {@code amount}, {@code id})
+   * @return paged inventory rows stocking that game item
+   */
+  @GetMapping("/game-item/{gameItemId}")
+  @Transactional(readOnly = true)
+  public PageResponse<InventoryItemDto> getInventoryByGameItem(
+      @PathVariable @NotNull UUID gameItemId,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false, defaultValue = "location.name,asc;amount,desc") String sort) {
+    Pageable pageable =
+        PaginationUtil.createPageRequest(
+            page, size, sort, Set.of("amount", "id", "location.name"), "location.name");
+    Page<InventoryItemDto> p =
+        inventoryAggregationService.getInventoryByGameItem(gameItemId, pageable);
+    return PageResponse.of(p);
+  }
+
+  /**
+   * Calling user's own inventory items. Owner id derived from the JWT — no impersonation. {@code
+   * catalog=MATERIAL} (the default) returns the material rows under the historical sort contract;
+   * {@code catalog=ITEM} returns the caller's game-item rows under the quality-less {@code
+   * gameItem.name} / {@code amount} whitelist (REQ-INV-029).
+   *
+   * @param jwt the caller's token (owner scope)
+   * @param catalog which stock catalog to list; defaults to {@code MATERIAL}
+   * @param page zero-based page index
+   * @param size page size
+   * @param sort sort spec; {@code null} falls back to the per-catalog default
    * @return paged inventory items
    */
   @GetMapping("/my-inventory")
   @Transactional(readOnly = true)
   public PageResponse<InventoryItemDto> getMyInventory(
       @AuthenticationPrincipal Jwt jwt,
+      @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false, defaultValue = "material.name,asc;quality,desc;amount,desc")
-          String sort) {
+      @RequestParam(required = false) String sort) {
+    if (catalog == InventoryCatalog.ITEM) {
+      Pageable pageable =
+          PaginationUtil.createPageRequest(
+              page,
+              size,
+              sort != null ? sort : ITEM_FLAT_DEFAULT_SORT,
+              ITEM_FLAT_SORT_FIELDS,
+              "gameItem.name");
+      return PageResponse.of(
+          inventoryAggregationService.getUserItemInventory(
+              userService.getUserIdFromJwt(jwt), pageable));
+    }
     Pageable pageable =
         PaginationUtil.createPageRequest(
-            page, size, sort, Set.of("amount", "quality", "id", "material.name"), "quality");
+            page,
+            size,
+            sort != null ? sort : MATERIAL_FLAT_DEFAULT_SORT,
+            MATERIAL_FLAT_SORT_FIELDS,
+            "quality");
     Page<InventoryItemDto> p =
         inventoryItemService.getUserInventory(userService.getUserIdFromJwt(jwt), pageable);
     return PageResponse.of(p);
@@ -158,6 +260,11 @@ public class InventoryItemController {
    * @param nonPersonalOnly when {@code true}, narrows the result to the caller's shared stock
    *     ({@code personal = false} rows) — the "Mein Lager" non-personal-entries-only filter;
    *     defaults to {@code false} and is mutually exclusive with {@code personalOnly}
+   * @param catalog which stock catalog to group; defaults to {@code MATERIAL}. {@code ITEM} groups
+   *     GameItem → Stack over the quality-less item stack key, filters by {@code gameItemIds} /
+   *     {@code jobOrderIds}, and rejects {@code minQuality} / {@code missionIds} with 400
+   *     (REQ-INV-029/031)
+   * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only)
    * @return grouped DTOs
    */
   @GetMapping("/my-inventory/grouped")
@@ -166,11 +273,22 @@ public class InventoryItemController {
       getMyGroupedInventory(
           @AuthenticationPrincipal Jwt jwt,
           @RequestParam(required = false) List<UUID> materialIds,
+          @RequestParam(required = false) List<UUID> gameItemIds,
           @RequestParam(required = false) Integer minQuality,
           @RequestParam(required = false) List<UUID> jobOrderIds,
           @RequestParam(required = false) List<UUID> missionIds,
           @RequestParam(required = false, defaultValue = "false") boolean personalOnly,
-          @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly) {
+          @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly,
+          @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
+    if (catalog == InventoryCatalog.ITEM) {
+      rejectMaterialOnlyFilters(minQuality, missionIds);
+      return inventoryAggregationService.getMyAggregatedItemInventory(
+          userService.getUserIdFromJwt(jwt),
+          gameItemIds,
+          jobOrderIds,
+          personalOnly,
+          nonPersonalOnly);
+    }
     return inventoryItemService.getMyAggregatedInventory(
         userService.getUserIdFromJwt(jwt),
         materialIds,
@@ -182,24 +300,53 @@ public class InventoryItemController {
   }
 
   /**
-   * Squadron-wide flat inventory list (admin/logistician view).
+   * Squadron-wide flat inventory list (admin/logistician view). {@code catalog=MATERIAL} (the
+   * default) keeps the historical material contract; {@code catalog=ITEM} lists game-item rows,
+   * filters by {@code gameItemIds} / {@code jobOrderIds} and rejects {@code minQuality} / {@code
+   * missionIds} with 400 (REQ-INV-029/031).
    *
+   * @param materialIds optional material filter ({@code catalog=MATERIAL} only)
+   * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only)
+   * @param minQuality optional quality floor; rejected for {@code catalog=ITEM}
+   * @param jobOrderIds optional job-order filter (both catalogs)
+   * @param missionIds optional mission filter; rejected for {@code catalog=ITEM}
+   * @param catalog which stock catalog to list; defaults to {@code MATERIAL}
+   * @param page zero-based page index
+   * @param size page size
+   * @param sort sort spec; {@code null} falls back to the per-catalog default
    * @return paged inventory items
    */
   @GetMapping("/all")
   @Transactional(readOnly = true)
   public PageResponse<InventoryItemDto> getAllInventory(
       @RequestParam(required = false) List<UUID> materialIds,
+      @RequestParam(required = false) List<UUID> gameItemIds,
       @RequestParam(required = false) Integer minQuality,
       @RequestParam(required = false) List<UUID> jobOrderIds,
       @RequestParam(required = false) List<UUID> missionIds,
+      @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false, defaultValue = "material.name,asc;quality,desc;amount,desc")
-          String sort) {
+      @RequestParam(required = false) String sort) {
+    if (catalog == InventoryCatalog.ITEM) {
+      rejectMaterialOnlyFilters(minQuality, missionIds);
+      Pageable pageable =
+          PaginationUtil.createPageRequest(
+              page,
+              size,
+              sort != null ? sort : ITEM_FLAT_DEFAULT_SORT,
+              ITEM_FLAT_SORT_FIELDS,
+              "gameItem.name");
+      return PageResponse.of(
+          inventoryAggregationService.getAllItemInventory(gameItemIds, jobOrderIds, pageable));
+    }
     Pageable pageable =
         PaginationUtil.createPageRequest(
-            page, size, sort, Set.of("amount", "quality", "id", "material.name"), "quality");
+            page,
+            size,
+            sort != null ? sort : MATERIAL_FLAT_DEFAULT_SORT,
+            MATERIAL_FLAT_SORT_FIELDS,
+            "quality");
     Page<InventoryItemDto> p =
         inventoryItemService.getAllInventory(
             materialIds, minQuality, jobOrderIds, missionIds, pageable);
@@ -226,8 +373,15 @@ public class InventoryItemController {
 
   /**
    * Squadron-wide grouped variant — same shape as {@link #getMyGroupedInventory} but scoped to all
-   * users.
+   * users. {@code catalog=ITEM} groups GameItem → Stack, filters by {@code gameItemIds} / {@code
+   * jobOrderIds}, and rejects {@code minQuality} / {@code missionIds} with 400 (REQ-INV-029/031).
    *
+   * @param materialIds optional material filter ({@code catalog=MATERIAL} only)
+   * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only)
+   * @param minQuality optional quality floor; rejected for {@code catalog=ITEM}
+   * @param jobOrderIds optional job-order filter (both catalogs)
+   * @param missionIds optional mission filter; rejected for {@code catalog=ITEM}
+   * @param catalog which stock catalog to group; defaults to {@code MATERIAL}
    * @return grouped DTOs
    */
   @GetMapping("/all/grouped")
@@ -235,9 +389,15 @@ public class InventoryItemController {
   public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
       getAllGroupedInventory(
           @RequestParam(required = false) List<UUID> materialIds,
+          @RequestParam(required = false) List<UUID> gameItemIds,
           @RequestParam(required = false) Integer minQuality,
           @RequestParam(required = false) List<UUID> jobOrderIds,
-          @RequestParam(required = false) List<UUID> missionIds) {
+          @RequestParam(required = false) List<UUID> missionIds,
+          @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
+    if (catalog == InventoryCatalog.ITEM) {
+      rejectMaterialOnlyFilters(minQuality, missionIds);
+      return inventoryAggregationService.getAllAggregatedItemInventory(gameItemIds, jobOrderIds);
+    }
     return inventoryItemService.getAllAggregatedInventory(
         materialIds, minQuality, jobOrderIds, missionIds);
   }
@@ -251,19 +411,38 @@ public class InventoryItemController {
    * inventory grows unboundedly per stack, so this is the only path that materialises the
    * individual entries.
    *
+   * <p>{@code catalog=MATERIAL} (the default) addresses the stack by {@code materialId} (+ optional
+   * {@code quality}); {@code catalog=ITEM} addresses it by {@code gameItemId} and rejects a {@code
+   * quality} param — item stacks carry no quality key (REQ-INV-005/029). The catalog-matching id is
+   * required (400 when absent).
+   *
    * @return one page of the stack's entries, oldest-first
    */
   @GetMapping("/my-inventory/stack/entries")
   @Transactional(readOnly = true)
   public PageResponse<InventoryItemDto> getMyStackEntries(
       @AuthenticationPrincipal Jwt jwt,
-      @RequestParam @NotNull UUID materialId,
+      @RequestParam(required = false) UUID materialId,
+      @RequestParam(required = false) UUID gameItemId,
       @RequestParam @NotNull UUID locationId,
       @RequestParam(required = false) Integer quality,
       @RequestParam(required = false, defaultValue = "false") Boolean personal,
       @RequestParam(required = false) UUID owningOrgUnitId,
+      @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size) {
+    if (catalog == InventoryCatalog.ITEM) {
+      requireItemStackKey(gameItemId, quality);
+      return PageResponse.of(
+          inventoryAggregationService.getMyItemStackEntries(
+              userService.getUserIdFromJwt(jwt),
+              gameItemId,
+              locationId,
+              personal,
+              owningOrgUnitId,
+              stackEntriesPageRequest(page, size)));
+    }
+    requireMaterialStackKey(materialId);
     Page<InventoryItemDto> p =
         inventoryItemService.getMyStackEntries(
             userService.getUserIdFromJwt(jwt),
@@ -281,20 +460,35 @@ public class InventoryItemController {
    * on the admin/logistician "global Lager" page. Includes the stack's owning {@code userId}
    * because a global stack is per-owner; the service re-applies the same org-unit scope predicate
    * as the grouped view, so the drill-down can never widen visibility beyond the caller's org-unit
-   * slice.
+   * slice. Catalog addressing follows {@link #getMyStackEntries}: {@code materialId} (+ optional
+   * {@code quality}) for {@code MATERIAL}, {@code gameItemId} without {@code quality} for {@code
+   * ITEM} (REQ-INV-005/029).
    *
    * @return one page of the stack's entries, oldest-first
    */
   @GetMapping("/all/stack/entries")
   @Transactional(readOnly = true)
   public PageResponse<InventoryItemDto> getAllStackEntries(
-      @RequestParam @NotNull UUID materialId,
+      @RequestParam(required = false) UUID materialId,
+      @RequestParam(required = false) UUID gameItemId,
       @RequestParam @NotNull UUID userId,
       @RequestParam @NotNull UUID locationId,
       @RequestParam(required = false) Integer quality,
       @RequestParam(required = false) UUID owningOrgUnitId,
+      @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size) {
+    if (catalog == InventoryCatalog.ITEM) {
+      requireItemStackKey(gameItemId, quality);
+      return PageResponse.of(
+          inventoryAggregationService.getAllItemStackEntries(
+              gameItemId,
+              userId,
+              locationId,
+              owningOrgUnitId,
+              stackEntriesPageRequest(page, size)));
+    }
+    requireMaterialStackKey(materialId);
     Page<InventoryItemDto> p =
         inventoryItemService.getAllStackEntries(
             materialId,
@@ -303,6 +497,40 @@ public class InventoryItemController {
             quality,
             owningOrgUnitId,
             stackEntriesPageRequest(page, size));
+    return PageResponse.of(p);
+  }
+
+  /**
+   * Paged picker of the game items bookable as Lager item stock — the output of at least one active
+   * blueprint, deliberately a superset of the anonymous order picker's predicate (design §5.3/§5.4,
+   * REQ-INV-029). A dedicated endpoint rather than a reuse of {@code GET
+   * /api/v1/orders/item-catalog}: that one is {@code permitAll()} for the anonymous item-order
+   * request form, and Member-facing Lager UI must not hang on an anonymous surface. No method-level
+   * {@code @PreAuthorize} needed — the endpoint inherits {@code hasAnyRole(ADMIN, OFFICER,
+   * LOGISTICIAN, KRT_MEMBER)} from the {@code /api/v1/inventory/**} URL umbrella in {@code
+   * SecurityConfig} (verified), matching the controller's other read handlers.
+   *
+   * @param q optional case-insensitive item-name filter
+   * @param page zero-based page index
+   * @param size page size
+   * @param sort sort spec (only {@code name} is whitelisted)
+   * @return paged bookable game-item references (id, name, manufacturer, kind — no PII)
+   */
+  @GetMapping("/item-catalog")
+  @Operation(
+      summary = "List bookable game items",
+      description =
+          "Returns a paginated list of game items that can be booked as Lager item stock (output"
+              + " of at least one active blueprint).")
+  @Transactional(readOnly = true)
+  public PageResponse<InventoryGameItemReferenceDto> getItemCatalog(
+      @RequestParam(required = false) String q,
+      @RequestParam(required = false, defaultValue = "0") int page,
+      @RequestParam(required = false, defaultValue = "20") int size,
+      @RequestParam(required = false, defaultValue = "name,asc") String sort) {
+    Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, Set.of("name"), "name");
+    Page<InventoryGameItemReferenceDto> p =
+        inventoryItemCatalogService.findBookableItems(q, pageable);
     return PageResponse.of(p);
   }
 
@@ -323,6 +551,58 @@ public class InventoryItemController {
             ? Math.min(size, STACK_ENTRIES_MAX_SIZE)
             : STACK_ENTRIES_DEFAULT_SIZE;
     return org.springframework.data.domain.PageRequest.of(resolvedPage, resolvedSize);
+  }
+
+  /**
+   * Rejects the material-only filter parameters on a {@code catalog=ITEM} read (REQ-INV-029/031):
+   * game items carry no quality dimension, so a {@code minQuality} floor is meaningless, and item
+   * rows are never mission-allocated, so a {@code missionIds} filter could only ever return the
+   * empty set — both are contract errors, surfaced as RFC 7807 400 rather than silently ignored.
+   *
+   * @param minQuality the quality floor parameter; must be {@code null} for the item catalog
+   * @param missionIds the mission filter parameter; must be {@code null} or empty for the item
+   *     catalog
+   * @throws BadRequestException when either material-only filter is present
+   */
+  private static void rejectMaterialOnlyFilters(Integer minQuality, List<UUID> missionIds) {
+    if (minQuality != null) {
+      throw new BadRequestException("minQuality is not supported for catalog=ITEM");
+    }
+    if (missionIds != null && !missionIds.isEmpty()) {
+      throw new BadRequestException("missionIds is not supported for catalog=ITEM");
+    }
+  }
+
+  /**
+   * Validates the stack address of a {@code catalog=ITEM} stack-entries drill-down (REQ-INV-005/
+   * 029): the stack is keyed by {@code gameItemId}, and a {@code quality} parameter is rejected
+   * because item stacks carry no quality dimension.
+   *
+   * @param gameItemId the item stack key; must be present
+   * @param quality the material-only quality key; must be absent
+   * @throws BadRequestException when the item key is missing or a quality key is supplied
+   */
+  private static void requireItemStackKey(UUID gameItemId, Integer quality) {
+    if (gameItemId == null) {
+      throw new BadRequestException("gameItemId is required for catalog=ITEM");
+    }
+    if (quality != null) {
+      throw new BadRequestException("quality is not supported for catalog=ITEM");
+    }
+  }
+
+  /**
+   * Validates the stack address of a {@code catalog=MATERIAL} stack-entries drill-down: the stack
+   * is keyed by {@code materialId}, which was historically a required parameter and became optional
+   * in the signature only so the {@code ITEM} variant can omit it (REQ-INV-029).
+   *
+   * @param materialId the material stack key; must be present
+   * @throws BadRequestException when the material key is missing
+   */
+  private static void requireMaterialStackKey(UUID materialId) {
+    if (materialId == null) {
+      throw new BadRequestException("materialId is required for catalog=MATERIAL");
+    }
   }
 
   /**

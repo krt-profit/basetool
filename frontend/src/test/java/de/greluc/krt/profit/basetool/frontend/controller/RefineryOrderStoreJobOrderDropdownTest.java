@@ -129,10 +129,24 @@ class RefineryOrderStoreJobOrderDropdownTest {
     // exactly the case the old materials-based filter could not handle.
     JobOrderReferenceDto matching =
         new JobOrderReferenceDto(
-            matchingOrderId, 71, "h1", "IN_PROGRESS", null, List.of(), List.of(outputMaterialId));
+            matchingOrderId,
+            71,
+            "h1",
+            "IN_PROGRESS",
+            null,
+            List.of(),
+            List.of(outputMaterialId),
+            List.of());
     JobOrderReferenceDto unrelated =
         new JobOrderReferenceDto(
-            unrelatedOrderId, 99, "h2", "IN_PROGRESS", null, List.of(), List.of(UUID.randomUUID()));
+            unrelatedOrderId,
+            99,
+            "h2",
+            "IN_PROGRESS",
+            null,
+            List.of(),
+            List.of(UUID.randomUUID()),
+            List.of());
 
     when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
         .thenReturn(order);

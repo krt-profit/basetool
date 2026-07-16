@@ -730,10 +730,11 @@ public class JobOrderService {
    * freeze). Each line's required materials are re-derived from its blueprint. Unlike the
    * logistician {@link #updateItemJobOrder} — which leaves now-unrequired links as REQ-ORDERS-019
    * orphan warnings — the requester path unlinks the inventory of every material no longer required
-   * by any surviving line, honouring the issue's "removing an item unlinks the linked inventory"
-   * rule, via the same safe post-persist unlink ordering. On commit the processing org unit's
-   * officers/leads are notified. Audited as {@code JOB_ORDER_ITEM_UPDATED} with {@code
-   * byRequester=true}.
+   * by any surviving line <em>and</em> drops the game-item allocation slices of every game item the
+   * rebuilt line set no longer requests (REQ-INV-031), honouring the issue's "removing an item
+   * unlinks the linked inventory" rule, via the same safe post-persist unlink ordering. On commit
+   * the processing org unit's officers/leads are notified. Audited as {@code
+   * JOB_ORDER_ITEM_UPDATED} with {@code byRequester=true}.
    *
    * @param id the order id.
    * @param updateDto the new item lines + comment (carries the expected version); org-unit / status
@@ -761,10 +762,12 @@ public class JobOrderService {
 
     jobOrder.setComment(normalizeComment(updateDto.comment()));
 
-    // Snapshot the required materials before the rebuild so we can unlink the inventory of any
-    // material the new line set no longer requires.
+    // Snapshot the required materials and requested game items before the rebuild so we can unlink
+    // the inventory of anything the new line set no longer requires.
     final Set<UUID> requiredBefore =
         new LinkedHashSet<>(jobOrderItemService.requiredMaterialIds(jobOrder));
+    final Set<UUID> requiredGameItemsBefore =
+        new LinkedHashSet<>(jobOrderItemService.requiredGameItemIds(jobOrder));
 
     jobOrder.getItems().clear();
     populateItemLines(jobOrder, updateDto.items());
@@ -774,11 +777,21 @@ public class JobOrderService {
     // canonical createHandover ordering (CLAUDE.md "Bulk updates inside loops").
     jobOrderRepository.saveAndFlush(jobOrder);
 
+    // Compute BOTH diff sets before the first clearing bulk update runs — each unlink detaches the
+    // persistence context, so the managed aggregate must not be walked afterwards.
     Set<UUID> noLongerRequired = new LinkedHashSet<>(requiredBefore);
     noLongerRequired.removeAll(jobOrderItemService.requiredMaterialIds(jobOrder));
+    Set<UUID> noLongerRequestedGameItems = new LinkedHashSet<>(requiredGameItemsBefore);
+    noLongerRequestedGameItems.removeAll(jobOrderItemService.requiredGameItemIds(jobOrder));
     for (UUID removedMaterialId : noLongerRequired) {
       // R2 (REQ-INV-027): drop the order's allocation slices for the no-longer-required material.
       inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(id, removedMaterialId);
+    }
+    for (UUID removedGameItemId : noLongerRequestedGameItems) {
+      // Game-item sibling (REQ-INV-031): drop the order's allocation slices on item stock whose
+      // game item the rebuilt line set no longer requests — otherwise the earmark would linger as
+      // a permanent orphan-link warning (REQ-ORDERS-019).
+      inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndGameItem(id, removedGameItemId);
     }
 
     // Re-fetch a managed instance for the post-clear reads (claim reconciliation, audit, DTO).

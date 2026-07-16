@@ -1,5 +1,6 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-15.
-> **Owner area:** ORDERS/UI · **Related ADRs:** [ADR-0099](../adr/0099-job-order-item-production-booking.md)
+> **Owner area:** ORDERS/UI · **Related ADRs:** [ADR-0099](../adr/0099-job-order-item-production-booking.md),
+> [ADR-0100](../adr/0100-inventory-game-item-rows.md) (production book-in)
 
 # Item-order production booking (Herstellung) & order-detail tab layout
 
@@ -117,6 +118,17 @@ Aufträge and Mein Inventar are **audited areas**, so both event types are recor
 unified viewer's per-area filter, and carried in the DE/EN i18n labels (`REQ-AUDIT-001`,
 [`audit.md`](audit.md)).
 
+**Book-in (REQ-INV-032, ADR-0100).** A production booking now **also books the produced units
+into the Lager** as game-item stock ([`inventory-items.md`](inventory-items.md)): the request's
+`bookIn` block names the location, the owner user (default: actor), the owning org unit
+(create-on-behalf stamping semantics) and the personal flag, and auto-earmarks the produced
+units to the producing order by default (`allocateToOrder`, deselectable; mutually exclusive
+with `personal = true` → 400). The book-in runs in the same transaction as the consumption and
+is audited as `INVENTORY_RECEIVED_FROM_PRODUCTION`. **Rollout:** `bookIn` is
+transitional-optional at the API level (`null` ⇒ the legacy no-stock behaviour above) until the
+frontend's production modal ships it, then becomes required. The full contract lives in
+REQ-INV-032.
+
 **Frontend.** The Herstellung modal renders one reconciliation card per required material; each card
 carries a **"Nicht ausbuchen" checkbox** (`data-prod-skip`). Ticking it flags the card, disables that
 material's stock inputs, drops the material from the "buchen" coverage gate, and adds its id to the
@@ -158,6 +170,10 @@ apply map.
 - [ ] A non-`ITEM` order is rejected with 400.
 - [ ] A booking records one `JOB_ORDER_PRODUCTION_BOOKED` and one
   `INVENTORY_CONSUMED_BY_PRODUCTION` per consumed entry, none carrying free text.
+- [ ] A booking with a `bookIn` block creates (or merges into) the matching game-item stack,
+  earmarked to the order unless deselected, audited as `INVENTORY_RECEIVED_FROM_PRODUCTION` in
+  the same transaction (REQ-INV-032); `bookIn == null` preserves the legacy counter-only
+  behaviour during rollout.
 - [ ] The endpoint is reachable only by a LOGISTICIAN/OFFICER/ADMIN with `canEditJobOrder`; the
   success response re-renders the `production` + `kpi` sections in place and propagates them to a
   peer without a reload.

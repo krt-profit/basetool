@@ -91,6 +91,13 @@ repeated per-level header, right-aligned tabular numbers with a 0-1000 quality g
 rendered only when an entry has one. The
 per-material aggregate page (`/inventory`, `AggregatedInventoryDto`) is unchanged.
 
+**Game-item rows (REQ-INV-029/030).** Since [`inventory-items.md`](inventory-items.md)
+REQ-INV-029 the Lager also holds **game-item** stock rows with their own stack key —
+`user · gameItem · location · personal · owningOrgUnit`, no quality dimension — rendered in
+their own Items view (REQ-INV-030). The material tree and its grouping queries described here
+exclude item rows **explicitly** (`material IS NOT NULL`); the item view mirrors the same
+group-on-read semantics per that spec.
+
 Both tree levels are collapsible, and their expand/collapse state is **persisted per user**
 (`localStorage`, keyed by the viewer's id — `expanded_rows_lager_*` for material groups,
 `expanded_stacks_lager_*` for location stacks) and re-applied on initial load **and after every
@@ -172,7 +179,10 @@ below them; `createdAt` is the entries' ordering key, not a displayed column. Bo
 actions are compact icon buttons (book-out = outbound arrow, note = pencil; their labels carried in
 `aria-label` / `title`) so the dense action column never crowds — or overlaps — the amount beside
 it; on tablet-width and narrower (≤ 1024px) the amount and actions reflow onto their own line
-beneath the Auftrag/Einsatz controls.
+beneath the Auftrag/Einsatz controls. The **item variant** (`catalog=ITEM`, REQ-INV-030)
+addresses a stack by `gameItemId` with **no quality key** — item rows carry no quality
+dimension ([`inventory-items.md`](inventory-items.md) REQ-INV-029); paging and ordering are
+identical.
 
 **Acceptance**
 
@@ -345,6 +355,14 @@ order, newline-joined, truncated to the 1000-char note column) — and then dele
 **not-delivered** (combining a delivered with a non-delivered contribution has no single truth; owner
 decision).
 
+**Game-item rows (REQ-INV-029).** A **game-item** stock row
+([`inventory-items.md`](inventory-items.md)) follows the `PIECE` auto-merge rule — items are
+whole units, so they always merge on write and the SCU opt-in checkbox is **never rendered**
+for them. The merge identity of an item row is its item stack key (owner · gameItem · location
+· `personal` · owning org-unit pool), and the `FOR UPDATE` merge-group query carries NULL-safe
+material **and** quality branches plus the `gameItem` key — without them the item merge would
+silently degenerate to a permanent no-op.
+
 **Materialbörse invariant.** A merge **never** changes a Materialbörse entry (see
 [`materialboerse.md`](materialboerse.md)). A row that backs *any* `MaterialExchangeOffer` (any status)
 is excluded from the merge — it is never a survivor whose amount changes and never folded away: the
@@ -432,6 +450,13 @@ assignment), refuse a job-order target whose material the order does not require
 reject a duplicate target, hold PIECE amounts whole, and enforce R5. Each mutation is audited
 (`INVENTORY_ALLOCATION_ADDED` / `_CHANGED` / `_REMOVED`, REQ-AUDIT-001). The entry's `@Version` is the
 single optimistic-lock token for its allocations (an inverse-side slice change force-increments it).
+
+**Game-item rows (REQ-INV-031).** A **game-item** stock row
+([`inventory-items.md`](inventory-items.md)) allocates only to qualifying `ITEM` orders whose
+lines request that gameItem (the gameItem sibling of the REQ-ORDERS-018 material gate) and has
+**no mission dimension** — a mission allocation on an item row is rejected with 400. Everything
+else in this requirement (R5, chips, deduct-from plans, merge union) applies to item rows
+unchanged on the job-order dimension.
 
 **Split at check-in (R4).** The create payload additionally accepts per-dimension allocation lists,
 so a book-in can be earmarked to several orders / missions with their own amounts in one shot,
@@ -540,7 +565,10 @@ non-personal stock up to one row per material, showing the total amount, the **a
 average** quality and the **maximum** available quality (the best single entry's quality). The three
 aggregates come from one grouped query — amount-weighted average, `MAX(quality)`, `SUM(amount)` over
 `GROUP BY material`; the row links through to the per-material drilldown (`/inventory/all` filtered to
-the material).
+the material). Since REQ-INV-030 ([`inventory-items.md`](inventory-items.md)) the `/inventory`
+page also offers an **item-variant** aggregate — one row per gameItem with the total amount but
+**without** the quality columns (item rows carry no quality); the material variant described
+here is unchanged and excludes item rows.
 
 **Acceptance**
 

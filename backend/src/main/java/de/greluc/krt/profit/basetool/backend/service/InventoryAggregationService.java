@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -30,8 +31,10 @@ import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryStackDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
+import de.greluc.krt.profit.basetool.backend.model.projection.InventoryItemStackAggregate;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate;
 import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
+import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
@@ -62,6 +65,12 @@ import org.springframework.transaction.annotation.Transactional;
  * no write repositories. Multi-org-unit scoping goes through {@code OwnerScopeService.currentScope
  * Predicate()} exactly as before, so an aggregation can never widen visibility beyond the caller's
  * org-unit slice.
+ *
+ * <p>Catalog-discriminated since V220 (REQ-INV-029, ADR-0100): the historical methods serve the
+ * material catalog (their queries exclude game-item rows), and each grouped / aggregated / flat /
+ * stack-entry read has a game-item sibling ({@code *Item*} methods) keyed on the quality-less item
+ * stack identity. The controller dispatches between the two families on its {@code catalog} query
+ * parameter.
  */
 @Service
 @RequiredArgsConstructor
@@ -71,6 +80,7 @@ public class InventoryAggregationService {
   private final InventoryItemRepository inventoryItemRepository;
   private final UserRepository userRepository;
   private final MaterialRepository materialRepository;
+  private final GameItemRepository gameItemRepository;
   private final JobOrderRepository jobOrderRepository;
   private final InventoryItemMapper inventoryItemMapper;
   private final MaterialMapper materialMapper;
@@ -107,11 +117,36 @@ public class InventoryAggregationService {
             obj ->
                 new AggregatedInventoryDto(
                     materialMapper.toDto((Material) obj[0]),
+                    null,
                     obj[1] != null
                         ? Math.round(((Number) obj[1]).doubleValue() * 100.0) / 100.0
                         : 0.0,
                     obj[2] != null ? ((Number) obj[2]).doubleValue() : 0.0,
                     obj[3] != null ? ((Number) obj[3]).doubleValue() : 0.0));
+  }
+
+  /**
+   * Game-item sibling of {@link #getAggregatedInventory(Pageable)} — the {@code catalog=ITEM}
+   * variant of the aggregated Lager overview (REQ-INV-028/029): one row per game item with the
+   * summed non-personal amount in the caller's scope. The quality columns of the material variant
+   * have no item counterpart (items carry no quality dimension) and map to {@code null}.
+   *
+   * @param pageable page request (whitelisted {@code gameItem.name} / {@code amount} sort)
+   * @return paged aggregated DTOs carrying the game-item reference and the total amount
+   */
+  public Page<AggregatedInventoryDto> getAggregatedItemInventory(Pageable pageable) {
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return inventoryItemRepository
+        .getAggregatedItemInventory(
+            scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable)
+        .map(
+            obj ->
+                new AggregatedInventoryDto(
+                    null,
+                    inventoryItemMapper.gameItemToReferenceDto((GameItem) obj[0]),
+                    null,
+                    null,
+                    obj[1] != null ? ((Number) obj[1]).doubleValue() : 0.0));
   }
 
   /**
@@ -140,17 +175,63 @@ public class InventoryAggregationService {
   }
 
   /**
-   * User-scoped inventory list. Excludes personal items because those have their own dedicated
-   * service.
+   * Game-item sibling of {@link #getInventoryByMaterial(UUID, Pageable)} — the drilldown behind
+   * {@code GET /api/v1/inventory/game-item/{gameItemId}} (REQ-INV-029): every non-personal stock
+   * row of one game item, under the same strict-staffel scope predicate as the material drilldown.
+   *
+   * @param gameItemId game item to drill into
+   * @param pageable page request
+   * @return paged inventory rows stocking that game item (excludes personal rows)
+   * @throws NotFoundException when the game-item id is unknown
+   */
+  public Page<InventoryItemDto> getInventoryByGameItem(UUID gameItemId, Pageable pageable) {
+    GameItem gameItem =
+        gameItemRepository
+            .findById(gameItemId)
+            .orElseThrow(() -> new NotFoundException("Game item not found"));
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return inventoryItemRepository
+        .findByGameItemAndPersonalFalseScoped(
+            gameItem,
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
+            pageable)
+        .map(inventoryItemMapper::toDto);
+  }
+
+  /**
+   * User-scoped material inventory list ({@code catalog=MATERIAL}). Excludes personal-inventory
+   * records (those have their own dedicated service) and game-item rows (served by {@link
+   * #getUserItemInventory(UUID, Pageable)}).
    *
    * @param userId owner id
    * @param pageable page request
-   * @return paged inventory items owned by the user
+   * @return paged material inventory rows owned by the user
    */
   public Page<InventoryItemDto> getUserInventory(UUID userId, Pageable pageable) {
     User user =
         userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
-    return inventoryItemRepository.findByUser(user, pageable).map(inventoryItemMapper::toDto);
+    return inventoryItemRepository
+        .findMaterialRowsByUser(user, pageable)
+        .map(inventoryItemMapper::toDto);
+  }
+
+  /**
+   * Game-item sibling of {@link #getUserInventory(UUID, Pageable)} — the flat "my inventory" list
+   * for {@code catalog=ITEM} (REQ-INV-029): the game-item stock rows owned by the caller.
+   *
+   * @param userId owner id
+   * @param pageable page request (whitelisted {@code gameItem.name} / {@code amount} sort)
+   * @return paged game-item inventory rows owned by the user
+   * @throws NotFoundException when the user id is unknown
+   */
+  public Page<InventoryItemDto> getUserItemInventory(UUID userId, Pageable pageable) {
+    User user =
+        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+    return inventoryItemRepository
+        .findItemRowsByUser(user, pageable)
+        .map(inventoryItemMapper::toDto);
   }
 
   /**
@@ -301,6 +382,73 @@ public class InventoryAggregationService {
   }
 
   /**
+   * Game-item sibling of {@link #getMyAggregatedInventory(UUID, List, Integer, List, List, boolean,
+   * boolean)} — the {@code catalog=ITEM} variant of the "my inventory" {@code /grouped} view
+   * (REQ-INV-029): the caller's game-item stock rolled up GameItem → Stack over the quality-less
+   * item stack key. Item filter surface only ({@code gameItemIds}, {@code jobOrderIds}) plus the
+   * mutually exclusive {@code personalOnly} / {@code nonPersonalOnly} narrowing toggles; the
+   * quality floor and mission filter of the material variant do not exist for items (REQ-INV-031)
+   * and are rejected upstream by the controller.
+   *
+   * @param userId owner id
+   * @param gameItemIds optional game-item filter
+   * @param jobOrderIds optional job-order filter
+   * @param personalOnly when {@code true}, narrows to the caller's private stock rows
+   * @param nonPersonalOnly when {@code true}, narrows to the caller's shared stock rows
+   * @return item groups, each carrying its sorted stacks and item-wide total
+   * @throws NotFoundException when the user id is unknown
+   */
+  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
+      getMyAggregatedItemInventory(
+          UUID userId,
+          List<UUID> gameItemIds,
+          List<UUID> jobOrderIds,
+          boolean personalOnly,
+          boolean nonPersonalOnly) {
+    User user =
+        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+    boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
+    boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
+    List<InventoryItemStackAggregate> stacks =
+        inventoryItemRepository.findUserItemStacks(
+            user.getId(),
+            hasGameItems,
+            hasGameItems ? gameItemIds : null,
+            hasJobOrders,
+            hasJobOrders ? jobOrderIds : null,
+            personalOnly,
+            nonPersonalOnly);
+    return buildGroupedFromItemStacks(stacks);
+  }
+
+  /**
+   * Game-item sibling of {@link #getAllAggregatedInventory(List, Integer, List, List)} — the {@code
+   * catalog=ITEM} variant of the squadron-wide {@code /grouped} view (REQ-INV-029), scoped by the
+   * caller's org-unit predicate exactly like the material variant. Item filter surface only ({@code
+   * gameItemIds}, {@code jobOrderIds}); no quality floor, no mission filter (REQ-INV-031).
+   *
+   * @param gameItemIds optional game-item filter
+   * @param jobOrderIds optional job-order filter
+   * @return item groups, each carrying its sorted stacks and item-wide total
+   */
+  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
+      getAllAggregatedItemInventory(List<UUID> gameItemIds, List<UUID> jobOrderIds) {
+    boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
+    boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    List<InventoryItemStackAggregate> stacks =
+        inventoryItemRepository.findGlobalItemStacks(
+            hasGameItems,
+            hasGameItems ? gameItemIds : null,
+            hasJobOrders,
+            hasJobOrders ? jobOrderIds : null,
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds());
+    return buildGroupedFromItemStacks(stacks);
+  }
+
+  /**
    * Assembles the Material → Stack shape the {@code /grouped} views render from the SQL-computed
    * per-stack aggregates. Outer grouping is by material; the individual entries are no longer
    * materialised here — append-only rows grow unboundedly per stack, so a stack's entries are
@@ -372,7 +520,91 @@ public class InventoryAggregationService {
     double avgQuality =
         totalAmount > 0 ? Math.round((weightedQualitySum / totalAmount) * 100.0) / 100.0 : 0.0;
     return new de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto(
-        material, totalAmount, avgQuality, maxQuality, stacks);
+        material, null, totalAmount, avgQuality, maxQuality, stacks);
+  }
+
+  /**
+   * Game-item sibling of {@link #buildGroupedFromStacks(List)}: assembles the GameItem → Stack
+   * shape the {@code catalog=ITEM} {@code /grouped} views render from the SQL-computed per-stack
+   * item aggregates. Outer grouping is by game item, sorted by item name; entries stay lazy
+   * (REQ-INV-005) exactly like the material variant.
+   *
+   * @param aggregates the SQL-grouped per-item-stack rows for the current scope/filter
+   * @return the game-item groups, each carrying its sorted stacks and item-wide total
+   */
+  private List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
+      buildGroupedFromItemStacks(List<InventoryItemStackAggregate> aggregates) {
+    return aggregates.stream()
+        .collect(
+            java.util.stream.Collectors.groupingBy(
+                aggregate -> aggregate.gameItem().getId(),
+                java.util.LinkedHashMap::new,
+                java.util.stream.Collectors.toList()))
+        .values()
+        .stream()
+        .map(this::buildItemGroup)
+        .sorted(java.util.Comparator.comparing(g -> g.gameItem().name()))
+        .toList();
+  }
+
+  /**
+   * Builds one game-item roll-up from its per-stack aggregates: the stacks (sorted by the shared
+   * {@link #STACK_ORDER}, whose quality key is a constant {@code null} for item stacks, leaving
+   * location asc / amount desc) plus the item-wide summed amount. The quality figures of the
+   * material group have no item counterpart and stay {@code null} (REQ-INV-028/029).
+   *
+   * @param itemStacks every per-stack aggregate of one game item in the current scope; never empty
+   * @return the populated game-item group with its nested stacks
+   */
+  private de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto buildItemGroup(
+      List<InventoryItemStackAggregate> itemStacks) {
+    List<InventoryStackDto> stacks = new java.util.ArrayList<>(itemStacks.size());
+    de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto gameItem = null;
+    double totalAmount = 0.0;
+    for (InventoryItemStackAggregate aggregate : itemStacks) {
+      InventoryItemDto refs = mapItemAggregateRefs(aggregate);
+      if (gameItem == null) {
+        gameItem = refs.gameItem();
+      }
+      double amt = aggregate.totalAmount() != null ? aggregate.totalAmount() : 0.0;
+      stacks.add(
+          new InventoryStackDto(
+              refs.user(),
+              refs.location(),
+              null,
+              refs.personal(),
+              refs.owningSquadron(),
+              amt,
+              null,
+              null,
+              aggregate.entryCount() != null ? aggregate.entryCount().intValue() : 0));
+      totalAmount += amt;
+    }
+    stacks.sort(STACK_ORDER);
+    return new de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto(
+        null, gameItem, totalAmount, null, null, stacks);
+  }
+
+  /**
+   * Game-item counterpart of {@link #mapAggregateRefs(InventoryStackAggregate)}: projects one item
+   * stack aggregate's shared identity entities through the inventory-item mapper via a transient
+   * probe {@link InventoryItem}, so PII redaction, the {@code owningOrgUnit → owningSquadron}
+   * projection and the game-item reference (incl. manufacturer name) behave exactly as for a real
+   * entry. The probe's {@code material} / {@code quality} stay {@code null} — the item stack key
+   * carries neither (REQ-INV-029).
+   *
+   * @param aggregate the per-stack item aggregate whose shared identity to project
+   * @return an inventory-item DTO carrying only the mapped reference fields (amount/version/id
+   *     null)
+   */
+  private InventoryItemDto mapItemAggregateRefs(InventoryItemStackAggregate aggregate) {
+    InventoryItem probe = new InventoryItem();
+    probe.setUser(aggregate.user());
+    probe.setGameItem(aggregate.gameItem());
+    probe.setLocation(aggregate.location());
+    probe.setPersonal(aggregate.personal());
+    probe.setOwningOrgUnit(aggregate.owningOrgUnit());
+    return inventoryItemMapper.toDto(probe);
   }
 
   /**
@@ -475,6 +707,73 @@ public class InventoryAggregationService {
   }
 
   /**
+   * Game-item sibling of {@link #getMyStackEntries(UUID, UUID, UUID, Integer, Boolean, UUID,
+   * Pageable)} — the {@code catalog=ITEM} per-stack drill-down of the "my inventory" view
+   * (REQ-INV-005/029). The stack is addressed by {@code gameItemId} with no quality key (items
+   * carry no quality dimension); owner-scoping and the personal/owning-org-unit identity dimensions
+   * behave exactly like the material variant.
+   *
+   * @param userId the calling owner whose stack to drill into
+   * @param gameItemId the stack's game item
+   * @param locationId the stack's storage location
+   * @param personal whether the stack is private stock (defaults to {@code false} when {@code
+   *     null})
+   * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null}
+   * @param pageable the page request (the query forces oldest-first by creation instant)
+   * @return one page of the stack's entries, oldest-first
+   * @throws NotFoundException when the user id is unknown
+   */
+  public Page<InventoryItemDto> getMyItemStackEntries(
+      UUID userId,
+      UUID gameItemId,
+      UUID locationId,
+      Boolean personal,
+      UUID owningOrgUnitId,
+      Pageable pageable) {
+    User user =
+        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+    return inventoryItemRepository
+        .findUserItemStackEntries(
+            user.getId(),
+            gameItemId,
+            locationId,
+            personal != null ? personal : Boolean.FALSE,
+            owningOrgUnitId,
+            pageable)
+        .map(inventoryItemMapper::toDto);
+  }
+
+  /**
+   * Game-item sibling of {@link #getAllStackEntries(UUID, UUID, UUID, Integer, UUID, Pageable)} —
+   * the {@code catalog=ITEM} per-stack drill-down of the squadron-wide Lager view
+   * (REQ-INV-005/029). Addressed by {@code gameItemId} with no quality key; the same scope
+   * predicate as the grouped item view applies, so the drill-down can never widen visibility beyond
+   * the caller's org-unit slice.
+   *
+   * @param gameItemId the stack's game item
+   * @param userId the stack's owning user
+   * @param locationId the stack's storage location
+   * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null}
+   * @param pageable the page request (the query forces oldest-first by creation instant)
+   * @return one page of the stack's entries, oldest-first
+   */
+  public Page<InventoryItemDto> getAllItemStackEntries(
+      UUID gameItemId, UUID userId, UUID locationId, UUID owningOrgUnitId, Pageable pageable) {
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return inventoryItemRepository
+        .findGlobalItemStackEntries(
+            gameItemId,
+            userId,
+            locationId,
+            owningOrgUnitId,
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
+            pageable)
+        .map(inventoryItemMapper::toDto);
+  }
+
+  /**
    * Convenience overload without job-order/mission filters.
    *
    * @param materialIds optional material filter
@@ -517,6 +816,36 @@ public class InventoryAggregationService {
             hasJobOrders ? jobOrderIds : null,
             hasMissions,
             hasMissions ? missionIds : null,
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
+            pageable)
+        .map(inventoryItemMapper::toDto);
+  }
+
+  /**
+   * Game-item sibling of {@link #getAllInventory(List, Integer, List, List, Pageable)} — the flat
+   * squadron-wide list for {@code catalog=ITEM} (REQ-INV-029), scoped by the caller's org-unit
+   * predicate. Item filter surface only ({@code gameItemIds}, {@code jobOrderIds}); the quality
+   * floor and mission filter of the material variant do not exist for items (REQ-INV-031). Not
+   * aggregated — one row per {@code InventoryItem}.
+   *
+   * @param gameItemIds optional game-item filter
+   * @param jobOrderIds optional job-order filter
+   * @param pageable page request (whitelisted {@code gameItem.name} / {@code amount} sort)
+   * @return paged game-item inventory rows
+   */
+  public Page<InventoryItemDto> getAllItemInventory(
+      List<UUID> gameItemIds, List<UUID> jobOrderIds, Pageable pageable) {
+    boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
+    boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return inventoryItemRepository
+        .findGlobalItemsByFilters(
+            hasGameItems,
+            hasGameItems ? gameItemIds : null,
+            hasJobOrders,
+            hasJobOrders ? jobOrderIds : null,
             scope.adminAllScope(),
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),

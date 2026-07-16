@@ -24,29 +24,38 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.exception.ProductionAllocationException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItemMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
+import de.greluc.krt.profit.basetool.backend.model.Squadron;
+import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemProductionConsumptionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.util.List;
 import java.util.Optional;
@@ -79,6 +88,11 @@ class JobOrderItemProductionServiceTest {
   @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
   @Mock private JobOrderItemService jobOrderItemService;
   @Mock private AuditService auditService;
+  @Mock private UserService userService;
+  @Mock private UserRepository userRepository;
+  @Mock private LocationRepository locationRepository;
+  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private InventoryCheckoutService inventoryCheckoutService;
   @InjectMocks private JobOrderItemProductionService service;
 
   private UUID orderId;
@@ -154,7 +168,8 @@ class JobOrderItemProductionServiceTest {
             List.of(
                 new JobOrderItemProductionConsumptionDto(
                     inventoryId, materialId, 40.0, INVENTORY_VERSION)),
-            List.of());
+            List.of(),
+            null);
 
     // When
     JobOrderItemDto result = service.bookProduction(orderId, lineId, dto);
@@ -178,7 +193,7 @@ class JobOrderItemProductionServiceTest {
     // Given — 3 of 4 already manufactured, so only 1 unit remains, but 2 are requested.
     line.setManufacturedAmount(3);
     JobOrderItemProductionCreateDto dto =
-        new JobOrderItemProductionCreateDto(2, LINE_VERSION, List.of(), List.of());
+        new JobOrderItemProductionCreateDto(2, LINE_VERSION, List.of(), List.of(), null);
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -198,7 +213,8 @@ class JobOrderItemProductionServiceTest {
             List.of(
                 new JobOrderItemProductionConsumptionDto(
                     inventoryId, materialId, 30.0, INVENTORY_VERSION)),
-            List.of());
+            List.of(),
+            null);
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -217,7 +233,8 @@ class JobOrderItemProductionServiceTest {
             List.of(
                 new JobOrderItemProductionConsumptionDto(
                     inventoryId, materialId, 50.0, INVENTORY_VERSION)),
-            List.of());
+            List.of(),
+            null);
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -233,7 +250,7 @@ class JobOrderItemProductionServiceTest {
     materialOrder.setId(orderId);
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(materialOrder));
     JobOrderItemProductionCreateDto dto =
-        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of());
+        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of(), null);
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -251,7 +268,8 @@ class JobOrderItemProductionServiceTest {
             List.of(
                 new JobOrderItemProductionConsumptionDto(
                     inventoryId, materialId, 40.0, INVENTORY_VERSION)),
-            List.of());
+            List.of(),
+            null);
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -272,7 +290,8 @@ class JobOrderItemProductionServiceTest {
             List.of(
                 new JobOrderItemProductionConsumptionDto(
                     inventoryId, materialId, 40.0, INVENTORY_VERSION)),
-            List.of());
+            List.of(),
+            null);
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
@@ -296,7 +315,8 @@ class JobOrderItemProductionServiceTest {
             List.of(
                 new JobOrderItemProductionConsumptionDto(
                     inventoryId, materialId, 40.0, INVENTORY_VERSION)),
-            List.of());
+            List.of(),
+            null);
 
     // When
     service.bookProduction(orderId, lineId, dto);
@@ -318,7 +338,7 @@ class JobOrderItemProductionServiceTest {
     // Given — an item line with no derivable material requirements: nothing is consumed.
     line.getMaterials().clear();
     JobOrderItemProductionCreateDto dto =
-        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of());
+        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of(), null);
 
     // When
     service.bookProduction(orderId, lineId, dto);
@@ -339,7 +359,7 @@ class JobOrderItemProductionServiceTest {
     // Given — the line's only material (Steel) is marked "nicht ausbuchen", so its 40-SCU demand is
     // dropped and the consumption plan is empty: production is recorded but no stock is touched.
     JobOrderItemProductionCreateDto dto =
-        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of(materialId));
+        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of(materialId), null);
 
     // When
     JobOrderItemDto result = service.bookProduction(orderId, lineId, dto);
@@ -357,5 +377,294 @@ class JobOrderItemProductionServiceTest {
         .record(eq(AuditEventType.JOB_ORDER_PRODUCTION_BOOKED), any(), any(), any(), any());
     verify(auditService, never())
         .record(eq(AuditEventType.INVENTORY_CONSUMED_BY_PRODUCTION), any(), any(), any(), any());
+  }
+
+  // ---------------------------------------------------------------
+  // production book-in (REQ-INV-032)
+  // ---------------------------------------------------------------
+
+  /**
+   * Prepares the fixture line for a book-in scenario: no material requirements (so the consumption
+   * plan is empty and the inventory mocks stay silent) and a produced {@link GameItem} to book in.
+   *
+   * @return the line's game item.
+   */
+  private GameItem givenProducibleLineWithoutMaterials() {
+    line.getMaterials().clear();
+    GameItem gameItem = new GameItem();
+    gameItem.setId(UUID.randomUUID());
+    gameItem.setName("Quantum Drive");
+    line.setGameItem(gameItem);
+    return gameItem;
+  }
+
+  /**
+   * Builds a book-in target for the production payload.
+   *
+   * @param locationId the storage location ("wo")
+   * @param ownerUserId the stock owner ("bei wem"), or {@code null} for the acting user
+   * @param owningOrgUnitId the org-unit picker output, or {@code null}
+   * @param personal the personal-pool flag, or {@code null}
+   * @param allocateToOrder the auto-earmark opt-out, or {@code null} (defaults to earmarking)
+   * @return the assembled book-in block
+   */
+  private static JobOrderItemProductionCreateDto.BookInDto bookIn(
+      UUID locationId,
+      UUID ownerUserId,
+      UUID owningOrgUnitId,
+      Boolean personal,
+      Boolean allocateToOrder) {
+    return new JobOrderItemProductionCreateDto.BookInDto(
+        locationId, ownerUserId, owningOrgUnitId, personal, allocateToOrder);
+  }
+
+  // covers REQ-INV-032 (bookIn == null keeps the transitional legacy behaviour byte-identically)
+  @Test
+  void bookProduction_nullBookIn_createsNoStockRow_touchesNoBookInCollaborators() {
+    // Given a producible line and the legacy payload without a bookIn block
+    givenProducibleLineWithoutMaterials();
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of(), null);
+
+    // When
+    service.bookProduction(orderId, lineId, dto);
+
+    // Then — the counter advances, but no stock row is created, none of the book-in collaborators
+    // is touched and no INVENTORY_RECEIVED_FROM_PRODUCTION event is written (the pre-item-stock
+    // status quo).
+    assertThat(line.getManufacturedAmount()).isEqualTo(1);
+    verify(inventoryItemRepository, never()).save(any());
+    verifyNoInteractions(
+        userService,
+        userRepository,
+        locationRepository,
+        ownerScopeService,
+        inventoryCheckoutService);
+    verify(auditService, never())
+        .record(eq(AuditEventType.INVENTORY_RECEIVED_FROM_PRODUCTION), any(), any(), any(), any());
+  }
+
+  // covers REQ-INV-032 (bookIn creates the earmarked item row, merges after save, audits)
+  @Test
+  void bookProduction_bookIn_createsEarmarkedItemRow_mergesAfterSave_andAudits() {
+    // Given a producible line, a named owner / location / org-unit target and the default
+    // auto-earmark (allocateToOrder omitted)
+    GameItem gameItem = givenProducibleLineWithoutMaterials();
+    UUID ownerId = UUID.randomUUID();
+    User owner = new User();
+    owner.setId(ownerId);
+    UUID locationId = UUID.randomUUID();
+    Location location = new Location();
+    location.setId(locationId);
+    location.setName("ARC-L1");
+    UUID orgUnitId = UUID.randomUUID();
+    Squadron orgUnit = new Squadron();
+    orgUnit.setId(orgUnitId);
+    when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+    when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, orgUnitId))
+        .thenReturn(orgUnit);
+    when(inventoryItemRepository.save(any(InventoryItem.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(inventoryCheckoutService.mergeStockIfRequested(any(InventoryItem.class), eq(false)))
+        .thenAnswer(inv -> inv.getArgument(0));
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(
+            2,
+            LINE_VERSION,
+            List.of(),
+            List.of(),
+            bookIn(locationId, ownerId, orgUnitId, null, null));
+
+    // When
+    service.bookProduction(orderId, lineId, dto);
+
+    // Then — one fresh item row: gameItem set, quality null (REQ-INV-029), stamped through the
+    // create-on-behalf resolver, carrying the auto-earmark slice attached BEFORE the single save.
+    org.mockito.ArgumentCaptor<InventoryItem> captor =
+        org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository).save(captor.capture());
+    InventoryItem stockRow = captor.getValue();
+    assertThat(stockRow.getGameItem()).isSameAs(gameItem);
+    assertThat(stockRow.getMaterial()).isNull();
+    assertThat(stockRow.getQuality()).isNull();
+    assertThat(stockRow.getUser()).isSameAs(owner);
+    assertThat(stockRow.getOwningOrgUnit()).isSameAs(orgUnit);
+    assertThat(stockRow.getPersonal()).isFalse();
+    assertThat(stockRow.getAmount()).isEqualTo(2.0);
+    assertThat(stockRow.getJobOrderAllocations()).hasSize(1);
+    var slice = stockRow.getJobOrderAllocations().get(0);
+    assertThat(slice.getJobOrder()).isSameAs(order);
+    assertThat(slice.getAmount()).isEqualTo(2.0);
+    assertThat(slice.getDelivered()).isFalse();
+    // The org-unit stamp went through the owner-validated picker resolution (REQ-ORG-004/016).
+    verify(ownerScopeService).resolveOrgUnitForPickerOutputNullable(owner, orgUnitId);
+    // Slice-first-then-merge: the merge helper folds the saved row AFTER the save (item rows
+    // always auto-merge, client flag false).
+    org.mockito.InOrder callOrder = inOrder(inventoryItemRepository, inventoryCheckoutService);
+    callOrder.verify(inventoryItemRepository).save(stockRow);
+    callOrder.verify(inventoryCheckoutService).mergeStockIfRequested(stockRow, false);
+    // The audit event carries the ids-only details payload (REQ-AUDIT-001).
+    org.mockito.ArgumentCaptor<CharSequence> details =
+        org.mockito.ArgumentCaptor.forClass(CharSequence.class);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.INVENTORY_RECEIVED_FROM_PRODUCTION),
+            any(),
+            any(),
+            eq(ownerId),
+            details.capture());
+    assertThat(details.getValue().toString())
+        .contains("jobOrderId=" + orderId)
+        .contains("gameItemId=" + gameItem.getId())
+        .contains("amount=2")
+        .contains("locationId=" + locationId);
+    // A named owner is used verbatim — the acting-user fallback is never consulted.
+    verifyNoInteractions(userService);
+  }
+
+  // covers REQ-INV-032 (personal + allocateToOrder is contradictory — default true variant)
+  @Test
+  void bookProduction_bookIn_personalWithDefaultAllocate_throwsBadRequest() {
+    // Given a personal book-in that leaves allocateToOrder at its true default
+    givenProducibleLineWithoutMaterials();
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(
+            1,
+            LINE_VERSION,
+            List.of(),
+            List.of(),
+            bookIn(UUID.randomUUID(), null, null, true, null));
+
+    // When / Then — personal stock never carries allocations; the earmark must be explicitly
+    // deselected, never silently dropped
+    assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
+        .isInstanceOf(BadRequestException.class);
+    verify(inventoryItemRepository, never()).save(any());
+  }
+
+  // covers REQ-INV-032 (personal + explicit allocateToOrder=true is equally contradictory)
+  @Test
+  void bookProduction_bookIn_personalWithExplicitAllocate_throwsBadRequest() {
+    // Given a personal book-in explicitly requesting the order earmark
+    givenProducibleLineWithoutMaterials();
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(
+            1,
+            LINE_VERSION,
+            List.of(),
+            List.of(),
+            bookIn(UUID.randomUUID(), null, null, true, true));
+
+    // When / Then
+    assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
+        .isInstanceOf(BadRequestException.class);
+    verify(inventoryItemRepository, never()).save(any());
+  }
+
+  // covers REQ-INV-032 (personal book-in with the earmark deselected creates a slice-less row)
+  @Test
+  void bookProduction_bookIn_personalWithAllocateFalse_createsPersonalRowWithoutSlice() {
+    // Given a personal book-in that deselects the auto-earmark
+    GameItem gameItem = givenProducibleLineWithoutMaterials();
+    UUID ownerId = UUID.randomUUID();
+    User owner = new User();
+    owner.setId(ownerId);
+    UUID locationId = UUID.randomUUID();
+    Location location = new Location();
+    location.setId(locationId);
+    when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+    when(inventoryItemRepository.save(any(InventoryItem.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(inventoryCheckoutService.mergeStockIfRequested(any(InventoryItem.class), eq(false)))
+        .thenAnswer(inv -> inv.getArgument(0));
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(
+            1, LINE_VERSION, List.of(), List.of(), bookIn(locationId, ownerId, null, true, false));
+
+    // When
+    service.bookProduction(orderId, lineId, dto);
+
+    // Then — the produced unit lands in the owner's personal pool with no earmark slice
+    org.mockito.ArgumentCaptor<InventoryItem> captor =
+        org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository).save(captor.capture());
+    assertThat(captor.getValue().getPersonal()).isTrue();
+    assertThat(captor.getValue().getGameItem()).isSameAs(gameItem);
+    assertThat(captor.getValue().getJobOrderAllocations()).isEmpty();
+  }
+
+  // covers REQ-INV-032 (unknown book-in owner -> 404)
+  @Test
+  void bookProduction_bookIn_unknownOwner_throwsNotFound() {
+    // Given a book-in naming an owner that does not exist
+    givenProducibleLineWithoutMaterials();
+    UUID unknownOwnerId = UUID.randomUUID();
+    when(userRepository.findById(unknownOwnerId)).thenReturn(Optional.empty());
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(
+            1,
+            LINE_VERSION,
+            List.of(),
+            List.of(),
+            bookIn(UUID.randomUUID(), unknownOwnerId, null, null, null));
+
+    // When / Then
+    assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
+        .isInstanceOf(NotFoundException.class);
+    verify(inventoryItemRepository, never()).save(any());
+  }
+
+  // covers REQ-INV-032 (owner defaults to the acting user)
+  @Test
+  void bookProduction_bookIn_defaultsOwnerToActingUser() {
+    // Given a book-in without an explicit owner
+    givenProducibleLineWithoutMaterials();
+    User actor = new User();
+    actor.setId(UUID.randomUUID());
+    UUID locationId = UUID.randomUUID();
+    Location location = new Location();
+    location.setId(locationId);
+    when(userService.getCurrentUser()).thenReturn(Optional.of(actor));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+    when(inventoryItemRepository.save(any(InventoryItem.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(inventoryCheckoutService.mergeStockIfRequested(any(InventoryItem.class), eq(false)))
+        .thenAnswer(inv -> inv.getArgument(0));
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(
+            1, LINE_VERSION, List.of(), List.of(), bookIn(locationId, null, null, null, null));
+
+    // When
+    service.bookProduction(orderId, lineId, dto);
+
+    // Then — the row is created for the acting user; no owner lookup by id happens
+    org.mockito.ArgumentCaptor<InventoryItem> captor =
+        org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository).save(captor.capture());
+    assertThat(captor.getValue().getUser()).isSameAs(actor);
+    verify(userRepository, never()).findById(any());
+    verify(ownerScopeService).resolveOrgUnitForPickerOutputNullable(actor, null);
+  }
+
+  // covers REQ-INV-032 (a line without a game item cannot be booked in)
+  @Test
+  void bookProduction_bookIn_lineWithoutGameItem_throwsBadRequest() {
+    // Given a book-in against the fixture line, which carries no game item
+    line.getMaterials().clear();
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(
+            1,
+            LINE_VERSION,
+            List.of(),
+            List.of(),
+            bookIn(UUID.randomUUID(), null, null, null, null));
+
+    // When / Then
+    assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("no game item");
+    verify(inventoryItemRepository, never()).save(any());
   }
 }

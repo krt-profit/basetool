@@ -1168,6 +1168,7 @@ class JobOrderServiceTest {
             null,
             null,
             null,
+            null,
             100,
             10.0,
             false,
@@ -1353,6 +1354,7 @@ class JobOrderServiceTest {
             i1.getId(),
             userAlpha,
             null,
+            null,
             locB,
             80,
             5.0,
@@ -1370,6 +1372,7 @@ class JobOrderServiceTest {
         new InventoryItemDto(
             i2.getId(),
             userAlpha,
+            null,
             null,
             locA,
             90,
@@ -1389,6 +1392,7 @@ class JobOrderServiceTest {
             i3.getId(),
             userBeta,
             null,
+            null,
             locA,
             70,
             20.0,
@@ -1407,6 +1411,7 @@ class JobOrderServiceTest {
         new InventoryItemDto(
             i4.getId(),
             userAlpha,
+            null,
             null,
             locA,
             80,
@@ -1476,6 +1481,7 @@ class JobOrderServiceTest {
     InventoryItemDto orphanDto =
         new InventoryItemDto(
             orphanItem.getId(),
+            null,
             null,
             null,
             null,

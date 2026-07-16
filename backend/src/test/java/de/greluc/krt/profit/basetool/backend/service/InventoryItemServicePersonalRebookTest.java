@@ -439,6 +439,66 @@ class InventoryItemServicePersonalRebookTest {
    * @param personal the source row's personal flag (drives the rebook direction)
    * @return the populated transient source row
    */
+  // ---------------------------------------------------------------
+  // game-item stock rows (V220, REQ-INV-029)
+  // ---------------------------------------------------------------
+
+  // covers REQ-INV-029 (personal-rebook copies the catalog reference pair as a unit)
+  @Test
+  void rebook_itemRow_copiesGameItemOntoNewRow() {
+    // Given a shared game-item stock row being personalized
+    InventoryItem item = newItem(10.0, 1L, false);
+    item.setMaterial(null);
+    item.setQuality(null);
+    de.greluc.krt.profit.basetool.backend.model.GameItem gameItem =
+        new de.greluc.krt.profit.basetool.backend.model.GameItem();
+    gameItem.setId(UUID.randomUUID());
+    gameItem.setName("Quantum Drive");
+    item.setGameItem(gameItem);
+    item.setOwningOrgUnit(sourceOrgUnit);
+    when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+    // When — rebook 4 whole units into the personal pool
+    service.rebookPersonal(ITEM_ID, dto(4.0, 1L, null), OWNER_ID, false);
+
+    // Then — the new row carries the gameItem alongside null material/quality; without the copy
+    // the split row would violate the XOR CHECK (chk_inventory_item_catalog_xor, V220) -> 500 on
+    // every item Umbuchung.
+    ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
+    InventoryItem newRow =
+        captor.getAllValues().stream()
+            .filter(i -> i != item)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("expected the split row to be saved"));
+    assertSame(gameItem, newRow.getGameItem());
+    org.junit.jupiter.api.Assertions.assertNull(newRow.getMaterial());
+    org.junit.jupiter.api.Assertions.assertNull(newRow.getQuality());
+    assertTrue(newRow.getPersonal(), "the split row flips to the personal pool");
+    assertEquals(4.0, newRow.getAmount());
+  }
+
+  // covers REQ-INV-029 (item rebooks move whole units only)
+  @Test
+  void rebook_itemRow_fractionalAmount_throwsBadRequest() {
+    // Given a game-item stock row
+    InventoryItem item = newItem(10.0, 1L, false);
+    item.setMaterial(null);
+    item.setQuality(null);
+    de.greluc.krt.profit.basetool.backend.model.GameItem gameItem =
+        new de.greluc.krt.profit.basetool.backend.model.GameItem();
+    gameItem.setId(UUID.randomUUID());
+    item.setGameItem(gameItem);
+    when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+
+    // When / Then — a fractional rebook amount is rejected before any split
+    assertThrows(
+        BadRequestException.class,
+        () -> service.rebookPersonal(ITEM_ID, dto(1.5, 1L, null), OWNER_ID, false));
+    verify(inventoryItemRepository, never()).save(any());
+    verify(inventoryItemRepository, never()).delete(any());
+  }
+
   private InventoryItem newItem(double amount, Long version, boolean personal) {
     InventoryItem item = new InventoryItem();
     item.setId(ITEM_ID);
@@ -475,6 +535,7 @@ class InventoryItemServicePersonalRebookTest {
   private static InventoryItemDto sentinelDto() {
     return new InventoryItemDto(
         UUID.randomUUID(),
+        null,
         null,
         null,
         null,
