@@ -29,7 +29,6 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
-import com.microsoft.playwright.options.SelectOption;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -117,14 +116,16 @@ class RefineryOrderLifecycleE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/refinery-orders/" + orderId);
         page.waitForLoadState();
-        // The input-material <select> is required, but its options come from the 10-minute-cached
-        // /api/v1/materials, which need not contain this test's freshly-seeded material — so the
-        // order's pre-selected option can be absent, leaving the dropdown empty and blocking the
-        // submit with a validation bubble. Pick whatever RAW material the dropdown offers (index 0
-        // is the "-- Bitte wählen --" placeholder) so the form validates. The form carries no
-        // output-material field, so the backend re-infers the output from the new input; the test
-        // asserts the edited Ore-Sales, not the material.
-        page.locator("#inputMaterialId_0").selectOption(new SelectOption().setIndex(1));
+        // The input-material picker (a searchable combobox — its id stays on the enhancer's hidden
+        // input) is required, but its options come from the 10-minute-cached /api/v1/materials,
+        // which need not contain this test's freshly-seeded material — so the order's pre-selected
+        // option can be absent, leaving the picker empty and blocking the submit with a validation
+        // bubble. Pick whatever RAW material the combobox offers (it renders no placeholder option)
+        // so the form validates. The form carries no output-material field, so the backend
+        // re-infers the output from the new input; the test asserts the edited Ore-Sales, not the
+        // material.
+        E2eSupport.selectComboboxFirstOption(
+            page.locator(".krt-combobox:has(#inputMaterialId_0) .krt-combobox__input"));
         page.locator("#oreSales").fill("12345");
         // Drop the fixed footer so the bottom Save button is clickable, then submit and wait for
         // the

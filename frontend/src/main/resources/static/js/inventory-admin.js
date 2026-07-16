@@ -712,13 +712,19 @@ function refreshUmbuchenTransferOrgUnitPicker() {
         });
 }
 
+// Opens the Umbuchen (transfer) modal for one leaf entry. `userName` and `locationName` are the
+// row's current owner/location labels: both target pickers are REMOTE comboboxes (remote-users /
+// remote-locations), so presetting them needs the label alongside the id — the loaded item set
+// cannot resolve a label locally.
 function openUmbuchenModal(
     id,
     amount,
     version,
     materialId,
     userId,
+    userName,
     locationId,
+    locationName,
     quantityType,
     owningOrgUnitId,
 ) {
@@ -748,14 +754,24 @@ function openUmbuchenModal(
     if (amountOf)
         amountOf.textContent = amountOf.getAttribute('data-template').replace('{0}', amount);
     const umbuchenUser = document.getElementById('umbuchenTargetUserId');
-    // The target-user <select> is upgraded into a searchable combobox; its id moves to the
-    // hidden input, so use the combobox API to sync both the value and the visible label.
+    // The target-user picker is a REMOTE combobox (remote-users, #1193): like the location picker
+    // below, presetting it needs the label with the id — a bare setValue(id) cannot resolve the
+    // name from the on-demand item set and would clear the field on every modal open.
     if (umbuchenUser.krtCombobox) {
-        umbuchenUser.krtCombobox.setValue(userId);
+        umbuchenUser.krtCombobox.setValue(userId, userName);
     } else {
         umbuchenUser.value = userId;
     }
-    document.getElementById('umbuchenTargetLocationId').value = locationId;
+    // The location picker is a REMOTE searchable combobox (remote-locations, REQ-FE-016): the
+    // catalog is fetched per query, so the row's location is outside the loaded set — setValue()
+    // must carry the label with the id (a bare id would clear the selection, a bare .value write
+    // would leave the textbox stale).
+    const umbuchenLocation = document.getElementById('umbuchenTargetLocationId');
+    if (umbuchenLocation.krtCombobox) {
+        umbuchenLocation.krtCombobox.setValue(locationId, locationName);
+    } else {
+        umbuchenLocation.value = locationId;
+    }
     refreshUmbuchenTransferOrgUnitPicker();
     // Inline `flex` (not `block`) preserves `.modal`'s flex centring; `block` would override the
     // stylesheet flex and pin the dialog to the top of the viewport (#1328).
@@ -1479,7 +1495,9 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             el.getAttribute('data-version'),
             el.getAttribute('data-material-id'),
             el.getAttribute('data-user-id'),
+            el.getAttribute('data-user-name'),
             el.getAttribute('data-location-id'),
+            el.getAttribute('data-location-name'),
             el.getAttribute('data-quantity-type'),
             el.getAttribute('data-owning-org-unit-id'),
         );

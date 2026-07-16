@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.microsoft.playwright.Browser;
@@ -31,6 +32,7 @@ import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -47,12 +49,14 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * longer override the class rule, so the hint stayed hidden for SCU materials. The fix toggles the
  * runtime {@code krtm-hidden} class instead.
  *
- * <p>This test opens {@code /orders/create}, adds a material row, selects an SCU-typed material,
- * and asserts the row's SCU hint becomes visible — the discriminator that turns red on the pre-fix
- * frontend (which leaves the hint hidden) — while asserting no {@code style-src-attr} CSP violation
- * is logged. Materials with a quantity type are core seed data, so the SCU option is present on any
- * provisioned stack; the reveal step is guarded so a stack seeded without an SCU material still
- * runs the console guard rather than failing spuriously.
+ * <p>This test opens {@code /orders/create}, adds a material row, selects an SCU-typed material
+ * (discovered via the {@code /catalog/material-search} proxy the picker's server-side-search
+ * combobox also queries, REQ-FE-016), and asserts the row's SCU hint becomes visible — the
+ * discriminator that turns red on the pre-fix frontend (which leaves the hint hidden) — while
+ * asserting no {@code style-src-attr} CSP violation is logged. Materials with a quantity type are
+ * core seed data, so an SCU-typed material is present on any provisioned stack; the reveal step is
+ * guarded so a stack seeded without an SCU material still runs the console guard rather than
+ * failing spuriously.
  *
  * <p>Read-only: it builds a row in the browser but never submits, so it mutates no server state.
  * The actor is {@code test-admin}, who may create orders.
@@ -90,7 +94,10 @@ class OrdersCreateScuHintRevealE2eTest {
   /**
    * Adds a material row on the create-order form and asserts that choosing an SCU material reveals
    * the row's SCU hint (via the toggled visibility class) without any {@code style-src-attr} CSP
-   * violation — the reveal-over-class failure mode the ADR-0093 JS fix addresses.
+   * violation — the reveal-over-class failure mode the ADR-0093 JS fix addresses. Piggybacks the
+   * REQ-FE-016 metadata-mirror contract onto the same pick: the selected option's {@code
+   * data-quantity-type} must appear on the combobox's hidden input, and a programmatic {@code
+   * setValue('')} must remove the previously mirrored key instead of leaving it stale.
    */
   @Test
   void scuMaterialRevealsHintWithoutCspViolation() {
@@ -111,13 +118,52 @@ class OrdersCreateScuHintRevealE2eTest {
         // scuHintMarkup and starts hidden via krtm-hidden).
         page.locator("[data-trigger=\"orders-add-material\"]").click();
         Locator row = page.locator("#materials-container .material-row").last();
-        Locator select = row.locator("[data-role=\"material-select\"]");
 
-        Locator scuOption = select.locator("option[data-quantity-type=\"SCU\"]").first();
-        if (scuOption.count() > 0) {
-          select.selectOption(scuOption.getAttribute("value"));
+        // The row's material picker is a server-side-search combobox (REQ-FE-016): the page no
+        // longer preloads the catalog as <option>s, so an SCU-typed material is discovered by
+        // querying the same catalog proxy the picker's remote source uses (fetched in-page so the
+        // session cookie authenticates the call), then picked in the combobox by its id — the
+        // enhancer mirrors each fetched option's value into data-value, and the seeded e2e
+        // catalog is small enough that the empty-query first page contains every material.
+        Object catalog =
+            page.evaluate(
+                "() => fetch('/catalog/material-search?jobOrder=true&q=')"
+                    + ".then(r => (r.ok ? r.json() : []))");
+        String scuMaterialId = null;
+        if (catalog instanceof List<?> rows) {
+          for (Object entry : rows) {
+            if (entry instanceof Map<?, ?> material && "SCU".equals(material.get("quantityType"))) {
+              Object id = material.get("id");
+              scuMaterialId = id == null ? null : id.toString();
+              break;
+            }
+          }
+        }
+        if (scuMaterialId != null) {
+          E2eSupport.selectComboboxByValue(
+              row.locator(
+                  ".krt-combobox:has([data-role=\"material-select\"])" + " .krt-combobox__input"),
+              scuMaterialId);
           assertThat(row.locator(".scu-hint"))
               .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
+
+          // Metadata-mirror contract (REQ-FE-016): the pick above must have mirrored the option's
+          // data-quantity-type onto the hidden input, and clearing the picker via the programmatic
+          // setValue path must REMOVE the previously mirrored key — the stale-key half of the
+          // contract, which no user-driven flow exercises.
+          Locator hiddenMaterial = row.locator("input[data-role=\"material-select\"]");
+          assertEquals(
+              "SCU",
+              hiddenMaterial.getAttribute("data-quantity-type"),
+              "the picked SCU option's quantity type must be mirrored onto the hidden input");
+          Object staleKeyRemoved =
+              hiddenMaterial.evaluate(
+                  "el => { el.krtCombobox.setValue(''); return el.dataset.quantityType"
+                      + " === undefined; }");
+          assertEquals(
+              Boolean.TRUE,
+              staleKeyRemoved,
+              "setValue('') must remove the previously mirrored data-quantity-type");
         }
 
         List<String> cspStyleViolations =

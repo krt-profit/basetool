@@ -24,13 +24,10 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExternalAliasDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExternalAliasWriteRequest;
-import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -74,17 +71,15 @@ public class AdminMaterialAliasesPageController {
   private static final ParameterizedTypeReference<List<MaterialExternalAliasDto>> ALIAS_LIST_TYPE =
       new ParameterizedTypeReference<>() {};
 
-  /** Response type for the {@code /materials/lookup} material-reference list. */
-  private static final ParameterizedTypeReference<List<MaterialReferenceDto>>
-      MATERIAL_REFERENCE_LIST_TYPE = new ParameterizedTypeReference<>() {};
-
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the alias list plus the add form. Failures (backend 500, network) collapse to an error
-   * banner shown in the page header so the operator sees the alias data is stale.
+   * Renders the alias list plus the add form. The material pickers are remote-search comboboxes
+   * backed by {@code /catalog/material-search}, so no material catalogue is fetched here. Failures
+   * (backend 500, network) collapse to an error banner shown in the page header so the operator
+   * sees the alias data is stale.
    *
-   * @param model Thymeleaf model populated with the alias list and a material lookup list
+   * @param model Thymeleaf model populated with the alias list
    * @return the {@code admin/material-aliases} view name
    */
   @GetMapping
@@ -92,29 +87,20 @@ public class AdminMaterialAliasesPageController {
     try {
       List<MaterialExternalAliasDto> aliases = backendApiClient.get(BACKEND_BASE, ALIAS_LIST_TYPE);
       model.addAttribute("aliases", aliases == null ? List.of() : aliases);
-
-      List<MaterialReferenceDto> materials =
-          backendApiClient.get("/api/v1/materials/lookup", MATERIAL_REFERENCE_LIST_TYPE);
-      List<MaterialReferenceDto> sorted =
-          new ArrayList<>(materials == null ? List.of() : materials);
-      sorted.sort(
-          Comparator.comparing(
-              m -> m.name() == null ? "" : m.name(), String.CASE_INSENSITIVE_ORDER));
-      model.addAttribute("materials", sorted);
     } catch (Exception e) {
       log.error("Failed to load material-alias admin page", e);
       model.addAttribute("error", "error.admin.materialAlias.load");
       model.addAttribute("aliases", List.of());
-      model.addAttribute("materials", List.of());
     }
     return "admin/material-aliases";
   }
 
   /**
-   * Resolves a material's display name from its id for the edit-form preview.
+   * Loads a single alias for the edit form. The alias DTO's denormalised {@code materialName} seeds
+   * the remote material combobox's single pre-selected option.
    *
    * @param id alias UUID
-   * @param model Thymeleaf model populated with the alias and the material picker list
+   * @param model Thymeleaf model populated with the alias under edit
    * @return the {@code admin/material-aliases} view name (the edit form lives on the same page)
    */
   @GetMapping("/{id}")

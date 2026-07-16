@@ -12,9 +12,13 @@
 
 ### Changed
 
+- **Material- und Ortsauswahl laufen jetzt überall über eine durchsuchbare Combobox mit Server-Suche statt über ein einfaches Dropdown.** Betroffen sind das Einbuchen-Formular (Material + Ort), die Materialzeilen beim Anlegen und Bearbeiten von Aufträgen, die Eingangsmaterial-Auswahl beim Anlegen und Bearbeiten von Raffinerieaufträgen, der Ziel-Ort im Umbuchen-Dialog, die Materialnavigation der Lager-Detailseite und die Admin-Materialaliasse. Tippen sucht wie bei den Nutzer- und Item-Suchfeldern direkt auf dem Server — dadurch bleibt jeder Eintrag unabhängig von der Kataloggröße auffindbar und die Seiten müssen den Katalog nicht mehr komplett einbetten (REQ-FE-016, ADR-0100).
+
 - **Lager: Beim Umbuchen ist das „Buchen in OrgUnit"-Dropdown jetzt immer sichtbar, sobald der Ziel-Eigentümer mindestens einer Org-Einheit angehört, und auf die aktuelle Einheit der Zeile vorbelegt.** Es listet die Einheiten des ausgewählten Eigentümers über alle vier Ebenen (Staffel, Spezialkommando, Bereich, Organisationsleitung) — vorher erschienen nur Staffel/SK, und der Picker blieb bei genau einer Einheit ganz verborgen. Da nun immer eine konkrete Einheit vorausgewählt ist, behält ein Umbuchen ohne Änderung des Dropdowns die bisherige Einheit bei (REQ-INV-007, #1328).
 
 ### Fixed
+
+- **Aufträge: Der scmdb.net-Import füllt die Mengenfelder wieder zuverlässig.** Der Import suchte die Mengenfelder noch als `input[type="number"]`, obwohl sie seit der SCU-Dezimal-Umstellung Textfelder sind — gefundene Materialien wurden dadurch ohne Menge eingetragen und der Import brach still ab.
 
 - **Lager: Der Umbuchen- und der Ausbuchen-Dialog werden wieder mittig im Fenster angezeigt statt am oberen Rand zu kleben.** Die Dialoge wurden per Inline-`display:block` geöffnet, was die zentrierende Flex-Ausrichtung von `.modal` überschrieb; sie öffnen jetzt mit `display:flex` (#1328).
 

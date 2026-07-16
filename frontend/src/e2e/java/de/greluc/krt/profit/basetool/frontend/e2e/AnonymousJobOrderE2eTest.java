@@ -29,7 +29,6 @@ import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
-import com.microsoft.playwright.options.SelectOption;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -153,7 +152,7 @@ class AnonymousJobOrderE2eTest {
         page.locator("#requestingOrgUnitId").selectOption(nonProfitSkId);
         page.locator("#responsibleOrgUnitId").selectOption(IRIDIUM_ID);
         page.locator("#handle").fill(handle);
-        page.getByTestId("order-material-select").selectOption(new SelectOption().setIndex(1));
+        E2eSupport.selectComboboxFirstOption(page.getByTestId("order-material-select"));
         page.getByTestId("order-material-amount").fill("50");
         E2eSupport.clickSubmitClearingFooter(page.getByTestId("order-submit"));
         page.waitForLoadState();

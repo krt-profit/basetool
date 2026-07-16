@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -120,13 +121,35 @@ public class MaterialService {
   }
 
   /**
-   * Lightweight projection used by typeaheads — only id and name.
+   * Lightweight projection used by typeaheads — only id, name and quantity type. Deliberately
+   * complete (no silent bound): a truncated list would make materials beyond the bound unreachable
+   * in every consumer. Payload-bounded pickers use {@link #searchPicker(String, boolean, boolean,
+   * Pageable)} instead.
    *
-   * @return all materials as reference DTOs
+   * @return all visible materials as reference DTOs
    */
   public List<de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto>
       findAllReference() {
     return materialRepository.findAllReference();
+  }
+
+  /**
+   * Live search for the material pickers (REQ-FE-016): pages visible materials whose name contains
+   * {@code search} (case-insensitive, LIKE metacharacters escaped so user input matches literally),
+   * optionally narrowed to the job-order subset (orders material lines) or to refinery inputs (RAW
+   * or manually raw-flagged). Deliberately uncached: query strings are user-typed and would pollute
+   * the shared materials cache, and the repository read is cheap at picker page sizes.
+   *
+   * @param search the raw name fragment, or {@code null}/blank for the unfiltered first page
+   * @param jobOrderOnly when true, only {@code isJobOrder = true} materials
+   * @param rawOnly when true, only refinery inputs (RAW type or manually raw-flagged)
+   * @param pageable page request from the whitelisted picker sort
+   * @return one page of matching visible materials with the refined material initialized
+   */
+  public Page<Material> searchPicker(
+      @Nullable String search, boolean jobOrderOnly, boolean rawOnly, @NotNull Pageable pageable) {
+    return materialRepository.searchPicker(
+        LikePatterns.escapeNullable(search), jobOrderOnly, MaterialType.RAW, rawOnly, pageable);
   }
 
   /**

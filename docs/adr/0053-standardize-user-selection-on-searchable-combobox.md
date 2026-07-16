@@ -75,6 +75,17 @@ binding requirement (REQ-FE-011).
 - E2E tests that drove the converted `<select>`s with Playwright `selectOption()` had to switch to
   filling the combobox textbox and picking an option.
 
+**Follow-up (2026-07-16, REQ-FE-016):** the standard was extended from user pickers to **catalog
+pickers** — material, game-item and booking-flow location selects. To make that possible the
+component gained an option-metadata mirror: the selected option's extra `data-*`
+(`data-quantity-type`, `data-refined-id`/`-name`, …) is mirrored onto the hidden input by one
+shared helper on every value-set path (commit, preselect seeding, typed exact match, `setValue`),
+with stale-key removal and select-level passthrough keys reserved — because enhancement removes
+the native `<option>`s, and consumers previously read `selectedOptions[0].dataset.*`. The binding
+conversion checklist (grep for `querySelector('select')` / `.selectedOptions` / `.selectedIndex` /
+`.options[` / `.value =` writes / `cloneNode` per site) and the live-row-clone prohibition live in
+REQ-FE-016 (`docs/specs/frontend-ajax-mutations.md`).
+
 ## Alternatives considered
 
 - **Remote `/users/search` combobox for every field** — rejected as the default: it needs per-field

@@ -63,17 +63,22 @@ function calcScu(index) {
 function updateOutputMaterial(selectElement) {
     const entryBlock = selectElement.closest('.material-entry');
     const outputDisplay = entryBlock.querySelector('span[id^="outputMaterialDisplay_"]');
-    const selectedOption = selectElement.options[selectElement.selectedIndex];
 
-    if (selectedOption) {
-        const refinedName = selectedOption.getAttribute('data-refined-name');
-        if (refinedName) {
-            outputDisplay.innerText = refinedName;
-            outputDisplay.style.opacity = '1';
-        } else {
-            outputDisplay.innerText = '-';
-            outputDisplay.style.opacity = '0.7';
-        }
+    // The input-material picker is a server-side searchable combobox (REQ-FE-016): the selected
+    // option's data-refined-name is mirrored onto the hidden input carrying the control's id. The
+    // raw <select> fallback covers only the not-yet-enhanced pre-enhancement state, whose sole
+    // non-placeholder option is the server-rendered seed (the remote picker preloads no catalog).
+    let refinedName = selectElement.dataset.refinedName || '';
+    if (!refinedName && selectElement.tagName === 'SELECT') {
+        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        refinedName = (selectedOption && selectedOption.getAttribute('data-refined-name')) || '';
+    }
+    if (refinedName) {
+        outputDisplay.innerText = refinedName;
+        outputDisplay.style.opacity = '1';
+    } else {
+        outputDisplay.innerText = '-';
+        outputDisplay.style.opacity = '0.7';
     }
 
     // Refresh the yield badge against the shared module's map. With no location picked the
@@ -107,6 +112,37 @@ function addMaterialRow() {
     const count = entries.length;
 
     const template = entries[0].cloneNode(true);
+
+    // The input-material picker is an enhanced combobox (REQ-FE-016); its clone is dead
+    // (listeners dropped, duplicated ARIA ids, no native <select> left to re-enhance).
+    // Build a fresh EMPTY select — the remote combobox (remote-materials-raw) searches the
+    // raw catalog on demand, so no options are preloaded — carry over row 0's id/name
+    // (renumbered by the loop below), and let krtEnhanceComboboxes upgrade it once the row
+    // is inserted.
+    const clonedPicker = template.querySelector('.krt-combobox');
+    if (clonedPicker) {
+        const hiddenField = clonedPicker.querySelector('input[type="hidden"]');
+        const freshSelect = document.createElement('select');
+        if (hiddenField) {
+            freshSelect.id = hiddenField.id;
+            freshSelect.name = hiddenField.name;
+        }
+        freshSelect.required = true;
+        freshSelect.setAttribute('data-trigger', 'rfc-update-output');
+        freshSelect.setAttribute('data-krt-combobox', 'remote-materials-raw');
+        clonedPicker.parentNode.replaceChild(freshSelect, clonedPicker);
+        // The enhancer re-pointed row 0's label (for="krt-cb-N-input") and minted its id; the
+        // clone carries both, which the /_\d+$/ renumbering below cannot fix — strip the id
+        // (else every added row duplicates it) and re-bind the label to the rebuilt select's
+        // field id so the renumber loop and the fresh enhancement pick it up cleanly.
+        const clonedLabel = freshSelect.parentNode.querySelector('label');
+        if (clonedLabel) {
+            clonedLabel.removeAttribute('id');
+            if (hiddenField) {
+                clonedLabel.setAttribute('for', hiddenField.id);
+            }
+        }
+    }
 
     // Renumber the title in the header. Source is row 0 ("Material #1") so without an
     // update the cloned row would also read "Material #1" until the page is reloaded.
@@ -187,6 +223,11 @@ function addMaterialRow() {
     });
 
     container.appendChild(template);
+    // Manually built DOM: the global enhancer does not see it, so upgrade the rebuilt
+    // material select in place (REQ-FE-016).
+    if (window.krtEnhanceComboboxes) {
+        window.krtEnhanceComboboxes(template);
+    }
 }
 
 function removeMaterialRow(button) {
@@ -350,13 +391,60 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     // event re-derives the output-material display and the yield badge like a manual pick.
     // The select is resolved RELATIVE to the chip (not via a row index): add/remove
     // renumber the select ids, so a stored index would silently target the wrong row.
+    // The picker is a REMOTE combobox (remote-materials-raw), so the refined-output metadata
+    // is not resolvable locally: look the suggested material up via the catalog proxy and pass
+    // label + metadata to setValue. A failed/miss lookup degrades to id + name only (the
+    // output display shows '-'), toastless like the rest of the import review flow.
     window.krtEvents.on('click', 'rfc-apply-suggestion', function (el) {
         const materialId = el.getAttribute('data-material-id');
+        const materialName = el.getAttribute('data-material-name') || '';
         const entry = el.closest('.material-entry');
-        const select = entry ? entry.querySelector('select[id^="inputMaterialId_"]') : null;
+        // Attribute-only selector: after combobox enhancement the control's id lives on a
+        // hidden <input>, not a <select> (REQ-FE-016).
+        const select = entry ? entry.querySelector('[id^="inputMaterialId_"]') : null;
         if (!select || !materialId) return;
-        select.value = materialId;
-        select.dispatchEvent(new Event('change', { bubbles: true }));
+        // setValue() syncs the hidden value, the visible label and the mirrored metadata;
+        // the explicit change dispatch re-derives the output display + yield badge like a
+        // manual pick (setValue itself never fires change).
+        function applySuggestion(match) {
+            if (select.krtCombobox) {
+                if (match) {
+                    select.krtCombobox.setValue(materialId, match.name, {
+                        quantityType: match.quantityType || '',
+                        refinedId: (match.refinedMaterial && match.refinedMaterial.id) || '',
+                        refinedName: (match.refinedMaterial && match.refinedMaterial.name) || '',
+                    });
+                } else {
+                    select.krtCombobox.setValue(materialId, materialName);
+                }
+            } else {
+                select.value = materialId;
+            }
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        fetch('/catalog/material-search?raw=true&q=' + encodeURIComponent(materialName), {
+            headers: { Accept: 'application/json' },
+        })
+            .then(function (r) {
+                return r.ok ? r.json() : [];
+            })
+            .then(function (list) {
+                const rows = Array.isArray(list) ? list : [];
+                // Exact id match first; fall back to the first exact name match (the id is
+                // authoritative, the name only disambiguates a paged-out id).
+                const match =
+                    rows.find(function (m) {
+                        return m.id === materialId;
+                    }) ||
+                    rows.find(function (m) {
+                        return m.name === materialName;
+                    }) ||
+                    null;
+                applySuggestion(match);
+            })
+            .catch(function () {
+                applySuggestion(null);
+            });
     });
 }
 
@@ -420,7 +508,9 @@ function _reinitRefineryForm(fromSwap) {
     }
     updateMethodRatings();
     document.querySelectorAll('.material-entry').forEach((_, index) => calcScu(index));
-    document.querySelectorAll('select[id^="inputMaterialId_"]').forEach((select) => {
+    // Attribute-only selector: matches the raw <select> before enhancement and the hidden
+    // <input> carrying the id after it (REQ-FE-016).
+    document.querySelectorAll('[id^="inputMaterialId_"]').forEach((select) => {
         if (select.value) updateOutputMaterial(select);
     });
     if (window.krtRefineryYield) {
