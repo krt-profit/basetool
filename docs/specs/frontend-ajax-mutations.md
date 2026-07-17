@@ -1189,6 +1189,67 @@ registry), `CatalogSearchController`, the re-pointed consumers in `inventory-inp
 in `personal-inventory.js` (`renderResults`, `SEARCH_LIMIT`) · **ADR:** ADR-0053
 (follow-up note), ADR-0100
 
+### REQ-FE-017 — Account-selection fields are server-side search comboboxes too
+
+REQ-FE-011 established the searchable combobox and its `remoteSource` mode for **user** pickers; the
+same mechanism now covers **bank-account** selection, so the pattern is proven for a second entity
+type and the `window.krtComboboxRemoteSources` registry is confirmed generic (not user-specific).
+**Every field that lets a user pick a bank account from a potentially-large set must be a
+`remoteSource` combobox** that fetches matching accounts on demand rather than preloading a roster —
+the account analogue of the 5000-scale switch (ADR-0085/ADR-0089), and the fix for the former
+`?size=500` preload that silently truncated past 500 accounts (REQ-BANK-053).
+
+The control opts in **declaratively by the marker value** `data-krt-combobox="remote-bank-accounts"`,
+resolved through the shared registry to the source in
+[`krt-bank-account-search.js`](../../frontend/src/main/resources/static/js/krt-bank-account-search.js)
+(loaded from `fragments/head.html` **before** `krt-searchable-select.js`, exactly like the user
+sources). The source queries the frontend proxy `GET /api/proxy/bank/accounts/search` (→ backend
+`GET /api/v1/bank/accounts?status=ACTIVE&size=…&sort=name,asc`, caller-scoped, REQ-BANK-010) and maps
+each row to a `<accountNo> — <name>` option. Four pickers convert: the transfer destination
+(REQ-BANK-040), the direct-booking **source** account, the grant-create account and the grants
+**per-account filter**; an edit-mode picker (the grants filter) seeds exactly its current account so
+the box shows a name, not a raw id, while the add-only pickers seed only the placeholder.
+
+Two combobox-conversion rules from REQ-FE-011/ADR-0089 apply and are load-bearing here:
+
+- **Delegated `change` handlers match the attribute, not the tag.** Enhancement replaces the
+  `<select>` with a value-only hidden `<input>` that inherits the control's `data-*` and re-dispatches
+  `change` on commit, so a handler pinned to `select[data-role=…]` would stop firing. The
+  source-account and grants-filter handlers use `[data-role=…]`.
+- **Per-option metadata that must survive is carried out-of-band.** The direct-booking source
+  account's per-account **Begründung mandate** (REQ-BANK-045) used to ride the `<option>`'s
+  `data-requires-justification`; since the hidden input has no options, the search source records it
+  in `window.krtBankAccountMeta` (id → boolean, derived from the account type) and `bank.js` reads it
+  there — keeping the shared combobox component generic.
+
+Pickers bounded to a genuinely small, page-scoped account set may stay in local-filter mode; deviation
+beyond that needs prior approval by @greluc and a spec amendment first.
+
+**Acceptance**
+
+- [ ] Every bank-account selection field over a potentially-large set carries
+  `data-krt-combobox="remote-bank-accounts"` and ships **no** preloaded account `<option>` roster;
+  typing finds an account by **account number or name**, and the picked account's id submits.
+- [ ] The account source is registered before the enhancer and upgrades pickers on initial load **and**
+  after `krt:swapped` (the movement modal rides the account-detail `accountBody` and manage
+  `manageBody` swaps).
+- [ ] The grants per-account filter seeds its currently-filtered account by name; clearing it filters
+  to all accounts.
+- [ ] The source-account picker still marks the Begründung `required` for a CARTEL/CARTEL_BANK/SPECIAL
+  source, reading the mandate from `window.krtBankAccountMeta`.
+
+**Enforced by:** `BankInPlaceFragmentMvcTest` / `BankDashboardMovementModalMvcTest` /
+`BankRequestQueuePageControllerMvcTest` (the converted pickers carry the `remote-bank-accounts` marker
+and preload no roster), `BankProxyControllerTest` (the `/accounts/search` proxy forwards
+active/name-sorted + unwraps content), `BankPageControllerTest` / `BankGrantsPageControllerTest` (no
+account roster preloaded; the grants filter seeds only the selected account) · **Code:**
+`krt-bank-account-search.js` (the `remote-bank-accounts` `krtComboboxRemoteSources` entry +
+`window.krtBankAccountMeta`), `krt-searchable-select.js` (the marker→`remoteSource` lookup, reused),
+`static/js/bank.js` (attribute-delegated source/filter handlers, metadata-map justification),
+`controller/BankProxyController#searchAccounts`, `templates/fragments/bank-movement-modal.html`,
+`templates/bank-grants.html`, `fragments/head.html` (script load order) · **ADR:** ADR-0053, ADR-0089,
+ADR-0106 · **Issues:** —
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract

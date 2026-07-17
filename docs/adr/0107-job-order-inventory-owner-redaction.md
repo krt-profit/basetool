@@ -1,4 +1,4 @@
-# ADR-0106 — Requesting-side viewers of an SK-public order see redacted inventory owner/location
+# ADR-0107 — Requesting-side viewers of an SK-public order see redacted inventory owner/location
 
 - **Status:** Accepted
 - **Date:** 2026-07-17

@@ -22,17 +22,23 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDetailDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankApprovalLimitsDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankCapabilitiesDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankGrantDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import java.util.Collections;
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -48,8 +54,34 @@ class BankGrantsPageControllerTest {
         userId, handle, accountId, "KB-0001", "Staffel IRIDIUM", true, false, false, true, 0L);
   }
 
+  /** A minimal account-detail payload so the controller can seed the filter combobox's account. */
+  private static BankAccountDetailDto detail(UUID accountId) {
+    BankAccountDto account =
+        new BankAccountDto(
+            accountId,
+            "KB-0001",
+            "Staffel IRIDIUM",
+            "ORG_UNIT",
+            "ACTIVE",
+            null,
+            null,
+            BigDecimal.ZERO,
+            null,
+            null,
+            null,
+            0L,
+            Instant.parse("2026-01-15T10:00:00Z"));
+    return new BankAccountDetailDto(
+        account,
+        BigDecimal.ZERO,
+        0,
+        new BankCapabilitiesDto(false, false, false, false),
+        new BankApprovalLimitsDto(
+            false, false, false, false, List.of(), Map.of(), null, null, List.of()));
+  }
+
   @Test
-  void grants_ShouldFilterByAccountInAccountView() {
+  void grants_ShouldFilterByAccount_andSeedSelectedAccountForCombobox() {
     // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankGrantsPageController controller = new BankGrantsPageController(backendApiClient);
@@ -58,8 +90,11 @@ class BankGrantsPageControllerTest {
     UUID user = UUID.randomUUID();
     when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(List.of(grant(user, "alpha", accountId)));
-    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 500, 0, 0, Collections.emptyList()));
+    // The account roster is no longer preloaded (remote-bank-accounts combobox); only the selected
+    // account is resolved for the filter's edit-mode seed.
+    when(backendApiClient.get(
+            eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class)))
+        .thenReturn(detail(accountId));
 
     // When
     String view = controller.grants(null, accountId, null, null, model);
@@ -67,8 +102,12 @@ class BankGrantsPageControllerTest {
     // Then
     assertEquals("bank-grants", view);
     assertEquals(Boolean.FALSE, model.getAttribute("byEmployee"));
-    assertEquals(accountId, model.getAttribute("selectedAccountId"));
+    BankAccountDto selected = (BankAccountDto) model.getAttribute("selectedAccount");
+    assertNotNull(selected);
+    assertEquals("KB-0001", selected.accountNo());
     verify(backendApiClient).get(eq("/api/v1/bank/grants?accountId=" + accountId), anyTypeRef());
+    // No full account roster is preloaded (the picker searches on demand).
+    verify(backendApiClient, never()).get(startsWith("/api/v1/bank/accounts?"), anyTypeRef());
   }
 
   @Test
@@ -87,8 +126,6 @@ class BankGrantsPageControllerTest {
     when(backendApiClient.get(eq("/api/v1/bank/grants?userId=" + userId), anyTypeRef()))
         .thenReturn(List.of(allGrants.get(0)));
     when(backendApiClient.get(eq("/api/v1/bank/grants"), anyTypeRef())).thenReturn(allGrants);
-    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 500, 0, 0, Collections.emptyList()));
 
     // When
     controller.grants("employee", null, userId, null, model);
@@ -96,6 +133,8 @@ class BankGrantsPageControllerTest {
     // Then
     assertEquals(Boolean.TRUE, model.getAttribute("byEmployee"));
     assertEquals(userId, model.getAttribute("selectedUserId"));
+    // The per-employee view resolves no account (the account seed is account-view only).
+    assertNull(model.getAttribute("selectedAccount"));
     Map<UUID, String> grantees = (Map<UUID, String>) model.getAttribute("grantees");
     assertNotNull(grantees);
     assertEquals(2, grantees.size());
@@ -104,9 +143,8 @@ class BankGrantsPageControllerTest {
   }
 
   // covers REQ-FE-005 (#579) — an in-place re-render (fragment=grantsMatrix) returns only the
-  // matrix
-  // fragment honouring the active filter, and skips the all-grants / accounts lookups that feed the
-  // filter selectors and the create modal (all outside the swapped region).
+  // matrix fragment honouring the active filter, and skips the all-grants / account-seed lookups
+  // that feed the filter selectors and the create modal (all outside the swapped region).
   @Test
   void grants_fragmentGrantsMatrix_rendersOnlyMatrixFragment_andSkipsFilterAndModalLookups() {
     // Given
@@ -126,7 +164,10 @@ class BankGrantsPageControllerTest {
     List<BankGrantDto> grants = (List<BankGrantDto>) model.getAttribute("grants");
     assertNotNull(grants);
     assertEquals(1, grants.size());
-    // The fragment path must not load the filter selectors / create-modal lookups.
-    verify(backendApiClient, never()).get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef());
+    // The fragment path must not load the filter selectors / create-modal lookups or the account
+    // seed.
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/bank/accounts/" + accountId), eq(BankAccountDetailDto.class));
+    verify(backendApiClient, never()).get(eq("/api/v1/bank/grants"), anyTypeRef());
   }
 }

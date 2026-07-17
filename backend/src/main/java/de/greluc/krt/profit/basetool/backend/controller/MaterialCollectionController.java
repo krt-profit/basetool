@@ -39,7 +39,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * REST controller for the material collection overview of a job order. Provides a sorted list of
  * all inventory items linked to a specific job order. The per-entry owner/location is redacted for
- * a requesting-side viewer of an SK-public order (REQ-ORDERS-029, ADR-0106) via {@link
+ * a requesting-side viewer of an SK-public order (REQ-ORDERS-029, ADR-0107) via {@link
  * JobOrderInventoryOwnerRedactor}, gated on {@code canSeeJobOrderInventoryOwners}.
  */
 @RestController

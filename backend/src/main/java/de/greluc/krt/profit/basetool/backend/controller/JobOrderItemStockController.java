@@ -41,7 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
  * stock earmarked to a job order, grouped per game item — the item sibling of {@link
  * MaterialCollectionController}. Reading the panel requires being able to see the order ({@code
  * canSeeJobOrder}); the per-entry owner/location is additionally redacted for a requesting-side
- * viewer of an SK-public order (REQ-ORDERS-029, ADR-0106) via {@link
+ * viewer of an SK-public order (REQ-ORDERS-029, ADR-0107) via {@link
  * JobOrderInventoryOwnerRedactor}, gated on {@code canSeeJobOrderInventoryOwners}.
  */
 @RestController

@@ -29,7 +29,7 @@ import org.springframework.stereotype.Component;
 /**
  * Single seam that blanks the inventory <em>owner identity and location</em> of the stock linked to
  * a job order before those projections leave the API to a caller who is not entitled to the order's
- * responsible (processing) side (REQ-ORDERS-029, ADR-0106). It is applied by the four
+ * responsible (processing) side (REQ-ORDERS-029, ADR-0107). It is applied by the four
  * order-inventory read endpoints whenever {@code
  * OwnerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)} is {@code false} — i.e. a
  * requesting-side viewer of an SK-public order: they keep seeing the order and its stock

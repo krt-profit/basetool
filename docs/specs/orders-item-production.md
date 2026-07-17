@@ -23,7 +23,7 @@ This spec governs both halves — the production-booking domain (`REQ-ORDERS-025
 presentation (`REQ-ORDERS-026`) — plus the order-detail **Item-Bestand panel** that surfaces the
 item stock earmarked to the order (`REQ-ORDERS-028`, the item sibling of the Materialsammlung) and
 the **owner/location redaction** that hides the fulfilling side's inventory owner and Standort from a
-requesting-side viewer of an SK-public order (`REQ-ORDERS-029`, ADR-0106). The decision behind the
+requesting-side viewer of an SK-public order (`REQ-ORDERS-029`, ADR-0107). The decision behind the
 booking flow is [ADR-0099](../adr/0099-job-order-item-production-booking.md).
 
 ## Requirements
@@ -321,7 +321,7 @@ requester-redacted view (REQ-ORDERS-023), mirroring the *Aggregierte Materialien
 requester-only viewer (`redacted == true`) additionally cannot reach the endpoint at all — it is
 gated on `canSeeJobOrder`, which a requester-only viewer fails (403). For a caller who *can* see the
 order but is on the **requesting** side of an **SK-public** order, the per-entry owner and location
-are blanked by the backend (REQ-ORDERS-029, ADR-0106) — the panel still renders the amounts and the
+are blanked by the backend (REQ-ORDERS-029, ADR-0107) — the panel still renders the amounts and the
 delivered marker, with owner/location shown as `—`. An order with no earmarked item stock renders an
 empty-state message.
 
@@ -367,7 +367,7 @@ the per-entry owner and location for a caller who can see the order but is **not
 responsible (processing) side**. Concretely: on a Spezialkommando-responsible (SK-public) order,
 `canSeeJobOrder` admits every profit-eligible member — including members of the merely **requesting**
 squadron — but the fulfilling side's owner/Standort must not leak to the requesting side (owner
-decision 2026-07-17, ADR-0106).
+decision 2026-07-17, ADR-0107).
 
 **Gate.** `OwnerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)` — identical to
 `canSeeJobOrderBlueprintOwners`: membership of the order's responsible org unit (or an admin with
@@ -410,7 +410,7 @@ entitled, redactor output otherwise) · **Code:**
 `AccessGateService.canSeeJobOrderInventoryOwners` + `OwnerScopeService` facade,
 `JobOrderInventoryOwnerRedactor`, `JobOrderItemStockController` / `MaterialCollectionController` /
 `JobOrderController` (the two pickers), `orders-detail.html` + `material-collection.html` (`—`
-fallbacks) · **Issues:** — · **ADR:** [ADR-0106](../adr/0106-job-order-inventory-owner-redaction.md)
+fallbacks) · **Issues:** — · **ADR:** [ADR-0107](../adr/0107-job-order-inventory-owner-redaction.md)
 
 ## Out of scope
 

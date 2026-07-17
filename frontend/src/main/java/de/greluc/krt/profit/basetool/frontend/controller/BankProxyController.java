@@ -19,22 +19,28 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Thin AJAX proxy for every bank mutation ({@code /api/proxy/bank/**}, epic #556). Browser-side JS
@@ -54,7 +60,52 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class BankProxyController {
 
+  /**
+   * Response type for the paged account search ({@code /api/v1/bank/accounts}), whose raw JSON rows
+   * are decoded as maps so this proxy stays decoupled from the account DTO shape.
+   */
+  private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>>
+      ACCOUNT_SEARCH_PAGE = new ParameterizedTypeReference<>() {};
+
+  /** How many matches one account-picker fetch returns; matches the combobox's render cap. */
+  private static final int ACCOUNT_SEARCH_PAGE_SIZE = 50;
+
   private final BackendApiClient backendApiClient;
+
+  /**
+   * Server-side account search behind the {@code remote-bank-accounts} combobox source
+   * (REQ-BANK-053, REQ-FE-017, ADR-0106 — the account analogue of {@code UserProxyController}'s
+   * user search). The combobox fetches matching <em>active</em> accounts on demand instead of
+   * preloading the whole roster, so a transfer destination / grant target stays reachable past the
+   * former 500-account cap. Forwards to the caller-scoped backend list ({@code
+   * /api/v1/bank/accounts}) — management sees all, an employee only their granted accounts
+   * (REQ-BANK-010) — narrowed to {@code status=ACTIVE} and the typed query, sorted by name, capped
+   * at one render page. The backend enforces the real bank gate; this proxy only requires an
+   * authenticated session and returns the page content as a flat list ({@code id}, {@code
+   * accountNo}, {@code name}, {@code type}, …) for the JS source to map, or an empty list on
+   * backend failure so the picker shows "no matches" rather than throwing.
+   *
+   * <p>The query is built with {@link UriComponentsBuilder} so a crafted {@code &} in the term
+   * cannot inject extra parameters; a {@code null} query (the browse-mode empty fetch collapsed by
+   * the {@code emptyAsNull} binder) is normalised to the empty match-all filter, exactly as the
+   * user search proxy does.
+   *
+   * @param query the free-text name/account-number filter, or {@code null}/blank to match all
+   * @return matching active-account records (raw JSON maps), never {@code null}
+   */
+  @GetMapping("/accounts/search")
+  @PreAuthorize("isAuthenticated()")
+  public List<Map<String, Object>> searchAccounts(@RequestParam(required = false) String query) {
+    String uri =
+        UriComponentsBuilder.fromPath("/api/v1/bank/accounts")
+            .queryParam("query", query == null ? "" : query)
+            .queryParam("status", "ACTIVE")
+            .queryParam("size", ACCOUNT_SEARCH_PAGE_SIZE)
+            .queryParam("sort", "name,asc")
+            .toUriString();
+    PageResponse<Map<String, Object>> response = backendApiClient.get(uri, ACCOUNT_SEARCH_PAGE);
+    return response != null && response.content() != null ? response.content() : List.of();
+  }
 
   /**
    * Forwards a deposit booking.

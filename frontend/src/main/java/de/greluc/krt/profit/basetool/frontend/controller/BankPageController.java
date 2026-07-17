@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDetailDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankDashboardDto;
@@ -61,13 +60,6 @@ public class BankPageController {
 
   /** Response type for the bank-wide holder registry ({@code /api/v1/bank/holders}). */
   private static final ParameterizedTypeReference<List<BankHolderDto>> BANK_HOLDER_LIST =
-      new ParameterizedTypeReference<>() {};
-
-  /**
-   * Response type for the paged transfer-target account list ({@code
-   * /api/v1/bank/accounts?size=500}) that fills the transfer-destination select.
-   */
-  private static final ParameterizedTypeReference<PageResponse<BankAccountDto>> BANK_ACCOUNT_PAGE =
       new ParameterizedTypeReference<>() {};
 
   /**
@@ -143,35 +135,36 @@ public class BankPageController {
     // Full-page render only: assemble the direct-booking "Kontobewegung" modal's data
     // (REQ-BANK-023, #997). The CTA + modal live OUTSIDE the swapped bankGrid fragment, so a
     // view-toggle swap never re-reads these; a successful booking re-renders the grid in place.
-    addMovementModalData(model);
+    // canBook (whether to offer the modal at all) is derived from the already-loaded dashboard
+    // rather than a separate account fetch: the modal's source/destination account pickers are now
+    // server-side search comboboxes (REQ-FE-017, ADR-0106), so no account roster is preloaded.
+    boolean canBook =
+        dashboard != null
+            && dashboard.accounts() != null
+            && dashboard.accounts().stream().anyMatch(a -> "ACTIVE".equals(a.status()));
+    addMovementModalData(model, canBook);
     return "bank-dashboard";
   }
 
   /**
    * Assembles the shared "Kontobewegung" direct-booking modal's catalog data for the dashboard's
-   * full-page render (REQ-BANK-023, #997). Every active account is both a bookable source and a
-   * transfer destination on this non-account-scoped surface (a same-account transfer is rejected by
-   * the backend, REQ-BANK-006); the holder registry, all-kinds org-unit picklist and the in-game
-   * transfer-fee rate feed the modal's selectors and live fee preview. The deposit/withdrawal
-   * counterparty picker is a server-side searchable combobox (remote-bank-users, #1193 follow-up),
-   * so no user roster is preloaded here. The modal books through the unchanged {@code /deposits} /
-   * {@code /withdrawals} / {@code /transfers} endpoints, so this adds no new endpoint, audit event
-   * or metric. Mirrors {@code BankRequestQueuePageController}.
+   * full-page render (REQ-BANK-023, #997). The modal's source account and transfer destination are
+   * server-side account-search comboboxes (remote-bank-accounts, REQ-FE-017/ADR-0106) that fetch
+   * matching active accounts on demand, so no account roster is preloaded here (a same-account
+   * transfer is still rejected by the backend, REQ-BANK-006); the holder registry, all-kinds
+   * org-unit picklist and the in-game transfer-fee rate feed the modal's selectors and live fee
+   * preview. The deposit/withdrawal counterparty picker is likewise a server-side searchable
+   * combobox (remote-bank-users, #1193 follow-up), so no user roster is preloaded either. The modal
+   * books through the unchanged {@code /deposits} / {@code /withdrawals} / {@code /transfers}
+   * endpoints, so this adds no new endpoint, audit event or metric. Mirrors {@code
+   * BankRequestQueuePageController}.
    *
-   * @param model the MVC model populated with the movement-modal catalogs and {@code canBook}
+   * @param model the MVC model populated with the movement-modal catalogs
+   * @param canBook whether at least one active account is visible to the caller — gates the CTA +
+   *     modal; derived by the caller from the already-loaded page state, not a separate fetch
    */
-  private void addMovementModalData(@NotNull Model model) {
-    PageResponse<BankAccountDto> accounts =
-        backendApiClient.get("/api/v1/bank/accounts?size=500", BANK_ACCOUNT_PAGE);
-    List<BankAccountDto> activeAccounts =
-        accounts == null
-            ? List.of()
-            : BankAccountOrder.byName(
-                accounts.content().stream().filter(a -> "ACTIVE".equals(a.status())).toList(),
-                BankAccountDto::name);
-    model.addAttribute("movementAccounts", activeAccounts);
-    model.addAttribute("transferTargets", activeAccounts);
-    model.addAttribute("canBook", !activeAccounts.isEmpty());
+  private void addMovementModalData(@NotNull Model model, boolean canBook) {
+    model.addAttribute("canBook", canBook);
     List<BankHolderDto> holders = backendApiClient.get("/api/v1/bank/holders", BANK_HOLDER_LIST);
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
     model.addAttribute(
@@ -232,8 +225,6 @@ public class BankPageController {
     addBookingsModel(id, page, size, from, to, model);
     addChartModel(id, chartRange, detail, model);
     List<BankHolderDto> holders = backendApiClient.get("/api/v1/bank/holders", BANK_HOLDER_LIST);
-    PageResponse<BankAccountDto> accounts =
-        backendApiClient.get("/api/v1/bank/accounts?size=500", BANK_ACCOUNT_PAGE);
 
     model.addAttribute("detail", detail);
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
@@ -242,16 +233,10 @@ public class BankPageController {
         holders == null
             ? List.<BankHolderDto>of()
             : holders.stream().filter(BankHolderDto::active).toList());
-    model.addAttribute(
-        "transferTargets",
-        accounts == null
-            ? List.<BankAccountDto>of()
-            : BankAccountOrder.byName(
-                accounts.content().stream()
-                    .filter(a -> !a.id().equals(id))
-                    .filter(a -> "ACTIVE".equals(a.status()))
-                    .toList(),
-                BankAccountDto::name));
+    // The transfer-destination picker (REQ-BANK-040) on the always-present booking modal is now a
+    // server-side account-search combobox (remote-bank-accounts, REQ-FE-017/ADR-0106) that fetches
+    // matching active accounts on demand, so no transfer-target roster is preloaded here; a
+    // same-account transfer stays rejected by the backend (REQ-BANK-006).
     // The deposit/withdrawal counterparty picker (Einzahler / Empfänger, REQ-BANK-044) on the
     // always-present booking modals is a server-side searchable combobox (remote-bank-users, #1193
     // follow-up) that queries /users/search-bank on demand, so no user roster is preloaded here.

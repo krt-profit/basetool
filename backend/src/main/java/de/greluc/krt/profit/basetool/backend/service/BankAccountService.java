@@ -56,6 +56,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -95,19 +96,41 @@ public class BankAccountService {
 
   /**
    * Pages over the accounts the caller may see: management/admin get all accounts, employees get
-   * exactly their granted accounts (REQ-BANK-010). Balances are joined in one grouped query.
+   * exactly their granted accounts (REQ-BANK-010), optionally narrowed by a case-insensitive
+   * name/account-number substring and by status/type sets (REQ-BANK-053, ADR-0106 — the server-side
+   * account search that backs the remote account pickers and the paged management table, replacing
+   * the former unbounded {@code size=500} preload). Balances are joined in one grouped query, so
+   * the read stays statement-bounded regardless of the account count (REQ-DATA-003, {@code
+   * BankReadNoNPlusOneTest}). A blank/{@code null} query is normalised to the empty string, which
+   * the repository turns into the match-all {@code LIKE '%%'} (never a null bind — the "empty means
+   * all" convention). The query is a <strong>bound parameter</strong> (SQL-injection-safe) and is
+   * intentionally <strong>not</strong> {@code LikePatterns}-escaped: plain {@code LIKE} does not
+   * honour the backslash escape in this Hibernate/PostgreSQL setup, so escaping would only hide an
+   * account whose name contains a literal {@code %}/{@code _}; a caller's {@code %}/{@code _}
+   * therefore act as harmless LIKE wildcards on this bank-employee-gated read.
    *
    * @param management whether the caller has the management perspective
    * @param userId the caller's user id (used for the employee filter)
+   * @param query the raw name/account-no search fragment, or {@code null}/blank for no text filter
+   * @param statuses the account statuses to include (never empty — the controller passes the full
+   *     set for "no status filter")
+   * @param types the account types to include (never empty — the controller passes the full set for
+   *     "no type filter")
    * @param pageable page, size and whitelisted sort
-   * @return one page of accounts incl. balances
+   * @return one page of matching accounts incl. balances
    */
   public Page<BankAccountDto> getAccounts(
-      boolean management, @NotNull UUID userId, @NotNull Pageable pageable) {
+      boolean management,
+      @NotNull UUID userId,
+      @Nullable String query,
+      @NotNull Set<BankAccountStatus> statuses,
+      @NotNull Set<BankAccountType> types,
+      @NotNull Pageable pageable) {
+    String pattern = query == null || query.isBlank() ? "" : query;
     Page<BankAccount> page =
         management
-            ? accountRepository.findAll(pageable)
-            : accountRepository.findGrantedTo(userId, pageable);
+            ? accountRepository.findAllFiltered(pattern, statuses, types, pageable)
+            : accountRepository.findGrantedToFiltered(userId, pattern, statuses, types, pageable);
     Map<UUID, BigDecimal> balances =
         balancesFor(page.getContent().stream().map(BankAccount::getId).toList());
     return page.map(

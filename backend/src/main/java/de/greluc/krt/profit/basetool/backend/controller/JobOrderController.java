@@ -753,7 +753,7 @@ public class JobOrderController {
    * Returns every inventory item linked to a specific material of a job order. Drives the
    * per-material drill-down in the order detail view. The owner/location of each item is blanked
    * for a requesting-side viewer of an SK-public order ({@code canSeeJobOrderInventoryOwners} is
-   * {@code false}, REQ-ORDERS-029 / ADR-0106).
+   * {@code false}, REQ-ORDERS-029 / ADR-0107).
    *
    * @param id job-order id
    * @param matId material id
@@ -779,7 +779,7 @@ public class JobOrderController {
    * "orphaned" links surfaced as a warning on the order detail (REQ-ORDERS-019). Such links bind
    * stock to the order while staying invisible in every material row. The owner/location of each
    * item is blanked for a requesting-side viewer of an SK-public order ({@code
-   * canSeeJobOrderInventoryOwners} is {@code false}, REQ-ORDERS-029 / ADR-0106).
+   * canSeeJobOrderInventoryOwners} is {@code false}, REQ-ORDERS-029 / ADR-0107).
    *
    * @param id job-order id
    * @return orphaned inventory-item DTOs (empty when every linked item matches a requirement),

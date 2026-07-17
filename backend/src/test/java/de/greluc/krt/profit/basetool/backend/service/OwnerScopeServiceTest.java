@@ -639,7 +639,7 @@ class OwnerScopeServiceTest {
       // (canSeeJobOrder is true for any profit member), but the fulfilling side's inventory
       // owner/location is restricted to members of that SK. A profit member from the merely
       // REQUESTING squadron is denied — there is no SK-public escape on this gate, so the endpoint
-      // redacts owner/location for them (ADR-0106).
+      // redacts owner/location for them (ADR-0107).
       UUID skId = UUID.randomUUID();
       SpecialCommand sk = new SpecialCommand();
       sk.setId(skId);

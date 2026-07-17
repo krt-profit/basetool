@@ -56,7 +56,7 @@ order purely because their org unit **requested** it: the linked-inventory **own
 location** on the order's four inventory reads (Item-Bestand panel, material collection, the two
 pickers) are redacted for them, since the SK-public escape would otherwise expose the fulfilling
 side's owners. See [`orders-item-production.md`](orders-item-production.md) `REQ-ORDERS-029` /
-[ADR-0106](../adr/0106-job-order-inventory-owner-redaction.md).
+[ADR-0107](../adr/0107-job-order-inventory-owner-redaction.md).
 
 **Acceptance**
 
