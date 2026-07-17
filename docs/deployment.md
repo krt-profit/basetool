@@ -106,7 +106,7 @@ verifies every image before it runs it). It is not in Ubuntu's default repos, so
 install the pinned release binary and verify its checksum before installing:
 
 ```bash
-COSIGN_VERSION=v3.1.1
+COSIGN_VERSION=v3.1.2
 arch=$(dpkg --print-architecture)          # amd64 or arm64
 curl -fsSLo /tmp/cosign        "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-${arch}"
 curl -fsSLo /tmp/cosign_checksums.txt "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign_checksums.txt"
@@ -122,7 +122,7 @@ cosign version
 > **cosign 3.0.6** — and **cosign 2.x cannot verify cosign 3.x keyless signatures**
 > (3.x verifies 3.x and 2.x; 2.x does not verify 3.x). A host on cosign 2.x would
 > therefore fail this gate on every deploy (fail-closed). Keep the host on the
-> current 3.x release (3.1.1 verifies the CI's 3.0.6 signatures), and when the CI's
+> current 3.x release (3.1.2 verifies the CI's 3.0.6 signatures), and when the CI's
 > `cosign-installer` pin is bumped, keep the host **≥** that cosign version. Already
 > installed an older cosign? See [Updating cosign](#updating-cosign).
 
@@ -1122,14 +1122,14 @@ the new `/usr/local/bin/cosign`. To go from an older cosign (e.g. a 2.x install)
 the current 3.x:
 
 ```bash
-COSIGN_VERSION=v3.1.1
+COSIGN_VERSION=v3.1.2
 arch=$(dpkg --print-architecture)
 curl -fsSLo /tmp/cosign               "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-${arch}"
 curl -fsSLo /tmp/cosign_checksums.txt "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign_checksums.txt"
 ( cd /tmp && grep " cosign-linux-${arch}\$" cosign_checksums.txt | sha256sum -c - )
 sudo install -m 0755 /tmp/cosign /usr/local/bin/cosign   # overwrites the old binary
 rm -f /tmp/cosign /tmp/cosign_checksums.txt
-cosign version                                            # expect 3.1.1
+cosign version                                            # expect 3.1.2
 ```
 
 Then **prove the host can verify a real CI-signed image** before relying on the
