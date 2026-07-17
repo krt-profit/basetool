@@ -346,7 +346,7 @@ blocking every deploy; it is logged loudly on every skipped verification.
 both 2.x and 3.x keyless signatures, but cosign 2.x **cannot** verify 3.x signatures. The CI signs
 with the cosign that `sigstore/cosign-installer` pins (currently 3.0.6 via `@v4.1.2`), so the host
 cosign must be **≥ that version and never a lower major** — otherwise the fail-closed gate blocks
-every deploy. The host tracks the current 3.x release (3.1.1); when the CI installer pin is bumped,
+every deploy. The host tracks the current 3.x release (3.1.2); when the CI installer pin is bumped,
 the host is kept ≥ it.
 
 **Acceptance**
