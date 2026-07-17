@@ -993,33 +993,35 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds);
 
   /**
-   * Loads the caller's own Lager rows for the Materialbörse "Material anbieten" item picker,
-   * optionally filtered by a material-name fragment and capped by the {@link Pageable}.
-   * Owner-scoped by {@code user.id} (a member may only offer their own stock), with material and
-   * location eager-loaded so the picker renders without an N+1, ordered by material name. Location
-   * is loaded here only because it is the owner's own picker — it is never exposed on the public
-   * board.
+   * Loads the caller's own Lager rows for the Materialbörse release picker — <b>both</b> material
+   * rows ("Material anbieten") and game-item rows ("Item anbieten" from stock, REQ-MARKET-014,
+   * design §8) — optionally filtered by a name fragment and capped by the {@link Pageable}.
+   * Owner-scoped by {@code user.id} (a member may only offer their own stock), with material, game
+   * item and location eager-loaded so the picker renders without an N+1, ordered by the row's
+   * catalog name. Location is loaded here only because it is the owner's own picker — it is never
+   * exposed on the public board.
    *
-   * <p>Search and ordering go through an explicit {@code LEFT JOIN i.material m} — the {@code
+   * <p>Search and ordering go through explicit {@code LEFT JOIN}s on both {@code i.material} and
+   * {@code i.gameItem} with a {@code COALESCE(m.name, gi.name)} name — the {@code
    * MaterialExchangeOfferRepository.findBoard} pattern — because attribute navigation ({@code
-   * i.material.name}) would smuggle in an implicit <em>inner</em> join that silently drops
-   * NULL-material rows. The explicit {@code i.material IS NOT NULL} keeps the picker material-only
-   * for now regardless: game-item rows (V220, REQ-INV-029) stay off the Börse until stock-backed
-   * item offers ship (design §8), at which point this guard is dropped and the join rewrite already
-   * carries both kinds.
+   * i.material.name}) would smuggle in an implicit <em>inner</em> join that silently drops the
+   * other kind's rows (a game-item row has a {@code NULL} material, a material row a {@code NULL}
+   * game item). Since stock-backed item offers shipped (design §8) the former {@code i.material IS
+   * NOT NULL} guard is dropped so both kinds surface; the release service branches on the picked
+   * row's kind (material offer vs stock-backed item offer).
    *
    * @param userId the caller (the picker only ever shows the caller's own rows).
-   * @param query a pre-lowercased {@code %fragment%} matched against the material name, or {@code
-   *     null} for no filter.
+   * @param query a pre-lowercased {@code %fragment%} matched against the material or game-item
+   *     name, or {@code null} for no filter.
    * @param pageable the cap on the number of picker rows.
-   * @return the caller's matching Lager rows, never {@code null}.
+   * @return the caller's matching Lager rows (material and item), never {@code null}.
    */
-  @EntityGraph(attributePaths = {"material", "location"})
+  @EntityGraph(attributePaths = {"material", "gameItem", "location"})
   @Query(
-      "SELECT i FROM InventoryItem i LEFT JOIN i.material m WHERE i.user.id = :userId "
-          + "AND i.material IS NOT NULL "
-          + "AND (:query IS NULL OR LOWER(m.name) LIKE :query) "
-          + "ORDER BY m.name ASC")
+      "SELECT i FROM InventoryItem i LEFT JOIN i.material m LEFT JOIN i.gameItem gi "
+          + "WHERE i.user.id = :userId "
+          + "AND (:query IS NULL OR LOWER(m.name) LIKE :query OR LOWER(gi.name) LIKE :query) "
+          + "ORDER BY COALESCE(m.name, gi.name) ASC")
   List<InventoryItem> findReleasableForUser(
       @Param("userId") UUID userId, @Param("query") String query, Pageable pageable);
 }

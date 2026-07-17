@@ -256,13 +256,19 @@
             qtyInput.value = '';
         }
         if (!isItem) {
-            setFacts(ctx.material, ctx.quality);
+            // A stock-backed item offer edit (REQ-MARKET-014): the amount block edits the whole-unit
+            // item quantity (ctx.quantityType === 'PIECE', ctx.available = the backing row's stock)
+            // and there is no quality — the facts show the item name only.
+            let isStockItemEdit = isEdit && ctx.kind === 'ITEM';
+            setFacts(ctx.material, isStockItemEdit ? null : ctx.quality);
+            toggleQualityFact(!isStockItemEdit);
             if (isNew) {
-                // No item picked yet: disable the amount field until the picker selection sets its max.
+                // No row picked yet: disable the amount field until the picker selection sets its max
+                // (and pickItem decides whether the picked row carries a quality fact).
                 setAmountField('', null);
             } else {
-                // 'edit': value = current offered amount, ceiling = item's total stock (ctx.available).
-                // 'lager': value = ceiling = the item's stock (offer the whole row by default).
+                // 'edit': value = current offered amount/quantity, ceiling = item's total stock
+                // (ctx.available). 'lager': value = ceiling = the item's stock (whole row by default).
                 let max = isEdit ? ctx.available : ctx.amount;
                 setAmountField(ctx.amount, max);
             }
@@ -388,22 +394,26 @@
         }
         list.innerHTML = pickerItems
             .map(function (it) {
+                // The picker carries both material rows and game-item rows (stock-backed item
+                // offers, REQ-MARKET-014). An item row has no quality — omit the "Q x ·" prefix and
+                // render a blank data-quality so picking it hides the quality fact.
+                let isItem = it.kind === 'ITEM';
                 let meta =
-                    'Q ' +
-                    it.quality +
-                    ' · ' +
+                    (isItem ? '' : 'Q ' + it.quality + ' · ') +
                     formatAmount(it.amount, it.quantityType) +
                     (it.locationName ? ' · ' + escapeHtml(it.locationName) : '') +
                     (it.alreadyReleased ? ' · ' + escapeHtml(i18n.pickerAlready || '') : '');
                 return (
                     '<li class="krt-combobox__option" role="option" data-item-id="' +
                     it.inventoryItemId +
+                    '" data-kind="' +
+                    escapeHtml(it.kind) +
                     '" data-material="' +
                     escapeHtml(it.materialName) +
                     '" data-quantity-type="' +
                     escapeHtml(it.quantityType) +
                     '" data-quality="' +
-                    it.quality +
+                    (isItem ? '' : it.quality) +
                     '" data-amount="' +
                     it.amount +
                     '"><strong>' +
@@ -417,13 +427,23 @@
         list.hidden = false;
     }
 
+    /** Shows or hides the quality fact — item rows (stock-backed item offers) have no quality. */
+    function toggleQualityFact(show) {
+        toggle('[data-mb-fact-quality-wrap]', show);
+    }
+
     function pickItem(li) {
         state.itemId = li.getAttribute('data-item-id');
         state.quantityType = li.getAttribute('data-quantity-type');
+        let isItem = li.getAttribute('data-kind') === 'ITEM';
         let amount = li.getAttribute('data-amount');
-        setFacts(li.getAttribute('data-material'), li.getAttribute('data-quality'));
+        // An item row has no quality; a material row shows it. Releasing an item row posts the same
+        // /offers/ajax payload — the backend detects the game-item row and creates a stock-backed
+        // item offer (REQ-MARKET-014).
+        setFacts(li.getAttribute('data-material'), isItem ? null : li.getAttribute('data-quality'));
+        toggleQualityFact(!isItem);
         // Offer the whole picked row by default; its stock is the ceiling. setAmountField reads
-        // state.quantityType (just set) to render the SCU/PIECE unit + step.
+        // state.quantityType (just set) to render the SCU/PIECE unit + step (PIECE for item rows).
         setAmountField(amount, amount);
         let input = q('[data-mb-picker-input]');
         if (input) {

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -67,6 +68,7 @@ class MaterialExchangeRepositoryDataTest {
   @Autowired private MaterialExchangeInterestRepository interestRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private MaterialRepository materialRepository;
+  @Autowired private GameItemRepository gameItemRepository;
   @Autowired private LocationRepository locationRepository;
   @Autowired private InventoryItemRepository inventoryItemRepository;
 
@@ -325,6 +327,44 @@ class MaterialExchangeRepositoryDataTest {
   }
 
   /**
+   * A <b>stock-backed</b> item offer (REQ-MARKET-014, ADR-0108) persists with a non-null {@code
+   * inventory_item_id} (V221 relaxed the V213 CHECK) and the board clamps its quantity to the
+   * backing row's current stock: an offer that stated 6 on a game-item row since booked down to 2
+   * is kept by a min-amount of 2 but dropped by a min-amount of 3 — mirroring the material offer's
+   * {@code LEAST} clamp, and proving the board never breaks on the new inventoryItem on an ITEM
+   * offer.
+   */
+  @Test
+  void findBoard_stockBackedItemOffer_quantityClampedToStock() {
+    // covers REQ-MARKET-014
+    User owner = persistUser("stock-item");
+    InventoryItem row = persistItemStockRow(owner, "Quantum Drive", 2.0); // booked down to 2
+    MaterialExchangeOffer stockBacked = persistStockBackedItemOffer(row, owner, 6); // stated 6
+    entityManager.flush();
+
+    var all =
+        offerRepository.findBoard(
+            owner.getId(), false, null, 0, null, "neu", PageRequest.of(0, 20));
+    assertThat(all.getContent())
+        .as("a stock-backed item offer is on the board (LEFT JOIN keeps it)")
+        .contains(stockBacked);
+
+    var keptByStock =
+        offerRepository.findBoard(
+            owner.getId(), false, null, 0, 2.0, "menge", PageRequest.of(0, 20));
+    assertThat(keptByStock.getContent())
+        .as("min-amount 2 keeps it — effective quantity clamped to the row's 2 in stock")
+        .contains(stockBacked);
+
+    var droppedByStock =
+        offerRepository.findBoard(
+            owner.getId(), false, null, 0, 3.0, "menge", PageRequest.of(0, 20));
+    assertThat(droppedByStock.getContent())
+        .as("min-amount 3 drops it — the stated 6 is clamped to the 2 in stock")
+        .doesNotContain(stockBacked);
+  }
+
+  /**
    * The V213 exactly-one-branch {@code CHECK} rejects a malformed item offer — here one missing its
    * quantity — surfacing as a translated {@link DataIntegrityViolationException}.
    */
@@ -392,6 +432,46 @@ class MaterialExchangeRepositoryDataTest {
     offer.setOfferedAmount(offeredAmount);
     offer.setRemark("Tausche gegen **Titanium**.");
     offer.setStatus(status);
+    offer.setReleasedAt(Instant.now());
+    return offerRepository.save(offer);
+  }
+
+  /**
+   * Persists a minimal game-item Lager row (no quality) for the given owner, item name and amount.
+   */
+  private InventoryItem persistItemStockRow(User owner, String itemName, double amount) {
+    Location location = new Location();
+    location.setName("Hub-" + UUID.randomUUID());
+    locationRepository.save(location);
+
+    GameItem gameItem = new GameItem();
+    gameItem.setName(itemName + "-" + UUID.randomUUID());
+    gameItemRepository.save(gameItem);
+
+    InventoryItem item = new InventoryItem();
+    item.setUser(owner);
+    item.setLocation(location);
+    item.setGameItem(gameItem);
+    item.setAmount(amount);
+    item.setPersonal(true);
+    return inventoryItemRepository.save(item);
+  }
+
+  /**
+   * Persists an active stock-backed item offer (REQ-MARKET-014) bound to a game-item Lager row,
+   * with a stated whole-unit quantity and its product key/name derived from the row's item name.
+   */
+  private MaterialExchangeOffer persistStockBackedItemOffer(
+      InventoryItem row, User owner, int quantity) {
+    MaterialExchangeOffer offer = new MaterialExchangeOffer();
+    offer.setKind(MaterialExchangeOfferKind.ITEM);
+    offer.setInventoryItem(row);
+    offer.setOwner(owner);
+    offer.setItemProductKey("prod-key-" + UUID.randomUUID());
+    offer.setItemName(row.getGameItem().getName());
+    offer.setItemQuantity(quantity);
+    offer.setRemark("Tausche gegen **aUEC**.");
+    offer.setStatus(MaterialExchangeOfferStatus.ACTIVE);
     offer.setReleasedAt(Instant.now());
     return offerRepository.save(offer);
   }

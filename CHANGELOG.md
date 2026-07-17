@@ -14,6 +14,8 @@
 
 - **Lager: Das Einbuchen-Formular hat jetzt einen Material ↔ Item-Umschalter.** Im Item-Modus wird das Item über eine durchsuchbare Katalogsuche gewählt (nur Items mit Blueprint), die Menge in ganzen Stück erfasst (ohne Qualität und ohne Zusammenführen-Checkbox — Items werden automatisch zusammengeführt) und die Auftragszuordnung auf Item-Aufträge gefiltert, die das Item anfordern; Einsatz-Zuordnungen entfallen im Item-Modus (REQ-INV-029/031).
 
+- **Materialbörse: Items lassen sich jetzt direkt aus dem Item-Lagerbestand anbieten (bestandsgedecktes Item-Angebot).** Über „Material anbieten" erscheinen neben den Material- auch die eigenen Item-Lagerposten; ein daraus freigegebenes Angebot ist an den Lagerposten gebunden — die Stückzahl ist auf den Bestand begrenzt (bei Freigabe und Bearbeitung geprüft), sinkt bei Ausbuchungen/Umbuchungen automatisch mit und das Angebot verschwindet mit dem letzten Stück, genau wie bei Material-Angeboten. Frei angegebene Item-Angebote ohne Lagerbezug bleiben weiterhin möglich, und Item-Angebote sind jetzt bearbeitbar (zuvor lief die Bearbeitung eines Item-Angebots ins Leere) (REQ-MARKET-014, Migration V221, ADR-0108).
+
 - **Monitoring: Das Containers-Dashboard zeigt neben „CPU Throttled Seconds" jetzt „CPU Throttled Period Ratio %".** Das neue Panel bildet den Anteil der gedrosselten CFS-Perioden ab (die latenzrelevante Kennzahl statt der reinen Drossel-Sekunden) und markiert mit einer roten 25%-Linie die Schwelle des Alerts `ContainerCpuThrottledHigh`, sodass echtes CPU-Throttling auf einen Blick von harmlosen Burst-Spitzen unterscheidbar ist (REQ-OBS-014).
 
 ### Changed
