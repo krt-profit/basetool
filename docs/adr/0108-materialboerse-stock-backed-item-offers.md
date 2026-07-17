@@ -60,8 +60,9 @@ Concrete choices:
   multi-listing freedom is intact.
 - **Kind-aware ratchet.** A sibling `clampItemQuantityToStock` (whole units, `ITEM`-only, active-only)
   runs in the same book-out / transfer / rebooking decrement transactions as the material clamp
-  (`InventoryCheckoutService`); item rows have no refinery/handover-material consumption path, so no
-  other site needs it. Each atomic conditional update is a no-op for the other kind.
+  (`InventoryCheckoutService`), and — since `REQ-ORDERS-030` — when an item delivery consumes the
+  order's earmarked item stock (`JobOrderItemHandoverService`, the item-offer sibling of the material
+  handover's `clampOfferedAmountToStock`). Each atomic conditional update is a no-op for the other kind.
 - **Kind-aware `updateOffer` (fixes a latent defect).** The edit path previously validated
   `offeredAmount` against `offer.getInventoryItem()` unconditionally, which NPEs/400s on any item
   offer. It now branches: MATERIAL → offered amount vs stock; stock-backed ITEM → item quantity vs

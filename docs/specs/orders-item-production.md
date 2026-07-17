@@ -451,6 +451,11 @@ beyond `manufacturedAmount − deliveredAmount`). The delivery ceiling stays gat
   [`audit.md`](audit.md)); no new `AuditEventType`, viewer filter or i18n label is added. Details carry
   the order `#displayId`, the game-item name, the consumed/remaining amounts and the depletion flag —
   no user free text / no PII.
+- A **non-depleted** consumed row that still exists ratchets any active **stock-backed Materialbörse
+  item offer** on it down to its reduced whole-unit stock (`clampItemQuantityToStock`,
+  `REQ-MARKET-013/014`, ADR-0108) — the item-offer sibling of the material handover's
+  `clampOfferedAmountToStock`; a **depleted** row's offer is cascade-removed with the row (V210 `ON
+  DELETE CASCADE`), so it needs no clamp. This is the item-delivery decrement site of REQ-MARKET-013.
 
 **Concurrency (CLAUDE.md landmines).** The flow issues **no** `@Modifying(clearAutomatically = true)`
 bulk update, so the persistence context is never detached: the consumed game-item rows are
@@ -459,9 +464,10 @@ drives the completion check, and completion runs through `completeJobOrderWithin
 `@Version` bump, no re-fetch, no 409 even when one delivery consumes several rows and completes the
 order. Consumed rows are locked `FOR UPDATE` oldest-first
 (`findGameItemRowsByJobOrderAndGameItemForUpdate`) so two racing deliveries against one earmark pool
-serialise. The per-non-depleted-row snapshot list is collected in the loop and the audit (and,
-post-Materialbörse-item-offers, the item-stock ratchet) run once after it — the collect-then-run-after
-point the Börse phase (design §8) wires `clampItemQuantityToStock` into.
+serialise. The per-consumed-row snapshot list is collected in the loop; after the writes (handover
+save + completion) the audit **and** the stock-backed item-offer ratchet run once over it —
+`clampItemQuantityToStock` for each non-depleted row (REQ-MARKET-013/014, ADR-0108) — the same
+collect-then-run shape as the material handover's `clampOfferedAmountToStock`.
 
 **Live update & peer sync (`REQ-FE-001/010/015`).** A successful item handover re-renders the `items` /
 `item-handovers` / `item-handover-lines` / `header` sections **and** the `item-stock` panel
@@ -489,13 +495,19 @@ choice, so the rationale is captured in this requirement rather than in a separa
   `@Version` once (no 409); each consumed row records one `INVENTORY_HANDED_OVER`.
 - [ ] The success response re-renders the ordered-items / handover / `item-stock` sections in place and
   reaches a peer (and Lager viewers) without a reload.
+- [ ] A non-depleted consumed row backing an active stock-backed Materialbörse item offer ratchets
+  that offer's `itemQuantity` down to the row's reduced stock; a depleted row's offer is
+  cascade-removed with the row.
 
-**Enforced by:** `JobOrderItemHandoverServiceTest` (consume-and-delete, partial draw, legacy
-best-effort, partial-stock best-effort, multi-row oldest-first, complete-without-refetch, audit),
-`JobOrderItemHandoverE2eTest` (item stock drops after a UI handover) · **Code:**
-`JobOrderItemHandoverService.createItemHandover` / `consumeEarmarkedItemStock`,
+**Enforced by:** `JobOrderItemHandoverServiceTest` (consume-and-delete, partial draw, this-order-slice
+cap with free rest / sibling order untouched, per-game-item aggregation, legacy best-effort,
+partial-stock best-effort, multi-row oldest-first, complete-without-refetch, item-offer ratchet on a
+reduced row / no clamp on a depleted row, audit), `JobOrderItemHandoverE2eTest` (item stock drops
+after a UI handover) · **Code:** `JobOrderItemHandoverService.createItemHandover` /
+`consumeEarmarkedItemStock`,
 `InventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate`,
-`InventoryAllocations.reduceJobOrder`, `AuditEventType.INVENTORY_HANDED_OVER`, `orders-detail.js`
+`InventoryAllocations.reduceJobOrder`, `MaterialExchangeOfferRepository.clampItemQuantityToStock`,
+`AuditEventType.INVENTORY_HANDED_OVER`, `orders-detail.js`
 (item-handover success `item-stock` + `inventory`/`stock` broadcast) · **Issues:** — · **Design:**
 [`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md) §10 Phase 6 / §11.1
 

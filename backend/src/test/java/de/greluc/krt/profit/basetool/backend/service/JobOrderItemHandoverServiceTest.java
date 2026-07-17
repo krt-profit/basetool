@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
@@ -47,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverEntry
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.time.Instant;
@@ -64,7 +66,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * Unit tests for {@link JobOrderItemHandoverService}: delivered-count increments, over-delivery
  * (capped at the manufactured-but-undelivered quantity, REQ-ORDERS-025) and foreign-line rejection,
  * the non-item-order guard, auto-completion when every line is fully delivered, and the best-effort
- * delivery-consumes-earmarked-item-stock step (REQ-ORDERS-030).
+ * delivery-consumes-earmarked-item-stock step (REQ-ORDERS-030) — including the this-order-slice cap
+ * (free rest / sibling order untouched), the per-game-item aggregation across lines, and the
+ * stock-backed Materialbörse item-offer ratchet on a reduced row (REQ-MARKET-013/014).
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderItemHandoverServiceTest {
@@ -73,6 +77,7 @@ class JobOrderItemHandoverServiceTest {
   @Mock private JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   @Mock private JobOrderItemHandoverMapper jobOrderItemHandoverMapper;
   @Mock private InventoryItemRepository inventoryItemRepository;
+  @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
   @Mock private JobOrderService jobOrderService;
   @Mock private UserService userService;
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
@@ -334,6 +339,138 @@ class JobOrderItemHandoverServiceTest {
     verify(jobOrderRepository, times(1)).findById(orderId);
     verify(inventoryItemRepository).delete(r1);
     verify(inventoryItemRepository).delete(r2);
+  }
+
+  @Test
+  void createItemHandoverDrawsOnlyThisOrdersSliceLeavingTheFreeRest() {
+    // covers REQ-ORDERS-030 — a row stocking 5 units earmarks only 3 to this order (2 free): a
+    // handover of 5 draws only this order's 3-unit slice (best-effort — the 2-unit shortfall is
+    // delivered without stock backing), so the row survives with its 2 free (unearmarked) units and
+    // the now-zero this-order slice is dropped. Handing over MORE than the slice makes the slice
+    // cap
+    // load-bearing: capping at the row amount instead would draw 5, deplete and DELETE the row here
+    // (destroying the free rest), which the amount==2.0 / never-delete assertions catch (Variante C
+    // R5, REQ-INV-027 — the physical remainder never goes negative).
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    InventoryItem row = itemRow(5.0, 3.0);
+    when(inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
+            orderId, gameItemId))
+        .thenReturn(List.of(row));
+
+    service.createItemHandover(orderId, payload(lineId, 5));
+
+    assertThat(line.getDeliveredAmount()).isEqualTo(5);
+    assertThat(row.getAmount()).isEqualTo(2.0);
+    // The slice was drawn to zero and dropped; the row keeps only its unearmarked free rest.
+    assertThat(InventoryAllocations.jobOrderSlice(row, orderId)).isNull();
+    verify(inventoryItemRepository).save(row);
+    verify(inventoryItemRepository, never()).delete(any(InventoryItem.class));
+  }
+
+  @Test
+  void createItemHandoverLeavesASiblingOrdersEarmarkSliceUntouched() {
+    // covers REQ-ORDERS-030 — a row split-earmarked to THIS order (3) and a sibling ITEM order (2),
+    // 5 units total: a handover of 5 draws only this order's 3-unit slice (best-effort — the 2-unit
+    // shortfall delivers without backing); the sibling's 2-unit slice and the row's remaining 2
+    // units
+    // survive, and the row is not deleted. Handing over MORE than this order's slice makes the cap
+    // load-bearing: capping at the row amount instead would draw 5, deplete and DELETE the row —
+    // dropping the sibling's slice — which the sibling-survives / never-delete assertions catch
+    // (Variante C R5, REQ-INV-027).
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    UUID siblingOrderId = UUID.randomUUID();
+    JobOrder siblingOrder = JobOrder.builder().id(siblingOrderId).type(JobOrderType.ITEM).build();
+    InventoryItem row = itemRow(5.0, 3.0);
+    InventoryAllocations.addJobOrder(row, siblingOrder, 2.0, false);
+    when(inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
+            orderId, gameItemId))
+        .thenReturn(List.of(row));
+
+    service.createItemHandover(orderId, payload(lineId, 5));
+
+    assertThat(row.getAmount()).isEqualTo(2.0);
+    assertThat(InventoryAllocations.jobOrderSlice(row, orderId)).isNull();
+    var siblingSlice = InventoryAllocations.jobOrderSlice(row, siblingOrderId);
+    assertThat(siblingSlice).isNotNull();
+    assertThat(siblingSlice.getAmount()).isEqualTo(2.0);
+    verify(inventoryItemRepository).save(row);
+    verify(inventoryItemRepository, never()).delete(any(InventoryItem.class));
+  }
+
+  @Test
+  void createItemHandoverAggregatesTwoLinesOfTheSameGameItemIntoOneEarmarkDraw() {
+    // covers REQ-ORDERS-030 — two ordered lines requesting the SAME game item share one (row,
+    // order)
+    // earmark pool, so a handover delivering both lines draws their combined units from that single
+    // pool. Deliver 3 (line 1) + 2 (line 2) = 5 out of a 5-unit earmarked row → the pool is loaded
+    // once (not once per line) and the row is drained and deleted exactly once.
+    UUID secondLineId = UUID.randomUUID();
+    JobOrderItem secondLine =
+        JobOrderItem.builder()
+            .id(secondLineId)
+            .gameItem(gameItem)
+            .amount(2)
+            .deliveredAmount(0)
+            .manufacturedAmount(2)
+            .build();
+    order.addItem(secondLine);
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    InventoryItem row = itemRow(5.0, 5.0);
+    when(inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
+            orderId, gameItemId))
+        .thenReturn(List.of(row));
+
+    service.createItemHandover(
+        orderId,
+        new JobOrderItemHandoverCreateDto(
+            Instant.parse("2026-01-01T00:00:00Z"),
+            "recipient",
+            List.of(
+                new JobOrderItemHandoverEntryCreateDto(lineId, 3),
+                new JobOrderItemHandoverEntryCreateDto(secondLineId, 2))));
+
+    assertThat(line.getDeliveredAmount()).isEqualTo(3);
+    assertThat(secondLine.getDeliveredAmount()).isEqualTo(2);
+    verify(inventoryItemRepository, times(1))
+        .findGameItemRowsByJobOrderAndGameItemForUpdate(orderId, gameItemId);
+    verify(inventoryItemRepository).delete(row);
+  }
+
+  @Test
+  void createItemHandoverRatchetsAStockBackedItemOfferOnTheReducedRow() {
+    // covers REQ-ORDERS-030 + REQ-MARKET-013/014 — a partially consumed row that still exists must
+    // ratchet any active stock-backed Materialbörse item offer on it down to the row's reduced
+    // whole-unit stock (the item-offer sibling of the material handover's
+    // clampOfferedAmountToStock,
+    // ADR-0108). Hand over 3 of a 5-unit row → the offer is clamped to the remaining 2 units.
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    InventoryItem row = itemRow(5.0, 5.0);
+    UUID rowId = row.getId();
+    when(inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
+            orderId, gameItemId))
+        .thenReturn(List.of(row));
+
+    service.createItemHandover(orderId, payload(lineId, 3));
+
+    verify(materialExchangeOfferRepository).clampItemQuantityToStock(rowId, 2);
+  }
+
+  @Test
+  void createItemHandoverDoesNotClampAnItemOfferForADepletedRow() {
+    // covers REQ-ORDERS-030 + REQ-MARKET-013/014 — a depleted row is deleted and its stock-backed
+    // item offer is cascade-removed with it (V210 ON DELETE CASCADE), so no explicit clamp runs.
+    // Mirrors the material handover's `if (!depleted)` guard.
+    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
+    InventoryItem row = itemRow(5.0, 5.0);
+    when(inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
+            orderId, gameItemId))
+        .thenReturn(List.of(row));
+
+    service.createItemHandover(orderId, payload(lineId, 5));
+
+    verify(inventoryItemRepository).delete(row);
+    verify(materialExchangeOfferRepository, never())
+        .clampItemQuantityToStock(any(UUID.class), anyInt());
   }
 
   private static JobOrderItemHandoverCreateDto payload(UUID jobOrderItemId, int amount) {

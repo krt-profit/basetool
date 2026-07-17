@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverEntry
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
@@ -76,7 +77,9 @@ import org.springframework.transaction.annotation.Transactional;
  * oldest-first, so two racing handovers against the same earmark pool serialise. The audit trail
  * (executing user + squadron snapshot) mirrors the material handover for cross-staffel
  * transparency, and each consumed row emits the shared {@code INVENTORY_HANDED_OVER} cross-domain
- * event.
+ * event. A non-depleted consumed row additionally ratchets any active stock-backed Materialbörse
+ * item offer on it down to its reduced stock ({@code clampItemQuantityToStock}, REQ-MARKET-013/014,
+ * ADR-0108); a depleted row's offer is cascade-removed with the row (V210).
  */
 @Service
 @RequiredArgsConstructor
@@ -95,6 +98,7 @@ public class JobOrderItemHandoverService {
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final JobOrderItemHandoverMapper jobOrderItemHandoverMapper;
   private final InventoryItemRepository inventoryItemRepository;
+  private final MaterialExchangeOfferRepository materialExchangeOfferRepository;
   private final JobOrderService jobOrderService;
   private final UserService userService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
@@ -201,19 +205,29 @@ public class JobOrderItemHandoverService {
     final List<ConsumedItem> consumedItems =
         consumeEarmarkedItemStock(jobOrderId, handedByGameItem);
 
-    // One INVENTORY_HANDED_OVER per consumed game-item row (cross-domain inventory effect), emitted
-    // from the loop-captured snapshots so a deleted row is never re-read. Reuses the shared
-    // handover
-    // event (same lifecycle as the material handover), so no viewer filter / label change is needed
-    // —
-    // and, like the material handover, the INVENTORY events precede the JOB_ORDER handover event.
-    // Post-#1342 (Materialbörse stock-backed item offers): wire the item-offer stock ratchet here —
-    // one clampItemQuantityToStock(itemId, remaining) per non-depleted snapshot — mirroring the
-    // material handover's clampOfferedAmountToStock. No such offer exists on this branch, so
-    // nothing
-    // is clamped yet; the collect-then-run-after-the-loop structure keeps the rebase point local.
+    JobOrderItemHandover saved = jobOrderItemHandoverRepository.save(handover);
+
+    boolean allDelivered =
+        jobOrder.getItems().stream()
+            .allMatch(line -> line.getDeliveredAmount() >= line.getAmount());
+    if (allDelivered) {
+      jobOrderService.completeJobOrderWithinTransaction(jobOrder);
+    }
+
+    // Ratchet the Materialbörse offers and emit the cross-domain audit from the loop-captured
+    // snapshots after the writes (so a deleted row is never re-read) — the same collect-then-run
+    // shape as the material handover. A non-depleted row that survives ratchets any active
+    // stock-backed item offer on it down to its reduced whole-unit stock
+    // (clampItemQuantityToStock, REQ-MARKET-013/014, ADR-0108) — the item-offer sibling of the
+    // material handover's clampOfferedAmountToStock; a depleted row was deleted and its offer
+    // cascade-removed with it (V210), so it needs no clamp. Each draw records one shared
+    // INVENTORY_HANDED_OVER (source ITEM_HANDOVER), which precedes the JOB_ORDER handover event.
     final Integer orderDisplayId = jobOrder.getDisplayId();
     for (ConsumedItem consumed : consumedItems) {
+      if (!consumed.depleted()) {
+        materialExchangeOfferRepository.clampItemQuantityToStock(
+            consumed.itemId(), (int) Math.floor(consumed.remaining()));
+      }
       auditService.record(
           AuditEventType.INVENTORY_HANDED_OVER,
           consumed.itemId(),
@@ -225,16 +239,6 @@ public class JobOrderItemHandoverService {
               .with("amount", consumed.amount())
               .with("remaining", consumed.remaining())
               .with("depleted", consumed.depleted()));
-    }
-
-    JobOrderItemHandover saved = jobOrderItemHandoverRepository.save(handover);
-    JobOrderItemHandoverDto resultDto = jobOrderItemHandoverMapper.toDto(saved);
-
-    boolean allDelivered =
-        jobOrder.getItems().stream()
-            .allMatch(line -> line.getDeliveredAmount() >= line.getAmount());
-    if (allDelivered) {
-      jobOrderService.completeJobOrderWithinTransaction(jobOrder);
     }
 
     // The recipientHandle is user free text and is never written to the audit details.
@@ -249,7 +253,7 @@ public class JobOrderItemHandoverService {
             .with("entries", dto.entries().size())
             .with("autoCompleted", allDelivered));
 
-    return resultDto;
+    return jobOrderItemHandoverMapper.toDto(saved);
   }
 
   /**

@@ -106,9 +106,12 @@ covered, it is **persisted down** to the row's new stock **in the same transacti
 via an atomic conditional update (`ACTIVE` offers only; only when the stored value `> newStock`). This
 is **kind-aware** (REQ-MARKET-014, ADR-0108): a **material** offer clamps its `offeredAmount`
 (`MaterialExchangeOfferRepository.clampOfferedAmountToStock`), a **stock-backed item** offer clamps its
-whole-unit `itemQuantity` (`clampItemQuantityToStock`); both run at the same book-out / transfer /
-rebooking decrement sites in `InventoryCheckoutService` (item rows have no refinery/handover-material
-consumption path). This is the *persisting* counterpart to the display-time clamp-on-read
+whole-unit `itemQuantity` (`clampItemQuantityToStock`); both run at the book-out / transfer / rebooking
+decrement sites in `InventoryCheckoutService`. The job-order handover sites decrement one row kind each
+and clamp only that kind: a **material** handover reduces material rows (`JobOrderHandoverService`,
+`clampOfferedAmountToStock`), an **item** delivery reduces game-item rows (`JobOrderItemHandoverService`,
+REQ-ORDERS-030, `clampItemQuantityToStock`). This is the *persisting* counterpart to the display-time
+clamp-on-read
 (REQ-MARKET-002/014, ADR-0086): the board already never *shows* more than is in stock, but without
 persisting the reduction the stored value would silently **recover** on a later stock increase.
 
@@ -129,7 +132,8 @@ the new stock (book-out, transfer, rebooking, update, handover).
 `MaterialExchangeOfferRepository#clampOfferedAmountToStock` / `#clampItemQuantityToStock`,
 `InventoryCheckoutService` (book-out / transfer / rebooking + `ratchetBoardOffersToStock` /
 `clampOffersToStock`), `InventoryItemService#updateInventoryItem`,
-`JobOrderHandoverService#createHandover` · **Issues:** #1182
+`JobOrderHandoverService#createHandover`, `JobOrderItemHandoverService#createItemHandover`
+(item-delivery decrement, REQ-ORDERS-030) · **Issues:** #1182
 
 ### REQ-MARKET-003 — Signal-only
 
