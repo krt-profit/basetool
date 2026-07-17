@@ -102,7 +102,12 @@ class HangarPaginationMvcTest {
   @Test
   @WithMockUser
   void withSearch_keepsSearchInPaginationLinksAndOffersClear() throws Exception {
-    when(backendApiClient.get(contains("/api/v1/hangar/my-ships"), anyTypeRef()))
+    // With an active search the my-ships fetch rides the term as a single-encoded URI variable
+    // ({search}) through the 3-arg get overload (#1344 re-encoding trap), so stub that overload.
+    when(backendApiClient.get(
+            contains("/api/v1/hangar/my-ships"),
+            anyTypeRef(),
+            org.mockito.ArgumentMatchers.<Object>any()))
         .thenReturn(page(1, 50, 300));
 
     mockMvc

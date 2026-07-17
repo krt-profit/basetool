@@ -90,6 +90,36 @@ public class HangarPageController {
   private final CachedCatalogListLoader catalogListLoader;
 
   /**
+   * Runs a backend GET whose query carries the fixed paging params plus an optional free-text
+   * {@code search} term, encoding {@code search} <em>exactly once</em> across the
+   * frontend&rarr;backend hop. The caller pre-sets the safe paging params on {@code uri}; this
+   * method appends a non-blank term as a WebClient URI-template variable ({@code search={search}})
+   * so the WebClient encodes it once per RFC 3986, rather than baking the already-encoded {@link
+   * org.springframework.web.util.UriComponentsBuilder#toUriString()} output into the {@code
+   * get(String)} call — which the WebClient would encode a second time (a space becomes {@code
+   * %2520} instead of {@code %20}, an umlaut {@code %25C3%25BC}), so a multi-word or umlaut ship
+   * search reached the backend {@code @RequestParam} mangled and matched nothing (the #371
+   * re-encoding trap). A {@code null}/blank term is omitted so the unfiltered page is fetched.
+   *
+   * @param uri the pre-built URI carrying only the safe paging params
+   * @param search the free-text ship-name filter, or {@code null}/blank for no filter
+   * @param responseType the decoded response type
+   * @param <T> the response body type
+   * @return the decoded backend response
+   */
+  private <T> T backendSearch(
+      org.springframework.web.util.UriComponentsBuilder uri,
+      String search,
+      ParameterizedTypeReference<T> responseType) {
+    String base = uri.toUriString();
+    if (search == null || search.isBlank()) {
+      return backendApiClient.get(base, responseType);
+    }
+    String separator = base.indexOf('?') >= 0 ? "&" : "?";
+    return backendApiClient.get(base + separator + "search={search}", responseType, search);
+  }
+
+  /**
    * Renders the personal hangar page, server-side paginated (REQ-HANGAR-002). Fetches one page of
    * my ships and the three cached reference catalogs (ship types, locations, manufacturers) in
    * parallel via {@link ParallelPageLoader}; each catalog call independently degrades to an empty
@@ -127,18 +157,17 @@ public class HangarPageController {
     int effectivePage = page == null || page < 0 ? 0 : page;
     String effectiveSearch = search == null || search.isBlank() ? null : search.trim();
 
-    String myShipsUrl =
+    org.springframework.web.util.UriComponentsBuilder myShipsUri =
         org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/hangar/my-ships")
             .queryParam("page", effectivePage)
-            .queryParam("size", effectiveSize)
-            .queryParamIfPresent("search", java.util.Optional.ofNullable(effectiveSearch))
-            .toUriString();
+            .queryParam("size", effectiveSize);
 
     CompletableFuture<PageResponse<ShipDto>> shipsFuture =
         parallelPageLoader
             .<PageResponse<ShipDto>>loadAsync(
                 () -> {
-                  PageResponse<ShipDto> p = backendApiClient.get(myShipsUrl, MY_SHIPS_PAGE_TYPE);
+                  PageResponse<ShipDto> p =
+                      backendSearch(myShipsUri, effectiveSearch, MY_SHIPS_PAGE_TYPE);
                   return p != null
                       ? p
                       : new PageResponse<>(
@@ -366,10 +395,7 @@ public class HangarPageController {
                   "/api/v1/hangar/squadron-overview")
               .queryParam("page", effectivePage)
               .queryParam("size", effectiveSize);
-      if (effectiveSearch != null) {
-        uriBuilder.queryParam("search", effectiveSearch);
-      }
-      res = backendApiClient.get(uriBuilder.toUriString(), SQUADRON_OVERVIEW_PAGE_TYPE);
+      res = backendSearch(uriBuilder, effectiveSearch, SQUADRON_OVERVIEW_PAGE_TYPE);
       if (res != null && res.content() != null) {
         overview = new ArrayList<>(res.content());
       }

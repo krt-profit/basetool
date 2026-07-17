@@ -305,7 +305,9 @@ class InventoryPageControllerMvcTest {
             1,
             Collections.emptyList());
     when(backendApiClient.get(
-            eq("/api/v1/inventory/item-catalog?q=Quantum&size=50&sort=name,asc"), anyTypeRef()))
+            eq("/api/v1/inventory/item-catalog?size=50&sort=name,asc&q={q}"),
+            anyTypeRef(),
+            eq("Quantum")))
         .thenReturn(page);
 
     mockMvc
@@ -315,12 +317,45 @@ class InventoryPageControllerMvcTest {
         .andExpect(jsonPath("$[0].name").value("Quantum Drive"));
   }
 
+  // #1344 regression: a multi-word item name must reach the backend single-encoded (the real
+  // spaces), not double-encoded (%2520). The term rides as a URI variable ({q}) and is verified
+  // to be forwarded verbatim, so the combobox finds e.g. "Quantum Drive" again.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void itemSearch_passesMultiWordQueryAsUriVariable() throws Exception {
+    UUID itemId = UUID.randomUUID();
+    PageResponse<InventoryGameItemReferenceDto> page =
+        new PageResponse<>(
+            List.of(new InventoryGameItemReferenceDto(itemId, "Quantum Drive", "RSI", "SHIP_ITEM")),
+            0,
+            50,
+            1,
+            1,
+            Collections.emptyList());
+    when(backendApiClient.get(
+            eq("/api/v1/inventory/item-catalog?size=50&sort=name,asc&q={q}"),
+            anyTypeRef(),
+            eq("Quantum Drive")))
+        .thenReturn(page);
+
+    mockMvc
+        .perform(get("/inventory/item-search").param("q", "Quantum Drive"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].name").value("Quantum Drive"));
+
+    verify(backendApiClient)
+        .get(
+            eq("/api/v1/inventory/item-catalog?size=50&sort=name,asc&q={q}"),
+            anyTypeRef(),
+            eq("Quantum Drive"));
+  }
+
   // covers REQ-INV-031 (design §6.6): a backend failure degrades the item search to an empty list —
   // the combobox shows "no matches" instead of surfacing the error.
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void itemSearch_backendFailure_returnsEmptyList() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef()))
+    when(backendApiClient.get(anyString(), anyTypeRef(), any()))
         .thenThrow(new RuntimeException("backend down"));
 
     mockMvc

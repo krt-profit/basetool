@@ -47,15 +47,49 @@ class UserProxyControllerTest {
 
     PageResponse<Map<String, Object>> mockPageResponse =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(mockPageResponse);
+    when(backendApiClient.get(
+            eq("/api/v1/users/search?size=1000&sort=username,asc&query={query}"),
+            anyTypeRef(),
+            eq("query")))
+        .thenReturn(mockPageResponse);
 
     // Act
     List<Map<String, Object>> result = controller.searchUsers("query");
 
-    // Assert
+    // Assert — the free-text query rides as a single-encoded URI variable, not baked into the URI.
     assertNotNull(result);
     verify(backendApiClient)
-        .get(eq("/api/v1/users/search?query=query&size=1000&sort=username,asc"), anyTypeRef());
+        .get(
+            eq("/api/v1/users/search?size=1000&sort=username,asc&query={query}"),
+            anyTypeRef(),
+            eq("query"));
+  }
+
+  // #1344 regression: a multi-word query must reach the backend single-encoded (the real spaces),
+  // not double-encoded (%2520). The controller passes it as a WebClient URI-template variable so
+  // the
+  // client encodes it once; verify the raw value is forwarded verbatim as that variable.
+  @Test
+  void searchUsers_passesMultiWordQueryAsUriVariable() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    UserProxyController controller = new UserProxyController(backendApiClient);
+
+    PageResponse<Map<String, Object>> mockPageResponse =
+        new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
+    when(backendApiClient.get(
+            eq("/api/v1/users/search?size=1000&sort=username,asc&query={query}"),
+            anyTypeRef(),
+            eq("John Doe")))
+        .thenReturn(mockPageResponse);
+
+    List<Map<String, Object>> result = controller.searchUsers("John Doe");
+
+    assertNotNull(result);
+    verify(backendApiClient)
+        .get(
+            eq("/api/v1/users/search?size=1000&sort=username,asc&query={query}"),
+            anyTypeRef(),
+            eq("John Doe"));
   }
 
   // #1193: opening the picker without typing (browse mode) fires an empty ?query=, which the
@@ -69,13 +103,20 @@ class UserProxyControllerTest {
 
     PageResponse<Map<String, Object>> mockPageResponse =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(mockPageResponse);
+    when(backendApiClient.get(
+            eq("/api/v1/users/search?size=1000&sort=username,asc&query={query}"),
+            anyTypeRef(),
+            eq("")))
+        .thenReturn(mockPageResponse);
 
     List<Map<String, Object>> result = controller.searchUsers(null);
 
     assertNotNull(result);
     verify(backendApiClient)
-        .get(eq("/api/v1/users/search?query=&size=1000&sort=username,asc"), anyTypeRef());
+        .get(
+            eq("/api/v1/users/search?size=1000&sort=username,asc&query={query}"),
+            anyTypeRef(),
+            eq(""));
   }
 
   // #1193: the bank-audience twin forwards to the widened backend search endpoint (ADR-0089) with
@@ -87,13 +128,20 @@ class UserProxyControllerTest {
 
     PageResponse<Map<String, Object>> mockPageResponse =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(mockPageResponse);
+    when(backendApiClient.get(
+            eq("/api/v1/users/search-bank?size=1000&sort=username,asc&query={query}"),
+            anyTypeRef(),
+            eq("query")))
+        .thenReturn(mockPageResponse);
 
     List<Map<String, Object>> result = controller.searchUsersForBank("query");
 
     assertNotNull(result);
     verify(backendApiClient)
-        .get(eq("/api/v1/users/search-bank?query=query&size=1000&sort=username,asc"), anyTypeRef());
+        .get(
+            eq("/api/v1/users/search-bank?size=1000&sort=username,asc&query={query}"),
+            anyTypeRef(),
+            eq("query"));
   }
 
   // The Umbuchen owner pickers (inventory-my.js / inventory-admin.js) and the bank counterparty
