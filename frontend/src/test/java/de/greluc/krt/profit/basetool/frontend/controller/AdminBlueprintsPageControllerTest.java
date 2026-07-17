@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -43,7 +44,9 @@ class AdminBlueprintsPageControllerTest {
     AdminBlueprintsPageController controller = new AdminBlueprintsPageController(backendApiClient);
     PageResponse<BlueprintDto> page =
         new PageResponse<>(List.of(minimalDto()), 0, 25, 1, 1, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    // A present search term is forwarded as a URI-template variable ({search}); eq("omni") pins the
+    // raw value passed as the third (URI-variable) argument.
+    when(backendApiClient.get(anyString(), anyTypeRef(), eq("omni"))).thenReturn(page);
     Model model = new ConcurrentModel();
 
     String view = controller.listBlueprints("omni", 0, null, model);
@@ -62,7 +65,7 @@ class AdminBlueprintsPageControllerTest {
     AdminBlueprintsPageController controller = new AdminBlueprintsPageController(backendApiClient);
     PageResponse<BlueprintDto> page =
         new PageResponse<>(List.of(minimalDto()), 0, 25, 1, 1, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), eq("omni"))).thenReturn(page);
     Model model = new ConcurrentModel();
 
     String view = controller.listBlueprints("omni", 0, "results", model);

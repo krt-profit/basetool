@@ -22,7 +22,11 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -36,6 +40,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -126,5 +131,46 @@ class AdminBlueprintsPageControllerMvcTest {
         .andExpect(content().string(containsString("class=\"bp-count\"")))
         .andExpect(content().string(containsString("class=\"pager\"")))
         .andExpect(content().string(not(containsString("id=\"admin-bp-results\""))));
+  }
+
+  // Regression guard for the frontend-proxy double-encoding sub-class: the admin blueprint list
+  // forwards a multi-word free-text term as a WebClient URI-template variable ({search}), not
+  // URLEncoder it into the URI string, so the backend @RequestParam decodes the exact typed term.
+  // URLEncoder form-encoding (space -> '+') double-encodes across the frontend->backend hop and
+  // yields zero matches.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void list_passesMultiWordSearchAsUriVariable() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(page(1));
+
+    mockMvc
+        .perform(get("/admin/blueprints").param("search", "Omni Sky").param("fragment", "results"))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
+    ArgumentCaptor<Object> termCaptor = ArgumentCaptor.captor();
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), termCaptor.capture());
+    assertTrue(uriCaptor.getValue().contains("search={search}"), uriCaptor.getValue());
+    assertEquals("Omni Sky", termCaptor.getValue());
+  }
+
+  // Same guard with an umlaut term: "Größe Röhre" encodes to Gr%C3%B6%C3%9Fe… under URLEncoder,
+  // which the hop would re-encode to a literal zero-match. As a URI variable the raw term reaches
+  // the backend.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void list_passesUmlautSearchAsUriVariable_notFormEncoded() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(page(1));
+
+    String term = "Größe Röhre";
+    mockMvc
+        .perform(get("/admin/blueprints").param("search", term).param("fragment", "results"))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
+    ArgumentCaptor<Object> termCaptor = ArgumentCaptor.captor();
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), termCaptor.capture());
+    assertTrue(uriCaptor.getValue().contains("search={search}"), uriCaptor.getValue());
+    assertEquals(term, termCaptor.getValue());
   }
 }

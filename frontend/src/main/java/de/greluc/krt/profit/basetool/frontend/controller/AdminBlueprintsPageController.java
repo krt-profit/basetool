@@ -24,8 +24,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -89,13 +87,20 @@ public class AdminBlueprintsPageController {
             .append("&page=")
             .append(safePage)
             .append("&sort=outputName,asc");
-    if (trimmed != null) {
-      uri.append("&search=").append(URLEncoder.encode(trimmed, StandardCharsets.UTF_8));
+    boolean hasSearch = trimmed != null;
+    if (hasSearch) {
+      // Pass the free-text term as a WebClient URI-template variable so it is percent-encoded
+      // exactly once across the frontend->backend hop. URLEncoder form-encoding (space -> '+')
+      // double-encodes umlauts / reserved chars when re-encoded on the hop, yielding zero matches
+      // (see BackendApiClient#get(String, ParameterizedTypeReference, Object...)).
+      uri.append("&search={search}");
     }
 
     try {
       PageResponse<BlueprintDto> response =
-          backendApiClient.get(uri.toString(), BLUEPRINT_PAGE_TYPE);
+          hasSearch
+              ? backendApiClient.get(uri.toString(), BLUEPRINT_PAGE_TYPE, trimmed)
+              : backendApiClient.get(uri.toString(), BLUEPRINT_PAGE_TYPE);
       if (response != null) {
         model.addAttribute(
             "blueprints", response.content() == null ? List.of() : response.content());

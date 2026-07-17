@@ -1119,6 +1119,22 @@ the Umbuchen target-location pickers, the production modal's book-in location pi
 (REQ-INV-032), the `/inventory/material` navigate select and the admin material-alias pickers; the
 orders item picker already used the component's `remoteSource` API.
 
+**Free-text terms cross the frontend→backend hop as URI-template variables, encoded exactly once
+(binding).** A page-controller relay that forwards a free-text search term (`q` / `query` /
+`search`) to a backend endpoint must pass it as a WebClient URI-template variable — `…?q={q}` plus
+the **raw** value through the 3-arg `backendApiClient.get(uriTemplate, type, uriVars…)` overload —
+and must **not** `URLEncoder.encode` it into the URI string. Hand-encoding is double-encoded on the
+hop: WebClient's default `TEMPLATE_AND_VALUES` mode re-encodes the `%`, so `Müller` reaches the
+backend as the literal `M%C3%BC…` (and `John Doe` as `John%2520Doe`) → zero matches for any umlaut /
+space / reserved-character term, while single-token ASCII queries slip through unnoticed and hide
+the defect. This holds for **every** free-text relay, not only the catalog pickers above: the
+operations and admin-blueprint list filters, the personal-inventory and default-blueprint
+type-aheads, the admin owned-blueprint filter, and the personal/admin item-inventory `q` filters all
+forward the raw term as a URI variable. Only UUID / enum / int / bool / sort params (carrying no `%XX` after encoding) are safe to
+concatenate into the URI string; the wire encoding is pinned by `BackendApiClientHappyPathTest`, and
+per-relay multi-word + umlaut regression `…passes{MultiWord,Umlaut}QueryAsUriVariable` MvcTests
+guard each site.
+
 **Option-metadata mirror (the load-bearing part).** Enhancing a select **removes** the native
 `<option>` elements, so option-level metadata (`data-quantity-type` on material options,
 `data-refined-id`/`-name` on refinery options) would vanish. The component therefore mirrors the

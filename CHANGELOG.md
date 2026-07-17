@@ -35,7 +35,10 @@
 ### Fixed
 
 - **Materialbörse: Die Item-Suche im „Material anbieten"-Dialog findet Item-Lagerposten mit mehrwortigen Namen wieder.** Das Frontend kodierte den Suchbegriff auf dem Weg zum Backend doppelt (ein Leerzeichen wurde zu `%2520` statt `%20`), sodass die getippte Suche nach einem Item-Bestand wie „E2E Boerse Item Stock Widget" nichts fand, während das Durchstöbern ohne Suchbegriff die Zeile zeigte. Der Freigabe- und der Item-Picker sowie die Angebotssuche übergeben den Suchbegriff jetzt einmalig kodiert als URI-Variable (REQ-MARKET-002/014).
+
 - **Combobox-Suchen finden mehrwortige und Umlaut-Begriffe wieder: Die Nutzer-, Bankkonto-, Mitglieder-, Item- und Hangar-Suche im Frontend-Proxy waren doppelt URL-kodiert.** Ein getippter Suchbegriff mit Leerzeichen oder Umlaut (z. B. „John Doe" in der Nutzer-Combobox) wurde auf dem Weg zum Backend zweimal kodiert und traf dort verstümmelt ein, sodass die Suche nichts fand; einwortige Begriffe waren nicht betroffen. Der Begriff wird jetzt genau einmal kodiert (REQ-FE-016/017).
+
+- **Suche: Mehrwortige und umlauthaltige Suchbegriffe finden jetzt wieder Treffer in Operationen, Blueprints und Standard-Blueprints, dem UEX-Ortstypeahead sowie dem persönlichen und dem Admin-Item-Inventar.** Die betroffenen Frontend-Proxys kodierten den Freitext doppelt (`URLEncoder` plus erneute WebClient-Kodierung), sodass etwa „Müller" beim Backend als `M%C3%BC…` ankam und die Suche leer lief; der Begriff wird jetzt als WebClient-URI-Template-Variable genau einmal kodiert (REQ-FE-016).
 
 - **Admin (Persönliche Blueprints): Der Filter über die Blueprints eines ausgewählten Nutzers findet mehrwortige und umlauthaltige Begriffe wieder.** Das Frontend kodierte den Suchbegriff auf dem Weg zum Backend doppelt (die `enc(...)`-Hilfsmethode plus erneute WebClient-Kodierung), sodass etwa „Größe Röhre" verstümmelt ankam und nichts fand; der Begriff wird jetzt genau einmal als WebClient-URI-Template-Variable kodiert (REQ-FE-016).
 
