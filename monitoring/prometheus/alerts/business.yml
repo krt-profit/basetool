@@ -84,10 +84,23 @@ groups:
       # fires and ExternalFetchErrors stays quiet (an empty 200 is not a fetch error). basetool_
       # scheduled_job_items_total is populated from the same per-run tallies as the sync-report
       # summary (UexItemSyncService upserts / the five SC-Wiki step counts). A 48h flatline at zero
-      # while the job keeps succeeding means the catalogue is silently importing nothing. The `and on
-      # (task)` guard matches the two series solely on the job name (their __name__/instance
-      # labels differ). The items series only exists once a counting run has recorded it, so this
-      # cannot fire before the job's first successful run.
+      # while the job keeps succeeding means the catalogue is silently importing nothing.
+      #
+      # Restart-robust guard (2026-07-17): the second leg is `increase(...executions_total{
+      # outcome="success"}[48h]) > 0`, NOT the earlier `(time() - last_success) < 172800`. The items
+      # counter is registered lazily (its 0->N birth is never scraped) and resets to 0 on every backend
+      # restart, so across restarts more frequent than the 24h sync cadence Prometheus sees a
+      # permanently-flat items series and `increase(items[48h])` reads 0 even when every run healthily
+      # upserts thousands of rows — while the startup run keeps last_success fresh, so the old
+      # last-success leg tripped and SyncZeroItems false-fired continuously (uex_sync + scwiki_sync, the
+      # 2026-07-15..17 storm; the syncs were healthy — UEX upserted ~7499 rows/run). executions_total{
+      # outcome="success"} shares the items counter's exact lazy-registration + per-restart-reset
+      # behaviour, so whenever that artifact drives increase(items) to a false 0 the executions increase
+      # is ALSO 0 and the alert is correctly suppressed; a genuine empty-200 outage on a STABLE backend
+      # leaves items flat at 0 while executions_success visibly climbs, so the alert still fires. Same
+      # robust shape as UserSyncZeroItems below. The `and on (task)` guard matches the two series solely
+      # on the job name (their __name__/instance labels differ).
+      #
       # 304 carve-out (#1182): a HEALTHY unchanged catalogue is NOT a zero-item run. Both catalogue
       # clients (UexClient / ScWikiClient) do conditional GETs (ETag/If-None-Match), so an unchanged
       # catalogue returns 304 for every category/endpoint and upserts nothing; uex_sync
@@ -101,13 +114,13 @@ groups:
         expr: |
           increase(basetool_scheduled_job_items_total{task=~"uex_sync|scwiki_sync"}[48h]) == 0
           and on (task)
-          (time() - basetool_scheduled_job_last_success_timestamp_seconds{task=~"uex_sync|scwiki_sync"}) < 172800
+          increase(basetool_scheduled_job_executions_total{task=~"uex_sync|scwiki_sync",outcome="success"}[48h]) > 0
         for: 1h
         labels:
           severity: warning
         annotations:
           summary: "Catalogue sync importing zero items ({{ $labels.task }})"
-          description: "The {{ $labels.task }} sync has processed zero items in 48h while still recording successful runs — the upstream catalogue is likely returning empty responses. Check the upstream API and the sync-report admin page."
+          description: "The {{ $labels.task }} sync has recorded successful runs in 48h but processed zero items — the upstream catalogue is likely returning empty responses. Check the upstream API and the sync-report admin page."
 
       # (logging audit) A single SC-Wiki sync step (ScWikiScheduler.runStep) can throw and be swallowed
       # so the other steps still run: the umbrella scwiki_sync job then records outcome=success with a

@@ -804,6 +804,7 @@ scenario_monitoring_reload_self_heals_on_noop() {
   assert_contains "no change" "it is still the idempotence no-op for the app stack"
   assert_no_docker " pull " "the app stack is not pulled on the fast exit"
   assert_no_docker "profile prod up" "the app stack is not re-applied on the fast exit"
+  assert_docker "monitoring.yml up -d" "the monitoring compose-definition reconcile (up -d) also runs on the fast exit"
   assert_docker "force-recreate --no-deps prometheus" "the stale Prometheus config is self-healed (force-recreate)"
   assert_no_docker "force-recreate --no-deps alloy" "alloy is already converged — left alone"
   assert_no_docker "force-recreate --no-deps blackbox-exporter" "blackbox is already converged — left alone"
@@ -813,6 +814,45 @@ scenario_monitoring_reload_self_heals_on_noop() {
   else
     record 0 "the config-applied timestamp metric is emitted for PrometheusConfigStale"
   fi
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 12d (2026-07-17): the compose-definition apply gap. A converged no-op
+# tick with monitoring enabled and the config subtree already converged (no
+# force-recreate) must STILL run the plain monitoring `up -d` on the fast-exit
+# path, so a docker-compose.monitoring.yml DEFINITION drift (a service's
+# mem_limit / environment / volumes / image pin — invisible to the per-subtree
+# config-FILE diff) is applied per-service by compose. Before this, reconcile
+# only force-recreated on config-FILE drift, so an alloy 256M->384M limit change
+# (and a cadvisor mount change) never reached the running container on a quiet
+# host — the mem_limit stayed stale for days while disk said 384M.
+# ---------------------------------------------------------------------------
+scenario_monitoring_compose_def_applied_on_noop() {
+  echo "Scenario: converged no-op, monitoring enabled, config converged → plain up -d still reconciles compose-def drift"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  echo "# dummy monitoring compose" > "${T_COMPOSE_DIR}/docker-compose.monitoring.yml"
+  mkdir -p "${T_COMPOSE_DIR}/monitoring/prometheus" \
+    "${T_COMPOSE_DIR}/monitoring/alloy" "${T_COMPOSE_DIR}/monitoring/blackbox"
+  echo "scrape_interval: 30s" > "${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml"
+  echo "same" > "${T_COMPOSE_DIR}/monitoring/alloy/config.alloy"
+  echo "same" > "${T_COMPOSE_DIR}/monitoring/blackbox/blackbox.yml"
+  # Baseline MATCHES the on-disk tree exactly → no config-subtree drift → no force-recreate expected.
+  mkdir -p "${T_STATE_DIR}/monitoring-reload"
+  cp -R "${T_COMPOSE_DIR}/monitoring/prometheus" "${T_STATE_DIR}/monitoring-reload/prometheus"
+  cp -R "${T_COMPOSE_DIR}/monitoring/alloy" "${T_STATE_DIR}/monitoring-reload/alloy"
+  cp -R "${T_COMPOSE_DIR}/monitoring/blackbox" "${T_STATE_DIR}/monitoring-reload/blackbox-exporter"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "IRI_MONITORING_ENABLED=true" || rc=$?
+  assert_exit 0 "$rc" "the converged no-op tick exits 0"
+  assert_contains "no change" "it is still the idempotence no-op for the app stack"
+  assert_no_docker " pull " "the app stack is not pulled on the fast exit"
+  assert_no_docker "profile prod up" "the app stack is not re-applied on the fast exit"
+  assert_docker "monitoring.yml up -d" "the monitoring compose-definition reconcile (up -d) runs on the converged no-op"
+  assert_no_docker "--force-recreate" "no service is force-recreated when the config subtree is converged"
   rm -rf "${tmp}"
 }
 
@@ -1017,6 +1057,7 @@ scenario_starting_grace
 scenario_monitoring_config_reload
 scenario_monitoring_reload_no_drift
 scenario_monitoring_reload_self_heals_on_noop
+scenario_monitoring_compose_def_applied_on_noop
 scenario_monitoring_reconcile_disabled_when_running
 scenario_signature_verified_on_apply
 scenario_signature_failure_aborts

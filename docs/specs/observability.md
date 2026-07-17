@@ -407,9 +407,17 @@ transaction per pass) rather than per-scrape.
   > `scwiki_sync` (the sum of the five SC-Wiki step counts, a failing step contributing `0`; same
   > carve-out below). For the two catalogue syncs it is populated from the same
   > per-run tallies the sync-report summary uses and backs the `SyncZeroItems` alert, which fires when
-  > a sync keeps succeeding but has processed zero rows for 48 h — the empty-200 catalogue outage that
-  > neither `ExternalSyncStale` (last-success stays fresh) nor `ExternalFetchErrors` (an empty 200 is
-  > not a fetch error) catches. **Unchanged-catalogue carve-out (`uex_sync` + `scwiki_sync`, #1182):**
+  > a sync records a successful run in 48 h but has processed zero rows — the empty-200 catalogue outage
+  > that neither `ExternalSyncStale` (last-success stays fresh) nor `ExternalFetchErrors` (an empty 200
+  > is not a fetch error) catches. **Restart-robust guard (2026-07-17):** the second leg is
+  > `increase(...executions_total{outcome="success"}[48h]) > 0`, not `(time() - last_success) < 172800`.
+  > The items counter is registered lazily (its 0→N birth is never scraped) and resets on each backend
+  > restart, so across restarts more frequent than the daily cadence Prometheus sees a permanently-flat
+  > items series and `increase(items[48h])` reads 0 even on a healthy sync — the old last-success leg
+  > then false-fired continuously (the 2026-07-15…17 storm; UEX was upserting ~7499 rows/run).
+  > `executions_total{outcome="success"}` shares the items counter's lazy-registration + per-restart-reset
+  > behaviour, so it cancels the false `0` while still climbing on a genuine outage; same robust shape as
+  > `UserSyncZeroItems`. **Unchanged-catalogue carve-out (`uex_sync` + `scwiki_sync`, #1182):**
   > `UexClient` and `ScWikiClient` both do conditional GETs, so when the whole catalogue is unchanged
   > every category/endpoint returns `304 Not Modified` and the run upserts nothing — a healthy no-op
   > indistinguishable from an empty-200 outage by the raw upsert tally alone. To stop that false

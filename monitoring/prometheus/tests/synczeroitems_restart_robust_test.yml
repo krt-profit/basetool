@@ -1,0 +1,72 @@
+# promtool unit test for the restart-robust SyncZeroItems guard (REQ-OBS-014, 2026-07-17).
+#
+# Proves the second leg `increase(basetool_scheduled_job_executions_total{outcome="success"}[48h]) > 0`
+# (which replaced the fragile `(time() - last_success) < 172800`) behaves correctly:
+#   - SUPPRESSED for a HEALTHY sync whose items counter reads flat across backend restarts (the
+#     lazy-registration + per-restart-reset artifact that made increase(items[48h]) a false 0): both
+#     items and executions_success are flat, so the executions leg is 0 and the alert stays silent —
+#     the 2026-07-15..17 false-positive storm;
+#   - FIRES for a GENUINE empty-200 outage on a stable backend: items flat at 0 while
+#     executions_success visibly climbs, so the executions leg is > 0 and the alert trips;
+#   - SILENT for a healthy backend that is actually importing rows (items climbing).
+#
+# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
+#   docker run --rm -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.13.0 promtool test rules tests/synczeroitems_restart_robust_test.yml
+
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1h
+
+tests:
+  # A healthy sync (~7499 rows/run) whose items counter Prometheus sees as a permanently-flat 7499
+  # because it is registered lazily and resets on each restart. executions_success is likewise parked
+  # flat at 1 per container life. Both increase([48h]) == 0 -> the executions leg (> 0) is FALSE ->
+  # the alert MUST stay silent. This is the exact false-positive the old last-success leg produced.
+  - name: suppressed - healthy sync, flat counters across restarts (items 7499, executions 1)
+    interval: 1h
+    input_series:
+      - series: 'basetool_scheduled_job_items_total{task="uex_sync"}'
+        values: "7499x52"
+      - series: 'basetool_scheduled_job_executions_total{task="uex_sync",outcome="success"}'
+        values: "1x52"
+    alert_rule_test:
+      - eval_time: 50h
+        alertname: SyncZeroItems
+        exp_alerts: []
+
+  # A genuine empty-200 outage on a STABLE backend: the job keeps running and succeeding (executions
+  # climbs 0,1,2,...) but every run upserts nothing (items flat at 0). items increase == 0 AND
+  # executions increase > 0 -> the alert MUST fire (past the 1h `for`).
+  - name: fires - real empty-200 outage on a stable backend (items flat 0, executions climbing)
+    interval: 1h
+    input_series:
+      - series: 'basetool_scheduled_job_items_total{task="uex_sync"}'
+        values: "0x52"
+      - series: 'basetool_scheduled_job_executions_total{task="uex_sync",outcome="success"}'
+        values: "0+1x52"
+    alert_rule_test:
+      - eval_time: 50h
+        alertname: SyncZeroItems
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              task: uex_sync
+            exp_annotations:
+              summary: "Catalogue sync importing zero items (uex_sync)"
+              description: "The uex_sync sync has recorded successful runs in 48h but processed zero items — the upstream catalogue is likely returning empty responses. Check the upstream API and the sync-report admin page."
+
+  # A healthy backend actually importing rows: items climbs, so increase(items[48h]) > 0 -> the first
+  # leg (== 0) is FALSE -> silent. Guards against the alert firing on a normally-working sync.
+  - name: silent - healthy backend importing rows (items climbing)
+    interval: 1h
+    input_series:
+      - series: 'basetool_scheduled_job_items_total{task="scwiki_sync"}'
+        values: "1000+2000x52"
+      - series: 'basetool_scheduled_job_executions_total{task="scwiki_sync",outcome="success"}'
+        values: "1+1x52"
+    alert_rule_test:
+      - eval_time: 50h
+        alertname: SyncZeroItems
+        exp_alerts: []

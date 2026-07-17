@@ -360,7 +360,8 @@ services:
   # cAdvisor — per-container metrics via the GET-only docker socket proxy (never the raw socket).
   # No cap_drop: ALL — it reads host cgroup/sys state and needs broader access than the exporters.
   # The Docker container factory ALSO opens a direct containerd client (Docker delegates runtime
-  # state to containerd), so it needs /run/containerd/containerd.sock mounted: without it the
+  # state to containerd), so it needs the containerd socket mounted (as the /run/containerd directory,
+  # see the volumes note for why the directory and not the single socket file): without it the
   # factory fails to register and, under --docker_only, cAdvisor emits ZERO name-labelled series —
   # every Container-dashboard panel then reads "No data". The socket-proxy speaks only the Docker
   # REST API, not containerd's gRPC, so it cannot cover this. The containerd socket is
@@ -402,7 +403,15 @@ services:
     volumes:
       - /:/rootfs:ro
       - /sys:/sys:ro
-      - /run/containerd/containerd.sock:/run/containerd/containerd.sock:ro
+      # containerd runtime socket (dockerd's `--containerd=/run/containerd/containerd.sock`). Mount the
+      # DIRECTORY, not the single socket file: a single-file bind mount pins the create-time inode, so
+      # when containerd restarts and re-creates the socket (a new inode) cAdvisor keeps dialing the old
+      # dead inode -> `dial unix /run/containerd/containerd.sock: connect: connection refused` every
+      # housekeeping tick, and a core container recreated after that point loses its handler ->
+      # CoreContainerMetricsMissing (2026-07-17: the socket-inode change stranded the running cAdvisor
+      # and blanked a core container_last_seen series). A directory mount always resolves the live
+      # socket. Same inode-pin class as the prometheus.yml single-file mount reconcile (ADR-0072 §6).
+      - /run/containerd:/run/containerd:ro
     deploy:
       resources:
         limits:

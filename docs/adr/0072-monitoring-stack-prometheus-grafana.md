@@ -85,6 +85,17 @@ phase checklists. This ADR records the architectural decisions and their trade-o
    proxy keeps full value there, and cAdvisor's own Docker-API access stays GET-filtered —
    only the single containerd socket is added on top, nothing more.
 
+   **Amendment (2026-07-17):** the mount is now the containerd run **directory**
+   (`/run/containerd:/run/containerd:ro`), not the single socket file. A single-file bind mount pins
+   the create-time inode, so a containerd restart that re-creates the socket strands cAdvisor on the
+   old, dead inode — `dial unix /run/containerd/containerd.sock: connect: connection refused` on every
+   housekeeping tick, and a core container recreated after that point loses its handler → a false
+   `CoreContainerMetricsMissing` (observed 2026-07-16/17 after a host containerd restart). A directory
+   mount always resolves the live socket. This is the same inode-pin class as the single-file
+   `prometheus.yml` config mount (§6 above / REQ-OPS-013). The security envelope is unchanged: the
+   directory holds the same root-equivalent containerd socket plus its per-container shim sockets, all
+   already within cAdvisor's near-total `/:/rootfs:ro` host read access.
+
 7. **Admin-only access:** Grafana behind NPM + Keycloak OIDC restricted to realm role
    `Admin` (PKCE, `role_attribute_strict`, dedicated protocol mapper); basic auth,
    sign-up, anonymous access, gravatar and external snapshots disabled. No other
