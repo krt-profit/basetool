@@ -549,6 +549,22 @@ reconcile_monitoring_reloads() {
   fi
   [[ -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" ]] || return 0
   write_monitoring_reconcile_state_metric 0
+  # Apply monitoring COMPOSE-DEFINITION drift (a service's mem_limit / environment / volumes / image
+  # pin) to the running containers. `up -d` recreates ONLY the services whose compose config-hash
+  # actually changed — per-service, idempotent, a fast no-op when nothing drifted — so it is safe on
+  # the 5-min converged hot path (this function runs there too) yet finally lands e.g. an alloy
+  # 256M -> 384M limit change. It is COMPLEMENTARY to the per-service force-recreate below: that
+  # catches inode-pinned config-FILE edits (prometheus.yml / config.alloy) `up -d` cannot see because
+  # the bind-mount path is unchanged, whereas this catches compose-definition drift the subtree diff
+  # cannot see. Without it, a monitoring compose-definition change only lands on a full app deploy
+  # (the up -d at the success block below), so on a quiet host it silently never reaches the running
+  # container — 2026-07-17: alloy ran the stale 256M/230MiB definition for days while disk said
+  # 384M/300MiB, and cadvisor a stale mount, because only the config subtree was reconciled. Best-
+  # effort, non-gating (a failed apply logs and retries next tick; it never fails the deploy).
+  if ! docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
+       -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" up -d >/dev/null 2>&1; then
+    log "  monitoring: WARN compose-definition reconcile (up -d) failed — non-gating, retries next tick"
+  fi
   reconcile_monitoring_reload prometheus prometheus
   reconcile_monitoring_reload alloy alloy
   reconcile_monitoring_reload blackbox-exporter blackbox
