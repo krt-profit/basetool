@@ -19,26 +19,36 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferKind;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import java.util.UUID;
 
 /**
- * One entry of the "Material anbieten" item picker — a Lager row of the caller's own stock that can
- * be released to the Materialbörse (REQ-MARKET-002). Only ever returned to the item's owner, so it
- * may include the {@link #locationName} for disambiguation (the owner's own stock); that location
- * is never carried onto the public board.
+ * One entry of the Materialbörse release picker — a Lager row of the caller's own stock that can be
+ * released to the board (REQ-MARKET-002/014). The picker carries <b>both</b> kinds of row: a
+ * material row (releases a {@link MaterialExchangeOfferKind#MATERIAL} offer) and a game-item row
+ * (releases a stock-backed {@link MaterialExchangeOfferKind#ITEM} offer, design §8), discriminated
+ * by {@link #kind}. Only ever returned to the row's owner, so it may include the {@link
+ * #locationName} for disambiguation (the owner's own stock); that location is never carried onto
+ * the public board.
  *
  * @param inventoryItemId the Lager row to release.
- * @param materialName the material's name.
- * @param quantityType the material's quantity unit ({@code SCU} or {@code PIECE}), so the picker
- *     and the release dialog render the amount in the material's own unit rather than always SCU.
- * @param quality the row's quality (0–1000).
- * @param amount the row's quantity, expressed in the material's {@link #quantityType} unit.
+ * @param kind which offer kind releasing this row produces — {@code MATERIAL} for a material row,
+ *     {@code ITEM} for a game-item row.
+ * @param materialName the display name of the row's catalog entry — the material name for a
+ *     material row, the game-item name for an item row.
+ * @param quantityType the row's quantity unit ({@code SCU} or {@code PIECE}), so the picker and the
+ *     release dialog render the amount in the row's own unit; always {@code PIECE} for a game-item
+ *     row (items are whole units).
+ * @param quality the row's quality (0–1000) for a material row; {@code null} for a game-item row
+ *     (items have no quality).
+ * @param amount the row's quantity, expressed in the row's {@link #quantityType} unit.
  * @param locationName the row's location, shown only in the owner's own picker.
  * @param alreadyReleased whether an active offer already exists for this row.
  */
 public record MaterialExchangeReleasableItemDto(
     UUID inventoryItemId,
+    MaterialExchangeOfferKind kind,
     String materialName,
     QuantityType quantityType,
     Integer quality,

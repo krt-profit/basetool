@@ -131,6 +131,43 @@ public class BlueprintProductService {
   }
 
   /**
+   * Resolves a game item (a Lager item-stock row's catalog reference) to its blueprint product —
+   * the identity bridge for a <b>stock-backed</b> Materialbörse item offer (design §8,
+   * REQ-MARKET-014, ADR-0108). A stock row keys on a {@link
+   * de.greluc.krt.profit.basetool.backend.model.GameItem}, but an offer keys on the blueprint
+   * {@code product_key} (ADR-0087), so a release from item stock derives the key + snapshot name
+   * from the row's game item: of the active blueprints that produce it, it normalizes each {@code
+   * outputName} to a product key and picks the lowest key — a <b>deterministic</b> choice when a
+   * game item has several producing blueprints, since {@code findByOutputItemId} carries no {@code
+   * ORDER BY} — then resolves that back to the canonical product — the <em>same</em> {@link
+   * ResolvedProduct} a free-stated item offer of the same item would carry, so both flavours share
+   * one identity. The item-catalog predicate (REQ-INV-029, {@code findItemsWithActiveBlueprint})
+   * guarantees a stocked game item has such a blueprint, so the key resolves; a game item with no
+   * (longer any) active blueprint yields empty and the caller rejects the release.
+   *
+   * @param gameItemId the game item to resolve, or {@code null}
+   * @return the resolved blueprint product for that game item, or empty if the id is {@code null}
+   *     or the game item is not produced by any active blueprint
+   */
+  @NotNull
+  public Optional<ResolvedProduct> resolveByGameItem(@Nullable UUID gameItemId) {
+    if (gameItemId == null) {
+      return Optional.empty();
+    }
+    return blueprintRepository.findByOutputItemId(gameItemId).stream()
+        .map(Blueprint::getOutputName)
+        .filter(name -> name != null && !name.isBlank())
+        .map(normalizer::normalize)
+        .filter(key -> !key.isEmpty())
+        // Sort the candidate product keys so the pick is deterministic when several active
+        // blueprints produce this game item (findByOutputItemId has no ORDER BY); the lowest key
+        // keeps the derived identity stable across runs.
+        .sorted()
+        .findFirst()
+        .flatMap(this::resolveByProductKey);
+  }
+
+  /**
    * Resolves a normalized product key to the recipe graph of a representative SC Wiki recipe for
    * the Personal Inventory blueprint view (#327): the build slots with their ingredients and
    * per-quality stat modifiers, plus the count of recipe variants collapsing into the product.

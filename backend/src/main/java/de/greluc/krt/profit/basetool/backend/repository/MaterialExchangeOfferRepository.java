@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOffer;
+import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferKind;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import java.util.Collection;
 import java.util.Optional;
@@ -44,17 +45,30 @@ public interface MaterialExchangeOfferRepository
    * own offers (the "Meine Angebote" tab) and by the toolbar filters. The board is org-wide (no
    * OrgUnit scope filter, decision D3): every active offer is visible to every member.
    *
-   * <p>The board carries both offer kinds (REQ-MARKET-012). Because an item offer has a {@code
-   * NULL} {@code inventory_item_id}, the item / material / owner / org-unit associations are joined
-   * with an explicit {@code LEFT JOIN FETCH} (an implicit path join would be an inner join and
-   * would silently drop item offers) — this both eager-loads them so the list renders without an
-   * N+1 and exposes the aliases the filters and the sort need. The name filter and the sort span
-   * both branches via {@code COALESCE}: a material offer's effective amount is {@code
-   * LEAST(offeredAmount, item.amount)} — the owner-chosen offered quantity clamped to current stock
-   * (ADR-0086) — and an item offer's is its stated {@code itemQuantity} ({@code
-   * COALESCE(LEAST(...), itemQuantity)}); the material/item name is COALESCE-d likewise. The
+   * <p>The board carries both offer kinds (REQ-MARKET-012/014). Because a free-stated item offer
+   * has a {@code NULL} {@code inventory_item_id}, the item / material / owner / org-unit
+   * associations are joined with an explicit {@code LEFT JOIN FETCH} (an implicit path join would
+   * be an inner join and would silently drop such offers) — this both eager-loads them so the list
+   * renders without an N+1 and exposes the aliases the filters and the sort need. The effective
+   * amount spans all branches via an explicit {@code CASE}: {@code CASE WHEN offeredAmount IS NOT
+   * NULL THEN LEAST(offeredAmount, item.amount) WHEN item.id IS NOT NULL THEN LEAST(itemQuantity,
+   * item.amount) ELSE itemQuantity END} — a material offer clamps its offered amount to current
+   * stock (ADR-0086), a <b>stock-backed</b> item offer clamps its itemQuantity to its backing row's
+   * stock (ADR-0108, REQ-MARKET-014), and a <b>free-stated</b> item offer (no backing row) falls
+   * through to its stated itemQuantity. A {@code CASE} is required rather than the terser {@code
+   * COALESCE(LEAST(offeredAmount, item.amount), …)} because PostgreSQL {@code LEAST}/{@code
+   * GREATEST} <em>ignore</em> {@code NULL} arguments (they return {@code NULL} only when
+   * <em>every</em> argument is {@code NULL}): {@code LEAST(NULL, item.amount)} yields {@code
+   * item.amount} (the full stock), not {@code NULL}, so for a stock-backed item offer (whose {@code
+   * offeredAmount} is always {@code NULL}) a {@code COALESCE} would never fall through to {@code
+   * LEAST(itemQuantity, item.amount)} and would advertise/sort/filter the whole backing stock
+   * instead of the stated quantity. This expression is duplicated <b>byte-for-byte</b> at three
+   * sites — the main-query {@code WHERE} min-amount filter, the {@code menge} {@code ORDER BY}, and
+   * the {@code countQuery} {@code WHERE} — and the three must stay in sync (a {@code @Query} string
+   * cannot share the sub-expression). The material/item name is {@code COALESCE}-d likewise. The
    * location is never referenced, keeping the Standort private (REQ-MARKET-004). The min-quality
-   * filter applies only to material offers — an item offer has no quality, so a non-zero
+   * filter applies only to material offers — an item offer (either flavour) has a {@code NULL}
+   * quality (a stock-backed item offer's backing row carries no quality either), so a non-zero
    * min-quality excludes item offers. All fetched associations are single-valued
    * {@code @ManyToOne}, so pagination stays a DB {@code LIMIT}. The sort is embedded (driven by
    * {@code sortKey}) rather than carried on the {@link Pageable}, so the caller passes an unsorted
@@ -90,10 +104,9 @@ public interface MaterialExchangeOfferRepository
                  OR LOWER(ow.displayName) LIKE :query)
             AND (:minQuality = 0 OR ii.quality >= :minQuality)
             AND (:minAmount IS NULL
-                 OR (ii.id IS NOT NULL AND LEAST(o.offeredAmount, ii.amount) >= :minAmount)
-                 OR (ii.id IS NULL AND o.itemQuantity >= :minAmount))
+                 OR CASE WHEN o.offeredAmount IS NOT NULL THEN LEAST(o.offeredAmount, ii.amount) WHEN ii.id IS NOT NULL THEN LEAST(o.itemQuantity, ii.amount) ELSE o.itemQuantity END >= :minAmount)
           ORDER BY
-            CASE WHEN :sortKey = 'menge' THEN COALESCE(LEAST(o.offeredAmount, ii.amount), o.itemQuantity) END DESC,
+            CASE WHEN :sortKey = 'menge' THEN CASE WHEN o.offeredAmount IS NOT NULL THEN LEAST(o.offeredAmount, ii.amount) WHEN ii.id IS NOT NULL THEN LEAST(o.itemQuantity, ii.amount) ELSE o.itemQuantity END END DESC,
             CASE WHEN :sortKey = 'mat' THEN LOWER(COALESCE(m.name, o.itemName)) END ASC,
             CASE WHEN :sortKey = 'neu' THEN o.releasedAt END DESC,
             CASE WHEN :sortKey NOT IN ('menge', 'mat', 'neu') THEN COALESCE(ii.quality, -1) END DESC,
@@ -115,8 +128,7 @@ public interface MaterialExchangeOfferRepository
                  OR LOWER(ow.displayName) LIKE :query)
             AND (:minQuality = 0 OR ii.quality >= :minQuality)
             AND (:minAmount IS NULL
-                 OR (ii.id IS NOT NULL AND LEAST(o.offeredAmount, ii.amount) >= :minAmount)
-                 OR (ii.id IS NULL AND o.itemQuantity >= :minAmount))
+                 OR CASE WHEN o.offeredAmount IS NOT NULL THEN LEAST(o.offeredAmount, ii.amount) WHEN ii.id IS NOT NULL THEN LEAST(o.itemQuantity, ii.amount) ELSE o.itemQuantity END >= :minAmount)
           """)
   Page<MaterialExchangeOffer> findBoard(
       @Param("viewerId") UUID viewerId,
@@ -212,6 +224,40 @@ public interface MaterialExchangeOfferRepository
         AND o.offeredAmount > :stock
       """)
   int clampOfferedAmountToStock(@Param("itemId") UUID itemId, @Param("stock") double stock);
+
+  /**
+   * Ratchets the stored {@code itemQuantity} of the active <b>stock-backed</b> item offer on a
+   * game-item Lager row down to the row's current whole-unit stock when the stock drops below it —
+   * the item-offer sibling of {@link #clampOfferedAmountToStock(UUID, double)} (REQ-MARKET-013/014,
+   * design §8). A book-out / transfer / rebooking that reduces the backing item row and leaves the
+   * offered quantity no longer covered persists the reduction, so a later stock increase does not
+   * silently re-expand the offer (offering more stays an explicit owner decision).
+   *
+   * <p>Conditional and atomic, exactly like the material clamp: only rows where {@code
+   * item_quantity > :stock} are touched (an increase is a no-op), and only {@code ACTIVE} {@link
+   * MaterialExchangeOfferKind#ITEM} offers with a backing row match — a material offer carries a
+   * {@code null} {@code item_quantity}, and a free-stated item offer has a {@code null} {@code
+   * inventory_item_id} and so is never keyed by {@code itemId}. Whole units only (no SCU rounding —
+   * item stock is integral). Runs in the caller's decrement transaction so the clamp commits with
+   * the stock reduction. The offer's {@code @Version} is intentionally left untouched — a
+   * concurrent owner edit is guarded independently by the release/edit {@code itemQuantity <=
+   * current stock} validation.
+   *
+   * @param itemId the backing game-item Lager row whose active item offer to clamp.
+   * @param stock the row's new (reduced) whole-unit stock the offered quantity must not exceed.
+   * @return the number of offers clamped (0 or 1).
+   */
+  @Modifying
+  @Query(
+      """
+      UPDATE MaterialExchangeOffer o SET o.itemQuantity = :stock
+      WHERE o.inventoryItem.id = :itemId
+        AND o.kind = de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferKind.ITEM
+        AND o.status = de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus.ACTIVE
+        AND o.itemQuantity IS NOT NULL
+        AND o.itemQuantity > :stock
+      """)
+  int clampItemQuantityToStock(@Param("itemId") UUID itemId, @Param("stock") int stock);
 
   /**
    * Counts offers in the given status across the whole board — the "Alle Angebote" tab count and

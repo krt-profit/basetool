@@ -54,11 +54,18 @@ import lombok.Setter;
  *       #offeredAmount} — a member may offer only a <b>part</b> of the row's stock (REQ-MARKET-002,
  *       ADR-0086). The item's {@code location} is deliberately <b>never</b> read into any board
  *       query or DTO — the Standort stays private (REQ-MARKET-004).
- *   <li>A {@link MaterialExchangeOfferKind#ITEM} offer (#1185, REQ-MARKET-012) has <b>no</b> Lager
- *       row and no {@link #offeredAmount}: it references a craftable item ("an item for which a
- *       blueprint exists") by its normalized {@link #itemProductKey} — with the display {@link
- *       #itemName} snapshotted at release — and the owner states {@link #itemQuantity} explicitly.
- *       Item offers carry no quality and no location.
+ *   <li>A {@link MaterialExchangeOfferKind#ITEM} offer (#1185, REQ-MARKET-012) references a
+ *       craftable item ("an item for which a blueprint exists") by its normalized {@link
+ *       #itemProductKey} — with the display {@link #itemName} snapshotted at release — and carries
+ *       the owner-stated {@link #itemQuantity}; it never carries an {@link #offeredAmount}, and has
+ *       no quality and no location. An item offer comes in two flavours (REQ-MARKET-014, ADR-0108):
+ *       a <b>free-stated</b> offer has <b>no</b> Lager row ({@link #inventoryItem} {@code null},
+ *       craft-on-demand), while a <b>stock-backed</b> offer released from a game-item Lager row
+ *       (V220, REQ-INV-029) <b>does</b> carry {@link #inventoryItem} (the physical stock): its
+ *       {@link #itemQuantity} is validated {@code <=} the row's whole-unit stock at release/edit
+ *       and ratcheted down on every stock decrement (REQ-MARKET-013), and its {@link
+ *       #itemProductKey}/ {@link #itemName} are derived from the row's game item via its blueprint
+ *       product.
  * </ul>
  *
  * <p>{@link #owner} and {@link #owningOrgUnit} are denormalised at release time (from the item for
@@ -69,10 +76,11 @@ import lombok.Setter;
  * an independent aggregate ({@link MaterialExchangeInterest}, no mapped collection here), so
  * registering or withdrawing interest never bumps this offer's {@code @Version}. A partial-unique
  * constraint {@code (inventory_item_id) WHERE status = 'ACTIVE'} (V210) enforces one active offer
- * per Lager row, so re-releasing an item re-activates the row instead of inserting a duplicate;
- * item offers carry a {@code NULL} {@code inventory_item_id} (distinct under that partial index)
- * and are deliberately not de-duplicated (a member may list the same item several times,
- * REQ-MARKET-012).
+ * per Lager row, so re-releasing an item re-activates the row instead of inserting a duplicate — it
+ * governs material offers and <b>stock-backed</b> item offers alike (both carry a non-null {@code
+ * inventory_item_id}). <b>Free-stated</b> item offers carry a {@code NULL} {@code
+ * inventory_item_id} (distinct under that partial index) and are deliberately not de-duplicated (a
+ * member may list the same item several times, REQ-MARKET-012).
  */
 @Entity
 @Getter
@@ -100,11 +108,14 @@ public class MaterialExchangeOffer extends AbstractEntity<UUID> {
   private MaterialExchangeOfferKind kind;
 
   /**
-   * The source Lager row for a {@link MaterialExchangeOfferKind#MATERIAL} offer; {@code null} for
-   * an {@link MaterialExchangeOfferKind#ITEM} offer. Material, quality and amount are read live
-   * from it; its location is never read. {@code ON DELETE CASCADE} (V210) removes the offer when
-   * the underlying stock row is deleted, so the board never lists an offer whose stock no longer
-   * exists.
+   * The source Lager row this offer is backed by. Always set for a {@link
+   * MaterialExchangeOfferKind#MATERIAL} offer (its material, quality and amount are read live from
+   * it) and for a <b>stock-backed</b> {@link MaterialExchangeOfferKind#ITEM} offer (a game-item
+   * Lager row whose whole-unit stock caps {@link #itemQuantity}); {@code null} only for a
+   * <b>free-stated</b> item offer (craft-on-demand, REQ-MARKET-012/014). The row's location is
+   * never read. {@code ON DELETE CASCADE} (V210) removes the offer when the underlying stock row is
+   * deleted, so the board never lists an offer whose stock no longer exists. The V221 CHECK relaxed
+   * the V213 rule that forbade an item offer from carrying this FK.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "inventory_item_id")
@@ -129,10 +140,12 @@ public class MaterialExchangeOffer extends AbstractEntity<UUID> {
   private String itemName;
 
   /**
-   * The user-specified quantity (whole pieces) of an {@link MaterialExchangeOfferKind#ITEM} offer
-   * ({@code null} for a material offer). Unlike a material offer's amount — read live from the
-   * Lager row — an item offer has no backing stock, so the owner states this number; the DB {@code
-   * CHECK} (V213) requires it to be positive.
+   * The quantity (whole pieces) of an {@link MaterialExchangeOfferKind#ITEM} offer ({@code null}
+   * for a material offer). The owner states this number; the DB {@code CHECK} (V213) requires it to
+   * be positive. For a <b>free-stated</b> item offer it is an unbacked point-in-time claim; for a
+   * <b>stock-backed</b> item offer (with {@link #inventoryItem} set) the service validates it
+   * {@code <=} the row's current stock at release/edit and the ratchet persists it down on every
+   * stock decrement (REQ-MARKET-013/014), so it never exceeds the physical stock.
    */
   @Column(name = "item_quantity")
   private Integer itemQuantity;

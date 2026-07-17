@@ -176,7 +176,14 @@ class MaterialExchangeControllerTest {
     List<MaterialExchangeReleasableItemDto> items =
         List.of(
             new MaterialExchangeReleasableItemDto(
-                UUID.randomUUID(), "Agricium", QuantityType.SCU, 796, 340.0, "Lorville", false));
+                UUID.randomUUID(),
+                MaterialExchangeOfferKind.MATERIAL,
+                "Agricium",
+                QuantityType.SCU,
+                796,
+                340.0,
+                "Lorville",
+                false));
     when(boardService.myReleasableItems("agri")).thenReturn(items);
 
     assertThat(controller.releasableItems("agri")).isSameAs(items);

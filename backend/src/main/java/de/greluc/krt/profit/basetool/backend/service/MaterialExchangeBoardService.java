@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeInterestCount;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferDto;
@@ -244,12 +245,17 @@ public class MaterialExchangeBoardService {
   }
 
   /**
-   * Returns the caller's own Lager rows eligible for release, for the "Material anbieten" item
-   * picker — optionally filtered by a material-name fragment and capped at {@value #PICKER_LIMIT}
-   * rows. Each entry flags whether it already carries an active offer.
+   * Returns the caller's own Lager rows eligible for release, for the Materialbörse release picker
+   * — <b>both</b> material rows ("Material anbieten") and game-item rows (stock-backed item offers,
+   * REQ-MARKET-014, design §8) — optionally filtered by a name fragment and capped at {@value
+   * #PICKER_LIMIT} rows. Each entry flags whether it already carries an active offer, and is
+   * discriminated by kind so the release modal knows whether picking it releases a material or a
+   * stock-backed item offer. A game-item row renders its item name, {@code PIECE} unit and no
+   * quality; a material row keeps its material name, unit and quality.
    *
-   * @param query a material-name fragment, or {@code null}/blank for the caller's whole stock.
-   * @return the caller's releasable items (owner-scoped), never {@code null}.
+   * @param query a name fragment (material or item), or {@code null}/blank for the caller's whole
+   *     stock.
+   * @return the caller's releasable rows (material and item, owner-scoped), never {@code null}.
    */
   public List<MaterialExchangeReleasableItemDto> myReleasableItems(@Nullable String query) {
     UUID viewerId = requireViewerId();
@@ -261,17 +267,44 @@ public class MaterialExchangeBoardService {
     Set<UUID> released =
         releasedInventoryItemIds(items.stream().map(InventoryItem::getId).toList());
     return items.stream()
-        .map(
-            item ->
-                new MaterialExchangeReleasableItemDto(
-                    item.getId(),
-                    item.getMaterial().getName(),
-                    item.getMaterial().getQuantityType(),
-                    item.getQuality(),
-                    item.getAmount(),
-                    item.getLocation() == null ? null : item.getLocation().getName(),
-                    released.contains(item.getId())))
+        .map(item -> toReleasableDto(item, released.contains(item.getId())))
         .toList();
+  }
+
+  /**
+   * Maps one of the caller's own Lager rows to a release-picker entry, branching on the row kind: a
+   * game-item row (REQ-INV-029) becomes an {@code ITEM} entry with the item name, {@code PIECE}
+   * unit and no quality (a stock-backed item offer, REQ-MARKET-014); a material row becomes a
+   * {@code MATERIAL} entry with the material name, its own unit and its quality.
+   *
+   * @param item the Lager row (its material / game item and location are eager-loaded).
+   * @param alreadyReleased whether an active offer already backs this row.
+   * @return the picker entry.
+   */
+  private static MaterialExchangeReleasableItemDto toReleasableDto(
+      InventoryItem item, boolean alreadyReleased) {
+    boolean isItem = item.getGameItem() != null;
+    String locationName = item.getLocation() == null ? null : item.getLocation().getName();
+    if (isItem) {
+      return new MaterialExchangeReleasableItemDto(
+          item.getId(),
+          MaterialExchangeOfferKind.ITEM,
+          item.getGameItem().getName(),
+          QuantityType.PIECE,
+          null,
+          item.getAmount(),
+          locationName,
+          alreadyReleased);
+    }
+    return new MaterialExchangeReleasableItemDto(
+        item.getId(),
+        MaterialExchangeOfferKind.MATERIAL,
+        item.getMaterial().getName(),
+        item.getMaterial().getQuantityType(),
+        item.getQuality(),
+        item.getAmount(),
+        locationName,
+        alreadyReleased);
   }
 
   /**
@@ -332,11 +365,14 @@ public class MaterialExchangeBoardService {
     Double amount = null;
     Double availableAmount = null;
     if (offer.getKind() == MaterialExchangeOfferKind.ITEM) {
-      // Item offer: no Lager row, no quality/live stock — the display name + user-stated quantity
-      // live on the offer itself, so never dereference the (null) inventoryItem here
-      // (REQ-MARKET-012).
+      // Item offer: the display name + quantity live on the offer itself (REQ-MARKET-012). A
+      // free-stated offer has no Lager row; a stock-backed one (REQ-MARKET-014) does, so its
+      // quantity is clamped to the row's current stock on read (mirroring the material clamp,
+      // ADR-0086) and the owner additionally sees the row's total stock to bound the edit dialog.
       itemName = offer.getItemName();
-      itemQuantity = offer.getItemQuantity();
+      itemQuantity = effectiveItemQuantity(offer);
+      availableAmount =
+          mine && offer.getInventoryItem() != null ? offer.getInventoryItem().getAmount() : null;
     } else {
       InventoryItem item = offer.getInventoryItem();
       Material mat = item.getMaterial();
@@ -515,6 +551,32 @@ public class MaterialExchangeBoardService {
     double offeredValue = offered == null ? 0.0 : offered;
     double stockValue = stock == null ? 0.0 : stock;
     return Math.max(0.0, Math.min(offeredValue, stockValue));
+  }
+
+  /**
+   * The effective item quantity served to the board for an {@link MaterialExchangeOfferKind#ITEM}
+   * offer — the stored {@link MaterialExchangeOffer#getItemQuantity() itemQuantity}, clamped to the
+   * backing row's current whole-unit stock for a <b>stock-backed</b> offer so the board never
+   * advertises more than is in stock (the item sibling of {@link
+   * #effectiveOfferedAmount(MaterialExchangeOffer)}, ADR-0086/0108, REQ-MARKET-014). A
+   * <b>free-stated</b> offer (no backing row) returns its stated quantity unchanged. Never
+   * negative.
+   *
+   * @param offer the item offer.
+   * @return the clamped whole-unit quantity, or {@code null} if the offer states none.
+   */
+  @Nullable
+  private static Integer effectiveItemQuantity(MaterialExchangeOffer offer) {
+    Integer quantity = offer.getItemQuantity();
+    if (quantity == null) {
+      return null;
+    }
+    InventoryItem item = offer.getInventoryItem();
+    if (item == null || item.getAmount() == null) {
+      return quantity;
+    }
+    int stock = (int) Math.floor(item.getAmount());
+    return Math.max(0, Math.min(quantity, stock));
   }
 
   /**

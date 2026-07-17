@@ -284,8 +284,8 @@ public class InventoryCheckoutService {
       // follow-up edit of the reduced row 409s.
       InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
       // Ratchet any active Materialbörse offer on this row down to the reduced stock
-      // (REQ-MARKET-013).
-      materialExchangeOfferRepository.clampOfferedAmountToStock(sourceId, remainingAmount);
+      // (REQ-MARKET-013/014 — kind-aware for material and stock-backed item offers).
+      ratchetBoardOffersToStock(sourceId, remainingAmount);
       recordBookOutTail(
           checkoutType,
           sourceId,
@@ -396,8 +396,8 @@ public class InventoryCheckoutService {
       // current within the transaction so any future in-place consumer of a transfer cannot 409.
       inventoryItemRepository.saveAndFlush(item);
       // Ratchet any active Materialbörse offer on the source row down to the reduced stock
-      // (REQ-MARKET-013).
-      materialExchangeOfferRepository.clampOfferedAmountToStock(sourceId, remainingAmount);
+      // (REQ-MARKET-013/014 — kind-aware for material and stock-backed item offers).
+      ratchetBoardOffersToStock(sourceId, remainingAmount);
     }
     auditService.record(
         AuditEventType.INVENTORY_ITEM_TRANSFERRED,
@@ -711,8 +711,8 @@ public class InventoryCheckoutService {
       // follow-up in-place edit of the reduced row cannot 409 (REQ-FE-003 parity with book-out).
       inventoryItemRepository.saveAndFlush(item);
       // Ratchet any active Materialbörse offer on the source row down to the reduced stock
-      // (REQ-MARKET-013).
-      materialExchangeOfferRepository.clampOfferedAmountToStock(sourceId, remainingAmount);
+      // (REQ-MARKET-013/014 — kind-aware for material and stock-backed item offers).
+      ratchetBoardOffersToStock(sourceId, remainingAmount);
     }
 
     auditService.record(
@@ -935,18 +935,36 @@ public class InventoryCheckoutService {
 
   /**
    * Ratchets any active Materialbörse offer on a Lager row down to the row's current stock
-   * (REQ-MARKET-013) — the public seam the item-facade's update path calls after it edits a row's
-   * amount, mirroring the book-out / transfer / rebooking decrement sites that clamp inline. It is
-   * a no-op when the stock did not drop below the offered quantity (an increase never changes an
-   * offer). Delegates to the atomic conditional {@link
-   * MaterialExchangeOfferRepository#clampOfferedAmountToStock}.
+   * (REQ-MARKET-013/014) — the public seam the item-facade's update path calls after it edits a
+   * row's amount, mirroring the book-out / transfer / rebooking decrement sites that clamp inline.
+   * It is a no-op when the stock did not drop below the offered quantity (an increase never changes
+   * an offer). Delegates to the kind-aware {@link #ratchetBoardOffersToStock(UUID, double)}.
    *
    * @param itemId the backing Lager row.
    * @param stock the row's current (possibly reduced) stock.
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void clampOffersToStock(UUID itemId, double stock) {
+    ratchetBoardOffersToStock(itemId, stock);
+  }
+
+  /**
+   * Ratchets down any active Materialbörse offer on a Lager row to the row's reduced stock in the
+   * decrementing transaction (REQ-MARKET-013/014) — kind-aware: a {@code MATERIAL} offer clamps its
+   * SCU {@code offeredAmount}, a stock-backed {@code ITEM} offer its whole-unit {@code
+   * itemQuantity} (the item clamp floors the stock to whole units — item stock is integral). Each
+   * atomic conditional update is a no-op for the other kind and for a row backing no offer, so
+   * invoking both at every decrement site is correct: a material row can back only a material
+   * offer, a game-item row only an item offer. Both are plain {@code @Modifying} updates (no {@code
+   * clearAutomatically}), so neither detaches the persistence context — safe to call after the
+   * saveAndFlush of the reduced row.
+   *
+   * @param itemId the backing Lager row whose active offer to clamp.
+   * @param stock the row's new (reduced) stock.
+   */
+  private void ratchetBoardOffersToStock(UUID itemId, double stock) {
     materialExchangeOfferRepository.clampOfferedAmountToStock(itemId, stock);
+    materialExchangeOfferRepository.clampItemQuantityToStock(itemId, (int) Math.floor(stock));
   }
 
   /**

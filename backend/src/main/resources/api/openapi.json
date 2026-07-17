@@ -56990,13 +56990,13 @@
               "$ref" : "#/components/schemas/InventoryAllocationInput"
             }
           },
-          "missionFreeForGameItem" : {
+          "qualityConsistentWithCatalog" : {
             "type" : "boolean"
           },
           "catalogReferenceValid" : {
             "type" : "boolean"
           },
-          "qualityConsistentWithCatalog" : {
+          "missionFreeForGameItem" : {
             "type" : "boolean"
           }
         },
@@ -61092,6 +61092,10 @@
           "inventoryItemId" : {
             "type" : "string",
             "format" : "uuid"
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "MATERIAL", "ITEM" ]
           },
           "materialName" : {
             "type" : "string"

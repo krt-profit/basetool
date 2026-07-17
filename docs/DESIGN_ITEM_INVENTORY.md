@@ -1,9 +1,11 @@
 > **Doc type:** Design spec (partially shipped) — the agreed blueprint for the item-stock
 > feature. The backend/API scope (PR 2) has shipped: REQ-INV-029…032 live in
 > [`docs/specs/inventory-items.md`](specs/inventory-items.md) and ADR-0101 is accepted —
-> those are the living truth for the shipped parts. The frontend item views/flows (PR 3)
-> and the Börse phase (§8) still implement against this document; it freezes as a
-> historical plan once they ship.
+> those are the living truth for the shipped parts. The **Börse phase (§8) has shipped** as
+> REQ-MARKET-014 / ADR-0108 (stock-backed item offers, see
+> [`docs/specs/materialboerse.md`](specs/materialboerse.md)) — that is now the living truth for
+> it, and the §8 text below is a historical plan. The frontend item views/flows (PR 3) still
+> implement against this document; it freezes as a historical plan once they ship.
 > **Owner area:** INV / ORDERS / MARKET / UI / FE · **Related ADRs:** ADR-0053, ADR-0087,
 > ADR-0098, ADR-0099 (existing); ADR-0101 (accepted with the backend PR).
 
