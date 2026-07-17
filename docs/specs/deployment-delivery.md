@@ -242,8 +242,16 @@ though the on-disk file was already correct) could not have persisted. On a Prom
 `deploy.sh` stamps `basetool_monitoring_config_applied_timestamp{component="prometheus"}`, which backs
 the `PrometheusConfigStale` alert (REQ-OBS-014). The reconcile is best-effort and **never gates** the
 deploy — a stopped monitoring service or a failed recreate only logs — and force-recreates only on an
-actual content change (config edits are rare, so the brief scrape gap is negligible). A host that runs
-the monitoring stack **must** set `IRI_MONITORING_ENABLED=true` (a systemd drop-in on the `iri-deploy`
+actual content change (config edits are rare, so the brief scrape gap is negligible). Before that
+per-service config diff the reconcile additionally runs a plain
+`docker compose -p iri-monitoring … up -d` (no `--force-recreate`), so a monitoring
+**compose-definition** drift — a service's `mem_limit`, `environment`, `volumes`, or image pin, none of
+which the config-subtree diff can see — is applied by compose per-service (it recreates only the
+services whose config-hash changed, a fast no-op otherwise). Without it a compose-definition change
+reached the running container only on a full app deploy, so on a quiet host it silently never landed —
+the 2026-07-17 case where Alloy ran the stale 256M/230MiB definition for days while disk said
+384M/300MiB (and cAdvisor a stale containerd mount), tripping a chronic `ContainerWorkingSetHigh`. A
+host that runs the monitoring stack **must** set `IRI_MONITORING_ENABLED=true` (a systemd drop-in on the `iri-deploy`
 service — `/etc/systemd/system/iri-deploy.service.d/monitoring.conf` with
 `Environment=IRI_MONITORING_ENABLED=true`, then `systemctl daemon-reload`). If the stack is running but
 the flag is unset the reconcile gates itself off, yet the config-bundle rsync keeps rewriting
@@ -263,6 +271,10 @@ reconcile is a silent no-op — nothing scrapes the textfile there anyway.
   last applied snapshot force-recreates Prometheus — including on the converged no-op fast-exit —
   without pulling or re-applying the app stack; a component whose on-disk config already matches its
   snapshot is left untouched, and the reconcile never gates the deploy.
+- [ ] On a host with monitoring enabled, every reconciling tick — including the converged no-op
+  fast-exit — runs a plain `docker compose -p iri-monitoring … up -d` so a compose-definition drift
+  (mem_limit / environment / volumes / image pin) is applied per-service, while a fully converged
+  monitoring stack (config subtree matching every snapshot) triggers no `--force-recreate`.
 - [ ] On a host running the monitoring stack with `IRI_MONITORING_ENABLED` unset, every tick logs a
   WARN and emits `basetool_monitoring_reconcile_disabled{component="deploy"} == 1` (the
   `MonitoringReconcileDisabled` signal); with the flag set, the gauge is `0` and the reconcile runs.
