@@ -142,8 +142,13 @@ public class OperationPageController {
       Model model,
       @AuthenticationPrincipal OidcUser principal) {
     StringBuilder uri = new StringBuilder("/api/v1/operations/search?");
-    if (search != null && !search.isBlank()) {
-      uri.append("query=").append(URLEncoder.encode(search, StandardCharsets.UTF_8)).append("&");
+    boolean hasSearch = search != null && !search.isBlank();
+    if (hasSearch) {
+      // Pass the free-text term as a WebClient URI-template variable so it is percent-encoded
+      // exactly once across the frontend->backend hop. URLEncoder form-encoding (space -> '+')
+      // double-encodes umlauts / reserved chars when re-encoded on the hop, yielding zero matches
+      // (see BackendApiClient#get(String, ParameterizedTypeReference, Object...)).
+      uri.append("query={query}&");
     }
     if (start != null && !start.isBlank()) {
       uri.append("start=").append(URLEncoder.encode(start, StandardCharsets.UTF_8)).append("&");
@@ -164,7 +169,9 @@ public class OperationPageController {
 
     try {
       PageResponse<OperationDto> operationsPage =
-          backendApiClient.get(uri.toString(), OPERATION_PAGE_TYPE, false);
+          hasSearch
+              ? backendApiClient.get(uri.toString(), OPERATION_PAGE_TYPE, search)
+              : backendApiClient.get(uri.toString(), OPERATION_PAGE_TYPE, false);
       model.addAttribute("operations", operationsPage.content());
       model.addAttribute("operationsPage", operationsPage);
       model.addAttribute("search", search);

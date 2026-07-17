@@ -287,7 +287,12 @@ public class AdminPersonalInventoryPageController {
         uri.append("&sort=").append(URLEncoder.encode(sort, StandardCharsets.UTF_8));
       }
       if (q != null && !q.isBlank()) {
-        uri.append("&q=").append(URLEncoder.encode(q, StandardCharsets.UTF_8));
+        // Free-text term as a WebClient URI-template variable so it is percent-encoded exactly
+        // once across the frontend->backend hop; URLEncoder form-encoding (space -> '+')
+        // double-encodes umlauts / reserved chars when re-encoded on the hop, yielding zero
+        // matches.
+        uri.append("&q={q}");
+        return backendApiClient.get(uri.toString(), PERSONAL_INVENTORY_PAGE_TYPE, q);
       }
       return backendApiClient.get(uri.toString(), PERSONAL_INVENTORY_PAGE_TYPE);
     } catch (Exception e) {

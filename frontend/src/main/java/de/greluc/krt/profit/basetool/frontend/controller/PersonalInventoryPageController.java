@@ -367,12 +367,11 @@ public class PersonalInventoryPageController {
     try {
       String query = q == null ? "" : q;
       int effectiveLimit = limit == null ? 25 : Math.min(2000, Math.max(1, limit));
-      String uri =
-          "/api/v1/uex/locations/search?q="
-              + URLEncoder.encode(query, StandardCharsets.UTF_8)
-              + "&limit="
-              + effectiveLimit;
-      List<UexLocationDto> result = backendApiClient.get(uri, UEX_LOCATION_LIST_TYPE);
+      // Pass the free-text term as a WebClient URI-template variable so it is percent-encoded
+      // exactly once across the frontend->backend hop; URLEncoder form-encoding (space -> '+')
+      // double-encodes umlauts / reserved chars when re-encoded on the hop, yielding zero matches.
+      String uri = "/api/v1/uex/locations/search?q={q}&limit=" + effectiveLimit;
+      List<UexLocationDto> result = backendApiClient.get(uri, UEX_LOCATION_LIST_TYPE, query);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
       log.warn("UEX location typeahead failed for query='{}': {}", q, e.getMessage());
@@ -405,7 +404,9 @@ public class PersonalInventoryPageController {
         uri.append("&sort=").append(URLEncoder.encode(sort, StandardCharsets.UTF_8));
       }
       if (q != null && !q.isBlank()) {
-        uri.append("&q=").append(URLEncoder.encode(q, StandardCharsets.UTF_8));
+        // Free-text term as a WebClient URI-template variable (encoded once); see uexSearch.
+        uri.append("&q={q}");
+        return backendApiClient.get(uri.toString(), PERSONAL_INVENTORY_ITEM_PAGE_TYPE, q);
       }
       return backendApiClient.get(uri.toString(), PERSONAL_INVENTORY_ITEM_PAGE_TYPE);
     } catch (Exception e) {

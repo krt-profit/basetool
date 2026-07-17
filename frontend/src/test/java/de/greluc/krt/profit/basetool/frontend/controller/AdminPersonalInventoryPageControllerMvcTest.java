@@ -22,6 +22,9 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
@@ -42,6 +45,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -120,5 +124,62 @@ class AdminPersonalInventoryPageControllerMvcTest {
 
     // The fragment path must not query the user list.
     verify(backendApiClient, never()).get(eq("/api/v1/users?size=1000"), anyTypeRef());
+  }
+
+  // Regression guard for the frontend-proxy double-encoding sub-class: the admin personal-inventory
+  // item filter must forward a multi-word free-text term as a WebClient URI-template variable
+  // ({q}),
+  // not URLEncoder it into the URI string, so the backend @RequestParam decodes the exact typed
+  // term. URLEncoder form-encoding (space -> '+') double-encodes across the frontend->backend hop
+  // and yields zero matches. fragment=results skips the selected-member lookup, leaving one read.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_passesMultiWordQueryAsUriVariable() throws Exception {
+    String userSub = UUID.randomUUID().toString();
+    PageResponse<PersonalInventoryItemDto> items =
+        new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(items);
+
+    mockMvc
+        .perform(
+            get("/admin/personal-inventory")
+                .param("userSub", userSub)
+                .param("q", "Widget Alpha")
+                .param("fragment", "results"))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
+    ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
+    assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
+    assertEquals("Widget Alpha", qCaptor.getValue());
+  }
+
+  // Same guard with an umlaut term: "Röhre Größe" encodes to R%C3%B6hre… under URLEncoder, which
+  // the
+  // hop would re-encode to a literal zero-match. As a URI variable the raw term reaches the
+  // backend.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_passesUmlautQueryAsUriVariable_notFormEncoded() throws Exception {
+    String userSub = UUID.randomUUID().toString();
+    PageResponse<PersonalInventoryItemDto> items =
+        new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(items);
+
+    String term = "Röhre Größe";
+    mockMvc
+        .perform(
+            get("/admin/personal-inventory")
+                .param("userSub", userSub)
+                .param("q", term)
+                .param("fragment", "results"))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
+    ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
+    assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
+    assertEquals(term, qCaptor.getValue());
   }
 }

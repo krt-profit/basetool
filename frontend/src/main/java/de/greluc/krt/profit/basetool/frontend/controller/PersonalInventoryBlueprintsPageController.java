@@ -33,8 +33,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintUpdateR
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -152,12 +150,11 @@ public class PersonalInventoryBlueprintsPageController {
     try {
       String query = q == null ? "" : q;
       int effectiveLimit = limit == null ? 25 : Math.min(200, Math.max(1, limit));
-      String uri =
-          "/api/v1/blueprints/products/search?q="
-              + URLEncoder.encode(query, StandardCharsets.UTF_8)
-              + "&limit="
-              + effectiveLimit;
-      List<BlueprintProductDto> result = backendApiClient.get(uri, BLUEPRINT_PRODUCT_LIST);
+      // Pass the free-text term as a WebClient URI-template variable so it is percent-encoded
+      // exactly once across the frontend->backend hop; URLEncoder form-encoding (space -> '+')
+      // double-encodes umlauts / reserved chars when re-encoded on the hop, yielding zero matches.
+      String uri = "/api/v1/blueprints/products/search?q={q}&limit=" + effectiveLimit;
+      List<BlueprintProductDto> result = backendApiClient.get(uri, BLUEPRINT_PRODUCT_LIST, query);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
       log.warn("Blueprint product type-ahead failed for query='{}': {}", q, e.getMessage());
@@ -478,7 +475,9 @@ public class PersonalInventoryBlueprintsPageController {
             .append(page)
             .append("&sort=productName,asc");
     if (q != null && !q.isBlank()) {
-      uri.append("&q=").append(URLEncoder.encode(q, StandardCharsets.UTF_8));
+      // Free-text term as a WebClient URI-template variable (encoded once); see search(...).
+      uri.append("&q={q}");
+      return backendApiClient.get(uri.toString(), PERSONAL_BLUEPRINT_PAGE, q);
     }
     return backendApiClient.get(uri.toString(), PERSONAL_BLUEPRINT_PAGE);
   }

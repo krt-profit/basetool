@@ -21,7 +21,11 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -38,6 +42,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -241,5 +246,47 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
         .andExpect(
             content()
                 .string(org.hamcrest.Matchers.not(containsString("id=\"krt-bp-import-modal\""))));
+  }
+
+  // Regression guard for the frontend-proxy double-encoding sub-class: the blueprint-product
+  // typeahead must forward a multi-word free-text term as a WebClient URI-template variable ({q}),
+  // not URLEncoder it into the URI string, so the backend @RequestParam decodes the exact typed
+  // term. URLEncoder form-encoding (space -> '+') double-encodes across the frontend->backend hop
+  // and yields zero matches.
+  @Test
+  @WithMockUser
+  void search_passesMultiWordQueryAsUriVariable() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/personal-inventory/blueprints/search").param("q", "Arclight Pistol"))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
+    ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
+    assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
+    assertEquals("Arclight Pistol", qCaptor.getValue());
+  }
+
+  // Same guard with an umlaut term: "Röhre Größe" encodes to R%C3%B6hre… under URLEncoder, which
+  // the
+  // hop would re-encode to a literal zero-match. As a URI variable the raw term reaches the
+  // backend.
+  @Test
+  @WithMockUser
+  void search_passesUmlautQueryAsUriVariable_notFormEncoded() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(List.of());
+
+    String term = "Röhre Größe";
+    mockMvc
+        .perform(get("/personal-inventory/blueprints/search").param("q", term))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
+    ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
+    assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
+    assertEquals(term, qCaptor.getValue());
   }
 }

@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.contains;
@@ -59,6 +61,7 @@ import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -148,6 +151,49 @@ class OperationPageControllerMvcTest {
         .andExpect(content().string(containsString("ACTIVE")))
         // Active operations carry the success-hued status-pill modifier.
         .andExpect(content().string(containsString("status-active")));
+  }
+
+  // Regression guard for the frontend-proxy double-encoding sub-class: the operations list must
+  // forward a multi-word free-text term as a WebClient URI-template variable ({query}), not
+  // URLEncoder it into the URI string, so the backend @RequestParam decodes the exact typed term.
+  // URLEncoder form-encoding (space -> '+') double-encodes across the frontend->backend hop and
+  // yields zero matches. fragment=results keeps the call count to the single search read.
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationsList_passesMultiWordSearchAsUriVariable() throws Exception {
+    when(backendApiClient.get(startsWith("/api/v1/operations/search?"), anyTypeRef(), any()))
+        .thenReturn(new PageResponse<>(List.<OperationDto>of(), 0, 20, 0L, 0, List.of()));
+
+    mockMvc
+        .perform(get("/operations").param("search", "Widget Alpha").param("fragment", "results"))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
+    ArgumentCaptor<Object> termCaptor = ArgumentCaptor.captor();
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), termCaptor.capture());
+    assertTrue(uriCaptor.getValue().contains("query={query}"), uriCaptor.getValue());
+    assertEquals("Widget Alpha", termCaptor.getValue());
+  }
+
+  // Same guard with an umlaut term: "Müller Größe" encodes to M%C3%BC… under URLEncoder, which the
+  // hop would re-encode to a literal zero-match. As a URI variable the raw term reaches the
+  // backend.
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationsList_passesUmlautSearchAsUriVariable_notFormEncoded() throws Exception {
+    when(backendApiClient.get(startsWith("/api/v1/operations/search?"), anyTypeRef(), any()))
+        .thenReturn(new PageResponse<>(List.<OperationDto>of(), 0, 20, 0L, 0, List.of()));
+
+    String term = "Müller Größe";
+    mockMvc
+        .perform(get("/operations").param("search", term).param("fragment", "results"))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
+    ArgumentCaptor<Object> termCaptor = ArgumentCaptor.captor();
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), termCaptor.capture());
+    assertTrue(uriCaptor.getValue().contains("query={query}"), uriCaptor.getValue());
+    assertEquals(term, termCaptor.getValue());
   }
 
   // ── /operations/{id} (detail) ───────────────────────────────────────────
