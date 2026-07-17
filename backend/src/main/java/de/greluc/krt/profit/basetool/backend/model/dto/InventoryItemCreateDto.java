@@ -87,8 +87,8 @@ public record InventoryItemCreateDto(
     UUID jobOrderId,
     UUID owningOrgUnitId,
     Boolean mergeStock,
-    @Valid List<InventoryAllocationInput> jobOrderAllocations,
-    @Valid List<InventoryAllocationInput> missionAllocations)
+    List<@Valid InventoryAllocationInput> jobOrderAllocations,
+    List<@Valid InventoryAllocationInput> missionAllocations)
     implements QuantityAware {
 
   /**

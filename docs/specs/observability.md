@@ -52,6 +52,16 @@ probe noise, with bots, scanners and pre-login navigation adding more. The
 log level, so the signal survives for the dashboard/alerts; every other 4xx — including `403
 ACCESS_DENIED`, the security-relevant "authenticated but not allowed" case — stays at `WARN`.
 
+`RequestLoggingFilter` escalates the access-log line to `WARN` (`Slow request …`) when a request
+exceeds `app.logging.slow-request-threshold-ms` (2000 ms), **except the notification SSE relay**
+(`/api/v1/notifications/stream` on the backend, `/notifications/stream` on the frontend), which stays
+at `INFO`. Spring MVC books an async request's whole lifetime as its elapsed duration, so a relay
+held open for up to 30 minutes would cross the threshold on **every** close and flood the access log
+with false-positive `Slow request` WARNs — the log-side twin of the `http.server.requests` latency
+skew that `NotificationStreamObservationPredicate` already suppresses (REQ-OBS-009). The relay still
+emits its single `INFO` access-log line, so the one-line-per-request guarantee holds; relay health
+stays visible through the dedicated SSE meters, not the access log.
+
 ### REQ-OBS-002 — Correlation-id propagation
 
 `correlationId` comes from the inbound `X-Correlation-Id` header (configurable via

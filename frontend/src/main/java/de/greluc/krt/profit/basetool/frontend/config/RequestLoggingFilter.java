@@ -38,11 +38,22 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *
  * <p>Static resources, the actuator and swagger assets are skipped to keep the access log focused
  * on real user traffic.
+ *
+ * <p>The notification SSE relay ({@value #STREAM_PATH}) is never escalated to the "Slow request"
+ * WARN branch: Spring MVC books the async request's whole lifetime as the elapsed duration, so a
+ * relay held open for up to 30 minutes ({@code NotificationPageController.STREAM_TIMEOUT_MS}) would
+ * cross the slow-request threshold on every close and flood the access log with false-positive WARN
+ * lines. It still gets its one INFO access-log line. This is the access-log mirror of {@link
+ * NotificationStreamObservationPredicate} dropping the same endpoint from {@code
+ * http.server.requests} (REQ-OBS-001/-009).
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class RequestLoggingFilter extends OncePerRequestFilter implements Ordered {
+
+  /** Request path of the long-lived notification SSE relay, excluded from slow-request WARNs. */
+  private static final String STREAM_PATH = "/notifications/stream";
 
   private final LoggingProperties loggingProperties;
 
@@ -60,7 +71,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter implements Ordere
       int status = response.getStatus();
       String method = request.getMethod();
       String path = request.getRequestURI();
-      if (durationMs >= loggingProperties.slowRequestThresholdMs()) {
+      if (durationMs >= loggingProperties.slowRequestThresholdMs() && !STREAM_PATH.equals(path)) {
         log.warn("Slow request {} {} -> {} in {} ms", method, path, status, durationMs);
       } else if (log.isInfoEnabled()) {
         log.info("{} {} -> {} in {} ms", method, path, status, durationMs);

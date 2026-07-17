@@ -42,4 +42,4 @@ import org.jetbrains.annotations.Nullable;
 public record JobOrderHandoverItemCreateDto(
     @NotNull UUID inventoryItemId,
     @NotNull @Positive Double amount,
-    @Valid @Nullable List<AllocationReductionDto> missionReductions) {}
+    @Nullable List<@Valid AllocationReductionDto> missionReductions) {}
