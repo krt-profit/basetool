@@ -26,7 +26,9 @@ import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationBulkResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationCountResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationPageSliceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationViewDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import io.micrometer.core.instrument.Gauge;
@@ -63,6 +65,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -87,6 +90,8 @@ public class NotificationPageController {
   private static final DateTimeFormatter DISPLAY_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'").withZone(ZoneOffset.UTC);
   private static final ParameterizedTypeReference<List<NotificationDto>> LIST_TYPE =
+      new ParameterizedTypeReference<>() {};
+  private static final ParameterizedTypeReference<PageResponse<NotificationDto>> PAGE_TYPE =
       new ParameterizedTypeReference<>() {};
   private static final ParameterizedTypeReference<ServerSentEvent<String>> SSE_TYPE =
       new ParameterizedTypeReference<>() {};
@@ -118,7 +123,10 @@ public class NotificationPageController {
   }
 
   /**
-   * Renders the full notifications page (most recent first), fail-soft to an empty list.
+   * Renders the full notifications page: the newest {@value #PAGE_LIMIT} notifications plus the
+   * paging facts (total count, more-pages flag) that drive the "showing X of Y" hint and the
+   * load-more control, so a cap-exceeding inbox is visibly — never silently — truncated
+   * (REQ-NOTIF-019). Fail-soft to an empty list on a backend hiccup.
    *
    * @param model the view model
    * @return the notifications template name
@@ -126,7 +134,11 @@ public class NotificationPageController {
   @GetMapping
   public String page(Model model) {
     try {
-      model.addAttribute("notifications", loadView(PAGE_LIMIT));
+      PageResponse<NotificationDto> firstPage = loadPage(0);
+      List<NotificationViewDto> views = toViews(firstPage);
+      model.addAttribute("notifications", views);
+      model.addAttribute("notifTotal", firstPage == null ? 0L : firstPage.totalElements());
+      model.addAttribute("notifHasMore", hasMore(firstPage));
     } catch (ReauthenticationRequiredException e) {
       // Let GlobalExceptionHandler bounce the user through a fresh Keycloak login (302) rather than
       // rendering an empty inbox on a dead session.
@@ -134,9 +146,27 @@ public class NotificationPageController {
     } catch (Exception e) {
       log.debug("Failed to load notifications page", e);
       model.addAttribute("notifications", List.of());
+      model.addAttribute("notifTotal", 0L);
+      model.addAttribute("notifHasMore", false);
       model.addAttribute("error", "notifications.error.load");
     }
     return "notifications";
+  }
+
+  /**
+   * Returns one further inbox page for the load-more control on the {@code /notifications} page
+   * (REQ-NOTIF-019). Items are localized server-side exactly like the initial render, so appended
+   * entries are indistinguishable from server-rendered ones.
+   *
+   * @param page the zero-based page index to fetch (page 0 is the initial server render)
+   * @return the localized page slice with the total count and the more-pages flag
+   */
+  @ResponseBody
+  @GetMapping(value = "/page-items", headers = "X-Requested-With=XMLHttpRequest")
+  public NotificationPageSliceDto pageItems(@RequestParam(defaultValue = "1") int page) {
+    PageResponse<NotificationDto> result = loadPage(Math.max(0, page));
+    return new NotificationPageSliceDto(
+        toViews(result), result == null ? 0L : result.totalElements(), hasMore(result));
   }
 
   /**
@@ -317,6 +347,46 @@ public class NotificationPageController {
     }
     Locale locale = LocaleContextHolder.getLocale();
     return dtos.stream().map(dto -> toView(dto, locale)).toList();
+  }
+
+  /**
+   * Fetches one page of the caller's inbox from the paginated backend listing, newest first. Used
+   * by the initial page render (page 0) and the load-more relay, unlike the bell dropdown which
+   * keeps the lighter {@code /recent} endpoint.
+   *
+   * @param page the zero-based page index
+   * @return the backend page response, or {@code null} when the backend returned none
+   */
+  private PageResponse<NotificationDto> loadPage(int page) {
+    return backendApiClient.get(
+        BACKEND_BASE + "?page={page}&size={size}&sort=createdAt,desc",
+        PAGE_TYPE,
+        Integer.valueOf(page),
+        Integer.valueOf(PAGE_LIMIT));
+  }
+
+  /**
+   * Localizes a backend page's content into view DTOs; empty on a {@code null} page/content.
+   *
+   * @param result the backend page response, may be {@code null}
+   * @return the localized views of the page content
+   */
+  private List<NotificationViewDto> toViews(PageResponse<NotificationDto> result) {
+    if (result == null || result.content() == null) {
+      return List.of();
+    }
+    Locale locale = LocaleContextHolder.getLocale();
+    return result.content().stream().map(dto -> toView(dto, locale)).toList();
+  }
+
+  /**
+   * Whether at least one further page exists after the given one.
+   *
+   * @param result the backend page response, may be {@code null}
+   * @return {@code true} when more pages follow
+   */
+  private static boolean hasMore(PageResponse<NotificationDto> result) {
+    return result != null && result.page() + 1 < result.totalPages();
   }
 
   private NotificationViewDto toView(NotificationDto dto, Locale locale) {

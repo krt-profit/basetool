@@ -372,6 +372,72 @@
         });
     }
 
+    // ---- inbox page load-more (REQ-NOTIF-019) --------------------------------
+
+    // The /notifications page renders only the newest 50; the load-more button appends the next
+    // server page in place so the older tail stays reachable instead of being silently cut off.
+    // Items arrive as the same localized view DTOs the dropdown uses, so buildItem() renders them
+    // identically to the server-rendered rows and the delegated mark-read/delete handlers apply.
+    function loadMorePage(btn) {
+        const list = document.getElementById('notification-page-list');
+        if (!list || btn.disabled) {
+            return;
+        }
+        const page = parseInt(btn.getAttribute('data-notif-next-page'), 10) || 1;
+        btn.disabled = true;
+        fetch('/notifications/page-items?page=' + page, csrfRequestInit())
+            .then(function (res) {
+                if (window.krtReauth && window.krtReauth.check(res)) {
+                    return null;
+                }
+                return res.ok ? res.json() : null;
+            })
+            .then(function (data) {
+                if (!data || !Array.isArray(data.items)) {
+                    return;
+                }
+                data.items.forEach(function (item) {
+                    // A notification arriving since page 0 shifts rows down, so an offset fetch can
+                    // re-return a row already shown — skip those to avoid duplicates. (The reverse,
+                    // a delete shifting an unseen row up past the offset, is the inherent limit of
+                    // offset pagination and is out of scope for REQ-NOTIF-019; a manual reload
+                    // recovers it, as it does for every offset-paginated list in the app.)
+                    if (!list.querySelector('[data-notif-id="' + cssEscape(item.id) + '"]')) {
+                        list.appendChild(buildItem(item));
+                    }
+                });
+                btn.setAttribute('data-notif-next-page', String(page + 1));
+                updatePageHint(list, data.totalElements);
+                if (!data.hasMore) {
+                    const wrap = btn.closest('.notification-page-more');
+                    if (wrap) {
+                        wrap.remove();
+                    } else {
+                        btn.remove();
+                    }
+                }
+            })
+            .catch(function () {
+                /* leave the button usable so the user can retry a transient failure */
+            })
+            .finally(function () {
+                btn.disabled = false;
+            });
+    }
+
+    // Keep the "showing X of Y" hint truthful after each appended page.
+    function updatePageHint(list, total) {
+        const hint = document.querySelector('[data-notif-hint]');
+        if (!hint) {
+            return;
+        }
+        const template = hint.getAttribute('data-notif-hint-template') || '';
+        const shown = list.querySelectorAll('.notification-item').length;
+        hint.textContent = template
+            .replace('{shown}', String(shown))
+            .replace('{total}', String(total));
+    }
+
     function confirmThen(title, body, action) {
         if (typeof window.showKrtConfirm === 'function') {
             window
@@ -413,6 +479,11 @@
         const clearReadBtn = event.target.closest('[data-notif-clear-read]');
         if (clearReadBtn) {
             doClearRead(clearReadBtn);
+            return;
+        }
+        const loadMoreBtn = event.target.closest('[data-notif-load-more]');
+        if (loadMoreBtn) {
+            loadMorePage(loadMoreBtn);
             return;
         }
         if (event.target.closest('#notification-toggle')) {

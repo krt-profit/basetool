@@ -20,6 +20,12 @@
 (function () {
     'use strict';
 
+    // Result cap requested from /personal-inventory/uex-search (mirrors the backend clamp). When a
+    // response fills the cap — realistically only the empty-query "browse everything" mode — the
+    // list is (potentially) truncated and renderResults appends a refine-your-search hint instead
+    // of pretending the catalog ends there (REQ-FE-016 no-silent-truncation rule, ADR-0100).
+    const SEARCH_LIMIT = 2000;
+
     let modal = null;
     let deleteModal = null;
     let form = null;
@@ -373,7 +379,8 @@
             (endpoints.uexSearch || '/personal-inventory/uex-search') +
             '?q=' +
             encodeURIComponent(q) +
-            '&limit=2000';
+            '&limit=' +
+            SEARCH_LIMIT;
         resultsEl.hidden = false;
         resultsEl.innerHTML =
             '<div class="krt-pi-typeahead-loading">' +
@@ -424,6 +431,18 @@
                 '</span>' +
                 '</button>';
         });
+        if (items.length >= SEARCH_LIMIT) {
+            // The response filled the requested cap, so more locations likely exist beyond it —
+            // say so instead of silently ending the list (REQ-FE-016). Typing any query narrows
+            // the result far below the cap, so every location stays reachable.
+            html +=
+                '<div class="krt-pi-typeahead-more">' +
+                escapeHtml(
+                    (window.krtPersonalInventoryI18n || {}).moreResults ||
+                        'Weitere Treffer vorhanden - Suche verfeinern',
+                ) +
+                '</div>';
+        }
         resultsEl.innerHTML = html;
         resultsEl.querySelectorAll('.krt-pi-typeahead-item').forEach(function (btn) {
             btn.addEventListener('click', function () {

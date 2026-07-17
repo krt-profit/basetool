@@ -63,6 +63,16 @@
         <p class="notification-empty" data-notif-empty
            th:classappend="${#lists.isEmpty(notifications)} ? '' : 'notification-badge-hidden'"
            th:text="#{notifications.empty}">Keine Benachrichtigungen</p>
+        <!-- REQ-NOTIF-019: the page renders the newest 50 only - say so and offer the rest,
+             instead of silently truncating the inbox at the cap. -->
+        <div class="notification-page-more" th:if="${notifHasMore}">
+            <p class="notification-page-hint" data-notif-hint
+               th:attr="data-notif-hint-template=#{notifications.showingLatest('{shown}', '{total}')}"
+               th:text="#{notifications.showingLatest(${#lists.size(notifications)}, ${notifTotal})}">Zeige die neuesten 50 von 123 Benachrichtigungen</p>
+            <button type="button" class="btn btn-secondary" data-notif-load-more
+                    data-notif-next-page="1"
+                    th:text="#{notifications.loadMore}">Mehr laden</button>
+        </div>
     </div>
 </main>
 </body>

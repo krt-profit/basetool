@@ -21,8 +21,10 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -168,5 +170,110 @@ class PromotionManagePageControllerMvcTest {
             content().string(containsString("<option value=\"" + catId1 + "\">Trading</option>")))
         .andExpect(
             content().string(containsString("<option value=\"" + catId2 + "\">Mining</option>")));
+  }
+
+  // covers REQ-PROMO-001 — the member axis is page-walked completely: members spread across two
+  // backend pages both land in the matrix (their per-member eligibility is fetched), so no row is
+  // silently dropped past the first page. A completed walk renders no truncation banner.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void manage_pageWalksEveryMemberPage_andRendersNoTruncationBanner() throws Exception {
+    UUID topicId = UUID.randomUUID();
+    UUID catId = UUID.randomUUID();
+    UUID memberA = UUID.randomUUID();
+    UUID memberB = UUID.randomUUID();
+
+    PromotionTopicDto topic = new PromotionTopicDto(topicId, 0L, "Profit", null, 0, null, null);
+    PromotionCategoryDto cat =
+        new PromotionCategoryDto(catId, 0L, topicId, "Profit", "Trading", "desc", 0, null, null);
+
+    when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
+        .thenReturn(List.of(topic));
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/categories/by-topic/" + topicId + "/all"), anyTypeRef()))
+        .thenReturn(List.of(cat));
+    // Evaluations fit one page.
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 1, List.of()));
+    // Members span TWO pages — the walk must fetch both and concatenate them.
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/members?size=1000&page=0"), anyTypeRef()))
+        .thenReturn(
+            new PageResponse<>(List.of(member(memberA, "alice")), 0, 1000, 2, 2, List.of()));
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/evaluations/members?size=1000&page=1"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(member(memberB, "bob")), 1, 1000, 2, 2, List.of()));
+    when(backendApiClient.get(contains("/api/v1/promotion/eligibility/user/"), anyTypeRef()))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/promotion/manage").sessionAttr("iridium.activeOrgUnitId", UUID.randomUUID()))
+        .andExpect(status().isOk())
+        // A completed walk must not raise the truncation banner.
+        .andExpect(content().string(not(containsString("alert-warning"))));
+
+    // Both members from both pages entered the matrix — their eligibility was queried, which the
+    // controller only does for members present in the concatenated list.
+    verify(backendApiClient)
+        .get(contains("/api/v1/promotion/eligibility/user/" + memberA), anyTypeRef());
+    verify(backendApiClient)
+        .get(contains("/api/v1/promotion/eligibility/user/" + memberB), anyTypeRef());
+  }
+
+  // covers REQ-PROMO-001 — when a matrix axis page walk stops at CatalogPages.MAX_CATALOG_PAGES
+  // (the safety cap) the page must render the loud truncation banner instead of presenting a
+  // partial matrix as complete. Here the evaluations axis reports far more pages than the cap.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void manage_rendersTruncationBanner_whenAnAxisWalkHitsTheSafetyCap() throws Exception {
+    UUID topicId = UUID.randomUUID();
+    UUID catId = UUID.randomUUID();
+    UUID memberId = UUID.randomUUID();
+
+    PromotionTopicDto topic = new PromotionTopicDto(topicId, 0L, "Profit", null, 0, null, null);
+    PromotionCategoryDto cat =
+        new PromotionCategoryDto(catId, 0L, topicId, "Profit", "Trading", "desc", 0, null, null);
+    MemberEvaluationDto eval =
+        new MemberEvaluationDto(
+            UUID.randomUUID(),
+            0L,
+            memberId.toString(),
+            catId,
+            "Trading",
+            null,
+            "Profit",
+            "LEVEL_A",
+            null,
+            null);
+
+    when(backendApiClient.get(eq("/api/v1/promotion/topics/all"), anyTypeRef()))
+        .thenReturn(List.of(topic));
+    when(backendApiClient.get(
+            contains("/api/v1/promotion/categories/by-topic/" + topicId + "/all"), anyTypeRef()))
+        .thenReturn(List.of(cat));
+    // Evaluations report 200 pages (> MAX_CATALOG_PAGES): every page is non-empty, so the walk
+    // stops at the safety cap and flags truncation.
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(eval), 0, 1000, 200_000, 200, List.of()));
+    // One member so the matrix (and thus the in-fragment banner) renders.
+    when(backendApiClient.get(contains("/api/v1/promotion/evaluations/members"), anyTypeRef()))
+        .thenReturn(
+            new PageResponse<>(List.of(member(memberId, "alice")), 0, 1000, 1, 1, List.of()));
+    when(backendApiClient.get(contains("/api/v1/promotion/eligibility/user/"), anyTypeRef()))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/promotion/manage").sessionAttr("iridium.activeOrgUnitId", UUID.randomUUID()))
+        .andExpect(status().isOk())
+        // The shared warning alert (fragments/components :: alert('warning', …)) renders — the
+        // matrix is incomplete and the user is told so, never a silent partial matrix.
+        .andExpect(content().string(containsString("alert-warning")));
+  }
+
+  /** Builds a minimal evaluatable member with the given id and username for the matrix axis. */
+  private static UserDto member(UUID id, String username) {
+    return new UserDto(
+        id, username, null, username, null, 20, null, Set.of(), Set.of(), null, null, null, null,
+        null, List.of(), 0L, null, false);
   }
 }
