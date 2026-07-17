@@ -231,6 +231,50 @@ class InventoryItemCatalogQueryDataTest {
     assertThat(releasable).extracting(InventoryItem::getId).containsExactly(itemRow.getId());
   }
 
+  // covers REQ-MARKET-014 (the MaterialboardItemStockOfferE2eTest #1344 investigation): a FULL,
+  // multi-word name search of a game-item stock row must find it at the REPOSITORY level. This
+  // proves the LEFT-JOIN + three-valued OR is sound for the exact e2e query shape (game item "E2E
+  // Boerse Item Stock Widget", pattern "%e2e boerse item stock widget%"), i.e. the e2e failure was
+  // NOT here but in the frontend proxy double-encoding the space (%2520) — see
+  // MaterialboersePageController.backendGetWithQuery.
+  @Test
+  void findReleasableForUser_filtersByFullGameItemName() {
+    // Given — a fresh game-item Lager row for the caller with the exact e2e item name
+    GameItem widget = new GameItem();
+    widget.setName("E2E Boerse Item Stock Widget");
+    gameItemRepository.save(widget);
+    InventoryItem widgetRow = new InventoryItem();
+    widgetRow.setUser(user);
+    widgetRow.setLocation(location);
+    widgetRow.setGameItem(widget);
+    widgetRow.setAmount(20.0);
+    widgetRow.setPersonal(false);
+    widgetRow.setOwningOrgUnit(orgUnit);
+    inventoryItemRepository.save(widgetRow);
+    entityManager.flush();
+
+    // When — the release picker's typed search (MaterialExchangeQueryParams.normalizeQuery shape)
+    List<InventoryItem> releasable =
+        inventoryItemRepository.findReleasableForUser(
+            user.getId(), "%e2e boerse item stock widget%", PageRequest.of(0, 50));
+
+    // Then — the game-item row surfaces (the typed name search must not drop item rows)
+    assertThat(releasable).extracting(InventoryItem::getId).contains(widgetRow.getId());
+  }
+
+  // covers REQ-MARKET-014 (the picker name filter matches the MATERIAL name via the m LEFT JOIN —
+  // the COALESCE(m.name, gi.name) rewrite must keep the material-row search working too)
+  @Test
+  void findReleasableForUser_filtersByMaterialName() {
+    // When — filter by a fragment of the seeded material's name (lower-cased %fragment%)
+    List<InventoryItem> releasable =
+        inventoryItemRepository.findReleasableForUser(
+            user.getId(), "%quantanium%", PageRequest.of(0, 50));
+
+    // Then — only the material row matches (the item row's name does not contain the fragment)
+    assertThat(releasable).extracting(InventoryItem::getId).containsExactly(materialRow.getId());
+  }
+
   // covers REQ-INV-029/031 (Materialsammlung stays material-only; item earmarks get their own seam)
   @Test
   void jobOrderRowSeams_splitEarmarksByCatalog() {

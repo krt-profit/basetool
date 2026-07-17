@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -236,7 +237,9 @@ class HangarPageControllerMvcTest {
     PageResponse<SquadronShipOverviewDto> page =
         new PageResponse<>(List.of(), 0, 50, 12, 1, List.of());
     when(backendApiClient.get(
-            eq("/api/v1/hangar/squadron-overview?page=0&size=50&search=Cutlass"), anyTypeRef()))
+            eq("/api/v1/hangar/squadron-overview?page=0&size=50&search={search}"),
+            anyTypeRef(),
+            eq("Cutlass")))
         .thenReturn(page);
 
     mockMvc
@@ -248,5 +251,30 @@ class HangarPageControllerMvcTest {
                 .string(containsString("/hangar/squadron?search=Cutlass&amp;page=0&amp;size=10")))
         // the clear-filter link drops the search but keeps the page size
         .andExpect(content().string(containsString("href=\"/hangar/squadron?size=50\"")));
+  }
+
+  // #1344 regression: a multi-word ship search must reach the backend single-encoded (the real
+  // spaces), not double-encoded (%2520). The term rides as a URI variable ({search}) and is
+  // verified to be forwarded verbatim, so "Cutlass Black" filters the squadron overview again.
+  @Test
+  @WithMockUser
+  void viewSquadron_passesMultiWordSearchAsUriVariable() throws Exception {
+    PageResponse<SquadronShipOverviewDto> page =
+        new PageResponse<>(List.of(), 0, 50, 0, 1, List.of());
+    when(backendApiClient.get(
+            eq("/api/v1/hangar/squadron-overview?page=0&size=50&search={search}"),
+            anyTypeRef(),
+            eq("Cutlass Black")))
+        .thenReturn(page);
+
+    mockMvc
+        .perform(get("/hangar/squadron").param("search", "Cutlass Black"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient)
+        .get(
+            eq("/api/v1/hangar/squadron-overview?page=0&size=50&search={search}"),
+            anyTypeRef(),
+            eq("Cutlass Black"));
   }
 }

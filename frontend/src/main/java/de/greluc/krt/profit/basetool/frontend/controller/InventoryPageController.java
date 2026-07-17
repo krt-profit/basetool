@@ -448,17 +448,21 @@ public class InventoryPageController {
   @org.springframework.web.bind.annotation.ResponseBody
   public List<de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto>
       itemSearch(@RequestParam(required = false) String q) {
-    // Build the URI via UriComponentsBuilder so a crafted `&` in the term cannot inject extra
-    // query parameters — the same L-1 hardening as UserProxyController.forwardSearch.
+    // Build the URI with only the fixed (safe) paging params via UriComponentsBuilder so a crafted
+    // `&` in the term cannot inject extra query parameters (the L-1 hardening), and pass the
+    // free-text `q` as a WebClient URI-template variable ({q}) so it is percent-encoded exactly
+    // once across the frontend->backend hop. Baking the pre-encoded toUriString() value into
+    // get(String) would let the WebClient encode it a second time (space -> %2520), so a multi-word
+    // item search reached the backend mangled and matched nothing (the #371 re-encoding trap). A
+    // null/blank term is normalised to the empty match-all filter.
     String uri =
         org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/inventory/item-catalog")
-            .queryParam("q", q == null ? "" : q)
             .queryParam("size", 50)
             .queryParam("sort", "name,asc")
             .toUriString();
     try {
       PageResponse<de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto>
-          page = backendApiClient.get(uri, GAME_ITEM_REFERENCE_PAGE);
+          page = backendApiClient.get(uri + "&q={q}", GAME_ITEM_REFERENCE_PAGE, q == null ? "" : q);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception e) {
       log.error("Failed to search bookable game items", e);

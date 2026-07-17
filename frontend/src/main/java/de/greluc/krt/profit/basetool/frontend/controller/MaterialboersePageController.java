@@ -34,6 +34,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -184,10 +185,9 @@ public class MaterialboersePageController {
     UriComponentsBuilder uri =
         UriComponentsBuilder.fromPath("/api/v1/blueprints/products/search")
             .queryParam("limit", PRODUCT_PICKER_LIMIT);
-    appendIfPresent(uri, "q", q);
     return proxy(
         "Load Materialbörse offerable products failed",
-        () -> backendApiClient.get(uri.toUriString(), PRODUCT_LIST));
+        () -> backendGetWithQuery(uri, q, PRODUCT_LIST));
   }
 
   /**
@@ -286,10 +286,9 @@ public class MaterialboersePageController {
   public ResponseEntity<Object> releasableItems(@RequestParam(required = false) String q) {
     UriComponentsBuilder uri =
         UriComponentsBuilder.fromPath("/api/v1/material-exchange/releasable-items");
-    appendIfPresent(uri, "q", q);
     return proxy(
         "Load Materialbörse releasable items failed",
-        () -> backendApiClient.get(uri.toUriString(), RELEASABLE_LIST));
+        () -> backendGetWithQuery(uri, q, RELEASABLE_LIST));
   }
 
   /**
@@ -308,13 +307,11 @@ public class MaterialboersePageController {
         UriComponentsBuilder.fromPath("/api/v1/material-exchange/offers")
             .queryParam("tab", tab)
             .queryParam("size", BOARD_SIZE);
-    appendIfPresent(uri, "q", q);
     appendIfPresent(uri, "minQuality", minQuality);
     appendIfPresent(uri, "minAmount", minAmount);
     appendIfPresent(uri, "sort", sort);
     try {
-      PageResponse<MaterialExchangeOfferDto> page =
-          backendApiClient.get(uri.toUriString(), OFFERS_PAGE);
+      PageResponse<MaterialExchangeOfferDto> page = backendGetWithQuery(uri, q, OFFERS_PAGE);
       return page == null ? List.of() : page.content();
     } catch (BackendServiceException e) {
       log.debug("Failed to load Materialbörse board", e);
@@ -380,6 +377,39 @@ public class MaterialboersePageController {
       return requested;
     }
     return offers.isEmpty() ? null : offers.get(0).id().toString();
+  }
+
+  /**
+   * Runs an authenticated backend GET whose query string carries an optional free-text {@code q}
+   * fragment, encoding {@code q} <em>exactly once</em> across the frontend&rarr;backend hop. The
+   * caller pre-sets every non-free-text (safe) parameter on {@code uri}; this method appends the
+   * {@code q} fragment as a WebClient URI-template variable ({@code q={q}}) rather than into the
+   * pre-encoded {@link UriComponentsBuilder#toUriString()} output.
+   *
+   * <p>The distinction matters because {@code toUriString()} already percent-encodes its query
+   * values and the WebClient then encodes the resulting string a second time: a space in a
+   * multi-word term becomes {@code %2520} instead of {@code %20}, so the backend
+   * {@code @RequestParam} decodes a literal {@code %20}-laden string that matches nothing (the
+   * {@code MaterialboardItemStockOfferE2eTest} "E2E Boerse Item Stock Widget" release-picker search
+   * returned zero rows). Passing {@code q} as a URI variable lets the WebClient encode it once, per
+   * RFC 3986 — the #371 frontend&rarr;backend re-encoding contract (REQ-MARKET-002/014).
+   *
+   * @param uri the pre-built URI (path plus every safe, non-free-text query parameter).
+   * @param q the free-text search fragment, or {@code null}/blank for no filter.
+   * @param responseType the decoded response type.
+   * @param <T> the response body type.
+   * @return the decoded backend response.
+   */
+  private <T> T backendGetWithQuery(
+      @NotNull UriComponentsBuilder uri,
+      @Nullable String q,
+      @NotNull ParameterizedTypeReference<T> responseType) {
+    String base = uri.toUriString();
+    if (q == null || q.isBlank()) {
+      return backendApiClient.get(base, responseType);
+    }
+    String separator = base.indexOf('?') >= 0 ? "&" : "?";
+    return backendApiClient.get(base + separator + "q={q}", responseType, q);
   }
 
   /**

@@ -138,28 +138,57 @@ class BankProxyControllerTest {
   void searchAccounts_ShouldForwardActiveNameSortedSearch_andUnwrapContent() {
     // Given a matching account page from the backend
     Map<String, Object> row = Map.of("id", "acc-1", "accountNo", "KB-0001", "name", "Phoenix");
-    when(backendApiClient.get(org.mockito.ArgumentMatchers.anyString(), anyTypeRef()))
+    when(backendApiClient.get(
+            org.mockito.ArgumentMatchers.anyString(),
+            anyTypeRef(),
+            org.mockito.ArgumentMatchers.<Object>any()))
         .thenReturn(new PageResponse<>(List.of(row), 0, 50, 1, 1, List.of()));
 
     // When
     List<Map<String, Object>> result = controller.searchAccounts("pho");
 
-    // Then — the content is unwrapped, and the forwarded URI carries the picker's fixed filters
+    // Then — the content is unwrapped, the URI carries the picker's fixed filters plus the query as
+    // a single-encoded URI-template variable, and the raw term is forwarded verbatim.
     assertEquals(1, result.size());
     assertEquals("KB-0001", result.get(0).get("accountNo"));
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef());
+    ArgumentCaptor<Object> varCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), varCaptor.capture());
     String uri = uriCaptor.getValue();
     assertTrue(uri.startsWith("/api/v1/bank/accounts"), "forwards to the account list endpoint");
-    assertTrue(uri.contains("query=pho"), "forwards the typed query");
+    assertTrue(uri.contains("query={query}"), "the query rides as a single-encoded URI variable");
     assertTrue(uri.contains("status=ACTIVE"), "the picker searches active accounts only");
     assertTrue(uri.contains("sort=name,asc"), "results are name-sorted");
+    assertEquals("pho", varCaptor.getValue(), "the raw query value is forwarded verbatim");
+  }
+
+  // #1344 regression: a multi-word account/name query must reach the backend single-encoded (the
+  // real spaces), not double-encoded (%2520). Verify the raw value is forwarded as the URI
+  // variable.
+  @Test
+  void searchAccounts_passesMultiWordQueryAsUriVariable() {
+    when(backendApiClient.get(
+            eq("/api/v1/bank/accounts?status=ACTIVE&size=50&sort=name,asc&query={query}"),
+            anyTypeRef(),
+            eq("Phoenix Reserve")))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+
+    controller.searchAccounts("Phoenix Reserve");
+
+    verify(backendApiClient)
+        .get(
+            eq("/api/v1/bank/accounts?status=ACTIVE&size=50&sort=name,asc&query={query}"),
+            anyTypeRef(),
+            eq("Phoenix Reserve"));
   }
 
   @Test
   void searchAccounts_NullQuery_matchesAll_andEmptyResponseDegradesToEmptyList() {
     // Given a null (browse-mode) query and a null backend response
-    when(backendApiClient.get(org.mockito.ArgumentMatchers.anyString(), anyTypeRef()))
+    when(backendApiClient.get(
+            org.mockito.ArgumentMatchers.anyString(),
+            anyTypeRef(),
+            org.mockito.ArgumentMatchers.<Object>any()))
         .thenReturn(null);
 
     // When
@@ -169,8 +198,10 @@ class BankProxyControllerTest {
     // to an empty list (the picker shows "no matches", never throws).
     assertEquals(List.of(), result);
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef());
-    assertTrue(uriCaptor.getValue().contains("query="), "the null query is forwarded as empty");
+    ArgumentCaptor<Object> varCaptor = ArgumentCaptor.forClass(Object.class);
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), varCaptor.capture());
+    assertTrue(uriCaptor.getValue().contains("query={query}"), "the query rides as a URI variable");
+    assertEquals("", varCaptor.getValue(), "the null query is normalised to the empty filter");
   }
 
   @Test
