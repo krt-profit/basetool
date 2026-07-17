@@ -388,7 +388,13 @@ public class AdminPersonalBlueprintsPageController {
               .append(PAGE_SIZE)
               .append("&sort=productName,asc");
       if (q != null && !q.isBlank()) {
-        uri.append("&q=").append(enc(q));
+        // Free-text term as a WebClient URI-template variable so it is percent-encoded exactly once
+        // across the frontend->backend hop (REQ-FE-016); enc(...) form-encoding (space -> '+')
+        // double-encodes umlauts / reserved chars when WebClient's TEMPLATE_AND_VALUES mode
+        // re-encodes the '%', yielding zero matches. The enc(...) wrapper is why this site was
+        // missed by the URLEncoder.encode( sweep in PR #1347.
+        uri.append("&q={q}");
+        return backendApiClient.get(uri.toString(), PERSONAL_BLUEPRINT_PAGE_TYPE, q);
       }
       return backendApiClient.get(uri.toString(), PERSONAL_BLUEPRINT_PAGE_TYPE);
     } catch (Exception e) {
