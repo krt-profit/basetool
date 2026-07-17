@@ -101,12 +101,12 @@ public class AdminDefaultBlueprintsPageController {
     try {
       String query = q == null ? "" : q;
       int effectiveLimit = limit == null ? 25 : Math.min(200, Math.max(1, limit));
-      String uri =
-          "/api/v1/blueprints/products/search?q="
-              + URLEncoder.encode(query, StandardCharsets.UTF_8)
-              + "&limit="
-              + effectiveLimit;
-      List<BlueprintProductDto> result = backendApiClient.get(uri, BLUEPRINT_PRODUCT_LIST_TYPE);
+      // Pass the free-text term as a WebClient URI-template variable so it is percent-encoded
+      // exactly once across the frontend->backend hop; URLEncoder form-encoding (space -> '+')
+      // double-encodes umlauts / reserved chars when re-encoded on the hop, yielding zero matches.
+      String uri = "/api/v1/blueprints/products/search?q={q}&limit=" + effectiveLimit;
+      List<BlueprintProductDto> result =
+          backendApiClient.get(uri, BLUEPRINT_PRODUCT_LIST_TYPE, query);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
       log.warn("Default-blueprint product type-ahead failed for query='{}': {}", q, e.getMessage());

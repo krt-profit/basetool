@@ -20,8 +20,6 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -30,13 +28,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,12 +44,14 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level test for {@link PersonalInventoryPageController}: verifies that the user-area personal
- * inventory page renders for an authenticated user with model attributes filled from the (mocked)
- * backend.
+ * MVC-level test for {@link AdminDefaultBlueprintsPageController}'s type-ahead search proxy. Pins
+ * the frontend-proxy double-encoding fix: the free-text term must reach the backend as a WebClient
+ * URI-template variable (encoded exactly once), never {@code URLEncoder}-encoded into the URI
+ * string (which the frontend&rarr;backend hop re-encodes, mangling spaces and umlauts to a
+ * zero-match).
  */
 @SpringBootTest
-class PersonalInventoryPageControllerMvcTest {
+class AdminDefaultBlueprintsPageControllerMvcTest {
 
   private MockMvc mockMvc;
 
@@ -73,76 +68,38 @@ class PersonalInventoryPageControllerMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
+  // Regression guard for the frontend-proxy double-encoding sub-class: the default-blueprint
+  // typeahead must forward a multi-word free-text term as a WebClient URI-template variable ({q}),
+  // not URLEncoder it into the URI string, so the backend @RequestParam decodes the exact typed
+  // term. URLEncoder form-encoding (space -> '+') double-encodes across the frontend->backend hop
+  // and yields zero matches.
   @Test
-  @WithMockUser
-  void view_shouldRenderPersonalInventoryView_whenAuthenticated() throws Exception {
-    // Given
-    PageResponse<PersonalInventoryItemDto> empty =
-        new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
-
-    // When & Then
-    mockMvc
-        .perform(get("/personal-inventory"))
-        .andExpect(status().isOk())
-        .andExpect(view().name("personal-inventory"))
-        .andExpect(model().attributeExists("personalInventoryForm"))
-        .andExpect(model().attributeExists("items"));
-  }
-
-  // covers REQ-FE-002 — an AJAX filter swap (fragment=results) renders only the item-list fragment:
-  // the total marker is present, but the swap-target wrapper, the filter form and the modals (all
-  // outside the fragment) are not.
-  @Test
-  @WithMockUser
-  void view_fragmentResults_rendersOnlyResultsFragment() throws Exception {
-    PageResponse<PersonalInventoryItemDto> empty =
-        new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
-
-    mockMvc
-        .perform(get("/personal-inventory").param("fragment", "results"))
-        .andExpect(status().isOk())
-        .andExpect(view().name("personal-inventory :: results"))
-        .andExpect(content().string(containsString("id=\"pi-total-meta\"")))
-        .andExpect(content().string(containsString("empty-state")))
-        .andExpect(content().string(not(containsString("id=\"pi-results\""))))
-        .andExpect(content().string(not(containsString("krt-pi-filter"))))
-        .andExpect(content().string(not(containsString("id=\"krt-pi-modal\""))));
-  }
-
-  // Regression guard for the frontend-proxy double-encoding sub-class: the UEX typeahead must
-  // forward a multi-word free-text term as a WebClient URI-template variable ({q}), not URLEncoder
-  // it into the URI string, so the backend @RequestParam decodes the exact typed term. URLEncoder
-  // form-encoding (space -> '+') double-encodes across the frontend->backend hop and yields zero
-  // matches.
-  @Test
-  @WithMockUser
-  void uexSearch_passesMultiWordQueryAsUriVariable() throws Exception {
+  @WithMockUser(roles = "ADMIN")
+  void search_passesMultiWordQueryAsUriVariable() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(List.of());
 
     mockMvc
-        .perform(get("/personal-inventory/uex-search").param("q", "Port Olisar"))
+        .perform(get("/admin/default-blueprints/search").param("q", "Arclight Pistol"))
         .andExpect(status().isOk());
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
     ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
     verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
     assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
-    assertEquals("Port Olisar", qCaptor.getValue());
+    assertEquals("Arclight Pistol", qCaptor.getValue());
   }
 
-  // Same guard with an umlaut term: "Müller Hütte" encodes to M%C3%BC… under URLEncoder, which the
-  // hop would re-encode to a literal zero-match. As a URI variable the raw term reaches the
+  // Same guard with an umlaut term: "Müller Röhre" encodes to M%C3%BCller… under URLEncoder, which
+  // the hop would re-encode to a literal zero-match. As a URI variable the raw term reaches the
   // backend.
   @Test
-  @WithMockUser
-  void uexSearch_passesUmlautQueryAsUriVariable_notFormEncoded() throws Exception {
+  @WithMockUser(roles = "ADMIN")
+  void search_passesUmlautQueryAsUriVariable_notFormEncoded() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(List.of());
 
-    String term = "Müller Hütte";
+    String term = "Müller Röhre";
     mockMvc
-        .perform(get("/personal-inventory/uex-search").param("q", term))
+        .perform(get("/admin/default-blueprints/search").param("q", term))
         .andExpect(status().isOk());
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
