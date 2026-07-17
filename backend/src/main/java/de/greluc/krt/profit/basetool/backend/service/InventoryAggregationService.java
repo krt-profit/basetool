@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
+import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
@@ -938,7 +939,7 @@ public class InventoryAggregationService {
     // getId() on the lazy GameItem proxy resolves from the FK without initialising it, so this
     // walk issues no per-line catalogue queries; the set is empty for MATERIAL orders.
     java.util.Map<UUID, int[]> lineTotals = new java.util.HashMap<>();
-    for (de.greluc.krt.profit.basetool.backend.model.JobOrderItem line : jobOrder.getItems()) {
+    for (JobOrderItem line : jobOrder.getItems()) {
       if (line.getGameItem() == null) {
         continue;
       }

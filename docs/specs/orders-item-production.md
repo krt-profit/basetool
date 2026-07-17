@@ -343,7 +343,8 @@ redaction). An order with no earmarked item stock renders an empty-state message
 (`getItemStockForJobOrder` grouping / slice / delivered / orphan context / 404),
 `JobOrderItemDetailRenderTest` (panel + empty state + fragment swap + MATERIAL-order absence),
 `LiveSyncSectionMapParityTest`, `JobOrderProductionE2eTest` (panel populated after a booked
-production with auto-earmark) · **Code:** `JobOrderItemStockController`,
+production with auto-earmark, then the delivered toggle flipped and its marker persisted)
+· **Code:** `JobOrderItemStockController`,
 `InventoryAggregationService.getItemStockForJobOrder`, `JobOrderItemStockGroupDto` /
 `JobOrderItemStockEntryDto`, `JobOrderPageController.viewOrderDetail` (`itemStockSection`
 dispatch), `orders-detail.html` (`itemStockSection` fragment), `orders-detail.js`

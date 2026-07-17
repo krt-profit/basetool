@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.ItemDerivationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
@@ -130,8 +131,7 @@ public class JobOrderPageController {
    * /api/v1/orders/{id}/item-stock}, REQ-ORDERS-028) — the game-item stock earmarked to the order,
    * grouped per game item.
    */
-  private static final ParameterizedTypeReference<
-          List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto>>
+  private static final ParameterizedTypeReference<List<JobOrderItemStockGroupDto>>
       LIST_OF_ITEM_STOCK_GROUP = new ParameterizedTypeReference<>() {};
 
   /**

@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
@@ -1172,13 +1173,11 @@ public class InventoryItemService {
    * InventoryAggregationService#getItemStockForJobOrder}.
    *
    * @param jobOrderId the UUID of the job order
-   * @return name-sorted list of {@link
-   *     de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto}; empty when no
-   *     game-item stock is earmarked to the order
+   * @return name-sorted list of {@link JobOrderItemStockGroupDto}; empty when no game-item stock is
+   *     earmarked to the order
    * @throws NotFoundException when the job order is unknown
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto>
-      getItemStockForJobOrder(UUID jobOrderId) {
+  public List<JobOrderItemStockGroupDto> getItemStockForJobOrder(UUID jobOrderId) {
     return inventoryAggregationService.getItemStockForJobOrder(jobOrderId);
   }
 
