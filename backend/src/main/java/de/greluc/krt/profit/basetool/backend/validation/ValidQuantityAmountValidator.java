@@ -52,8 +52,36 @@ public class ValidQuantityAmountValidator
 
   @Override
   public boolean isValid(QuantityAware dto, ConstraintValidatorContext context) {
-    if (dto == null || dto.materialId() == null || dto.amount() == null) {
+    if (dto == null || dto.amount() == null) {
       return true; // Let @NotNull handle these
+    }
+
+    // Game-item payloads (REQ-INV-029): unconditionally positive whole units, no catalog lookup
+    // needed. Checked BEFORE the materialId null-guard — with materialId optional since V220, a
+    // gameItemId-only payload would otherwise skip ALL amount validation (the silent hole the
+    // item-inventory design flagged).
+    if (dto.gameItemId() != null) {
+      if (dto.amount() <= 0) {
+        context.disableDefaultConstraintViolation();
+        context
+            .buildConstraintViolationWithTemplate("{error.validation.quantity_must_be_positive}")
+            .addPropertyNode("amount")
+            .addConstraintViolation();
+        return false;
+      }
+      if (dto.amount() % 1 != 0) {
+        context.disableDefaultConstraintViolation();
+        context
+            .buildConstraintViolationWithTemplate("{error.validation.quantity_must_be_integer}")
+            .addPropertyNode("amount")
+            .addConstraintViolation();
+        return false;
+      }
+      return true;
+    }
+
+    if (dto.materialId() == null) {
+      return true; // Let @NotNull / the catalog-XOR validation handle these
     }
 
     if (dto.amount() <= 0) {

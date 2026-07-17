@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -28,7 +30,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.config.CapabilityFlagsAdvice;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -98,6 +102,29 @@ class OrderHierarchyVisibilityTest {
             eq("/api/v1/users/me"),
             eq(de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class)))
         .thenReturn(null);
+    // REQ-FE-016: the job-order material catalog stays a server-side model attribute (it gates
+    // the edit modal's per-row seed option), but the page must not dump it as preloaded
+    // <option>s — the order has no material lines, so no catalog name may render at all.
+    MaterialDto distinctMaterial =
+        new MaterialDto(
+            UUID.randomUUID(),
+            "Quantainium-Distinct",
+            null,
+            "SCU",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            Boolean.TRUE,
+            null,
+            Boolean.TRUE,
+            0L);
+    when(backendApiClient.getCached(
+            eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef(), anyBoolean()))
+        .thenReturn(java.util.List.of(distinctMaterial));
 
     java.util.Map<String, Object> claims = new java.util.HashMap<>();
     claims.put(
@@ -130,6 +157,21 @@ class OrderHierarchyVisibilityTest {
             content()
                 .string(
                     org.hamcrest.Matchers.containsString(
-                        "Bearbeiten"))); // The edit button for LOGISTICIAN
+                        "Bearbeiten"))) // The edit button for LOGISTICIAN
+        // REQ-FE-016: the edit modal's material picker (live rows AND the inert
+        // #edit-material-row-template new rows are cloned from) opts into the
+        // server-side-search combobox enhancement via the remote-materials-joborder source key.
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.containsString(
+                        "data-role=\"material-select\""
+                            + " data-krt-combobox=\"remote-materials-joborder\"")))
+        // ... and the catalog is no longer dumped into the page as a preloaded option list.
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Quantainium-Distinct"))));
   }
 }

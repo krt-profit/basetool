@@ -308,12 +308,16 @@ public class JobOrderStockProjectionService {
   }
 
   /**
-   * Loads every job-order-linked inventory row for the given orders in one query and indexes it by
-   * order id then material id, so the paged list can sum each material bucket at its own quality
-   * floor in memory (REQ-DATA-003) instead of firing a {@code SUM} aggregate per bucket per order.
+   * Loads every job-order-linked <em>material</em> inventory row for the given orders in one query
+   * and indexes it by order id then material id, so the paged list can sum each material bucket at
+   * its own quality floor in memory (REQ-DATA-003) instead of firing a {@code SUM} aggregate per
+   * bucket per order. Game-item earmarks (V220, REQ-INV-029 — created by the production
+   * auto-earmark) are excluded in-query by {@code findMaterialStockRowsByJobOrderIds}; without that
+   * guard they would surface here as {@code materialId = null} rows and NPE the {@code groupingBy}
+   * below, 500ing the paged order list.
    *
    * @param orderIds the orders whose linked stock to index; empty yields an empty index.
-   * @return order id → material id → the linked inventory rows, never {@code null}.
+   * @return order id → material id → the linked material inventory rows, never {@code null}.
    */
   private Map<UUID, Map<UUID, List<JobOrderMaterialStockRow>>> loadStockIndex(
       Collection<UUID> orderIds) {

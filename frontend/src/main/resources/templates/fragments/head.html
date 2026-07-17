@@ -163,9 +163,19 @@
     -->
     <script th:src="@{/js/krt-user-search.js}" th:attr="nonce=${cspNonce}"></script>
     <!--
+      Shared server-side catalog-search sources for the combobox (REQ-FE-016): registers the
+      `remote-materials*` / `remote-locations` / `remote-game-items` remoteSource functions so
+      the material/location/bookable-item pickers fetch matching entries on demand instead of
+      preloading the catalog. Must load BEFORE the enhancer below so the registry exists when a
+      marked picker is upgraded. No `defer` for the same reason. (Comment wording note: several
+      MockMvc tests assert a member page does NOT contain the book-in action's literal German
+      label, and this fragment renders on every page — keep such labels out of this comment.)
+    -->
+    <script th:src="@{/js/krt-catalog-search.js}" th:attr="nonce=${cspNonce}"></script>
+    <!--
       Shared server-side bank-account-search source for the combobox (REQ-FE-017, ADR-0104).
       Registers the `remote-bank-accounts` remoteSource on window.krtComboboxRemoteSources; must load
-      BEFORE the enhancer below (same reason as the user-search sources). No `defer`.
+      BEFORE the enhancer below (same reason as the user-search / catalog sources). No `defer`.
     -->
     <script th:src="@{/js/krt-bank-account-search.js}" th:attr="nonce=${cspNonce}"></script>
     <!--

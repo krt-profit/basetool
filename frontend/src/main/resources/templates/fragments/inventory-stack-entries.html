@@ -31,6 +31,10 @@
          present as its own indented .tree-note row. All data-* hooks (bulk select, version
          sync, book-out, note) are preserved verbatim. -->
     <th:block th:each="entry : ${entries}">
+        <!-- Catalog-discriminated leaf rows (REQ-INV-029/030): a material entry renders the
+             historical quality/mission-carrying row, a game-item entry the quality-less,
+             whole-unit item row further below. -->
+        <th:block th:if="${entry.gameItem == null}">
         <div class="tree-row tree-row--leaf" th:data-item-id="${entry.id}">
             <div class="tree-leaf-main">
                 <input type="checkbox" class="item-checkbox inventory-item-checkbox"
@@ -204,6 +208,7 @@
                         th:data-quantity-type="${entry.material.quantityType}"
                         th:data-user-id="${entry.user.id}"
                         th:data-location-id="${entry.location.id}"
+                        th:data-location-name="${entry.location.name}"
                         th:data-personal="${entry.personal}"
                         th:data-has-assoc="${!#lists.isEmpty(entry.jobOrderAllocations) or !#lists.isEmpty(entry.missionAllocations)}"
                         th:data-owning-org-unit-id="${entry.owningSquadron != null ? entry.owningSquadron.id : null}"
@@ -230,6 +235,132 @@
                 <span class="tree-note-text inventory-note-text" th:text="${entry.note}">Notiz</span>
             </div>
         </div>
+        </th:block>
+        <!-- Game-item leaf row (REQ-INV-030/031): no quality cell, no mission split, whole
+             amounts (items are PIECE-like units), no Materialbörse toggle (item offers are a
+             later phase, design §8). The Auftrag split offers only ITEM orders that request this
+             gameItem (requiredGameItemIds — the REQ-ORDERS-018 sibling gate). Action buttons
+             carry a PIECE quantity type and no material id, so the shared modals use
+             whole-number steps and keep SELL disabled (no terminal market data for items). -->
+        <th:block th:if="${entry.gameItem != null}">
+        <div class="tree-row tree-row--leaf" th:data-item-id="${entry.id}">
+            <div class="tree-leaf-main">
+                <input type="checkbox" class="item-checkbox inventory-item-checkbox"
+                       th:data-id="${entry.id}"
+                       th:data-game-item-id="${entry.gameItem.id}"
+                       data-trigger="inv-my-update-bulk-state">
+                <div class="tree-fieldset">
+                    <div class="tree-field">
+                        <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
+                        <div class="assoc-split"
+                             th:data-entry-id="${entry.id}"
+                             data-assoc-field="JOB_ORDER"
+                             th:data-amount="${entry.amount}"
+                             th:data-version="${entry.version}"
+                             data-piece="true">
+                            <span th:each="a : ${entry.jobOrderAllocations}"
+                                  class="assoc-chip assoc-chip--order"
+                                  role="button" tabindex="0"
+                                  data-trigger="inv-my-assoc-edit"
+                                  data-assoc-chip="jobOrder"
+                                  th:data-target-id="${a.jobOrderId}"
+                                  th:data-amount="${a.amount}"
+                                  th:title="#{inventory.assoc.amount}">
+                                <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
+                                <span class="assoc-chip__amt"
+                                      th:text="${#numbers.formatInteger(a.amount, 1, 'NONE')}">1</span>
+                            </span>
+                            <span class="assoc-add-wrap">
+                                <button type="button" class="assoc-add"
+                                        data-trigger="inv-my-assoc-add-open"
+                                        th:aria-label="#{inventory.assoc.add.order}"
+                                        th:text="#{inventory.assoc.add}">+ Zuordnen</button>
+                                <div class="assoc-pop krtm-hidden" data-assoc-pop>
+                                    <div data-assoc-pop-pick>
+                                        <select data-krt-combobox
+                                                data-trigger="inv-my-assoc-pick"
+                                                th:data-combobox-placeholder="#{inventory.assoc.add.order}">
+                                            <option value=""></option>
+                                            <option th:each="order : ${jobOrders}"
+                                                    th:if="${order.requiredGameItemIds != null and #lists.contains(order.requiredGameItemIds, entry.gameItem.id) and not #lists.contains(entry.jobOrderAllocations.![jobOrderId], order.id)}"
+                                                    th:value="${order.id}"
+                                                    th:text="'#' + ${order.displayId}"></option>
+                                        </select>
+                                    </div>
+                                    <div class="assoc-pop__menge krtm-hidden" data-assoc-pop-amount>
+                                        <label th:text="#{inventory.assoc.amount}">Menge</label>
+                                        <div class="assoc-menge-row">
+                                            <input type="number" min="0" step="1"
+                                                   class="assoc-menge-input" data-assoc-amount-input
+                                                   th:aria-label="#{inventory.assoc.amount}"/>
+                                            <button type="button" class="btn btn-primary btn-xs"
+                                                    data-trigger="inv-my-assoc-save"
+                                                    th:text="#{general.save}">Speichern</button>
+                                            <button type="button" class="btn btn-quiet-danger btn-xs krtm-hidden"
+                                                    data-trigger="inv-my-assoc-remove"
+                                                    th:text="#{inventory.assoc.remove}">Entfernen</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </span>
+                            <span class="chip" data-assoc-rest
+                                  th:classappend="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? 'chip--success' : (${entry.jobOrderRest &lt; 0} ? 'chip--danger' : 'chip--muted')"
+                                  th:text="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.jobOrderRest &lt; 0} ? #{inventory.assoc.rest.over(${#numbers.formatInteger(-entry.jobOrderRest, 1, 'NONE')})} : #{inventory.assoc.rest.free(${#numbers.formatInteger(entry.jobOrderRest, 1, 'NONE')})})">Rest 0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="tree-cell tree-cell--num tree-amount">
+                <span><span th:text="${entry.amount != null ? #numbers.formatInteger(entry.amount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
+            </div>
+            <div class="tree-cell tree-cell--actions">
+                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                        th:data-id="${entry.id}"
+                        th:data-amount="${entry.amount}"
+                        th:data-version="${entry.version}"
+                        th:data-game-item-id="${entry.gameItem.id}"
+                        data-quantity-type="PIECE"
+                        th:data-user-id="${entry.user.id}"
+                        th:data-location-id="${entry.location.id}"
+                        data-trigger="inv-my-bookout"
+                        th:title="#{inventory.bookout.btn}" th:aria-label="#{inventory.bookout.btn}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bookout"/></svg>
+                </button>
+                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                        th:data-id="${entry.id}"
+                        th:data-amount="${entry.amount}"
+                        th:data-version="${entry.version}"
+                        th:data-game-item-id="${entry.gameItem.id}"
+                        data-quantity-type="PIECE"
+                        th:data-user-id="${entry.user.id}"
+                        th:data-location-id="${entry.location.id}"
+                        th:data-personal="${entry.personal}"
+                        th:data-has-assoc="${!#lists.isEmpty(entry.jobOrderAllocations)}"
+                        th:data-owning-org-unit-id="${entry.owningSquadron != null ? entry.owningSquadron.id : null}"
+                        data-trigger="inv-my-umbuchen"
+                        th:title="#{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>
+                </button>
+                <button type="button" class="btn btn-xs btn-icon inventory-note-btn"
+                        th:classappend="${entry.note != null and !#strings.isEmpty(entry.note)} ? 'btn-outline has-note' : 'btn-ghost'"
+                        th:data-id="${entry.id}"
+                        th:data-version="${entry.version}"
+                        th:data-note="${entry.note}"
+                        data-trigger="inv-my-open-note"
+                        th:title="${entry.note != null and !#strings.isEmpty(entry.note)} ? ${entry.note} : #{inventory.note.add}"
+                        th:aria-label="${entry.note != null and !#strings.isEmpty(entry.note)} ? #{inventory.note.edit} : #{inventory.note.add}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="tree-note" th:if="${entry.note != null and !#strings.isEmpty(entry.note)}"
+             th:attr="data-note-for=${entry.id}" th:title="${entry.note}" th:aria-label="#{inventory.note.label}">
+            <div class="tree-note-box">
+                <span class="tree-note-label" th:text="#{inventory.note.label}">Notiz</span>
+                <span class="tree-note-text inventory-note-text" th:text="${entry.note}">Notiz</span>
+            </div>
+        </div>
+        </th:block>
     </th:block>
     <div class="tree-row" th:if="${#lists.isEmpty(entries)}">
         <div class="tree-cell text-muted krtm-grid-column-1-1-padding-left-3rem-2793" th:text="#{inventory.stack.entries.empty}">Keine Einträge vorhanden.</div>
@@ -262,6 +393,10 @@
          and a note renders only when present as its own indented .tree-note row. All data-* hooks
          (book-out, note, inv-admin-assoc-*) are preserved. -->
     <th:block th:each="entry : ${entries}">
+        <!-- Catalog-discriminated leaf rows (REQ-INV-029/030): a material entry renders the
+             historical quality/mission-carrying row, a game-item entry the quality-less,
+             whole-unit item row further below. -->
+        <th:block th:if="${entry.gameItem == null}">
         <div class="tree-row tree-row--leaf" th:data-item-id="${entry.id}">
             <div class="tree-leaf-main">
                 <div class="tree-fieldset">
@@ -438,6 +573,139 @@
                         th:data-material-id="${entry.material.id}"
                         th:data-quantity-type="${entry.material.quantityType}"
                         th:data-user-id="${entry.user.id}"
+                        th:data-user-name="${entry.user.effectiveName}"
+                        th:data-location-id="${entry.location.id}"
+                        th:data-location-name="${entry.location.name}"
+                        th:data-owning-org-unit-id="${entry.owningSquadron != null ? entry.owningSquadron.id : null}"
+                        data-trigger="inv-admin-umbuchen"
+                        th:title="#{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>
+                </button>
+                <button type="button" class="btn btn-xs btn-icon inventory-note-btn"
+                        th:classappend="${entry.note != null and !#strings.isEmpty(entry.note)} ? 'btn-outline has-note' : 'btn-ghost'"
+                        th:data-id="${entry.id}"
+                        th:data-version="${entry.version}"
+                        th:data-note="${entry.note}"
+                        data-trigger="inv-admin-open-note"
+                        th:title="${entry.note != null and !#strings.isEmpty(entry.note)} ? ${entry.note} : #{inventory.note.add}"
+                        th:aria-label="${entry.note != null and !#strings.isEmpty(entry.note)} ? #{inventory.note.edit} : #{inventory.note.add}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="tree-note" th:if="${entry.note != null and !#strings.isEmpty(entry.note)}"
+             th:attr="data-note-for=${entry.id}" th:title="${entry.note}" th:aria-label="#{inventory.note.label}">
+            <div class="tree-note-box">
+                <span class="tree-note-label" th:text="#{inventory.note.label}">Notiz</span>
+                <span class="tree-note-text inventory-note-text" th:text="${entry.note}">Notiz</span>
+            </div>
+        </div>
+        </th:block>
+        <!-- Game-item leaf row (REQ-INV-030/031): no quality cell, no mission split, whole
+             amounts, no Materialbörse toggle (item offers are a later phase, design §8). The
+             Auftrag split offers only ITEM orders that request this gameItem
+             (requiredGameItemIds); chips stay read-only for non-association roles. Action
+             buttons carry a PIECE quantity type and no material id, so the shared
+             modals use whole-number steps and keep SELL disabled. -->
+        <th:block th:if="${entry.gameItem != null}">
+        <div class="tree-row tree-row--leaf" th:data-item-id="${entry.id}">
+            <div class="tree-leaf-main">
+                <div class="tree-fieldset">
+                    <div class="tree-field">
+                        <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
+                        <div class="assoc-split"
+                             th:data-entry-id="${entry.id}"
+                             data-assoc-field="JOB_ORDER"
+                             th:data-amount="${entry.amount}"
+                             th:data-version="${entry.version}"
+                             data-piece="true">
+                            <!-- Editable chips + add popover for association-capable roles. -->
+                            <th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                                <span th:each="a : ${entry.jobOrderAllocations}"
+                                      class="assoc-chip assoc-chip--order"
+                                      role="button" tabindex="0"
+                                      data-trigger="inv-admin-assoc-edit"
+                                      data-assoc-chip="jobOrder"
+                                      th:data-target-id="${a.jobOrderId}"
+                                      th:data-amount="${a.amount}"
+                                      th:title="#{inventory.assoc.amount}">
+                                    <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
+                                    <span class="assoc-chip__amt"
+                                          th:text="${#numbers.formatInteger(a.amount, 1, 'NONE')}">1</span>
+                                </span>
+                                <span class="assoc-add-wrap">
+                                    <button type="button" class="assoc-add"
+                                            data-trigger="inv-admin-assoc-add-open"
+                                            th:aria-label="#{inventory.assoc.add.order}"
+                                            th:text="#{inventory.assoc.add}">+ Zuordnen</button>
+                                    <div class="assoc-pop krtm-hidden" data-assoc-pop>
+                                        <div data-assoc-pop-pick>
+                                            <select data-krt-combobox
+                                                    data-trigger="inv-admin-assoc-pick"
+                                                    th:data-combobox-placeholder="#{inventory.assoc.add.order}">
+                                                <option value=""></option>
+                                                <option th:each="order : ${jobOrders}"
+                                                        th:if="${order.requiredGameItemIds != null and #lists.contains(order.requiredGameItemIds, entry.gameItem.id) and not #lists.contains(entry.jobOrderAllocations.![jobOrderId], order.id)}"
+                                                        th:value="${order.id}"
+                                                        th:text="'#' + ${order.displayId}"></option>
+                                            </select>
+                                        </div>
+                                        <div class="assoc-pop__menge krtm-hidden" data-assoc-pop-amount>
+                                            <label th:text="#{inventory.assoc.amount}">Menge</label>
+                                            <div class="assoc-menge-row">
+                                                <input type="number" min="0" step="1"
+                                                       class="assoc-menge-input" data-assoc-amount-input
+                                                       th:aria-label="#{inventory.assoc.amount}"/>
+                                                <button type="button" class="btn btn-primary btn-xs"
+                                                        data-trigger="inv-admin-assoc-save"
+                                                        th:text="#{general.save}">Speichern</button>
+                                                <button type="button" class="btn btn-quiet-danger btn-xs krtm-hidden"
+                                                        data-trigger="inv-admin-assoc-remove"
+                                                        th:text="#{inventory.assoc.remove}">Entfernen</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </span>
+                            </th:block>
+                            <!-- Read-only chips for viewers without association rights. -->
+                            <th:block sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+                                <span th:each="a : ${entry.jobOrderAllocations}"
+                                      class="assoc-chip assoc-chip--order">
+                                    <span th:text="'#' + ${a.jobOrderDisplayId}">#1042</span> ·
+                                    <span class="assoc-chip__amt"
+                                          th:text="${#numbers.formatInteger(a.amount, 1, 'NONE')}">1</span>
+                                </span>
+                            </th:block>
+                            <span class="chip" data-assoc-rest
+                                  th:classappend="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? 'chip--success' : (${entry.jobOrderRest &lt; 0} ? 'chip--danger' : 'chip--muted')"
+                                  th:text="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.jobOrderRest &lt; 0} ? #{inventory.assoc.rest.over(${#numbers.formatInteger(-entry.jobOrderRest, 1, 'NONE')})} : #{inventory.assoc.rest.free(${#numbers.formatInteger(entry.jobOrderRest, 1, 'NONE')})})">Rest 0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="tree-cell tree-cell--num tree-amount">
+                <span><span th:text="${entry.amount != null ? #numbers.formatInteger(entry.amount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
+            </div>
+            <div class="tree-cell tree-cell--actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)">
+                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                        th:data-id="${entry.id}"
+                        th:data-amount="${entry.amount}"
+                        th:data-version="${entry.version}"
+                        th:data-game-item-id="${entry.gameItem.id}"
+                        data-quantity-type="PIECE"
+                        th:data-user-id="${entry.user.id}"
+                        th:data-location-id="${entry.location.id}"
+                        data-trigger="inv-admin-bookout"
+                        th:title="#{inventory.bookout.btn}" th:aria-label="#{inventory.bookout.btn}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-bookout"/></svg>
+                </button>
+                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                        th:data-id="${entry.id}"
+                        th:data-amount="${entry.amount}"
+                        th:data-version="${entry.version}"
+                        th:data-game-item-id="${entry.gameItem.id}"
+                        data-quantity-type="PIECE"
+                        th:data-user-id="${entry.user.id}"
                         th:data-location-id="${entry.location.id}"
                         th:data-owning-org-unit-id="${entry.owningSquadron != null ? entry.owningSquadron.id : null}"
                         data-trigger="inv-admin-umbuchen"
@@ -463,6 +731,7 @@
                 <span class="tree-note-text inventory-note-text" th:text="${entry.note}">Notiz</span>
             </div>
         </div>
+        </th:block>
     </th:block>
     <div class="tree-row" th:if="${#lists.isEmpty(entries)}">
         <div class="tree-cell text-muted krtm-grid-column-1-1-padding-left-3rem-2793" th:text="#{inventory.stack.entries.empty}">Keine Einträge vorhanden.</div>

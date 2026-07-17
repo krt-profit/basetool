@@ -35,11 +35,18 @@ import java.util.UUID;
  * remainder per dimension ({@code amount − Σ}) the UI renders as the rest-chip. Both are the
  * authoritative multi-earmark view; the former single {@code jobOrderId} / {@code missionId}
  * scalars were dropped once every consumer read the allocations.
+ *
+ * <p>Since V220 the row is catalog-discriminated (REQ-INV-029, ADR-0101): a material row carries
+ * {@code material} + non-null {@code quality} with {@code gameItem == null}; a game-item row
+ * carries {@code gameItem} with {@code material == null} and {@code quality == null}. Exactly one
+ * of the two references is set — the DTO mirrors the DB CHECK {@code
+ * chk_inventory_item_catalog_xor} rather than adding a redundant kind field.
  */
 public record InventoryItemDto(
     UUID id,
     UserReferenceDto user,
     MaterialReferenceDto material,
+    InventoryGameItemReferenceDto gameItem,
     LocationReferenceDto location,
     Integer quality,
     Double amount,
@@ -70,6 +77,7 @@ public record InventoryItemDto(
         id,
         user,
         material,
+        gameItem,
         location,
         quality,
         amount,

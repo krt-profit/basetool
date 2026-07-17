@@ -19827,7 +19827,7 @@
       "post" : {
         "tags" : [ "Orders" ],
         "summary" : "Book production for an item line",
-        "description" : "Records how many units of an ordered item were manufactured and reduces the linked inventory consumed. The consumption must exactly cover the required material demand.",
+        "description" : "Records how many units of an ordered item were manufactured and reduces the linked inventory consumed. The consumption must exactly cover the required material demand. An optional bookIn block additionally books the produced units into the Lager as item stock (location, owner, owning org unit) in the same transaction, by default earmarked for this order; without it the booking behaves exactly as before.",
         "operationId" : "bookProduction",
         "parameters" : [ {
           "name" : "id",
@@ -43302,6 +43302,148 @@
         }
       }
     },
+    "/api/v1/materials/search" : {
+      "get" : {
+        "tags" : [ "material-controller" ],
+        "operationId" : "searchMaterials",
+        "parameters" : [ {
+          "name" : "search",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "jobOrderOnly",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        }, {
+          "name" : "rawOnly",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "sort",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseMaterialDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/materials/profit-calculation" : {
       "get" : {
         "tags" : [ "profit-calculation-controller" ],
@@ -44525,6 +44667,132 @@
         }
       }
     },
+    "/api/v1/locations/search" : {
+      "get" : {
+        "tags" : [ "location-controller" ],
+        "operationId" : "searchLocations",
+        "parameters" : [ {
+          "name" : "search",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "sort",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseLocationReferenceDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/locations/refineries" : {
       "get" : {
         "tags" : [ "location-controller" ],
@@ -44922,6 +45190,15 @@
         "tags" : [ "inventory-item-controller" ],
         "operationId" : "getMyInventory",
         "parameters" : [ {
+          "name" : "catalog",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MATERIAL",
+            "enum" : [ "MATERIAL", "ITEM" ]
+          }
+        }, {
           "name" : "page",
           "in" : "query",
           "required" : false,
@@ -44942,8 +45219,7 @@
           "in" : "query",
           "required" : false,
           "schema" : {
-            "type" : "string",
-            "default" : "material.name,asc;quality,desc;amount,desc"
+            "type" : "string"
           }
         } ],
         "responses" : {
@@ -45044,7 +45320,15 @@
         "parameters" : [ {
           "name" : "materialId",
           "in" : "query",
-          "required" : true,
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "gameItemId",
+          "in" : "query",
+          "required" : false,
           "schema" : {
             "type" : "string",
             "format" : "uuid"
@@ -45080,6 +45364,15 @@
           "schema" : {
             "type" : "string",
             "format" : "uuid"
+          }
+        }, {
+          "name" : "catalog",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MATERIAL",
+            "enum" : [ "MATERIAL", "ITEM" ]
           }
         }, {
           "name" : "page",
@@ -45205,6 +45498,17 @@
             }
           }
         }, {
+          "name" : "gameItemIds",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          }
+        }, {
           "name" : "minQuality",
           "in" : "query",
           "required" : false,
@@ -45249,6 +45553,15 @@
           "schema" : {
             "type" : "boolean",
             "default" : false
+          }
+        }, {
+          "name" : "catalog",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MATERIAL",
+            "enum" : [ "MATERIAL", "ITEM" ]
           }
         } ],
         "responses" : {
@@ -45580,12 +45893,282 @@
         }
       }
     },
+    "/api/v1/inventory/item-catalog" : {
+      "get" : {
+        "tags" : [ "inventory-item-controller" ],
+        "summary" : "List bookable game items",
+        "description" : "Returns a paginated list of game items that can be booked as Lager item stock (output of at least one active blueprint).",
+        "operationId" : "getItemCatalog",
+        "parameters" : [ {
+          "name" : "q",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        }, {
+          "name" : "sort",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "name,asc;id,asc"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseInventoryGameItemReferenceDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/game-item/{gameItemId}" : {
+      "get" : {
+        "tags" : [ "inventory-item-controller" ],
+        "operationId" : "getInventoryByGameItem",
+        "parameters" : [ {
+          "name" : "gameItemId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "sort",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "location.name,asc;amount,desc"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseInventoryItemDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/inventory/all" : {
       "get" : {
         "tags" : [ "inventory-item-controller" ],
         "operationId" : "getAllInventory",
         "parameters" : [ {
           "name" : "materialIds",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          }
+        }, {
+          "name" : "gameItemIds",
           "in" : "query",
           "required" : false,
           "schema" : {
@@ -45626,6 +46209,15 @@
             }
           }
         }, {
+          "name" : "catalog",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MATERIAL",
+            "enum" : [ "MATERIAL", "ITEM" ]
+          }
+        }, {
           "name" : "page",
           "in" : "query",
           "required" : false,
@@ -45646,8 +46238,7 @@
           "in" : "query",
           "required" : false,
           "schema" : {
-            "type" : "string",
-            "default" : "material.name,asc;quality,desc;amount,desc"
+            "type" : "string"
           }
         } ],
         "responses" : {
@@ -45819,7 +46410,15 @@
         "parameters" : [ {
           "name" : "materialId",
           "in" : "query",
-          "required" : true,
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "gameItemId",
+          "in" : "query",
+          "required" : false,
           "schema" : {
             "type" : "string",
             "format" : "uuid"
@@ -45855,6 +46454,15 @@
           "schema" : {
             "type" : "string",
             "format" : "uuid"
+          }
+        }, {
+          "name" : "catalog",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MATERIAL",
+            "enum" : [ "MATERIAL", "ITEM" ]
           }
         }, {
           "name" : "page",
@@ -45980,6 +46588,17 @@
             }
           }
         }, {
+          "name" : "gameItemIds",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          }
+        }, {
           "name" : "minQuality",
           "in" : "query",
           "required" : false,
@@ -46008,6 +46627,15 @@
               "type" : "string",
               "format" : "uuid"
             }
+          }
+        }, {
+          "name" : "catalog",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MATERIAL",
+            "enum" : [ "MATERIAL", "ITEM" ]
           }
         } ],
         "responses" : {
@@ -46109,6 +46737,15 @@
         "tags" : [ "inventory-item-controller" ],
         "operationId" : "getAggregatedInventory",
         "parameters" : [ {
+          "name" : "catalog",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "MATERIAL",
+            "enum" : [ "MATERIAL", "ITEM" ]
+          }
+        }, {
           "name" : "page",
           "in" : "query",
           "required" : false,
@@ -46129,8 +46766,7 @@
           "in" : "query",
           "required" : false,
           "schema" : {
-            "type" : "string",
-            "default" : "material.name,asc;quality,desc;amount,desc"
+            "type" : "string"
           }
         } ],
         "responses" : {
@@ -48413,7 +49049,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "PROMOTION_TOPIC_CREATED", "PROMOTION_TOPIC_UPDATED", "PROMOTION_TOPIC_DELETED", "PROMOTION_CATEGORY_CREATED", "PROMOTION_CATEGORY_UPDATED", "PROMOTION_CATEGORY_DELETED", "PROMOTION_LEVEL_CONTENT_CREATED", "PROMOTION_LEVEL_CONTENT_UPDATED", "PROMOTION_LEVEL_CONTENT_DELETED", "PROMOTION_RANK_REQUIREMENT_CREATED", "PROMOTION_RANK_REQUIREMENT_UPDATED", "PROMOTION_RANK_REQUIREMENT_DELETED", "PROMOTION_EVALUATION_CREATED", "PROMOTION_EVALUATION_UPDATED", "PROMOTION_EVALUATION_DELETED", "PROMOTION_AUDIT_EXPORTED", "PROMOTION_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED" ]
+            "enum" : [ "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "PROMOTION_TOPIC_CREATED", "PROMOTION_TOPIC_UPDATED", "PROMOTION_TOPIC_DELETED", "PROMOTION_CATEGORY_CREATED", "PROMOTION_CATEGORY_UPDATED", "PROMOTION_CATEGORY_DELETED", "PROMOTION_LEVEL_CONTENT_CREATED", "PROMOTION_LEVEL_CONTENT_UPDATED", "PROMOTION_LEVEL_CONTENT_DELETED", "PROMOTION_RANK_REQUIREMENT_CREATED", "PROMOTION_RANK_REQUIREMENT_UPDATED", "PROMOTION_RANK_REQUIREMENT_DELETED", "PROMOTION_EVALUATION_CREATED", "PROMOTION_EVALUATION_UPDATED", "PROMOTION_EVALUATION_DELETED", "PROMOTION_AUDIT_EXPORTED", "PROMOTION_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED" ]
           }
         }, {
           "name" : "page",
@@ -54284,6 +54920,24 @@
         },
         "required" : [ "version" ]
       },
+      "InventoryGameItemReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "manufacturer" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string"
+          }
+        }
+      },
       "InventoryItemDto" : {
         "type" : "object",
         "properties" : {
@@ -54296,6 +54950,9 @@
           },
           "material" : {
             "$ref" : "#/components/schemas/MaterialReferenceDto"
+          },
+          "gameItem" : {
+            "$ref" : "#/components/schemas/InventoryGameItemReferenceDto"
           },
           "location" : {
             "$ref" : "#/components/schemas/LocationReferenceDto"
@@ -55518,6 +56175,30 @@
         },
         "required" : [ "amount", "claimingOrgUnitId", "materialId", "qualityRequirement" ]
       },
+      "BookInDto" : {
+        "type" : "object",
+        "properties" : {
+          "locationId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "ownerUserId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "owningOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "personal" : {
+            "type" : "boolean"
+          },
+          "allocateToOrder" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "locationId" ]
+      },
       "JobOrderItemProductionConsumptionDto" : {
         "type" : "object",
         "properties" : {
@@ -55564,9 +56245,12 @@
               "type" : "string",
               "format" : "uuid"
             }
+          },
+          "bookIn" : {
+            "$ref" : "#/components/schemas/BookInDto"
           }
         },
-        "required" : [ "amount", "consumption", "version" ]
+        "required" : [ "amount", "bookIn", "consumption", "version" ]
       },
       "JobOrderItemHandoverCreateDto" : {
         "type" : "object",
@@ -56115,6 +56799,10 @@
             "type" : "string",
             "format" : "uuid"
           },
+          "gameItemId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "locationId" : {
             "type" : "string",
             "format" : "uuid"
@@ -56158,9 +56846,18 @@
             "items" : {
               "$ref" : "#/components/schemas/InventoryAllocationInput"
             }
+          },
+          "catalogReferenceValid" : {
+            "type" : "boolean"
+          },
+          "missionFreeForGameItem" : {
+            "type" : "boolean"
+          },
+          "qualityConsistentWithCatalog" : {
+            "type" : "boolean"
           }
         },
-        "required" : [ "amount", "locationId", "materialId", "quality" ]
+        "required" : [ "amount", "locationId" ]
       },
       "InventoryItemPersonalRebookDto" : {
         "type" : "object",
@@ -59369,6 +60066,13 @@
               "type" : "string",
               "format" : "uuid"
             }
+          },
+          "requiredGameItemIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
           }
         }
       },
@@ -60317,6 +61021,39 @@
           }
         }
       },
+      "PageResponseLocationReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/LocationReferenceDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
       "LeitungMemberDto" : {
         "type" : "object",
         "properties" : {
@@ -60486,6 +61223,9 @@
           "material" : {
             "$ref" : "#/components/schemas/MaterialReferenceDto"
           },
+          "gameItem" : {
+            "$ref" : "#/components/schemas/InventoryGameItemReferenceDto"
+          },
           "totalAmount" : {
             "type" : "number",
             "format" : "double"
@@ -60543,11 +61283,47 @@
           }
         }
       },
+      "PageResponseInventoryGameItemReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/InventoryGameItemReferenceDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
       "AggregatedInventoryDto" : {
         "type" : "object",
         "properties" : {
           "material" : {
             "$ref" : "#/components/schemas/MaterialDto"
+          },
+          "gameItem" : {
+            "$ref" : "#/components/schemas/InventoryGameItemReferenceDto"
           },
           "quality" : {
             "type" : "number",
@@ -61247,7 +62023,7 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "PROMOTION_TOPIC_CREATED", "PROMOTION_TOPIC_UPDATED", "PROMOTION_TOPIC_DELETED", "PROMOTION_CATEGORY_CREATED", "PROMOTION_CATEGORY_UPDATED", "PROMOTION_CATEGORY_DELETED", "PROMOTION_LEVEL_CONTENT_CREATED", "PROMOTION_LEVEL_CONTENT_UPDATED", "PROMOTION_LEVEL_CONTENT_DELETED", "PROMOTION_RANK_REQUIREMENT_CREATED", "PROMOTION_RANK_REQUIREMENT_UPDATED", "PROMOTION_RANK_REQUIREMENT_DELETED", "PROMOTION_EVALUATION_CREATED", "PROMOTION_EVALUATION_UPDATED", "PROMOTION_EVALUATION_DELETED", "PROMOTION_AUDIT_EXPORTED", "PROMOTION_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED" ]
+            "enum" : [ "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "PROMOTION_TOPIC_CREATED", "PROMOTION_TOPIC_UPDATED", "PROMOTION_TOPIC_DELETED", "PROMOTION_CATEGORY_CREATED", "PROMOTION_CATEGORY_UPDATED", "PROMOTION_CATEGORY_DELETED", "PROMOTION_LEVEL_CONTENT_CREATED", "PROMOTION_LEVEL_CONTENT_UPDATED", "PROMOTION_LEVEL_CONTENT_DELETED", "PROMOTION_RANK_REQUIREMENT_CREATED", "PROMOTION_RANK_REQUIREMENT_UPDATED", "PROMOTION_RANK_REQUIREMENT_DELETED", "PROMOTION_EVALUATION_CREATED", "PROMOTION_EVALUATION_UPDATED", "PROMOTION_EVALUATION_DELETED", "PROMOTION_AUDIT_EXPORTED", "PROMOTION_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED" ]
           },
           "actorHandle" : {
             "type" : "string"

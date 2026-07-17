@@ -28,7 +28,10 @@ import java.util.UUID;
  * Lager "Auftrag" dropdown and the refinery-order store "Auftrag" dropdown can hide an order that
  * does not require a row's material (REQ-ORDERS-018); {@code materials} stays the MATERIAL-order
  * lines (empty for ITEM orders). {@code requestingOrgUnit} labels the refinery store picker option
- * with the order's customer org unit (may be {@code null} on pre-rework rows).
+ * with the order's customer org unit (may be {@code null} on pre-rework rows). {@code
+ * requiredGameItemIds} is the game-item sibling of {@code requiredMaterialIds} (REQ-INV-031): the
+ * distinct game items an ITEM order's lines request, empty for MATERIAL orders — the item-view
+ * order picker's gate.
  */
 public record JobOrderReferenceDto(
     UUID id,
@@ -37,4 +40,5 @@ public record JobOrderReferenceDto(
     @BackendEnumAsString String status,
     SquadronReferenceDto requestingOrgUnit,
     List<JobOrderMaterialDto> materials,
-    List<UUID> requiredMaterialIds) {}
+    List<UUID> requiredMaterialIds,
+    List<UUID> requiredGameItemIds) {}

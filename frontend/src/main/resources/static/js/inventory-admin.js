@@ -122,8 +122,31 @@ function collectChecked(className) {
     return values;
 }
 
+// Which Lager view is active (REQ-INV-030): the Material <-> Items switch is server-rendered
+// navigation, so the authoritative state is the page URL's view= parameter — which every filter
+// re-swap also carries (history.replaceState keeps the address bar in sync).
+function lagerIsItemsView() {
+    try {
+        return new URLSearchParams(window.location.search).get('view') === 'items';
+    } catch {
+        return false;
+    }
+}
+
+// The grouping key of a tree group row: material rows carry data-material-id, game-item rows
+// data-game-item-id (REQ-INV-030). Exactly one is present.
+function groupKeyOf(el) {
+    return el.getAttribute('data-material-id') || el.getAttribute('data-game-item-id');
+}
+
 function filterInventory() {
+    // REQ-INV-030: the rebuilt fragment URL is derived from the page's own filter state PLUS the
+    // active view, so a filter change, a modal write and a live-sync peer refresh all re-render
+    // whichever view (Material or Items) is on screen. Only the active view's filter form exists
+    // in the DOM, so the class-driven collections of the other view are simply empty.
+    const itemsView = lagerIsItemsView();
     const activeMats = collectChecked('matCheck');
+    const activeGameItems = collectChecked('gameItemCheck');
     const activeJobOrders = collectChecked('jobOrderCheck');
     const activeMissions = collectChecked('missionCheck');
 
@@ -139,14 +162,18 @@ function filterInventory() {
     const url = new URL(window.location.origin + '/inventory/all');
     url.searchParams.append('fragment', 'true');
 
+    if (itemsView) url.searchParams.append('view', 'items');
     activeMats.forEach((m) => url.searchParams.append('materialIds', m));
+    activeGameItems.forEach((g) => url.searchParams.append('gameItemIds', g));
     if (minQuality) url.searchParams.append('minQuality', minQuality);
     activeJobOrders.forEach((j) => url.searchParams.append('jobOrderIds', j));
     activeMissions.forEach((m) => url.searchParams.append('missionIds', m));
 
     // Update browser URL (without fragment param) so the filter is bookmarkable / reloadable
     const visibleUrl = new URL(window.location.origin + '/inventory/all');
+    if (itemsView) visibleUrl.searchParams.append('view', 'items');
     activeMats.forEach((m) => visibleUrl.searchParams.append('materialIds', m));
+    activeGameItems.forEach((g) => visibleUrl.searchParams.append('gameItemIds', g));
     if (minQuality) visibleUrl.searchParams.append('minQuality', minQuality);
     activeJobOrders.forEach((j) => visibleUrl.searchParams.append('jobOrderIds', j));
     activeMissions.forEach((m) => visibleUrl.searchParams.append('missionIds', m));
@@ -252,20 +279,26 @@ if (
 }
 
 function resetInventoryFilter() {
-    ['matCheck', 'jobOrderCheck', 'missionCheck'].forEach(function (cls) {
+    ['matCheck', 'gameItemCheck', 'jobOrderCheck', 'missionCheck'].forEach(function (cls) {
         const boxes = document.getElementsByClassName(cls);
         for (let i = 0; i < boxes.length; i++) boxes[i].checked = false;
     });
-    ['matAll', 'jobOrderAll', 'missionAll'].forEach(function (id) {
-        const el = document.getElementById(id);
-        if (el) el.checked = false;
-    });
+    ['matAll', 'gameItemAll', 'jobOrderAll', 'itemJobOrderAll', 'missionAll'].forEach(
+        function (id) {
+            const el = document.getElementById(id);
+            if (el) el.checked = false;
+        },
+    );
     const minQualitySelect = document.getElementById('minQuality');
     if (minQualitySelect) minQualitySelect.value = '';
     if (document.getElementById('materialHeader'))
         updateSelectState('matAll', 'matCheck', 'materialHeader');
+    if (document.getElementById('gameItemHeader'))
+        updateSelectState('gameItemAll', 'gameItemCheck', 'gameItemHeader');
     if (document.getElementById('jobOrderHeader'))
         updateSelectState('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader');
+    if (document.getElementById('itemJobOrderHeader'))
+        updateSelectState('itemJobOrderAll', 'jobOrderCheck', 'itemJobOrderHeader');
     if (document.getElementById('missionHeader'))
         updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     filterInventory();
@@ -275,8 +308,17 @@ document.addEventListener('DOMContentLoaded', function () {
     if (document.getElementsByClassName('matCheck').length > 0) {
         updateSelectState('matAll', 'matCheck', 'materialHeader');
     }
+    if (document.getElementsByClassName('gameItemCheck').length > 0) {
+        updateSelectState('gameItemAll', 'gameItemCheck', 'gameItemHeader');
+    }
     if (document.getElementsByClassName('jobOrderCheck').length > 0) {
-        updateSelectState('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader');
+        // The material and the items view render different header/all ids for the shared
+        // jobOrderCheck class (unique ids in the template source); exactly one pair exists.
+        if (document.getElementById('itemJobOrderHeader')) {
+            updateSelectState('itemJobOrderAll', 'jobOrderCheck', 'itemJobOrderHeader');
+        } else {
+            updateSelectState('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader');
+        }
     }
     if (document.getElementsByClassName('missionCheck').length > 0) {
         updateSelectState('missionAll', 'missionCheck', 'missionHeader');
@@ -301,16 +343,22 @@ function lagerUserId() {
     return userId && userId !== 'unknown' ? userId : null;
 }
 
-// localStorage key holding the array of expanded material-group ids.
+// localStorage key holding the array of expanded group ids. View-scoped (REQ-INV-030): the
+// items view persists under expanded_rows_lager_items_* so the Material and the Items tree
+// remember their expansion state independently.
 function groupStorageKey() {
     const userId = lagerUserId();
-    return userId ? 'expanded_rows_lager_' + userId : null;
+    if (!userId) return null;
+    return (lagerIsItemsView() ? 'expanded_rows_lager_items_' : 'expanded_rows_lager_') + userId;
 }
 
-// localStorage key holding the array of expanded stack ids.
+// localStorage key holding the array of expanded stack ids (view-scoped like groupStorageKey).
 function stackStorageKey() {
     const userId = lagerUserId();
-    return userId ? 'expanded_stacks_lager_' + userId : null;
+    if (!userId) return null;
+    return (
+        (lagerIsItemsView() ? 'expanded_stacks_lager_items_' : 'expanded_stacks_lager_') + userId
+    );
 }
 
 // A stack's identity is exactly the page-less stack-entries URL its data-attributes build, so the
@@ -341,13 +389,14 @@ function writeExpanded(key, values) {
     }
 }
 
-// Re-applies the persisted material-group expansion to the freshly rendered tree.
+// Re-applies the persisted group expansion (material or game-item groups — see groupKeyOf) to
+// the freshly rendered tree.
 function restoreExpandedGroups() {
     const expandedRows = readExpanded(groupStorageKey());
     if (expandedRows.length === 0) return;
     document.querySelectorAll('.tree-row--group').forEach(function (row) {
-        const materialId = row.getAttribute('data-material-id');
-        if (materialId && expandedRows.includes(materialId)) {
+        const groupKey = groupKeyOf(row);
+        if (groupKey && expandedRows.includes(groupKey)) {
             const nextRow = row.nextElementSibling;
             const icon = row.querySelector('.toggle-icon');
             if (nextRow && nextRow.classList.contains('tree-group-items')) {
@@ -388,7 +437,7 @@ function restoreExpandedTree() {
 function toggleGroup(row) {
     const nextRow = row.nextElementSibling;
     const icon = row.querySelector('.toggle-icon');
-    const materialId = row.getAttribute('data-material-id');
+    const groupKey = groupKeyOf(row);
     if (!nextRow || !nextRow.classList.contains('tree-group-items')) return;
 
     const key = groupStorageKey();
@@ -396,17 +445,17 @@ function toggleGroup(row) {
     if (window.getComputedStyle(nextRow).display === 'none') {
         nextRow.style.display = 'block';
         if (icon) icon.textContent = '▼';
-        if (materialId && !expandedRows.includes(materialId)) {
-            expandedRows.push(materialId);
+        if (groupKey && !expandedRows.includes(groupKey)) {
+            expandedRows.push(groupKey);
             writeExpanded(key, expandedRows);
         }
     } else {
         nextRow.style.display = 'none';
         if (icon) icon.textContent = '▶';
-        if (materialId) {
+        if (groupKey) {
             writeExpanded(
                 key,
-                expandedRows.filter((id) => id !== materialId),
+                expandedRows.filter((id) => id !== groupKey),
             );
         }
     }
@@ -449,17 +498,30 @@ function toggleStack(row) {
 // stamped on the stack-header row. A global stack is per-owner, so userId is part of the
 // key; the global Lager is non-personal, so no personal flag is sent. An absent dimension
 // is omitted so the backend's null-safe match selects rows where it is itself absent.
+// A game-item stack (REQ-INV-030) is addressed by gameItemId with no quality key and goes
+// to the item sibling endpoint; the material branch stays byte-identical (its param order
+// is also the persisted stack identity — see stackKey).
 function buildStackEntriesUrl(headerRow, page) {
     const params = new URLSearchParams();
-    params.set('materialId', headerRow.getAttribute('data-material-id'));
-    params.set('userId', headerRow.getAttribute('data-user-id'));
-    params.set('locationId', headerRow.getAttribute('data-location-id'));
-    const quality = headerRow.getAttribute('data-quality');
-    if (quality !== null && quality !== '') params.set('quality', quality);
+    const gameItemId = headerRow.getAttribute('data-game-item-id');
+    if (gameItemId) {
+        params.set('gameItemId', gameItemId);
+        params.set('userId', headerRow.getAttribute('data-user-id'));
+        params.set('locationId', headerRow.getAttribute('data-location-id'));
+    } else {
+        params.set('materialId', headerRow.getAttribute('data-material-id'));
+        params.set('userId', headerRow.getAttribute('data-user-id'));
+        params.set('locationId', headerRow.getAttribute('data-location-id'));
+        const quality = headerRow.getAttribute('data-quality');
+        if (quality !== null && quality !== '') params.set('quality', quality);
+    }
     const owningOrgUnitId = headerRow.getAttribute('data-owning-org-unit-id');
     if (owningOrgUnitId) params.set('owningOrgUnitId', owningOrgUnitId);
     if (page != null) params.set('page', page);
-    return '/inventory/all/stack/entries?' + params.toString();
+    const path = gameItemId
+        ? '/inventory/all/game-item-stack/entries?'
+        : '/inventory/all/stack/entries?';
+    return path + params.toString();
 }
 
 // Replaces a stack's entries container with a single status line (loading / error),
@@ -673,8 +735,10 @@ function refreshUmbuchenTransferOrgUnitPicker() {
     // org-unit kinds — Staffel + SK + Bereich + OL — via ?allKinds=true (mirrors the bank
     // counterparty picker, REQ-BANK-044). The default (allKinds=false) returns only Staffel/SK, so
     // a Bereich/OL-member target could not be booked into their Bereich/OL pool even though the
-    // backend resolver (resolveOrgUnitForPickerOutputNullable) accepts it.
-    fetch('/api/v1/users/' + encodeURIComponent(targetUserId) + '/memberships?allKinds=true', {
+    // backend resolver (resolveOrgUnitForPickerOutputNullable) accepts it. The fetch goes through
+    // the frontend's /users/{id}/memberships proxy (UserProxyController) — the frontend origin
+    // maps no /api/v1/users/** route, so the backend path 404s here and silently hides the picker.
+    fetch('/users/' + encodeURIComponent(targetUserId) + '/memberships?allKinds=true', {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
     })
@@ -712,13 +776,19 @@ function refreshUmbuchenTransferOrgUnitPicker() {
         });
 }
 
+// Opens the Umbuchen (transfer) modal for one leaf entry. `userName` and `locationName` are the
+// row's current owner/location labels: both target pickers are REMOTE comboboxes (remote-users /
+// remote-locations), so presetting them needs the label alongside the id — the loaded item set
+// cannot resolve a label locally.
 function openUmbuchenModal(
     id,
     amount,
     version,
     materialId,
     userId,
+    userName,
     locationId,
+    locationName,
     quantityType,
     owningOrgUnitId,
 ) {
@@ -748,14 +818,24 @@ function openUmbuchenModal(
     if (amountOf)
         amountOf.textContent = amountOf.getAttribute('data-template').replace('{0}', amount);
     const umbuchenUser = document.getElementById('umbuchenTargetUserId');
-    // The target-user <select> is upgraded into a searchable combobox; its id moves to the
-    // hidden input, so use the combobox API to sync both the value and the visible label.
+    // The target-user picker is a REMOTE combobox (remote-users, #1193): like the location picker
+    // below, presetting it needs the label with the id — a bare setValue(id) cannot resolve the
+    // name from the on-demand item set and would clear the field on every modal open.
     if (umbuchenUser.krtCombobox) {
-        umbuchenUser.krtCombobox.setValue(userId);
+        umbuchenUser.krtCombobox.setValue(userId, userName);
     } else {
         umbuchenUser.value = userId;
     }
-    document.getElementById('umbuchenTargetLocationId').value = locationId;
+    // The location picker is a REMOTE searchable combobox (remote-locations, REQ-FE-016): the
+    // catalog is fetched per query, so the row's location is outside the loaded set — setValue()
+    // must carry the label with the id (a bare id would clear the selection, a bare .value write
+    // would leave the textbox stale).
+    const umbuchenLocation = document.getElementById('umbuchenTargetLocationId');
+    if (umbuchenLocation.krtCombobox) {
+        umbuchenLocation.krtCombobox.setValue(locationId, locationName);
+    } else {
+        umbuchenLocation.value = locationId;
+    }
     refreshUmbuchenTransferOrgUnitPicker();
     // Inline `flex` (not `block`) preserves `.modal`'s flex centring; `block` would override the
     // stylesheet flex and pin the dialog to the top of the viewport (#1328).
@@ -1479,7 +1559,9 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             el.getAttribute('data-version'),
             el.getAttribute('data-material-id'),
             el.getAttribute('data-user-id'),
+            el.getAttribute('data-user-name'),
             el.getAttribute('data-location-id'),
+            el.getAttribute('data-location-name'),
             el.getAttribute('data-quantity-type'),
             el.getAttribute('data-owning-org-unit-id'),
         );

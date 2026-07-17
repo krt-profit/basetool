@@ -84,11 +84,23 @@ yields (which can land on a binary value like `37.160000000000004`). Rounding is
 `PIECE` amounts are whole, so it is a no-op for them. This mirrors the frontend (round, don't reject)
 rather than refusing over-precise input.
 
+**Amendment (game-item stock rows, [`inventory-items.md`](inventory-items.md) REQ-INV-029).**
+(a) A **game-item** stock row is unconditionally whole-unit: `@ValidQuantityAmount` enforces
+positive + whole whenever the payload carries a `gameItemId`, keyed on that id alone with **no
+catalog lookup** (all items are whole units; the `MaterialPieceTypeLookup` seam stays
+material-only) — a payload without a `materialId` no longer skips amount validation. (b) The
+whole-number rule is now **also enforced server-side on book-out / rebook amounts** in the
+checkout service (next to the existing amount-≤-available check), closing the former
+create-only gap for `PIECE` materials and covering item rows (their DTOs carry no catalog
+reference, so bean validation cannot reach them).
+
 **Acceptance**
 
 - [ ] An amount with more than three decimals is stored rounded HALF_UP to three (`0.0015` → `0.002`, `1.2345` → `1.235`).
 - [ ] No write path stores a material amount with more than three decimals.
 - [ ] A `0` or negative material amount is rejected on the guarded create/update endpoints (incl. job-order create + edit, which previously accepted `0`).
+- [ ] A payload carrying a `gameItemId` has its amount validated positive + whole with no catalog lookup; a zero/negative/fractional amount is rejected 400 even with `materialId` absent.
+- [ ] A fractional book-out / rebook amount on a `PIECE`-material row or a game-item row is rejected server-side.
 
 **Enforced by:** `ValidQuantityAmountValidatorTest`, `MaterialAmountRoundingTest`. **Code:**
 `backend/.../validation/ValidQuantityAmount*`,

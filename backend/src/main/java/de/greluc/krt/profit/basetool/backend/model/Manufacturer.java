@@ -31,14 +31,22 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.BatchSize;
 
-/** Manufacturer JPA entity. */
+/**
+ * Manufacturer JPA entity. The class-level {@code @BatchSize} batches the initialisation of lazy
+ * {@code Manufacturer} proxies (Hibernate 6 honours it on the <em>target</em> entity for to-one
+ * associations): the Lager item views project {@code GameItem.manufacturer} into every stack /
+ * catalog reference row (REQ-INV-029), so without batching each distinct manufacturer proxy would
+ * fire its own {@code SELECT} while a grouped page is mapped.
+ */
 @Entity
 @Getter
 @Setter
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
+@BatchSize(size = 50)
 public class Manufacturer extends AbstractEntity<UUID> {
 
   @Getter(onMethod_ = @__(@Override))

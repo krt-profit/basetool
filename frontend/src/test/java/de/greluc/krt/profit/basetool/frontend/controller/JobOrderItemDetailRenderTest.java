@@ -901,6 +901,79 @@ class JobOrderItemDetailRenderTest {
         .doesNotContain("data-testid=\"blueprint-owners-section\"");
   }
 
+  // covers REQ-INV-032 (the production modal renders the book-in section: server-side-search
+  // location combobox (remote-locations, REQ-FE-016 — no preloaded catalog), remote-users owner
+  // picker seeded + preselected with the acting user, the org-unit picker shell orders-detail.js
+  // repopulates per owner, and the personal / default-on "dem Auftrag zuordnen" controls)
+  @Test
+  void itemOrder_productionModal_rendersBookInSection() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(oneLineItemOrder(orderId));
+    when(backendApiClient.get(
+            eq("/api/v1/users/me"),
+            eq(de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class)))
+        .thenReturn(
+            new de.greluc.krt.profit.basetool.frontend.model.dto.UserDto(
+                userId,
+                "logistician",
+                "Logi Stician",
+                "Logi Stician",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                true,
+                false,
+                true,
+                null,
+                null,
+                1L,
+                null,
+                null));
+
+    String html =
+        mockMvc
+            .perform(get("/orders/" + orderId).with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // Then: the location picker is a server-side-search combobox (remote-locations) that renders
+    // with no preloaded catalog options.
+    int locationAt = html.indexOf("id=\"production-location\"");
+    assertThat(locationAt).as("book-in location picker rendered").isGreaterThan(0);
+    assertThat(html.substring(locationAt, html.indexOf('>', locationAt)))
+        .as("location picker carries the remote-locations combobox marker")
+        .contains("data-krt-combobox=\"remote-locations\"");
+    // The owner picker is a remote-users combobox seeded + preselected with the acting user.
+    assertThat(html)
+        .as("book-in owner picker carries the remote-users marker")
+        .contains("id=\"production-owner\"")
+        .contains("data-krt-combobox=\"remote-users\"");
+    assertThat(html).as("acting-user seed option").contains("Logi Stician");
+    assertThat(html)
+        .as("acting-user id stamped for the JS owner fallback")
+        .contains("data-acting-user-id=\"" + userId + "\"");
+    // The acting-user display name is stamped too, so a book-in reset can re-seed the owner
+    // combobox's visible label even after a remote search evicted the server-seeded option
+    // (remote mode: a bare setValue(id) with no label would blank the field, REQ-FE-016).
+    assertThat(html)
+        .as("acting-user name stamped for the owner-picker label re-seed")
+        .contains("data-acting-user-name=\"Logi Stician\"");
+    // The org-unit picker shell and the two checkboxes render; "dem Auftrag zuordnen" defaults on.
+    assertThat(html).as("org-unit picker shell").contains("id=\"production-orgunit\"");
+    assertThat(html).as("personal checkbox").contains("id=\"production-personal\"");
+    int allocateAt = html.indexOf("id=\"production-allocate\"");
+    assertThat(allocateAt).as("allocate checkbox rendered").isGreaterThan(0);
+    String allocateTag = html.substring(allocateAt, html.indexOf('>', allocateAt));
+    assertThat(allocateTag).as("allocate checkbox defaults on").contains("checked");
+  }
+
   // No-double-fetch guard for the parallelized logistician fan-out (#768). The order-detail render
   // splits addOwnerPickerOptions into a fetch step + an apply step so the requesting-org-unit list
   // can be loaded on a ParallelPageLoader worker thread alongside users/materials/squadrons. Pin

@@ -19,19 +19,26 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.ui.ConcurrentModel;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
@@ -66,5 +73,34 @@ class AdminSettingsPageControllerTest {
     controller.updateSettings("30", 0L, "90", 0L, "UP", 0L, "0.5", 0L, "  ", 0L, ra);
 
     verify(backendApiClient, never()).put(eq(INTAKE_URI), any(), any());
+  }
+
+  // covers REQ-ADMIN-001 — a squadron beyond the first backend page still gets its promotion
+  // toggle rendered on the settings page
+  @Test
+  void viewSettings_walksAllSquadronPickerPages() {
+    // Given — the squadron catalog spans two backend pages; the SK picker is empty
+    SquadronDto first = new SquadronDto(UUID.randomUUID(), "Alpha", "AL", "", true, true, true, 0L);
+    SquadronDto second = new SquadronDto(UUID.randomUUID(), "Zulu", "ZU", "", true, true, true, 0L);
+    String squadronsBase = "/api/v1/squadrons?size=1000&sort=name,asc";
+    when(backendApiClient.get(eq(squadronsBase + "&page=0"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(second), 0, 1000, 2, 2, List.of()));
+    when(backendApiClient.get(eq(squadronsBase + "&page=1"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(first), 1, 1000, 2, 2, List.of()));
+    when(backendApiClient.get(
+            eq("/api/v1/special-commands?size=1000&sort=name,asc&page=0"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
+    ConcurrentModel model = new ConcurrentModel();
+
+    // When
+    controller.viewSettings(model);
+
+    // Then — both pages land in the toggle list, sorted, with no truncation flagged
+    @SuppressWarnings("unchecked")
+    List<SquadronDto> squadrons = (List<SquadronDto>) model.getAttribute("squadrons");
+    assertEquals(2, squadrons.size(), "the second backend page must not be dropped");
+    assertEquals("Alpha", squadrons.get(0).name());
+    assertEquals("Zulu", squadrons.get(1).name());
+    assertEquals(Boolean.FALSE, model.getAttribute("catalogTruncated"));
   }
 }

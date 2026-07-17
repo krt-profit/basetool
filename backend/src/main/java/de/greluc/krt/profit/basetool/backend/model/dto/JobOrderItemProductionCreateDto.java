@@ -42,9 +42,39 @@ import java.util.UUID;
  * @param skippedMaterialIds ids of required materials the operator opted out of booking out: their
  *     demand is excluded from the coverage check and no linked inventory is consumed for them.
  *     {@code null} is treated as none skipped
+ * @param bookIn where and for whom the produced units are booked into the Lager as game-item stock
+ *     (REQ-INV-032, design §5.6); required — the production modal always sends it, and a missing
+ *     block is a 400 validation error (the transitional null-tolerant rollout window closed when
+ *     the modal's book-in section shipped)
  */
 public record JobOrderItemProductionCreateDto(
     @NotNull @Min(1) Integer amount,
     @NotNull Long version,
     @NotNull List<@Valid JobOrderItemProductionConsumptionDto> consumption,
-    List<UUID> skippedMaterialIds) {}
+    List<UUID> skippedMaterialIds,
+    @NotNull @Valid BookInDto bookIn) {
+
+  /**
+   * The production book-in target (REQ-INV-032): the location, owner and org-unit pool the produced
+   * game-item stock lands on, plus the personal flag and the auto-earmark opt-out.
+   *
+   * @param locationId the storage location the produced units are booked in at ("wo"); required
+   * @param ownerUserId the user the stock row is created for ("bei wem"); {@code null} defaults to
+   *     the acting user
+   * @param owningOrgUnitId the org-unit picker output whose stock pool the row is stamped onto
+   *     (REQ-ORG-004/016 create-on-behalf semantics, validated against the owner's memberships);
+   *     {@code null} triggers the auto-stamp path
+   * @param personal {@code true} books the units into the owner's personal pool; {@code null} is
+   *     treated as {@code false}. Mutually exclusive with {@code allocateToOrder} — personal stock
+   *     never carries allocations
+   * @param allocateToOrder {@code true} (also the {@code null} default) auto-earmarks the produced
+   *     units to the producing order via a job-order allocation slice; must be explicitly {@code
+   *     false} when {@code personal} is set
+   */
+  public record BookInDto(
+      @NotNull UUID locationId,
+      UUID ownerUserId,
+      UUID owningOrgUnitId,
+      Boolean personal,
+      Boolean allocateToOrder) {}
+}

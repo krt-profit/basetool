@@ -30,6 +30,8 @@ import de.greluc.krt.profit.basetool.frontend.model.form.SquadronForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.MapPayloadValues;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
@@ -87,11 +89,16 @@ public class AdminMissionDataPageController {
   private final ParallelPageLoader parallelPageLoader;
 
   /**
-   * Renders all three reference catalogs side by side. Seeds empty forms when the model does not
+   * Renders all three reference catalogs side by side, each fetched <em>completely</em> — every
+   * page, not one capped chunk (REQ-ADMIN-001, ADR-0102). Seeds empty forms when the model does not
    * already carry one (a previous validation failure rerender). The three catalogs are fetched in
    * parallel via {@link ParallelPageLoader}; if any individual fetch throws, the corresponding
    * catalog renders empty and a single shared error message ({@code error.admin.mission.data.load})
-   * is surfaced — same user-visible behaviour as the previous sequential implementation.
+   * is surfaced — same user-visible behaviour as the previous sequential implementation. If a page
+   * walk hits its safety cap, the per-section flags {@code jobTypesTruncated} / {@code
+   * squadronsTruncated} / {@code frequencyTypesTruncated} render a loud warning banner inside the
+   * affected section's results fragment — inside, so the include-inactive AJAX swap re-evaluates it
+   * (REQ-ADMIN-002).
    *
    * @param includeInactiveJobTypes show soft-deleted job types
    * @param includeInactiveSquadrons show soft-deleted squadrons
@@ -125,7 +132,7 @@ public class AdminMissionDataPageController {
 
     AtomicBoolean anyFailure = new AtomicBoolean(false);
 
-    CompletableFuture<List<JobTypeDto>> jobTypesFuture =
+    CompletableFuture<CompleteCatalog<JobTypeDto>> jobTypesFuture =
         parallelPageLoader
             .loadAsync(() -> fetchJobTypes(includeInactiveJobTypes))
             .exceptionally(
@@ -135,7 +142,7 @@ public class AdminMissionDataPageController {
                   return null;
                 });
 
-    CompletableFuture<List<SquadronDto>> squadronsFuture =
+    CompletableFuture<CompleteCatalog<SquadronDto>> squadronsFuture =
         parallelPageLoader
             .loadAsync(() -> fetchSquadrons(includeInactiveSquadrons))
             .exceptionally(
@@ -145,7 +152,7 @@ public class AdminMissionDataPageController {
                   return null;
                 });
 
-    CompletableFuture<List<Map<String, Object>>> freqsFuture =
+    CompletableFuture<CompleteCatalog<Map<String, Object>>> freqsFuture =
         parallelPageLoader
             .loadAsync(() -> fetchFrequencyTypes(includeInactiveFrequencyTypes))
             .exceptionally(
@@ -157,12 +164,21 @@ public class AdminMissionDataPageController {
 
     CompletableFuture.allOf(jobTypesFuture, squadronsFuture, freqsFuture).join();
 
-    model.addAttribute("jobTypes", jobTypesFuture.join());
-    model.addAttribute("squadrons", squadronsFuture.join());
-    List<Map<String, Object>> freqs = freqsFuture.join();
-    if (freqs != null) {
-      model.addAttribute("frequencyTypes", freqs);
+    CompleteCatalog<JobTypeDto> jobTypesCatalog = jobTypesFuture.join();
+    CompleteCatalog<SquadronDto> squadronsCatalog = squadronsFuture.join();
+    CompleteCatalog<Map<String, Object>> freqsCatalog = freqsFuture.join();
+    model.addAttribute("jobTypes", jobTypesCatalog == null ? null : jobTypesCatalog.items());
+    model.addAttribute("squadrons", squadronsCatalog == null ? null : squadronsCatalog.items());
+    if (freqsCatalog != null) {
+      model.addAttribute("frequencyTypes", freqsCatalog.items());
     }
+    // Per-section flags, not one page-wide OR: each results fragment carries its own banner so
+    // the include-inactive AJAX swap (REQ-FE-002) re-evaluates truncation without a full reload,
+    // and a truncated job-type walk never banners the unaffected squadron/frequency sections.
+    model.addAttribute("jobTypesTruncated", jobTypesCatalog != null && jobTypesCatalog.truncated());
+    model.addAttribute(
+        "squadronsTruncated", squadronsCatalog != null && squadronsCatalog.truncated());
+    model.addAttribute("frequencyTypesTruncated", freqsCatalog != null && freqsCatalog.truncated());
     if (anyFailure.get()) {
       model.addAttribute("error", "error.admin.mission.data.load");
     }
@@ -195,21 +211,24 @@ public class AdminMissionDataPageController {
   }
 
   /**
-   * Fetches the job-type catalog from the backend, transforms the raw {@code Map} payload into a
-   * list of {@link JobTypeDto} records and sorts the result case-insensitively by name. Returns
-   * {@code null} when the backend responds with no content; callers treat that as "no catalog
-   * available", same as the previous sequential implementation.
+   * Fetches the <em>complete</em> job-type catalog from the backend — every page, not one capped
+   * chunk (REQ-ADMIN-001, ADR-0102) — transforms the raw {@code Map} payload into a list of {@link
+   * JobTypeDto} records and sorts the result case-insensitively by name. An empty backend catalog
+   * yields an empty item list; the returned wrapper carries the truncation flag for the page-level
+   * warning banner (REQ-ADMIN-002).
    */
-  private List<JobTypeDto> fetchJobTypes(boolean includeInactive) {
-    PageResponse<Map<String, Object>> page =
-        backendApiClient.get(
-            "/api/v1/job-types?size=1000&sort=name,asc&includeInactive=" + includeInactive,
-            MAP_PAGE);
-    if (page == null || page.content() == null) {
-      return null;
-    }
+  private CompleteCatalog<JobTypeDto> fetchJobTypes(boolean includeInactive) {
+    CompleteCatalog<Map<String, Object>> catalog =
+        CatalogPages.fetchAll(
+            page ->
+                backendApiClient.get(
+                    "/api/v1/job-types?size=1000&sort=name,asc&includeInactive="
+                        + includeInactive
+                        + "&page="
+                        + page,
+                    MAP_PAGE));
     List<JobTypeDto> jobTypes =
-        page.content().stream()
+        catalog.items().stream()
             .map(
                 m ->
                     new JobTypeDto(
@@ -225,25 +244,28 @@ public class AdminMissionDataPageController {
             .collect(Collectors.toCollection(ArrayList::new));
     jobTypes.sort(
         Comparator.comparing(j -> j.name() == null ? "" : j.name(), String.CASE_INSENSITIVE_ORDER));
-    return jobTypes;
+    return new CompleteCatalog<>(jobTypes, catalog.totalElements(), catalog.truncated());
   }
 
   /**
-   * Fetches the squadron catalog from the backend, transforms the raw {@code Map} payload into a
-   * list of {@link SquadronDto} records and sorts the result case-insensitively by name. Returns
-   * {@code null} when the backend responds with no content; callers treat that as "no catalog
-   * available", same as the previous sequential implementation.
+   * Fetches the <em>complete</em> squadron catalog from the backend — every page, not one capped
+   * chunk (REQ-ADMIN-001, ADR-0102) — transforms the raw {@code Map} payload into a list of {@link
+   * SquadronDto} records and sorts the result case-insensitively by name. An empty backend catalog
+   * yields an empty item list; the returned wrapper carries the truncation flag for the page-level
+   * warning banner (REQ-ADMIN-002).
    */
-  private List<SquadronDto> fetchSquadrons(boolean includeInactive) {
-    PageResponse<Map<String, Object>> page =
-        backendApiClient.get(
-            "/api/v1/squadrons?size=1000&sort=name,asc&includeInactive=" + includeInactive,
-            MAP_PAGE);
-    if (page == null || page.content() == null) {
-      return null;
-    }
+  private CompleteCatalog<SquadronDto> fetchSquadrons(boolean includeInactive) {
+    CompleteCatalog<Map<String, Object>> catalog =
+        CatalogPages.fetchAll(
+            page ->
+                backendApiClient.get(
+                    "/api/v1/squadrons?size=1000&sort=name,asc&includeInactive="
+                        + includeInactive
+                        + "&page="
+                        + page,
+                    MAP_PAGE));
     List<SquadronDto> squadrons =
-        page.content().stream()
+        catalog.items().stream()
             .map(
                 m ->
                     new SquadronDto(
@@ -258,22 +280,24 @@ public class AdminMissionDataPageController {
             .collect(Collectors.toCollection(ArrayList::new));
     squadrons.sort(
         Comparator.comparing(s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER));
-    return squadrons;
+    return new CompleteCatalog<>(squadrons, catalog.totalElements(), catalog.truncated());
   }
 
   /**
-   * Fetches the frequency-type catalog from the backend and returns the raw {@code Map} content
-   * (this list is rendered with Thymeleaf utility helpers and does not need a typed DTO). Returns
-   * {@code null} when the backend responds with no content; callers treat that as "no catalog
-   * available", same as the previous sequential implementation.
+   * Fetches the <em>complete</em> frequency-type catalog from the backend — every page, not one
+   * capped chunk (REQ-ADMIN-001, ADR-0102) — and returns the raw {@code Map} content (this list is
+   * rendered with Thymeleaf utility helpers and does not need a typed DTO). The returned wrapper
+   * carries the truncation flag for the page-level warning banner (REQ-ADMIN-002).
    */
-  private List<Map<String, Object>> fetchFrequencyTypes(boolean includeInactive) {
-    PageResponse<Map<String, Object>> page =
-        backendApiClient.get(
-            "/api/v1/frequency-types?size=1000&sort=sortIndex,asc"
-                + (includeInactive ? "" : "&active=true"),
-            MAP_PAGE);
-    return page != null ? page.content() : null;
+  private CompleteCatalog<Map<String, Object>> fetchFrequencyTypes(boolean includeInactive) {
+    return CatalogPages.fetchAll(
+        page ->
+            backendApiClient.get(
+                "/api/v1/frequency-types?size=1000&sort=sortIndex,asc"
+                    + (includeInactive ? "" : "&active=true")
+                    + "&page="
+                    + page,
+                MAP_PAGE));
   }
 
   /**

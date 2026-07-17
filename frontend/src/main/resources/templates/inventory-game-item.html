@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title>Item Details - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<style th:attr="nonce=${cspNonce}">
+        .actions-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box flex-between">
+        <h1 th:text="#{inventory.items.drilldown.title}">Detailansicht Item</h1>
+    </div>
+
+    <div class="hud-box mt-2">
+        <div th:if="${error}" class="hud-box hud-box-error">
+            <p th:text="#{__${error}__}">Fehler</p>
+        </div>
+
+        <div class="actions-bar">
+            <a th:href="@{/inventory(view='items')}" class="btn btn-ghost">&laquo; <span th:text="#{inventory.items.back}">Zurück zur Übersicht</span></a>
+            <!-- Deliberately NO "navigate to another item" picker here (unlike the material
+                 drilldown's #materialSelect): the material page preloads its ~150-entry catalog
+                 into a local-filter combobox, but the item catalog is thousands of entries —
+                 preloading them is off the table. The server-side remote-game-items combobox
+                 marker (design §6.6 / REQ-FE-016) ships with the Einbuchen pass; add the
+                 navigate picker here once that registry exists. -->
+        </div>
+
+        <!-- Live-sync results container (REQ-FE-015): inventory-game-item.js re-fetches this
+             fragment (?fragment=results -> inventoryGameItemResults) when a peer's stock change
+             lands in the shared "inventory" room, so the drilldown refreshes in place without a
+             reload (REQ-INV-030). -->
+        <div id="inventory-game-item-results">
+        <th:block th:fragment="inventoryGameItemResults">
+        <h3 class="krtm-font-family-lato-sans-serif-font-weight-700-957b" th:if="${gameItemName != null}" th:text="${gameItemName}">Item</h3>
+        <div class="overflow-x-auto">
+            <div class="table-responsive">
+            <table class="krt-table">
+                <thead>
+                    <tr>
+                        <th th:text="#{inventory.items.drilldown.col.user}">Nutzer</th>
+                        <th th:text="#{inventory.items.drilldown.col.location}">Ort</th>
+                        <th th:text="#{inventory.items.drilldown.col.amount}">Menge</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="item : ${items}">
+                        <td th:text="${item.user.effectiveName}">Username</td>
+                        <td th:text="${item.location.name}">Ort</td>
+                        <td><span th:text="${item.amount != null ? #numbers.formatInteger(item.amount, 1) : '0'}">10</span> <span th:text="#{material.quantity.piece}">Stück</span></td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(items)}">
+                        <td colspan="3" class="text-center text-muted" th:text="#{inventory.items.drilldown.empty}">Keine Einträge für dieses Item gefunden.</td>
+                    </tr>
+                </tbody>
+            </table>
+            </div>
+        </div>
+        </th:block>
+        </div>
+    </div>
+</main>
+<th:block th:replace="~{fragments/toast :: toast}" />
+<script th:src="@{/js/inventory-game-item.js}" th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>

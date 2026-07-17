@@ -154,8 +154,10 @@ public final class ScopeSpecifications {
    * InventoryItem's scope predicate (alias {@code i}, field {@code owningOrgUnit}): the plain
    * triple with no escape tail — the direct Lager-View is strict-staffel per REQ-ORG-003. Reused
    * verbatim by {@code InventoryItemRepository.findByMaterialAndPersonalFalseScoped}, {@code
-   * #findGlobalByFilters}, {@code #findGlobalStacks}, {@code #findGlobalStackEntries}, {@code
-   * #getAggregatedInventory} and {@code #deleteAllNonPersonal}.
+   * #findByGameItemAndPersonalFalseScoped}, {@code #findGlobalByFilters}, {@code
+   * #findGlobalItemsByFilters}, {@code #findGlobalStacks}, {@code #findGlobalItemStacks}, {@code
+   * #findGlobalStackEntries}, {@code #findGlobalItemStackEntries}, {@code #getAggregatedInventory},
+   * {@code #getAggregatedItemInventory} and {@code #deleteAllNonPersonal}.
    */
   static final String INVENTORY_ITEM_SCOPE_TRIPLE =
       """

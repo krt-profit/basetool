@@ -98,6 +98,13 @@ public enum AuditEventType {
   /** A new inventory row was created from refinery output (cross-domain store). */
   INVENTORY_RECEIVED_FROM_REFINERY(AuditDomain.INVENTORY),
 
+  /**
+   * A new game-item stock row was booked in from a job-order production run (cross-domain store,
+   * REQ-INV-032): the produced units land in the Lager at the location/owner/org-unit the operator
+   * chose in the Herstellung modal, optionally auto-earmarked to the producing order.
+   */
+  INVENTORY_RECEIVED_FROM_PRODUCTION(AuditDomain.INVENTORY),
+
   /** Inventory stock was decremented/deleted by a job-order handover (cross-domain). */
   INVENTORY_HANDED_OVER(AuditDomain.INVENTORY),
 

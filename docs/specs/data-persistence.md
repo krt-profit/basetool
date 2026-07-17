@@ -209,8 +209,13 @@ and its invalidation domain; the cache key is the constant's `name()`. This make
 **unrepresentable**: a per-principal URI (`/api/v1/users/me`, `/api/v1/me/capabilities`,
 `/api/v1/me/active-org-unit`) cannot be cached because no constant names it, and adding one is a
 reviewable, spec-gated act. Every `CachedCatalog` is verified global (no `sub` / role /
-`X-Active-Org-Unit-Id` / redaction variance). `FrontendCacheSplitTest` pins the URIs so a refactor
-cannot silently change a cache target.
+`X-Active-Org-Unit-Id` / redaction variance). Each constant also declares its **fetch mode**: a
+paged catalogue consumed as "the whole list" is marked `Fetch.PAGE_WALK` and assembled complete by
+a page walk *inside* `getCached` before the single cache write, so the cache can never serve a
+silently truncated catalogue app-wide (REQ-ADMIN-003 in
+[`admin-catalog-completeness.md`](admin-catalog-completeness.md), ADR-0103).
+`FrontendCacheSplitTest` pins the URIs **and** fetch modes so a refactor cannot silently change a
+cache target or re-truncate a walked catalogue.
 
 **Per-domain split (FE-CACHE-2).** Catalogues no longer share one `staticData` cache that any admin
 mutation dropped wholesale (a squadron toggle cold-starting the 10 000-row terminal list, the material

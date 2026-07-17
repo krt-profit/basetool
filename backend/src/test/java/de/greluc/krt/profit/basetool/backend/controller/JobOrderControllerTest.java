@@ -271,7 +271,14 @@ class JobOrderControllerTest {
   void lookupJobOrders_delegatesToServiceReferenceQuery() {
     JobOrderReferenceDto ref =
         new JobOrderReferenceDto(
-            UUID.randomUUID(), 42, "alice", JobOrderStatus.OPEN, null, List.of(), List.of());
+            UUID.randomUUID(),
+            42,
+            "alice",
+            JobOrderStatus.OPEN,
+            null,
+            List.of(),
+            List.of(),
+            List.of());
     when(jobOrderQueryService.findAllActiveReference()).thenReturn(List.of(ref));
 
     List<JobOrderReferenceDto> result = controller.lookupJobOrders();
@@ -371,6 +378,7 @@ class JobOrderControllerTest {
     InventoryItemDto inv =
         new InventoryItemDto(
             UUID.randomUUID(),
+            null,
             null,
             null,
             null,
@@ -698,8 +706,16 @@ class JobOrderControllerTest {
   void bookProduction_delegatesToService() {
     UUID jobOrderId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
+    // bookIn is required since the REQ-INV-032 flip (@NotNull, enforced by @Valid at the API
+    // boundary), so the pass-through payload carries a complete block.
     JobOrderItemProductionCreateDto dto =
-        new JobOrderItemProductionCreateDto(3, 7L, List.of(), List.of());
+        new JobOrderItemProductionCreateDto(
+            3,
+            7L,
+            List.of(),
+            List.of(),
+            new JobOrderItemProductionCreateDto.BookInDto(
+                UUID.randomUUID(), null, null, false, true));
     JobOrderItemDto persisted =
         new JobOrderItemDto(itemId, null, null, 5, 3, 0, null, List.of(), 8L);
     when(jobOrderItemProductionService.bookProduction(jobOrderId, itemId, dto))

@@ -31,6 +31,14 @@
  * POST->redirect stays the no-JS fallback. Both former blocks always render, so they are combined
  * into this single module in document order.
  *
+ * The Material <-> Item catalog-mode toggle (design §6.2, REQ-INV-029) swaps only the
+ * catalog-specific blocks of the single shared form: the inactive block is hidden AND its controls
+ * disabled (so `required` never blocks submit and disabled controls stay out of the POST — the
+ * client half of the materialId/gameItemId XOR). Item mode books whole units (PIECE semantics:
+ * step 1, Stück unit, no SCU hint, no merge opt-in — items always auto-merge), has no mission
+ * allocation section (REQ-INV-031) and filters the order rows by the option's data-game-items CSV
+ * instead of data-materials.
+ *
  * MSG_UNIT_PIECE / MSG_UNIT_SCU and the INV_ADD_MSG error strings are defined by the inline Thymeleaf
  * bootstrap block of inventory-input.html, which executes immediately before this classic script.
  */
@@ -47,6 +55,17 @@ document.addEventListener('DOMContentLoaded', function () {
         if (matSelect.value) {
             updateAmountFieldForMaterial(matSelect);
         }
+    }
+
+    // Item mode (design §6.2): the remote-game-items picker re-filters the order rows by
+    // data-game-items and mirrors its committed label into the gameItemName echo, which seeds the
+    // picker's option on a classic-path validation redisplay (no by-id catalog resolve exists).
+    const gameItemSelect = document.getElementById('gameItemId');
+    if (gameItemSelect) {
+        gameItemSelect.addEventListener('change', function () {
+            filterOrderSelects(this.value);
+            syncGameItemNameEcho(this);
+        });
     }
 
     const personalToggle = document.getElementById('personal');
@@ -72,22 +91,113 @@ document.addEventListener('DOMContentLoaded', function () {
     document.addEventListener('change', function (event) {
         if (event.target.matches('[data-alloc-target]')) {
             updateAllocOver();
+        } else if (event.target.matches('[data-trigger="inv-input-mode-toggle"]')) {
+            applyCatalogMode();
         }
     });
+
+    // Apply the server-derived initial mode (item on a gameItemId-carrying redisplay) so the
+    // inactive block starts disabled and the amount/allocation wiring matches the visible catalog.
+    applyCatalogMode();
 });
+
+// ===== Material <-> Item catalog-mode toggle (design §6.2) =====
+
+// Resolves the active catalog mode from the radio pair; defaults to material.
+function currentCatalogMode() {
+    const checked = document.querySelector('input[name="inventoryCatalogMode"]:checked');
+    return checked && checked.value === 'item' ? 'item' : 'material';
+}
+
+// The active mode's picked catalog id ('' when nothing is picked yet). Reads the enhanced
+// combobox's hidden input via getElementById — both pickers keep their original ids (REQ-FE-016).
+function activeCatalogId() {
+    const el = document.getElementById(
+        currentCatalogMode() === 'item' ? 'gameItemId' : 'materialId',
+    );
+    return el ? el.value : '';
+}
+
+// Disables/enables every control inside a catalog block (same mechanism as orders-create's
+// setFormDisabled): disabled controls are omitted from the POST body and their `required` never
+// blocks the visible mode's submit. Covers the enhanced comboboxes too — both their hidden
+// value-carrying input and the visible textbox match 'input'.
+function setCatalogBlockDisabled(blockId, disabled) {
+    const block = document.getElementById(blockId);
+    if (!block) return;
+    block.querySelectorAll('input, select, textarea, button').forEach(function (el) {
+        el.disabled = disabled;
+    });
+}
+
+// Applies the active catalog mode: swap + disable the catalog blocks, switch the amount field
+// (item mode = PIECE semantics: whole units, Stück, no SCU hint, no merge opt-in), recompute the
+// allocation sections (no mission dimension in item mode) and re-filter the order rows.
+function applyCatalogMode() {
+    const mode = currentCatalogMode();
+    const materialBlock = document.getElementById('mode-material-fields');
+    const itemBlock = document.getElementById('mode-item-fields');
+    if (materialBlock) materialBlock.hidden = mode !== 'material';
+    if (itemBlock) itemBlock.hidden = mode !== 'item';
+    setCatalogBlockDisabled('mode-material-fields', mode !== 'material');
+    setCatalogBlockDisabled('mode-item-fields', mode !== 'item');
+    if (mode === 'item') {
+        applyItemAmountMode();
+    } else {
+        const matSelect = document.getElementById('materialId');
+        if (matSelect) updateAmountFieldForMaterial(matSelect);
+    }
+    syncPersonalAllocations();
+    filterOrderSelects(activeCatalogId());
+}
+
+// Item-mode amount semantics: a gameItem row is booked in whole units like a PIECE material —
+// integer step, Stück unit, no SCU hint, and the merge opt-in is never offered (items always
+// auto-merge server-side, REQ-INV-026).
+function applyItemAmountMode() {
+    const amountInput = document.getElementById('amount');
+    const unitSpan = document.getElementById('amount-unit');
+    const scuHint = document.getElementById('amount-scu-hint');
+    if (amountInput) amountInput.setAttribute('step', '1');
+    if (unitSpan) unitSpan.textContent = '(' + MSG_UNIT_PIECE + ')';
+    if (scuHint) scuHint.classList.add('krtm-hidden');
+    updateMergeOptIn('PIECE');
+}
+
+// Mirrors the item picker's committed label into the hidden gameItemName echo so a classic-path
+// validation redisplay can seed the remote combobox's single option with a readable label. Reads
+// the enhanced control's textbox (precedented in bank.js/inventory-admin.js); the raw-<select>
+// fallback covers a not-yet-enhanced control.
+function syncGameItemNameEcho(control) {
+    const echo = document.getElementById('gameItemName');
+    if (!echo) return;
+    let label = '';
+    const wrapper = control.closest('.krt-combobox');
+    if (wrapper) {
+        const textbox = wrapper.querySelector('.krt-combobox__input');
+        label = textbox ? textbox.value.trim() : '';
+    } else if (control.tagName === 'SELECT' && control.selectedOptions[0]) {
+        label = control.selectedOptions[0].textContent.trim();
+    }
+    echo.value = label;
+}
 
 function updateAmountFieldForMaterial(selectElement) {
     const amountInput = document.getElementById('amount');
     const unitSpan = document.getElementById('amount-unit');
     const scuHint = document.getElementById('amount-scu-hint');
-    if (
-        !amountInput ||
-        !selectElement.selectedOptions ||
-        selectElement.selectedOptions.length === 0
-    )
-        return;
+    if (!amountInput) return;
 
-    const qtType = selectElement.selectedOptions[0].getAttribute('data-quantity-type');
+    // The material picker is a searchable combobox (REQ-FE-016): the selected option's
+    // data-quantity-type is mirrored onto the hidden input carrying #materialId, replacing the
+    // former selectedOptions[0] read (the native <option>s are gone after enhancement). The raw
+    // <select> fallback covers a not-yet-enhanced control (e.g. the enhancer script failed to
+    // execute), matching the sibling material-unit refreshers in orders-create/orders-detail.
+    let qtType = selectElement.dataset.quantityType || '';
+    if (!qtType && selectElement.tagName === 'SELECT') {
+        const opt = selectElement.selectedOptions && selectElement.selectedOptions[0];
+        qtType = (opt && opt.getAttribute('data-quantity-type')) || '';
+    }
 
     if (qtType === 'PIECE') {
         amountInput.setAttribute('step', '1');
@@ -165,8 +275,8 @@ function addAllocRow(dimension) {
     container.appendChild(template.content.cloneNode(true));
     reindexAllocRows(dimension);
     if (dimension === 'jobOrder') {
-        const matSelect = document.getElementById('materialId');
-        filterOrderSelects(matSelect ? matSelect.value : '');
+        // Filter the fresh row by the active catalog mode's picked entry (material or gameItem).
+        filterOrderSelects(activeCatalogId());
     }
     updateAllocOver();
 }
@@ -182,16 +292,19 @@ function removeAllocRow(button) {
     updateAllocOver();
 }
 
-// Filters every job-order row select to the orders that need the chosen material (data-materials
-// CSV), clearing an incompatible current selection — the multi-row successor of the former single
-// #jobOrderId filter.
-function filterOrderSelects(matId) {
+// Filters every job-order row select to the orders that request the chosen catalog entry,
+// clearing an incompatible current selection — the multi-row successor of the former single
+// #jobOrderId filter. Mode-aware (design §6.2): material mode keys the filter on the option's
+// data-materials CSV, item mode on its data-game-items sibling (the gameItems an ITEM order's
+// lines request, REQ-INV-031).
+function filterOrderSelects(catalogId) {
+    const attr = currentCatalogMode() === 'item' ? 'data-game-items' : 'data-materials';
     document.querySelectorAll('#jobOrderAllocRows [data-alloc-target]').forEach(function (select) {
         let hasSelectedValid = false;
         for (let i = 1; i < select.options.length; i++) {
             const option = select.options[i];
-            const materialsStr = option.getAttribute('data-materials');
-            const compatible = !matId || (materialsStr && materialsStr.split(',').includes(matId));
+            const idsStr = option.getAttribute(attr);
+            const compatible = !catalogId || (idsStr && idsStr.split(',').includes(catalogId));
             option.style.display = compatible ? '' : 'none';
             option.disabled = !compatible;
             if (compatible && option.selected) hasSelectedValid = true;
@@ -227,15 +340,19 @@ function updateAllocOver() {
 }
 
 // Personal stock can never be assigned: hide + clear both allocation sections while personal is
-// ticked (the backend rejects a personal entry carrying assignments too).
+// ticked (the backend rejects a personal entry carrying assignments too). Applies to both catalog
+// modes; item mode additionally hides + clears the mission section outright — item rows reject
+// the mission dimension (REQ-INV-031).
 function syncPersonalAllocations() {
     const personal = document.getElementById('personal');
     const on = !!(personal && personal.checked);
+    const itemMode = currentCatalogMode() === 'item';
     ['jobOrder', 'mission'].forEach(function (dimension) {
         const cfg = allocConfig(dimension);
+        const hide = on || (dimension === 'mission' && itemMode);
         const group = document.getElementById(cfg.group);
-        if (group) group.classList.toggle('krtm-hidden', on);
-        if (on) {
+        if (group) group.classList.toggle('krtm-hidden', hide);
+        if (hide) {
             const container = document.getElementById(cfg.rows);
             if (container) container.innerHTML = '';
         }

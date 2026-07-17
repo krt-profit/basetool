@@ -105,6 +105,7 @@ public class InventoryWriteController {
       BindingResult bindingResult,
       Model model,
       RedirectAttributes redirectAttributes) {
+    validateCatalogMode(form, bindingResult);
     if (formPersonalWithAssignment(form)) {
       bindingResult.rejectValue(
           "personal",
@@ -118,20 +119,7 @@ public class InventoryWriteController {
     }
 
     try {
-      InventoryItemCreateDto request =
-          new InventoryItemCreateDto(
-              Boolean.TRUE.equals(form.getIsGlobal()) ? form.getUserId() : null,
-              form.getMaterialId(),
-              form.getLocationId(),
-              form.getQuality(),
-              form.getAmount(),
-              form.getPersonal(),
-              form.getMissionId(),
-              form.getJobOrderId(),
-              form.getOwningOrgUnitId(),
-              form.getMergeStock(),
-              toAllocationInputs(form.getJobOrderAllocations()),
-              toAllocationInputs(form.getMissionAllocations()));
+      InventoryItemCreateDto request = buildCreateRequest(form);
       backendApiClient.post("/api/v1/inventory", request, InventoryItemDto.class);
       redirectAttributes.addFlashAttribute("successToast", "success.inventory.add");
     } catch (BackendServiceException e) {
@@ -176,6 +164,7 @@ public class InventoryWriteController {
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> addInventoryItemAjax(
       @Valid @ModelAttribute("inventoryForm") InventoryForm form, BindingResult bindingResult) {
+    validateCatalogMode(form, bindingResult);
     if (formPersonalWithAssignment(form)) {
       return inventoryValidationError("INVENTORY_PERSONAL_ASSIGNMENT");
     }
@@ -183,20 +172,7 @@ public class InventoryWriteController {
       return inventoryValidationError("VALIDATION");
     }
     try {
-      InventoryItemCreateDto request =
-          new InventoryItemCreateDto(
-              Boolean.TRUE.equals(form.getIsGlobal()) ? form.getUserId() : null,
-              form.getMaterialId(),
-              form.getLocationId(),
-              form.getQuality(),
-              form.getAmount(),
-              form.getPersonal(),
-              form.getMissionId(),
-              form.getJobOrderId(),
-              form.getOwningOrgUnitId(),
-              form.getMergeStock(),
-              toAllocationInputs(form.getJobOrderAllocations()),
-              toAllocationInputs(form.getMissionAllocations()));
+      InventoryItemCreateDto request = buildCreateRequest(form);
       backendApiClient.post("/api/v1/inventory", request, InventoryItemDto.class);
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", inventorySourceTarget(form.getSource())));
@@ -207,6 +183,63 @@ public class InventoryWriteController {
       log.error("Failed to add inventory item (ajax)", e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
+  }
+
+  /**
+   * Cross-field catalog-mode validation of the create form (design §6.2, REQ-INV-029): exactly one
+   * of {@code materialId} / {@code gameItemId} must be set (the inactive mode's controls are
+   * disabled client-side, so both-set or neither-set only happens on a crafted or degraded
+   * request), and material mode additionally requires a {@code quality} (item rows carry none, so
+   * the field-level {@code @NotNull} moved here). Shared by the classic and AJAX handlers; the
+   * classic path renders the rejected fields inline, the AJAX path maps any error to the generic
+   * 422 {@code VALIDATION} code.
+   *
+   * @param form the bound create form
+   * @param bindingResult the binding result the violations are recorded on
+   */
+  private static void validateCatalogMode(InventoryForm form, BindingResult bindingResult) {
+    boolean material = form.getMaterialId() != null;
+    boolean item = form.getGameItemId() != null;
+    if (material == item) {
+      bindingResult.rejectValue(
+          item ? "gameItemId" : "materialId",
+          "error.inventory.catalog.required",
+          "Bitte genau ein Material oder ein Item auswählen.");
+      return;
+    }
+    if (material && form.getQuality() == null) {
+      bindingResult.rejectValue(
+          "quality", "error.inventory.quality.required", "Bitte eine Qualität angeben.");
+    }
+  }
+
+  /**
+   * Maps the validated create form to the backend create payload. Derives the catalog mode from the
+   * set reference ({@link #validateCatalogMode} guarantees the XOR) and defensively clears every
+   * inactive-mode field server-side: item mode sends {@code gameItemId} with {@code null} quality,
+   * no mission assignment (item rows reject the mission dimension, REQ-INV-031) and no merge opt-in
+   * (items always auto-merge, REQ-INV-026); material mode sends {@code materialId} + quality
+   * exactly as before the item mode shipped.
+   *
+   * @param form the validated create form
+   * @return the backend create payload
+   */
+  private static InventoryItemCreateDto buildCreateRequest(InventoryForm form) {
+    boolean itemMode = form.getGameItemId() != null;
+    return new InventoryItemCreateDto(
+        Boolean.TRUE.equals(form.getIsGlobal()) ? form.getUserId() : null,
+        itemMode ? null : form.getMaterialId(),
+        itemMode ? form.getGameItemId() : null,
+        form.getLocationId(),
+        itemMode ? null : form.getQuality(),
+        form.getAmount(),
+        form.getPersonal(),
+        itemMode ? null : form.getMissionId(),
+        form.getJobOrderId(),
+        form.getOwningOrgUnitId(),
+        itemMode ? Boolean.FALSE : form.getMergeStock(),
+        toAllocationInputs(form.getJobOrderAllocations()),
+        itemMode ? List.of() : toAllocationInputs(form.getMissionAllocations()));
   }
 
   /**
@@ -321,10 +354,11 @@ public class InventoryWriteController {
       model.addAttribute("errorToast", "error.validation.failed");
       model.addAttribute("showBookOutModal", id);
       if (fromAdminListing) {
-        return inventoryPageController.viewAllInventory(null, null, null, null, false, model);
+        return inventoryPageController.viewAllInventory(
+            null, null, null, null, null, null, false, model);
       }
       return inventoryPageController.viewMyInventory(
-          null, null, null, null, false, false, false, model);
+          null, null, null, null, null, null, false, false, false, model);
     }
 
     try {

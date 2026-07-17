@@ -967,20 +967,28 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 
 The `inventory` room is the squadron Lager (#1307/#1309): a single opaque `stock` section stands for
 "the inventory changed". **All** inventory views subscribe and re-pull their own fragment on a peer's
-write — the shared `/inventory/all` and personal `/inventory/my` grouped tables (`filterInventory` /
-`filterMyInventory`, including their lazily-loaded stack entries, so a collapsed stack re-fetches its
-chips on the next expand), the aggregated `/inventory` overview and the per-material
-`/inventory/material/{id}` drilldown (each `krtFetch.swap` its `?fragment=results` container). Every
-inventory write (allocation add/change/remove, book-out, transfer, personal-rebook, bulk-checkout,
-delete-all, note) broadcasts it, from whichever page made it. Because it is a global room but each
-viewer's fragment is owner- and org-unit-scoped, a cross-scope peer refresh (another squadron, or a
-personal-only change seen by a shared view) is a harmless no-op. The same inventory writes also
-cross-publish to the `order:{id}` room (the order material collection tracks the earmark roll-up) and
-the `materialboard` room (a stock-reducing write clamps an offer server-side), so those surfaces
-reflect inventory changes live too. The affected order ids are read off the entry's leaf chips before
-the write; the sole exception is the admin `DELETE /inventory/all` full wipe, which cannot enumerate
-them client-side — its board and inventory rooms are still poked, but an open order collection
-self-heals on the next interaction (an accepted limitation for that rare nuke).
+write — the shared `/inventory/all` and personal `/inventory/my` grouped tables in **both their
+Material and Items views** (REQ-INV-030: `filterInventory` / `filterMyInventory` rebuild the fragment
+URL from the page's own filter state *including the `view=` parameter*, so a peer's change re-renders
+whichever view is active; the lazily-loaded stack entries ride along, so a collapsed stack — material
+or game-item — re-fetches its chips on the next expand), the aggregated `/inventory` overview (both
+catalogs) and the per-catalog `/inventory/material/{id}` and `/inventory/game-item/{gameItemId}`
+drilldowns (each `krtFetch.swap` its `?fragment=results` container). No new section keys were added
+for the item views — the single `stock` seam covers both catalogs, so the three mirror points stay
+untouched. Every inventory write (allocation add/change/remove, book-out, transfer, personal-rebook,
+bulk-checkout, delete-all, note) broadcasts it, from whichever page made it. Because it is a global
+room but each viewer's fragment is owner- and org-unit-scoped, a cross-scope peer refresh (another
+squadron, or a personal-only change seen by a shared view) is a harmless no-op. The same inventory
+writes also cross-publish to the `order:{id}` room (the order material collection tracks the earmark
+roll-up) and the `materialboard` room (a stock-reducing write clamps an offer server-side), so those
+surfaces reflect inventory changes live too. The affected order ids are read off the entry's leaf
+chips before the write; the sole exception is the admin `DELETE /inventory/all` full wipe, which
+cannot enumerate them client-side — its board and inventory rooms are still poked, but an open order
+collection self-heals on the next interaction (an accepted limitation for that rare nuke). A further
+cross-publisher is the production-booking modal on the order detail page: since Herstellung books
+the produced item stock in (REQ-INV-032, the book-in section), its success handler additionally
+pokes `inventory`/`stock` — the existing seam, so Lager viewers see the fresh stock live with no
+seam-map change.
 
 The standalone order **material-collection** page (`/orders/{id}/material-collection`) joins the same
 `order:{id}` room in its own right (#1309): its per-row delivered toggle and owner/location moves
@@ -1076,6 +1084,89 @@ requester-refused queue + bank dual-auth matrix) · `RedisLiveSyncFanoutTest` +
 (`MISSION_SECTIONS`, `OPERATION_SECTIONS`, `ORDER_SECTIONS`, orders-queue seam, bank
 `BANK_ACCOUNT_SECTIONS` / `ORGUNIT_ACCOUNT_SECTIONS` / `BANK_STAFF_SECTIONS` /
 `ORGUNIT_BANK_SECTIONS`, materialboard) · **ADR:** ADR-0094 · **Issues:** #1102, #1115, #1120
+
+### REQ-FE-016 — Catalog pickers (material / game item / location) are searchable comboboxes
+
+The user-picker rule of REQ-FE-011 extends to **catalog** pickers: every field that selects a
+**material**, a **game item** or a **booking-flow location** from the catalog must be a
+`krt-searchable-select` combobox — a plain `<select>` over a full catalog is incomplete. Catalog
+pickers search **server-side** (`remoteSource` mode): the page never preloads the catalog as
+`<option>`s; the picker fetches the matching entries per (debounced) keystroke through the public
+`/catalog/material-search` / `/catalog/location-search` relays onto the backend picker searches
+(`GET /api/v1/materials/search` with `jobOrderOnly`/`rawOnly` narrowing, `GET
+/api/v1/locations/search`), 25 name-sorted rows per query. **No silent caps, ever:** every entry
+stays reachable by typing a narrower term regardless of catalog size, and the complete-list
+endpoints that other surfaces consume (`/api/v1/materials/lookup`, `/api/v1/locations/lookup`)
+stay deliberately **unbounded** — a fixed bound on a complete-list surface silently hides the
+tail, the defect class that forced the item picker onto server-side search (ADR-0100). The marker
+values are registered in `krt-catalog-search.js`: `remote-materials`,
+`remote-materials-joborder` (orders lines), `remote-materials-raw` (refinery inputs),
+`remote-locations`, and `remote-game-items` (the inventory item mode's bookable-item picker — the
+one **authenticated** relay, `GET /inventory/item-search`, onto the role-gated backend
+`/api/v1/inventory/item-catalog`, REQ-INV-029). Server-rendered edit/redisplay states seed exactly
+**one** selected `<option>` (gated `th:if`) so the label and its metadata survive enhancement;
+programmatic fills use `krtCombobox.setValue(value, label, data?)` — in remote mode a bare
+`setValue(value)` cannot resolve a label and clears the field, so every call site passes the label
+(or resolves the entry via the search relay first). Converted sites: the inventory Einbuchen
+material + location pickers and its item-mode game-item picker, the job-order create/edit material
+lines (server-rendered **and** JS-built rows), the refinery create/details input-material pickers,
+the Umbuchen target-location pickers, the production modal's book-in location picker
+(REQ-INV-032), the `/inventory/material` navigate select and the admin material-alias pickers; the
+orders item picker already used the component's `remoteSource` API.
+
+**Option-metadata mirror (the load-bearing part).** Enhancing a select **removes** the native
+`<option>` elements, so option-level metadata (`data-quantity-type` on material options,
+`data-refined-id`/`-name` on refinery options) would vanish. The component therefore mirrors the
+selected option's extra `data-*` (everything outside the combobox-owned keys) onto the hidden
+input, and consumers read `hidden.dataset.*` instead of `selectedOptions[0].dataset.*`. The mirror
+is **one shared helper invoked on every value-set path** — click/keyboard commit, enhance-time
+preselect seeding, `reconcile()`'s typed-exact-match, and the programmatic `setValue()` API —
+because covering only commit would leave typed or programmatic picks with stale metadata. It
+removes previously-mirrored keys before applying the new option's map (an option lacking a key the
+previous one carried must not inherit the old value) and never overwrites keys the enhancer copied
+from the select itself (`data-role`, `data-trigger`, … are reserved). A `remoteSource` may return
+an optional `data` map per option for the same purpose.
+
+**Conversion checklist (binding).** Before adding the marker to any select, grep the page's JS for
+`querySelector('select')`, `.selectedOptions`, `.selectedIndex`, `.options[`, direct `.value =`
+writes and `cloneNode` on containers holding the picker — each hit is either re-pointed
+(hidden-input dataset read / `element.krtCombobox.setValue()`, which never fires `change`; dispatch
+one explicitly where the old flow relied on it) or the site must not be converted. Rows built by
+cloning a **live** row must switch to an inert `<template>`/options-template source plus
+`krtEnhanceComboboxes(row)` — a cloned enhanced combobox is dead (listeners dropped, duplicated
+ARIA ids, no native select left to re-enhance).
+
+**Acceptance**
+
+- [ ] Every material / game-item / booking-location picker carries a `data-krt-combobox` marker
+  bound to a registered remote source (or wires `remoteSource` via the direct API); typing
+  fetches the matching entries server-side; the committed value submits under the original field
+  name.
+- [ ] An entry beyond any single response page (25 rows) is reachable by typing a narrower term —
+  no picker, endpoint or template silently truncates the catalog.
+- [ ] Picking a PIECE material through the combobox switches the amount field to whole-number mode
+  and back for SCU (the quantity-type mirror), including on edit-mode preselect and typed exact
+  match — never a stale unit from the previously selected option.
+- [ ] Dynamically added rows (order material lines, refinery goods rows) render a working
+  searchable picker, and programmatic fills (SCMDB import, import-review suggestion chips,
+  Umbuchen preselect) show the picked label, not a blank box.
+
+**Enforced by:** the migrated picker flows in `InventoryOperationsE2eTest`,
+`JobOrderCreateE2eTest`, `OrdersCreateScuHintRevealE2eTest` (quantity-type mirror + stale-key
+removal end-to-end) and `RefineryOrderCreateE2eTest` (via `E2eSupport.selectComboboxByValue`) ·
+`CatalogSearchControllerMvcTest` (relay mapping incl. refined metadata, fail-soft empty list,
+anonymous reachability) · MockMvc view tests asserting the mode-bearing marker on every converted
+select (`JobOrderPageControllerResponsiblePickerMvcTest`, `OrderHierarchyVisibilityTest`,
+`InventoryPageControllerMvcTest`, `AdminMaterialAliasesPageControllerMvcTest`,
+`OfficerRefineryAccessTest`) · the search unit tests in `LocationServiceTest` /
+`MaterialServiceTest` (LIKE escaping, filter flags, complete unbounded lookups) · **Code:**
+`krt-searchable-select.js` (`optionData` harvest, `mirrorItemData` on all four value-set paths,
+reserved select-level keys, label-carrying `setValue`), `krt-catalog-search.js` (remote-source
+registry), `CatalogSearchController`, the re-pointed consumers in `inventory-input.js`,
+`orders-create.js` (`refreshMaterialUnit`, async `importFromScmdb`), `orders-detail.js`,
+`refinery-orders-create.js` / `refinery-orders-details.js` (`updateOutputMaterial`, rebuilt
+`addMaterialRow`, async suggestion chips), `refinery-yield-badge.js` · **ADR:** ADR-0053
+(follow-up note), ADR-0100
 
 ### REQ-FE-017 — Account-selection fields are server-side search comboboxes too
 

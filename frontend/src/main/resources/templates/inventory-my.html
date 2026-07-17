@@ -104,6 +104,17 @@
         @media (max-width: 768px) {
             .inventory-note-preview { max-width: 100%; font-size: 1rem; padding: 0.6rem 0.75rem; }
         }
+
+        /* Item view (REQ-INV-030): the game-item tree has no quality column, so it runs on a
+           four-column grid (item / context / amount / actions) and its leaf main area spans the
+           first two columns so amount + actions stay column-aligned. Page-scoped, the material
+           tree keeps the shared five-column default. */
+        .lager-items-tree {
+            --tree-cols: minmax(220px, 1.8fr) minmax(220px, 1.7fr) 124px 172px;
+        }
+        .lager-items-tree .tree-leaf-main {
+            grid-column: 1 / 3;
+        }
     </style>
     </th:block>
 </head>
@@ -129,6 +140,18 @@
         <h1>Mein Lager</h1>
     </div>
 
+    <!-- Material <-> Items view switch (REQ-INV-030): server-rendered navigation links in the
+         shared .tab-nav DS pattern; the view= query parameter picks which tree the server
+         renders (no client-side toggling of two prerendered trees). -->
+    <div class="tab-nav mt-2" role="tablist" th:aria-label="#{inventory.items.view.aria}">
+        <a th:href="@{/inventory/my}" class="tab" role="tab"
+           th:classappend="${view != 'items'} ? ' active' : ''" th:aria-selected="${view != 'items'}"
+           data-testid="lager-view-material" th:text="#{inventory.items.view.material}">Material</a>
+        <a th:href="@{/inventory/my(view='items')}" class="tab" role="tab"
+           th:classappend="${view == 'items'} ? ' active' : ''" th:aria-selected="${view == 'items'}"
+           data-testid="lager-view-items" th:text="#{inventory.items.view.items}">Items</a>
+    </div>
+
     <div class="hud-box mt-2">
         <div th:if="${error}" class="hud-box hud-box-error">
             <p th:text="#{__${error}__}">Fehler</p>
@@ -140,7 +163,7 @@
             <a th:href="@{/inventory/input(source='my')}" class="btn btn--cta" th:text="#{inventory.input.new}">Neuen Eintrag erfassen</a>
 
             <div class="krtm-margin-left-auto-display-flex-gap-1rem-align-2424">
-                <form th:action="@{/inventory/my}" method="get" id="myFilterForm" class="my-inventory-filter no-track krtm-margin-0-display-flex-gap-1rem-align-items-c-5700">
+                <form th:if="${view != 'items'}" th:action="@{/inventory/my}" method="get" id="myFilterForm" class="my-inventory-filter no-track krtm-margin-0-display-flex-gap-1rem-align-items-c-5700">
                     <div class="flex-gap-sm">
                         <label class="form-label-xs" th:text="#{inventory.filter.material}">Material:</label>
                         <div class="multi-select-container" id="materialFilterContainer">
@@ -214,6 +237,62 @@
                     </label>
                     <button type="button" class="btn btn-ghost" data-trigger="inv-my-reset-filter" th:text="#{inventory.filter.reset}">Filter zur\u00fccksetzen</button>
                 </form>
+                <!-- Item-view filters (REQ-INV-030): gameItem multi-select populated only from
+                     items that currently have stock in the caller's scope (never the full
+                     catalog), the job-order filter, and the personal flags. All element ids are
+                     item-prefixed so the template source keeps ids unique (HTMLHint id-unique);
+                     the checkbox CLASSES are shared with the material form \u2014 only one form
+                     renders per view, so the class-driven collection cannot mix. -->
+                <form th:if="${view == 'items'}" th:action="@{/inventory/my}" method="get" id="myItemsFilterForm" class="my-inventory-filter no-track krtm-margin-0-display-flex-gap-1rem-align-items-c-5700">
+                    <input type="hidden" name="view" value="items">
+                    <div class="flex-gap-sm">
+                        <label class="form-label-xs" th:text="#{inventory.items.filter.gameItem}">Item:</label>
+                        <div class="multi-select-container" id="gameItemFilterContainer">
+                            <div class="multi-select-header" data-trigger="inv-my-toggle-multi" data-multi-target="gameItemOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="gameItemHeader">
+                                <span class="selected-text" id="gameItemSelectedText" th:text="#{filter.all}">Alle</span>
+                            </div>
+                            <div class="multi-select-options" id="gameItemOptions">
+                                <label class="multi-select-option">
+                                    <span th:text="#{filter.all}">Alle</span>
+                                    <input type="checkbox" id="gameItemAll" value="ALL" data-trigger="inv-my-toggle-all" data-all-id="gameItemAll" data-check-class="gameItemCheck" data-header-id="gameItemHeader">
+                                </label>
+                                <label class="multi-select-option" th:each="gi : ${gameItems}">
+                                    <span th:text="${gi.name}">Item</span>
+                                    <input type="checkbox" class="gameItemCheck" name="gameItemIds" th:value="${gi.id}" th:checked="${selectedGameItemIds != null and selectedGameItemIds.contains(gi.id)}" data-trigger="inv-my-update-state" data-all-id="gameItemAll" data-check-class="gameItemCheck" data-header-id="gameItemHeader">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex-gap-sm">
+                        <label class="form-label-xs" th:text="#{inventory.filter.jobOrder}">Auftrag:</label>
+                        <div class="multi-select-container" id="itemJobOrderFilterContainer">
+                            <div class="multi-select-header" data-trigger="inv-my-toggle-multi" data-multi-target="itemJobOrderOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="itemJobOrderHeader">
+                                <span class="selected-text" id="itemJobOrderSelectedText" th:text="#{filter.all}">Alle</span>
+                            </div>
+                            <div class="multi-select-options" id="itemJobOrderOptions">
+                                <label class="multi-select-option">
+                                    <span th:text="#{filter.all}">Alle</span>
+                                    <input type="checkbox" id="itemJobOrderAll" value="ALL" data-trigger="inv-my-toggle-all" data-all-id="itemJobOrderAll" data-check-class="jobOrderCheck" data-header-id="itemJobOrderHeader">
+                                </label>
+                                <label class="multi-select-option" th:each="jo : ${jobOrders}">
+                                    <span th:text="|#${jo.displayId} - ${jo.handle}|">#1 - handle</span>
+                                    <input type="checkbox" class="jobOrderCheck" name="jobOrderIds" th:value="${jo.id}" th:checked="${selectedJobOrderIds != null and selectedJobOrderIds.contains(jo.id)}" data-trigger="inv-my-update-state" data-all-id="itemJobOrderAll" data-check-class="jobOrderCheck" data-header-id="itemJobOrderHeader">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <label class="flex-gap-sm cursor-pointer krtm-align-items-center-6a4e">
+                        <input type="checkbox" id="itemPersonalOnly" name="personalOnly" value="true" class="item-checkbox"
+                               th:checked="${selectedPersonalOnly}" data-trigger="inv-my-personal-filter">
+                        <span class="form-label-xs" th:text="#{inventory.filter.personalOnly}">Nur pers\u00f6nliche Eintr\u00e4ge</span>
+                    </label>
+                    <label class="flex-gap-sm cursor-pointer krtm-align-items-center-6a4e">
+                        <input type="checkbox" id="itemNonPersonalOnly" name="nonPersonalOnly" value="true" class="item-checkbox"
+                               th:checked="${selectedNonPersonalOnly}" data-trigger="inv-my-personal-filter">
+                        <span class="form-label-xs" th:text="#{inventory.filter.nonPersonalOnly}">Nur nicht-pers\u00f6nliche Eintr\u00e4ge</span>
+                    </label>
+                    <button type="button" class="btn btn-ghost" data-trigger="inv-my-reset-filter" th:text="#{inventory.filter.reset}">Filter zur\u00fccksetzen</button>
+                </form>
             </div>
         </div>
 
@@ -227,6 +306,7 @@
 
         <div class="overflow-x-auto" id="myInventoryTableContainer" th:fragment="inventoryTableFragment">
             <div class="table-responsive">
+            <th:block th:if="${view != 'items'}">
             <!-- Consolidated tree table (das-kartell-design .tree-table): one sticky header
                  for all depths; Material -> Standort/Stack -> Eintrag shown by indentation +
                  rails instead of three repeated <thead> sets. The per-material bulk select-all
@@ -303,6 +383,77 @@
                     <div class="tree-cell text-muted krtm-grid-column-1-1-text-align-center-26f2" th:text="#{inventory.empty}">Du hast noch nichts eingelagert.</div>
                 </div>
             </div>
+            </th:block>
+            <th:block th:if="${view == 'items'}">
+            <!-- Item tree (REQ-INV-030): GameItem -> Standort/Stack -> lazy entries on the
+                 page-scoped four-column .lager-items-tree grid — no quality column, whole-unit
+                 amounts, kind badge + manufacturer on the group row. The runtime id
+                 "inventoryTable" is emitted via th:id so the template source keeps ids unique
+                 (only one tree renders per view). Same lazy-load and data-trigger wiring as the
+                 material tree; the stack key is gameItemId + location + personal + org unit. -->
+            <div class="tree-table lager-items-tree" th:id="'inventoryTable'" th:data-user-id="${#authentication.name}">
+                <div class="tree-row tree-head">
+                    <div class="tree-cell" th:text="#{inventory.tree.stock}">Bestand</div>
+                    <div class="tree-cell" th:text="#{inventory.tree.context}">Kontext / Zuordnung</div>
+                    <div class="tree-cell tree-cell--num" th:text="#{inventory.amount}">Menge</div>
+                    <div class="tree-cell krtm-text-align-right-3048" th:text="#{inventory.tree.action}">Aktion</div>
+                </div>
+
+                <div class="tree-group" th:each="group : ${groupedItems}">
+                    <div class="tree-row tree-row--group krtm-cursor-pointer-74fa" data-trigger="inv-my-toggle-group" th:data-game-item-id="${group.gameItem.id}">
+                        <div class="tree-cell tree-name">
+                            <span class="tree-chevron toggle-icon">▶</span>
+                            <span class="tree-label" th:text="${group.gameItem.name}">Item</span>
+                            <span class="chip chip--muted" th:if="${group.gameItem.kind != null}"
+                                  th:with="kindKey=|inventory.items.kind.${group.gameItem.kind}|"
+                                  th:text="${#messages.msgOrNull(kindKey)} ?: ${group.gameItem.kind}">Art</span>
+                        </div>
+                        <div class="tree-cell krtm-color-var-color-gray-2-4fcb">
+                            <span th:if="${group.gameItem.manufacturer != null}" th:text="|${group.gameItem.manufacturer} · |">Hersteller · </span>
+                            <span th:text="${#lists.size(group.stacks) == 1} ? #{inventory.tree.stackCount.one} : #{inventory.tree.stackCount.many(${#lists.size(group.stacks)})}">5 Stacks</span>
+                        </div>
+                        <div class="tree-cell tree-cell--num tree-amount">
+                            <span><span th:text="${group.totalAmount != null ? #numbers.formatInteger(group.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
+                        </div>
+                        <div class="tree-cell krtm-display-flex-justify-content-flex-end-align-053d">
+                            <input type="checkbox" class="item-checkbox group-select-all" th:data-game-item-id="${group.gameItem.id}" th:title="#{inventory.bulk.checkout.select.all}" data-trigger="inv-my-toggle-group-cb">
+                        </div>
+                    </div>
+
+                    <div class="tree-group-items krtm-display-none-5790">
+                        <div th:each="stack : ${group.stacks}">
+                            <div class="tree-row tree-row--mid stack-header krtm-cursor-pointer-74fa" data-trigger="inv-my-toggle-stack"
+                                 data-stack-loaded="false"
+                                 th:data-game-item-id="${group.gameItem.id}"
+                                 th:data-location-id="${stack.location.id}"
+                                 th:data-personal="${stack.personal}"
+                                 th:data-owning-org-unit-id="${stack.owningSquadron != null ? stack.owningSquadron.id : null}">
+                                <div class="tree-cell tree-name">
+                                    <span class="tree-chevron toggle-icon stack-toggle-icon">▶</span>
+                                    <span class="tree-label" th:text="${stack.location.name}" th:title="${stack.location.name}">Ort</span>
+                                </div>
+                                <div class="tree-cell"></div>
+                                <div class="tree-cell tree-cell--num tree-amount">
+                                    <span><span th:text="${stack.totalAmount != null ? #numbers.formatInteger(stack.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
+                                </div>
+                                <div class="tree-cell tree-cell--num krtm-color-var-color-gray-2-font-size-0-78rem-505c">
+                                    <span class="stack-entry-count" th:text="${stack.entryCount == 1} ? #{inventory.tree.entryCount.one} : #{inventory.tree.entryCount.many(${stack.entryCount})}">1 Eintrag</span>
+                                </div>
+                            </div>
+                            <div class="tree-stack-entries krtm-display-none-5790">
+                                <div class="stack-entries-content">
+                                    <!-- entries lazily loaded on expand via /inventory/my/game-item-stack/entries (REQ-INV-030) -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tree-row" th:if="${#lists.isEmpty(groupedItems)}">
+                    <div class="tree-cell text-muted krtm-grid-column-1-1-text-align-center-26f2" th:text="#{inventory.items.empty.my}">Du hast noch keine Items eingelagert.</div>
+                </div>
+            </div>
+            </th:block>
             </div>
         </div>
     </div>
@@ -446,9 +597,9 @@
                     </div>
                     <div class="flex-1">
                         <label for="umbuchenTargetLocationId" class="form-label" th:text="#{inventory.bookout.targetLocation}">Umbuchen zu Ort</label>
-                        <select id="umbuchenTargetLocationId" class="w-full">
-                            <option th:each="location : ${locations}" th:value="${location.id}" th:text="${location.name}"></option>
-                        </select>
+                        <!-- Server-side location search (remote-locations): no preloaded catalog; inventory-my.js
+                             seeds the row's current location (value + label) when the modal opens. -->
+                        <select id="umbuchenTargetLocationId" class="w-full" data-krt-combobox="remote-locations"></select>
                     </div>
                 </div>
                 <div id="umbuchenTargetOwningOrgUnitWrapper" class="krtm-display-none-margin-top-0-75rem-d00c">

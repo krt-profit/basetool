@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.EntityInUseException;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
@@ -38,6 +39,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 @ExtendWith(MockitoExtension.class)
 class LocationServiceTest {
@@ -95,6 +99,49 @@ class LocationServiceTest {
     when(refineryOrderRepository.existsByLocationId(locId)).thenReturn(true);
 
     assertThrows(EntityInUseException.class, () -> locationService.deleteLocation(locId));
+  }
+
+  @Test
+  void findAllReference_returnsTheCompleteUnboundedProjection() {
+    // Given
+    LocationReferenceDto ref = new LocationReferenceDto(UUID.randomUUID(), "Port Olisar");
+    when(locationRepository.findAllReference()).thenReturn(List.of(ref));
+
+    // When
+    List<LocationReferenceDto> result = locationService.findAllReference();
+
+    // Then
+    assertEquals(List.of(ref), result);
+    verify(locationRepository, times(1)).findAllReference();
+  }
+
+  @Test
+  void searchReference_escapesLikeMetacharactersAndPagesTheRepositoryQuery() {
+    // Given
+    LocationReferenceDto ref = new LocationReferenceDto(UUID.randomUUID(), "Area 18 100%");
+    PageRequest pageable = PageRequest.of(0, 25);
+    when(locationRepository.searchReference("100\\%", pageable))
+        .thenReturn(new PageImpl<>(List.of(ref)));
+
+    // When
+    Page<LocationReferenceDto> result = locationService.searchReference("100%", pageable);
+
+    // Then
+    assertEquals(List.of(ref), result.getContent());
+    verify(locationRepository, times(1)).searchReference("100\\%", pageable);
+  }
+
+  @Test
+  void searchReference_passesNullThroughAsTheNoFilterMarker() {
+    // Given
+    PageRequest pageable = PageRequest.of(0, 25);
+    when(locationRepository.searchReference(null, pageable)).thenReturn(new PageImpl<>(List.of()));
+
+    // When
+    locationService.searchReference(null, pageable);
+
+    // Then
+    verify(locationRepository, times(1)).searchReference(null, pageable);
   }
 
   @Test

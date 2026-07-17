@@ -125,5 +125,99 @@ class ValidQuantityAmountValidatorTest {
     assertTrue(validator.isValid(new TestDto(materialId, 10.1234), context));
   }
 
+  // --- game-item payloads (REQ-INV-029) -------------------------------------
+
+  // covers REQ-INV-029 (gameItem amounts: positive whole units, no catalog lookup)
+  @Test
+  void gameItemPayload_wholePositiveAmount_isValid_withoutMaterialLookup() {
+    // Given a gameItem-only payload with a positive whole amount
+    QuantityAware dto = new TestItemDto(UUID.randomUUID(), 5.0);
+
+    // When / Then — valid, and the PIECE lookup seam is never consulted (item amounts are
+    // unconditionally whole units, no catalog metadata needed).
+    assertTrue(validator.isValid(dto, context));
+    verifyNoInteractions(materialPieceTypeLookup);
+  }
+
+  // covers REQ-INV-029 (the closed validator hole: a gameItemId-only payload IS validated)
+  @Test
+  void gameItemPayload_zeroOrNegativeAmount_isInvalid() {
+    // Given the violation-builder plumbing
+    when(context.buildConstraintViolationWithTemplate(anyString())).thenReturn(builder);
+    when(builder.addPropertyNode("amount")).thenReturn(nodeBuilder);
+
+    // When / Then — with materialId == null the pre-V220 validator silently skipped ALL amount
+    // rules; the closed hole now rejects zero and negative amounts on the gameItem branch.
+    assertFalse(validator.isValid(new TestItemDto(UUID.randomUUID(), 0.0), context));
+    assertFalse(validator.isValid(new TestItemDto(UUID.randomUUID(), -3.0), context));
+
+    verify(context, times(2)).disableDefaultConstraintViolation();
+    verify(context, times(2))
+        .buildConstraintViolationWithTemplate("{error.validation.quantity_must_be_positive}");
+    verifyNoInteractions(materialPieceTypeLookup);
+  }
+
+  // covers REQ-INV-029 (gameItem amounts are whole units)
+  @Test
+  void gameItemPayload_fractionalAmount_isInvalid() {
+    // Given the violation-builder plumbing
+    when(context.buildConstraintViolationWithTemplate(anyString())).thenReturn(builder);
+    when(builder.addPropertyNode("amount")).thenReturn(nodeBuilder);
+
+    // When / Then — fractional item amounts are rejected like PIECE materials, but without any
+    // MaterialPieceTypeLookup interaction.
+    assertFalse(validator.isValid(new TestItemDto(UUID.randomUUID(), 2.5), context));
+
+    verify(context).disableDefaultConstraintViolation();
+    verify(context)
+        .buildConstraintViolationWithTemplate("{error.validation.quantity_must_be_integer}");
+    verifyNoInteractions(materialPieceTypeLookup);
+  }
+
+  // covers REQ-INV-029 (catalog precedence: the gameItem branch wins over the material branch)
+  @Test
+  void dualCatalogPayload_gameItemBranchWins_withoutMaterialLookup() {
+    // Given the violation-builder plumbing and a payload carrying BOTH catalog references (a
+    // crafted shape the DTO's @AssertTrue XOR guard rejects separately)
+    when(context.buildConstraintViolationWithTemplate(anyString())).thenReturn(builder);
+    when(builder.addPropertyNode("amount")).thenReturn(nodeBuilder);
+
+    // When / Then — the fractional amount is rejected under the item rule: the gameItem branch
+    // runs first, so the material/PIECE lookup is never consulted even though materialId is set.
+    assertFalse(validator.isValid(new TestDualDto(materialId, UUID.randomUUID(), 2.5), context));
+
+    verify(context).disableDefaultConstraintViolation();
+    verify(context)
+        .buildConstraintViolationWithTemplate("{error.validation.quantity_must_be_integer}");
+    verifyNoInteractions(materialPieceTypeLookup);
+  }
+
   record TestDto(UUID materialId, Double amount) implements QuantityAware {}
+
+  /**
+   * Dual-catalog {@link QuantityAware} probe (REQ-INV-029): carries BOTH a {@code materialId} and a
+   * {@code gameItemId} — the crafted shape the DTO XOR guard rejects — so the precedence test can
+   * pin that the validator's gameItem branch runs first and the material/PIECE lookup stays
+   * untouched.
+   *
+   * @param materialId the referenced material
+   * @param gameItemId the referenced game item
+   * @param amount the requested quantity
+   */
+  record TestDualDto(UUID materialId, UUID gameItemId, Double amount) implements QuantityAware {}
+
+  /**
+   * Game-item flavoured {@link QuantityAware} probe (REQ-INV-029): carries only a {@code
+   * gameItemId} and an amount, with {@link #materialId()} fixed to {@code null} — the payload shape
+   * whose amount rules the validator's gameItem branch enforces.
+   *
+   * @param gameItemId the referenced game item
+   * @param amount the requested quantity
+   */
+  record TestItemDto(UUID gameItemId, Double amount) implements QuantityAware {
+    @Override
+    public UUID materialId() {
+      return null;
+    }
+  }
 }

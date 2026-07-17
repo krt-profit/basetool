@@ -58,6 +58,43 @@ class ShipDataPageControllerTest {
     assertEquals("ship-data", view);
   }
 
+  // covers REQ-ADMIN-001 — ship types beyond the first backend page stay visible and editable
+  @Test
+  void listData_concatenatesAllShipTypePages() {
+    // Given — one manufacturer page, two ship-type pages
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    ShipDataPageController controller = new ShipDataPageController(backendApiClient);
+    Model model = new ConcurrentModel();
+
+    ManufacturerDto rsi = new ManufacturerDto(null, "RSI", "RSI", null, null, null, false);
+    ShipTypeDto aurora = new ShipTypeDto(null, "Aurora", rsi, null, null, false);
+    ShipTypeDto zeus = new ShipTypeDto(null, "Zeus", rsi, null, null, false);
+    when(backendApiClient.get(
+            org.mockito.ArgumentMatchers.eq(
+                "/api/v1/manufacturers?size=1000&sort=name,asc&includeHidden=true&page=0"),
+            anyTypeRef()))
+        .thenReturn(new PageResponse<>(java.util.List.of(rsi), 0, 1000, 1, 1, null));
+    String shipTypesBase = "/api/v1/ship-types?size=1000&sort=name,asc&includeHidden=true";
+    when(backendApiClient.get(
+            org.mockito.ArgumentMatchers.eq(shipTypesBase + "&page=0"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(java.util.List.of(zeus), 0, 1000, 2, 2, null));
+    when(backendApiClient.get(
+            org.mockito.ArgumentMatchers.eq(shipTypesBase + "&page=1"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(java.util.List.of(aurora), 1, 1000, 2, 2, null));
+
+    // When
+    controller.listData(model);
+
+    // Then — both pages render, sorted, with no truncation flagged
+    @SuppressWarnings("unchecked")
+    java.util.List<ShipTypeDto> shipTypes =
+        (java.util.List<ShipTypeDto>) model.getAttribute("shipTypes");
+    assertEquals(2, shipTypes.size(), "the second backend page must not be dropped");
+    assertEquals("Aurora", shipTypes.get(0).name());
+    assertEquals("Zeus", shipTypes.get(1).name());
+    assertEquals(Boolean.FALSE, model.getAttribute("catalogTruncated"));
+  }
+
   @Test
   void testResetAllFitted_Success() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);

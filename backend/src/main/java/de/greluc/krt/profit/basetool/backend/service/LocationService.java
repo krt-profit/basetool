@@ -27,11 +27,13 @@ import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -73,14 +75,32 @@ public class LocationService {
   }
 
   /**
-   * Lightweight projection used by typeaheads and dropdowns — only id/name/shorthand, no
-   * description or hidden flag.
+   * Lightweight projection used by typeaheads and dropdowns — only id + name, no description or
+   * hidden flag. Deliberately complete (no silent bound): the catalogue is admin-curated plus UEX
+   * universe sync, and a truncated list would make locations beyond the bound unreachable in every
+   * consumer. Payload-bounded pickers use {@link #searchReference(String, Pageable)} instead.
    *
-   * @return all locations as reference DTOs (no caching — pre-projected by the repository)
+   * @return all non-hidden locations as reference DTOs (no caching — pre-projected by the
+   *     repository)
    */
   public List<de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto>
       findAllReference() {
     return locationRepository.findAllReference();
+  }
+
+  /**
+   * Live search for the location pickers (REQ-FE-016): pages non-hidden locations whose name
+   * contains {@code search} (case-insensitive, LIKE metacharacters escaped so user input matches
+   * literally). Deliberately uncached: query strings are user-typed and would pollute the shared
+   * {@code locations} cache, and the repository projection is a cheap indexed read.
+   *
+   * @param search the raw name fragment, or {@code null}/blank for the unfiltered first page
+   * @param pageable page request from the whitelisted picker sort
+   * @return one page of matching non-hidden locations as reference DTOs
+   */
+  public Page<de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto> searchReference(
+      @Nullable String search, @NotNull Pageable pageable) {
+    return locationRepository.searchReference(LikePatterns.escapeNullable(search), pageable);
   }
 
   /**

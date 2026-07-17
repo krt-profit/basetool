@@ -87,20 +87,23 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    *
    * <p>The item lines ({@code items} → {@code items.materials} → {@code items.materials.material})
    * are fetched too so the Lager picker can compute an ITEM order's required materials ({@code
-   * JobOrderItemService.requiredMaterialIds}) without an N+1 per ITEM order. A row explosion across
-   * the {@code materials} and {@code items.materials} collection paths does not occur in practice:
-   * the two order kinds are mutually exclusive, so for any given order exactly one of the two
-   * collections is non-empty. The {@code handovers} branch fetched here is MATERIAL-only (an ITEM
-   * order's deliveries live on the separate {@code itemHandovers} collection, which is deliberately
-   * NOT fetched), so it too stays empty for an ITEM order. <strong>Do not add {@code itemHandovers}
-   * (or any second ITEM-side collection) to this graph:</strong> combined with {@code
-   * items.materials} it would be a genuine cartesian product on ITEM orders.
+   * JobOrderItemService.requiredMaterialIds}) without an N+1 per ITEM order; {@code items.gameItem}
+   * (a to-one path, no row explosion) joins the graph so the requested-game-item set ({@code
+   * JobOrderItemService.requiredGameItemIds}, REQ-INV-031) resolves N+1-free too. A row explosion
+   * across the {@code materials} and {@code items.materials} collection paths does not occur in
+   * practice: the two order kinds are mutually exclusive, so for any given order exactly one of the
+   * two collections is non-empty. The {@code handovers} branch fetched here is MATERIAL-only (an
+   * ITEM order's deliveries live on the separate {@code itemHandovers} collection, which is
+   * deliberately NOT fetched), so it too stays empty for an ITEM order. <strong>Do not add {@code
+   * itemHandovers} (or any second ITEM-side collection) to this graph:</strong> combined with
+   * {@code items.materials} it would be a genuine cartesian product on ITEM orders.
    */
   @EntityGraph(
       attributePaths = {
         "materials",
         "materials.material",
         "items",
+        "items.gameItem",
         "items.materials",
         "items.materials.material",
         "handovers",
