@@ -192,4 +192,28 @@ class NotificationServiceTest {
     verify(repository).findByRecipientSubOrderByCreatedAtDesc(eq(RECIPIENT), captor.capture());
     assertEquals(1, captor.getValue().getPageSize());
   }
+
+  // covers REQ-NOTIF-019 — the inbox-list sort whitelist includes id, so PaginationUtil appends it
+  // as a stable tiebreaker. Without a total order, two notifications sharing a createdAt instant
+  // could reorder between page fetches and the load-more would silently skip a row at the boundary.
+  @Test
+  void listSortWhitelistYieldsStableCreatedAtDescWithIdTiebreaker() {
+    org.springframework.data.domain.Sort sort =
+        de.greluc.krt.profit.basetool.backend.web.PaginationUtil.createPageRequest(
+                0,
+                50,
+                "createdAt,desc",
+                NotificationService.SORTABLE_FIELDS,
+                NotificationService.DEFAULT_SORT_FIELD)
+            .getSort();
+
+    org.springframework.data.domain.Sort.Order createdAt = sort.getOrderFor("createdAt");
+    org.springframework.data.domain.Sort.Order id = sort.getOrderFor("id");
+    assertNotNull(createdAt, "createdAt must drive the primary ordering");
+    assertEquals(
+        org.springframework.data.domain.Sort.Direction.DESC,
+        createdAt.getDirection(),
+        "newest first");
+    assertNotNull(id, "id must be appended as the deterministic tiebreaker (REQ-NOTIF-019)");
+  }
 }
