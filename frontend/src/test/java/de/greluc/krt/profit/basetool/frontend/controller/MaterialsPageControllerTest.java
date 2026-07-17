@@ -21,10 +21,15 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
@@ -42,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
@@ -146,11 +152,13 @@ class MaterialsPageControllerTest {
             200,
             true,
             true);
+    // The detail page now page-walks the price list (CatalogPages.fetchAll); a single-page response
+    // (totalPages=1) ends the walk after page 0 (ADR-0102/0103, REQ-UI-015).
     PageResponse<MaterialPriceDto> pageResponse =
-        new PageResponse<>(List.of(priceDto), 0, 1000, 1, 1, Collections.emptyList());
+        new PageResponse<>(List.of(priceDto), 0, 10000, 1, 1, Collections.emptyList());
 
     when(backendApiClient.get(
-            eq("/api/v1/materials/" + id + "/prices?size=1000&sort=terminal.name,asc"),
+            eq("/api/v1/materials/" + id + "/prices?size=10000&sort=terminal.name,asc&page=0"),
             anyTypeRef()))
         .thenReturn(pageResponse);
 
@@ -222,8 +230,8 @@ class MaterialsPageControllerTest {
     when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef()))
         .thenReturn(matrixPage());
 
-    // Act
-    MatrixGridDto grid = controller.getMatrixData();
+    // Act — no filter selection takes the cached (page-walked) unfiltered path.
+    MatrixGridDto grid = controller.getMatrixData(null, null, false, false);
 
     // Assert
     assertNotNull(grid);
@@ -253,12 +261,45 @@ class MaterialsPageControllerTest {
         .thenThrow(new RuntimeException("backend down"));
 
     // Act
-    MatrixGridDto grid = controller.getMatrixData();
+    MatrixGridDto grid = controller.getMatrixData(null, null, false, false);
 
     // Assert — failures degrade to an empty grid so the client shows its no-results state.
     assertNotNull(grid);
     assertTrue(grid.terminals().isEmpty());
     assertTrue(grid.groups().isEmpty());
+  }
+
+  @Test
+  void getMatrixData_withFilters_relaysFilterParamsToBackendPageWalk() {
+    // Arrange — an active filter selection must go through the parameterised (server-side filtered)
+    // page-walk, not the cached unfiltered path (ADR-0105, REQ-UI-014). One material + one system
+    // ⇒ two URI variables; Mockito matches varargs element-wise, and a totalPages=1 response ends
+    // the page-walk after page 0.
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    MaterialsPageController controller = new MaterialsPageController(backendApiClient);
+
+    when(backendApiClient.<PageResponse<MaterialMatrixItemDto>>get(
+            anyString(), anyTypeRef(), any(), any()))
+        .thenReturn(matrixPage());
+
+    // Act — material + system + loading-dock selected; auto-load off.
+    MatrixGridDto grid =
+        controller.getMatrixData(List.of("Aluminum"), List.of("Stanton"), true, false);
+
+    // Assert — the relayed template carries one placeholder per active filter (values are passed as
+    // URI variables so the WebClient encodes them, never URLEncoder; the wire encoding is pinned by
+    // BackendApiClientHappyPathTest), the page cursor is appended, the inactive boolean is omitted,
+    // and the cached unfiltered path was not consulted.
+    assertNotNull(grid);
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), any(), any());
+    String template = uriCaptor.getValue();
+    assertTrue(template.contains("materialNames={f0}"), template);
+    assertTrue(template.contains("starSystems={f1}"), template);
+    assertTrue(template.contains("hasLoadingDock=true"), template);
+    assertTrue(template.contains("page=0"), template);
+    assertFalse(template.contains("isAutoLoad"), template);
+    verify(backendApiClient, never()).getCached(eq(CachedCatalog.MATERIALS_MATRIX), anyTypeRef());
   }
 
   @Test

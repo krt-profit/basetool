@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -197,14 +198,40 @@ public class MaterialService {
   }
 
   /**
-   * Returns the full material × terminal matrix used by the matrix overview page. The frontend
-   * pulls everything in one query and filters in memory.
+   * Returns the material × terminal matrix used by the matrix overview page, applying the four
+   * optional server-side filters (ADR-0105, REQ-UI-014). Each dimension is unconstrained when its
+   * argument is absent: an {@code IN} filter is skipped when its collection is {@code null} <em>or
+   * empty</em> (an empty {@code IN ()} would match nothing), and a boolean filter is skipped when
+   * its flag is {@code null}. An all-absent call returns the full matrix, exactly as before.
    *
+   * @param materialNames material names to keep, or {@code null}/empty for all
+   * @param starSystems star-system names to keep, or {@code null}/empty for all
+   * @param hasLoadingDock {@code TRUE} to keep only loading-dock terminals, {@code null} for all
+   * @param isAutoLoad {@code TRUE} to keep only auto-load terminals, {@code null} for all
    * @param pageable page request
-   * @return paged matrix items
+   * @return paged (filtered) matrix items
    */
-  public Page<MaterialMatrixItemDto> getAllMatrixItems(@NotNull Pageable pageable) {
-    return materialPriceRepository.findAllMatrixItems(pageable);
+  public Page<MaterialMatrixItemDto> getMatrixItems(
+      Collection<String> materialNames,
+      Collection<String> starSystems,
+      Boolean hasLoadingDock,
+      Boolean isAutoLoad,
+      @NotNull Pageable pageable) {
+    return materialPriceRepository.findMatrixItems(
+        emptyToNull(materialNames), emptyToNull(starSystems), hasLoadingDock, isAutoLoad, pageable);
+  }
+
+  /**
+   * Normalises an {@code IN}-filter collection so an empty selection becomes {@code null} ("no
+   * filter") — the repository's {@code :param IS NULL OR x IN :param} idiom treats {@code null} as
+   * unconstrained but would emit an invalid {@code IN ()} for an empty collection.
+   *
+   * @param values the filter values, possibly {@code null} or empty
+   * @param <T> the element type
+   * @return {@code null} when {@code values} is {@code null} or empty, otherwise {@code values}
+   */
+  private static <T> Collection<T> emptyToNull(Collection<T> values) {
+    return values == null || values.isEmpty() ? null : values;
   }
 
   /**

@@ -43685,6 +43685,40 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "name" : "materialNames",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }, {
+          "name" : "starSystems",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }, {
+          "name" : "hasLoadingDock",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
+        }, {
+          "name" : "isAutoLoad",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean"
+          }
         } ],
         "responses" : {
           "200" : {
@@ -56818,13 +56852,13 @@
               "$ref" : "#/components/schemas/InventoryAllocationInput"
             }
           },
-          "missionFreeForGameItem" : {
+          "qualityConsistentWithCatalog" : {
             "type" : "boolean"
           },
           "catalogReferenceValid" : {
             "type" : "boolean"
           },
-          "qualityConsistentWithCatalog" : {
+          "missionFreeForGameItem" : {
             "type" : "boolean"
           }
         },

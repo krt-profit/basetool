@@ -2,17 +2,22 @@
  * Materials trade-matrix grid — client-side renderer with vertical virtual scrolling.
  *
  * The server (`GET /materials/overview`) ships only an empty skeleton plus a JSON config element;
- * this module fetches the whole matrix once from `GET /materials/overview/data` and draws it. The
- * matrix is a dense materials x terminals grid that, rendered eagerly, builds tens of thousands of
- * DOM cells and freezes the browser. Instead we keep the full data in memory and materialize ONLY
- * the rows currently inside the scroll viewport (plus a small buffer) into <tbody>, padding the
- * scroll height with two spacer rows. Scrolling re-renders the window; the DOM node count stays
- * roughly constant no matter how large the universe grows.
+ * this module fetches the matrix from `GET /materials/overview/data` and draws it. The matrix is a
+ * dense materials x terminals grid that, rendered eagerly, builds tens of thousands of DOM cells
+ * and freezes the browser. Instead we keep the fetched data in memory and materialize ONLY the
+ * rows currently inside the scroll viewport (plus a small buffer) into <tbody>, padding the scroll
+ * height with two spacer rows. Scrolling re-renders the window; the DOM node count stays roughly
+ * constant no matter how large the universe grows.
  *
- * Filtering (material / system / loading-dock / auto-load) is done in memory against the fetched
- * data and re-renders the window — no server round-trip per filter change. Columns are NOT
- * virtualized (terminals are bounded by the game universe and rendered in full per visible row);
- * the unbounded dimension is the material rows, which is what we virtualize.
+ * Filtering (material / system / loading-dock / auto-load) is SERVER-SIDE (ADR-0105, REQ-UI-014):
+ * on every filter change the grid re-fetches `/materials/overview/data` with the selection as query
+ * parameters and re-renders. This replaced an in-memory filter over a single clamped fetch, which
+ * silently dropped material×terminal cells once the universe exceeded the backend page-size clamp.
+ * A stale-response guard (fetchToken) discards out-of-order responses from rapid filter changes.
+ * The category-grouping toggle and the collapse/expand of a category are pure presentation and stay
+ * client-side (no re-fetch). Columns are NOT virtualized (terminals are bounded by the game
+ * universe and rendered in full per visible row); the unbounded dimension is the material rows,
+ * which is what we virtualize.
  */
 (function () {
     'use strict';
@@ -68,19 +73,33 @@
 
     let rowHeight = 0; // measured from the first rendered row (uniform via CSS)
     let calibrated = false;
-    let grid = null; // full data: { terminals: [...], groups: [...] }
-    let cols = []; // current (column-filtered) terminal columns
+    let grid = null; // fetched (already server-filtered) data: { terminals: [...], groups: [...] }
+    let cols = []; // current terminal columns (the fetched grid's terminals)
     let flat = []; // flattened display items: { type: 'kind'|'row', ... }
     let renderedStart = -1;
     let renderedEnd = -1;
     let colsSig = ''; // signature of current columns, to know when headers must rebuild
     let scrollPending = false;
     let filterTimer = null;
+    let fetchToken = 0; // monotonic; a response whose token is stale (superseded) is discarded
+    let bound = false; // filter listeners are attached exactly once
 
     /* --------------------------------------------------------------------- data load */
 
     function init() {
-        fetch(DATA_URL, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        // Bind first so the grouping preference is restored before the initial render and the
+        // filters are live immediately; then load the (unfiltered) grid.
+        bindFilters();
+        fetchGrid();
+    }
+
+    // Fetches the grid for the current filter selection and re-renders. Filtering is server-side:
+    // buildFilterQuery() turns the checkbox state into query parameters the backend applies, so the
+    // response already contains only the matching slice. Out-of-order responses from rapid filter
+    // changes are discarded via a monotonic token so the grid never shows a stale selection.
+    function fetchGrid() {
+        const token = ++fetchToken;
+        fetch(DATA_URL + buildFilterQuery(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(function (res) {
                 if (!res.ok) {
                     throw new Error('HTTP ' + res.status);
@@ -88,6 +107,9 @@
                 return res.json();
             })
             .then(function (data) {
+                if (token !== fetchToken) {
+                    return; // a newer fetch has superseded this one
+                }
                 grid = {
                     terminals: (data && data.terminals) || [],
                     groups: (data && data.groups) || [],
@@ -95,14 +117,25 @@
                 if (loading) {
                     loading.classList.add(HIDDEN_CLASS);
                 }
+                if (errorBox) {
+                    errorBox.classList.add(HIDDEN_CLASS);
+                }
                 wrapper.classList.remove(HIDDEN_CLASS);
-                bindFilters();
-                applyFilters();
+                render();
             })
             .catch(function () {
+                if (token !== fetchToken) {
+                    return;
+                }
                 if (loading) {
                     loading.classList.add(HIDDEN_CLASS);
                 }
+                // Keep the error state exclusive: hide the grid so a failed filter re-fetch never
+                // leaves the previous selection's rows visible under the error banner (they would
+                // contradict the filter widgets, which already updated synchronously). Drop the
+                // stale data too so a later scroll can't resurface it before a successful re-fetch.
+                wrapper.classList.add(HIDDEN_CLASS);
+                grid = null;
                 if (errorBox) {
                     errorBox.classList.remove(HIDDEN_CLASS);
                 }
@@ -111,28 +144,46 @@
 
     /* ----------------------------------------------------------------------- filters */
 
-    // Reads the checkbox state into a filter spec. A dimension with zero or all options checked is
-    // treated as "no filter" (matches the previous server semantics and avoids needless work).
-    function readFilters() {
-        return {
-            materials: selectedSet(document.getElementsByClassName('matCheck')),
-            systems: selectedSet(document.getElementsByClassName('sysCheck')),
-            loadingDock: isChecked('filterLoadingDock'),
-            autoLoad: isChecked('filterAutoLoad'),
-        };
+    // Turns the checkbox state into the backend query string. A dimension with zero or all options
+    // checked is treated as "no filter" (omitted), matching the backend's null-means-all semantics
+    // and keeping the unfiltered request URL identical to the cached default. The parameter names
+    // mirror MaterialsPageController#getMatrixData (materials / systems / loadingDock / autoLoad).
+    function buildFilterQuery() {
+        const parts = [];
+        const materials = selectedValues('matCheck');
+        const systems = selectedValues('sysCheck');
+        if (materials) {
+            materials.forEach(function (v) {
+                parts.push('materials=' + encodeURIComponent(v));
+            });
+        }
+        if (systems) {
+            systems.forEach(function (v) {
+                parts.push('systems=' + encodeURIComponent(v));
+            });
+        }
+        if (isChecked('filterLoadingDock')) {
+            parts.push('loadingDock=true');
+        }
+        if (isChecked('filterAutoLoad')) {
+            parts.push('autoLoad=true');
+        }
+        return parts.length ? '?' + parts.join('&') : '';
     }
 
-    function selectedSet(checks) {
+    // Returns the checked values of a filter dimension, or null when zero or all are checked (i.e.
+    // the dimension applies no filter). Only the per-option checkboxes of `className` are counted,
+    // never the select-all box.
+    function selectedValues(className) {
+        const checks = document.getElementsByClassName(className);
         const total = checks.length;
-        const picked = {};
-        let count = 0;
+        const picked = [];
         for (let i = 0; i < total; i++) {
             if (checks[i].checked) {
-                picked[checks[i].value] = true;
-                count++;
+                picked.push(checks[i].value);
             }
         }
-        if (count === 0 || count === total) {
+        if (picked.length === 0 || picked.length === total) {
             return null; // no filter
         }
         return picked;
@@ -161,37 +212,17 @@
         }
     }
 
-    function applyFilters() {
+    // Renders the currently fetched grid. The server has already applied the four filter dimensions,
+    // so this is pure presentation: the columns are the fetched terminals and the rows are the
+    // fetched groups, arranged per the client-only grouping/collapse state. Called after every fetch
+    // and whenever a client-only view control (grouping toggle, category collapse) changes.
+    function render() {
         if (!grid) {
             return;
         }
-        const f = readFilters();
-
-        cols = grid.terminals.filter(function (t) {
-            if (f.systems && !f.systems[t.starSystemName]) {
-                return false;
-            }
-            if (f.loadingDock && !t.hasLoadingDock) {
-                return false;
-            }
-            if (f.autoLoad && !t.isAutoLoad) {
-                return false;
-            }
-            return true;
-        });
-
-        const groups = [];
-        grid.groups.forEach(function (g) {
-            const rows = g.rows.filter(function (r) {
-                return !f.materials || f.materials[r.materialName];
-            });
-            if (rows.length) {
-                groups.push({ kind: g.kind, rows: rows });
-            }
-        });
-
+        cols = grid.terminals;
         renderHead();
-        buildFlat(groups);
+        buildFlat(grid.groups);
         // Force a full body re-render for the new data set.
         renderedStart = -1;
         renderedEnd = -1;
@@ -473,13 +504,16 @@
 
     /* ----------------------------------------------------------------- filter wiring */
 
-    function scheduleApply() {
+    // Debounces a server re-fetch so dragging through many checkboxes issues one request, not one
+    // per click. Each fired fetch carries a fresh token, so an earlier in-flight response that
+    // arrives late is discarded rather than clobbering the newer selection.
+    function scheduleRefetch() {
         if (filterTimer) {
             clearTimeout(filterTimer);
         }
         filterTimer = setTimeout(function () {
             filterTimer = null;
-            applyFilters();
+            fetchGrid();
         }, 200);
     }
 
@@ -514,6 +548,10 @@
     }
 
     function bindFilters() {
+        if (bound) {
+            return; // listeners attach exactly once, even if init runs again
+        }
+        bound = true;
         // Dropdown open / close.
         Array.prototype.forEach.call(
             document.getElementsByClassName('mtx-multi-header'),
@@ -545,7 +583,7 @@
                         checks[i].checked = box.checked;
                     }
                     updateSelectedText(checkClass, box.getAttribute('data-header-id'));
-                    scheduleApply();
+                    scheduleRefetch();
                 });
             },
         );
@@ -567,7 +605,7 @@
                     allBox.checked = allChecked;
                 }
                 updateSelectedText(checkClass, chk.getAttribute('data-header-id'));
-                scheduleApply();
+                scheduleRefetch();
             });
         });
 
@@ -575,7 +613,7 @@
         Array.prototype.forEach.call(
             document.getElementsByClassName('mtx-bool-filter'),
             function (b) {
-                b.addEventListener('change', scheduleApply);
+                b.addEventListener('change', scheduleRefetch);
             },
         );
 
@@ -592,7 +630,8 @@
             groupBox.addEventListener('change', function () {
                 grouped = groupBox.checked;
                 writeGroupPref(grouped ? '1' : '0');
-                applyFilters();
+                // Pure presentation over the already-fetched grid — no server round-trip.
+                render();
             });
         }
 
@@ -604,8 +643,8 @@
             }
             const kind = kindRow.getAttribute('data-kind');
             collapsed[kind] = !collapsed[kind];
-            // Rebuild the flat list with the new collapse state, keeping current filters.
-            applyFilters();
+            // Rebuild the flat list with the new collapse state — client-only, no re-fetch.
+            render();
         });
 
         wrapper.addEventListener('scroll', onScroll);
