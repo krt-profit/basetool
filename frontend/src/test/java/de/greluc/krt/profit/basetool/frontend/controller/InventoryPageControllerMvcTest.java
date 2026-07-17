@@ -28,6 +28,8 @@ import static org.hamcrest.Matchers.stringContainsInOrder;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -356,6 +358,82 @@ class InventoryPageControllerMvcTest {
                             + " data-krt-combobox=\"remote-materials\"")))
         .andExpect(content().string(containsString("Quantanium")))
         .andExpect(content().string(not(containsString("Laranite"))));
+  }
+
+  /**
+   * Full-render guard for the per-material drilldown's server-side pagination (REQ-INV-033). Stubs
+   * a three-page backend response and asserts the real {@code inventory-material} view renders a
+   * data row plus the pager (a next-page link at the snapped size) and the size picker's
+   * whitelisted options — so the page can never again silently cap a large material at a single
+   * fetch (ADR-0104), and a Thymeleaf error in the pager wiring fails the build.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewMaterialInventory_ShouldRenderPaginationControls() throws Exception {
+    UUID materialId = UUID.randomUUID();
+    InventoryItemDto item =
+        new InventoryItemDto(
+            UUID.randomUUID(),
+            new UserReferenceDto(UUID.randomUUID(), "user", "User", "User", 1),
+            new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+            null,
+            new LocationReferenceDto(UUID.randomUUID(), "Port Olisar"),
+            80,
+            10.0,
+            false,
+            List.of(),
+            10.0,
+            List.of(),
+            10.0,
+            null,
+            null,
+            1L,
+            Instant.now());
+    PageResponse<InventoryItemDto> page =
+        new PageResponse<>(List.of(item), 1, 50, 120, 3, Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(List.of(new MaterialReferenceDto(materialId, "Quantanium", "SCU")));
+
+    mockMvc
+        .perform(get("/inventory/material/" + materialId).param("page", "1"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-material"))
+        .andExpect(content().string(containsString("Port Olisar")))
+        // The pager renders inside the results fragment with a real next-page link at the
+        // whitelisted size, plus the size-picker options.
+        .andExpect(content().string(containsString("class=\"pagination\"")))
+        .andExpect(content().string(containsString("page=2")))
+        .andExpect(content().string(containsString("size=50")))
+        .andExpect(content().string(containsString(">200<")));
+  }
+
+  /**
+   * Fragment-swap guard for the material drilldown pager (REQ-INV-033 / REQ-FE-005): a {@code
+   * fragment=results} request renders only the results table + pager — no full page, no material
+   * switcher — and must not re-fetch the cached material catalog (the REQ-DATA-012 fragment-gating
+   * rule, so in-place paging does not amplify catalog reads).
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewMaterialInventory_FragmentSwap_RendersPagerWithoutCatalogFetch() throws Exception {
+    UUID materialId = UUID.randomUUID();
+    PageResponse<InventoryItemDto> page =
+        new PageResponse<>(List.of(), 1, 50, 120, 3, Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+
+    mockMvc
+        .perform(
+            get("/inventory/material/" + materialId)
+                .param("page", "1")
+                .param("fragment", "results"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("page=2")))
+        .andExpect(content().string(not(containsString("materialSelect"))));
+
+    // Scoped to the materials catalog: the layout advices legitimately read other cached
+    // catalogs (title, capabilities) on every request, fragment or not.
+    verify(backendApiClient, never()).getCached(eq(CachedCatalog.MATERIALS_LOOKUP), anyTypeRef());
   }
 
   // covers REQ-INV-001 (SCU amount input) / REQ-INV-002 (PIECE amount input) — see
@@ -1082,6 +1160,52 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("/js/inventory-game-item.js")))
         .andExpect(content().string(not(containsString("id=\"materialSelect\""))))
         .andExpect(content().string(not(containsString("4.000"))));
+  }
+
+  /**
+   * Full-render guard for the per-game-item drilldown's server-side pagination (REQ-INV-033) — the
+   * item sibling of {@code viewMaterialInventory_ShouldRenderPaginationControls}. Stubs a
+   * three-page backend response and asserts the pager (next-page link at the snapped size) and the
+   * size-picker options render inside the item results fragment, so a large item's stock is fully
+   * reachable page by page rather than silently capped at a single fetch (ADR-0104).
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewGameItemInventory_ShouldRenderPaginationControls() throws Exception {
+    UUID gameItemId = UUID.randomUUID();
+    InventoryItemDto item =
+        new InventoryItemDto(
+            UUID.randomUUID(),
+            new UserReferenceDto(UUID.randomUUID(), "user", "User", "Item Owner", null),
+            null,
+            sampleGameItem(gameItemId),
+            new LocationReferenceDto(UUID.randomUUID(), "Port Tressler"),
+            null,
+            4.0,
+            false,
+            java.util.List.of(),
+            null,
+            java.util.List.of(),
+            null,
+            null,
+            null,
+            1L,
+            Instant.parse("2026-03-01T00:00:00Z"));
+    PageResponse<InventoryItemDto> page =
+        new PageResponse<>(List.of(item), 1, 50, 130, 3, Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/game-item/" + gameItemId).param("page", "1"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-game-item"))
+        .andExpect(content().string(containsString("Port Tressler")))
+        .andExpect(content().string(containsString("class=\"pagination\"")))
+        .andExpect(content().string(containsString("page=2")))
+        .andExpect(content().string(containsString("size=50")))
+        .andExpect(content().string(containsString(">200<")));
   }
 
   /**

@@ -19,10 +19,11 @@
 
 /*
  * Per-game-item inventory drilldown page module (templates/inventory-game-item.html,
- * REQ-INV-030) — the item sibling of inventory-material.js. Joins the shared "inventory"
- * live-sync room (REQ-FE-015) so a peer's stock change anywhere re-fetches this read-only
- * drilldown's results table in place, without a reload. The page has no mutations of its own,
- * so it only receives.
+ * REQ-INV-030) — the item sibling of inventory-material.js. Binds the in-place pager for the
+ * server-side paginated results table (REQ-INV-033) so a page/size click swaps the results
+ * fragment in place with history, and joins the shared "inventory" live-sync room (REQ-FE-015)
+ * so a peer's stock change anywhere re-fetches this read-only drilldown's results table in place,
+ * without a reload. The page has no mutations of its own, so it only receives.
  */
 
 // Single source of truth for the receiver map; the one key mirrors the
@@ -32,6 +33,12 @@ const INVENTORY_GAME_ITEM_SECTIONS = {
 };
 
 document.addEventListener('DOMContentLoaded', function () {
+    if (window.krtFetch) {
+        // In-place pager + page-size picker (REQ-INV-033): paging swaps the results fragment in
+        // place with history, so the URL always names the visible page and the live-sync refresh
+        // below re-fetches exactly that page.
+        window.krtFetch.bindSwap({ container: '#inventory-game-item-results', history: true });
+    }
     if (
         window.krtLiveSync &&
         typeof window.krtLiveSync.createReceiver === 'function' &&
