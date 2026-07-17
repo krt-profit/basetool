@@ -746,6 +746,37 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   List<InventoryItem> findGameItemRowsByJobOrderIdOrdered(@Param("jobOrderId") UUID jobOrderId);
 
   /**
+   * Loads every <em>game-item</em> inventory row that carries {@code gameItemId} and is earmarked
+   * to {@code jobOrderId}, oldest-first ({@code createdAt}, {@code id} tiebreak) and locked {@code
+   * PESSIMISTIC_WRITE} ({@code FOR UPDATE}) — the consumption source of the best-effort
+   * delivery-consumes-stock step (REQ-ORDERS-030). An item handover of {@code N} units of a line
+   * draws down the order's own earmark on these rows oldest-first, so two racing writers against
+   * the same order/game-item pool serialise on the row lock rather than both committing a
+   * decrement.
+   *
+   * <p>{@code i.gameItem.id = :gameItemId} is an id-only dereference resolved straight from the FK
+   * column (no join, no NULL-row surprise — game-item rows always carry a game item, ADR-0101), and
+   * the {@code EXISTS} sub-select restricts the set to rows this order earmarks. Deliberately not
+   * {@code @EntityGraph}-fetched: the caller reads each row's {@code jobOrderAllocations} slice
+   * (batch-loaded) to cap the draw at this order's own earmark, and join-fetching a collection
+   * under a pessimistic lock is avoided (mirrors {@link #findMergeGroupForUpdate}).
+   *
+   * @param jobOrderId the order whose earmarked game-item rows to consume from; never {@code null}.
+   * @param gameItemId the game item being delivered; never {@code null}.
+   * @return the order's game-item rows for that item, locked, oldest-first; never {@code null}.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      """
+      SELECT i FROM InventoryItem i WHERE i.gameItem.id = :gameItemId AND EXISTS
+      (SELECT 1 FROM InventoryJobOrderAllocation ja
+      WHERE ja.inventoryItem = i AND ja.jobOrder.id = :jobOrderId)
+      ORDER BY i.createdAt ASC, i.id ASC
+      """)
+  List<InventoryItem> findGameItemRowsByJobOrderAndGameItemForUpdate(
+      @Param("jobOrderId") UUID jobOrderId, @Param("gameItemId") UUID gameItemId);
+
+  /**
    * Returns the total quantity of one material <em>allocated</em> to one job-order whose entry
    * quality meets or exceeds the threshold; {@code 0.0} if there is no matching allocation. Since
    * Variante C (REQ-INV-027) the sum is over the per-entry job-order allocation amounts, so an

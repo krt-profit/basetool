@@ -47,7 +47,8 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   REQ-INV-026) / per-(entry, job-order) delivery-toggle (`INVENTORY_ITEM_DELIVERY_TOGGLED` —
   `delivered` lives on the job-order allocation since Variante C, REQ-INV-027) / bulk-checkout /
   global wipe; plus the cross-area writers (refinery store → `INVENTORY_RECEIVED_FROM_REFINERY`,
-  job-order handover → `INVENTORY_HANDED_OVER`, job-order item-production consumption →
+  job-order handover — material handover **and** item delivery consuming the order's earmarked item
+  stock, REQ-ORDERS-030 → `INVENTORY_HANDED_OVER`, job-order item-production consumption →
   `INVENTORY_CONSUMED_BY_PRODUCTION`, job-order item-production book-in →
   `INVENTORY_RECEIVED_FROM_PRODUCTION`, REQ-INV-032), the org-unit re-stamp on membership change,
   and the owner-reassignment on user deletion.

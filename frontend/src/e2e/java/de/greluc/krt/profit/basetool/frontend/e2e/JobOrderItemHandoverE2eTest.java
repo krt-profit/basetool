@@ -20,10 +20,14 @@
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
@@ -128,6 +132,16 @@ class JobOrderItemHandoverE2eTest {
             seeder.createLocation(USERNAME, PASSWORD, "E2E Item HO Loc " + UUID.randomUUID());
         seeder.manufactureItemOrderLineFully(USERNAME, PASSWORD, id, locationId);
 
+        // REQ-ORDERS-030 baseline: full manufacture booked the two produced units in as game-item
+        // stock auto-earmarked to this order (REQ-INV-032), so the order now carries earmarked item
+        // stock the delivery below must draw down. Read the squadron-wide total of the produced
+        // game
+        // item (same grouped catalog=ITEM endpoint the /inventory/all item view renders from) so
+        // the
+        // before/after delta proves the consumption.
+        String gameItemId = orderedGameItemId(seeder, id);
+        double stockAfterManufacture = itemStockTotal(seeder, gameItemId);
+
         String detailUrl = baseUrl + "/orders/" + id;
         // The item-handover controls live in a non-default tab pane (an item order defaults to the
         // "items" tab), so deeplink straight to the item-handovers tab before asserting or driving
@@ -146,6 +160,15 @@ class JobOrderItemHandoverE2eTest {
             .isVisible();
         assertThat(page.getByTestId("item-handover-open")).isVisible();
 
+        // REQ-ORDERS-030: the partial delivery of one unit drew exactly one unit out of the order's
+        // earmarked item stock (best-effort consumption), so the squadron-wide total dropped by
+        // one.
+        assertEquals(
+            stockAfterManufacture - 1.0,
+            itemStockTotal(seeder, gameItemId),
+            1e-6,
+            "the partial item handover must consume one earmarked unit (REQ-ORDERS-030)");
+
         // Edit freeze: with a handover on record, the item-edit route redirects to the detail page
         // rather than rendering the editor, so its submit control is never shown.
         E2eSupport.navigate(page, detailUrl + "/items/edit");
@@ -157,6 +180,19 @@ class JobOrderItemHandoverE2eTest {
         recordItemHandover(page, "1", "E2E Item Recipient B");
         E2eSupport.navigate(page, itemHandoverUrl);
         assertThat(page.getByTestId("item-handover-open")).hasCount(0);
+
+        // REQ-ORDERS-030: the completing delivery drew the last earmarked unit, so the
+        // squadron-wide
+        // total dropped by both produced units and the fully delivered order retains no earmarked
+        // item stock at all — the phantom stock a delivery would leave behind has disappeared.
+        assertEquals(
+            stockAfterManufacture - 2.0,
+            itemStockTotal(seeder, gameItemId),
+            1e-6,
+            "the completing item handover must consume the last earmarked unit (REQ-ORDERS-030)");
+        assertTrue(
+            orderItemStockEmpty(seeder, id),
+            "a fully delivered item order must retain no earmarked item stock (REQ-ORDERS-030)");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "joborder-item-handover");
         throw failure;
@@ -220,5 +256,70 @@ class JobOrderItemHandoverE2eTest {
             response.url().contains("/item-handovers")
                 && "POST".equals(response.request().method()),
         () -> page.getByTestId("item-handover-submit").click());
+  }
+
+  /**
+   * Resolves the id of the game item the order's single line requests, read from the persisted
+   * order so the item-stock assertions target exactly the widget the production booked in
+   * (REQ-INV-032).
+   *
+   * @param seeder the backend seeder used for the authenticated read-back
+   * @param orderId the item order to inspect
+   * @return the game-item id of {@code items[0].gameItem}
+   */
+  private static String orderedGameItemId(BackendSeeder seeder, String orderId) {
+    return JsonParser.parseString(seeder.getBody(USERNAME, PASSWORD, "/api/v1/orders/" + orderId))
+        .getAsJsonObject()
+        .getAsJsonArray("items")
+        .get(0)
+        .getAsJsonObject()
+        .getAsJsonObject("gameItem")
+        .get("id")
+        .getAsString();
+  }
+
+  /**
+   * Sums the squadron-wide item-stock total of one game item through the same grouped {@code
+   * catalog=ITEM} endpoint the {@code /inventory/all} item view renders from (REQ-INV-030/032), so
+   * a before/after delta proves the delivery consumed the earmarked stock (REQ-ORDERS-030) without
+   * racing the post-write render.
+   *
+   * @param seeder the backend seeder used for the authenticated read-back
+   * @param gameItemId the game item whose stacks to sum
+   * @return the summed {@code totalAmount} across all of the item's stacks (0 when none exist)
+   */
+  private static double itemStockTotal(BackendSeeder seeder, String gameItemId) {
+    String body =
+        seeder.getBody(
+            USERNAME,
+            PASSWORD,
+            "/api/v1/inventory/all/grouped?catalog=ITEM&gameItemIds=" + gameItemId);
+    double sum = 0;
+    for (JsonElement groupElement : JsonParser.parseString(body).getAsJsonArray()) {
+      for (JsonElement stackElement : groupElement.getAsJsonObject().getAsJsonArray("stacks")) {
+        JsonObject stack = stackElement.getAsJsonObject();
+        if (stack.has("totalAmount") && !stack.get("totalAmount").isJsonNull()) {
+          sum += stack.get("totalAmount").getAsDouble();
+        }
+      }
+    }
+    return sum;
+  }
+
+  /**
+   * Reports whether the order carries no earmarked item stock, read through the order-scoped
+   * item-stock endpoint (REQ-ORDERS-028). After a full delivery the consumed rows are depleted and
+   * deleted, so the grouped result is empty — the order-scoped proof that the delivery drew its
+   * earmark down to nothing (REQ-ORDERS-030).
+   *
+   * @param seeder the backend seeder used for the authenticated read-back
+   * @param orderId the item order whose earmarked item stock to inspect
+   * @return {@code true} when the order has no earmarked game-item rows left
+   */
+  private static boolean orderItemStockEmpty(BackendSeeder seeder, String orderId) {
+    return JsonParser.parseString(
+            seeder.getBody(USERNAME, PASSWORD, "/api/v1/orders/" + orderId + "/item-stock"))
+        .getAsJsonArray()
+        .isEmpty();
   }
 }

@@ -736,10 +736,14 @@ the core feature stays forward-compatible:
 5. **Phase 5 — Materialbörse stock-backed item offers** (§8): **directly after PR 3/4 as
    part of the same epic** (owner decision 2026-07-16 — not backlogged), including the
    kind-aware `updateOffer` fix. `MARKET`/`INV`.
-6. **Phase 6 — delivery consumes item stock (best-effort)**: decided (owner 2026-07-16)
-   — item handover consumes `min(handed-over amount, the order's earmarked item stock)`,
-   never blocking, so legacy manufactured-without-stock lines stay deliverable. Own REQ +
-   PR; scheduling flexible after Phase 5.
+6. **Phase 6 — delivery consumes item stock (best-effort)**: **Shipped** as
+   [`REQ-ORDERS-030`](specs/orders-item-production.md) — item handover consumes
+   `min(handed-over amount, the order's earmarked item stock)`, never blocking, so legacy
+   manufactured-without-stock lines stay deliverable and the phantom stock a delivery leaves
+   behind disappears. Consumed rows draw only this order's earmark slice oldest-first under a
+   `FOR UPDATE` lock, are audited as the reused `INVENTORY_HANDED_OVER`, and the success path
+   live-syncs the `item-stock` panel + the `inventory`/`stock` seam. No ADR — a behaviour
+   refinement fully captured in the REQ.
 
 Each PR carries its spec/README/CHANGELOG slice per the repo's same-PR rules.
 
@@ -747,10 +751,11 @@ Each PR carries its spec/README/CHANGELOG slice per the repo's same-PR rules.
 
 The former open items were decided by the owner on 2026-07-16 (recorded in §10):
 
-1. **Delivery consumes item stock — DECIDED: best-effort** (§10 Phase 6). Item handover
+1. **Delivery consumes item stock — DECIDED: best-effort — SHIPPED** as
+   [`REQ-ORDERS-030`](specs/orders-item-production.md) (§10 Phase 6). Item handover
    consumes `min(handed-over, the order's earmarked item stock)`, never blocking, so
    legacy manufactured-without-stock lines stay deliverable and phantom stock disappears
-   for the normal flow. Own REQ + PR.
+   for the normal flow.
 2. **Order-detail item-stock panel — DECIDED: dedicated follow-up PR right after PR 3**
    (§10 PR 4). Until then the allocation chips in the Lager views carry the visibility;
    the §4.4 material-only guards keep the order pages correct in the interim.

@@ -129,10 +129,10 @@ book-in section shipped.
 
 ## Out of scope
 
-Delivery-consumes-stock (decided follow-up, design §10 Phase 6), Materialbörse
-stock-backed item offers (Phase 5, design §8), non-blueprint items, and the
+Materialbörse stock-backed item offers (Phase 5, design §8), non-blueprint items, and the
 "Mein Inventar" boundary (design §11). The order-detail item-stock panel shipped as
-REQ-ORDERS-028 ([`orders-item-production.md`](orders-item-production.md)).
+REQ-ORDERS-028 and delivery-consumes-earmarked-stock (best-effort) as REQ-ORDERS-030 (both
+[`orders-item-production.md`](orders-item-production.md)).
 
 ## Open questions
 
