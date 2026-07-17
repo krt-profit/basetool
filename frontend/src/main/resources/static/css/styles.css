@@ -3118,6 +3118,21 @@ input[type='radio']:focus {
     margin-bottom: var(--space-3);
 }
 
+/* REQ-NOTIF-019: "showing X of Y" hint + load-more under the capped inbox list. */
+.notification-page-more {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding-top: var(--space-3);
+}
+
+.notification-page-hint {
+    margin: 0;
+    color: var(--color-gray-2-text);
+    font-size: 0.85rem;
+}
+
 .squadron-switcher {
     display: flex;
     flex-direction: column;

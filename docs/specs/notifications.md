@@ -1,6 +1,6 @@
 # Notifications & alerting
 
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-16.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-17.
 > **Owner area:** NOTIF · **Related ADRs:** [ADR-0014](../adr/0014-notification-system-architecture.md),
 > [ADR-0015](../adr/0015-notification-data-driven-rule-engine.md),
 > [ADR-0016](../adr/0016-notification-transport-polling-sse.md) · **Epic:**
@@ -445,6 +445,58 @@ nobody (the requester is the actor and seeds no rule); its sole pipeline effect 
 `service/NotificationCreationService#removeSupersededNotifications`,
 `repository/NotificationRepository#{findRecipientSubsByTypeInAndEntity,deleteByTypeInAndEntity}`,
 `service/BankBookingRequestService#cancelOwn`, `model/NotificationEventType` · **Issues:** #1252
+
+### REQ-NOTIF-019 — The inbox page shows its full history (hint + load-more), never a silent cap
+
+The `/notifications` page renders the newest **50** notifications. That cap MUST NOT be silent: an
+inbox holding more than one page MUST show a truthful "showing the latest N of M" hint and a
+**load-more** control that appends the next server page in place, so the older tail stays reachable
+— rather than presenting the latest 50 as if they were the whole inbox (the ADR-0100
+silent-truncation defect class, on the notifications surface). The bell dropdown keeps its lighter
+latest-10 `/recent` view unchanged; this requirement governs the full page only.
+
+The page and the load-more relay read the caller's own notifications from the already-paginated
+backend listing (`GET /api/v1/notifications`, `NotificationService#listOwn`, sub-scoped per
+REQ-NOTIF-004, `createdAt,desc`) — no new backend endpoint. The sort carries a stable **`id`
+tiebreaker** (`NotificationService.SORTABLE_FIELDS` includes `id`, appended by `PaginationUtil`),
+so notifications sharing a `createdAt` instant keep a deterministic total order across page fetches
+and the boundary between page *n* and *n+1* never silently drops a tied row. The initial render
+carries the total count and a more-pages flag; the load-more control fetches page *n* via a
+header-gated relay (`GET /notifications/page-items`) returning the same server-localized
+`NotificationViewDto`s as the initial render (identical text + relative time), appends only rows
+not already in the DOM (a notification arriving since page 0 pushes rows down, so an offset fetch
+may re-return an already-shown row — that duplicate is skipped), keeps the hint truthful after each
+append, and removes itself once the last page is loaded. A load-more failure leaves the control
+usable for a retry. The existing mark-read / delete / mark-all / clear-read handlers
+(REQ-NOTIF-005) are event-delegated, so they drive appended rows too.
+
+**Acceptance**
+
+- [ ] With more than 50 notifications, the page renders the "latest N of M" hint and a load-more
+  control; with ≤ 50 it renders neither.
+- [ ] Load-more appends the next page's localized rows in place (no full reload), updates the hint,
+  and de-duplicates against rows already present.
+- [ ] The control disappears once the final page has been appended; a relay failure keeps it
+  clickable for a retry.
+- [ ] Appended rows honour mark-read / delete without a reload (delegated handlers), and the
+  unread badge stays server-sourced (REQ-NOTIF-006).
+- [ ] The inbox-list sort resolves to a total order (`createdAt,desc` + `id` tiebreaker), so a
+  page boundary never silently drops a notification that shares a `createdAt` instant with another.
+
+The delete-shift edge inherent to offset pagination (deleting an already-shown row pushes an
+unseen row above the current offset, so the next fetch skips it) is **out of scope** — it needs
+keyset/cursor pagination, affects every offset-paginated list in the app equally, and a manual
+reload recovers it. This requirement bounds only the *silent-at-the-cap* and *tie-instability*
+truncation, not that inherent-to-offset edge.
+
+**Enforced by:** `NotificationPageControllerTest` (page total + has-more flags; `/page-items`
+slice), `NotificationServiceTest` (sort whitelist yields the stable `id` tiebreaker),
+`NotificationPageRenderMvcTest` (hint + load-more render only past one page),
+`MessageBundleConsistencyTest` (`notifications.loadMore` / `notifications.showingLatest` in every
+bundle) · **Code:** `frontend controller/NotificationPageController#page` / `#pageItems` /
+`#loadPage`, `model/dto/NotificationPageSliceDto`, `backend service/NotificationService`
+(`SORTABLE_FIELDS` with `id`), `templates/notifications.html`, `static/js/notifications.js`
+(`loadMorePage` / `updatePageHint`) · **Issues:** — (ADR-0100 silent-truncation audit follow-up)
 
 ## Out of scope (v1)
 

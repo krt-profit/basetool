@@ -27,6 +27,8 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionLevelContentDto
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionTopicDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RankRequirementDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
+import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -101,6 +103,15 @@ public class PromotionPageController {
   /** Response type for the {@code /promotion/eligibility} promotion-eligibility lists. */
   private static final ParameterizedTypeReference<List<PromotionEligibilityDto>>
       ELIGIBILITY_LIST_TYPE = new ParameterizedTypeReference<List<PromotionEligibilityDto>>() {};
+
+  /**
+   * Chunk size for the {@link CatalogPages#fetchAll page walks} feeding the evaluation matrix
+   * (evaluations and members). This is a <b>chunk size</b>, not a cap: the walk keeps requesting
+   * pages until the backend reports the last one, so the matrix stays complete at any data volume
+   * (REQ-PROMO-001) — unlike the former one-shot {@code ?size=10000} request whose overflow was
+   * silently dropped. A squadron that fits one chunk still costs exactly one request.
+   */
+  private static final int MATRIX_FETCH_PAGE_SIZE = 1000;
 
   private final BackendApiClient backendApiClient;
 
@@ -299,8 +310,10 @@ public class PromotionPageController {
       allCategories.addAll(topicCategories);
     }
 
-    // Fetch all evaluations for admin view
-    List<MemberEvaluationDto> allEvaluations = fetchAllEvaluations();
+    // Fetch all evaluations for admin view — the COMPLETE set via a page walk (REQ-PROMO-001), not
+    // one capped chunk, so no member/category cell is silently missing from the matrix.
+    CompleteCatalog<MemberEvaluationDto> evaluationsCatalog = fetchAllEvaluations();
+    List<MemberEvaluationDto> allEvaluations = evaluationsCatalog.items();
     // Build map: userId+categoryId -> evaluation
     Map<String, MemberEvaluationDto> evaluationMap = new LinkedHashMap<>();
     // Per-user latest updatedAt across all categories. Used by the template to render a
@@ -321,8 +334,10 @@ public class PromotionPageController {
       }
     }
 
-    // Fetch all members
-    List<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto> members = fetchMembers();
+    // Fetch all members — likewise the COMPLETE, page-walked axis (REQ-PROMO-001).
+    CompleteCatalog<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto> membersCatalog =
+        fetchMembers();
+    List<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto> members = membersCatalog.items();
 
     // Eligibility per member, keyed by member.id (stringified UUID) so the template can
     // look it up cheaply. Failures for a single member don't break the whole page.
@@ -343,6 +358,12 @@ public class PromotionPageController {
     model.addAttribute("eligibilityByUser", eligibilityByUser);
     model.addAttribute("lastEvaluatedByUser", lastEvaluatedByUser);
     model.addAttribute("hasEvaluationsByUser", hasEvaluationsByUser);
+    // Either matrix axis stopping at the page-walk safety cap means the rendered matrix is
+    // incomplete — surface it with a loud banner rather than showing silent holes that read as
+    // "not yet evaluated" (REQ-PROMO-001, mirrors REQ-ADMIN-002). The flag lives inside the
+    // matrixBody fragment so it is present on both the full render and the in-place re-render.
+    model.addAttribute(
+        "matrixTruncated", evaluationsCatalog.truncated() || membersCatalog.truncated());
     // matrixBody is the authoritative full re-render used to recover from an optimistic-lock
     // conflict in place: it rebuilds every row with fresh @Version, level, eligibility and
     // last-evaluated state — exactly what the old full-page reload produced, minus the navigation.
@@ -528,33 +549,60 @@ public class PromotionPageController {
     }
   }
 
-  private List<MemberEvaluationDto> fetchAllEvaluations() {
+  /**
+   * Walks <b>every</b> page of the squadron-scoped evaluation listing. Evaluations grow
+   * multiplicatively (members × categories), so no single fixed page size is safe: the former
+   * one-shot {@code ?size=10000} request silently dropped everything past the bound and the matrix
+   * rendered holes indistinguishable from "not yet evaluated" (REQ-PROMO-001). The shared {@link
+   * CatalogPages#fetchAll} page walk (ADR-0102) assembles the complete set and reports whether it
+   * had to stop at its safety cap; the caller surfaces that truncation loudly. A backend error is
+   * swallowed to an empty catalogue, preserving the page's established fail-soft-to-empty
+   * behaviour.
+   *
+   * @return the complete evaluation catalogue with its truncation flag
+   */
+  private CompleteCatalog<MemberEvaluationDto> fetchAllEvaluations() {
     try {
-      PageResponse<MemberEvaluationDto> result =
-          backendApiClient.get(
-              "/api/v1/promotion/evaluations/all?size=10000", MEMBER_EVALUATION_PAGE_TYPE);
-      return result != null && result.content() != null ? result.content() : new ArrayList<>();
+      return CatalogPages.fetchAll(
+          page ->
+              backendApiClient.get(
+                  "/api/v1/promotion/evaluations/all?size="
+                      + MATRIX_FETCH_PAGE_SIZE
+                      + "&page="
+                      + page,
+                  MEMBER_EVALUATION_PAGE_TYPE));
     } catch (Exception e) {
       log.error("Failed to fetch all evaluations", e);
-      return new ArrayList<>();
+      return CompleteCatalog.empty();
     }
   }
 
-  private List<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto> fetchMembers() {
+  /**
+   * Walks <b>every</b> page of the squadron's evaluatable members. The backend's {@code
+   * /api/v1/promotion/evaluations/members} endpoint applies the same scope as {@code
+   * SquadronScopeService.currentSquadronId()} (Officer = own squadron, Admin = focused squadron or
+   * all squadrons) and excludes any user that carries the Admin OR the Officer role (issue #817):
+   * admins are squadron-less by design, and officers run the Bewertungsverwaltung rather than being
+   * its subject, so neither belongs in the matrix — it assesses only the ordinary members of the
+   * squadron. Fetched completely via {@link CatalogPages#fetchAll} so a squadron beyond the page
+   * size never silently loses matrix rows (REQ-PROMO-001); a backend error degrades to an empty
+   * catalogue.
+   *
+   * @return the complete member catalogue with its truncation flag
+   */
+  private CompleteCatalog<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto> fetchMembers() {
     try {
-      // Squadron-scoped list of the squadron's simple members. The backend's
-      // /api/v1/promotion/evaluations/members endpoint applies the same scope as
-      // SquadronScopeService.currentSquadronId() (Officer = own squadron, Admin = focused
-      // squadron or all squadrons) and excludes any user that carries the Admin OR the Officer
-      // role (issue #817): admins are squadron-less by design, and officers run the
-      // Bewertungsverwaltung rather than being its subject, so neither belongs in the matrix —
-      // it assesses only the ordinary members of the squadron.
-      PageResponse<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto> result =
-          backendApiClient.get("/api/v1/promotion/evaluations/members?size=1000", USER_PAGE_TYPE);
-      return result != null && result.content() != null ? result.content() : new ArrayList<>();
+      return CatalogPages.fetchAll(
+          page ->
+              backendApiClient.get(
+                  "/api/v1/promotion/evaluations/members?size="
+                      + MATRIX_FETCH_PAGE_SIZE
+                      + "&page="
+                      + page,
+                  USER_PAGE_TYPE));
     } catch (Exception e) {
       log.error("Failed to fetch evaluatable members", e);
-      return new ArrayList<>();
+      return CompleteCatalog.empty();
     }
   }
 
