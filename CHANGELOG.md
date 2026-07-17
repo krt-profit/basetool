@@ -10,6 +10,10 @@
 
 - **Monitoring: cAdvisor überlebt jetzt einen containerd-Neustart, ohne Container-Serien zu verlieren (behebt wiederkehrende `CoreContainerMetricsMissing`-Alarme).** Der containerd-Socket wird als Verzeichnis statt als Einzeldatei gemountet, damit ein neuer Socket-Inode sichtbar bleibt und cAdvisor nicht auf den toten Inode festgenagelt wird (REQ-OBS-014, ADR-0072).
 
+- **Logging: Der langlebige Benachrichtigungs-Stream wird nicht mehr fälschlich als „Slow request" gemeldet.** Der SSE-Relay-Endpunkt (`/api/v1/notifications/stream` bzw. `/notifications/stream`) hält die Verbindung bauartbedingt bis zu 30 Minuten offen; bisher überschritt er dadurch bei jedem Verbindungsende die Slow-Request-Schwelle und flutete das Zugriffslog mit falschen WARN-Zeilen. Er wird jetzt wie schon bei den Latenzmetriken (REQ-OBS-009) von der WARN-Eskalation ausgenommen und behält seine eine INFO-Zeile (REQ-OBS-001).
+
+- **Logging: Die Hibernate-Validator-Deprecation-Warnungen zu `@Valid` auf Sammlungen entfallen.** Mehrere DTOs trugen `@Valid` am Listen-Container statt am Element-Typ, was beim Start je Feld ein `HV000271: Using @Valid on a container … is deprecated` auslöste; die Annotation steht jetzt am Element-Typ (`List<@Valid X>`), die Validierung bleibt unverändert.
+
 ## [v1.5.0](https://github.com/krt-profit/basetool/releases/tag/v1.5.0) - 2026-07-17
 
 ### Added

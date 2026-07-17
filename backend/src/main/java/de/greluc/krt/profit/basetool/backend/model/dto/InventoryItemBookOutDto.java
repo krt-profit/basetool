@@ -73,5 +73,5 @@ public record InventoryItemBookOutDto(
     @NotNull Long version,
     @Nullable UUID targetOwningOrgUnitId,
     Boolean mergeStock,
-    @Valid @Nullable List<AllocationReductionDto> jobOrderReductions,
-    @Valid @Nullable List<AllocationReductionDto> missionReductions) {}
+    @Nullable List<@Valid AllocationReductionDto> jobOrderReductions,
+    @Nullable List<@Valid AllocationReductionDto> missionReductions) {}
