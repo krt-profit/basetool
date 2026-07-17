@@ -227,15 +227,21 @@ window.krtNotifyInventoryChanged = broadcastInventoryAllChanged;
 
 // Cross-feature live-sync (#1309): an inventory write also changes surfaces in OTHER rooms.
 // broadcastOrdersChanged tells each affected job order's detail viewers to re-pull their material
-// collection (its stock column tracks the earmark roll-up, not just deliveries), and
+// collection (its stock column tracks the earmark roll-up, not just deliveries) and — for item
+// rows — the order-detail Item-Bestand panel (`item-stock`, REQ-ORDERS-028), and
 // broadcastBoardChanged tells the Materialbörse to re-pull its board after a stock-reducing write
 // (the backend clamps an offer down to the remaining stock). The actor is not in those rooms, so
-// there is no self-refresh; an unaffected peer's re-fetch is a harmless no-op.
+// there is no self-refresh; an unaffected peer's re-fetch (or a section whose container the page
+// does not render) is a harmless no-op.
 function broadcastOrdersChanged(orderIds) {
     if (!window.krtLiveSync || typeof window.krtLiveSync.sendChanged !== 'function') return;
     (orderIds || []).forEach(function (orderId) {
         if (orderId)
-            window.krtLiveSync.sendChanged('order:' + orderId, ['materials', 'aggregated']);
+            window.krtLiveSync.sendChanged('order:' + orderId, [
+                'materials',
+                'aggregated',
+                'item-stock',
+            ]);
     });
 }
 function broadcastBoardChanged() {

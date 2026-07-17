@@ -51,6 +51,13 @@ LOGISTICIAN edit path. A stale write surfaces as HTTP 409; the edit is audited a
 / `JOB_ORDER_ITEM_UPDATED` with a `byRequester=true` discriminator (REQ-AUDIT-001), and on commit the
 processing unit's officers/leads are notified (REQ-NOTIF-017).
 
+A related, narrower carve-out applies even to a caller who *is* a full viewer of an **SK-public**
+order purely because their org unit **requested** it: the linked-inventory **owner identity and
+location** on the order's four inventory reads (Item-Bestand panel, material collection, the two
+pickers) are redacted for them, since the SK-public escape would otherwise expose the fulfilling
+side's owners. See [`orders-item-production.md`](orders-item-production.md) `REQ-ORDERS-029` /
+[ADR-0107](../adr/0107-job-order-inventory-owner-redaction.md).
+
 **Acceptance**
 
 - [ ] A non-profit member sees the orders their own org unit requested under "Meine Aufträge" and can

@@ -598,6 +598,101 @@ class OwnerScopeServiceTest {
   }
 
   @Nested
+  class CanSeeJobOrderInventoryOwnersTests {
+
+    private JobOrder orderResponsibleTo(
+        de.greluc.krt.profit.basetool.backend.model.OrgUnit responsible) {
+      return JobOrder.builder().id(UUID.randomUUID()).responsibleOrgUnit(responsible).build();
+    }
+
+    @Test
+    void member_ofResponsibleSquadron_canSeeOwners() {
+      // covers REQ-ORDERS-029 (squadron-responsible order: coincides with canSeeJobOrder)
+      JobOrder order = orderResponsibleTo(squadronA);
+      when(jobOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
+      lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+
+      assertTrue(service.canSeeJobOrderInventoryOwners(order.getId()));
+    }
+
+    @Test
+    void nonMember_ofResponsibleSquadron_cannotSeeOwners() {
+      // covers REQ-ORDERS-029
+      JobOrder order = orderResponsibleTo(squadronB);
+      when(jobOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
+      lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+
+      assertFalse(service.canSeeJobOrderInventoryOwners(order.getId()));
+    }
+
+    @Test
+    void requestingSideMember_ofPublicSkOrder_cannotSeeOwners() {
+      // covers REQ-ORDERS-029 — the defining case: an SK-responsible order is publicly readable
+      // (canSeeJobOrder is true for any profit member), but the fulfilling side's inventory
+      // owner/location is restricted to members of that SK. A profit member from the merely
+      // REQUESTING squadron is denied — there is no SK-public escape on this gate, so the endpoint
+      // redacts owner/location for them (ADR-0107).
+      UUID skId = UUID.randomUUID();
+      SpecialCommand sk = new SpecialCommand();
+      sk.setId(skId);
+      JobOrder order = orderResponsibleTo(sk);
+      when(jobOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
+      lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+
+      assertFalse(service.canSeeJobOrderInventoryOwners(order.getId()));
+    }
+
+    @Test
+    void member_ofResponsibleSk_canSeeOwners() {
+      // covers REQ-ORDERS-029
+      UUID skId = UUID.randomUUID();
+      SpecialCommand sk = new SpecialCommand();
+      sk.setId(skId);
+      JobOrder order = orderResponsibleTo(sk);
+      when(jobOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
+      lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(skMembership(MEMBER_USER_ID, skId)));
+
+      assertTrue(service.canSeeJobOrderInventoryOwners(order.getId()));
+    }
+
+    @Test
+    void adminWithoutPin_canSeeAnyOrdersOwners() {
+      // covers REQ-ORDERS-029
+      JobOrder order = orderResponsibleTo(squadronB);
+      when(jobOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      assertTrue(service.canSeeJobOrderInventoryOwners(order.getId()));
+    }
+
+    @Test
+    void unknownOrder_returnsFalse() {
+      // covers REQ-ORDERS-029
+      UUID missing = UUID.randomUUID();
+      when(jobOrderRepository.findById(missing)).thenReturn(Optional.empty());
+
+      assertFalse(service.canSeeJobOrderInventoryOwners(missing));
+    }
+  }
+
+  @Nested
   class CanSeeMissionTests {
 
     @Test

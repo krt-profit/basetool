@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
-import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.support.JobOrderInventoryOwnerRedactor;
@@ -37,50 +37,54 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST controller for the material collection overview of a job order. Provides a sorted list of
- * all inventory items linked to a specific job order. The per-entry owner/location is redacted for
- * a requesting-side viewer of an SK-public order (REQ-ORDERS-029, ADR-0107) via {@link
+ * REST controller for the order-detail Item-Bestand panel (REQ-ORDERS-028): lists the game-item
+ * stock earmarked to a job order, grouped per game item — the item sibling of {@link
+ * MaterialCollectionController}. Reading the panel requires being able to see the order ({@code
+ * canSeeJobOrder}); the per-entry owner/location is additionally redacted for a requesting-side
+ * viewer of an SK-public order (REQ-ORDERS-029, ADR-0107) via {@link
  * JobOrderInventoryOwnerRedactor}, gated on {@code canSeeJobOrderInventoryOwners}.
  */
 @RestController
 @RequestMapping("/api/v1/orders")
 @RequiredArgsConstructor
-public class MaterialCollectionController {
+public class JobOrderItemStockController {
 
   private final InventoryItemService inventoryItemService;
   private final OwnerScopeService ownerScopeService;
   private final JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
   /**
-   * Returns the inventory contributions linked to the given job order. The per-entry owner and
-   * location are blanked when the caller is not entitled to the order's responsible side ({@code
-   * canSeeJobOrderInventoryOwners} is {@code false} — a requesting-side viewer of an SK-public
-   * order, REQ-ORDERS-029); material, quality, quantities and the delivered marker are always kept.
+   * Returns the game-item stock earmarked to the given job order, grouped per game item. The
+   * per-entry owner and location are blanked when the caller is not entitled to the order's
+   * responsible side ({@code canSeeJobOrderInventoryOwners} is {@code false} — a requesting-side
+   * viewer of an SK-public order, REQ-ORDERS-029); amounts and the delivered marker are always
+   * kept.
    *
    * @param jobOrderId job order id
-   * @return inventory entries sorted by owner / location / material / quality / quantity, with
-   *     owner/location redacted for requesting-side viewers
+   * @return name-sorted game-item groups with per-entry owner (redacted for requesting-side
+   *     viewers), location, whole-unit amounts, this-order slice, delivered marker and entry
+   *     version
    */
   @Operation(
-      summary = "Get material collection for a job order",
+      summary = "Get the earmarked item stock for a job order",
       description =
-          "Returns all inventory items linked to the given job order, sorted by owner name,"
-              + " location, material name, quality (desc), quantity (desc).")
+          "Returns the game-item inventory rows earmarked to the given job order, grouped per game"
+              + " item (name-sorted) with per-entry owner, location, whole-unit stock, the order's"
+              + " own earmark slice, its delivered marker and the entry version.")
   @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "Material collection returned successfully"),
+    @ApiResponse(responseCode = "200", description = "Item stock returned successfully"),
     @ApiResponse(
         responseCode = "403",
         description = "Access denied – not allowed to see this job order"),
     @ApiResponse(responseCode = "404", description = "Job order not found")
   })
-  @GetMapping("/{jobOrderId}/material-collection")
+  @GetMapping("/{jobOrderId}/item-stock")
   @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#jobOrderId)")
-  public List<MaterialCollectionEntryDto> getMaterialCollection(
-      @PathVariable @NotNull UUID jobOrderId) {
-    List<MaterialCollectionEntryDto> entries =
-        inventoryItemService.getMaterialCollection(jobOrderId);
+  public List<JobOrderItemStockGroupDto> getItemStock(@PathVariable @NotNull UUID jobOrderId) {
+    List<JobOrderItemStockGroupDto> groups =
+        inventoryItemService.getItemStockForJobOrder(jobOrderId);
     return ownerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)
-        ? entries
-        : inventoryOwnerRedactor.redactMaterialCollection(entries);
+        ? groups
+        : inventoryOwnerRedactor.redactItemStockGroups(groups);
   }
 }

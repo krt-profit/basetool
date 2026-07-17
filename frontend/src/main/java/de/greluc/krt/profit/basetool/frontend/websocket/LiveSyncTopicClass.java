@@ -118,6 +118,7 @@ public enum LiveSyncTopicClass {
           "materials",
           "aggregated",
           "items",
+          "item-stock",
           "handovers",
           "item-handovers",
           "item-handover-lines",

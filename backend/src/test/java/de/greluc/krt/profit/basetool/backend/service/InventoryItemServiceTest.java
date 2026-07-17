@@ -1763,6 +1763,208 @@ class InventoryItemServiceTest {
         NotFoundException.class, () -> inventoryItemService.getMaterialCollection(jobOrderId));
   }
 
+  // ---- getItemStockForJobOrder (REQ-ORDERS-028) ----
+
+  /**
+   * Builds a game-item inventory row with one earmark slice per (order, amount, delivered) triple,
+   * for the Item-Bestand grouping tests.
+   */
+  private static InventoryItem itemStockRow(
+      GameItem gameItem,
+      User owner,
+      Location location,
+      double amount,
+      Long version,
+      Object[][] slices) {
+    InventoryItem row = new InventoryItem();
+    row.setId(UUID.randomUUID());
+    row.setVersion(version);
+    row.setUser(owner);
+    row.setLocation(location);
+    row.setGameItem(gameItem);
+    row.setAmount(amount);
+    for (Object[] sliceSpec : slices) {
+      InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
+      slice.setInventoryItem(row);
+      slice.setJobOrder((JobOrder) sliceSpec[0]);
+      slice.setAmount((Double) sliceSpec[1]);
+      slice.setDelivered((Boolean) sliceSpec[2]);
+      row.getJobOrderAllocations().add(slice);
+    }
+    return row;
+  }
+
+  @Test
+  void getItemStockForJobOrder_groupsPerGameItemAndReadsTheOrderSlice() {
+    // covers REQ-ORDERS-028
+    // Given: an ITEM order with two lines (5 ordered / 2 manufactured of the rifle across two
+    // lines; 1 / 0 of the scope) and three earmarked rows — two rifle rows (one shared with a
+    // sibling order, delivered only for THIS order) and one scope row.
+    UUID jobOrderId = UUID.randomUUID();
+    JobOrder jobOrder = new JobOrder();
+    jobOrder.setId(jobOrderId);
+    JobOrder foreignOrder = new JobOrder();
+    foreignOrder.setId(UUID.randomUUID());
+
+    GameItem rifle = new GameItem();
+    rifle.setId(UUID.randomUUID());
+    rifle.setName("Rifle");
+    GameItem scope = new GameItem();
+    scope.setId(UUID.randomUUID());
+    scope.setName("Optic Scope");
+
+    de.greluc.krt.profit.basetool.backend.model.JobOrderItem rifleLineA =
+        new de.greluc.krt.profit.basetool.backend.model.JobOrderItem();
+    rifleLineA.setGameItem(rifle);
+    rifleLineA.setAmount(3);
+    rifleLineA.setManufacturedAmount(2);
+    de.greluc.krt.profit.basetool.backend.model.JobOrderItem rifleLineB =
+        new de.greluc.krt.profit.basetool.backend.model.JobOrderItem();
+    rifleLineB.setGameItem(rifle);
+    rifleLineB.setAmount(2);
+    rifleLineB.setManufacturedAmount(0);
+    de.greluc.krt.profit.basetool.backend.model.JobOrderItem scopeLine =
+        new de.greluc.krt.profit.basetool.backend.model.JobOrderItem();
+    scopeLine.setGameItem(scope);
+    scopeLine.setAmount(1);
+    scopeLine.setManufacturedAmount(0);
+    jobOrder.addItem(rifleLineA);
+    jobOrder.addItem(rifleLineB);
+    jobOrder.addItem(scopeLine);
+
+    User alice = new User();
+    alice.setId(UUID.randomUUID());
+    alice.setUsername("alice");
+    alice.setDisplayName("Alice");
+    Location lorville = new Location();
+    lorville.setId(UUID.randomUUID());
+    lorville.setName("Lorville");
+
+    // The repository returns the rows pre-sorted by owner/location/name — the scope row FIRST, so
+    // the group sort must reorder the groups by game-item name (Optic Scope before Rifle).
+    InventoryItem scopeRow =
+        itemStockRow(scope, alice, lorville, 1.0, 3L, new Object[][] {{jobOrder, 1.0, false}});
+    InventoryItem rifleRowShared =
+        itemStockRow(
+            rifle,
+            alice,
+            lorville,
+            4.0,
+            7L,
+            new Object[][] {{foreignOrder, 2.0, false}, {jobOrder, 1.0, true}});
+    InventoryItem rifleRowPlain =
+        itemStockRow(rifle, alice, lorville, 2.0, null, new Object[][] {{jobOrder, 2.0, false}});
+
+    when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(jobOrder));
+    when(inventoryItemRepository.findGameItemRowsByJobOrderIdOrdered(jobOrderId))
+        .thenReturn(List.of(scopeRow, rifleRowShared, rifleRowPlain));
+    when(inventoryItemMapper.gameItemToReferenceDto(any(GameItem.class)))
+        .thenAnswer(
+            inv -> {
+              GameItem gi = inv.getArgument(0);
+              return new InventoryGameItemReferenceDto(gi.getId(), gi.getName(), null, null);
+            });
+
+    // When
+    List<JobOrderItemStockGroupDto> result =
+        inventoryItemService.getItemStockForJobOrder(jobOrderId);
+
+    // Then: two groups, sorted by game-item name.
+    assertEquals(2, result.size());
+    JobOrderItemStockGroupDto scopeGroup = result.get(0);
+    JobOrderItemStockGroupDto rifleGroup = result.get(1);
+    assertEquals("Optic Scope", scopeGroup.gameItem().name(), "groups are name-sorted");
+    assertEquals("Rifle", rifleGroup.gameItem().name());
+
+    // Then: the rifle group sums the order's line context across both lines and the slice totals.
+    assertEquals(5, rifleGroup.orderedAmount(), "ordered = 3 + 2 across the two rifle lines");
+    assertEquals(2, rifleGroup.manufacturedAmount());
+    assertEquals(
+        3L,
+        rifleGroup.allocatedTotal(),
+        "Σ of THIS order's slices (1 + 2), not the 2.0" + " earmarked to the sibling order");
+    assertEquals(2, rifleGroup.entries().size());
+
+    // Then: the shared row reads THIS order's slice — amount 1, delivered true — never the foreign
+    // slice, and quantity stays the entry's total physical stock (whole units).
+    JobOrderItemStockEntryDto shared = rifleGroup.entries().get(0);
+    assertEquals(rifleRowShared.getId(), shared.inventoryEntryId());
+    assertEquals(7L, shared.version());
+    assertEquals("Alice", shared.ownerName());
+    assertEquals(alice.getId(), shared.ownerId());
+    assertEquals("Lorville", shared.location());
+    assertEquals(lorville.getId(), shared.locationId());
+    assertEquals(4L, shared.quantity(), "quantity is the entry's total physical stock");
+    assertEquals(1L, shared.allocatedQuantity(), "allocatedQuantity is this order's slice");
+    assertTrue(shared.delivered(), "delivered reads this order's slice, not the sibling's");
+
+    // Then: a null persisted version is echoed as 0 (the delivered toggle's echo baseline).
+    assertEquals(0L, rifleGroup.entries().get(1).version());
+    assertFalse(rifleGroup.entries().get(1).delivered());
+
+    // Then: the scope group carries its own line context.
+    assertEquals(1, scopeGroup.orderedAmount());
+    assertEquals(0, scopeGroup.manufacturedAmount());
+    assertEquals(1L, scopeGroup.allocatedTotal());
+  }
+
+  @Test
+  void getItemStockForJobOrder_orphanedEarmark_hasZeroLineContext() {
+    // covers REQ-ORDERS-028
+    // Given: an earmarked row whose game item the order no longer requests (no matching line) —
+    // the group still renders, with 0/0 ordered/manufactured context (REQ-ORDERS-019 flags the
+    // orphan separately).
+    UUID jobOrderId = UUID.randomUUID();
+    JobOrder jobOrder = new JobOrder();
+    jobOrder.setId(jobOrderId);
+
+    GameItem helmet = new GameItem();
+    helmet.setId(UUID.randomUUID());
+    helmet.setName("Helmet");
+    User owner = new User();
+    owner.setId(UUID.randomUUID());
+    owner.setUsername("bob");
+    Location loc = new Location();
+    loc.setId(UUID.randomUUID());
+    loc.setName("Area18");
+
+    InventoryItem row =
+        itemStockRow(helmet, owner, loc, 2.0, 1L, new Object[][] {{jobOrder, 2.0, false}});
+
+    when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.of(jobOrder));
+    when(inventoryItemRepository.findGameItemRowsByJobOrderIdOrdered(jobOrderId))
+        .thenReturn(List.of(row));
+    when(inventoryItemMapper.gameItemToReferenceDto(any(GameItem.class)))
+        .thenAnswer(
+            inv -> {
+              GameItem gi = inv.getArgument(0);
+              return new InventoryGameItemReferenceDto(gi.getId(), gi.getName(), null, null);
+            });
+
+    // When
+    List<JobOrderItemStockGroupDto> result =
+        inventoryItemService.getItemStockForJobOrder(jobOrderId);
+
+    // Then
+    assertEquals(1, result.size());
+    assertEquals(0, result.get(0).orderedAmount());
+    assertEquals(0, result.get(0).manufacturedAmount());
+    assertEquals(2L, result.get(0).allocatedTotal());
+    assertEquals("bob", result.get(0).entries().get(0).ownerName(), "username fallback");
+  }
+
+  @Test
+  void getItemStockForJobOrder_shouldThrowWhenJobOrderNotFound() {
+    // covers REQ-ORDERS-028
+    // Given
+    UUID jobOrderId = UUID.randomUUID();
+    when(jobOrderRepository.findById(jobOrderId)).thenReturn(Optional.empty());
+
+    // When / Then
+    assertThrows(
+        NotFoundException.class, () -> inventoryItemService.getItemStockForJobOrder(jobOrderId));
+  }
+
   // ---- updateDelivered ----
 
   @Test

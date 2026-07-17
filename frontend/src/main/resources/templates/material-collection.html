@@ -59,11 +59,18 @@
                                     th:value="${entry.ownerId}"
                                     th:selected="true"
                                     th:text="${entry.ownerName}"></option>
+                            <!-- Owner is blanked by the backend for a requesting-side viewer of an
+                                 SK-public order (REQ-ORDERS-029); show a dash placeholder. -->
+                            <option th:if="${entry.ownerId == null}" selected disabled>—</option>
                         </select>
                     </td>
                     <td>
                         <select class="location-select krt-select krtm-min-height-44px-width-100-min-width-140px-ba-ded1"
                                 th:data-inventory-id="${entry.inventoryEntryId}">
+                            <!-- Location is blanked by the backend for a requesting-side viewer of an
+                                 SK-public order (REQ-ORDERS-029); a dash placeholder stays selected so
+                                 the redacted row does not default-select an arbitrary location. -->
+                            <option th:if="${entry.locationId == null}" selected disabled>—</option>
                             <option th:each="loc : ${locations}"
                                     th:value="${loc.id}"
                                     th:text="${loc.name}"

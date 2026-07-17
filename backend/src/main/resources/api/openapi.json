@@ -39678,6 +39678,115 @@
         }
       }
     },
+    "/api/v1/orders/{jobOrderId}/item-stock" : {
+      "get" : {
+        "tags" : [ "job-order-item-stock-controller" ],
+        "summary" : "Get the earmarked item stock for a job order",
+        "description" : "Returns the game-item inventory rows earmarked to the given job order, grouped per game item (name-sorted) with per-entry owner, location, whole-unit stock, the order's own earmark slice, its delivered marker and the entry version.",
+        "operationId" : "getItemStock",
+        "parameters" : [ {
+          "name" : "jobOrderId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Item stock returned successfully",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/JobOrderItemStockGroupDto"
+                  }
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders/{jobOrderId}/item-handovers/{handoverId}/report" : {
       "get" : {
         "tags" : [ "Orders" ],
@@ -56881,13 +56990,13 @@
               "$ref" : "#/components/schemas/InventoryAllocationInput"
             }
           },
-          "qualityConsistentWithCatalog" : {
+          "missionFreeForGameItem" : {
             "type" : "boolean"
           },
           "catalogReferenceValid" : {
             "type" : "boolean"
           },
-          "missionFreeForGameItem" : {
+          "qualityConsistentWithCatalog" : {
             "type" : "boolean"
           }
         },
@@ -59982,6 +60091,70 @@
           },
           "delivered" : {
             "type" : "boolean"
+          }
+        }
+      },
+      "JobOrderItemStockEntryDto" : {
+        "type" : "object",
+        "properties" : {
+          "inventoryEntryId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "ownerName" : {
+            "type" : "string"
+          },
+          "ownerId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "location" : {
+            "type" : "string"
+          },
+          "locationId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "quantity" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "allocatedQuantity" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "delivered" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "JobOrderItemStockGroupDto" : {
+        "type" : "object",
+        "properties" : {
+          "gameItem" : {
+            "$ref" : "#/components/schemas/InventoryGameItemReferenceDto"
+          },
+          "orderedAmount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "manufacturedAmount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "allocatedTotal" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "entries" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderItemStockEntryDto"
+            }
           }
         }
       },

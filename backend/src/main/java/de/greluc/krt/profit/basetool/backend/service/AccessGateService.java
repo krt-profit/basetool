@@ -386,6 +386,36 @@ public class AccessGateService {
   }
 
   /**
+   * {@code true} iff the current principal may see the <em>inventory owner identity and
+   * location</em> of the stock earmarked / linked to {@code jobOrderId} — the per-entry owner and
+   * Standort the order-detail Item-Bestand panel, the material collection and the two inventory
+   * pickers render (REQ-ORDERS-029). Like {@link #canSeeJobOrderBlueprintOwners(UUID)} this is
+   * <strong>stricter</strong> than {@link #canSeeJobOrder(UUID)}: it drops the SK-public escape, so
+   * for a Spezialkommando-processed (publicly readable) order it is {@code true} only for members
+   * of the responsible SK (or admins with matching scope), never for a member of the merely
+   * <em>requesting</em> squadron. A requesting-side viewer therefore still sees the order and its
+   * progress, but the fulfilling side's owner/location is redacted (ADR-0107).
+   *
+   * <p>For a squadron-responsible order it coincides with {@link #canSeeJobOrder(UUID)} (whose
+   * squadron branch already requires {@link #canSeeSquadron(UUID)} on the responsible unit), so the
+   * redaction only ever engages on the SK-public escape path. A {@code null} responsible org unit
+   * (legacy pre-backfill rows) and non-existent ids return {@code false} — i.e. owner/location is
+   * redacted by default, the safe direction for a redactor gate.
+   *
+   * @param jobOrderId the job order whose linked-inventory owner/location the caller wants to read;
+   *     never {@code null}.
+   * @return {@code true} iff the caller is a member of the order's responsible org unit (or an
+   *     admin with matching scope).
+   */
+  public boolean canSeeJobOrderInventoryOwners(@NotNull UUID jobOrderId) {
+    return jobOrderRepository
+        .findById(jobOrderId)
+        .map(JobOrder::getResponsibleOrgUnit)
+        .map(responsible -> canSeeSquadron(responsible.getId()))
+        .orElse(false);
+  }
+
+  /**
    * {@code true} iff the current principal may edit job order {@code jobOrderId} (Phase 3, #343).
    * Mirrors {@link #canSeeJobOrder(UUID)} but for writes:
    *

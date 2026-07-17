@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.support.JobOrderInventoryOwnerRedactor;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.web.PdfResponses;
@@ -121,6 +122,7 @@ public class JobOrderController {
   private final JobOrderHandoverReportService jobOrderHandoverReportService;
   private final UserService userService;
   private final AuthHelperService authHelperService;
+  private final JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
   /**
    * Records a materials handover for the job order. Multi-item flows use the bulk-update-after-loop
@@ -749,11 +751,13 @@ public class JobOrderController {
 
   /**
    * Returns every inventory item linked to a specific material of a job order. Drives the
-   * per-material drill-down in the order detail view.
+   * per-material drill-down in the order detail view. The owner/location of each item is blanked
+   * for a requesting-side viewer of an SK-public order ({@code canSeeJobOrderInventoryOwners} is
+   * {@code false}, REQ-ORDERS-029 / ADR-0107).
    *
    * @param id job-order id
    * @param matId material id
-   * @return inventory-item DTOs
+   * @return inventory-item DTOs, owner/location redacted for requesting-side viewers
    */
   @GetMapping("/{id}/materials/{matId}/inventory")
   @Operation(
@@ -763,16 +767,23 @@ public class JobOrderController {
   @Transactional(readOnly = true)
   public List<de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto>
       getInventoryItemsForJobOrderMaterial(@PathVariable UUID id, @PathVariable UUID matId) {
-    return jobOrderQueryService.getInventoryItemsForJobOrderMaterial(id, matId);
+    List<de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto> items =
+        jobOrderQueryService.getInventoryItemsForJobOrderMaterial(id, matId);
+    return ownerScopeService.canSeeJobOrderInventoryOwners(id)
+        ? items
+        : inventoryOwnerRedactor.redactInventoryItems(items);
   }
 
   /**
    * Returns the inventory items linked to the order whose material the order does not require —
    * "orphaned" links surfaced as a warning on the order detail (REQ-ORDERS-019). Such links bind
-   * stock to the order while staying invisible in every material row.
+   * stock to the order while staying invisible in every material row. The owner/location of each
+   * item is blanked for a requesting-side viewer of an SK-public order ({@code
+   * canSeeJobOrderInventoryOwners} is {@code false}, REQ-ORDERS-029 / ADR-0107).
    *
    * @param id job-order id
-   * @return orphaned inventory-item DTOs (empty when every linked item matches a requirement)
+   * @return orphaned inventory-item DTOs (empty when every linked item matches a requirement),
+   *     owner/location redacted for requesting-side viewers
    */
   @GetMapping("/{id}/inventory/orphaned")
   @Operation(
@@ -784,7 +795,11 @@ public class JobOrderController {
   @Transactional(readOnly = true)
   public List<de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto>
       getOrphanedLinkedInventory(@PathVariable UUID id) {
-    return jobOrderQueryService.getOrphanedLinkedInventory(id);
+    List<de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto> items =
+        jobOrderQueryService.getOrphanedLinkedInventory(id);
+    return ownerScopeService.canSeeJobOrderInventoryOwners(id)
+        ? items
+        : inventoryOwnerRedactor.redactInventoryItems(items);
   }
 
   /**

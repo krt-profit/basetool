@@ -953,17 +953,17 @@ several users can see the same state. The transport is **one WebSocket per tab**
 per-page sockets are forbidden for new surfaces (a second bespoke sync stack is the defect class
 this requirement exists to prevent, #1102). Covered topics and their section whitelists:
 
-|          Topic           |                                                     Sections                                                      | Presence dots |                                        Subscribe authorization                                        |
-|--------------------------|-------------------------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------------------|
-| `mission:{id}`           | crew, finance, mgmt, overview, steps, objectives, frequencies, organisation                                       | yes           | `GET /api/v1/missions/{id}`                                                                           |
-| `operation:{id}`         | overview, missions, payout, finance                                                                               | no            | `GET /api/v1/operations/{id}`                                                                         |
-| `order:{id}`             | header, materials, aggregated, items, handovers, item-handovers, item-handover-lines, blueprint-owners, assignees | no            | `GET /api/v1/orders/{id}` (a requesting-owner is admitted; their re-fetches stay redacted)            |
-| `orders` (global queue)  | queue                                                                                                             | no            | capabilities `canViewJobOrders` (guests and requesters are refused)                                   |
-| `bank:{accountId}`       | account, bookings, chart                                                                                          | no            | staff account read, falling back to the org-unit account read; refused only when both explicitly deny |
-| `bank` (staff-global)    | grid, requestQueue, manage, grants                                                                                | no            | `ROLE_BANK_EMPLOYEE` (local check)                                                                    |
-| `orgunit-bank` (global)  | orgUnitBank, orgUnitBankSettings                                                                                  | no            | member-or-above (the `/org-unit-bank` page gate, local check)                                         |
-| `materialboard` (global) | board                                                                                                             | no            | authenticated                                                                                         |
-| `inventory` (global)     | stock                                                                                                             | no            | authenticated (every viewer re-fetches its own owner/org-unit-scoped view)                            |
+|          Topic           |                                                           Sections                                                            | Presence dots |                                        Subscribe authorization                                        |
+|--------------------------|-------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------------------|
+| `mission:{id}`           | crew, finance, mgmt, overview, steps, objectives, frequencies, organisation                                                   | yes           | `GET /api/v1/missions/{id}`                                                                           |
+| `operation:{id}`         | overview, missions, payout, finance                                                                                           | no            | `GET /api/v1/operations/{id}`                                                                         |
+| `order:{id}`             | header, materials, aggregated, items, item-stock, handovers, item-handovers, item-handover-lines, blueprint-owners, assignees | no            | `GET /api/v1/orders/{id}` (a requesting-owner is admitted; their re-fetches stay redacted)            |
+| `orders` (global queue)  | queue                                                                                                                         | no            | capabilities `canViewJobOrders` (guests and requesters are refused)                                   |
+| `bank:{accountId}`       | account, bookings, chart                                                                                                      | no            | staff account read, falling back to the org-unit account read; refused only when both explicitly deny |
+| `bank` (staff-global)    | grid, requestQueue, manage, grants                                                                                            | no            | `ROLE_BANK_EMPLOYEE` (local check)                                                                    |
+| `orgunit-bank` (global)  | orgUnitBank, orgUnitBankSettings                                                                                              | no            | member-or-above (the `/org-unit-bank` page gate, local check)                                         |
+| `materialboard` (global) | board                                                                                                                         | no            | authenticated                                                                                         |
+| `inventory` (global)     | stock                                                                                                                         | no            | authenticated (every viewer re-fetches its own owner/org-unit-scoped view)                            |
 
 The `inventory` room is the squadron Lager (#1307/#1309): a single opaque `stock` section stands for
 "the inventory changed". **All** inventory views subscribe and re-pull their own fragment on a peer's
@@ -979,16 +979,21 @@ untouched. Every inventory write (allocation add/change/remove, book-out, transf
 bulk-checkout, delete-all, note) broadcasts it, from whichever page made it. Because it is a global
 room but each viewer's fragment is owner- and org-unit-scoped, a cross-scope peer refresh (another
 squadron, or a personal-only change seen by a shared view) is a harmless no-op. The same inventory
-writes also cross-publish to the `order:{id}` room (the order material collection tracks the earmark
-roll-up) and the `materialboard` room (a stock-reducing write clamps an offer server-side), so those
-surfaces reflect inventory changes live too. The affected order ids are read off the entry's leaf
+writes also cross-publish to the `order:{id}` room — `materials`/`aggregated` (the order material
+collection tracks the earmark roll-up) plus `item-stock` (the order-detail Item-Bestand panel,
+REQ-ORDERS-028, refreshed when a Lager-side write (un)earmarks an item row; a page that does not
+render a section's container skips it silently) — and to the `materialboard` room (a stock-reducing
+write clamps an offer server-side), so those surfaces reflect inventory changes live too. The
+affected order ids are read off the entry's leaf
 chips before the write; the sole exception is the admin `DELETE /inventory/all` full wipe, which
 cannot enumerate them client-side — its board and inventory rooms are still poked, but an open order
 collection self-heals on the next interaction (an accepted limitation for that rare nuke). A further
 cross-publisher is the production-booking modal on the order detail page: since Herstellung books
 the produced item stock in (REQ-INV-032, the book-in section), its success handler additionally
 pokes `inventory`/`stock` — the existing seam, so Lager viewers see the fresh stock live with no
-seam-map change.
+seam-map change — and refreshes + broadcasts the order room's own `item-stock` section, because the
+book-in auto-earmark changes the Item-Bestand panel (REQ-ORDERS-028); the panel's delivered toggle
+likewise broadcasts `item-stock` on success.
 
 The standalone order **material-collection** page (`/orders/{id}/material-collection`) joins the same
 `order:{id}` room in its own right (#1309): its per-row delivered toggle and owner/location moves

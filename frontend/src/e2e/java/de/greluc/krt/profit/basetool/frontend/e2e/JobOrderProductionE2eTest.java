@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.google.gson.JsonElement;
@@ -61,12 +63,15 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * and the produced widget is visible on {@code /inventory/all?view=items} with its name and
  * whole-unit amount.
  *
- * <p>Four things are asserted end-to-end: before production the item-handover control is absent
+ * <p>Six things are asserted end-to-end: before production the item-handover control is absent
  * (delivery gated); the booking succeeds through the UI; afterwards the persisted {@code
  * manufacturedAmount} is 1 (read back through the backend) and the item-handover control has
- * appeared (delivery unlocked); and the produced stock is visible in the shared Lager's item view
- * (REQ-INV-032). The actor is {@code test-admin}, which satisfies the production role gate through
- * the role hierarchy and is an IRIDIUM member (the order's responsible unit).
+ * appeared (delivery unlocked); the produced stock is visible in the shared Lager's item view
+ * (REQ-INV-032); since the book-in auto-earmarks the produced unit to the order, the order detail's
+ * Item-Bestand panel lists the earmarked stock with its per-(entry, order) delivered toggle; and
+ * flipping that toggle persists the delivered marker in place (REQ-ORDERS-028). The actor is {@code
+ * test-admin}, which satisfies the production role gate through the role hierarchy and is an
+ * IRIDIUM member (the order's responsible unit).
  */
 @Tag("e2e")
 class JobOrderProductionE2eTest {
@@ -110,7 +115,8 @@ class JobOrderProductionE2eTest {
    * of the single unit through the production modal (consuming the linked stock and booking the
    * produced unit in, REQ-INV-032), and asserts the persisted manufactured amount, the now-unlocked
    * item-handover control, and the produced item stock — grown by exactly one unit and visible on
-   * the shared Lager's item view.
+   * the shared Lager's item view. Finally it asserts the order-detail Item-Bestand panel lists the
+   * auto-earmarked stock and flipping its delivered toggle persists the marker (REQ-ORDERS-028).
    */
   @Test
   void booksProductionConsumingLinkedStockAndUnlocksDelivery() {
@@ -181,6 +187,37 @@ class JobOrderProductionE2eTest {
         assertThat(itemGroupRow).containsText(ORDERABLE_ITEM_NAME);
         assertThat(itemGroupRow.locator(".tree-amount"))
             .containsText(Pattern.compile("(?<!\\d)" + Math.round(stockAfter) + "(?!\\d)"));
+
+        // REQ-ORDERS-028: the produced unit was auto-earmarked to the order ("dem Auftrag
+        // zuordnen" defaults on), so the order detail's Item-Bestand panel on the "Bestellte
+        // Items" tab lists the earmarked stock — the widget's group with one entry row carrying
+        // the per-(entry, order) delivered toggle.
+        E2eSupport.navigate(page, baseUrl + "/orders/" + id + "?tab=items");
+        Locator itemStockPanel = page.getByTestId("order-item-stock-panel");
+        assertThat(itemStockPanel)
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+        assertThat(itemStockPanel).containsText(ORDERABLE_ITEM_NAME);
+        Locator deliveredToggle =
+            itemStockPanel.locator(
+                "input[data-trigger='od-item-stock-delivered'][data-job-order-id='" + id + "']");
+        assertThat(deliveredToggle).hasCount(1);
+
+        // REQ-ORDERS-028 (delivered flip): the per-(entry, order) toggle starts unchecked, and
+        // flipping it persists via PATCH /inventory/{id}/delivered (the Materialsammlung's write)
+        // and re-renders the `item-stock` section in place. Await the PATCH so the mutation is not
+        // dropped, then prove both halves: the re-rendered checkbox reflects the new state, and the
+        // marker is persisted (read back through the item-stock endpoint, not the optimistic
+        // checkbox).
+        assertThat(deliveredToggle).not().isChecked();
+        assertFalse(earmarkDelivered(seeder, id), "the fresh earmark starts undelivered");
+        page.waitForResponse(
+            response ->
+                response.url().contains("/delivered")
+                    && "PATCH".equals(response.request().method()),
+            () -> deliveredToggle.check());
+        assertThat(deliveredToggle).isChecked();
+        assertTrue(
+            earmarkDelivered(seeder, id), "flipping the toggle must persist the delivered marker");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "joborder-production");
         throw failure;
@@ -327,6 +364,28 @@ class JobOrderProductionE2eTest {
         .getAsJsonObject("gameItem")
         .get("id")
         .getAsString();
+  }
+
+  /**
+   * Reads the persisted delivered marker of the order's first earmarked item-stock entry through
+   * the item-stock endpoint (REQ-ORDERS-028), so the delivered-flip assertion proves persistence
+   * rather than the optimistic checkbox state.
+   *
+   * @param seeder the backend seeder used for the authenticated read-back
+   * @param orderId the item order whose earmarked stock to inspect
+   * @return the {@code delivered} flag of the first group's first entry ({@code [0].entries[0]})
+   */
+  private static boolean earmarkDelivered(BackendSeeder seeder, String orderId) {
+    return JsonParser.parseString(
+            seeder.getBody(USERNAME, PASSWORD, "/api/v1/orders/" + orderId + "/item-stock"))
+        .getAsJsonArray()
+        .get(0)
+        .getAsJsonObject()
+        .getAsJsonArray("entries")
+        .get(0)
+        .getAsJsonObject()
+        .get("delivered")
+        .getAsBoolean();
   }
 
   /**

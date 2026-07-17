@@ -726,8 +726,10 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * (owner, location, game-item name, amount desc — no quality dimension). Serves the orphaned-link
    * warning (REQ-ORDERS-019), which must also flag item earmarks whose ITEM order no longer
    * requests the game item — the material-only seam above deliberately excludes item rows, so
-   * without this query a stale item earmark would stay invisible forever. {@code
-   * gameItem.manufacturer} is graphed because the item reference DTO renders the manufacturer name.
+   * without this query a stale item earmark would stay invisible forever — and the order-detail
+   * Item-Bestand panel ({@code InventoryAggregationService.getItemStockForJobOrder},
+   * REQ-ORDERS-028). {@code gameItem.manufacturer} is graphed because the item reference DTO
+   * renders the manufacturer name.
    *
    * @param jobOrderId the order whose allocated game-item rows to list.
    * @return the order's game-item rows, display associations graphed, never {@code null}.
