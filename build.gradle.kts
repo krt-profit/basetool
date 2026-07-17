@@ -95,7 +95,9 @@ configure<com.diffplug.gradle.spotless.SpotlessExtension> {
   // latter registers its task lazily and trips Gradle 9.5.1's mutation guard
   // ("DefaultTaskContainer#register ... cannot be executed in the current
   // context"), whereas the built-in extension registers eagerly during apply.
-  // CHANGELOG.md is excluded (the release workflow parses its structure).
+  // CHANGELOG.md is excluded (the release workflow parses its structure);
+  // CHANGELOG-ARCHIVE.md holds the same very-long-line release entries split out
+  // of it and is excluded for the same reason (keep the historical text stable).
   flexmark {
     // LICENSE.md is excluded because flexmark cannot converge on it (its output is
     // not idempotent), which it otherwise skips with a warning on every run.
@@ -106,7 +108,7 @@ configure<com.diffplug.gradle.spotless.SpotlessExtension> {
     // to git until flexmark rewrites it to LF — flipping it to "modified" with an
     // empty `git diff` on every `spotlessApply`. Excluding it stops that churn.
     target("**/*.md")
-    targetExclude(*vendored, "CHANGELOG.md", "LICENSE.md", "CLAUDE.md")
+    targetExclude(*vendored, "CHANGELOG.md", "CHANGELOG-ARCHIVE.md", "LICENSE.md", "CLAUDE.md")
     flexmark()
   }
 
