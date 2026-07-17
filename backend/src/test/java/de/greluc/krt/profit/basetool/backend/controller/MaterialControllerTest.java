@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.MaterialService;
 import java.util.List;
@@ -128,6 +130,50 @@ class MaterialControllerTest {
     assertEquals(1, result.content().size());
     verify(materialService).getAllMaterials(any(Pageable.class));
     verify(materialService, never()).getVisibleMaterials(any(Pageable.class));
+  }
+
+  @Test
+  void getMaterialMatrixItems_relaysFilterParamsToService() {
+    // Given the four optional server-side filters (ADR-0105, REQ-UI-014)
+    when(materialService.getMatrixItems(
+            eq(List.of("Aluminum")),
+            eq(List.of("Stanton")),
+            eq(Boolean.TRUE),
+            eq(null),
+            any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    // When
+    PageResponse<MaterialMatrixItemDto> result =
+        materialController.getMaterialMatrixItems(
+            0, 100000, null, List.of("Aluminum"), List.of("Stanton"), true, null);
+
+    // Then — the controller is a thin pass-through: each filter reaches the service verbatim.
+    assertEquals(0, result.content().size());
+    verify(materialService)
+        .getMatrixItems(
+            eq(List.of("Aluminum")),
+            eq(List.of("Stanton")),
+            eq(Boolean.TRUE),
+            eq(null),
+            any(Pageable.class));
+  }
+
+  @Test
+  void getMaterialMatrixItems_withoutFilters_passesNullsForEveryDimension() {
+    // Given a bare /matrix call — every filter absent means the full matrix
+    when(materialService.getMatrixItems(
+            eq(null), eq(null), eq(null), eq(null), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    // When
+    PageResponse<MaterialMatrixItemDto> result =
+        materialController.getMaterialMatrixItems(null, null, null, null, null, null, null);
+
+    // Then
+    assertEquals(0, result.content().size());
+    verify(materialService)
+        .getMatrixItems(eq(null), eq(null), eq(null), eq(null), any(Pageable.class));
   }
 
   private static MaterialDto minimalDto(UUID id, String name, boolean visible) {

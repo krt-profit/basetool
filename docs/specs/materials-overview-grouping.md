@@ -52,6 +52,10 @@ matrix's material/system/loading-dock/auto-load filters keep working in both vie
 
 ## Out of scope
 
+- **Data completeness of the two pages** (the detail price list showing every terminal; the matrix
+  filtering server-side over a complete page-walk) — governed by
+  [`materials-pages-completeness.md`](materials-pages-completeness.md) (REQ-UI-014/015, ADR-0105).
+  Both specs apply to the same pages and are orthogonal.
 - **Managing the categories themselves** (admin create/rename/delete) — unchanged; see the
   admin materials page. This spec only hides/shows the grouping at read time.
 - **Look & feel** of the toggle and cards — governed by the design system

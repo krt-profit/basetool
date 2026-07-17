@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.model.MaterialSourceSystem;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCreateDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
@@ -173,6 +174,41 @@ class MaterialServiceTest {
     assertEquals(1, result.getTotalElements());
     assertEquals("Area18", result.getContent().get(0).terminalName());
     assertEquals(new BigDecimal("5.0"), result.getContent().get(0).priceBuy());
+  }
+
+  @Test
+  void getMatrixItems_passesFilterArgumentsThrough() {
+    // Arrange — a concrete selection must reach the repository verbatim (ADR-0105, REQ-UI-014).
+    PageRequest pageRequest = PageRequest.of(0, 100000);
+    Page<MaterialMatrixItemDto> expected = new PageImpl<>(List.of());
+    when(materialPriceRepository.findMatrixItems(
+            List.of("Aluminum"), List.of("Stanton"), Boolean.TRUE, null, pageRequest))
+        .thenReturn(expected);
+
+    // Act
+    Page<MaterialMatrixItemDto> result =
+        materialService.getMatrixItems(
+            List.of("Aluminum"), List.of("Stanton"), Boolean.TRUE, null, pageRequest);
+
+    // Assert
+    assertSame(expected, result);
+    verify(materialPriceRepository)
+        .findMatrixItems(List.of("Aluminum"), List.of("Stanton"), Boolean.TRUE, null, pageRequest);
+  }
+
+  @Test
+  void getMatrixItems_normalisesEmptyCollectionsToNull() {
+    // Arrange — an empty IN selection must become null so the repository's `:param IS NULL OR
+    // x IN :param` idiom never emits an invalid `IN ()` (ADR-0105).
+    PageRequest pageRequest = PageRequest.of(0, 100000);
+    when(materialPriceRepository.findMatrixItems(null, null, null, null, pageRequest))
+        .thenReturn(new PageImpl<>(List.of()));
+
+    // Act
+    materialService.getMatrixItems(List.of(), List.of(), null, null, pageRequest);
+
+    // Assert — both empty lists were collapsed to null; the boolean nulls pass through unchanged.
+    verify(materialPriceRepository).findMatrixItems(null, null, null, null, pageRequest);
   }
 
   @Test

@@ -51,7 +51,7 @@
         </div>
         <div class="bank-form-row" th:if="${!byEmployee}">
             <label for="bank-grants-account-filter" class="visually-hidden" th:text="#{bank.grants.filter.account}">Konto</label>
-            <!-- Server-side account search (remote-bank-accounts, REQ-FE-017, ADR-0105): the account
+            <!-- Server-side account search (remote-bank-accounts, REQ-FE-017, ADR-0106): the account
                  roster is no longer preloaded. Only the currently-selected account is seeded (edit
                  mode) so the box shows its name; clearing the box filters to all accounts. -->
             <select id="bank-grants-account-filter" data-role="bank-grants-filter"
@@ -174,7 +174,7 @@
                     </div>
                     <div class="bank-form-row">
                         <label for="bank-grant-account" th:text="#{bank.grants.col.account}">Konto</label>
-                        <!-- Server-side account search (remote-bank-accounts, REQ-FE-017, ADR-0105):
+                        <!-- Server-side account search (remote-bank-accounts, REQ-FE-017, ADR-0106):
                              add-only picker (no edit-mode seed), only the placeholder is rendered;
                              typing queries /api/proxy/bank/accounts/search on demand. -->
                         <select id="bank-grant-account" name="accountId" required

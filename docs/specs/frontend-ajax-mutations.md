@@ -1243,7 +1243,7 @@ account roster preloaded; the grants filter seeds only the selected account) · 
 `static/js/bank.js` (attribute-delegated source/filter handlers, metadata-map justification),
 `controller/BankProxyController#searchAccounts`, `templates/fragments/bank-movement-modal.html`,
 `templates/bank-grants.html`, `fragments/head.html` (script load order) · **ADR:** ADR-0053, ADR-0089,
-ADR-0105 · **Issues:** —
+ADR-0106 · **Issues:** —
 
 ## Out of scope
 

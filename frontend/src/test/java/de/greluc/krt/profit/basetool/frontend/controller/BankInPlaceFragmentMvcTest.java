@@ -166,7 +166,7 @@ class BankInPlaceFragmentMvcTest {
                 new BankHolderDto(
                     holderId, UUID.randomUUID(), "alpha", true, BigDecimal.ZERO, false, 0L)));
     // No transfer-target roster is preloaded now — the destination is a server-side account-search
-    // combobox (remote-bank-accounts, REQ-FE-017/ADR-0105).
+    // combobox (remote-bank-accounts, REQ-FE-017/ADR-0106).
 
     mockMvc
         .perform(get("/bank/accounts/" + accountId).param("fragment", "accountBody"))
@@ -216,7 +216,7 @@ class BankInPlaceFragmentMvcTest {
         // (remote-bank-users), so it carries the marker and preloads no user roster.
         .andExpect(
             content().string(Matchers.containsString("data-krt-combobox=\"remote-bank-users\"")))
-        // REQ-FE-017/ADR-0105: the transfer-destination account picker is a server-side
+        // REQ-FE-017/ADR-0106: the transfer-destination account picker is a server-side
         // account-search combobox (remote-bank-accounts) and preloads no account roster.
         .andExpect(
             content().string(Matchers.containsString("data-krt-combobox=\"remote-bank-accounts\"")))

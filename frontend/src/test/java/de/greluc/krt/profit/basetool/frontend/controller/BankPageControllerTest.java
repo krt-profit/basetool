@@ -340,7 +340,7 @@ class BankPageControllerTest {
     String view = controller.accountDetail(accountId, null, null, null, null, null, null, model);
 
     // Then: the transfer-destination picker is a server-side account-search combobox now
-    // (remote-bank-accounts, REQ-FE-017/ADR-0105), so NO transfer-target roster is preloaded and no
+    // (remote-bank-accounts, REQ-FE-017/ADR-0106), so NO transfer-target roster is preloaded and no
     // account list is fetched; active holders still exclude the deactivated one (ADR-0039).
     assertEquals("bank-account-detail", view);
     assertNull(

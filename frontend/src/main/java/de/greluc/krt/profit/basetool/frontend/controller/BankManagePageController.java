@@ -103,7 +103,7 @@ public class BankManagePageController {
       @AuthenticationPrincipal OidcUser principal,
       Model model) {
     boolean management = hasRole(authentication, Roles.authority(Roles.BANK_MANAGEMENT));
-    // The account-management table is now truly paginated (REQ-BANK-053, ADR-0105): the former
+    // The account-management table is now truly paginated (REQ-BANK-053, ADR-0106): the former
     // unbounded size=500 preload silently dropped every account past 500. The backend already sorts
     // by name (stable via the id tiebreaker), so the page content keeps the A→Z ordering without a
     // client re-sort. The pager re-renders the manageBody fragment in place (REQ-FE-005).

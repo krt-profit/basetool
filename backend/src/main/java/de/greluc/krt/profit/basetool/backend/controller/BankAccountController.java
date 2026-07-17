@@ -94,7 +94,7 @@ public class BankAccountController {
   /**
    * Pages over the accounts visible to the caller: management/admin see all, employees their
    * granted accounts (REQ-BANK-010), optionally narrowed by a case-insensitive name/account-number
-   * substring and by status/type (REQ-BANK-053, ADR-0105). This one endpoint backs both the
+   * substring and by status/type (REQ-BANK-053, ADR-0106). This one endpoint backs both the
    * server-side account-search pickers (the frontend proxies it as {@code
    * /api/proxy/bank/accounts/search?query=…&status=ACTIVE&size=…}) and the paged management table,
    * replacing the former unbounded {@code size=500} preload that silently truncated past 500

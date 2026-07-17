@@ -97,7 +97,7 @@ public class BankAccountService {
   /**
    * Pages over the accounts the caller may see: management/admin get all accounts, employees get
    * exactly their granted accounts (REQ-BANK-010), optionally narrowed by a case-insensitive
-   * name/account-number substring and by status/type sets (REQ-BANK-053, ADR-0105 — the server-side
+   * name/account-number substring and by status/type sets (REQ-BANK-053, ADR-0106 — the server-side
    * account search that backs the remote account pickers and the paged management table, replacing
    * the former unbounded {@code size=500} preload). Balances are joined in one grouped query, so
    * the read stays statement-bounded regardless of the account count (REQ-DATA-003, {@code

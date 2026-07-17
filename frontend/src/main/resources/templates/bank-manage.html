@@ -186,7 +186,7 @@
             </div>
             <p class="text-center text-muted" th:if="${#lists.isEmpty(accounts)}"
                data-testid="bank-accounts-empty" th:text="#{bank.manage.accounts.empty}">Noch keine Konten angelegt.</p>
-            <!-- Real pagination (REQ-BANK-053, ADR-0105): the account list is now paged rather than a
+            <!-- Real pagination (REQ-BANK-053, ADR-0106): the account list is now paged rather than a
                  500-cap preload that silently truncated. The pager + page-size links re-render the
                  manageBody fragment in place via krtFetch (REQ-FE-005, wired below); the no-JS
                  page-btn links still reload the whole page. The base URL carries ?tab=konten so the

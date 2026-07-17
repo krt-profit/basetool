@@ -18,7 +18,7 @@
  */
 
 /*
- * Server-side bank-account search source for the searchable combobox (REQ-FE-017, ADR-0105). The
+ * Server-side bank-account search source for the searchable combobox (REQ-FE-017, ADR-0106). The
  * account analogue of krt-user-search.js: registers the `remote-bank-accounts` remoteSource the
  * global combobox auto-initialiser (krt-searchable-select.js) wires up by marker value, so an
  * account picker (transfer destination, grant target/filter, direct-booking source account) fetches

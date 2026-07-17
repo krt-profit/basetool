@@ -225,7 +225,7 @@ class BankRequestQueuePageControllerMvcTest {
         .andExpect(content().string(Matchers.containsString("id=\"bank-movement-modal\"")))
         // The type selector plus the source-account picker (only present on this non-account-scoped
         // surface), which is now a server-side account-search combobox (remote-bank-accounts,
-        // REQ-FE-017/ADR-0105) rather than a preloaded <select> of every active account.
+        // REQ-FE-017/ADR-0106) rather than a preloaded <select> of every active account.
         .andExpect(content().string(Matchers.containsString("bank-movement-type")))
         .andExpect(content().string(Matchers.containsString("bank-movement-source-account")))
         .andExpect(
