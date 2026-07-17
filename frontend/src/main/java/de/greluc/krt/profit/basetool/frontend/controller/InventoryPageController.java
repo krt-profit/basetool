@@ -171,6 +171,19 @@ public class InventoryPageController {
           new ParameterizedTypeReference<
               List<de.greluc.krt.profit.basetool.frontend.model.dto.MissionReferenceDto>>() {};
 
+  /**
+   * Selectable page sizes for the per-material and per-game-item drilldowns (REQ-INV-033). An
+   * out-of-list {@code size} snaps back to {@link #DRILLDOWN_DEFAULT_PAGE_SIZE}, so a crafted URL
+   * cannot request an unbounded page from the backend.
+   */
+  private static final List<Integer> DRILLDOWN_PAGE_SIZES = List.of(50, 100, 200);
+
+  /**
+   * Default drilldown page size, used when the caller supplies no {@code size} or one outside
+   * {@link #DRILLDOWN_PAGE_SIZES}.
+   */
+  private static final int DRILLDOWN_DEFAULT_PAGE_SIZE = 50;
+
   private final BackendApiClient backendApiClient;
   private final ParallelPageLoader parallelPageLoader;
 
@@ -254,26 +267,47 @@ public class InventoryPageController {
   }
 
   /**
-   * Renders the per-material drilldown ({@code /inventory/material/{materialId}}) showing every
-   * individual inventory row for the given material (up to 1000 in one page). Loads the
-   * active-job-order list because the page offers inline re-assignment of items to job orders.
+   * Renders the per-material drilldown ({@code /inventory/material/{materialId}}) listing the
+   * individual inventory rows for the given material, paginated server-side (REQ-INV-033) so a
+   * material with many rows stays fully reachable page by page instead of being silently capped
+   * (ADR-0104 — the page previously fetched a single {@code size=1000} slice and hid everything
+   * beyond it). The material catalog behind the "Anderes Material" switcher renders outside the
+   * results fragment, so it is fetched on the full render only; a pager click or a live-sync peer
+   * refresh re-fetches just the items page. The drilldown offers no inline job-order re-assignment
+   * (that moved onto the Lager stack-entry allocation chips, REQ-INV-027), so it loads no job-order
+   * catalog.
    *
    * @param materialId material id to drill into
-   * @param model Thymeleaf model populated with items, the material catalog and active job orders
-   * @return the {@code inventory-material} view name
+   * @param page zero-based page index; {@code null} or negative falls back to the first page
+   * @param size requested page size; values outside {@link #DRILLDOWN_PAGE_SIZES} snap back to
+   *     {@link #DRILLDOWN_DEFAULT_PAGE_SIZE}
+   * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
+   *     in-place AJAX pager swap (REQ-FE-005) or a live-sync peer refresh (REQ-FE-010, #1309)
+   * @param model Thymeleaf model populated with the items page, the pagination attributes and (on
+   *     the full render) the material catalog
+   * @return the {@code inventory-material} view name, or its {@code inventoryMaterialResults}
+   *     fragment selector
    */
   @GetMapping("/material/{materialId}")
   public String viewMaterialInventory(
       @PathVariable @NotNull UUID materialId,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String fragment,
       Model model) {
+    int effectivePage = page == null || page < 0 ? 0 : page;
+    int effectiveSize =
+        size != null && DRILLDOWN_PAGE_SIZES.contains(size) ? size : DRILLDOWN_DEFAULT_PAGE_SIZE;
     List<InventoryItemDto> items = new ArrayList<>();
     try {
       PageResponse<InventoryItemDto> p =
-          backendApiClient.get(
-              "/api/v1/inventory/material/" + materialId + "?size=1000", INVENTORY_ITEM_PAGE);
-      if (p != null && p.content() != null) {
-        items = new ArrayList<>(p.content());
+          fetchDrilldownPage(
+              "/api/v1/inventory/material/" + materialId, effectivePage, effectiveSize);
+      if (p != null) {
+        if (p.content() != null) {
+          items = new ArrayList<>(p.content());
+        }
+        model.addAttribute("inventoryMaterialPage", p);
       }
     } catch (Exception e) {
       log.error("Failed to fetch material inventory", e);
@@ -281,44 +315,61 @@ public class InventoryPageController {
     }
 
     model.addAttribute("items", items);
-    model.addAttribute("materials", fetchMaterials());
+    model.addAttribute("pageSizes", DRILLDOWN_PAGE_SIZES);
     model.addAttribute("selectedMaterialId", materialId);
-    model.addAttribute("jobOrders", fetchActiveJobOrders());
-    // REQ-FE-010 (#1309): a peer's stock change re-fetches just the results table via
-    // inventory-material.js, so the drilldown updates live without a reload.
+    // REQ-FE-005/REQ-FE-010 (#1309): the pager and the live-sync receiver re-fetch just the results
+    // fragment, which needs no catalog — the material switcher is full-render-only (the
+    // REQ-DATA-012
+    // fragment-gating rule), so the fragment path skips its cached material lookup.
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
       return "inventory-material :: inventoryMaterialResults";
     }
+    model.addAttribute("materials", fetchMaterials());
     return "inventory-material";
   }
 
   /**
    * Renders the per-game-item drilldown ({@code /inventory/game-item/{gameItemId}}, REQ-INV-030) —
-   * the item sibling of {@link #viewMaterialInventory}: every individual non-personal stock row of
-   * the given game item (up to 1000 in one page), with no quality column. Unlike the material page
-   * it deliberately loads no navigate catalog (the item catalog is thousands of entries; a preload
-   * is off the table and the remote search picker ships with the Einbuchen pass, design §6.6). The
-   * item's display name is taken from the first returned row's {@code gameItem} reference.
+   * the item sibling of {@link #viewMaterialInventory}: the individual non-personal stock rows of
+   * the given game item, with no quality column. Paginated server-side (REQ-INV-033) exactly like
+   * the material drilldown, so an item with many rows stays fully reachable page by page instead of
+   * being silently capped (ADR-0104 — the page previously fetched a single {@code size=1000}
+   * slice). Unlike the material page it deliberately loads no navigate catalog (the item catalog is
+   * thousands of entries; a preload is off the table and the remote search picker ships with the
+   * Einbuchen pass, design §6.6). The item's display name is taken from the first row of the
+   * current page's {@code gameItem} reference.
    *
    * @param gameItemId game item to drill into
-   * @param fragment when {@code "results"}, only the results-table fragment is rendered for the
-   *     live-sync in-place swap (REQ-FE-015)
-   * @param model Thymeleaf model populated with the rows and the resolved item display name
+   * @param page zero-based page index; {@code null} or negative falls back to the first page
+   * @param size requested page size; values outside {@link #DRILLDOWN_PAGE_SIZES} snap back to
+   *     {@link #DRILLDOWN_DEFAULT_PAGE_SIZE}
+   * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
+   *     in-place AJAX pager swap (REQ-FE-005) or the live-sync in-place swap (REQ-FE-015)
+   * @param model Thymeleaf model populated with the rows, the pagination attributes and the
+   *     resolved item display name
    * @return the {@code inventory-game-item} view name, or its {@code inventoryGameItemResults}
    *     fragment selector
    */
   @GetMapping("/game-item/{gameItemId}")
   public String viewGameItemInventory(
       @PathVariable @NotNull UUID gameItemId,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String fragment,
       Model model) {
+    int effectivePage = page == null || page < 0 ? 0 : page;
+    int effectiveSize =
+        size != null && DRILLDOWN_PAGE_SIZES.contains(size) ? size : DRILLDOWN_DEFAULT_PAGE_SIZE;
     List<InventoryItemDto> items = new ArrayList<>();
     try {
       PageResponse<InventoryItemDto> p =
-          backendApiClient.get(
-              "/api/v1/inventory/game-item/" + gameItemId + "?size=1000", INVENTORY_ITEM_PAGE);
-      if (p != null && p.content() != null) {
-        items = new ArrayList<>(p.content());
+          fetchDrilldownPage(
+              "/api/v1/inventory/game-item/" + gameItemId, effectivePage, effectiveSize);
+      if (p != null) {
+        if (p.content() != null) {
+          items = new ArrayList<>(p.content());
+        }
+        model.addAttribute("inventoryGameItemPage", p);
       }
     } catch (Exception e) {
       log.error("Failed to fetch game-item inventory", e);
@@ -326,6 +377,7 @@ public class InventoryPageController {
     }
 
     model.addAttribute("items", items);
+    model.addAttribute("pageSizes", DRILLDOWN_PAGE_SIZES);
     model.addAttribute("selectedGameItemId", gameItemId);
     model.addAttribute(
         "gameItemName",
@@ -341,6 +393,40 @@ public class InventoryPageController {
       return "inventory-game-item :: inventoryGameItemResults";
     }
     return "inventory-game-item";
+  }
+
+  /**
+   * Fetches one page of a drilldown's rows, re-fetching the last page once if the requested page
+   * overran the end (REQ-INV-033). A stale deep-link / bookmark or a peer's stock reduction (the
+   * page index rides in the URL and the live-sync receiver re-fetches it verbatim) can leave the
+   * URL pointing past the last page; the backend then returns an empty out-of-range page whose
+   * {@code totalPages == 1} hides the whole pager, stranding the viewer on an empty table even
+   * though rows still exist on page 0. Clamping to the last page hands back real rows and a usable
+   * pager. The extra round-trip is paid only in that rare overrun case; an in-range or
+   * genuinely-empty ({@code totalElements == 0}) result returns after the single fetch.
+   *
+   * @param baseUri the drilldown backend URI up to (but excluding) the {@code ?page/size} query —
+   *     e.g. {@code /api/v1/inventory/material/{id}}
+   * @param requestedPage the caller's already-non-negative page index
+   * @param size the resolved (whitelisted) page size
+   * @return the resolved page — the last page when the request overran a non-empty result — or
+   *     {@code null} when the backend yields no page
+   */
+  private PageResponse<InventoryItemDto> fetchDrilldownPage(
+      @NotNull String baseUri, int requestedPage, int size) {
+    PageResponse<InventoryItemDto> p =
+        backendApiClient.get(
+            baseUri + "?page=" + requestedPage + "&size=" + size, INVENTORY_ITEM_PAGE);
+    if (p != null
+        && p.totalElements() > 0
+        && requestedPage > 0
+        && requestedPage >= p.totalPages()) {
+      int lastPage = p.totalPages() - 1;
+      p =
+          backendApiClient.get(
+              baseUri + "?page=" + lastPage + "&size=" + size, INVENTORY_ITEM_PAGE);
+    }
+    return p;
   }
 
   /**

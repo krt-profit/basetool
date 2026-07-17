@@ -24,6 +24,8 @@
 
 ### Fixed
 
+- **Lager: Die Material- und die Item-Detailseite (`/inventory/material/{id}`, `/inventory/game-item/{id}`) blättern jetzt serverseitig durch alle Bestandszeilen statt bei 1000 Zeilen still abzuschneiden.** Bislang wurde nur eine feste Seite von 1000 Einträgen geladen und ohne Blättern angezeigt — bei mehr Zeilen waren die restlichen unsichtbar und unerreichbar. Beide Ansichten haben nun eine Seitensteuerung mit Seitengrößen 50/100/200, die die Ergebnisliste ohne Neuladen austauscht (REQ-INV-033, ADR-0104).
+
 - **Admin: Die Katalog-Seiten (Materialien, Orte, Missionsdaten, Spezialkommandos, Systemeinstellungen, UEX-Daten, Schiffsdaten) zeigen jetzt garantiert alle Einträge statt nur der ersten 1000 bzw. 10000.** Die Controller laden den Katalog seitenweise vollständig; die UEX-Zusammenfassungs-Chips zählen über die vom Backend gemeldete Gesamtzahl, und sollte das Sicherheitslimit beim Laden je erreicht werden, erscheint ein deutlicher Warnhinweis statt einer stillschweigend unvollständigen Liste (REQ-ADMIN-001/002, ADR-0102).
 
 - **Die gecachten Referenzkataloge des Frontends (Staffel-/SK-Umschalter in der Seitenleiste, Material-, Orts-, Schiffstyp- und Terminal-Auswahlen, Materialpreis-Matrix) laden jetzt ebenfalls garantiert alle Einträge statt einer einzelnen begrenzten Seite.** Der Cache holt solche Kataloge seitenweise vollständig, bevor er sie ablegt — ein über die bisherige Grenze hinaus gewachsener Katalog kann dadurch nicht mehr app-weit still abgeschnitten ausgeliefert werden (REQ-ADMIN-003, ADR-0103).

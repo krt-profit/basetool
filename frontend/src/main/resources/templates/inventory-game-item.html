@@ -80,6 +80,14 @@
             </table>
             </div>
         </div>
+        <!-- Server-side pagination (REQ-INV-033): the pager + size picker live inside the swapped
+             fragment, so a page/size click re-renders in place (krtFetch.bindSwap, REQ-FE-005) and
+             a live-sync refresh keeps the pager consistent with the visible page. -->
+        <div class="pagination-controls" th:if="${inventoryGameItemPage != null}"
+             th:with="itemBase=${'/inventory/game-item/' + selectedGameItemId}">
+            <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${inventoryGameItemPage}, baseUrl=${itemBase}, sizes=${pageSizes})}"></nav>
+            <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${inventoryGameItemPage}, baseUrl=${itemBase})}"></nav>
+        </div>
         </th:block>
         </div>
     </div>
