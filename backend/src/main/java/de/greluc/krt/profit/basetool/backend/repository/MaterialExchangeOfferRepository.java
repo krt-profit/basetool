@@ -49,19 +49,30 @@ public interface MaterialExchangeOfferRepository
    * has a {@code NULL} {@code inventory_item_id}, the item / material / owner / org-unit
    * associations are joined with an explicit {@code LEFT JOIN FETCH} (an implicit path join would
    * be an inner join and would silently drop such offers) — this both eager-loads them so the list
-   * renders without an N+1 and exposes the aliases the filters and the sort need. The name filter
-   * and the sort span all branches via {@code COALESCE}: the effective amount is {@code
-   * COALESCE(LEAST(offeredAmount, item.amount), LEAST(itemQuantity, item.amount), itemQuantity)} —
-   * a material offer clamps its offered amount to current stock (ADR-0086), a <b>stock-backed</b>
-   * item offer clamps its itemQuantity to its backing row's stock (ADR-0108, REQ-MARKET-014), and a
-   * <b>free-stated</b> item offer (no backing row) falls through to its stated itemQuantity; the
-   * material/item name is COALESCE-d likewise. The location is never referenced, keeping the
-   * Standort private (REQ-MARKET-004). The min-quality filter applies only to material offers — an
-   * item offer (either flavour) has a {@code NULL} quality (a stock-backed item offer's backing row
-   * carries no quality either), so a non-zero min-quality excludes item offers. All fetched
-   * associations are single-valued {@code @ManyToOne}, so pagination stays a DB {@code LIMIT}. The
-   * sort is embedded (driven by {@code sortKey}) rather than carried on the {@link Pageable}, so
-   * the caller passes an unsorted page request.
+   * renders without an N+1 and exposes the aliases the filters and the sort need. The effective
+   * amount spans all branches via an explicit {@code CASE}: {@code CASE WHEN offeredAmount IS NOT
+   * NULL THEN LEAST(offeredAmount, item.amount) WHEN item.id IS NOT NULL THEN LEAST(itemQuantity,
+   * item.amount) ELSE itemQuantity END} — a material offer clamps its offered amount to current
+   * stock (ADR-0086), a <b>stock-backed</b> item offer clamps its itemQuantity to its backing row's
+   * stock (ADR-0108, REQ-MARKET-014), and a <b>free-stated</b> item offer (no backing row) falls
+   * through to its stated itemQuantity. A {@code CASE} is required rather than the terser {@code
+   * COALESCE(LEAST(offeredAmount, item.amount), …)} because PostgreSQL {@code LEAST}/{@code
+   * GREATEST} <em>ignore</em> {@code NULL} arguments (they return {@code NULL} only when
+   * <em>every</em> argument is {@code NULL}): {@code LEAST(NULL, item.amount)} yields {@code
+   * item.amount} (the full stock), not {@code NULL}, so for a stock-backed item offer (whose {@code
+   * offeredAmount} is always {@code NULL}) a {@code COALESCE} would never fall through to {@code
+   * LEAST(itemQuantity, item.amount)} and would advertise/sort/filter the whole backing stock
+   * instead of the stated quantity. This expression is duplicated <b>byte-for-byte</b> at three
+   * sites — the main-query {@code WHERE} min-amount filter, the {@code menge} {@code ORDER BY}, and
+   * the {@code countQuery} {@code WHERE} — and the three must stay in sync (a {@code @Query} string
+   * cannot share the sub-expression). The material/item name is {@code COALESCE}-d likewise. The
+   * location is never referenced, keeping the Standort private (REQ-MARKET-004). The min-quality
+   * filter applies only to material offers — an item offer (either flavour) has a {@code NULL}
+   * quality (a stock-backed item offer's backing row carries no quality either), so a non-zero
+   * min-quality excludes item offers. All fetched associations are single-valued
+   * {@code @ManyToOne}, so pagination stays a DB {@code LIMIT}. The sort is embedded (driven by
+   * {@code sortKey}) rather than carried on the {@link Pageable}, so the caller passes an unsorted
+   * page request.
    *
    * @param viewerId the caller's user id — used only when {@code onlyMine} is {@code true}.
    * @param onlyMine {@code true} for the "Meine Angebote" tab, {@code false} for "Alle Angebote".
@@ -93,9 +104,9 @@ public interface MaterialExchangeOfferRepository
                  OR LOWER(ow.displayName) LIKE :query)
             AND (:minQuality = 0 OR ii.quality >= :minQuality)
             AND (:minAmount IS NULL
-                 OR COALESCE(LEAST(o.offeredAmount, ii.amount), LEAST(o.itemQuantity, ii.amount), o.itemQuantity) >= :minAmount)
+                 OR CASE WHEN o.offeredAmount IS NOT NULL THEN LEAST(o.offeredAmount, ii.amount) WHEN ii.id IS NOT NULL THEN LEAST(o.itemQuantity, ii.amount) ELSE o.itemQuantity END >= :minAmount)
           ORDER BY
-            CASE WHEN :sortKey = 'menge' THEN COALESCE(LEAST(o.offeredAmount, ii.amount), LEAST(o.itemQuantity, ii.amount), o.itemQuantity) END DESC,
+            CASE WHEN :sortKey = 'menge' THEN CASE WHEN o.offeredAmount IS NOT NULL THEN LEAST(o.offeredAmount, ii.amount) WHEN ii.id IS NOT NULL THEN LEAST(o.itemQuantity, ii.amount) ELSE o.itemQuantity END END DESC,
             CASE WHEN :sortKey = 'mat' THEN LOWER(COALESCE(m.name, o.itemName)) END ASC,
             CASE WHEN :sortKey = 'neu' THEN o.releasedAt END DESC,
             CASE WHEN :sortKey NOT IN ('menge', 'mat', 'neu') THEN COALESCE(ii.quality, -1) END DESC,
@@ -117,7 +128,7 @@ public interface MaterialExchangeOfferRepository
                  OR LOWER(ow.displayName) LIKE :query)
             AND (:minQuality = 0 OR ii.quality >= :minQuality)
             AND (:minAmount IS NULL
-                 OR COALESCE(LEAST(o.offeredAmount, ii.amount), LEAST(o.itemQuantity, ii.amount), o.itemQuantity) >= :minAmount)
+                 OR CASE WHEN o.offeredAmount IS NOT NULL THEN LEAST(o.offeredAmount, ii.amount) WHEN ii.id IS NOT NULL THEN LEAST(o.itemQuantity, ii.amount) ELSE o.itemQuantity END >= :minAmount)
           """)
   Page<MaterialExchangeOffer> findBoard(
       @Param("viewerId") UUID viewerId,

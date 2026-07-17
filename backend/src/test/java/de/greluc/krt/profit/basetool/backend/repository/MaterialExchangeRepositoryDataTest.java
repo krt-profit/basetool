@@ -365,6 +365,47 @@ class MaterialExchangeRepositoryDataTest {
   }
 
   /**
+   * A <b>stock-backed</b> item offer whose stated quantity is <em>below</em> its backing stock must
+   * be filtered and sorted by the <b>stated quantity</b>, not the full stock (REQ-MARKET-014). This
+   * is the regression guard for the PostgreSQL {@code LEAST}-ignores-NULL trap: because {@code
+   * LEAST(offeredAmount [NULL], ii.amount)} returns the stock (Postgres drops the NULL argument), a
+   * {@code COALESCE(LEAST(...), ...)} effective amount would advertise/sort the full stock; the
+   * query uses an explicit {@code CASE} instead. Here a row with 10 in stock offered at 3 is kept
+   * by a min-amount of 3 but dropped by 4, and sorts below a material offer of 4 (whereas the buggy
+   * expression would rank it as 10, i.e. first).
+   */
+  @Test
+  void findBoard_stockBackedItemOffer_offeredBelowStock_usesStatedQuantity() {
+    // covers REQ-MARKET-014
+    User owner = persistUser("under-offer");
+    InventoryItem itemRow = persistItemStockRow(owner, "Power Plant", 10.0); // 10 in stock
+    MaterialExchangeOffer understated = persistStockBackedItemOffer(itemRow, owner, 3); // offered 3
+    InventoryItem matRow = persistItem(owner, "Agricium", 500, 4.0);
+    MaterialExchangeOffer material =
+        persistOffer(matRow, owner, MaterialExchangeOfferStatus.ACTIVE, 4.0);
+    entityManager.flush();
+
+    var keptByStatedQty =
+        offerRepository.findBoard(owner.getId(), false, null, 0, 3.0, "neu", PageRequest.of(0, 20));
+    assertThat(keptByStatedQty.getContent())
+        .as("min-amount 3 keeps it — the effective quantity is the stated 3, not the 10 in stock")
+        .contains(understated);
+
+    var droppedAboveStatedQty =
+        offerRepository.findBoard(owner.getId(), false, null, 0, 4.0, "neu", PageRequest.of(0, 20));
+    assertThat(droppedAboveStatedQty.getContent())
+        .as("min-amount 4 drops it — the stated 3 (NOT the 10 in stock) is below the threshold")
+        .doesNotContain(understated);
+
+    var byMenge =
+        offerRepository.findBoard(
+            owner.getId(), false, null, 0, null, "menge", PageRequest.of(0, 20));
+    assertThat(byMenge.getContent())
+        .as("menge sort ranks the material offer (4) above the item offer (stated 3, not stock 10)")
+        .containsSubsequence(material, understated);
+  }
+
+  /**
    * The V213 exactly-one-branch {@code CHECK} rejects a malformed item offer — here one missing its
    * quantity — surfacing as a translated {@link DataIntegrityViolationException}.
    */

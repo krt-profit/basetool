@@ -136,13 +136,14 @@ public class BlueprintProductService {
    * REQ-MARKET-014, ADR-0108). A stock row keys on a {@link
    * de.greluc.krt.profit.basetool.backend.model.GameItem}, but an offer keys on the blueprint
    * {@code product_key} (ADR-0087), so a release from item stock derives the key + snapshot name
-   * from the row's game item: it takes the (first) active blueprint that produces the game item,
-   * normalizes its {@code outputName} to a product key, and resolves that back to the canonical
-   * product — the <em>same</em> {@link ResolvedProduct} a free-stated item offer of the same item
-   * would carry, so both flavours share one identity. The item-catalog predicate (REQ-INV-029,
-   * {@code findItemsWithActiveBlueprint}) guarantees a stocked game item has such a blueprint, so
-   * the key resolves; a game item with no (longer any) active blueprint yields empty and the caller
-   * rejects the release.
+   * from the row's game item: of the active blueprints that produce it, it normalizes each {@code
+   * outputName} to a product key and picks the lowest key — a <b>deterministic</b> choice when a
+   * game item has several producing blueprints, since {@code findByOutputItemId} carries no {@code
+   * ORDER BY} — then resolves that back to the canonical product — the <em>same</em> {@link
+   * ResolvedProduct} a free-stated item offer of the same item would carry, so both flavours share
+   * one identity. The item-catalog predicate (REQ-INV-029, {@code findItemsWithActiveBlueprint})
+   * guarantees a stocked game item has such a blueprint, so the key resolves; a game item with no
+   * (longer any) active blueprint yields empty and the caller rejects the release.
    *
    * @param gameItemId the game item to resolve, or {@code null}
    * @return the resolved blueprint product for that game item, or empty if the id is {@code null}
@@ -158,6 +159,10 @@ public class BlueprintProductService {
         .filter(name -> name != null && !name.isBlank())
         .map(normalizer::normalize)
         .filter(key -> !key.isEmpty())
+        // Sort the candidate product keys so the pick is deterministic when several active
+        // blueprints produce this game item (findByOutputItemId has no ORDER BY); the lowest key
+        // keeps the derived identity stable across runs.
+        .sorted()
         .findFirst()
         .flatMap(this::resolveByProductKey);
   }

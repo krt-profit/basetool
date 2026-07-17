@@ -226,6 +226,12 @@
                                     <!-- actions -->
                                     <div class="mb-dp-actions" th:data-offer-id="${offer.id()}" th:data-version="${offer.version()}">
                                         <th:block th:if="${offer.mine()}">
+                                            <!-- Edit CTA: material offers always; ITEM offers only when stock-backed
+                                                 (availableAmount != null gives the amount editor its stock ceiling).
+                                                 A free-stated item offer has no ceiling and the shared amount editor
+                                                 disables the input without one, so it stays quantity-locked in the UI
+                                                 (managed via deactivate + re-list); the backend edit path still exists
+                                                 for it (REQ-MARKET-012/014). -->
                                             <button type="button" class="btn btn-ghost btn-xs" data-mb-edit
                                                     th:if="${offer.kind() != 'ITEM' or offer.availableAmount() != null}"
                                                     th:data-offer-id="${offer.id()}" th:data-version="${offer.version()}"
