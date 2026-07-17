@@ -595,6 +595,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     _swapOrderSection(orderId, 'order-item-handovers-results', 'item-handovers');
                     _swapOrderSection(orderId, 'item-handover-lines', 'item-handover-lines');
                     _swapOrderSection(orderId, 'order-header-results', 'header');
+                    // The delivery consumed the order's earmarked item stock (REQ-ORDERS-030), so the
+                    // Item-Bestand panel changed — re-render + broadcast its `item-stock` section too
+                    // (mirrors the production booking success path). The key exists at all three
+                    // REQ-FE-010 mirror points, so no seam-map change is needed.
+                    _swapOrderSection(orderId, 'order-item-stock-results', 'item-stock');
+                    // The same consumption drew stock out of the Lager, so poke the global inventory
+                    // room's existing `stock` seam — Lager viewers re-pull their fragments without a
+                    // reload (design §6.5).
+                    if (
+                        window.krtLiveSync &&
+                        typeof window.krtLiveSync.sendChanged === 'function'
+                    ) {
+                        window.krtLiveSync.sendChanged('inventory', ['stock']);
+                    }
                     // A delivery that auto-completes the order removes it from the staff queue's
                     // default filter — tell peers viewing the queue to re-fetch (REQ-FE-015).
                     if (order && (order.status === 'COMPLETED' || order.status === 'REJECTED')) {

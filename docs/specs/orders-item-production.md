@@ -46,7 +46,10 @@ satisfies the invariant immediately.
 **Delivery is gated by manufacture.** Item delivery (`JobOrderItemHandoverService`) caps the
 deliverable quantity of a line at `manufacturedAmount − deliveredAmount`, not `amount −
 deliveredAmount`: a unit can only be handed over once it has been produced. Attempting to deliver
-more than the manufactured-but-undelivered quantity is rejected with HTTP 400.
+more than the manufactured-but-undelivered quantity is rejected with HTTP 400. The same delivery now
+also **consumes the order's earmarked item stock** for the delivered game items, best-effort — see
+`REQ-ORDERS-030` — so the phantom stock a delivery would otherwise leave behind disappears, while a
+legacy line manufactured before item stock existed still delivers unblocked.
 
 The *Item-Übergaben* tab surfaces this to the operator. While the order is not yet fully delivered
 (`isFullyDelivered` false) but nothing is manufactured-but-undelivered to hand over, it shows a hint
@@ -311,10 +314,12 @@ map in `orders-detail.js` (drives both the broadcast and the receive-side apply)
 `LiveSyncTopicClass.ORDER` whitelist, and — because receivers derive their container map from the
 same seam map — the receiving apply path; `LiveSyncSectionMapParityTest` pins the set-equality. The
 panel refreshes live on: a peer's delivered flip (`item-stock` broadcast), a production booking
-(its success refresh list gains `item-stock` — the book-in auto-earmarks the produced units), and a
-Lager-side earmark change (`inventory-my.js` / `inventory-admin.js` `broadcastOrdersChanged` now
-sends `materials`/`aggregated`/`item-stock` to each affected `order:{id}` room; a section whose
-container a page does not render is silently skipped).
+(its success refresh list gains `item-stock` — the book-in auto-earmarks the produced units), an item
+handover that consumes the earmark (`REQ-ORDERS-030` — its success path likewise re-renders and
+broadcasts `item-stock` and pokes `inventory`/`stock`), and a Lager-side earmark change
+(`inventory-my.js` / `inventory-admin.js` `broadcastOrdersChanged` now sends
+`materials`/`aggregated`/`item-stock` to each affected `order:{id}` room; a section whose container a
+page does not render is silently skipped).
 
 **Redaction.** The panel renders only for an `ITEM` order and is omitted from the
 requester-redacted view (REQ-ORDERS-023), mirroring the *Aggregierte Materialien* pane. A
@@ -411,6 +416,88 @@ entitled, redactor output otherwise) · **Code:**
 `JobOrderInventoryOwnerRedactor`, `JobOrderItemStockController` / `MaterialCollectionController` /
 `JobOrderController` (the two pickers), `orders-detail.html` + `material-collection.html` (`—`
 fallbacks) · **Issues:** — · **ADR:** [ADR-0107](../adr/0107-job-order-inventory-owner-redaction.md)
+
+### REQ-ORDERS-030 — Item delivery consumes the order's earmarked item stock (best-effort)
+
+An `ITEM` order's item handover (delivery, `JobOrderItemHandoverService.createItemHandover`) MUST, in
+the same transaction that advances each line's `deliveredAmount`, **consume the order's earmarked item
+stock** for the delivered game items — drawing `min(handed-over units, the whole-unit sum of the
+order's earmark slices on that game item)` out of the Lager, oldest-first (`createdAt`, `id`
+tiebreak). This removes the phantom item stock a delivery would otherwise leave behind: in the normal
+flow a produced line is booked in as stock earmarked to the order (`REQ-INV-032`,
+[`inventory-items.md`](inventory-items.md)) and the matching delivery draws that same stock back down
+to zero.
+
+**Best-effort, never blocking.** The consumption never fails the handover. When the earmarked stock is
+smaller than the handed amount — a **legacy line** manufactured before item stock existed
+(`manufacturedAmount > 0` with no earmark, backfilled `manufactured := delivered`, `REQ-ORDERS-025`),
+or a line whose earmark covers only part of the delivery — the available stock is consumed and the
+shortfall is delivered anyway. A stock shortfall is a silent no-op, **not** a `400`/`422`;
+`BadRequestException` stays reserved for genuine bad input (non-item order, foreign line, over-delivery
+beyond `manufacturedAmount − deliveredAmount`). The delivery ceiling stays gated by
+`manufacturedAmount` (`REQ-ORDERS-025`), independent of how much stock backs it.
+
+**Consumption rules** (per game-item row, oldest-first under a `FOR UPDATE` lock):
+
+- Draws only **this order's own earmark slice** on the row (`InventoryAllocations.jobOrderSlice`),
+  never a sibling `ITEM` order's slice or the unallocated rest — capped at the slice amount (Variante C
+  R5, `REQ-INV-027`). Because the slice ≤ the row amount, the physical remainder never goes negative.
+- Shrinks that slice (`InventoryAllocations.reduceJobOrder`) and the row's `amount` by the drawn
+  units; a **depleted** row is deleted (book-out depletion convention), a partially drawn row keeps its
+  reduced amount and this-order slice.
+- Item rows carry **no mission dimension** (`REQ-INV-031`), so there is no mission earmark to clamp.
+- Audited as one **`INVENTORY_HANDED_OVER`** (domain `INVENTORY`, `source = ITEM_HANDOVER`) per
+  consumed row — the **same** cross-domain event the material handover reuses (`REQ-AUDIT-001`,
+  [`audit.md`](audit.md)); no new `AuditEventType`, viewer filter or i18n label is added. Details carry
+  the order `#displayId`, the game-item name, the consumed/remaining amounts and the depletion flag —
+  no user free text / no PII.
+
+**Concurrency (CLAUDE.md landmines).** The flow issues **no** `@Modifying(clearAutomatically = true)`
+bulk update, so the persistence context is never detached: the consumed game-item rows are
+mutated/deleted while managed (none of them part of the `JobOrder` aggregate), the still-managed order
+drives the completion check, and completion runs through `completeJobOrderWithinTransaction` — a single
+`@Version` bump, no re-fetch, no 409 even when one delivery consumes several rows and completes the
+order. Consumed rows are locked `FOR UPDATE` oldest-first
+(`findGameItemRowsByJobOrderAndGameItemForUpdate`) so two racing deliveries against one earmark pool
+serialise. The per-non-depleted-row snapshot list is collected in the loop and the audit (and,
+post-Materialbörse-item-offers, the item-stock ratchet) run once after it — the collect-then-run-after
+point the Börse phase (design §8) wires `clampItemQuantityToStock` into.
+
+**Live update & peer sync (`REQ-FE-001/010/015`).** A successful item handover re-renders the `items` /
+`item-handovers` / `item-handover-lines` / `header` sections **and** the `item-stock` panel
+(`REQ-ORDERS-028`) in place on `order:{id}`, and pokes the global `inventory`/`stock` seam so Lager
+viewers see the drawn-down stock — mirroring the production-booking success path. All keys pre-exist at
+the three live-sync mirror points; no seam-map change.
+
+**Rationale / no ADR.** This is a behaviour refinement of an already-decided feature (owner decision
+2026-07-16, [`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md) §10 Phase 6 / §11.1), building on
+the item-stock model (ADR-0101) and production booking (ADR-0099); it introduces no new architectural
+choice, so the rationale is captured in this requirement rather than in a separate ADR.
+
+**Acceptance**
+
+- [ ] Delivering `N` units of a line whose earmarked stock is ≥ `N` draws exactly `N` out of the
+  order's earmark oldest-first; a fully drained row is deleted, a partially drawn row keeps its reduced
+  amount and this-order slice.
+- [ ] A legacy line (`manufacturedAmount > 0`, no earmarked stock) still delivers; nothing is consumed
+  and no `INVENTORY_HANDED_OVER` is emitted.
+- [ ] A line whose earmark is smaller than the delivery consumes the available stock and delivers the
+  rest anyway (never a 400/422 for the shortfall).
+- [ ] Consumption draws only this order's slice, never a sibling order's; the delivery ceiling stays
+  `manufacturedAmount − deliveredAmount`.
+- [ ] A delivery that consumes several earmarked rows and completes the order bumps the order
+  `@Version` once (no 409); each consumed row records one `INVENTORY_HANDED_OVER`.
+- [ ] The success response re-renders the ordered-items / handover / `item-stock` sections in place and
+  reaches a peer (and Lager viewers) without a reload.
+
+**Enforced by:** `JobOrderItemHandoverServiceTest` (consume-and-delete, partial draw, legacy
+best-effort, partial-stock best-effort, multi-row oldest-first, complete-without-refetch, audit),
+`JobOrderItemHandoverE2eTest` (item stock drops after a UI handover) · **Code:**
+`JobOrderItemHandoverService.createItemHandover` / `consumeEarmarkedItemStock`,
+`InventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate`,
+`InventoryAllocations.reduceJobOrder`, `AuditEventType.INVENTORY_HANDED_OVER`, `orders-detail.js`
+(item-handover success `item-stock` + `inventory`/`stock` broadcast) · **Issues:** — · **Design:**
+[`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md) §10 Phase 6 / §11.1
 
 ## Out of scope
 
