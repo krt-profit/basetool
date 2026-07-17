@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.0](https://github.com/krt-profit/basetool/releases/tag/v1.5.0) - 2026-07-17
+
 ### Added
 
 - **Lager: Items (Gegenstände mit Blueprint) sind jetzt als eigener Bestand im Lager erfassbar (Backend/API).** Lagereinträge tragen entweder ein Material (mit Qualität) oder ein Item (ohne Qualität, ganze Stückzahlen); Item-Einträge lassen sich nur Item-Aufträgen zuordnen, die das Item anfordern, und nie Missionen (REQ-INV-029…031, Migration V220, ADR-0101). Die Lager-Ansichten im Frontend folgen in einer separaten PR.
