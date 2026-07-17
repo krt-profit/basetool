@@ -26,6 +26,7 @@ import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -283,6 +284,34 @@ class MaterialboersePageControllerMvcTest {
     mockMvc
         .perform(post("/materialboerse/offers/" + offerId + "/deactivate/ajax").with(csrf()))
         .andExpect(status().isOk());
+  }
+
+  /**
+   * The release-picker item search passes a multi-word {@code q} to the backend as a single-encoded
+   * URI variable ({@code ?q={q}}) rather than pre-encoding it into the URI string. #1344
+   * regression: the pre-encoded {@link
+   * org.springframework.web.util.UriComponentsBuilder#toUriString()} value was re-encoded by the
+   * WebClient (space &rarr; {@code %2520}), so a game-item stock row named "E2E Boerse Item Stock
+   * Widget" matched nothing in the release picker.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void releasableItemsProxy_passesMultiWordQueryAsUriVariable() throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/material-exchange/releasable-items?q={q}"),
+            anyTypeRef(),
+            eq("E2E Boerse Item Stock Widget")))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/materialboerse/releasable-items").param("q", "E2E Boerse Item Stock Widget"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient)
+        .get(
+            eq("/api/v1/material-exchange/releasable-items?q={q}"),
+            anyTypeRef(),
+            eq("E2E Boerse Item Stock Widget"));
   }
 
   /**
