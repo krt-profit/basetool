@@ -2200,6 +2200,79 @@ two-column switch is the CSS media query (visual, REQ-UI-009) · **Code:** front
 `static/css/bank.css` (`.bank-detail-panels` + the `main.bank-detail` ultra-wide media query),
 `templates/bank-account-detail.html`, `templates/org-unit-bank-account-detail.html` · **Issues:** —
 
+### REQ-BANK-053 — Server-side account search + paginated account surfaces (5000-account scale)
+
+Every bank surface that offers a **list of accounts** must scale past the former unbounded
+`?size=500` preload, which silently truncated: beyond 500 active accounts a transfer destination, a
+grant target or a managed account became **unreachable with no search, no pagination and no "more"
+indicator**. ADR-0085 plans for ~5000 members, so the bound is plausible to cross. This is the
+account-side twin of the user-picker scaling switch (REQ-FE-011, ADR-0089) and is realised two ways
+(ADR-0104):
+
+- **The account listing endpoint gains search + status/type filters.** `GET /api/v1/bank/accounts`
+  accepts an optional case-insensitive `query` substring over **name and account number**, plus
+  repeatable `status` and `type` filters; an absent status/type means "all" (the full enum set). The
+  filter runs in the repository (`findAllFiltered` / `findGrantedToFiltered`, the management and
+  grant-scoped variants) as a `LOWER(name/accountNo) LIKE LOWER(CONCAT('%', :query, '%'))` predicate
+  plus `status IN … AND type IN …`. The query is a **bound parameter** (SQL-injection-safe) and is
+  deliberately **not** `LikePatterns`-escaped — plain `LIKE` does not honour the backslash escape in
+  this Hibernate/PostgreSQL setup, so escaping would only *hide* an account whose name contains a
+  literal `%`/`_`; a caller's `%`/`_` therefore act as harmless LIKE wildcards on this
+  bank-employee-gated read (a blank query normalises to the match-all `LIKE '%%'`). The listing stays
+  **caller-scoped** exactly as before
+  (management sees all, an employee only their granted accounts, REQ-BANK-010) and **balances stay
+  batch-joined** so the read is statement-bounded regardless of the account count (REQ-DATA-003).
+
+- **The four account pickers become server-side search comboboxes** (`remote-bank-accounts`,
+  REQ-FE-017): the transfer destination (REQ-BANK-040), the direct-booking **source** account, the
+  grant-create account and the grants **per-account filter**. Each fetches matching **active**
+  accounts on demand from the frontend proxy `GET /api/proxy/bank/accounts/search` instead of
+  preloading a roster. Two deliberate, backend-safe UX deltas: the transfer-destination picker may
+  list the current account (a same-account transfer is still rejected, REQ-BANK-006), and the grant
+  pickers search active accounts only. The source-account picker's per-account **Begründung mandate**
+  (REQ-BANK-045) — which used to ride the `<option>` — is carried by the `window.krtBankAccountMeta`
+  map the search source populates, because combobox enhancement drops per-option metadata.
+
+- **The `/bank/manage` account-management table is truly paginated** (page/size, name-sorted for a
+  stable order via the `id` tiebreaker, default page size 25), with the shared page-size picker + pager
+  re-rendering the `manageBody` fragment in place (REQ-FE-005); the accounts tab count is the page's
+  **total** element count, not the current page size. The singleton `CARTEL` account the KRT-Freigaben
+  tab needs (which may not sit on the current page) is fetched by its own `?type=CARTEL&size=1` lookup.
+
+The change is a read-scaling one: **no new audit event and no new business metric** (REQ-OBS
+unaffected — an authenticated read surface, no blackbox probe), and no new role or migration.
+
+**Acceptance**
+
+- [ ] `GET /api/v1/bank/accounts?query=…` filters by a case-insensitive name **or** account-number
+  substring, honours repeatable `status`/`type` (absent = all), stays caller-scoped, and binds the
+  query as a parameter (SQL-injection-safe; a `%`/`_` is a harmless LIKE wildcard).
+- [ ] The transfer-destination, direct-booking source, grant-create and grants per-account pickers
+  carry `data-krt-combobox="remote-bank-accounts"` and preload **no** account roster; typing finds an
+  account by number or name; a booking/grant against a searched account submits its id.
+- [ ] The source-account picker still marks the Begründung `required` for a CARTEL/CARTEL_BANK/SPECIAL
+  source (mandate read from the search metadata, not the `<option>`).
+- [ ] `/bank/manage` pages the accounts table with the standard controls; the tab count shows the
+  total account count; paging swaps only the `manageBody` fragment; the KRT-Freigaben tab still finds
+  the CARTEL account when it is off the current page.
+- [ ] No surface issues the former `?size=500` preload; a 600-account org keeps every account
+  reachable via search / the pager.
+
+**Enforced by:** `BankAccountSearchTest` (name/accountNo/status/type filter, grant scoping,
+injection-safety), `BankControllerSecurityTest` (query/status/type param binding + full-enum default),
+`BankReadNoNPlusOneTest` (paged list stays statement-bounded), frontend `BankProxyControllerTest`
+(the `/accounts/search` proxy forwards active/name-sorted + unwraps), `BankManagePageControllerTest`
+(pagination + size clamp + CARTEL lookup), `BankPageControllerTest` / `BankInPlaceFragmentMvcTest` /
+`BankDashboardMovementModalMvcTest` / `BankRequestQueuePageControllerMvcTest` (pickers preload no
+roster, carry the `remote-bank-accounts` marker), `BankGrantsPageControllerTest` (selected-account
+seed, no roster) · **Code:** `repository/BankAccountRepository#findAllFiltered/#findGrantedToFiltered`,
+`service/BankAccountService#getAccounts`, `controller/BankAccountController#getAccounts`, frontend
+`controller/BankProxyController#searchAccounts`, `controller/BankManagePageController`,
+`controller/BankPageController`, `controller/BankGrantsPageController`,
+`controller/BankRequestQueuePageController`, `static/js/krt-bank-account-search.js`, `static/js/bank.js`,
+`templates/fragments/bank-movement-modal.html`, `templates/bank-grants.html`,
+`templates/bank-manage.html` · **ADR:** ADR-0104 · **Issues:** —
+
 ## Out of scope
 
 - **Accounts for individual players** — an explicit owner decision: players appear only

@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankGrantDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.LinkedHashMap;
@@ -52,17 +52,16 @@ public class BankGrantsPageController {
   private static final ParameterizedTypeReference<List<BankGrantDto>> BANK_GRANT_LIST_TYPE =
       new ParameterizedTypeReference<>() {};
 
-  /** Response type for the paginated bank-account pull ({@code GET /api/v1/bank/accounts}). */
-  private static final ParameterizedTypeReference<PageResponse<BankAccountDto>>
-      BANK_ACCOUNT_PAGE_TYPE = new ParameterizedTypeReference<>() {};
-
   private final BackendApiClient backendApiClient;
 
   /**
    * Renders the grants matrix. The {@code view} parameter switches the grouping (G2 toggle): {@code
    * account} (default) filters by the selected account, {@code employee} filters by the selected
-   * grantee. The grant-creation modal's user picker is a server-side search combobox (#1193), so no
-   * full user roster is loaded here.
+   * grantee. The grant-creation modal's user picker is a server-side search combobox (#1193) and
+   * its account picker + the per-account filter are server-side account-search comboboxes
+   * (remote-bank-accounts, REQ-FE-017/ADR-0104), so neither a full user roster nor a full account
+   * roster is preloaded here — only the currently-filtered account is resolved for its combobox
+   * seed.
    *
    * @param view grouping mode ({@code account} default, {@code employee})
    * @param accountId selected account in per-account mode; absent = all accounts
@@ -98,8 +97,6 @@ public class BankGrantsPageController {
 
     List<BankGrantDto> allGrants =
         backendApiClient.get("/api/v1/bank/grants", BANK_GRANT_LIST_TYPE);
-    PageResponse<BankAccountDto> accounts =
-        backendApiClient.get("/api/v1/bank/accounts?size=500", BANK_ACCOUNT_PAGE_TYPE);
 
     // The per-employee selector lists every grantee that currently holds at least one grant.
     Map<UUID, String> grantees = new LinkedHashMap<>();
@@ -107,14 +104,25 @@ public class BankGrantsPageController {
       grantees.putIfAbsent(grant.userId(), grant.userHandle());
     }
 
-    model.addAttribute(
-        "accounts",
-        accounts == null
-            ? List.<BankAccountDto>of()
-            : BankAccountOrder.byName(accounts.content(), BankAccountDto::name));
+    // The per-account filter and the create modal's account picker are server-side account-search
+    // comboboxes (remote-bank-accounts, REQ-FE-017/ADR-0104), so the full account roster is no
+    // longer preloaded. Only the currently-filtered account is resolved for the combobox's
+    // edit-mode seed (so the box shows its name, not a raw id); a lookup failure degrades to no
+    // seed (the filter then shows its "all accounts" placeholder).
+    BankAccountDto selectedAccount = null;
+    if (!byEmployee && accountId != null) {
+      try {
+        BankAccountDetailDto detail =
+            backendApiClient.get("/api/v1/bank/accounts/" + accountId, BankAccountDetailDto.class);
+        selectedAccount = detail == null ? null : detail.account();
+      } catch (RuntimeException e) {
+        log.debug("Could not resolve selected grant-filter account {} for seeding", accountId, e);
+      }
+    }
+
+    model.addAttribute("selectedAccount", selectedAccount);
     model.addAttribute("grantees", grantees);
     model.addAttribute("byEmployee", byEmployee);
-    model.addAttribute("selectedAccountId", accountId);
     model.addAttribute("selectedUserId", userId);
     return "bank-grants";
   }

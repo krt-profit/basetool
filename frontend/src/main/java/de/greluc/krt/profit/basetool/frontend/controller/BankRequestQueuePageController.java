@@ -132,24 +132,18 @@ public class BankRequestQueuePageController {
       return "bank-requests :: requestQueue";
     }
     // Full-page render only: assemble the direct-booking "Kontobewegung" modal's data
-    // (REQ-BANK-023,
-    // #997). The CTA + modal live OUTSIDE the swapped requestQueue fragment, so a filter toggle or
-    // a
-    // confirm/reject swap never re-reads these; the modal books straight against the chosen
-    // account.
-    PageResponse<BankAccountDto> accounts =
-        backendApiClient.get("/api/v1/bank/accounts?size=500", BANK_ACCOUNT_PAGE);
-    List<BankAccountDto> activeAccounts =
-        accounts == null
-            ? List.of()
-            : BankAccountOrder.byName(
-                accounts.content().stream().filter(a -> "ACTIVE".equals(a.status())).toList(),
-                BankAccountDto::name);
-    // Every active account is both a bookable source and a transfer destination on this non-account
-    // scoped surface; a same-account transfer is rejected by the backend (REQ-BANK-006).
-    model.addAttribute("movementAccounts", activeAccounts);
-    model.addAttribute("transferTargets", activeAccounts);
-    model.addAttribute("canBook", !activeAccounts.isEmpty());
+    // (REQ-BANK-023, #997). The CTA + modal live OUTSIDE the swapped requestQueue fragment, so a
+    // filter toggle or a confirm/reject swap never re-reads these; the modal books straight against
+    // the chosen account.
+    // The modal's source account and transfer destination are server-side account-search comboboxes
+    // (remote-bank-accounts, REQ-FE-017/ADR-0104) that fetch matching active accounts on demand, so
+    // no account roster is preloaded here. canBook (whether to offer the modal at all) is a cheap
+    // one-row existence probe against the same caller-scoped search endpoint rather than the former
+    // unbounded 500-cap preload; a same-account transfer stays rejected by the backend
+    // (REQ-BANK-006).
+    PageResponse<BankAccountDto> activeProbe =
+        backendApiClient.get("/api/v1/bank/accounts?status=ACTIVE&size=1", BANK_ACCOUNT_PAGE);
+    model.addAttribute("canBook", activeProbe != null && activeProbe.totalElements() > 0);
     // The direct-booking counterparty picker (REQ-BANK-044) is a server-side searchable combobox
     // (remote-bank-users, #1193 follow-up) that queries /users/search-bank on demand, so no user
     // roster is preloaded here.

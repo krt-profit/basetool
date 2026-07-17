@@ -65,6 +65,12 @@ public class BankManagePageController {
   private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
       ORG_UNIT_OPTION_LIST_TYPE = new ParameterizedTypeReference<>() {};
 
+  /** Offered page sizes for the account-management table (REQ-BANK-053). */
+  private static final List<Integer> PAGE_SIZES = List.of(25, 50, 100);
+
+  /** Default page size when none (or a non-whitelisted one) is requested. */
+  private static final int DEFAULT_PAGE_SIZE = 25;
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -90,28 +96,42 @@ public class BankManagePageController {
   @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
   public String manage(
       @RequestParam(required = false) String tab,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String fragment,
       Authentication authentication,
       @AuthenticationPrincipal OidcUser principal,
       Model model) {
     boolean management = hasRole(authentication, Roles.authority(Roles.BANK_MANAGEMENT));
+    // The account-management table is now truly paginated (REQ-BANK-053, ADR-0104): the former
+    // unbounded size=500 preload silently dropped every account past 500. The backend already sorts
+    // by name (stable via the id tiebreaker), so the page content keeps the A→Z ordering without a
+    // client re-sort. The pager re-renders the manageBody fragment in place (REQ-FE-005).
+    int effectiveSize = size == null || !PAGE_SIZES.contains(size) ? DEFAULT_PAGE_SIZE : size;
+    int effectivePage = page == null || page < 0 ? 0 : page;
     PageResponse<BankAccountDto> accounts =
-        backendApiClient.get("/api/v1/bank/accounts?size=500", BANK_ACCOUNT_PAGE_TYPE);
+        backendApiClient.get(
+            "/api/v1/bank/accounts?page="
+                + effectivePage
+                + "&size="
+                + effectiveSize
+                + "&sort=name,asc",
+            BANK_ACCOUNT_PAGE_TYPE);
     List<BankHolderDto> holders =
         backendApiClient.get("/api/v1/bank/holders", BANK_HOLDER_LIST_TYPE);
-    List<BankAccountDto> orderedAccounts =
-        accounts == null
-            ? List.<BankAccountDto>of()
-            : BankAccountOrder.byName(accounts.content(), BankAccountDto::name);
-    model.addAttribute("accounts", orderedAccounts);
+    model.addAttribute("accountsPage", accounts);
+    model.addAttribute(
+        "accounts", accounts == null ? List.<BankAccountDto>of() : accounts.content());
+    model.addAttribute("accountCount", accounts == null ? 0L : accounts.totalElements());
+    model.addAttribute("pageSizes", PAGE_SIZES);
+    model.addAttribute("accountsPaginationBaseUrl", "/bank/manage?tab=konten");
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
     model.addAttribute("management", management);
     // The KRT account (singleton CARTEL) for the Bankleitung-only "KRT-Freigaben" tab
-    // (REQ-BANK-047),
-    // where the two 3-stage thresholds T1/T2 are edited; null until a KRT account exists.
-    model.addAttribute(
-        "cartelAccount",
-        orderedAccounts.stream().filter(a -> "CARTEL".equals(a.type())).findFirst().orElse(null));
+    // (REQ-BANK-047), where the two 3-stage thresholds T1/T2 are edited; null until a KRT account
+    // exists. Fetched by its own type-filtered one-row search rather than scanned out of the (now
+    // paged) accounts list, where the singleton might not sit on the current page.
+    model.addAttribute("cartelAccount", management ? fetchCartelAccount() : null);
     // The caller's own user id (OIDC sub) so the holder tab can link only the caller's own holder
     // row to its history; management links every row (REQ-BANK-032). The real per-holder gate is
     // server-side (canSeeHolder) — this only governs which links the UI renders.
@@ -157,6 +177,27 @@ public class BankManagePageController {
     // holder→holder
     // Umbuchung, which is fee-free (REQ-BANK-031, ADR-0052), so it needs no live fee preview.
     return "bank-manage";
+  }
+
+  /**
+   * Resolves the singleton {@code CARTEL} (KRT) account for the Bankleitung-only KRT-Freigaben tab
+   * (REQ-BANK-047) via a one-row, type-filtered search rather than scanning the paged accounts list
+   * (where the singleton might not sit on the current page, REQ-BANK-053). Returns {@code null}
+   * when no KRT account exists yet or the lookup fails, so the tab shows its "no KRT account" empty
+   * state.
+   *
+   * @return the CARTEL account, or {@code null} when none exists / the lookup fails
+   */
+  @Nullable
+  private BankAccountDto fetchCartelAccount() {
+    try {
+      PageResponse<BankAccountDto> page =
+          backendApiClient.get("/api/v1/bank/accounts?type=CARTEL&size=1", BANK_ACCOUNT_PAGE_TYPE);
+      return page == null || page.content().isEmpty() ? null : page.content().get(0);
+    } catch (RuntimeException e) {
+      log.debug("Could not resolve the CARTEL account for the KRT-Freigaben tab", e);
+      return null;
+    }
   }
 
   /**

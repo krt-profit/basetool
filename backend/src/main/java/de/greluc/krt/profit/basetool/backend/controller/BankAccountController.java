@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
+import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBalanceSeriesDto;
@@ -45,6 +47,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -89,26 +93,46 @@ public class BankAccountController {
 
   /**
    * Pages over the accounts visible to the caller: management/admin see all, employees their
-   * granted accounts (REQ-BANK-010).
+   * granted accounts (REQ-BANK-010), optionally narrowed by a case-insensitive name/account-number
+   * substring and by status/type (REQ-BANK-053, ADR-0104). This one endpoint backs both the
+   * server-side account-search pickers (the frontend proxies it as {@code
+   * /api/proxy/bank/accounts/search?query=…&status=ACTIVE&size=…}) and the paged management table,
+   * replacing the former unbounded {@code size=500} preload that silently truncated past 500
+   * accounts. {@code status}/{@code type} are repeatable; an absent filter means "all" (the full
+   * enum set), so the management table gets every account while a picker narrows to {@code ACTIVE}.
    *
    * @param page zero-based page index
    * @param size page size
    * @param sort whitelisted sort spec ({@code field,asc|desc})
+   * @param query optional case-insensitive name/account-number substring filter
+   * @param status statuses to include (repeatable); {@code null}/empty means all statuses
+   * @param type types to include (repeatable); {@code null}/empty means all types
    * @return one page of accounts incl. compute-on-read balances
    */
-  @Operation(summary = "List the bank accounts visible to the caller (paged)")
+  @Operation(summary = "List/search the bank accounts visible to the caller (paged)")
   @GetMapping
   @PreAuthorize(Roles.HAS_ROLE_BANK_EMPLOYEE)
   @Transactional(readOnly = true)
   public PageResponse<BankAccountDto> getAccounts(
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
+      @RequestParam(required = false) String sort,
+      @RequestParam(required = false) String query,
+      @RequestParam(required = false) List<BankAccountStatus> status,
+      @RequestParam(required = false) List<BankAccountType> type) {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, ACCOUNT_SORT_FIELDS, "accountNo");
+    Set<BankAccountStatus> statuses =
+        status == null || status.isEmpty()
+            ? EnumSet.allOf(BankAccountStatus.class)
+            : EnumSet.copyOf(status);
+    Set<BankAccountType> types =
+        type == null || type.isEmpty()
+            ? EnumSet.allOf(BankAccountType.class)
+            : EnumSet.copyOf(type);
     Page<BankAccountDto> result =
         bankAccountService.getAccounts(
-            bankSecurityService.isManagement(), currentUserId(), pageable);
+            bankSecurityService.isManagement(), currentUserId(), query, statuses, types, pageable);
     return PageResponse.of(result);
   }
 

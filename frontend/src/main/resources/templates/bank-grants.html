@@ -51,12 +51,17 @@
         </div>
         <div class="bank-form-row" th:if="${!byEmployee}">
             <label for="bank-grants-account-filter" class="visually-hidden" th:text="#{bank.grants.filter.account}">Konto</label>
+            <!-- Server-side account search (remote-bank-accounts, REQ-FE-017, ADR-0104): the account
+                 roster is no longer preloaded. Only the currently-selected account is seeded (edit
+                 mode) so the box shows its name; clearing the box filters to all accounts. -->
             <select id="bank-grants-account-filter" data-role="bank-grants-filter"
-                    data-view="account" data-param="accountId" data-testid="bank-grants-filter">
+                    data-view="account" data-param="accountId"
+                    data-krt-combobox="remote-bank-accounts"
+                    th:attr="data-combobox-placeholder=#{bank.account.search.placeholder},data-combobox-no-results=#{bank.account.search.noResults}"
+                    data-testid="bank-grants-filter">
                 <option value="" th:text="#{bank.grants.filter.allAccounts}">Alle Konten</option>
-                <option th:each="a : ${accounts}" th:value="${a.id()}"
-                        th:selected="${selectedAccountId != null and selectedAccountId == a.id()}"
-                        th:text="${a.accountNo()} + ' &#8212; ' + ${a.name()}">KB-0001 &#8212; Staffel IRIDIUM</option>
+                <option th:if="${selectedAccount != null}" th:value="${selectedAccount.id()}" selected
+                        th:text="${selectedAccount.accountNo()} + ' &#8212; ' + ${selectedAccount.name()}">KB-0001 &#8212; Staffel IRIDIUM</option>
             </select>
         </div>
         <div class="bank-form-row" th:if="${byEmployee}">
@@ -169,10 +174,14 @@
                     </div>
                     <div class="bank-form-row">
                         <label for="bank-grant-account" th:text="#{bank.grants.col.account}">Konto</label>
-                        <select id="bank-grant-account" name="accountId" required data-testid="bank-grant-account">
+                        <!-- Server-side account search (remote-bank-accounts, REQ-FE-017, ADR-0104):
+                             add-only picker (no edit-mode seed), only the placeholder is rendered;
+                             typing queries /api/proxy/bank/accounts/search on demand. -->
+                        <select id="bank-grant-account" name="accountId" required
+                                data-krt-combobox="remote-bank-accounts"
+                                th:attr="data-combobox-placeholder=#{bank.account.search.placeholder},data-combobox-no-results=#{bank.account.search.noResults}"
+                                data-testid="bank-grant-account">
                             <option value="" th:text="#{bank.field.targetAccount.placeholder}">Konto w&auml;hlen &hellip;</option>
-                            <option th:each="a : ${accounts}" th:value="${a.id()}"
-                                    th:text="${a.accountNo()} + ' &#8212; ' + ${a.name()}">KB-0001 &#8212; Staffel IRIDIUM</option>
                         </select>
                         <span class="bank-field-error" data-error-for="accountId"></span>
                     </div>

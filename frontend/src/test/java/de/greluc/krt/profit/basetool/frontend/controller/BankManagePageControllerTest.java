@@ -23,8 +23,10 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -40,6 +42,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -74,39 +77,45 @@ class BankManagePageControllerTest {
     return principal;
   }
 
+  /** Builds a minimal account DTO of the given number/name/type/status for the paged list. */
+  private static BankAccountDto account(String no, String name, String type, String status) {
+    return new BankAccountDto(
+        UUID.randomUUID(),
+        no,
+        name,
+        type,
+        status,
+        null,
+        null,
+        BigDecimal.ZERO,
+        null,
+        null,
+        null,
+        0L,
+        Instant.parse("2026-01-15T10:00:00Z"));
+  }
+
   @Test
-  void manage_ShouldDefaultToHolderTabAndFillModel() {
+  void manage_ShouldDefaultToHolderTabAndFillPagedModel() {
     // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankManagePageController controller = new BankManagePageController(backendApiClient);
     Model model = new ConcurrentModel();
-    BankAccountDto account =
-        new BankAccountDto(
-            UUID.randomUUID(),
-            "KB-0001",
-            "Staffel IRIDIUM",
-            "ORG_UNIT",
-            "ACTIVE",
-            null,
-            null,
-            BigDecimal.ZERO,
-            null,
-            null,
-            null,
-            0L,
-            Instant.parse("2026-01-15T10:00:00Z"));
+    BankAccountDto acc = account("KB-0001", "Staffel IRIDIUM", "ORG_UNIT", "ACTIVE");
     BankHolderDto holder =
         new BankHolderDto(
             UUID.randomUUID(), UUID.randomUUID(), "greluc", true, BigDecimal.ZERO, false, 0L);
-    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(account), 0, 500, 1, 1, Collections.emptyList()));
+    // Both the paged list and the type-filtered CARTEL lookup hit /api/v1/bank/accounts?…; a single
+    // startsWith stub covers both (the CARTEL account isn't asserted here).
+    when(backendApiClient.get(startsWith("/api/v1/bank/accounts?"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(acc), 0, 25, 1, 1, Collections.emptyList()));
     when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))
         .thenReturn(List.of(holder));
-    when(backendApiClient.get(eq("/api/v1/org-units/active"), anyTypeRef())).thenReturn(List.of());
 
     // When
     String view =
-        controller.manage(null, null, management(), oidcUser(UUID.randomUUID().toString()), model);
+        controller.manage(
+            null, null, null, null, management(), oidcUser(UUID.randomUUID().toString()), model);
 
     // Then
     assertEquals("bank-manage", view);
@@ -118,9 +127,69 @@ class BankManagePageControllerTest {
     List<BankAccountDto> accounts = (List<BankAccountDto>) model.getAttribute("accounts");
     assertNotNull(accounts);
     assertEquals(1, accounts.size());
+    // The tab count is the TOTAL element count, not the current page size (REQ-BANK-053).
+    assertEquals(1L, model.getAttribute("accountCount"));
+    assertNotNull(model.getAttribute("accountsPage"));
+    assertNotNull(model.getAttribute("pageSizes"));
+    assertEquals("/bank/manage?tab=konten", model.getAttribute("accountsPaginationBaseUrl"));
     List<BankHolderDto> holders = (List<BankHolderDto>) model.getAttribute("holders");
     assertNotNull(holders);
     assertEquals("greluc", holders.get(0).handle());
+  }
+
+  @Test
+  void manage_paginates_clampsUnknownSize_andForwardsPageAndSort() {
+    // Given
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    BankManagePageController controller = new BankManagePageController(backendApiClient);
+    Model model = new ConcurrentModel();
+    when(backendApiClient.get(startsWith("/api/v1/bank/accounts?"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 2, 50, 130, 3, Collections.emptyList()));
+
+    // When — page 2, an allowed size of 50
+    controller.manage(
+        "konten", 2, 50, null, management(), oidcUser(UUID.randomUUID().toString()), model);
+
+    // Then — the paged account list is fetched with page/size/sort=name (stable pagination)
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
+    verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
+        .get(uriCaptor.capture(), anyTypeRef());
+    assertTrue(
+        uriCaptor.getAllValues().stream()
+            .anyMatch(
+                u -> u.contains("page=2") && u.contains("size=50") && u.contains("sort=name")),
+        "the paged list request carries page=2&size=50&sort=name,asc");
+    // The CARTEL singleton is resolved by its own type-filtered one-row lookup, not scanned out of
+    // the page (management only).
+    assertTrue(
+        uriCaptor.getAllValues().stream().anyMatch(u -> u.contains("type=CARTEL")),
+        "the CARTEL account is fetched via a type-filtered lookup");
+  }
+
+  @Test
+  void manage_rejectsNonWhitelistedSize_fallsBackToDefault() {
+    // Given
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    BankManagePageController controller = new BankManagePageController(backendApiClient);
+    Model model = new ConcurrentModel();
+    when(backendApiClient.get(startsWith("/api/v1/bank/accounts?"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 25, 0, 0, Collections.emptyList()));
+
+    // When — a bogus/oversized page size (999) is requested
+    controller.manage(
+        "konten", null, 999, null, management(), oidcUser(UUID.randomUUID().toString()), model);
+
+    // Then — it is not honoured; the request falls back to the default page size (25)
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
+    verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
+        .get(uriCaptor.capture(), anyTypeRef());
+    assertTrue(
+        uriCaptor.getAllValues().stream()
+            .anyMatch(u -> u.contains("page=0") && u.contains("size=25")),
+        "a non-whitelisted size falls back to the default 25");
+    assertTrue(
+        uriCaptor.getAllValues().stream().noneMatch(u -> u.contains("size=999")),
+        "the bogus size is never forwarded");
   }
 
   @Test
@@ -132,7 +201,8 @@ class BankManagePageControllerTest {
     when(backendApiClient.get(any(String.class), anyTypeRef())).thenReturn(null);
 
     // When: an explicit ?tab=konten opens the accounts tab (the non-default branch).
-    controller.manage("konten", null, management(), oidcUser(UUID.randomUUID().toString()), model);
+    controller.manage(
+        "konten", null, null, null, management(), oidcUser(UUID.randomUUID().toString()), model);
 
     // Then
     assertEquals("konten", model.getAttribute("activeTab"));
@@ -149,12 +219,19 @@ class BankManagePageControllerTest {
     // When
     String view =
         controller.manage(
-            "HALTER", null, management(), oidcUser(UUID.randomUUID().toString()), model);
+            "HALTER",
+            null,
+            null,
+            null,
+            management(),
+            oidcUser(UUID.randomUUID().toString()),
+            model);
 
     // Then
     assertEquals("bank-manage", view);
     assertEquals("halter", model.getAttribute("activeTab"));
     assertEquals(List.of(), model.getAttribute("accounts"));
+    assertEquals(0L, model.getAttribute("accountCount"));
     assertEquals(List.of(), model.getAttribute("holders"));
     assertEquals(List.of(), model.getAttribute("orgUnits"));
   }
@@ -168,14 +245,20 @@ class BankManagePageControllerTest {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankManagePageController controller = new BankManagePageController(backendApiClient);
     Model model = new ConcurrentModel();
-    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 500, 0, 0, Collections.emptyList()));
+    when(backendApiClient.get(startsWith("/api/v1/bank/accounts?"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 25, 0, 0, Collections.emptyList()));
     when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef())).thenReturn(List.of());
 
     // When
     String view =
         controller.manage(
-            "halter", "manageBody", management(), oidcUser(UUID.randomUUID().toString()), model);
+            "halter",
+            null,
+            null,
+            "manageBody",
+            management(),
+            oidcUser(UUID.randomUUID().toString()),
+            model);
 
     // Then
     assertEquals("bank-manage :: manageBody", view);
@@ -201,13 +284,13 @@ class BankManagePageControllerTest {
     BankHolderDto ownHolder =
         new BankHolderDto(
             UUID.randomUUID(), UUID.fromString(sub), "emp", true, BigDecimal.ZERO, false, 0L);
-    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 500, 0, 0, Collections.emptyList()));
+    when(backendApiClient.get(startsWith("/api/v1/bank/accounts?"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 25, 0, 0, Collections.emptyList()));
     when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))
         .thenReturn(List.of(ownHolder));
 
     // When — the employee's principal carries the sub; getName() ("emp") deliberately differs.
-    controller.manage("halter", null, employee(), oidcUser(sub), model);
+    controller.manage("halter", null, null, null, employee(), oidcUser(sub), model);
 
     // Then — selfUserId is the sub (matches the holder's userId), never the preferred_username.
     assertEquals(sub, model.getAttribute("selfUserId"));

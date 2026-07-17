@@ -19,22 +19,17 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankDashboardAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankDashboardDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.hamcrest.Matchers;
@@ -55,8 +50,9 @@ import org.springframework.web.context.WebApplicationContext;
  * with {@code th:replace}, because {@code th:replace} (precedence 1) is processed before {@code
  * th:if} (3) — a same-element combination rendered the movement modal unconditionally, so a viewer
  * with no bookable (active) account still got the hidden modal in the DOM even though the CTA
- * button that opens it was correctly hidden. {@code canBook = !activeAccounts.isEmpty()} in {@link
- * BankPageController}, sourced from {@code GET /api/v1/bank/accounts?size=500}.
+ * button that opens it was correctly hidden. Since REQ-BANK-053/ADR-0104 the account pickers search
+ * on demand, so {@code canBook} is derived from the already-loaded dashboard's active accounts in
+ * {@link BankPageController} rather than a separate {@code /api/v1/bank/accounts} preload.
  */
 @SpringBootTest
 class BankDashboardMovementModalMvcTest {
@@ -74,54 +70,30 @@ class BankDashboardMovementModalMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
-  /** A single-account dashboard payload so the grid renders (the modal gating is independent). */
-  private BankDashboardDto dashboardWithOneAccount() {
-    return new BankDashboardDto(
-        true,
-        List.of(
-            new BankDashboardAccountDto(
-                UUID.randomUUID(),
-                "KB-0001",
-                "Staffel IRIDIUM",
-                "ORG_UNIT",
-                "ACTIVE",
-                new BigDecimal("1000"),
-                BigDecimal.ZERO,
-                List.of(),
-                null,
-                null,
-                null)),
-        null);
-  }
-
-  /** One ACTIVE account so {@code canBook} is true. */
-  private BankAccountDto activeAccount() {
-    return new BankAccountDto(
+  /** A dashboard card of the given status so the grid renders and canBook can be exercised. */
+  private BankDashboardAccountDto card(String status) {
+    return new BankDashboardAccountDto(
         UUID.randomUUID(),
         "KB-0001",
         "Staffel IRIDIUM",
         "ORG_UNIT",
-        "ACTIVE",
-        null,
-        null,
+        status,
         new BigDecimal("1000"),
+        BigDecimal.ZERO,
+        List.of(),
         null,
         null,
-        null,
-        0L,
-        Instant.parse("2026-01-01T00:00:00Z"));
+        null);
   }
 
   @Test
   @WithMockUser(roles = "BANK_EMPLOYEE")
   void dashboard_noBookableAccount_omitsMovementModal() throws Exception {
-    // No /api/v1/bank/accounts stub -> the accounts fetch returns null -> activeAccounts is empty
-    // ->
-    // canBook is false. The movement modal (and its CTA) must be absent. Pre-fix, the modal
-    // rendered
-    // unconditionally because th:if shared the element with th:replace.
+    // A dashboard whose only account is CLOSED -> no ACTIVE account -> canBook false. The movement
+    // modal (and its CTA) must be absent. Pre-fix, the modal rendered unconditionally because th:if
+    // shared the element with th:replace.
     when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
-        .thenReturn(dashboardWithOneAccount());
+        .thenReturn(new BankDashboardDto(true, List.of(card("CLOSED")), null));
 
     mockMvc
         .perform(get("/bank"))
@@ -134,17 +106,22 @@ class BankDashboardMovementModalMvcTest {
   @Test
   @WithMockUser(roles = "BANK_EMPLOYEE")
   void dashboard_withBookableAccount_rendersMovementModal() throws Exception {
-    // An ACTIVE account -> canBook true -> the CTA and the movement modal render (positive control,
-    // so the fix does not over-suppress).
+    // An ACTIVE account in the dashboard -> canBook true -> the CTA and the movement modal render
+    // (positive control, so the gating does not over-suppress). No separate account fetch is
+    // needed:
+    // canBook is read from the dashboard itself, and the modal's account pickers search on demand.
     when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
-        .thenReturn(dashboardWithOneAccount());
-    when(backendApiClient.get(startsWith("/api/v1/bank/accounts"), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(activeAccount()), 0, 500, 1, 1, List.of()));
+        .thenReturn(new BankDashboardDto(true, List.of(card("ACTIVE")), null));
 
     mockMvc
         .perform(get("/bank"))
         .andExpect(status().isOk())
         .andExpect(content().string(Matchers.containsString("id=\"bank-movement-modal\"")))
-        .andExpect(content().string(Matchers.containsString("bank-movement-open")));
+        .andExpect(content().string(Matchers.containsString("bank-movement-open")))
+        // REQ-FE-017/ADR-0104: the modal's source + destination account pickers are remote-search
+        // comboboxes and preload no account roster.
+        .andExpect(
+            content()
+                .string(Matchers.containsString("data-krt-combobox=\"remote-bank-accounts\"")));
   }
 }

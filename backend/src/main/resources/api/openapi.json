@@ -28307,7 +28307,7 @@
     "/api/v1/bank/accounts" : {
       "get" : {
         "tags" : [ "bank-account-controller" ],
-        "summary" : "List the bank accounts visible to the caller (paged)",
+        "summary" : "List/search the bank accounts visible to the caller (paged)",
         "operationId" : "getAccounts",
         "parameters" : [ {
           "name" : "page",
@@ -28331,6 +28331,35 @@
           "required" : false,
           "schema" : {
             "type" : "string"
+          }
+        }, {
+          "name" : "query",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "ACTIVE", "CLOSED" ]
+            }
+          }
+        }, {
+          "name" : "type",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "ORG_UNIT", "AREA", "CARTEL", "CARTEL_BANK", "SPECIAL" ]
+            }
           }
         } ],
         "responses" : {

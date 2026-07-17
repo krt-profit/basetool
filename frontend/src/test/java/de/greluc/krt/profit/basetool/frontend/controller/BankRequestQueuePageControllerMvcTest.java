@@ -224,9 +224,12 @@ class BankRequestQueuePageControllerMvcTest {
         .andExpect(content().string(Matchers.containsString("bank-movement-open")))
         .andExpect(content().string(Matchers.containsString("id=\"bank-movement-modal\"")))
         // The type selector plus the source-account picker (only present on this non-account-scoped
-        // surface) and one of its options.
+        // surface), which is now a server-side account-search combobox (remote-bank-accounts,
+        // REQ-FE-017/ADR-0104) rather than a preloaded <select> of every active account.
         .andExpect(content().string(Matchers.containsString("bank-movement-type")))
         .andExpect(content().string(Matchers.containsString("bank-movement-source-account")))
+        .andExpect(
+            content().string(Matchers.containsString("data-krt-combobox=\"remote-bank-accounts\"")))
         // The account label is type-aware (REQ-BANK-023): bank.js swaps it to Zielkonto for a
         // deposit (which has no source account) and Quellkonto for a withdrawal/transfer, from the
         // per-type data-label-* it carries.

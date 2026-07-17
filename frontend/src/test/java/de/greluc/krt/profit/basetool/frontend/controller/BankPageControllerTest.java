@@ -292,7 +292,7 @@ class BankPageControllerTest {
   }
 
   @Test
-  void accountDetail_ShouldFilterTransferTargetsToActiveAccountsAndActiveHolders() {
+  void accountDetail_ShouldNotPreloadTransferTargetRoster_AndFiltersActiveHolders() {
     // Given
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankPageController controller = new BankPageController(backendApiClient);
@@ -302,8 +302,6 @@ class BankPageControllerTest {
     UUID holderB = UUID.randomUUID();
 
     BankAccountDto self = account(accountId, "KB-0001", "ACTIVE", "1000");
-    BankAccountDto activeOther = account(UUID.randomUUID(), "KB-0002", "ACTIVE", "0");
-    BankAccountDto closedOther = account(UUID.randomUUID(), "KB-0003", "CLOSED", "0");
     BankAccountDetailDto detail =
         new BankAccountDetailDto(
             self,
@@ -334,10 +332,6 @@ class BankPageControllerTest {
                     holderA, UUID.randomUUID(), "alpha", true, BigDecimal.ZERO, false, 0L),
                 new BankHolderDto(
                     holderB, UUID.randomUUID(), "bravo", false, BigDecimal.ZERO, false, 0L)));
-    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
-        .thenReturn(
-            new PageResponse<>(
-                List.of(self, activeOther, closedOther), 0, 500, 3, 1, Collections.emptyList()));
     when(backendApiClient.get(
             eq("/api/v1/bank/transfer-fee-rate"), eq(BankTransferFeeRateDto.class)))
         .thenReturn(new BankTransferFeeRateDto(new BigDecimal("0.005")));
@@ -345,13 +339,15 @@ class BankPageControllerTest {
     // When
     String view = controller.accountDetail(accountId, null, null, null, null, null, null, model);
 
-    // Then: transfer targets exclude self and the closed account; active holders exclude the
-    // deactivated one (ADR-0039: no per-account distribution any more)
+    // Then: the transfer-destination picker is a server-side account-search combobox now
+    // (remote-bank-accounts, REQ-FE-017/ADR-0104), so NO transfer-target roster is preloaded and no
+    // account list is fetched; active holders still exclude the deactivated one (ADR-0039).
     assertEquals("bank-account-detail", view);
-    List<BankAccountDto> targets = (List<BankAccountDto>) model.getAttribute("transferTargets");
-    assertNotNull(targets);
-    assertEquals(1, targets.size());
-    assertEquals("KB-0002", targets.get(0).accountNo());
+    assertNull(
+        model.getAttribute("transferTargets"),
+        "no transfer-target roster is preloaded — the picker searches on demand");
+    verify(backendApiClient, never())
+        .get(org.mockito.ArgumentMatchers.startsWith("/api/v1/bank/accounts?"), anyTypeRef());
     List<BankHolderDto> activeHolders = (List<BankHolderDto>) model.getAttribute("activeHolders");
     assertNotNull(activeHolders);
     assertEquals(1, activeHolders.size());
@@ -406,8 +402,9 @@ class BankPageControllerTest {
     // When
     controller.accountDetail(accountId, -3, null, null, null, null, null, model);
 
-    // Then
-    assertEquals(List.of(), model.getAttribute("transferTargets"));
+    // Then — the transfer destination searches on demand (no roster attribute); holders degrade to
+    // an empty list.
+    assertNull(model.getAttribute("transferTargets"));
     assertEquals(List.of(), model.getAttribute("activeHolders"));
   }
 
@@ -483,8 +480,6 @@ class BankPageControllerTest {
             List.of(
                 new BankHolderDto(
                     holderA, UUID.randomUUID(), "alpha", true, BigDecimal.ZERO, false, 0L)));
-    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(self), 0, 500, 1, 1, Collections.emptyList()));
 
     // When
     String view =
@@ -493,12 +488,13 @@ class BankPageControllerTest {
     // Then
     assertEquals("bank-account-detail :: accountBody", view);
     // The accountBody fragment needs the FULL model (unlike the bookings-only fragment): detail,
-    // the holder registry for the modals' selects, transfer targets and bookings must all be
-    // present.
+    // the holder registry for the modals' selects and bookings must all be present. The transfer
+    // destination is a server-side account-search combobox now (remote-bank-accounts), so no
+    // transfer-target roster is preloaded.
     assertNotNull(model.getAttribute("detail"));
     assertNotNull(model.getAttribute("activeHolders"));
     assertNotNull(model.getAttribute("holders"));
-    assertNotNull(model.getAttribute("transferTargets"));
+    assertNull(model.getAttribute("transferTargets"));
     assertNotNull(model.getAttribute("bookings"));
   }
 

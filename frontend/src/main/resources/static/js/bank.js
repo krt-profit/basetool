@@ -1320,9 +1320,13 @@
         });
     });
 
-    /** Grants filter selects: navigate to the chosen grouping/entity on change. */
+    // Grants filter selects: navigate to the chosen grouping/entity on change. Match on the
+    // attribute, NOT the tag: the account filter is a searchable combobox (remote-bank-accounts), so
+    // after enhancement [data-role="bank-grants-filter"] resolves to the enhancer's hidden value
+    // input (an <input>, not a <select>); the employee filter stays a native <select>. Both inherit
+    // the data-view / data-param attributes read below.
     document.addEventListener('change', function (event) {
-        const select = event.target.closest('select[data-role="bank-grants-filter"]');
+        const select = event.target.closest('[data-role="bank-grants-filter"]');
         if (!select) {
             return;
         }
@@ -1596,9 +1600,18 @@
         }
         const source = form.querySelector('[data-role="bank-movement-source"]');
         if (source) {
-            const option = source.options[source.selectedIndex];
-            input.required =
-                !!option && option.getAttribute('data-requires-justification') === 'true';
+            // A native <select> carries the mandate on the chosen <option>; the enhanced
+            // remote-bank-accounts combobox is a hidden value input (no <option>s), so read the
+            // mandate from window.krtBankAccountMeta — populated by the account-search source as the
+            // user searches, keyed by the committed account id (REQ-FE-017, ADR-0104).
+            if (source.options) {
+                const option = source.options[source.selectedIndex];
+                input.required =
+                    !!option && option.getAttribute('data-requires-justification') === 'true';
+            } else {
+                const meta = window.krtBankAccountMeta || {};
+                input.required = !!source.value && meta[source.value] === true;
+            }
         } else {
             input.required = form.getAttribute('data-justification-required') === 'true';
         }
@@ -1672,10 +1685,14 @@
         }
     });
 
-    // The source-account picker (requests overview) drives the fixed-account id mirrored onto the
-    // form, the per-account Begründung mandate and the fee preview: re-sync them when it changes.
+    // The source-account picker (requests / dashboard overview) drives the fixed-account id mirrored
+    // onto the form, the per-account Begründung mandate and the fee preview: re-sync them when it
+    // changes. Match on the attribute, NOT the tag: the picker is a searchable combobox
+    // (remote-bank-accounts), so after enhancement [data-role="bank-movement-source"] resolves to
+    // the enhancer's hidden VALUE input (an <input>, not a <select>) that re-dispatches change on
+    // commit — a `select[...]` selector would miss it.
     document.addEventListener('change', function (event) {
-        const source = event.target.closest('select[data-role="bank-movement-source"]');
+        const source = event.target.closest('[data-role="bank-movement-source"]');
         if (!source) {
             return;
         }

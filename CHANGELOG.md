@@ -8,6 +8,8 @@
 
 ### Changed
 
+- **Bank: Die Konto-Auswahlfelder (Zielkonto einer Buchung, Quellkonto der Direktbuchung, Konto einer Berechtigung sowie der Kontofilter) sind jetzt server-seitige Suchfelder, und die Kontenverwaltung ist echt paginiert.** Vorher wurde die Kontoliste bei 500 Konten stillschweigend abgeschnitten — ein Transfer-Ziel, ein Berechtigungskonto oder ein verwaltetes Konto darüber hinaus war ohne Suche, Seitenblätterung oder Hinweis nicht mehr erreichbar. Die Picker holen passende aktive Konten jetzt beim Tippen nach (Nummer oder Name), und die Verwaltungstabelle blättert seitenweise, sodass bei den für ~5000 Mitglieder geplanten Kontozahlen jedes Konto erreichbar bleibt (REQ-BANK-053, REQ-FE-017).
+
 - **Lager: Beim Umbuchen ist das „Buchen in OrgUnit"-Dropdown jetzt immer sichtbar, sobald der Ziel-Eigentümer mindestens einer Org-Einheit angehört, und auf die aktuelle Einheit der Zeile vorbelegt.** Es listet die Einheiten des ausgewählten Eigentümers über alle vier Ebenen (Staffel, Spezialkommando, Bereich, Organisationsleitung) — vorher erschienen nur Staffel/SK, und der Picker blieb bei genau einer Einheit ganz verborgen. Da nun immer eine konkrete Einheit vorausgewählt ist, behält ein Umbuchen ohne Änderung des Dropdowns die bisherige Einheit bei (REQ-INV-007, #1328).
 
 ### Fixed
