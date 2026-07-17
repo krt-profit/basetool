@@ -34,6 +34,8 @@
 
 ### Fixed
 
+- **Materialbörse: Die Item-Suche im „Material anbieten"-Dialog findet Item-Lagerposten mit mehrwortigen Namen wieder.** Das Frontend kodierte den Suchbegriff auf dem Weg zum Backend doppelt (ein Leerzeichen wurde zu `%2520` statt `%20`), sodass die getippte Suche nach einem Item-Bestand wie „E2E Boerse Item Stock Widget" nichts fand, während das Durchstöbern ohne Suchbegriff die Zeile zeigte. Der Freigabe- und der Item-Picker sowie die Angebotssuche übergeben den Suchbegriff jetzt einmalig kodiert als URI-Variable (REQ-MARKET-002/014).
+
 - **Lager: Die Material- und die Item-Detailseite (`/inventory/material/{id}`, `/inventory/game-item/{id}`) blättern jetzt serverseitig durch alle Bestandszeilen statt bei 1000 Zeilen still abzuschneiden.** Bislang wurde nur eine feste Seite von 1000 Einträgen geladen und ohne Blättern angezeigt — bei mehr Zeilen waren die restlichen unsichtbar und unerreichbar. Beide Ansichten haben nun eine Seitensteuerung mit Seitengrößen 50/100/200, die die Ergebnisliste ohne Neuladen austauscht (REQ-INV-033, ADR-0104).
 
 - **Material-Detailseite: Die Preisliste zeigt jetzt garantiert alle Terminals, die das Material handeln.** Bisher wurde nur die erste Seite (max. 1000 Terminals) geladen und als vollständige Liste dargestellt, sodass alphabetisch spätere Terminals unbemerkt fehlten; die Liste wird nun seitenweise vollständig zusammengesetzt (REQ-UI-015, ADR-0105).
