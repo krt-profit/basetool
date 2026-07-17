@@ -189,20 +189,37 @@ public class MaterialController {
   }
 
   /**
-   * Full material × terminal price matrix used by the matrix overview page. The frontend pulls
-   * everything in one request (sized for {@code size=100000}) and filters in memory.
+   * Material × terminal price matrix used by the matrix overview page, with optional server-side
+   * filtering (ADR-0105, REQ-UI-014). The frontend relays its four filter dimensions as query
+   * parameters and page-walks the result, so a universe larger than one {@code size} page is no
+   * longer forced through an in-memory-only filter over a single clamped fetch. Absent parameters
+   * mean "no filter" on that dimension, so a bare {@code /matrix} call still returns the full
+   * matrix.
    *
-   * @return paged matrix items
+   * @param page zero-based page index (optional)
+   * @param size page size (optional; clamped by {@link PaginationUtil})
+   * @param sort sort expression (optional; whitelisted fields only)
+   * @param materialNames exact material names to keep (repeatable), or absent for all
+   * @param starSystems exact star-system names to keep (repeatable), or absent for all
+   * @param hasLoadingDock {@code true} to keep only terminals with a loading dock
+   * @param isAutoLoad {@code true} to keep only terminals with automatic cargo loading
+   * @return paged (filtered) matrix items
    */
   @GetMapping("/matrix")
   public PageResponse<MaterialMatrixItemDto> getMaterialMatrixItems(
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
+      @RequestParam(required = false) String sort,
+      @RequestParam(required = false) List<String> materialNames,
+      @RequestParam(required = false) List<String> starSystems,
+      @RequestParam(required = false) Boolean hasLoadingDock,
+      @RequestParam(required = false) Boolean isAutoLoad) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("material.name", "terminal.name", "id"), "material.name");
-    Page<MaterialMatrixItemDto> p = materialService.getAllMatrixItems(pageable);
+    Page<MaterialMatrixItemDto> p =
+        materialService.getMatrixItems(
+            materialNames, starSystems, hasLoadingDock, isAutoLoad, pageable);
     return PageResponse.of(p);
   }
 

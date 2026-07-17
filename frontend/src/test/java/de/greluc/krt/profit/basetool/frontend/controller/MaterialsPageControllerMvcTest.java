@@ -191,13 +191,16 @@ class MaterialsPageControllerMvcTest {
             200,
             true,
             true);
+    // The detail price list is page-walked (CatalogPages.fetchAll); a totalPages=1 response ends
+    // the
+    // walk after page 0 (REQ-UI-015).
     PageResponse<MaterialPriceDto> pricesPage =
-        new PageResponse<>(List.of(priceDto), 0, 1000, 1, 1, List.of());
+        new PageResponse<>(List.of(priceDto), 0, 10000, 1, 1, List.of());
 
     when(backendApiClient.get(eq("/api/v1/materials/" + id), eq(MaterialDto.class)))
         .thenReturn(material);
     when(backendApiClient.get(
-            eq("/api/v1/materials/" + id + "/prices?size=1000&sort=terminal.name,asc"),
+            eq("/api/v1/materials/" + id + "/prices?size=10000&sort=terminal.name,asc&page=0"),
             anyTypeRef()))
         .thenReturn(pricesPage);
 

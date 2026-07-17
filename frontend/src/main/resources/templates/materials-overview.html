@@ -34,10 +34,14 @@
         </div>
 
         <!--
-          Filter widgets are server-rendered (one checkbox per material / star system) but wired up
-          and applied entirely by /js/materials-matrix.js: it binds the dropdown open/close, the
-          select-all toggles and the boolean filters, then re-filters the already-fetched grid data
-          in memory and re-renders the virtual table. No server round-trip per filter change.
+          Filter widgets are server-rendered (one checkbox per material / star system) and wired up
+          by /js/materials-matrix.js: it binds the dropdown open/close, the select-all toggles and
+          the boolean filters, then re-fetches /materials/overview/data with the selection as query
+          parameters so the backend applies the filters (server-side filtering, ADR-0105/REQ-UI-014)
+          and returns only the matching slice. This replaced an in-memory filter over a single
+          clamped fetch, which silently dropped cells once the universe exceeded the page-size clamp.
+          The option lists themselves span the whole universe (derived server-side in the shell), so
+          narrowing a filter never removes options.
         -->
         <div class="filters-container">
             <div class="form-group">
@@ -98,7 +102,7 @@
 
         <!--
           Client-rendered, virtual-scrolling grid. The server ships only this empty skeleton plus
-          the JSON config below; /js/materials-matrix.js fetches the matrix from
+          the JSON config below; /js/materials-matrix.js fetches the (server-filtered) matrix from
           /materials/overview/data and materializes just the visible rows into <tbody>, so the DOM
           stays small no matter how large the universe is. See the controller class Javadoc.
         -->
