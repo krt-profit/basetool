@@ -23,7 +23,11 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -42,6 +46,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -138,6 +143,62 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"bp-results\""))))
         .andExpect(content().string(not(containsString("id=\"krt-bp-edit-modal\""))))
         .andExpect(content().string(not(containsString("krt-admin-banner"))));
+  }
+
+  // Regression guard for the enc(...)-wrapped frontend-proxy double-encoding sub-class (REQ-FE-016,
+  // the site PR #1347's URLEncoder.encode( sweep missed): the admin owned-blueprint filter must
+  // forward a multi-word free-text term as a WebClient URI-template variable ({q}), not enc(...) it
+  // into the URI string, so the backend @RequestParam decodes the exact typed term. Form-encoding
+  // (space -> '+') double-encodes across the frontend->backend hop and yields zero matches.
+  // fragment=results skips the selected-member lookup, leaving fetchOwned as the only read.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_passesMultiWordQueryAsUriVariable() throws Exception {
+    String userSub = UUID.randomUUID().toString();
+    PageResponse<PersonalBlueprintDto> page =
+        new PageResponse<>(List.of(), 0, 200, 0, 0, List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(page);
+
+    mockMvc
+        .perform(
+            get("/admin/personal-blueprints")
+                .param("userSub", userSub)
+                .param("q", "Arclight Pistol")
+                .param("fragment", "results"))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
+    ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
+    assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
+    assertEquals("Arclight Pistol", qCaptor.getValue());
+  }
+
+  // Same guard with an umlaut term: "Größe Röhre" encodes to Gr%C3%B6%C3%9Fe… under enc(...), which
+  // the hop would re-encode to a literal zero-match. As a URI variable the raw term reaches the
+  // backend intact.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_passesUmlautQueryAsUriVariable_notFormEncoded() throws Exception {
+    String userSub = UUID.randomUUID().toString();
+    PageResponse<PersonalBlueprintDto> page =
+        new PageResponse<>(List.of(), 0, 200, 0, 0, List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(page);
+
+    String term = "Größe Röhre";
+    mockMvc
+        .perform(
+            get("/admin/personal-blueprints")
+                .param("userSub", userSub)
+                .param("q", term)
+                .param("fragment", "results"))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
+    ArgumentCaptor<Object> qCaptor = ArgumentCaptor.captor();
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
+    assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
+    assertEquals(term, qCaptor.getValue());
   }
 
   // covers REQ-FE-011 (post-#1193) — the admin member picker is the shared searchable combobox in

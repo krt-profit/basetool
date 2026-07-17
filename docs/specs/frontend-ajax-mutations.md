@@ -1129,8 +1129,8 @@ backend as the literal `M%C3%BC…` (and `John Doe` as `John%2520Doe`) → zero 
 space / reserved-character term, while single-token ASCII queries slip through unnoticed and hide
 the defect. This holds for **every** free-text relay, not only the catalog pickers above: the
 operations and admin-blueprint list filters, the personal-inventory and default-blueprint
-type-aheads, and the personal/admin item-inventory `q` filters all forward the raw term as a URI
-variable. Only UUID / enum / int / bool / sort params (carrying no `%XX` after encoding) are safe to
+type-aheads, the admin owned-blueprint filter, and the personal/admin item-inventory `q` filters all
+forward the raw term as a URI variable. Only UUID / enum / int / bool / sort params (carrying no `%XX` after encoding) are safe to
 concatenate into the URI string; the wire encoding is pinned by `BackendApiClientHappyPathTest`, and
 per-relay multi-word + umlaut regression `…passes{MultiWord,Umlaut}QueryAsUriVariable` MvcTests
 guard each site.
