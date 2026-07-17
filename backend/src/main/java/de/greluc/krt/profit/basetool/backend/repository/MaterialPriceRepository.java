@@ -152,6 +152,22 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
    * <p>Excludes rows with no active buy/sell side - mirrors {@link #findPricesByMaterialId} so the
    * matrix does not surface terminals that {@link #clearStalePrices} has just neutralised after UEX
    * dropped the (material, terminal) pair.
+   *
+   * <p><b>Server-side filtering (ADR-0105, REQ-UI-014).</b> The four optional filter dimensions are
+   * applied here so the frontend never has to fetch the whole universe and filter in memory. Each
+   * dimension follows the codebase's optional-parameter idiom ({@code :param IS NULL OR …}) so a
+   * {@code null} means "no filter" and an all-{@code null} call is byte-for-byte the historical
+   * full-matrix query. Callers MUST pass {@code null} (never an empty collection) for an
+   * unconstrained {@code IN} dimension — an empty list would render {@code IN ()} and match
+   * nothing. The boolean dimensions filter to {@code true} only when the corresponding flag is
+   * {@code TRUE}; {@code null} leaves them unconstrained.
+   *
+   * @param materialNames exact material names to keep, or {@code null} for all
+   * @param starSystems exact star-system names to keep, or {@code null} for all
+   * @param hasLoadingDock {@code TRUE} to keep only loading-dock terminals, {@code null} for all
+   * @param isAutoLoad {@code TRUE} to keep only auto-load terminals, {@code null} for all
+   * @param pageable the page request
+   * @return the matching (material, terminal, price) matrix rows
    */
   @Query(
       """
@@ -175,8 +191,17 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
       WHERE (t.hidden = false OR t.hidden IS NULL)
       AND (p.statusBuy = true OR p.statusSell = true
            OR p.priceBuy > 0 OR p.priceSell > 0)
+      AND (:materialNames IS NULL OR m.name IN :materialNames)
+      AND (:starSystems IS NULL OR t.starSystemName IN :starSystems)
+      AND (:hasLoadingDock IS NULL OR t.hasLoadingDock = :hasLoadingDock)
+      AND (:isAutoLoad IS NULL OR t.isAutoLoad = :isAutoLoad)
       """)
-  Page<MaterialMatrixItemDto> findAllMatrixItems(Pageable pageable);
+  Page<MaterialMatrixItemDto> findMatrixItems(
+      @Param("materialNames") Collection<String> materialNames,
+      @Param("starSystems") Collection<String> starSystems,
+      @Param("hasLoadingDock") Boolean hasLoadingDock,
+      @Param("isAutoLoad") Boolean isAutoLoad,
+      Pageable pageable);
 
   /**
    * Returns every price row whose terminal supports cargo auto-load (i.e. usable as a profit-run

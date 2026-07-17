@@ -24,9 +24,13 @@
 
 - **Lager: Beim Umbuchen ist das „Buchen in OrgUnit"-Dropdown jetzt immer sichtbar, sobald der Ziel-Eigentümer mindestens einer Org-Einheit angehört, und auf die aktuelle Einheit der Zeile vorbelegt.** Es listet die Einheiten des ausgewählten Eigentümers über alle vier Ebenen (Staffel, Spezialkommando, Bereich, Organisationsleitung) — vorher erschienen nur Staffel/SK, und der Picker blieb bei genau einer Einheit ganz verborgen. Da nun immer eine konkrete Einheit vorausgewählt ist, behält ein Umbuchen ohne Änderung des Dropdowns die bisherige Einheit bei (REQ-INV-007, #1328).
 
+- **Material-Übersicht (Preis-Matrix): Die Filter (Material, System, Loading Dock, Auto Load) wirken jetzt serverseitig statt nur über die im Browser geladenen Zeilen.** Ein Filterwechsel fragt die passende Teilmenge direkt beim Backend an, statt die komplette Material×Terminal-Matrix in den Browser zu laden und dort zu filtern — ein gefiltertes Raster zeigt entsprechend nur noch Terminals und Materialien mit einem Preistreffer in der Auswahl (REQ-UI-014, ADR-0105).
+
 ### Fixed
 
 - **Lager: Die Material- und die Item-Detailseite (`/inventory/material/{id}`, `/inventory/game-item/{id}`) blättern jetzt serverseitig durch alle Bestandszeilen statt bei 1000 Zeilen still abzuschneiden.** Bislang wurde nur eine feste Seite von 1000 Einträgen geladen und ohne Blättern angezeigt — bei mehr Zeilen waren die restlichen unsichtbar und unerreichbar. Beide Ansichten haben nun eine Seitensteuerung mit Seitengrößen 50/100/200, die die Ergebnisliste ohne Neuladen austauscht (REQ-INV-033, ADR-0106).
+
+- **Material-Detailseite: Die Preisliste zeigt jetzt garantiert alle Terminals, die das Material handeln.** Bisher wurde nur die erste Seite (max. 1000 Terminals) geladen und als vollständige Liste dargestellt, sodass alphabetisch spätere Terminals unbemerkt fehlten; die Liste wird nun seitenweise vollständig zusammengesetzt (REQ-UI-015, ADR-0105).
 
 - **Admin: Die Katalog-Seiten (Materialien, Orte, Missionsdaten, Spezialkommandos, Systemeinstellungen, UEX-Daten, Schiffsdaten) zeigen jetzt garantiert alle Einträge statt nur der ersten 1000 bzw. 10000.** Die Controller laden den Katalog seitenweise vollständig; die UEX-Zusammenfassungs-Chips zählen über die vom Backend gemeldete Gesamtzahl, und sollte das Sicherheitslimit beim Laden je erreicht werden, erscheint ein deutlicher Warnhinweis statt einer stillschweigend unvollständigen Liste (REQ-ADMIN-001/002, ADR-0102).
 
