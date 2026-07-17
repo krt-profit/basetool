@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
+import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.support.JobOrderInventoryOwnerRedactor;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -37,8 +39,10 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * REST controller for the order-detail Item-Bestand panel (REQ-ORDERS-028): lists the game-item
  * stock earmarked to a job order, grouped per game item — the item sibling of {@link
- * MaterialCollectionController}. Same authorization as the sibling per-order stock reads (the
- * caller must be able to see the order).
+ * MaterialCollectionController}. Reading the panel requires being able to see the order ({@code
+ * canSeeJobOrder}); the per-entry owner/location is additionally redacted for a requesting-side
+ * viewer of an SK-public order (REQ-ORDERS-029, ADR-0104) via {@link
+ * JobOrderInventoryOwnerRedactor}, gated on {@code canSeeJobOrderInventoryOwners}.
  */
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -46,13 +50,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class JobOrderItemStockController {
 
   private final InventoryItemService inventoryItemService;
+  private final OwnerScopeService ownerScopeService;
+  private final JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
   /**
-   * Returns the game-item stock earmarked to the given job order, grouped per game item.
+   * Returns the game-item stock earmarked to the given job order, grouped per game item. The
+   * per-entry owner and location are blanked when the caller is not entitled to the order's
+   * responsible side ({@code canSeeJobOrderInventoryOwners} is {@code false} — a requesting-side
+   * viewer of an SK-public order, REQ-ORDERS-029); amounts and the delivered marker are always
+   * kept.
    *
    * @param jobOrderId job order id
-   * @return name-sorted game-item groups with per-entry owner, location, whole-unit amounts,
-   *     this-order slice, delivered marker and entry version
+   * @return name-sorted game-item groups with per-entry owner (redacted for requesting-side
+   *     viewers), location, whole-unit amounts, this-order slice, delivered marker and entry
+   *     version
    */
   @Operation(
       summary = "Get the earmarked item stock for a job order",
@@ -70,6 +81,10 @@ public class JobOrderItemStockController {
   @GetMapping("/{jobOrderId}/item-stock")
   @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#jobOrderId)")
   public List<JobOrderItemStockGroupDto> getItemStock(@PathVariable @NotNull UUID jobOrderId) {
-    return inventoryItemService.getItemStockForJobOrder(jobOrderId);
+    List<JobOrderItemStockGroupDto> groups =
+        inventoryItemService.getItemStockForJobOrder(jobOrderId);
+    return ownerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)
+        ? groups
+        : inventoryOwnerRedactor.redactItemStockGroups(groups);
   }
 }

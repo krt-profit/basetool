@@ -21,9 +21,10 @@ show only the tabs that apply to it.
 
 This spec governs both halves — the production-booking domain (`REQ-ORDERS-025`) and the tab/KPI
 presentation (`REQ-ORDERS-026`) — plus the order-detail **Item-Bestand panel** that surfaces the
-item stock earmarked to the order (`REQ-ORDERS-028`, the item sibling of the Materialsammlung).
-The decision behind the booking flow is
-[ADR-0099](../adr/0099-job-order-item-production-booking.md).
+item stock earmarked to the order (`REQ-ORDERS-028`, the item sibling of the Materialsammlung) and
+the **owner/location redaction** that hides the fulfilling side's inventory owner and Standort from a
+requesting-side viewer of an SK-public order (`REQ-ORDERS-029`, ADR-0104). The decision behind the
+booking flow is [ADR-0099](../adr/0099-job-order-item-production-booking.md).
 
 ## Requirements
 
@@ -316,9 +317,13 @@ sends `materials`/`aggregated`/`item-stock` to each affected `order:{id}` room; 
 container a page does not render is silently skipped).
 
 **Redaction.** The panel renders only for an `ITEM` order and is omitted from the
-requester-redacted view (REQ-ORDERS-023), mirroring the *Aggregierte Materialien* pane; the
-entries expose owner name/id exactly like the sibling material linked-stock reads (no additional
-redaction). An order with no earmarked item stock renders an empty-state message.
+requester-redacted view (REQ-ORDERS-023), mirroring the *Aggregierte Materialien* pane. A
+requester-only viewer (`redacted == true`) additionally cannot reach the endpoint at all — it is
+gated on `canSeeJobOrder`, which a requester-only viewer fails (403). For a caller who *can* see the
+order but is on the **requesting** side of an **SK-public** order, the per-entry owner and location
+are blanked by the backend (REQ-ORDERS-029, ADR-0104) — the panel still renders the amounts and the
+delivered marker, with owner/location shown as `—`. An order with no earmarked item stock renders an
+empty-state message.
 
 **Acceptance**
 
@@ -351,6 +356,61 @@ dispatch), `orders-detail.html` (`itemStockSection` fragment), `orders-detail.js
 (`ORDER_SECTIONS['item-stock']`, `onItemStockDeliveredToggle`), `LiveSyncTopicClass.ORDER`,
 `inventory-my.js` / `inventory-admin.js` (`broadcastOrdersChanged`) · **Issues:** — · **Design:**
 [`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md) §10 PR 4 / §11.2
+
+### REQ-ORDERS-029 — Requesting-side viewers see redacted inventory owner/location
+
+The four per-order reads that expose the **owner identity and location** of the stock linked to a
+job order — the Item-Bestand panel (`GET /orders/{id}/item-stock`, REQ-ORDERS-028), the material
+collection (`GET /orders/{id}/material-collection`), and the two inventory pickers
+(`GET /orders/{id}/materials/{matId}/inventory`, `GET /orders/{id}/inventory/orphaned`) — MUST blank
+the per-entry owner and location for a caller who can see the order but is **not entitled to its
+responsible (processing) side**. Concretely: on a Spezialkommando-responsible (SK-public) order,
+`canSeeJobOrder` admits every profit-eligible member — including members of the merely **requesting**
+squadron — but the fulfilling side's owner/Standort must not leak to the requesting side (owner
+decision 2026-07-17, ADR-0104).
+
+**Gate.** `OwnerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)` — identical to
+`canSeeJobOrderBlueprintOwners`: membership of the order's responsible org unit (or an admin with
+matching scope), **no SK-public escape**. For a squadron-responsible order it coincides with
+`canSeeJobOrder`, so the redaction only ever engages on the SK-public path; a `null` responsible unit
+or unknown order returns `false` (redact by default).
+
+**Redactor.** When the gate is `false` the endpoint passes its projection through
+`JobOrderInventoryOwnerRedactor`, which blanks **only** the owner (`ownerName`/`ownerId`, and the
+nested `user` + `owningSquadron` on the picker `InventoryItemDto`) and the location
+(`location`/`locationId`) — amounts, quality, the delivered marker and the ordered/manufactured
+context are always kept, so the requesting side still sees the order's progress. The redactor
+reconstructs each record field-by-field (never a wither) so a newly added owner/location field is a
+compile error until it is classified (mirrors `MissionGuestRedactor`, REQ-SEC-007). The frontend
+renders a blanked owner/location as `—` (item-stock panel, material-collection page); the JS
+drill-down / orphaned / Herstellung surfaces already fall back to a dash.
+
+A requester-**only** viewer (`redacted == true`, i.e. `!canSeeJobOrder`) is refused all four
+endpoints with `403` and never reaches the redactor at all.
+
+**Accepted trade-off.** A cross-unit LOGISTICIAN processing an SK-public order (requesting-squadron
+member, not in the responsible SK) also sees `—` for owner/location in the pickers. Nothing breaks
+functionally (production books by `inventoryItemId` + slice + version, never by owner/location); it
+is deliberately kept uniform rather than widening the picker gate to `… or canEditJobOrder`.
+
+**Acceptance**
+
+- [ ] On an SK-public order, a member of only the requesting squadron gets owner/location blanked on
+  all four endpoints (amounts/delivered kept); a member of the responsible SK and an admin see them.
+- [ ] A squadron-responsible order is unaffected — every viewer who passes `canSeeJobOrder` sees
+  owner/location.
+- [ ] A requester-only viewer (`redacted`) gets `403` on all four endpoints.
+- [ ] The redacted item-stock panel / material-collection page render `—` for owner/location.
+
+**Enforced by:** `OwnerScopeServiceTest.CanSeeJobOrderInventoryOwnersTests` (the gate — squadron /
+SK-member / requesting-side / admin / unknown), `JobOrderInventoryOwnerRedactorTest` (the three
+redaction passes blank owner/location, keep the rest, null-safe), `JobOrderItemStockControllerTest`
++ `MaterialCollectionControllerTest` + `JobOrderControllerTest` (redaction wiring: unredacted when
+entitled, redactor output otherwise) · **Code:**
+`AccessGateService.canSeeJobOrderInventoryOwners` + `OwnerScopeService` facade,
+`JobOrderInventoryOwnerRedactor`, `JobOrderItemStockController` / `MaterialCollectionController` /
+`JobOrderController` (the two pickers), `orders-detail.html` + `material-collection.html` (`—`
+fallbacks) · **Issues:** — · **ADR:** [ADR-0104](../adr/0104-job-order-inventory-owner-redaction.md)
 
 ## Out of scope
 

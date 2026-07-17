@@ -52,6 +52,7 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.support.JobOrderInventoryOwnerRedactor;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -112,6 +113,7 @@ class JobOrderControllerTest {
   @Mock private UserService userService;
   @Mock private AuthHelperService authHelperService;
   @Mock private OwnerScopeService ownerScopeService;
+  @Mock private JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
   @InjectMocks private JobOrderController controller;
 
@@ -371,35 +373,76 @@ class JobOrderControllerTest {
     verify(ownerScopeService, never()).canSeeJobOrder(any(UUID.class));
   }
 
+  private static InventoryItemDto sampleInventoryItem() {
+    return new InventoryItemDto(
+        UUID.randomUUID(),
+        null,
+        null,
+        null,
+        null,
+        750,
+        5.0,
+        false,
+        java.util.List.of(),
+        0.0,
+        java.util.List.of(),
+        0.0,
+        null,
+        null,
+        1L,
+        null);
+  }
+
   @Test
-  void getInventoryItemsForJobOrderMaterial_delegatesBothPathParameters() {
+  void getInventoryItemsForJobOrderMaterial_responsibleSideViewer_delegatesUnredacted() {
+    // covers REQ-ORDERS-029
     UUID jobOrderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
-    InventoryItemDto inv =
-        new InventoryItemDto(
-            UUID.randomUUID(),
-            null,
-            null,
-            null,
-            null,
-            750,
-            5.0,
-            false,
-            java.util.List.of(),
-            0.0,
-            java.util.List.of(),
-            0.0,
-            null,
-            null,
-            1L,
-            null);
+    InventoryItemDto inv = sampleInventoryItem();
     when(jobOrderQueryService.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId))
         .thenReturn(List.of(inv));
+    when(ownerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
 
     List<InventoryItemDto> result =
         controller.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId);
 
     assertThat(result).containsExactly(inv);
+    verify(inventoryOwnerRedactor, never()).redactInventoryItems(any());
+  }
+
+  @Test
+  void getInventoryItemsForJobOrderMaterial_requestingSideViewer_redactsOwners() {
+    // covers REQ-ORDERS-029
+    UUID jobOrderId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    List<InventoryItemDto> raw = List.of(sampleInventoryItem());
+    List<InventoryItemDto> redacted = List.of(sampleInventoryItem());
+    when(jobOrderQueryService.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId))
+        .thenReturn(raw);
+    when(ownerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
+    when(inventoryOwnerRedactor.redactInventoryItems(raw)).thenReturn(redacted);
+
+    List<InventoryItemDto> result =
+        controller.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId);
+
+    assertThat(result).isSameAs(redacted);
+    verify(inventoryOwnerRedactor).redactInventoryItems(raw);
+  }
+
+  @Test
+  void getOrphanedLinkedInventory_requestingSideViewer_redactsOwners() {
+    // covers REQ-ORDERS-029
+    UUID jobOrderId = UUID.randomUUID();
+    List<InventoryItemDto> raw = List.of(sampleInventoryItem());
+    List<InventoryItemDto> redacted = List.of(sampleInventoryItem());
+    when(jobOrderQueryService.getOrphanedLinkedInventory(jobOrderId)).thenReturn(raw);
+    when(ownerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
+    when(inventoryOwnerRedactor.redactInventoryItems(raw)).thenReturn(redacted);
+
+    List<InventoryItemDto> result = controller.getOrphanedLinkedInventory(jobOrderId);
+
+    assertThat(result).isSameAs(redacted);
+    verify(inventoryOwnerRedactor).redactInventoryItems(raw);
   }
 
   // ── PUT /api/v1/orders/{id}/status ───────────────────────────────────

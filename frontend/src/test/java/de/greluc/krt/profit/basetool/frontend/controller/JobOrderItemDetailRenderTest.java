@@ -1087,6 +1087,44 @@ class JobOrderItemDetailRenderTest {
         .doesNotContain("data-testid=\"order-item-stock-empty\"");
   }
 
+  // covers REQ-ORDERS-029 (the backend blanks owner/location for a requesting-side viewer; the
+  // panel must render a dash rather than an empty cell, while keeping the amount/progress)
+  @Test
+  void itemOrder_redactedOwnerLocation_rendersDash() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID entryId = UUID.randomUUID();
+    de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto redacted =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto(
+            new de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto(
+                UUID.randomUUID(), "Cirrus Optic Scope", "Behring", "WEAPON_ATTACHMENT"),
+            3,
+            1,
+            3L,
+            List.of(
+                new de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockEntryDto(
+                    entryId, 7L, null, null, null, null, 4L, 3L, false)));
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(oneLineItemOrder(orderId));
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId + "/item-stock"), anyTypeRef()))
+        .thenReturn(List.of(redacted));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).as("panel still renders").contains("data-testid=\"order-item-stock-panel\"");
+    assertThat(html).as("blanked owner/location render as a dash").contains("<td>—</td>");
+    assertThat(html).as("progress is kept on a redacted row").contains("von 4 im Bestand");
+  }
+
   // covers REQ-ORDERS-028 (empty state)
   @Test
   void itemOrder_noEarmarkedItemStock_rendersEmptyState() throws Exception {

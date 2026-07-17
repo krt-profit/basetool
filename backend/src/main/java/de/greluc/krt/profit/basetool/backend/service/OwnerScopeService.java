@@ -497,6 +497,21 @@ public class OwnerScopeService {
   }
 
   /**
+   * Delegates to {@link AccessGateService#canSeeJobOrderInventoryOwners(UUID)}: whether the caller
+   * may see the owner identity and location of the stock linked to the order (responsible-org-unit
+   * membership only, no SK-public escape — a requesting-side viewer gets owner/location redacted,
+   * REQ-ORDERS-029 / ADR-0104).
+   *
+   * @param jobOrderId the job order whose linked-inventory owner/location the caller wants to read;
+   *     never {@code null}.
+   * @return {@code true} iff the caller is a member of the order's responsible org unit (or an
+   *     admin with matching scope).
+   */
+  public boolean canSeeJobOrderInventoryOwners(@NotNull UUID jobOrderId) {
+    return accessGateService.canSeeJobOrderInventoryOwners(jobOrderId);
+  }
+
+  /**
    * Delegates to {@link AccessGateService#canEditJobOrder(UUID)}: whether the caller may edit job
    * order {@code jobOrderId} (mirrors the read path for writes).
    *

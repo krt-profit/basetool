@@ -732,8 +732,11 @@
                         <tr th:each="entry : ${group.entries}"
                             th:data-inventory-id="${entry.inventoryEntryId}"
                             th:data-version="${entry.version}">
-                            <td th:text="${entry.ownerName}"></td>
-                            <td th:text="${entry.location}"></td>
+                            <!-- Owner/location are blanked by the backend for a requesting-side
+                                 viewer of an SK-public order (REQ-ORDERS-029); render a dash so a
+                                 redacted cell reads as "hidden" rather than empty. -->
+                            <td th:text="${entry.ownerName != null ? entry.ownerName : '—'}"></td>
+                            <td th:text="${entry.location != null ? entry.location : '—'}"></td>
                             <td>
                                 <span th:text="|${#numbers.formatInteger(entry.allocatedQuantity, 1)} #{material.quantity.piece}|">1 Stück</span>
                                 <small th:if="${entry.quantity > entry.allocatedQuantity}"
