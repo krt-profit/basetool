@@ -78,6 +78,12 @@ class BlueprintProductServiceTest {
     return new BlueprintProductRow(outputName, key, manufacturer, outputItemId);
   }
 
+  private static Blueprint blueprint(String outputName) {
+    Blueprint blueprint = new Blueprint();
+    blueprint.setOutputName(outputName);
+    return blueprint;
+  }
+
   private void noneOwned() {
     when(personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(
             eq(SUB), org.mockito.ArgumentMatchers.any()))
@@ -186,6 +192,69 @@ class BlueprintProductServiceTest {
     when(blueprintRepository.findActiveProductRows("")).thenReturn(List.of());
 
     assertTrue(service.resolveByProductKey("does-not-exist").isEmpty());
+  }
+
+  @Test
+  void resolveByGameItem_nullId_returnsEmpty() {
+    assertTrue(service.resolveByGameItem(null).isEmpty());
+    verify(blueprintRepository, org.mockito.Mockito.never()).findByOutputItemId(any());
+  }
+
+  @Test
+  void resolveByGameItem_derivesProductFromTheRowsGameItem() {
+    // covers REQ-MARKET-014 — the stock-backed item-offer identity bridge: a game item resolves to
+    // the same canonical product a free-stated offer of that item would carry.
+    UUID gameItemId = UUID.randomUUID();
+    UUID outputItemId = UUID.randomUUID();
+    when(blueprintRepository.findByOutputItemId(gameItemId))
+        .thenReturn(List.of(blueprint("Arclight Pistol")));
+    when(blueprintRepository.findActiveProductRows(""))
+        .thenReturn(List.of(row("Arclight Pistol", "BP_A", "Behring", outputItemId)));
+
+    Optional<ResolvedProduct> resolved = service.resolveByGameItem(gameItemId);
+
+    assertTrue(resolved.isPresent());
+    assertEquals("arclight pistol", resolved.get().productKey());
+    assertEquals("Arclight Pistol", resolved.get().productName());
+    assertEquals(outputItemId, resolved.get().outputItemId());
+  }
+
+  @Test
+  void resolveByGameItem_multipleBlueprints_picksLowestKeyRegardlessOfRowOrder() {
+    // covers REQ-MARKET-014 / finding #3 — findByOutputItemId has no ORDER BY, so a game item
+    // produced by several active blueprints whose names normalize to different keys must resolve
+    // deterministically: the candidate keys are sorted and the lowest ("alpha widget") wins in
+    // BOTH row orders.
+    UUID itemForwardOrder = UUID.randomUUID();
+    UUID itemReverseOrder = UUID.randomUUID();
+    when(blueprintRepository.findByOutputItemId(itemForwardOrder))
+        .thenReturn(List.of(blueprint("Zeta Widget"), blueprint("Alpha Widget")));
+    when(blueprintRepository.findByOutputItemId(itemReverseOrder))
+        .thenReturn(List.of(blueprint("Alpha Widget"), blueprint("Zeta Widget")));
+    when(blueprintRepository.findActiveProductRows(""))
+        .thenReturn(
+            List.of(
+                row("Alpha Widget", "BP_ALPHA", null, null),
+                row("Zeta Widget", "BP_ZETA", null, null)));
+
+    Optional<ResolvedProduct> forward = service.resolveByGameItem(itemForwardOrder);
+    Optional<ResolvedProduct> reverse = service.resolveByGameItem(itemReverseOrder);
+
+    assertTrue(forward.isPresent());
+    assertTrue(reverse.isPresent());
+    assertEquals("alpha widget", forward.get().productKey());
+    assertEquals(
+        forward.get().productKey(),
+        reverse.get().productKey(),
+        "the derived product key is stable regardless of the DB row order");
+  }
+
+  @Test
+  void resolveByGameItem_noProducingBlueprint_returnsEmpty() {
+    UUID gameItemId = UUID.randomUUID();
+    when(blueprintRepository.findByOutputItemId(gameItemId)).thenReturn(List.of());
+
+    assertTrue(service.resolveByGameItem(gameItemId).isEmpty());
   }
 
   @Test

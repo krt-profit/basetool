@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeInterest;
@@ -689,6 +690,249 @@ class MaterialExchangeServiceTest {
     verify(auditService, never()).record(any(), any(), any(), any(), any());
   }
 
+  // ---- stock-backed item offers (design §8, REQ-MARKET-014, ADR-0108) ----
+
+  /**
+   * Releasing a game-item Lager row creates a <b>stock-backed</b> ITEM offer (REQ-MARKET-014): the
+   * offer carries the Lager row (bound to physical stock), stores the whole-unit quantity, derives
+   * its product key / display name from the row's game item via {@code resolveByGameItem}, and
+   * carries no {@code offeredAmount} — while the owner still sees the row's stock as {@code
+   * availableAmount}.
+   */
+  @Test
+  void release_gameItemRow_createsStockBackedItemOffer() {
+    // covers REQ-MARKET-014
+    GameItem gameItem = gameItem("Quantum Drive");
+    InventoryItem row = itemStockRow(owner, gameItem, 8.0);
+    UUID itemId = row.getId();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(row));
+    when(blueprintProductService.resolveByGameItem(gameItem.getId()))
+        .thenReturn(
+            Optional.of(new ResolvedProduct("quantum drive", "Quantum Drive", gameItem.getId())));
+    when(offerRepository.findByInventoryItemIdAndStatus(itemId, MaterialExchangeOfferStatus.ACTIVE))
+        .thenReturn(Optional.empty());
+    when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(interestRepository.findByOfferIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
+
+    MaterialExchangeOfferDto dto =
+        service.release(new MaterialExchangeReleaseRequest(itemId, 5.0, "gegen aUEC"));
+
+    ArgumentCaptor<MaterialExchangeOffer> captor = ArgumentCaptor.captor();
+    verify(offerRepository).saveAndFlush(captor.capture());
+    MaterialExchangeOffer saved = captor.getValue();
+    assertThat(saved.getKind()).isEqualTo(MaterialExchangeOfferKind.ITEM);
+    assertThat(saved.getInventoryItem()).as("stock-backed: bound to the Lager row").isSameAs(row);
+    assertThat(saved.getItemProductKey()).isEqualTo("quantum drive");
+    assertThat(saved.getItemName()).isEqualTo("Quantum Drive");
+    assertThat(saved.getItemQuantity()).isEqualTo(5);
+    assertThat(saved.getOfferedAmount()).as("item offers carry no offered amount").isNull();
+
+    assertThat(dto.kind()).isEqualTo(MaterialExchangeOfferKind.ITEM);
+    assertThat(dto.itemName()).isEqualTo("Quantum Drive");
+    assertThat(dto.itemQuantity()).isEqualTo(5);
+    assertThat(dto.quality()).as("item offers carry no quality").isNull();
+    assertThat(dto.availableAmount()).as("owner sees the row's stock").isEqualTo(8.0);
+  }
+
+  /** Offering more whole units than a game-item row holds is rejected (400) — nothing persisted. */
+  @Test
+  void release_gameItemRow_quantityExceedsStock_badRequest() {
+    // covers REQ-MARKET-014
+    GameItem gameItem = gameItem("Cooler");
+    InventoryItem row = itemStockRow(owner, gameItem, 3.0);
+    UUID itemId = row.getId();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(row));
+
+    assertThatThrownBy(
+            () -> service.release(new MaterialExchangeReleaseRequest(itemId, 5.0, "zu viel")))
+        .isInstanceOf(BadRequestException.class);
+    verify(offerRepository, never()).saveAndFlush(any());
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
+  }
+
+  /** A non-whole item quantity is rejected (400) — item stock is integral. */
+  @Test
+  void release_gameItemRow_fractionalQuantity_badRequest() {
+    // covers REQ-MARKET-014
+    GameItem gameItem = gameItem("Shield");
+    InventoryItem row = itemStockRow(owner, gameItem, 6.0);
+    UUID itemId = row.getId();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(row));
+
+    assertThatThrownBy(
+            () -> service.release(new MaterialExchangeReleaseRequest(itemId, 2.5, "krumm")))
+        .isInstanceOf(BadRequestException.class);
+    verify(offerRepository, never()).saveAndFlush(any());
+  }
+
+  /** A game-item row not produced by any active blueprint cannot be offered (400). */
+  @Test
+  void release_gameItemRow_noBlueprintProduct_badRequest() {
+    // covers REQ-MARKET-014
+    GameItem gameItem = gameItem("Loot Only");
+    InventoryItem row = itemStockRow(owner, gameItem, 4.0);
+    UUID itemId = row.getId();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(row));
+    when(blueprintProductService.resolveByGameItem(gameItem.getId())).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.release(new MaterialExchangeReleaseRequest(itemId, 2.0, "x")))
+        .isInstanceOf(BadRequestException.class);
+    verify(offerRepository, never()).saveAndFlush(any());
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
+  }
+
+  /**
+   * Re-releasing a game-item row that already carries an ACTIVE offer updates that same offer in
+   * place (one active offer per row via V210, REQ-MARKET-014) rather than inserting a duplicate.
+   */
+  @Test
+  void release_gameItemRow_existingActiveOffer_reReleasesInPlace() {
+    // covers REQ-MARKET-014
+    GameItem gameItem = gameItem("Power Plant");
+    InventoryItem row = itemStockRow(owner, gameItem, 10.0);
+    UUID itemId = row.getId();
+    MaterialExchangeOffer existing = stockBackedItemOffer(offerId, row, owner, 4);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(row));
+    when(blueprintProductService.resolveByGameItem(gameItem.getId()))
+        .thenReturn(Optional.of(new ResolvedProduct("prod-key", "Power Plant", gameItem.getId())));
+    when(offerRepository.findByInventoryItemIdAndStatus(itemId, MaterialExchangeOfferStatus.ACTIVE))
+        .thenReturn(Optional.of(existing));
+    when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(interestRepository.findByOfferIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
+
+    service.release(new MaterialExchangeReleaseRequest(itemId, 7.0, "mehr"));
+
+    ArgumentCaptor<MaterialExchangeOffer> captor = ArgumentCaptor.captor();
+    verify(offerRepository).saveAndFlush(captor.capture());
+    MaterialExchangeOffer saved = captor.getValue();
+    assertThat(saved).as("re-release updates the same offer").isSameAs(existing);
+    assertThat(saved.getId()).isEqualTo(offerId);
+    assertThat(saved.getItemQuantity()).isEqualTo(7);
+  }
+
+  /** The release picker returns a game-item row as an ITEM entry (PIECE unit, no quality). */
+  @Test
+  void myReleasableItems_returnsGameItemRowAsItemKind() {
+    // covers REQ-MARKET-014
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    GameItem gameItem = gameItem("Power Plant");
+    InventoryItem row = itemStockRow(owner, gameItem, 4.0);
+    when(inventoryItemRepository.findReleasableForUser(any(), any(), any()))
+        .thenReturn(List.of(row));
+    when(offerRepository.findInventoryItemIdsWithStatus(any(), any())).thenReturn(Set.of());
+
+    List<MaterialExchangeReleasableItemDto> items = boardService.myReleasableItems(null);
+
+    assertThat(items).hasSize(1);
+    MaterialExchangeReleasableItemDto dto = items.get(0);
+    assertThat(dto.kind()).isEqualTo(MaterialExchangeOfferKind.ITEM);
+    assertThat(dto.materialName()).as("item name in the display slot").isEqualTo("Power Plant");
+    assertThat(dto.quantityType()).isEqualTo(QuantityType.PIECE);
+    assertThat(dto.quality()).as("item rows have no quality").isNull();
+    assertThat(dto.amount()).isEqualTo(4.0);
+  }
+
+  /**
+   * Editing a <b>stock-backed</b> item offer changes its whole-unit quantity — this was impossible
+   * before REQ-MARKET-014: the pre-fix {@code updateOffer} unconditionally validated {@code
+   * offeredAmount} against {@code offer.getInventoryItem()}, but read the wrong field on an item
+   * offer. The new quantity is re-validated against the backing row's current stock.
+   */
+  @Test
+  void updateOffer_stockBackedItemOffer_editsQuantity() {
+    // covers REQ-MARKET-014
+    GameItem gameItem = gameItem("Cooler");
+    InventoryItem row = itemStockRow(owner, gameItem, 10.0);
+    MaterialExchangeOffer itemOffer = stockBackedItemOffer(offerId, row, owner, 6);
+    itemOffer.setVersion(2L);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(offerRepository.findById(offerId)).thenReturn(Optional.of(itemOffer));
+    when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(interestRepository.findByOfferIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
+
+    MaterialExchangeOfferDto dto =
+        service.updateOffer(offerId, new MaterialExchangeOfferUpdateRequest(9.0, "mehr", 2L));
+
+    assertThat(itemOffer.getItemQuantity()).isEqualTo(9);
+    assertThat(itemOffer.getRemark()).isEqualTo("mehr");
+    assertThat(dto.kind()).isEqualTo(MaterialExchangeOfferKind.ITEM);
+    assertThat(dto.itemQuantity()).isEqualTo(9);
+  }
+
+  /** Editing a stock-backed item offer above the backing row's current stock is rejected (400). */
+  @Test
+  void updateOffer_stockBackedItemOffer_quantityExceedsStock_badRequest() {
+    // covers REQ-MARKET-014
+    GameItem gameItem = gameItem("Cooler");
+    InventoryItem row = itemStockRow(owner, gameItem, 3.0);
+    MaterialExchangeOffer itemOffer = stockBackedItemOffer(offerId, row, owner, 3);
+    itemOffer.setVersion(1L);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(offerRepository.findById(offerId)).thenReturn(Optional.of(itemOffer));
+
+    assertThatThrownBy(
+            () ->
+                service.updateOffer(offerId, new MaterialExchangeOfferUpdateRequest(5.0, "x", 1L)))
+        .isInstanceOf(BadRequestException.class);
+    verify(offerRepository, never()).saveAndFlush(any());
+  }
+
+  /**
+   * Editing a <b>free-stated</b> item offer (no backing Lager row) changes its quantity with no
+   * stock cap — and, crucially, no longer NPEs on the null {@code inventoryItem} (the kind-aware
+   * {@code updateOffer} fix, REQ-MARKET-014).
+   */
+  @Test
+  void updateOffer_freeStatedItemOffer_editsQuantityWithoutNpe() {
+    // covers REQ-MARKET-014
+    MaterialExchangeOffer freeItem = new MaterialExchangeOffer();
+    freeItem.setId(offerId);
+    freeItem.setKind(MaterialExchangeOfferKind.ITEM);
+    freeItem.setOwner(owner);
+    freeItem.setItemProductKey("k");
+    freeItem.setItemName("Venture Helmet");
+    freeItem.setItemQuantity(3);
+    freeItem.setStatus(MaterialExchangeOfferStatus.ACTIVE);
+    freeItem.setReleasedAt(Instant.now());
+    freeItem.setVersion(1L);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(offerRepository.findById(offerId)).thenReturn(Optional.of(freeItem));
+    when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(interestRepository.findByOfferIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
+
+    MaterialExchangeOfferDto dto =
+        service.updateOffer(offerId, new MaterialExchangeOfferUpdateRequest(7.0, "mehr", 1L));
+
+    assertThat(freeItem.getItemQuantity()).isEqualTo(7);
+    assertThat(dto.itemQuantity()).isEqualTo(7);
+  }
+
+  /**
+   * The board clamps a stock-backed item offer's quantity to the backing row's current stock on
+   * read (the item sibling of the material clamp-on-read, ADR-0086/0108): an offer that stated 6 on
+   * a row since booked down to 2 shows only 2, and a non-owner never sees the row's available
+   * stock.
+   */
+  @Test
+  void detail_stockBackedItemOffer_clampsQuantityToCurrentStock() {
+    // covers REQ-MARKET-014
+    GameItem gameItem = gameItem("Shield");
+    InventoryItem row = itemStockRow(owner, gameItem, 2.0); // booked down since release
+    MaterialExchangeOffer itemOffer = stockBackedItemOffer(offerId, row, owner, 6);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(itemOffer));
+
+    MaterialExchangeOfferDto dto = boardService.detail(offerId);
+
+    assertThat(dto.itemQuantity()).as("clamped to current stock").isEqualTo(2);
+    assertThat(dto.availableAmount()).as("non-owner never sees available stock").isNull();
+  }
+
   private static User user(UUID id, String name) {
     User user = new User();
     user.setId(id);
@@ -724,6 +968,38 @@ class MaterialExchangeServiceTest {
     offer.setStatus(MaterialExchangeOfferStatus.ACTIVE);
     offer.setReleasedAt(Instant.now());
     offer.setRemark("tausche gegen **Titanium**");
+    offer.setVersion(0L);
+    return offer;
+  }
+
+  private static GameItem gameItem(String name) {
+    GameItem gameItem = new GameItem();
+    gameItem.setId(UUID.randomUUID());
+    gameItem.setName(name);
+    return gameItem;
+  }
+
+  private static InventoryItem itemStockRow(User owner, GameItem gameItem, double amount) {
+    InventoryItem item = new InventoryItem();
+    item.setId(UUID.randomUUID());
+    item.setUser(owner);
+    item.setGameItem(gameItem);
+    item.setAmount(amount);
+    return item;
+  }
+
+  private static MaterialExchangeOffer stockBackedItemOffer(
+      UUID id, InventoryItem row, User owner, int quantity) {
+    MaterialExchangeOffer offer = new MaterialExchangeOffer();
+    offer.setId(id);
+    offer.setKind(MaterialExchangeOfferKind.ITEM);
+    offer.setInventoryItem(row);
+    offer.setOwner(owner);
+    offer.setItemProductKey("prod-key");
+    offer.setItemName(row.getGameItem().getName());
+    offer.setItemQuantity(quantity);
+    offer.setStatus(MaterialExchangeOfferStatus.ACTIVE);
+    offer.setReleasedAt(Instant.now());
     offer.setVersion(0L);
     return offer;
   }

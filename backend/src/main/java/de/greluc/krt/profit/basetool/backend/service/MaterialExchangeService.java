@@ -123,18 +123,22 @@ public class MaterialExchangeService {
   private final ObjectProvider<MaterialExchangeService> selfProvider;
 
   /**
-   * Releases one of the caller's own Lager rows to the board (REQ-MARKET-002). The caller chooses
-   * the offered quantity, which may be the whole row or only a part of it (ADR-0086) but must be
-   * positive and at most the item's current stock. If an active offer already exists for the item,
-   * its offered amount, remark and release instant are updated (re-release); otherwise a new active
-   * offer is created. Owner, org unit, material and quality are all derived from the item — the
-   * caller never sets them.
+   * Releases one of the caller's own Lager rows to the board (REQ-MARKET-002/014). The row may be a
+   * <b>material</b> row — releasing a {@link MaterialExchangeOfferKind#MATERIAL} offer whose
+   * material and quality are read live from the item and whose offered quantity may be the whole
+   * row or only a part of it (ADR-0086) — or a <b>game-item</b> row — releasing a stock-backed
+   * {@link MaterialExchangeOfferKind#ITEM} offer (design §8), delegated to {@link
+   * #releaseFromItemStock(InventoryItem, MaterialExchangeReleaseRequest, UUID)}. Either way the
+   * caller-supplied {@link MaterialExchangeReleaseRequest#offeredAmount()} must be positive and at
+   * most the item's current stock, and an existing active offer for the row is re-released rather
+   * than duplicated. Owner and org unit are derived from the item — the caller never sets them.
    *
    * @param request the item id, the offered quantity and the trade remark.
    * @return the resulting offer detail (the caller is the owner, so names are included).
    * @throws NotFoundException if the item does not exist.
    * @throws AccessDeniedException if the item does not belong to the caller.
-   * @throws BadRequestException if the offered amount exceeds the item's current stock.
+   * @throws BadRequestException if the offered amount exceeds the item's current stock, or a
+   *     game-item row is not produced by any active blueprint.
    */
   @Transactional
   public MaterialExchangeOfferDto release(MaterialExchangeReleaseRequest request) {
@@ -148,6 +152,9 @@ public class MaterialExchangeService {
                         "Inventory item not found: " + request.inventoryItemId()));
     if (item.getUser() == null || !viewerId.equals(item.getUser().getId())) {
       throw new AccessDeniedException("Only the item's owner may release it to the Materialbörse.");
+    }
+    if (item.getGameItem() != null) {
+      return releaseFromItemStock(item, request, viewerId);
     }
     double offeredAmount = requireOfferableAmount(request.offeredAmount(), item);
 
@@ -178,6 +185,73 @@ public class MaterialExchangeService {
             .with("item", item.getId())
             .with("q", item.getQuality())
             .with("amt", offeredAmount)
+            .with("stock", item.getAmount())
+            .with("remarkLen", remarkLength(request.remark()))
+            .with("reRelease", reRelease));
+    return boardService.detailDto(saved, viewerId);
+  }
+
+  /**
+   * Releases a <b>game-item</b> Lager row as a stock-backed {@link MaterialExchangeOfferKind#ITEM}
+   * offer (design §8, REQ-MARKET-014, ADR-0108) — the item sibling of the material release branch
+   * of {@link #release(MaterialExchangeReleaseRequest)}. Unlike a free-stated item offer ({@link
+   * #releaseItem(MaterialExchangeItemReleaseRequest)}, craft-on-demand), a stock-backed offer is
+   * bound to the physical stock row: its offered quantity (carried in the request's {@code
+   * offeredAmount} field, interpreted as whole units) must be positive and at most the row's
+   * current stock, and its blueprint {@code productKey} + display name are derived from the row's
+   * game item via {@link BlueprintProductService#resolveByGameItem(UUID)} (the same identity a
+   * free-stated offer of the same item carries, ADR-0087). An existing active offer on the row is
+   * re-released (the V210 one-active-offer-per-row index governs stock-backed item offers too),
+   * otherwise a new one is created.
+   *
+   * @param item the caller's own game-item Lager row (ownership already checked).
+   * @param request the release payload — {@code offeredAmount} is the whole-unit quantity to offer.
+   * @param viewerId the acting owner.
+   * @return the resulting offer detail (the caller is the owner, so names are included).
+   * @throws BadRequestException if the quantity is not a positive whole number, exceeds the row's
+   *     current stock, or the game item is not produced by any active blueprint.
+   */
+  private MaterialExchangeOfferDto releaseFromItemStock(
+      InventoryItem item, MaterialExchangeReleaseRequest request, UUID viewerId) {
+    final int quantity = requireOfferableItemQuantity(request.offeredAmount(), item);
+    ResolvedProduct product =
+        blueprintProductService
+            .resolveByGameItem(item.getGameItem().getId())
+            .orElseThrow(
+                () ->
+                    new BadRequestException(
+                        "This item is not produced by any active blueprint and cannot be"
+                            + " offered."));
+
+    MaterialExchangeOffer offer =
+        offerRepository
+            .findByInventoryItemIdAndStatus(item.getId(), MaterialExchangeOfferStatus.ACTIVE)
+            .orElse(null);
+    final boolean reRelease = offer != null;
+    if (offer == null) {
+      offer = new MaterialExchangeOffer();
+      offer.setKind(MaterialExchangeOfferKind.ITEM);
+      offer.setInventoryItem(item);
+      offer.setOwner(item.getUser());
+      offer.setOwningOrgUnit(item.getOwningOrgUnit());
+      offer.setStatus(MaterialExchangeOfferStatus.ACTIVE);
+    }
+    offer.setItemProductKey(product.productKey());
+    offer.setItemName(product.productName());
+    offer.setItemQuantity(quantity);
+    offer.setRemark(request.remark());
+    offer.setReleasedAt(Instant.now());
+    MaterialExchangeOffer saved = offerRepository.saveAndFlush(offer);
+
+    auditService.record(
+        AuditEventType.MARKET_OFFER_RELEASED,
+        saved.getId(),
+        offerLabel(saved),
+        item.getUser().getId(),
+        AuditDetails.of("kind", MaterialExchangeOfferKind.ITEM)
+            .with("item", item.getId())
+            .with("product", product.productKey())
+            .with("qty", quantity)
             .with("stock", item.getAmount())
             .with("remarkLen", remarkLength(request.remark()))
             .with("reRelease", reRelease));
@@ -240,15 +314,33 @@ public class MaterialExchangeService {
 
   /**
    * Edits an existing offer's offered quantity and trade remark ("Angebot bearbeiten",
-   * REQ-MARKET-007). Only the owner may edit; the echoed version guards against a concurrent edit.
-   * The new offered amount must be positive and at most the linked item's current stock (ADR-0086).
+   * REQ-MARKET-007/014). Only the owner may edit; the echoed version guards against a concurrent
+   * edit. The edit is <b>kind-aware</b> (the item sibling of {@link
+   * #release(MaterialExchangeReleaseRequest)}), so it never dereferences a {@code null}
+   * inventoryItem on an item offer (the pre-existing defect this fixes):
+   *
+   * <ul>
+   *   <li>a {@link MaterialExchangeOfferKind#MATERIAL} offer validates the new offered amount to be
+   *       positive and at most the linked item's current stock (ADR-0086) and stores it in {@code
+   *       offeredAmount};
+   *   <li>a <b>stock-backed</b> {@link MaterialExchangeOfferKind#ITEM} offer validates the new
+   *       quantity to be a positive whole number at most the backing row's current stock
+   *       (REQ-MARKET-014) and stores it in {@code itemQuantity};
+   *   <li>a <b>free-stated</b> item offer validates only that the new quantity is a positive whole
+   *       number (it has no backing stock to cap against, REQ-MARKET-012) and stores it in {@code
+   *       itemQuantity}.
+   * </ul>
+   *
+   * <p>The request's {@code offeredAmount} field carries the SCU amount for a material offer and
+   * the whole-unit quantity for an item offer.
    *
    * @param offerId the offer to edit.
-   * @param request the new offered amount, remark and the client's last-seen version.
+   * @param request the new offered amount/quantity, remark and the client's last-seen version.
    * @return the updated offer detail.
    * @throws NotFoundException if the offer does not exist.
    * @throws AccessDeniedException if the caller is not the owner.
-   * @throws BadRequestException if the offered amount exceeds the item's current stock.
+   * @throws BadRequestException if the amount/quantity is invalid or exceeds the item's current
+   *     stock.
    */
   @Transactional
   public MaterialExchangeOfferDto updateOffer(
@@ -261,9 +353,21 @@ public class MaterialExchangeService {
     requireOwner(offer, viewerId);
     OptimisticLock.check(
         offer.getVersion(), request.version(), MaterialExchangeOffer.class, offerId);
-    double offeredAmount =
-        requireOfferableAmount(request.offeredAmount(), offer.getInventoryItem());
-    offer.setOfferedAmount(offeredAmount);
+
+    AuditDetails details;
+    if (offer.getKind() == MaterialExchangeOfferKind.ITEM) {
+      int quantity =
+          offer.getInventoryItem() != null
+              ? requireOfferableItemQuantity(request.offeredAmount(), offer.getInventoryItem())
+              : wholeItemQuantity(request.offeredAmount());
+      offer.setItemQuantity(quantity);
+      details = AuditDetails.of("kind", MaterialExchangeOfferKind.ITEM).with("qty", quantity);
+    } else {
+      double offeredAmount =
+          requireOfferableAmount(request.offeredAmount(), offer.getInventoryItem());
+      offer.setOfferedAmount(offeredAmount);
+      details = AuditDetails.of("amt", offeredAmount);
+    }
     offer.setRemark(request.remark());
     MaterialExchangeOffer saved = offerRepository.saveAndFlush(offer);
 
@@ -272,7 +376,7 @@ public class MaterialExchangeService {
         offerId,
         offerLabel(offer),
         offer.getOwner().getId(),
-        AuditDetails.of("amt", offeredAmount).with("remarkLen", remarkLength(request.remark())));
+        details.with("remarkLen", remarkLength(request.remark())));
     return boardService.detailDto(saved, viewerId);
   }
 
@@ -500,6 +604,55 @@ public class MaterialExchangeService {
               + ").");
     }
     return offered;
+  }
+
+  /**
+   * Validates a client-supplied item-offer quantity as a positive whole number — the item sibling
+   * of the positive/whole part of {@link #requireOfferableAmount(Double, InventoryItem)}
+   * (REQ-MARKET-012/014). Used directly for a free-stated item offer (no backing stock to cap
+   * against) and as the first step of {@link #requireOfferableItemQuantity(Double, InventoryItem)}.
+   * The request carries the quantity as a {@link Double}; it must round to a whole number.
+   *
+   * @param requested the client-supplied whole-unit quantity.
+   * @return the quantity as a whole int.
+   * @throws BadRequestException if the quantity is absent, below one, or not a whole number.
+   */
+  private static int wholeItemQuantity(@Nullable Double requested) {
+    if (requested == null || requested < 1.0) {
+      throw new BadRequestException("The offered item quantity must be at least one whole unit.");
+    }
+    long rounded = Math.round(requested);
+    if (Math.abs(requested - rounded) > 1e-6) {
+      throw new BadRequestException("The offered item quantity must be a whole number.");
+    }
+    return (int) rounded;
+  }
+
+  /**
+   * Validates and normalises a client-supplied item-offer quantity against a <b>stock-backed</b>
+   * item offer's backing row (design §8, REQ-MARKET-014) — the whole-unit item sibling of {@link
+   * #requireOfferableAmount(Double, InventoryItem)}: the quantity must be a positive whole number
+   * no greater than the game-item row's current stock. Enforced at release <em>and</em> edit,
+   * mirroring the material rule.
+   *
+   * @param requested the client-supplied whole-unit quantity.
+   * @param item the backing game-item Lager row whose current amount caps the offer.
+   * @return the offered quantity as a whole int.
+   * @throws BadRequestException if the quantity is not a positive whole number or exceeds the row's
+   *     current stock.
+   */
+  private static int requireOfferableItemQuantity(@Nullable Double requested, InventoryItem item) {
+    int quantity = wholeItemQuantity(requested);
+    double available = item.getAmount() == null ? 0.0 : item.getAmount();
+    if (quantity > available) {
+      throw new BadRequestException(
+          "The offered quantity exceeds the item's available stock ("
+              + quantity
+              + " > "
+              + available
+              + ").");
+    }
+    return quantity;
   }
 
   /**

@@ -213,6 +213,53 @@ class MaterialboersePageControllerMvcTest {
         .andExpect(content().string(not(containsString("Q null"))));
   }
 
+  /**
+   * A <b>stock-backed</b> item offer the viewer owns (REQ-MARKET-014) renders the edit CTA — unlike
+   * a free-stated item offer, its quantity is stock-backed so it is editable. The button carries
+   * the {@code data-kind="ITEM"} / {@code data-quantity-type="PIECE"} attributes and the item
+   * quantity as {@code data-amount}, and the template never dereferences the null {@code
+   * material()} of an item offer. The locale is pinned to English via {@code ?lang} so the
+   * assertion stays ASCII.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void page_stockBackedItemOffer_mine_rendersEditCta() throws Exception {
+    MaterialExchangeOfferDto stockBacked =
+        new MaterialExchangeOfferDto(
+            offerId,
+            "ITEM",
+            null,
+            "Quantum Drive",
+            5,
+            new UserReferenceDto(UUID.randomUUID(), "Lenoro", "Lenoro", "Lenoro", null),
+            List.of(new OrgUnitReferenceDto(UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON")),
+            true,
+            null,
+            null,
+            8.0,
+            Instant.now(),
+            "Trade for **aUEC**.",
+            0,
+            List.of(),
+            false,
+            "ACTIVE",
+            0L);
+    when(backendApiClient.get(contains("/material-exchange/offers?"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(stockBacked), 0, 200, 1, 1, List.of()));
+    when(backendApiClient.get(contains("/material-exchange/counts"), anyClass()))
+        .thenReturn(new MaterialExchangeCountsDto(1, 1));
+    when(backendApiClient.get(contains("/material-exchange/offers/"), anyClass()))
+        .thenReturn(stockBacked);
+
+    mockMvc
+        .perform(get("/materialboerse").param("lang", "en"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-mb-edit")))
+        .andExpect(content().string(containsString("data-kind=\"ITEM\"")))
+        .andExpect(content().string(containsString("data-quantity-type=\"PIECE\"")))
+        .andExpect(content().string(containsString("Quantum Drive")));
+  }
+
   /** The list fragment renders on its own for an in-place filter swap. */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")

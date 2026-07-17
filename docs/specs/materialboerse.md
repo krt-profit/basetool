@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-11.
-> **Owner area:** MARKET · **Related ADRs:** ADR-0082, ADR-0086, ADR-0087
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-17.
+> **Owner area:** MARKET · **Related ADRs:** ADR-0082, ADR-0086, ADR-0087, ADR-0101, ADR-0108
 
 # Materialbörse — material-exchange trade board
 
@@ -15,8 +15,10 @@ offer:
   free-form Markdown remark ("was suchst du im Gegenzug?"); material and quality are read **live** from
   the item, and the offered amount is the owner's stored, clamped-to-stock choice (REQ-MARKET-002);
 - an **item offer** (#1185, REQ-MARKET-012) — a **craftable item** ("an item for which a blueprint
-  exists"), which has no Lager row, so the member states the quantity explicitly and there is no
-  quality.
+  exists"). It comes in two flavours: a **free-stated** offer (no Lager row, the member states the
+  quantity, craft-on-demand) and a **stock-backed** offer (REQ-MARKET-014, ADR-0108) released from a
+  game-item Lager row, whose quantity is read/clamped against that row's stock exactly like a material
+  offer. Either way an item offer has no quality.
 
 Either way other members register interest and the anbieter takes the negotiation from there. The
 design is fixed by the DAS KARTELL design proposal `proposals/materialboerse-final.html` (locked
@@ -99,12 +101,15 @@ out it is deleted and its offer cascade-removed (no lingering zero-stock offer).
 ### REQ-MARKET-013 — Stock decrease ratchets the offer down (persisted); an increase never changes it
 
 When the Lager row backing an **active** offer is **reduced** — book-out (consume / sell / transfer),
-personal rebooking, amount edit, or job-order handover — and the stored `offeredAmount` is no longer
-covered, the offer's `offeredAmount` is **persisted down** to the row's new stock **in the same
-transaction as the decrement**, via the atomic conditional update
-`MaterialExchangeOfferRepository.clampOfferedAmountToStock` (`ACTIVE` offers only; only when
-`offeredAmount > newStock`). This is the *persisting* counterpart to the display-time clamp-on-read
-(REQ-MARKET-002, ADR-0086): the board already never *shows* more than is in stock, but without
+personal rebooking, amount edit, or job-order handover — and the stored offered quantity is no longer
+covered, it is **persisted down** to the row's new stock **in the same transaction as the decrement**,
+via an atomic conditional update (`ACTIVE` offers only; only when the stored value `> newStock`). This
+is **kind-aware** (REQ-MARKET-014, ADR-0108): a **material** offer clamps its `offeredAmount`
+(`MaterialExchangeOfferRepository.clampOfferedAmountToStock`), a **stock-backed item** offer clamps its
+whole-unit `itemQuantity` (`clampItemQuantityToStock`); both run at the same book-out / transfer /
+rebooking decrement sites in `InventoryCheckoutService` (item rows have no refinery/handover-material
+consumption path). This is the *persisting* counterpart to the display-time clamp-on-read
+(REQ-MARKET-002/014, ADR-0086): the board already never *shows* more than is in stock, but without
 persisting the reduction the stored value would silently **recover** on a later stock increase.
 
 An **increase** of the backing row never changes the offer — the conditional update is a no-op when
@@ -121,8 +126,9 @@ the new stock (book-out, transfer, rebooking, update, handover).
 - [ ] A fully booked-out row's offer is cascade-removed (unchanged from REQ-MARKET-002).
 
 **Enforced by:** `MaterialExchangeOfferClampDataTest`, `InventoryItemServiceBookOutTest` · **Code:**
-`MaterialExchangeOfferRepository#clampOfferedAmountToStock`, `InventoryCheckoutService`
-(book-out / transfer / rebooking + `clampOffersToStock`), `InventoryItemService#updateInventoryItem`,
+`MaterialExchangeOfferRepository#clampOfferedAmountToStock` / `#clampItemQuantityToStock`,
+`InventoryCheckoutService` (book-out / transfer / rebooking + `ratchetBoardOffersToStock` /
+`clampOffersToStock`), `InventoryItemService#updateInventoryItem`,
 `JobOrderHandoverService#createHandover` · **Issues:** #1182
 
 ### REQ-MARKET-003 — Signal-only
@@ -284,17 +290,25 @@ EN + base bundles, `{interessent}`/`{material}` placeholders).
 
 ### REQ-MARKET-012 — Offer a craftable item (blueprint product) with a stated quantity
 
+> This requirement describes the **free-stated** item offer (no backing Lager row). Since design §8
+> shipped, a member may instead release an item offer **from item stock** — a **stock-backed** item
+> offer whose quantity is read/clamped against a game-item Lager row exactly like a material offer
+> (REQ-MARKET-014, ADR-0108). The two are flavours of the one `ITEM` kind; everything below still holds
+> for the free-stated flavour, and the free-stated flavour remains fully supported.
+
 A member may list a **craftable item** on the board via the "Item anbieten" CTA (a second CTA beside
 "Material anbieten"). Only items **an active blueprint produces** are offerable: the item picker is
 the blueprint-product type-ahead, and the release is rejected server-side unless the chosen
 normalized `productKey` resolves through `BlueprintProductService.resolveByProductKey(...)` (#1185).
-Because an item offer has **no** backing Lager row, the member **states the quantity** (a whole
-number ≥ 1) — unlike a material offer, whose amount is read live — and there is **no quality** and
-**no location**. The offer is a discriminated kind of the same `MaterialExchangeOffer` aggregate
+Because a free-stated item offer has **no** backing Lager row, the member **states the quantity** (a
+whole number ≥ 1) — unlike a material offer, whose amount is read live — and there is **no quality**
+and **no location**. The offer is a discriminated kind of the same `MaterialExchangeOffer` aggregate
 (`kind ∈ {MATERIAL, ITEM}`, ADR-0087): it stores the resolved `productKey`, the canonical display
 name snapshotted at release, and the quantity; owner + squadron badge are stamped from the acting
-member. Item offers are **not** de-duplicated (a member may list the same item several times) — the
-V210 one-active-offer-per-Lager-row index governs only material offers. On the board, an item offer
+member. Free-stated item offers are **not** de-duplicated (a member may list the same item several
+times) — their `inventory_item_id` is `NULL`, distinct under the V210 one-active-offer-per-Lager-row
+partial-unique index, which governs material offers and stock-backed item offers (REQ-MARKET-014). On
+the board, an item offer
 renders its item name, an "Item" marker and its quantity (Stück) — no quality; a non-zero
 min-quality filter therefore excludes item offers. Every state-mutating item-offer activity reuses
 the `MARKET_*` audit events with a kind-aware, PII-free `kind`/`product`/`qty` details payload
@@ -328,6 +342,67 @@ anbieten" (item field hidden), an item offer only "Menge (Stück)" (amount field
 `itemQuantity`), `MaterialExchangeOfferRepository#findBoard`,
 `db/migration/V213__add_material_exchange_item_offers.sql`, `materialboerse.html`,
 `materialboerse-release.js`, `materialboerse.css`
+
+### REQ-MARKET-014 — Release an item offer from item stock (stock-backed item offer)
+
+Once game items are trackable as Lager stock rows (REQ-INV-029, ADR-0101), an item offer can be
+released **from item stock, analogous to a material offer** (design §8, ADR-0108) — the second flavour
+of the `ITEM` kind beside the free-stated offer (REQ-MARKET-012). The Materialbörse release picker
+("Material anbieten") returns **both** the caller's material rows and their game-item rows; picking a
+game-item row releases a **stock-backed item offer**: a `MaterialExchangeOffer` of `kind = ITEM` that
+**carries** the `inventory_item_id` (the physical stock), with:
+
+- **Quantity `<=` stock, at release and edit.** The offered `itemQuantity` is a whole number, positive
+  and at most the row's current stock — the item sibling of the material `requireOfferableAmount`
+  (REQ-MARKET-002). It is clamped to the row's stock **on read** (the board never advertises more than
+  is in stock, mirroring ADR-0086) and **ratcheted down** on every stock decrement (REQ-MARKET-013).
+- **Identity derived from the row's game item.** A stock row keys on a `GameItem`, an offer on the
+  blueprint `product_key` (ADR-0087). The release derives `itemProductKey`/`itemName` from the row's
+  game item via its blueprint product (`BlueprintProductService.resolveByGameItem`) — the same identity
+  a free-stated offer of that item carries; the catalog predicate (REQ-INV-029) guarantees it resolves.
+  The `inventory_item_id` is the physical truth, so the product-key↔item fuzziness stays a display
+  concern only.
+- **One active offer per row.** The V210 partial-unique index applies as-is (the row's non-null FK), so
+  re-releasing a game-item row re-activates its offer instead of duplicating; a full book-out deletes
+  the row and cascade-removes the offer (V210 `ON DELETE CASCADE`), so no zero-stock item offer lingers.
+- **No new schema table.** Migration V221 only **relaxes** the V213 branch-exclusivity `CHECK` so the
+  `ITEM` branch may carry `inventory_item_id` (only that half loosens; `offered_amount IS NULL` on
+  `ITEM` and the `MATERIAL` branch are unchanged) — a two-phase-safe loosening.
+- **No quality, no location.** Like every item offer, the board shows the item name + quantity (Stück),
+  no quality; a non-zero min-quality filter excludes it (a stock-backed row carries no quality either).
+
+`MaterialExchangeService.updateOffer` is **kind-aware** (fixing the pre-existing defect where it
+dereferenced a null `inventoryItem` on any item offer): a material offer validates `offeredAmount` vs
+stock, a stock-backed item offer `itemQuantity` vs stock, a free-stated item offer `itemQuantity ≥ 1`.
+The board's edit CTA is enabled for stock-backed item offers; free-stated offers stay edit-remark-only
+in the UI. Every state-mutating stock-backed item-offer activity reuses the `MARKET_*` audit events
+with a kind-aware, PII-free `kind`/`item`/`product`/`qty`/`stock` details payload (REQ-MARKET-008), and
+the location-never-exposed / interessenten-anonymity / live-sync rules are unchanged
+(REQ-MARKET-004/006/010).
+
+**Acceptance**
+- [ ] The release picker returns the caller's game-item rows as well as material rows; releasing a
+game-item row creates an `ITEM` offer with `inventory_item_id` set, `itemQuantity` ≤ the row's stock,
+and `itemProductKey`/`itemName` derived from the row's game item.
+- [ ] Releasing a quantity above the row's stock is rejected (400); a whole-number rule is enforced.
+- [ ] A second active release for the same game-item row re-activates the one offer (V210), never a
+duplicate.
+- [ ] Reducing a game-item row below its active offer's quantity ratchets `itemQuantity` down
+(book-out / transfer / rebooking); a full book-out cascade-removes the offer.
+- [ ] The board shows a stock-backed item offer's name + quantity clamped to current stock, no quality.
+- [ ] Editing an item offer works (was impossible — the pre-fix `updateOffer` NPEd on the null Lager
+row); a stock-backed edit re-validates the new quantity against current stock (400 if it exceeds it).
+- [ ] The free-stated item offer (REQ-MARKET-012) remains fully supported.
+
+**Enforced by:** `MaterialExchangeServiceTest`, `MaterialExchangeOfferClampDataTest`,
+`InventoryItemCatalogQueryDataTest`, `MaterialboersePageControllerMvcTest` · **Code:**
+`MaterialExchangeService#release`/`#releaseFromItemStock`/`#updateOffer`,
+`BlueprintProductService#resolveByGameItem`,
+`MaterialExchangeOfferRepository#clampItemQuantityToStock`/`#findBoard`,
+`InventoryItemRepository#findReleasableForUser`, `MaterialExchangeBoardService` (effective item
+quantity + releasable picker), `InventoryCheckoutService#ratchetBoardOffersToStock`,
+`db/migration/V221__relax_material_exchange_item_offer_stock_link.sql`, `materialboerse.html`,
+`materialboerse-release.js`
 
 ## Out of scope
 

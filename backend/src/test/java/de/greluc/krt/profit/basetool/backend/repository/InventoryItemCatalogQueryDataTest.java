@@ -204,17 +204,31 @@ class InventoryItemCatalogQueryDataTest {
     assertThat(page.getContent()).allSatisfy(row -> assertThat(row.getMaterial()).isNotNull());
   }
 
-  // covers REQ-INV-029 (Materialbörse releasable picker stays material-only until design §8)
+  // covers REQ-MARKET-014 (design §8 shipped: the releasable picker returns BOTH material and
+  // game-item rows via the LEFT-JOIN + COALESCE(m.name, gi.name) rewrite — the former
+  // material-only guard is dropped, and the release service branches on the picked row's kind)
   @Test
-  void findReleasableForUser_excludesItemRows() {
-    // When — the caller's releasable rows, unfiltered (the LEFT-JOIN rewrite with the explicit
-    // material guard; the pre-fix LOWER(i.material.name) inner join dropped NULL-material rows
-    // for the WRONG reason and would have leaked them once the guard was forgotten)
+  void findReleasableForUser_returnsBothMaterialAndItemRows() {
+    // When — the caller's releasable rows, unfiltered
     List<InventoryItem> releasable =
         inventoryItemRepository.findReleasableForUser(user.getId(), null, PageRequest.of(0, 50));
 
-    // Then
-    assertThat(releasable).extracting(InventoryItem::getId).containsExactly(materialRow.getId());
+    // Then — both kinds surface (item rows are no longer dropped by an implicit inner join)
+    assertThat(releasable)
+        .extracting(InventoryItem::getId)
+        .containsExactlyInAnyOrder(materialRow.getId(), itemRow.getId());
+  }
+
+  // covers REQ-MARKET-014 (the picker name filter matches the game-item name via the gi LEFT JOIN)
+  @Test
+  void findReleasableForUser_filtersByGameItemName() {
+    // When — filter by a fragment of the seeded game item's name (lower-cased %fragment%)
+    List<InventoryItem> releasable =
+        inventoryItemRepository.findReleasableForUser(
+            user.getId(), "%quantum-drive%", PageRequest.of(0, 50));
+
+    // Then — only the item row matches (the material row's name does not contain the fragment)
+    assertThat(releasable).extracting(InventoryItem::getId).containsExactly(itemRow.getId());
   }
 
   // covers REQ-INV-029/031 (Materialsammlung stays material-only; item earmarks get their own seam)
