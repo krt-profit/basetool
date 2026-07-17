@@ -107,29 +107,189 @@ class InventoryPageControllerTest {
     Model model = new ConcurrentModel();
     UUID materialId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
-        new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
+        new PageResponse<>(List.of(), 0, 50, 0, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
-    String view = controller.viewMaterialInventory(materialId, null, model);
+    String view = controller.viewMaterialInventory(materialId, null, null, null, model);
 
     assertEquals("inventory-material", view);
     assertTrue(model.containsAttribute("items"));
+    // REQ-INV-033: the drilldown is paginated — the PageResponse and the size options must reach
+    // the template so the pager + size picker render inside the results fragment.
+    assertSame(page, model.getAttribute("inventoryMaterialPage"));
+    assertEquals(List.of(50, 100, 200), model.getAttribute("pageSizes"));
     assertEquals(materialId, model.getAttribute("selectedMaterialId"));
   }
 
   @Test
-  void viewMaterialInventory_withFragmentResults_returnsOnlyTheResultsFragment() {
+  void viewMaterialInventory_forwardsPageAndWhitelistedSizeToBackend() {
+    // Given
     Model model = new ConcurrentModel();
     UUID materialId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
-        new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
+        new PageResponse<>(List.of(), 3, 100, 350, 4, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
-    // #1309: the live-sync receiver re-fetches ?fragment=results, which renders only the results
-    // table, not the whole page.
-    String view = controller.viewMaterialInventory(materialId, "results", model);
+    // When — the pager asks for page 3 with a whitelisted size.
+    controller.viewMaterialInventory(materialId, 3, 100, null, model);
+
+    // Then — both reach the backend verbatim (REQ-INV-033).
+    verify(backendApiClient)
+        .get(eq("/api/v1/inventory/material/" + materialId + "?page=3&size=100"), anyTypeRef());
+  }
+
+  @Test
+  void viewMaterialInventory_snapsOutOfListSizeBackToDefault() {
+    // Given
+    Model model = new ConcurrentModel();
+    UUID materialId = UUID.randomUUID();
+    PageResponse<InventoryItemDto> page =
+        new PageResponse<>(List.of(), 0, 50, 0, 1, Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+
+    // When — a crafted URL asks for the pre-REQ-INV-033 silent-cap size and a negative page.
+    controller.viewMaterialInventory(materialId, -1, 1000, null, model);
+
+    // Then — the size snaps back to the default and the page clamps to 0, so a crafted URL can
+    // never request an unbounded page from the backend again.
+    verify(backendApiClient)
+        .get(eq("/api/v1/inventory/material/" + materialId + "?page=0&size=50"), anyTypeRef());
+  }
+
+  @Test
+  void viewMaterialInventory_withFragmentResults_returnsFragmentWithoutCatalogFetch() {
+    Model model = new ConcurrentModel();
+    UUID materialId = UUID.randomUUID();
+    PageResponse<InventoryItemDto> page =
+        new PageResponse<>(List.of(), 1, 50, 120, 3, Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+
+    // #1309 / REQ-FE-005: the live-sync receiver and the pager re-fetch ?fragment=results, which
+    // renders only the results table, not the whole page.
+    String view = controller.viewMaterialInventory(materialId, 1, null, "results", model);
 
     assertEquals("inventory-material :: inventoryMaterialResults", view);
+    // Fragment-gating (REQ-DATA-012 rule): the swap needs only the items page — the material
+    // switcher catalog renders outside the fragment and must not be re-fetched per page click.
+    verify(backendApiClient, never()).getCached(any(), anyTypeRef());
+    verify(backendApiClient, times(1)).get(anyString(), anyTypeRef());
+  }
+
+  @Test
+  void viewGameItemInventory_shouldReturnItemPageAndForwardPaging() {
+    Model model = new ConcurrentModel();
+    UUID gameItemId = UUID.randomUUID();
+    PageResponse<InventoryItemDto> page =
+        new PageResponse<>(List.of(), 2, 100, 250, 3, Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+
+    String view = controller.viewGameItemInventory(gameItemId, 2, 100, null, model);
+
+    assertEquals("inventory-game-item", view);
+    assertTrue(model.containsAttribute("items"));
+    // REQ-INV-033: the item drilldown paginates exactly like the material sibling.
+    assertSame(page, model.getAttribute("inventoryGameItemPage"));
+    assertEquals(List.of(50, 100, 200), model.getAttribute("pageSizes"));
+    assertEquals(gameItemId, model.getAttribute("selectedGameItemId"));
+    verify(backendApiClient)
+        .get(eq("/api/v1/inventory/game-item/" + gameItemId + "?page=2&size=100"), anyTypeRef());
+  }
+
+  @Test
+  void viewGameItemInventory_snapsOutOfListSizeAndReturnsResultsFragment() {
+    Model model = new ConcurrentModel();
+    UUID gameItemId = UUID.randomUUID();
+    PageResponse<InventoryItemDto> page =
+        new PageResponse<>(List.of(), 0, 50, 0, 1, Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+
+    // Crafted 1000-size + fragment=results: the size snaps to the default and only the results
+    // fragment renders (live-sync / pager swap, REQ-FE-015).
+    String view = controller.viewGameItemInventory(gameItemId, null, 1000, "results", model);
+
+    assertEquals("inventory-game-item :: inventoryGameItemResults", view);
+    verify(backendApiClient)
+        .get(eq("/api/v1/inventory/game-item/" + gameItemId + "?page=0&size=50"), anyTypeRef());
+  }
+
+  @Test
+  void viewMaterialInventory_clampsOutOfRangePageToLastPage() {
+    // Given — a stale deep-link (or a peer's book-out) left the URL on page 5 while the material
+    // now holds a single page of 40 rows.
+    Model model = new ConcurrentModel();
+    UUID materialId = UUID.randomUUID();
+    String base = "/api/v1/inventory/material/" + materialId;
+    PageResponse<InventoryItemDto> overrun =
+        new PageResponse<>(List.of(), 5, 50, 40, 1, Collections.emptyList());
+    PageResponse<InventoryItemDto> lastPage =
+        new PageResponse<>(List.of(), 0, 50, 40, 1, Collections.emptyList());
+    when(backendApiClient.get(eq(base + "?page=5&size=50"), anyTypeRef())).thenReturn(overrun);
+    when(backendApiClient.get(eq(base + "?page=0&size=50"), anyTypeRef())).thenReturn(lastPage);
+
+    // When
+    controller.viewMaterialInventory(materialId, 5, null, null, model);
+
+    // Then — the overrun page is clamped to the last page so the viewer sees real rows + a usable
+    // pager instead of an empty stranded table (REQ-INV-033).
+    assertSame(lastPage, model.getAttribute("inventoryMaterialPage"));
+    verify(backendApiClient).get(eq(base + "?page=5&size=50"), anyTypeRef());
+    verify(backendApiClient).get(eq(base + "?page=0&size=50"), anyTypeRef());
+  }
+
+  @Test
+  void viewMaterialInventory_doesNotClampAGenuinelyEmptyMaterial() {
+    // Given — the material truly has no stock: an empty page 0 must NOT trigger a clamp re-fetch.
+    Model model = new ConcurrentModel();
+    UUID materialId = UUID.randomUUID();
+    PageResponse<InventoryItemDto> empty =
+        new PageResponse<>(List.of(), 0, 50, 0, 0, Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
+
+    // When
+    controller.viewMaterialInventory(materialId, 0, null, null, model);
+
+    // Then — exactly one fetch; the empty-state row renders (no pager) with no wasted round-trip.
+    verify(backendApiClient, times(1)).get(anyString(), anyTypeRef());
+  }
+
+  @Test
+  void viewGameItemInventory_clampsOverrunPageAndResolvesTitleFromLastPage() {
+    // Given — the item drilldown URL overran to page 3 while the item now holds one page of rows.
+    Model model = new ConcurrentModel();
+    UUID gameItemId = UUID.randomUUID();
+    String base = "/api/v1/inventory/game-item/" + gameItemId;
+    PageResponse<InventoryItemDto> overrun =
+        new PageResponse<>(List.of(), 3, 50, 20, 1, Collections.emptyList());
+    InventoryItemDto row =
+        new InventoryItemDto(
+            UUID.randomUUID(),
+            null,
+            null,
+            new InventoryGameItemReferenceDto(gameItemId, "Quantum Drive", "RSI", "VEHICLE_ITEM"),
+            null,
+            null,
+            4.0,
+            false,
+            List.of(),
+            null,
+            List.of(),
+            null,
+            null,
+            null,
+            1L,
+            null);
+    PageResponse<InventoryItemDto> lastPage =
+        new PageResponse<>(List.of(row), 0, 50, 20, 1, Collections.emptyList());
+    when(backendApiClient.get(eq(base + "?page=3&size=50"), anyTypeRef())).thenReturn(overrun);
+    when(backendApiClient.get(eq(base + "?page=0&size=50"), anyTypeRef())).thenReturn(lastPage);
+
+    // When
+    controller.viewGameItemInventory(gameItemId, 3, null, null, model);
+
+    // Then — the clamped page carries rows, so the drilldown shows stock (and its title resolves)
+    // instead of a stranded empty table with a vanished header (REQ-INV-033).
+    assertSame(lastPage, model.getAttribute("inventoryGameItemPage"));
+    assertEquals("Quantum Drive", model.getAttribute("gameItemName"));
   }
 
   @Test
