@@ -50,7 +50,7 @@ import org.springframework.web.context.WebApplicationContext;
  * with {@code th:replace}, because {@code th:replace} (precedence 1) is processed before {@code
  * th:if} (3) — a same-element combination rendered the movement modal unconditionally, so a viewer
  * with no bookable (active) account still got the hidden modal in the DOM even though the CTA
- * button that opens it was correctly hidden. Since REQ-BANK-053/ADR-0104 the account pickers search
+ * button that opens it was correctly hidden. Since REQ-BANK-053/ADR-0105 the account pickers search
  * on demand, so {@code canBook} is derived from the already-loaded dashboard's active accounts in
  * {@link BankPageController} rather than a separate {@code /api/v1/bank/accounts} preload.
  */
@@ -118,7 +118,7 @@ class BankDashboardMovementModalMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(Matchers.containsString("id=\"bank-movement-modal\"")))
         .andExpect(content().string(Matchers.containsString("bank-movement-open")))
-        // REQ-FE-017/ADR-0104: the modal's source + destination account pickers are remote-search
+        // REQ-FE-017/ADR-0105: the modal's source + destination account pickers are remote-search
         // comboboxes and preload no account roster.
         .andExpect(
             content()

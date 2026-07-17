@@ -15,7 +15,7 @@
   Used by both the account-detail page (fixed source account) and the booking-request overview
   (source-account selector). Reads the catalog lists activeHolders / holders / allOrgUnits from the
   surrounding model; the source account and the transfer destination are server-side account-search
-  comboboxes (remote-bank-accounts, REQ-FE-017/ADR-0104), so neither a movementAccounts nor a
+  comboboxes (remote-bank-accounts, REQ-FE-017/ADR-0105), so neither a movementAccounts nor a
   transferTargets roster is preloaded — they fetch matching active accounts on demand.
 
   Parameters:
@@ -74,7 +74,7 @@
                               th:text="#{bank.movement.field.sourceAccount}">Quellkonto</span>
                         <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.movement.field.sourceAccount.hint')}"></th:block>
                     </label>
-                    <!-- Server-side account search (remote-bank-accounts, REQ-FE-017, ADR-0104): the
+                    <!-- Server-side account search (remote-bank-accounts, REQ-FE-017, ADR-0105): the
                          active-account roster is no longer preloaded. Typing queries
                          /api/proxy/bank/accounts/search on demand, so the source account stays
                          reachable past the former 500-account cap. Only the placeholder is seeded;
@@ -91,7 +91,7 @@
                 </div>
 
                 <!-- Transfer destination (TRANSFER only). Server-side account search
-                     (remote-bank-accounts, REQ-FE-017, ADR-0104): the destination roster is no longer
+                     (remote-bank-accounts, REQ-FE-017, ADR-0105): the destination roster is no longer
                      preloaded — typing queries /api/proxy/bank/accounts/search on demand, so a
                      destination stays reachable past the former 500-account cap (REQ-BANK-040/-053).
                      A same-account transfer is still rejected by the backend (REQ-BANK-006). -->

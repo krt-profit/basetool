@@ -74,7 +74,7 @@ public class BankProxyController {
 
   /**
    * Server-side account search behind the {@code remote-bank-accounts} combobox source
-   * (REQ-BANK-053, REQ-FE-017, ADR-0104 — the account analogue of {@code UserProxyController}'s
+   * (REQ-BANK-053, REQ-FE-017, ADR-0105 — the account analogue of {@code UserProxyController}'s
    * user search). The combobox fetches matching <em>active</em> accounts on demand instead of
    * preloading the whole roster, so a transfer destination / grant target stays reachable past the
    * former 500-account cap. Forwards to the caller-scoped backend list ({@code

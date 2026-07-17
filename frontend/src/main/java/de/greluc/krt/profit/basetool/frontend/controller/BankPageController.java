@@ -137,7 +137,7 @@ public class BankPageController {
     // view-toggle swap never re-reads these; a successful booking re-renders the grid in place.
     // canBook (whether to offer the modal at all) is derived from the already-loaded dashboard
     // rather than a separate account fetch: the modal's source/destination account pickers are now
-    // server-side search comboboxes (REQ-FE-017, ADR-0104), so no account roster is preloaded.
+    // server-side search comboboxes (REQ-FE-017, ADR-0105), so no account roster is preloaded.
     boolean canBook =
         dashboard != null
             && dashboard.accounts() != null
@@ -149,7 +149,7 @@ public class BankPageController {
   /**
    * Assembles the shared "Kontobewegung" direct-booking modal's catalog data for the dashboard's
    * full-page render (REQ-BANK-023, #997). The modal's source account and transfer destination are
-   * server-side account-search comboboxes (remote-bank-accounts, REQ-FE-017/ADR-0104) that fetch
+   * server-side account-search comboboxes (remote-bank-accounts, REQ-FE-017/ADR-0105) that fetch
    * matching active accounts on demand, so no account roster is preloaded here (a same-account
    * transfer is still rejected by the backend, REQ-BANK-006); the holder registry, all-kinds
    * org-unit picklist and the in-game transfer-fee rate feed the modal's selectors and live fee
@@ -234,7 +234,7 @@ public class BankPageController {
             ? List.<BankHolderDto>of()
             : holders.stream().filter(BankHolderDto::active).toList());
     // The transfer-destination picker (REQ-BANK-040) on the always-present booking modal is now a
-    // server-side account-search combobox (remote-bank-accounts, REQ-FE-017/ADR-0104) that fetches
+    // server-side account-search combobox (remote-bank-accounts, REQ-FE-017/ADR-0105) that fetches
     // matching active accounts on demand, so no transfer-target roster is preloaded here; a
     // same-account transfer stays rejected by the backend (REQ-BANK-006).
     // The deposit/withdrawal counterparty picker (Einzahler / Empfänger, REQ-BANK-044) on the

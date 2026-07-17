@@ -1,4 +1,4 @@
-# ADR-0104 — Server-side bank-account search for the account pickers + real pagination for the management table
+# ADR-0105 — Server-side bank-account search for the account pickers + real pagination for the management table
 
 - **Status:** Accepted
 - **Date:** 2026-07-17

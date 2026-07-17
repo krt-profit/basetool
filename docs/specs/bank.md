@@ -2207,7 +2207,7 @@ Every bank surface that offers a **list of accounts** must scale past the former
 grant target or a managed account became **unreachable with no search, no pagination and no "more"
 indicator**. ADR-0085 plans for ~5000 members, so the bound is plausible to cross. This is the
 account-side twin of the user-picker scaling switch (REQ-FE-011, ADR-0089) and is realised two ways
-(ADR-0104):
+(ADR-0105):
 
 - **The account listing endpoint gains search + status/type filters.** `GET /api/v1/bank/accounts`
   accepts an optional case-insensitive `query` substring over **name and account number**, plus
@@ -2271,7 +2271,7 @@ seed, no roster) · **Code:** `repository/BankAccountRepository#findAllFiltered/
 `controller/BankPageController`, `controller/BankGrantsPageController`,
 `controller/BankRequestQueuePageController`, `static/js/krt-bank-account-search.js`, `static/js/bank.js`,
 `templates/fragments/bank-movement-modal.html`, `templates/bank-grants.html`,
-`templates/bank-manage.html` · **ADR:** ADR-0104 · **Issues:** —
+`templates/bank-manage.html` · **ADR:** ADR-0105 · **Issues:** —
 
 ## Out of scope
 

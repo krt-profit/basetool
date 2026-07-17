@@ -45,7 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Verifies the server-side bank-account search that backs the remote account pickers and the paged
- * management table (REQ-BANK-053, ADR-0104): the case-insensitive name/account-number substring
+ * management table (REQ-BANK-053, ADR-0105): the case-insensitive name/account-number substring
  * filter, the status and type narrowing, the grant-scoped variant, and that the bound-parameter
  * query is SQL-injection-safe. Runs against the real Testcontainers PostgreSQL so the {@code
  * LOWER(...) LIKE LOWER(CONCAT('%', :query, '%'))} predicate behaves exactly as in production.

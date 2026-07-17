@@ -1603,7 +1603,7 @@
             // A native <select> carries the mandate on the chosen <option>; the enhanced
             // remote-bank-accounts combobox is a hidden value input (no <option>s), so read the
             // mandate from window.krtBankAccountMeta — populated by the account-search source as the
-            // user searches, keyed by the committed account id (REQ-FE-017, ADR-0104).
+            // user searches, keyed by the committed account id (REQ-FE-017, ADR-0105).
             if (source.options) {
                 const option = source.options[source.selectedIndex];
                 input.required =

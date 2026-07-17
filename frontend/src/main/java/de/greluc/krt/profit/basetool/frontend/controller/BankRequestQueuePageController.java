@@ -136,7 +136,7 @@ public class BankRequestQueuePageController {
     // filter toggle or a confirm/reject swap never re-reads these; the modal books straight against
     // the chosen account.
     // The modal's source account and transfer destination are server-side account-search comboboxes
-    // (remote-bank-accounts, REQ-FE-017/ADR-0104) that fetch matching active accounts on demand, so
+    // (remote-bank-accounts, REQ-FE-017/ADR-0105) that fetch matching active accounts on demand, so
     // no account roster is preloaded here. canBook (whether to offer the modal at all) is a cheap
     // one-row existence probe against the same caller-scoped search endpoint rather than the former
     // unbounded 500-cap preload; a same-account transfer stays rejected by the backend

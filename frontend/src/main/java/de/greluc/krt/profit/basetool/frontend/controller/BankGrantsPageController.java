@@ -59,7 +59,7 @@ public class BankGrantsPageController {
    * account} (default) filters by the selected account, {@code employee} filters by the selected
    * grantee. The grant-creation modal's user picker is a server-side search combobox (#1193) and
    * its account picker + the per-account filter are server-side account-search comboboxes
-   * (remote-bank-accounts, REQ-FE-017/ADR-0104), so neither a full user roster nor a full account
+   * (remote-bank-accounts, REQ-FE-017/ADR-0105), so neither a full user roster nor a full account
    * roster is preloaded here — only the currently-filtered account is resolved for its combobox
    * seed.
    *
@@ -105,7 +105,7 @@ public class BankGrantsPageController {
     }
 
     // The per-account filter and the create modal's account picker are server-side account-search
-    // comboboxes (remote-bank-accounts, REQ-FE-017/ADR-0104), so the full account roster is no
+    // comboboxes (remote-bank-accounts, REQ-FE-017/ADR-0105), so the full account roster is no
     // longer preloaded. Only the currently-filtered account is resolved for the combobox's
     // edit-mode seed (so the box shows its name, not a raw id); a lookup failure degrades to no
     // seed (the filter then shows its "all accounts" placeholder).
