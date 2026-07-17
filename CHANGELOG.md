@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.1](https://github.com/krt-profit/basetool/releases/tag/v1.5.1) - 2026-07-17
+
 ### Fixed
 
 - **Monitoring: Der Alarm `SyncZeroItems` (UEX-/SC-Wiki-Katalogsync) feuert nicht mehr fälschlich, wenn das Backend häufiger als der Tagesrhythmus des Syncs neu startet.** Der Item-Zähler wird lazy registriert und bei jedem Neustart zurückgesetzt, sodass `increase[48h]` trotz kerngesundem Sync (z. B. ~7499 importierte Zeilen pro Lauf) 0 las und der Alarm dauerhaft feuerte; die Regel prüft jetzt einen tatsächlich beobachteten erfolgreichen Lauf (`executions_total{outcome="success"}`) im Fenster statt „letzter Erfolg < 48h" — ein echter Leer-200-Ausfall löst weiterhin aus (REQ-OBS-014).
