@@ -334,6 +334,14 @@
     font-style: italic;
 }
 
+/* REQ-FE-016: truncation hint appended when a result fills the requested cap. */
+.krt-pi-typeahead-more {
+    padding: 0.75rem 1rem;
+    color: var(--color-gray-2-text);
+    font-style: italic;
+    border-top: 1px solid var(--color-gray-3, #2a2a2a);
+}
+
 .visually-hidden {
     position: absolute !important;
     width: 1px;

@@ -611,6 +611,12 @@
             <div class="pm-matrix-wrapper">
                 <div id="pm-matrix-results">
                 <th:block th:fragment="matrixBody">
+                <!-- REQ-PROMO-001: a page walk that stopped at its safety cap means the matrix is
+                     incomplete; say so loudly (never render silent holes as "not yet evaluated").
+                     Lives inside the fragment so it survives the in-place matrix re-render. -->
+                <th:block th:if="${matrixTruncated}">
+                    <div th:replace="~{fragments/components :: alert('warning', 'promotion.manage.truncated', 'mb-1')}"></div>
+                </th:block>
                 <table class="pm-matrix">
                     <thead>
                         <tr class="pm-row-topic">
