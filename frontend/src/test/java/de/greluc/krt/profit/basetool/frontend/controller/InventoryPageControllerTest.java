@@ -241,7 +241,6 @@ class InventoryPageControllerTest {
     // Given — the material truly has no stock: an empty page 0 must NOT trigger a clamp re-fetch.
     Model model = new ConcurrentModel();
     UUID materialId = UUID.randomUUID();
-    String base = "/api/v1/inventory/material/" + materialId;
     PageResponse<InventoryItemDto> empty =
         new PageResponse<>(List.of(), 0, 50, 0, 0, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
