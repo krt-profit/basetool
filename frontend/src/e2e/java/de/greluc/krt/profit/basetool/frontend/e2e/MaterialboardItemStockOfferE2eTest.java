@@ -121,8 +121,20 @@ class MaterialboardItemStockOfferE2eTest {
         assertThat(pickerInput)
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        // Type the item name; the debounced server query returns the game-item row as an option.
-        pickerInput.fill(ITEM_NAME);
+        // Type the item name and gate on the debounced /releasable-items?q=… query it fires,
+        // so the picker list has settled before we touch it. The picker REPLACES the
+        // [data-mb-picker-list] innerHTML when that response renders; clicking an option
+        // mid-replacement detaches it, and the click retried to its 10s timeout on the
+        // timing-sensitive Firefox shard (chromium/webkit won the race). Waiting for the
+        // filtered response means the render has run and — via the JS pickerSeq guard that
+        // drops any late initial-query response — no further re-render follows, so the
+        // resolved option is stable when clicked. The modal-open query carries no q=, so the
+        // predicate matches only the typed search.
+        page.waitForResponse(
+            response ->
+                response.url().contains("/materialboerse/releasable-items")
+                    && response.url().contains("q="),
+            () -> pickerInput.fill(ITEM_NAME));
         Locator option =
             page.locator("#mb-modal [data-mb-picker-list] .krt-combobox__option")
                 .filter(new Locator.FilterOptions().setHasText(ITEM_NAME))
