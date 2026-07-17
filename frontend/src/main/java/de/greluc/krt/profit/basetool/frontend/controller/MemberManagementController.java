@@ -115,12 +115,16 @@ public class MemberManagementController {
       Model model) {
     try {
       // L-1: build the URI via UriComponentsBuilder so query-param encoding is correct and a
-      // crafted `search` cannot inject extra parameters (e.g. `foo&size=99999`).
+      // crafted `search` cannot inject extra parameters (e.g. `foo&size=99999`). The free-text
+      // `search` rides as a WebClient URI-template variable ({query}) rather than baked into the
+      // pre-encoded toUriString() output — otherwise the WebClient percent-encodes it a second time
+      // (space -> %2520), so a multi-word / umlaut member search reaches the backend mangled and
+      // matches nothing (the #371 re-encoding trap). A blank search uses the plain listing route.
+      boolean hasSearch = search != null && !search.isBlank();
       org.springframework.web.util.UriComponentsBuilder uriBuilder =
-          (search == null || search.isBlank())
-              ? org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/users")
-              : org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/users/search")
-                  .queryParam("query", search);
+          hasSearch
+              ? org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/users/search")
+              : org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/users");
       if (page != null) {
         uriBuilder.queryParam("page", page);
       }
@@ -129,8 +133,11 @@ public class MemberManagementController {
       }
       uriBuilder.queryParam("sort", "username,asc");
 
+      String uri = uriBuilder.toUriString();
       PageResponse<UserDto> pageResponse =
-          backendApiClient.get(uriBuilder.toUriString(), USER_PAGE_TYPE);
+          hasSearch
+              ? backendApiClient.get(uri + "&query={query}", USER_PAGE_TYPE, search)
+              : backendApiClient.get(uri, USER_PAGE_TYPE);
       List<UserDto> users = pageResponse == null ? null : pageResponse.content();
       model.addAttribute("users", users);
       model.addAttribute("usersPage", pageResponse);
@@ -185,14 +192,18 @@ public class MemberManagementController {
   @GetMapping("/api/search")
   @ResponseBody
   public List<UserDto> searchMembers(@RequestParam String query) {
-    // L-1: UriComponentsBuilder so the user-supplied query is properly query-param-encoded.
+    // L-1: UriComponentsBuilder so a crafted `&` cannot inject extra parameters; the free-text
+    // `query` rides as a WebClient URI-template variable ({query}) so it is percent-encoded exactly
+    // once across the frontend->backend hop. Baking the pre-encoded toUriString() value into
+    // get(String) would let the WebClient encode it a second time (space -> %2520), so a multi-word
+    // member search reached the backend mangled and matched nothing (the #371 re-encoding trap).
     String uri =
         org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/users/search")
-            .queryParam("query", query)
             .queryParam("size", 1000)
             .queryParam("sort", "username,asc")
             .toUriString();
-    PageResponse<UserDto> page = backendApiClient.get(uri, USER_PAGE_TYPE);
+    PageResponse<UserDto> page =
+        backendApiClient.get(uri + "&query={query}", USER_PAGE_TYPE, query);
     return page == null ? null : page.content();
   }
 

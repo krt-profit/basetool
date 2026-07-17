@@ -34,6 +34,8 @@
 
 ### Fixed
 
+- **Combobox-Suchen finden mehrwortige und Umlaut-Begriffe wieder: Die Nutzer-, Bankkonto-, Mitglieder-, Item- und Hangar-Suche im Frontend-Proxy waren doppelt URL-kodiert.** Ein getippter Suchbegriff mit Leerzeichen oder Umlaut (z. B. „John Doe" in der Nutzer-Combobox) wurde auf dem Weg zum Backend zweimal kodiert und traf dort verstümmelt ein, sodass die Suche nichts fand; einwortige Begriffe waren nicht betroffen. Der Begriff wird jetzt genau einmal kodiert (REQ-FE-016/017).
+
 - **Lager: Die Material- und die Item-Detailseite (`/inventory/material/{id}`, `/inventory/game-item/{id}`) blättern jetzt serverseitig durch alle Bestandszeilen statt bei 1000 Zeilen still abzuschneiden.** Bislang wurde nur eine feste Seite von 1000 Einträgen geladen und ohne Blättern angezeigt — bei mehr Zeilen waren die restlichen unsichtbar und unerreichbar. Beide Ansichten haben nun eine Seitensteuerung mit Seitengrößen 50/100/200, die die Ergebnisliste ohne Neuladen austauscht (REQ-INV-033, ADR-0104).
 
 - **Material-Detailseite: Die Preisliste zeigt jetzt garantiert alle Terminals, die das Material handeln.** Bisher wurde nur die erste Seite (max. 1000 Terminals) geladen und als vollständige Liste dargestellt, sodass alphabetisch spätere Terminals unbemerkt fehlten; die Liste wird nun seitenweise vollständig zusammengesetzt (REQ-UI-015, ADR-0105).

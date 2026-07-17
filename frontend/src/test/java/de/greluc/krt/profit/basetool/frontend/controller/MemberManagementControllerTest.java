@@ -133,18 +133,40 @@ class MemberManagementControllerTest {
     @Test
     void withSearch_routesToSearchEndpointWithQueryParam() {
       Model model = new ConcurrentModel();
-      when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(newPage(List.of()));
+      when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(newPage(List.of()));
 
       controller.listMembers("alice", null, null, null, model);
 
+      // The empty page yields no per-user SK-membership calls, so the search is the only backend
+      // GET — the free-text term rides as a single-encoded URI variable, forwarded verbatim.
       ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-      verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef());
+      ArgumentCaptor<Object> varCaptor = ArgumentCaptor.forClass(Object.class);
+      verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), varCaptor.capture());
       String uri = uriCaptor.getValue();
       assertTrue(
-          uri.startsWith("/api/v1/users/search?query=alice"),
-          "uri must start with /api/v1/users/search?query=alice, got: " + uri);
-      assertTrue(uri.endsWith("sort=username,asc"));
+          uri.startsWith("/api/v1/users/search?"), "uri must hit the search endpoint, got: " + uri);
+      assertTrue(uri.endsWith("&query={query}"), "the query rides as a URI variable, got: " + uri);
+      assertTrue(uri.contains("sort=username,asc"));
+      assertEquals("alice", varCaptor.getValue(), "the raw search term is forwarded verbatim");
       assertEquals("alice", model.getAttribute("search"));
+    }
+
+    // #1344 regression: a multi-word member search must reach the backend single-encoded (the real
+    // spaces), not double-encoded (%2520). Verify the raw value is forwarded as the URI variable.
+    @Test
+    void withMultiWordSearch_passesTermAsUriVariable() {
+      Model model = new ConcurrentModel();
+      when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(newPage(List.of()));
+
+      controller.listMembers("John Doe", null, null, null, model);
+
+      ArgumentCaptor<Object> varCaptor = ArgumentCaptor.forClass(Object.class);
+      verify(backendApiClient)
+          .get(
+              eq("/api/v1/users/search?sort=username,asc&query={query}"),
+              anyTypeRef(),
+              varCaptor.capture());
+      assertEquals("John Doe", varCaptor.getValue());
     }
 
     @Test
@@ -223,16 +245,35 @@ class MemberManagementControllerTest {
   @Test
   void searchMembers_returnsContentList() {
     PageResponse<UserDto> page = newPage(List.of(newUser("alice"), newUser("bob")));
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(page);
 
     List<UserDto> result = controller.searchMembers("ali");
 
     assertEquals(2, result.size());
   }
 
+  // The picker typeahead forwards the free-text term as a single-encoded URI variable so a
+  // multi-word query reaches the backend with real spaces (#1344 re-encoding trap).
+  @Test
+  void searchMembers_passesMultiWordQueryAsUriVariable() {
+    when(backendApiClient.get(
+            eq("/api/v1/users/search?size=1000&sort=username,asc&query={query}"),
+            anyTypeRef(),
+            eq("John Doe")))
+        .thenReturn(newPage(List.of()));
+
+    controller.searchMembers("John Doe");
+
+    verify(backendApiClient)
+        .get(
+            eq("/api/v1/users/search?size=1000&sort=username,asc&query={query}"),
+            anyTypeRef(),
+            eq("John Doe"));
+  }
+
   @Test
   void searchMembers_nullResponse_returnsNull() {
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(anyString(), anyTypeRef(), any())).thenReturn(null);
 
     assertNull(controller.searchMembers("ali"));
   }

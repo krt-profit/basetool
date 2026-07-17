@@ -96,14 +96,22 @@ public class BankProxyController {
   @GetMapping("/accounts/search")
   @PreAuthorize("isAuthenticated()")
   public List<Map<String, Object>> searchAccounts(@RequestParam(required = false) String query) {
+    // Build the URI with only the fixed (safe) filters via UriComponentsBuilder so a crafted `&`
+    // in the term cannot inject extra parameters; the free-text `query` rides as a WebClient
+    // URI-template variable ({query}) so it is percent-encoded exactly once across the
+    // frontend->backend hop. Baking the pre-encoded toUriString() value into get(String) would let
+    // the WebClient encode it a second time (space -> %2520), so a multi-word account/name search
+    // reached the backend mangled and matched nothing (the #371 re-encoding trap). A null query is
+    // normalised to the empty match-all filter, exactly as the user search proxy does.
     String uri =
         UriComponentsBuilder.fromPath("/api/v1/bank/accounts")
-            .queryParam("query", query == null ? "" : query)
             .queryParam("status", "ACTIVE")
             .queryParam("size", ACCOUNT_SEARCH_PAGE_SIZE)
             .queryParam("sort", "name,asc")
             .toUriString();
-    PageResponse<Map<String, Object>> response = backendApiClient.get(uri, ACCOUNT_SEARCH_PAGE);
+    PageResponse<Map<String, Object>> response =
+        backendApiClient.get(
+            uri + "&query={query}", ACCOUNT_SEARCH_PAGE, query == null ? "" : query);
     return response != null && response.content() != null ? response.content() : List.of();
   }
 
