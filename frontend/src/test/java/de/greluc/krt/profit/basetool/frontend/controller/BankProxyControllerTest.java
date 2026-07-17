@@ -19,17 +19,22 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class BankProxyControllerTest {
 
@@ -127,6 +132,45 @@ class BankProxyControllerTest {
 
     // Then
     verify(backendApiClient).patch("/api/v1/bank/holders/" + id, body, Map.class);
+  }
+
+  @Test
+  void searchAccounts_ShouldForwardActiveNameSortedSearch_andUnwrapContent() {
+    // Given a matching account page from the backend
+    Map<String, Object> row = Map.of("id", "acc-1", "accountNo", "KB-0001", "name", "Phoenix");
+    when(backendApiClient.get(org.mockito.ArgumentMatchers.anyString(), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(row), 0, 50, 1, 1, List.of()));
+
+    // When
+    List<Map<String, Object>> result = controller.searchAccounts("pho");
+
+    // Then — the content is unwrapped, and the forwarded URI carries the picker's fixed filters
+    assertEquals(1, result.size());
+    assertEquals("KB-0001", result.get(0).get("accountNo"));
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef());
+    String uri = uriCaptor.getValue();
+    assertTrue(uri.startsWith("/api/v1/bank/accounts"), "forwards to the account list endpoint");
+    assertTrue(uri.contains("query=pho"), "forwards the typed query");
+    assertTrue(uri.contains("status=ACTIVE"), "the picker searches active accounts only");
+    assertTrue(uri.contains("sort=name,asc"), "results are name-sorted");
+  }
+
+  @Test
+  void searchAccounts_NullQuery_matchesAll_andEmptyResponseDegradesToEmptyList() {
+    // Given a null (browse-mode) query and a null backend response
+    when(backendApiClient.get(org.mockito.ArgumentMatchers.anyString(), anyTypeRef()))
+        .thenReturn(null);
+
+    // When
+    List<Map<String, Object>> result = controller.searchAccounts(null);
+
+    // Then — the null query is normalised to an empty match-all filter and the null page degrades
+    // to an empty list (the picker shows "no matches", never throws).
+    assertEquals(List.of(), result);
+    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
+    verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef());
+    assertTrue(uriCaptor.getValue().contains("query="), "the null query is forwarded as empty");
   }
 
   @Test

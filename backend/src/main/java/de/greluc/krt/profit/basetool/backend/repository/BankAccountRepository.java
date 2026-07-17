@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.BankAccountType;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -37,8 +38,8 @@ import org.springframework.stereotype.Repository;
 
 /**
  * Spring Data repository for {@link BankAccount} rows (epic #556). Visibility filtering happens
- * here only as data-level helpers ({@link #findGrantedTo}); the authorization decision itself lives
- * in {@code BankSecurityService} (REQ-BANK-010).
+ * here only as data-level helpers ({@link #findGrantedToFiltered}); the authorization decision
+ * itself lives in {@code BankSecurityService} (REQ-BANK-010).
  */
 @Repository
 public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> {
@@ -123,33 +124,64 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> 
 
   /**
    * Pages over all accounts with the owning org unit pre-fetched — the management/admin account
-   * list (REQ-BANK-010 "sees all").
+   * list (REQ-BANK-010 "sees all") — narrowed by a case-insensitive name/account-number substring
+   * and by status/type sets (REQ-BANK-053: the server-side account search behind the remote account
+   * pickers and the paged management table). The {@code query} is a bound-parameter substring; an
+   * <strong>empty string</strong> means "no filter" (it becomes the match-all {@code LIKE '%%'},
+   * never {@code null}) — the "empty means all" convention shared with {@code
+   * UserRepository.searchScoped}. The status/type filters are IN-lists by design: callers pass the
+   * full enum set for "no filter", so the query never binds a null enum.
    *
+   * @param query the name/account-no substring, or the empty string for no text filter
+   * @param statuses the statuses to include (pass all values for "no filter")
+   * @param types the types to include (pass all values for "no filter")
    * @param pageable page, size and whitelisted sort
-   * @return one page of accounts
+   * @return one page of matching accounts
    */
-  @Override
   @EntityGraph(attributePaths = {"orgUnit"})
-  Page<BankAccount> findAll(Pageable pageable);
+  @Query(
+      """
+      SELECT a FROM BankAccount a WHERE
+      (LOWER(a.name) LIKE LOWER(CONCAT('%', :query, '%'))
+        OR LOWER(a.accountNo) LIKE LOWER(CONCAT('%', :query, '%')))
+      AND a.status IN :statuses AND a.type IN :types
+      """)
+  Page<BankAccount> findAllFiltered(
+      @Param("query") String query,
+      @Param("statuses") Set<BankAccountStatus> statuses,
+      @Param("types") Set<BankAccountType> types,
+      Pageable pageable);
 
   /**
    * Pages over exactly the accounts the given user holds a grant row on — the employee account list
-   * (REQ-BANK-009: row existence = view access).
+   * (REQ-BANK-009: row existence = view access) — narrowed exactly like {@link #findAllFiltered}
+   * (REQ-BANK-053), so an employee's remote account picker and paged table scope to their grants.
    *
    * @param userId the employee's user id
+   * @param query the name/account-no substring, or the empty string for no text filter
+   * @param statuses the statuses to include (pass all values for "no filter")
+   * @param types the types to include (pass all values for "no filter")
    * @param pageable page, size and whitelisted sort
-   * @return one page of granted accounts
+   * @return one page of matching granted accounts
    */
   @EntityGraph(attributePaths = {"orgUnit"})
   @Query(
       """
       SELECT a FROM BankAccount a WHERE a.id IN
       (SELECT g.id.accountId FROM BankAccountGrant g WHERE g.id.userId = :userId)
+      AND (LOWER(a.name) LIKE LOWER(CONCAT('%', :query, '%'))
+        OR LOWER(a.accountNo) LIKE LOWER(CONCAT('%', :query, '%')))
+      AND a.status IN :statuses AND a.type IN :types
       """)
-  Page<BankAccount> findGrantedTo(@Param("userId") UUID userId, Pageable pageable);
+  Page<BankAccount> findGrantedToFiltered(
+      @Param("userId") UUID userId,
+      @Param("query") String query,
+      @Param("statuses") Set<BankAccountStatus> statuses,
+      @Param("types") Set<BankAccountType> types,
+      Pageable pageable);
 
   /**
-   * List variant of {@link #findGrantedTo(UUID, Pageable)} for the dashboard, ordered by account
+   * Unfiltered list variant of the granted-accounts query for the dashboard, ordered by account
    * number (REQ-BANK-016). Unbounded by design — the org holds a handful of accounts and the
    * dashboard renders all of them as cards.
    *

@@ -98,7 +98,8 @@ class BankControllerSecurityTest {
 
   @Test
   void accountsList_bankEmployee_isAllowed() throws Exception {
-    when(bankAccountService.getAccounts(org.mockito.ArgumentMatchers.anyBoolean(), any(), any()))
+    when(bankAccountService.getAccounts(
+            org.mockito.ArgumentMatchers.anyBoolean(), any(), any(), any(), any(), any()))
         .thenReturn(org.springframework.data.domain.Page.empty());
     mockMvc
         .perform(
@@ -112,7 +113,8 @@ class BankControllerSecurityTest {
 
   @Test
   void accountsList_admin_passesViaHierarchy() throws Exception {
-    when(bankAccountService.getAccounts(org.mockito.ArgumentMatchers.anyBoolean(), any(), any()))
+    when(bankAccountService.getAccounts(
+            org.mockito.ArgumentMatchers.anyBoolean(), any(), any(), any(), any(), any()))
         .thenReturn(org.springframework.data.domain.Page.empty());
     mockMvc
         .perform(
@@ -139,7 +141,8 @@ class BankControllerSecurityTest {
         .andExpect(status().isForbidden());
 
     // A bank employee with the same pin set still passes (no org-unit scoping is applied).
-    when(bankAccountService.getAccounts(org.mockito.ArgumentMatchers.anyBoolean(), any(), any()))
+    when(bankAccountService.getAccounts(
+            org.mockito.ArgumentMatchers.anyBoolean(), any(), any(), any(), any(), any()))
         .thenReturn(org.springframework.data.domain.Page.empty());
     mockMvc
         .perform(
@@ -150,6 +153,89 @@ class BankControllerSecurityTest {
                         .jwt(j -> j.subject(UUID.randomUUID().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  void accountsList_forwardsSearchAndFilterParams_toTheService() throws Exception {
+    // REQ-BANK-053: the query/status/type params bind and reach the service as the escaped-here
+    // query String plus the requested status/type sets (a picker path: ACTIVE-only, CARTEL).
+    org.mockito.ArgumentCaptor<String> queryCaptor =
+        org.mockito.ArgumentCaptor.forClass(String.class);
+    @SuppressWarnings("unchecked")
+    org.mockito.ArgumentCaptor<
+            java.util.Set<de.greluc.krt.profit.basetool.backend.model.BankAccountStatus>>
+        statusCaptor = org.mockito.ArgumentCaptor.forClass(java.util.Set.class);
+    @SuppressWarnings("unchecked")
+    org.mockito.ArgumentCaptor<
+            java.util.Set<de.greluc.krt.profit.basetool.backend.model.BankAccountType>>
+        typeCaptor = org.mockito.ArgumentCaptor.forClass(java.util.Set.class);
+    when(bankAccountService.getAccounts(
+            org.mockito.ArgumentMatchers.anyBoolean(),
+            any(),
+            queryCaptor.capture(),
+            statusCaptor.capture(),
+            typeCaptor.capture(),
+            any()))
+        .thenReturn(org.springframework.data.domain.Page.empty());
+
+    mockMvc
+        .perform(
+            get("/api/v1/bank/accounts")
+                .param("query", "phoenix")
+                .param("status", "ACTIVE")
+                .param("type", "CARTEL")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(UUID.randomUUID().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
+        .andExpect(status().isOk());
+
+    org.junit.jupiter.api.Assertions.assertEquals("phoenix", queryCaptor.getValue());
+    org.junit.jupiter.api.Assertions.assertEquals(
+        java.util.EnumSet.of(de.greluc.krt.profit.basetool.backend.model.BankAccountStatus.ACTIVE),
+        statusCaptor.getValue());
+    org.junit.jupiter.api.Assertions.assertEquals(
+        java.util.EnumSet.of(de.greluc.krt.profit.basetool.backend.model.BankAccountType.CARTEL),
+        typeCaptor.getValue());
+  }
+
+  @Test
+  void accountsList_absentFilters_forwardTheFullEnumSets() throws Exception {
+    // The management table passes no status/type: the controller must forward "all" so every
+    // account (incl. CLOSED / every type) is listed rather than silently narrowing.
+    @SuppressWarnings("unchecked")
+    org.mockito.ArgumentCaptor<
+            java.util.Set<de.greluc.krt.profit.basetool.backend.model.BankAccountStatus>>
+        statusCaptor = org.mockito.ArgumentCaptor.forClass(java.util.Set.class);
+    @SuppressWarnings("unchecked")
+    org.mockito.ArgumentCaptor<
+            java.util.Set<de.greluc.krt.profit.basetool.backend.model.BankAccountType>>
+        typeCaptor = org.mockito.ArgumentCaptor.forClass(java.util.Set.class);
+    when(bankAccountService.getAccounts(
+            org.mockito.ArgumentMatchers.anyBoolean(),
+            any(),
+            any(),
+            statusCaptor.capture(),
+            typeCaptor.capture(),
+            any()))
+        .thenReturn(org.springframework.data.domain.Page.empty());
+
+    mockMvc
+        .perform(
+            get("/api/v1/bank/accounts")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(UUID.randomUUID().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
+        .andExpect(status().isOk());
+
+    org.junit.jupiter.api.Assertions.assertEquals(
+        java.util.EnumSet.allOf(
+            de.greluc.krt.profit.basetool.backend.model.BankAccountStatus.class),
+        statusCaptor.getValue());
+    org.junit.jupiter.api.Assertions.assertEquals(
+        java.util.EnumSet.allOf(de.greluc.krt.profit.basetool.backend.model.BankAccountType.class),
+        typeCaptor.getValue());
   }
 
   @Test

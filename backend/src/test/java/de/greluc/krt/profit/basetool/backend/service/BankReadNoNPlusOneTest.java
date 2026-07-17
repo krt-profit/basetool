@@ -85,9 +85,15 @@ class BankReadNoNPlusOneTest {
     bankDashboardService.getDashboard(true, managerId);
     long dashboardStatements = stats.getPrepareStatementCount();
 
-    // ... and the paged management account list
+    // ... and the paged management account list (no text/status/type filter — the full enum sets)
     stats.clear();
-    bankAccountService.getAccounts(true, managerId, PageRequest.of(0, 50));
+    bankAccountService.getAccounts(
+        true,
+        managerId,
+        null,
+        java.util.EnumSet.allOf(BankAccountStatus.class),
+        java.util.EnumSet.allOf(BankAccountType.class),
+        PageRequest.of(0, 50));
     long listStatements = stats.getPrepareStatementCount();
 
     // Then: a fixed handful of statements despite the 120 accounts (no per-account N+1)

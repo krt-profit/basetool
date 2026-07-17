@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -86,12 +87,14 @@ class BankInPlaceFragmentMvcTest {
   @WithMockUser(roles = {"BANK_MANAGEMENT"})
   void manage_fragmentManageBody_rendersPanelWithoutTheCreationModals() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
-    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
+    // The account list is paged now (REQ-BANK-053): the paged list request and the CARTEL lookup
+    // both hit /api/v1/bank/accounts?…, so a single startsWith stub feeds both.
+    when(backendApiClient.get(startsWith("/api/v1/bank/accounts?"), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(
                 List.of(account(UUID.randomUUID(), "KB-0001", "ACTIVE", "0")),
                 0,
-                500,
+                25,
                 1,
                 1,
                 Collections.emptyList()));
@@ -162,8 +165,8 @@ class BankInPlaceFragmentMvcTest {
             List.of(
                 new BankHolderDto(
                     holderId, UUID.randomUUID(), "alpha", true, BigDecimal.ZERO, false, 0L)));
-    when(backendApiClient.get(eq("/api/v1/bank/accounts?size=500"), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(self), 0, 500, 1, 1, Collections.emptyList()));
+    // No transfer-target roster is preloaded now — the destination is a server-side account-search
+    // combobox (remote-bank-accounts, REQ-FE-017/ADR-0106).
 
     mockMvc
         .perform(get("/bank/accounts/" + accountId).param("fragment", "accountBody"))
@@ -213,6 +216,10 @@ class BankInPlaceFragmentMvcTest {
         // (remote-bank-users), so it carries the marker and preloads no user roster.
         .andExpect(
             content().string(Matchers.containsString("data-krt-combobox=\"remote-bank-users\"")))
+        // REQ-FE-017/ADR-0106: the transfer-destination account picker is a server-side
+        // account-search combobox (remote-bank-accounts) and preloads no account roster.
+        .andExpect(
+            content().string(Matchers.containsString("data-krt-combobox=\"remote-bank-accounts\"")))
         .andExpect(
             content().string(Matchers.not(Matchers.containsString("id=\"bank-deposit-modal\""))));
     // The roster is fetched on demand, so the accountBody render issues no all-users lookup.
