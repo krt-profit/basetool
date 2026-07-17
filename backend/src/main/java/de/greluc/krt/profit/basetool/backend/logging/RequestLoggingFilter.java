@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.logging;
 
 import de.greluc.krt.profit.basetool.backend.config.LoggingProperties;
+import de.greluc.krt.profit.basetool.backend.config.NotificationStreamObservationPredicate;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -41,7 +42,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * keeps structured-JSON fields clean.
  *
  * <p>Slow requests (duration above {@link LoggingProperties#getSlowRequestThresholdMs()}) are
- * logged at WARN so operators can flag them in dashboards / alerting.
+ * logged at WARN so operators can flag them in dashboards / alerting. The notification SSE relay
+ * ({@value #STREAM_PATH}) is exempt from that escalation: Spring MVC books the async request's
+ * whole lifetime as the elapsed duration, so a stream held open for up to 30 minutes ({@code
+ * NotificationStreamService.EMITTER_TIMEOUT_MS}) would cross the threshold on every close and flood
+ * the access log with false-positive WARN lines. It still gets its one INFO access-log line. This
+ * is the access-log mirror of {@link NotificationStreamObservationPredicate} dropping the same
+ * endpoint from {@code http.server.requests} (REQ-OBS-001/-009).
  *
  * <p>Runs slightly earlier than {@link CorrelationIdFilter} in terms of filter order but since both
  * filters run once per request, the MDC values set by the correlation filter are still available
@@ -52,6 +59,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 @RequiredArgsConstructor
 public class RequestLoggingFilter extends OncePerRequestFilter implements Ordered {
+
+  /** Request path of the long-lived notification SSE relay, excluded from slow-request WARNs. */
+  private static final String STREAM_PATH = "/api/v1/notifications/stream";
 
   private final LoggingProperties loggingProperties;
 
@@ -69,7 +79,8 @@ public class RequestLoggingFilter extends OncePerRequestFilter implements Ordere
       int status = response.getStatus();
       String method = request.getMethod();
       String path = request.getRequestURI();
-      if (durationMs >= loggingProperties.getSlowRequestThresholdMs()) {
+      boolean slow = durationMs >= loggingProperties.getSlowRequestThresholdMs();
+      if (slow && !STREAM_PATH.equals(path)) {
         log.warn("Slow request {} {} -> {} in {} ms", method, path, status, durationMs);
       } else if (log.isInfoEnabled()) {
         log.info("{} {} -> {} in {} ms", method, path, status, durationMs);

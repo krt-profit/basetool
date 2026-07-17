@@ -46,6 +46,6 @@ public record CreateJobOrderItemLineDto(
     @NotNull UUID gameItemId,
     @NotNull UUID blueprintId,
     @NotNull @Min(1) Integer amount,
-    @Valid @Size(max = 100) List<CreateJobOrderItemMaterialDto> materials,
+    @Size(max = 100) List<@Valid CreateJobOrderItemMaterialDto> materials,
     @Nullable Integer clientLineId,
     @Nullable Integer parentClientLineId) {}
