@@ -394,7 +394,7 @@ public class AccessGateService {
    * for a Spezialkommando-processed (publicly readable) order it is {@code true} only for members
    * of the responsible SK (or admins with matching scope), never for a member of the merely
    * <em>requesting</em> squadron. A requesting-side viewer therefore still sees the order and its
-   * progress, but the fulfilling side's owner/location is redacted (ADR-0104).
+   * progress, but the fulfilling side's owner/location is redacted (ADR-0106).
    *
    * <p>For a squadron-responsible order it coincides with {@link #canSeeJobOrder(UUID)} (whose
    * squadron branch already requires {@link #canSeeSquadron(UUID)} on the responsible unit), so the

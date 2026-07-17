@@ -52,8 +52,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class NotificationService {
 
-  /** Sort properties accepted on the list endpoint; restricting them prevents unstable sorting. */
-  public static final Set<String> SORTABLE_FIELDS = Set.of("createdAt", "readAt", "read", "type");
+  /**
+   * Sort properties accepted on the list endpoint; restricting them prevents unstable sorting.
+   * {@code id} is included so {@link
+   * de.greluc.krt.profit.basetool.backend.web.PaginationUtil#createPageRequest} appends it as a
+   * deterministic tiebreaker — without it, two notifications sharing a {@code createdAt} instant
+   * could reorder between page fetches and the inbox page's load-more (REQ-NOTIF-019) would skip a
+   * row at the page boundary.
+   */
+  public static final Set<String> SORTABLE_FIELDS =
+      Set.of("id", "createdAt", "readAt", "read", "type");
 
   /** Default sort property for the list endpoint (most-recent-first when combined with DESC). */
   public static final String DEFAULT_SORT_FIELD = "createdAt";

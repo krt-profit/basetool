@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-13.
-> **Owner area:** INV · **Related ADRs:** ADR-0003, ADR-0097, ADR-0098
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-17.
+> **Owner area:** INV · **Related ADRs:** ADR-0003, ADR-0097, ADR-0098, ADR-0104
 
 # Inventory Lager — append-only entries & group-on-read
 
@@ -587,6 +587,68 @@ here is unchanged and excludes item rows.
 `InventoryItemRepository#getAggregatedInventory`,
 `InventoryAggregationService#getAggregatedInventory`, `AggregatedInventoryDto`,
 `templates/inventory-index.html` · **Issues:** —
+
+### REQ-INV-033 — Per-material and per-game-item drilldowns are paginated server-side (no silent cap)
+
+The two per-catalog drilldowns — the per-material page (`GET /inventory/material/{materialId}`) and
+its item sibling the per-game-item page (`GET /inventory/game-item/{gameItemId}`,
+[`inventory-items.md`](inventory-items.md) REQ-INV-030) — each list the individual in-scope
+inventory rows of one catalog entry. Both lists are **paginated server-side** and every row is
+reachable page by page — a drilldown must never render only a fixed-size prefix of its rows without
+saying so ([ADR-0104](../adr/0104-no-silent-caps-on-complete-list-surfaces.md); before this
+requirement each frontend page fetched a single `size=1000` slice and silently hid the rest).
+
+- **URL-driven paging.** `page` (zero-based) and `size` ride in the query string; the frontend
+  forwards them to the backend's paginated `/api/v1/inventory/material/{id}` and
+  `/api/v1/inventory/game-item/{id}` endpoints. A negative page clamps to `0`; a `size` outside the
+  whitelist `50 / 100 / 200` snaps back to the default `50`, so a crafted URL cannot request an
+  unbounded page.
+- **Overrun pages clamp to the last page.** The page index rides in the URL (history) and a
+  live-sync peer refresh re-fetches it verbatim, so a stale bookmark/deep-link or a peer's stock
+  reduction can leave the URL pointing past the last page. Because an empty out-of-range page would
+  collapse `totalPages` to `1` and hide the whole pager — stranding the viewer on an empty table
+  while rows still exist on page 0 — the controller detects a non-empty result whose requested page
+  overran and re-fetches the last page once, so the viewer always lands on real rows with a usable
+  pager (the item drilldown's title, resolved from the page's first row, likewise re-appears). A
+  genuinely empty catalog entry (`totalElements == 0`) is not re-fetched.
+- **In-place pager.** The pager and the page-size picker render **inside** the swapped results
+  fragment (the shared `fragments/pagination.html` component); a page or size click swaps the
+  fragment in place with history (REQ-FE-005, `krtFetch.bindSwap`), so the URL always names the
+  visible page and a live-sync peer refresh (REQ-FE-010/015) re-fetches exactly that page.
+- **Fragment fetches stay lean.** A `fragment=results` render fetches only the items page — the
+  material page's material-switcher catalog is full-render-only (the REQ-DATA-012 fragment-gating
+  rule); the item page carries no navigate catalog at all, and neither drilldown fetches a job-order
+  catalog (inline order re-assignment lives on the Lager stack-entry allocation chips, REQ-INV-027,
+  not on these read-only pages).
+
+**Acceptance**
+
+- [ ] With more rows than one page holds, each drilldown shows a pager; every row is reachable by
+  paging — no silently invisible remainder.
+- [ ] `page`/`size` are forwarded to the backend; an out-of-whitelist `size` (e.g. the legacy
+  `1000`) snaps back to the default `50` and a negative page clamps to `0`.
+- [ ] A request for a page past the end of a non-empty entry re-fetches the last page (real rows +
+  a usable pager), never an empty stranded table; a genuinely empty entry is not re-fetched.
+- [ ] Page and size clicks swap the results fragment in place (no full reload); the material
+  fragment render performs no material-catalog lookup.
+
+**Enforced by:** `InventoryPageControllerTest`
+(`viewMaterialInventory_forwardsPageAndWhitelistedSizeToBackend`,
+`viewMaterialInventory_snapsOutOfListSizeBackToDefault`,
+`viewMaterialInventory_withFragmentResults_returnsFragmentWithoutCatalogFetch`,
+`viewMaterialInventory_clampsOutOfRangePageToLastPage`,
+`viewMaterialInventory_doesNotClampAGenuinelyEmptyMaterial`,
+`viewGameItemInventory_shouldReturnItemPageAndForwardPaging`,
+`viewGameItemInventory_snapsOutOfListSizeAndReturnsResultsFragment`,
+`viewGameItemInventory_clampsOverrunPageAndResolvesTitleFromLastPage`),
+`InventoryPageControllerMvcTest` (`viewMaterialInventory_ShouldRenderPaginationControls`,
+`viewMaterialInventory_FragmentSwap_RendersPagerWithoutCatalogFetch`,
+`viewGameItemInventory_ShouldRenderPaginationControls`) · **Code:**
+`InventoryPageController#viewMaterialInventory` / `#viewGameItemInventory`,
+`templates/inventory-material.html`, `templates/inventory-game-item.html`,
+`static/js/inventory-material.js`, `static/js/inventory-game-item.js`, `fragments/pagination.html`,
+`InventoryItemController#getInventoryByMaterial` / `#getInventoryByGameItem` (backend paging) ·
+**Issues:** — · **ADR:** ADR-0104
 
 ## Out of scope
 

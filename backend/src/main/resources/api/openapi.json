@@ -56930,10 +56930,10 @@
           "qualityConsistentWithCatalog" : {
             "type" : "boolean"
           },
-          "catalogReferenceValid" : {
+          "missionFreeForGameItem" : {
             "type" : "boolean"
           },
-          "missionFreeForGameItem" : {
+          "catalogReferenceValid" : {
             "type" : "boolean"
           }
         },

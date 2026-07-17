@@ -53,7 +53,8 @@ live; the view-switch UI described here ships with the follow-up frontend PR (PR
 (`view=items` riding the page's query state); the item view mirrors the material tree
 (GameItem → stack → lazy entries, REQ-INV-002/005 semantics) without quality or mission
 columns and with view-scoped expansion persistence. Drilldowns are per-catalog pages
-(`/inventory/material/{id}`, `/inventory/game-item/{id}`) without a switch. The item
+(`/inventory/material/{id}`, `/inventory/game-item/{id}`) without a switch, both paginated
+server-side ([`inventory-lager.md`](inventory-lager.md) REQ-INV-033 — no silent cap). The item
 view's gameItem filter is populated only with gameItems that currently have stock rows
 in the viewer's scope — never the full catalog. The API read family carries a
 `catalog=MATERIAL|ITEM` discriminator (default `MATERIAL` — existing clients

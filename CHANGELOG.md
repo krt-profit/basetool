@@ -18,7 +18,7 @@
 
 ### Changed
 
-- **Aufträge: Bei öffentlichen SK-Aufträgen sehen Mitglieder der bestellenden Einheit Besitzer und Standort des zugeordneten Item-/Material-Bestands nicht mehr.** Auf dem Item-Bestand-Panel, der Materialsammlung und den Inventar-Detaillisten eines Auftrags werden Besitzer und Standort für Betrachter der Auftraggeber-Seite ausgeblendet („—"); Mengen, Liefer- und Herstellungsstand bleiben sichtbar. Mitglieder der bearbeitenden Einheit und Admins sehen weiterhin alles; bei staffel-eigenen Aufträgen ändert sich nichts (REQ-ORDERS-029, ADR-0104).
+- **Aufträge: Bei öffentlichen SK-Aufträgen sehen Mitglieder der bestellenden Einheit Besitzer und Standort des zugeordneten Item-/Material-Bestands nicht mehr.** Auf dem Item-Bestand-Panel, der Materialsammlung und den Inventar-Detaillisten eines Auftrags werden Besitzer und Standort für Betrachter der Auftraggeber-Seite ausgeblendet („—"); Mengen, Liefer- und Herstellungsstand bleiben sichtbar. Mitglieder der bearbeitenden Einheit und Admins sehen weiterhin alles; bei staffel-eigenen Aufträgen ändert sich nichts (REQ-ORDERS-029, ADR-0106).
 
 - **Material- und Ortsauswahl laufen jetzt überall über eine durchsuchbare Combobox mit Server-Suche statt über ein einfaches Dropdown.** Betroffen sind das Einbuchen-Formular (Material + Ort), die Materialzeilen beim Anlegen und Bearbeiten von Aufträgen, die Eingangsmaterial-Auswahl beim Anlegen und Bearbeiten von Raffinerieaufträgen, der Ziel-Ort im Umbuchen-Dialog, die Materialnavigation der Lager-Detailseite und die Admin-Materialaliasse. Tippen sucht wie bei den Nutzer- und Item-Suchfeldern direkt auf dem Server — dadurch bleibt jeder Eintrag unabhängig von der Kataloggröße auffindbar und die Seiten müssen den Katalog nicht mehr komplett einbetten (REQ-FE-016, ADR-0100).
 
@@ -26,9 +26,17 @@
 
 ### Fixed
 
+- **Lager: Die Material- und die Item-Detailseite (`/inventory/material/{id}`, `/inventory/game-item/{id}`) blättern jetzt serverseitig durch alle Bestandszeilen statt bei 1000 Zeilen still abzuschneiden.** Bislang wurde nur eine feste Seite von 1000 Einträgen geladen und ohne Blättern angezeigt — bei mehr Zeilen waren die restlichen unsichtbar und unerreichbar. Beide Ansichten haben nun eine Seitensteuerung mit Seitengrößen 50/100/200, die die Ergebnisliste ohne Neuladen austauscht (REQ-INV-033, ADR-0106).
+
 - **Admin: Die Katalog-Seiten (Materialien, Orte, Missionsdaten, Spezialkommandos, Systemeinstellungen, UEX-Daten, Schiffsdaten) zeigen jetzt garantiert alle Einträge statt nur der ersten 1000 bzw. 10000.** Die Controller laden den Katalog seitenweise vollständig; die UEX-Zusammenfassungs-Chips zählen über die vom Backend gemeldete Gesamtzahl, und sollte das Sicherheitslimit beim Laden je erreicht werden, erscheint ein deutlicher Warnhinweis statt einer stillschweigend unvollständigen Liste (REQ-ADMIN-001/002, ADR-0102).
 
 - **Die gecachten Referenzkataloge des Frontends (Staffel-/SK-Umschalter in der Seitenleiste, Material-, Orts-, Schiffstyp- und Terminal-Auswahlen, Materialpreis-Matrix) laden jetzt ebenfalls garantiert alle Einträge statt einer einzelnen begrenzten Seite.** Der Cache holt solche Kataloge seitenweise vollständig, bevor er sie ablegt — ein über die bisherige Grenze hinaus gewachsener Katalog kann dadurch nicht mehr app-weit still abgeschnitten ausgeliefert werden (REQ-ADMIN-003, ADR-0103).
+
+- **Beförderung: Die Bewertungsmatrix in der Bewertungsverwaltung zeigt jetzt garantiert alle Mitglieder und alle Bewertungen.** Bewertungen wachsen multiplikativ (Mitglieder × Kategorien); bisher wurden Mitglieder und Bewertungen in je einer begrenzten Anfrage geladen, sodass jenseits der Grenze Zellen fehlten und wie „noch nicht bewertet" aussahen. Beide Achsen werden nun seitenweise vollständig geladen; sollte das Sicherheitslimit je greifen, erscheint ein deutlicher Warnhinweis statt einer stillschweigend lückenhaften Matrix (REQ-PROMO-001, ADR-0102).
+
+- **Benachrichtigungen: Die Benachrichtigungsseite deckelt die Liste nicht mehr stillschweigend bei den neuesten 50.** Bei mehr als 50 Benachrichtigungen zeigt die Seite jetzt einen Hinweis „neueste N von M" und eine „Mehr laden"-Schaltfläche, die die nächste Seite direkt nachlädt, statt die neuesten 50 als vollständigen Posteingang auszugeben (REQ-NOTIF-019).
+
+- **Mein Inventar: Die Standortsuche weist im Durchstöbern-Modus jetzt auf weitere Treffer hin.** Bei leerer Eingabe liefert die UEX-Standortsuche bis zu 2000 Orte; füllt eine Antwort diese Grenze, hängt die Liste nun den Hinweis „Weitere Treffer vorhanden – Suche verfeinern" an, statt die gekappte Liste als vollständig darzustellen (REQ-FE-016).
 
 - **Aufträge: Der scmdb.net-Import füllt die Mengenfelder wieder zuverlässig.** Der Import suchte die Mengenfelder noch als `input[type="number"]`, obwohl sie seit der SCU-Dezimal-Umstellung Textfelder sind — gefundene Materialien wurden dadurch ohne Menge eingetragen und der Import brach still ab.
 

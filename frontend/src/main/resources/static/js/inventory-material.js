@@ -18,10 +18,12 @@
  */
 
 /*
- * Per-material inventory drilldown page module (templates/inventory-material.html). Joins the shared
- * "inventory" live-sync room (REQ-FE-010, #1309) so a peer's stock change anywhere re-fetches this
- * read-only drilldown's results table in place, without a reload. The page has no mutations of its
- * own, so it only receives.
+ * Per-material inventory drilldown page module (templates/inventory-material.html). Binds the
+ * in-place pager for the server-side paginated results table (REQ-INV-033) so a page/size click
+ * swaps the results fragment in place with history, and joins the shared "inventory" live-sync
+ * room (REQ-FE-010, #1309) so a peer's stock change anywhere re-fetches this read-only drilldown's
+ * results table in place, without a reload. The page has no mutations of its own, so it only
+ * receives.
  */
 
 // Single source of truth for the receiver map + the parity test; the one key mirrors the
@@ -31,6 +33,12 @@ const INVENTORY_MATERIAL_SECTIONS = {
 };
 
 document.addEventListener('DOMContentLoaded', function () {
+    if (window.krtFetch) {
+        // In-place pager + page-size picker (REQ-INV-033): paging swaps the results fragment in
+        // place with history, so the URL always names the visible page and the live-sync refresh
+        // below re-fetches exactly that page.
+        window.krtFetch.bindSwap({ container: '#inventory-material-results', history: true });
+    }
     if (
         window.krtLiveSync &&
         typeof window.krtLiveSync.createReceiver === 'function' &&
