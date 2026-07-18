@@ -297,8 +297,17 @@
         </div>
 
         <div class="bulk-checkout-bar" id="bulkCheckoutBar">
+            <!-- "Alle markieren" (REQ-INV-034): selects every entry of the current filtered view —
+                 across collapsed stacks and pagination — by fetching all matching entry ids from
+                 /inventory/my/entry-ids, so the user need not expand and tick each one before
+                 "Markierte ausbuchen". Toggles to "Auswahl aufheben" once a full selection is on. -->
+            <button type="button" id="bulkSelectAllBtn" class="btn btn-ghost"
+                    data-state="off"
+                    th:data-text-select="#{inventory.bulk.selectAll}"
+                    th:data-text-clear="#{inventory.bulk.selectAll.clear}"
+                    th:text="#{inventory.bulk.selectAll}"
+                    data-trigger="inv-my-select-all">Alle markieren</button>
             <button type="button" id="bulkCheckoutBtn" class="btn btn-ghost" disabled
-                   
                     th:text="#{inventory.bulk.checkout.btn}"
                     data-trigger="inv-my-open-bulk">Markierte ausbuchen</button>
             <span id="bulkCheckoutCount" class="krtm-color-var-color-gray-2-font-size-0-9rem-cdef"></span>
@@ -694,7 +703,8 @@
         errorForbidden: /*[[#{inventory.bulk.checkout.error.forbidden}]]*/ 'Keine Berechtigung f\u00fcr einen oder mehrere Eintr\u00e4ge.',
         errorNotFound: /*[[#{inventory.bulk.checkout.error.notfound}]]*/ 'Ein oder mehrere Eintr\u00e4ge wurden nicht gefunden.',
         errorConflict: /*[[#{inventory.bulk.checkout.error.conflict}]]*/ 'Konflikt bei der Massenausbuchung. Bitte lade die Seite neu.',
-        modalMessage: /*[[#{inventory.bulk.checkout.modal.message}]]*/ 'Sollen die {0} markierten Eintr\u00e4ge vollst\u00e4ndig ausgebucht werden?'
+        modalMessage: /*[[#{inventory.bulk.checkout.modal.message}]]*/ 'Sollen die {0} markierten Eintr\u00e4ge vollst\u00e4ndig ausgebucht werden?',
+        selectAllFailed: /*[[#{inventory.bulk.selectAll.error}]]*/ 'Die Eintr\u00e4ge konnten nicht ermittelt werden.'
     };
 
     // #577 part 2: the single book-out and the bulk-checkout now save in place through the shared

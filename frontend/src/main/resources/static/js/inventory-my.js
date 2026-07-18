@@ -67,22 +67,36 @@ function bulkGroupSelector(groupCb) {
     );
 }
 
+// Source of truth for the bulk selection (REQ-INV-034): the ids the user has picked, kept in a Set
+// that is DECOUPLED from the lazily-loaded leaf checkboxes so "Alle markieren" can select entries in
+// still-collapsed stacks and beyond a stack's first page. A loaded checkbox's checked state is
+// derived from this set (applyBulkSelectionToLoaded); the bulk-checkout reads the set directly.
+const bulkSelectedIds = new Set();
+
+// The bulk selection as a plain array — what the bulk-checkout modal + POST consume. Kept under the
+// original name so the modal-open / execute call sites are unchanged.
 function getCheckedItemIds() {
-    const boxes = document.querySelectorAll('.inventory-item-checkbox:checked');
-    const ids = [];
-    boxes.forEach(function (cb) {
-        ids.push(cb.getAttribute('data-id'));
+    return Array.from(bulkSelectedIds);
+}
+
+// Reflects the current selection onto the checkboxes inside `root` (the whole document, or a freshly
+// injected stack fragment): a box is checked exactly when its entry id is in the selection set.
+function applyBulkSelectionToLoaded(root) {
+    (root || document).querySelectorAll('.inventory-item-checkbox').forEach(function (cb) {
+        const id = cb.getAttribute('data-id');
+        cb.checked = !!id && bulkSelectedIds.has(id);
     });
-    return ids;
 }
 
 function updateBulkCheckoutState() {
-    const ids = getCheckedItemIds();
+    const count = bulkSelectedIds.size;
     const btn = document.getElementById('bulkCheckoutBtn');
     const countSpan = document.getElementById('bulkCheckoutCount');
-    if (btn) btn.disabled = ids.length === 0;
-    if (countSpan) countSpan.textContent = ids.length > 0 ? '(' + ids.length + ')' : '';
-    // Update group-select-all checkboxes
+    if (btn) btn.disabled = count === 0;
+    if (countSpan) countSpan.textContent = count > 0 ? '(' + count + ')' : '';
+    // Update group-select-all checkboxes — they mirror only their currently-loaded leaf boxes (a
+    // collapsed group has none loaded, so it stays unchecked even under a view-wide select-all; the
+    // authoritative total is the count span).
     document.querySelectorAll('.group-select-all').forEach(function (groupCb) {
         const groupBoxes = document.querySelectorAll(bulkGroupSelector(groupCb));
         let allChecked = groupBoxes.length > 0;
@@ -98,12 +112,124 @@ function updateBulkCheckoutState() {
     });
 }
 
+// A single leaf checkbox was toggled by hand: sync the set, then reconcile the derived UI.
+function onEntryCheckboxToggle(cb) {
+    const id = cb.getAttribute('data-id');
+    if (id) {
+        if (cb.checked) bulkSelectedIds.add(id);
+        else bulkSelectedIds.delete(id);
+    }
+    syncSelectAllButtonToSelection();
+    updateBulkCheckoutState();
+}
+
 function toggleGroupCheckboxes(groupCb) {
     const groupBoxes = document.querySelectorAll(bulkGroupSelector(groupCb));
     groupBoxes.forEach(function (cb) {
         cb.checked = groupCb.checked;
+        const id = cb.getAttribute('data-id');
+        if (id) {
+            if (groupCb.checked) bulkSelectedIds.add(id);
+            else bulkSelectedIds.delete(id);
+        }
     });
+    syncSelectAllButtonToSelection();
     updateBulkCheckoutState();
+}
+
+// ── "Alle markieren" — select every entry of the current filtered view (REQ-INV-034) ───────────
+// The grouped tree lazy-loads and paginates each stack, so ticking only the on-screen boxes would
+// silently miss collapsed stacks and later pages. This fetches the complete matching id set from the
+// /inventory/my/entry-ids proxy (same filter surface as the table) and drives the selection from it,
+// so the follow-up "Markierte ausbuchen" spans the whole filtered view. The button is a toggle:
+// while a selection is active it reads "Auswahl aufheben" and clears instead.
+let bulkSelectAllInFlight = false;
+
+// Swaps the toggle button between its "select all" and "clear selection" labels + data-state.
+function setSelectAllButtonState(on) {
+    const btn = document.getElementById('bulkSelectAllBtn');
+    if (!btn) return;
+    btn.setAttribute('data-state', on ? 'on' : 'off');
+    const label = btn.getAttribute(on ? 'data-text-clear' : 'data-text-select');
+    if (label) btn.textContent = label;
+}
+
+// Once the selection is empty (e.g. the user unticked the last box) the toggle must fall back to its
+// "select all" label so it never sits on "clear" with nothing to clear.
+function syncSelectAllButtonToSelection() {
+    if (bulkSelectedIds.size === 0) setSelectAllButtonState(false);
+}
+
+// Clears the whole bulk selection and resets the derived UI + toggle label.
+function clearBulkSelection() {
+    bulkSelectedIds.clear();
+    applyBulkSelectionToLoaded(document);
+    setSelectAllButtonState(false);
+    updateBulkCheckoutState();
+}
+
+// Builds the /inventory/my/entry-ids request from the page's own filter state + active view, exactly
+// as filterMyInventory builds the table fragment URL, so the returned id set matches what the table
+// shows. Resolves to the array of matching entry ids.
+function fetchAllMatchingEntryIds() {
+    const itemsView = lagerIsItemsView();
+    const activeMaterials = collectMyChecked('matCheck');
+    const activeGameItems = collectMyChecked('gameItemCheck');
+    const activeJobOrders = collectMyChecked('jobOrderCheck');
+    const activeMissions = collectMyChecked('missionCheck');
+    const minQualitySelect = document.getElementById('minQuality');
+    const minQuality = minQualitySelect ? minQualitySelect.value : '';
+    const personalOnly = personalFlagChecked('personalOnly', 'itemPersonalOnly');
+    const nonPersonalOnly = personalFlagChecked('nonPersonalOnly', 'itemNonPersonalOnly');
+
+    const url = new URL(window.location.origin + '/inventory/my/entry-ids');
+    if (itemsView) url.searchParams.append('view', 'items');
+    activeMaterials.forEach((m) => url.searchParams.append('materialIds', m));
+    activeGameItems.forEach((g) => url.searchParams.append('gameItemIds', g));
+    if (minQuality) url.searchParams.append('minQuality', minQuality);
+    activeJobOrders.forEach((j) => url.searchParams.append('jobOrderIds', j));
+    activeMissions.forEach((m) => url.searchParams.append('missionIds', m));
+    if (personalOnly) url.searchParams.append('personalOnly', 'true');
+    if (nonPersonalOnly) url.searchParams.append('nonPersonalOnly', 'true');
+
+    return fetch(url, {
+        method: 'GET',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+    }).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+    });
+}
+
+async function toggleSelectAllInView() {
+    const btn = document.getElementById('bulkSelectAllBtn');
+    // Already selected → this click clears the selection instead.
+    if (btn && btn.getAttribute('data-state') === 'on') {
+        clearBulkSelection();
+        return;
+    }
+    if (bulkSelectAllInFlight) return;
+    bulkSelectAllInFlight = true;
+    if (btn) btn.disabled = true;
+    try {
+        const ids = await fetchAllMatchingEntryIds();
+        bulkSelectedIds.clear();
+        (Array.isArray(ids) ? ids : []).forEach(function (id) {
+            if (id) bulkSelectedIds.add(String(id));
+        });
+        applyBulkSelectionToLoaded(document);
+        setSelectAllButtonState(bulkSelectedIds.size > 0);
+        updateBulkCheckoutState();
+    } catch (e) {
+        console.error('Failed to select all inventory entries', e);
+        if (typeof window.showFrontendErrorToast === 'function') {
+            window.showFrontendErrorToast(bulkI18n.selectAllFailed);
+        }
+    } finally {
+        bulkSelectAllInFlight = false;
+        if (btn) btn.disabled = false;
+    }
 }
 
 function openBulkCheckoutModal() {
@@ -160,14 +286,8 @@ async function executeBulkCheckout() {
             if (typeof window.showFrontendSuccessToast === 'function') {
                 window.showFrontendSuccessToast(bulkI18n.success.replace('{0}', ids.length));
             }
-            const bulkBtn = document.getElementById('bulkCheckoutBtn');
-            const bulkCount = document.getElementById('bulkCheckoutCount');
-            if (bulkBtn) {
-                bulkBtn.disabled = true;
-            }
-            if (bulkCount) {
-                bulkCount.textContent = '';
-            }
+            // filterMyInventory() re-swaps the table and clears the bulk selection (set, count,
+            // button + toggle label) at its start, so no manual reset is needed here.
             filterMyInventory();
             broadcastInventoryChanged();
             broadcastOrdersChanged(affectedOrderIds);
@@ -287,6 +407,14 @@ function filterMyInventory() {
     // active view, so a filter change, a modal write and a live-sync peer refresh all re-render
     // whichever view (Material or Items) is on screen. Only the active view's filter form exists
     // in the DOM, so the class-driven collections of the other view are simply empty.
+    //
+    // The grouped table is swapped wholesale here (filter change, post-write refresh, or a live-sync
+    // peer refresh), so the freshly rendered leaf checkboxes come back unchecked. Reset the bulk
+    // selection to match (REQ-INV-034): keeping stale ids across a re-render would let a bulk
+    // check-out target an entry a peer already removed (backend 404) or an entry no longer in the
+    // filtered view. "Alle markieren" itself does not re-swap the table, so a live selection survives
+    // drill-down expansion.
+    clearBulkSelection();
     const itemsView = lagerIsItemsView();
     const activeMaterials = collectMyChecked('matCheck');
     const activeGameItems = collectMyChecked('gameItemCheck');
@@ -706,7 +834,10 @@ function loadStackEntries(headerRow, page) {
             if (typeof window.krtEnhanceComboboxes === 'function') {
                 window.krtEnhanceComboboxes(content);
             }
-            // Newly injected checkboxes must be reflected in the bulk-checkout state.
+            // Reflect the current bulk selection on the freshly injected checkboxes (REQ-INV-034):
+            // a stack expanded after "Alle markieren" (or after ticking others) must come up already
+            // checked, and the count/group state must stay consistent.
+            applyBulkSelectionToLoaded(content);
             updateBulkCheckoutState();
         })
         .catch(function (e) {
@@ -1629,7 +1760,10 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('change', 'inv-my-toggle-group-cb', function (el) {
         toggleGroupCheckboxes(el);
     });
-    window.krtEvents.on('change', 'inv-my-update-bulk-state', updateBulkCheckoutState);
+    window.krtEvents.on('change', 'inv-my-update-bulk-state', function (el) {
+        onEntryCheckboxToggle(el);
+    });
+    window.krtEvents.on('click', 'inv-my-select-all', toggleSelectAllInView);
     // Variante C allocation chips (REQ-INV-027).
     window.krtEvents.on('click', 'inv-my-assoc-add-open', function (el) {
         const split = el.closest('.assoc-split');

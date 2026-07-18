@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Mein Lager: Ein Button „Alle markieren" vor „Markierte ausbuchen" wählt alle Einträge der aktuellen Ansicht aus.** In „Mein Lager" (`/inventory/my`, Material- und Items-Ansicht) markiert der Button jeden Eintrag der aktuellen Filteransicht — auch in eingeklappten Stapeln und über die Seitenblätterung hinweg —, sodass man vor „Markierte ausbuchen" nicht mehr jeden Eintrag einzeln anhaken muss; ein erneuter Klick hebt die Auswahl wieder auf (REQ-INV-034).
+
 ## [v1.5.1](https://github.com/krt-profit/basetool/releases/tag/v1.5.1) - 2026-07-17
 
 ### Fixed
