@@ -575,6 +575,10 @@ x-ingest: &ingest-template
     # Public frontend URL the extractor's browser is sent to (…?handoff=<id>). Override per
     # deployment in .env; the local dev stack should point this at http://localhost:18081.
     FRONTEND_URL: ${IRI_FRONTEND_PUBLIC_URL:-https://profit-base.online}
+    # One-time browser handoff lifetime (REQ-INGEST-003). 30m by default: staging happens on Send,
+    # but opening the pre-filled page is a separate manual click afterwards, so a shorter window
+    # expired before pickup for slower users ("Import-Link abgelaufen"). Tune via .env if needed.
+    APP_INGEST_HANDOFF_TTL: ${IRI_INGEST_HANDOFF_TTL:-PT30M}
     REDIS_HOST: redis
     REDIS_PORT: 6379
     REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}

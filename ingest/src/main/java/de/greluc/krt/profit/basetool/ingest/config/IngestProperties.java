@@ -65,10 +65,15 @@ public class IngestProperties {
   @NotBlank private String blueprintPath = "/personal-inventory/blueprints";
 
   /**
-   * Lifetime of a staged handoff entry in Redis. Short by design — the browser picks the draft up
-   * within seconds of the device-grant approval; an unconsumed entry expires (REQ-INGEST-003).
+   * Lifetime of a staged handoff entry in Redis (REQ-INGEST-003). Kept short by design, but 30
+   * minutes rather than the original 5: staging happens the moment the user clicks Send in the
+   * extractor, whereas opening the pre-filled basetool page is a <em>separate</em> manual click
+   * (plus a possible full browser login), so a 5-minute window could expire before pickup for a
+   * slower user and surfaced as "Import-Link abgelaufen oder ungültig" on every send. The entry
+   * stays single-use and per-subject scoped, so the longer window does not relax the replay / IDOR
+   * guarantees. Overridable via the {@code APP_INGEST_HANDOFF_TTL} environment variable.
    */
-  @NotNull private Duration handoffTtl = Duration.ofMinutes(5);
+  @NotNull private Duration handoffTtl = Duration.ofMinutes(30);
 
   /**
    * Hard upper bound on an accepted ingest payload, in bytes. Mirrors the frontend proxy's

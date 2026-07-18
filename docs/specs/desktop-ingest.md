@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-27.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-18.
 > **Owner area:** INGEST · **Related ADRs:** [ADR-0018](../adr/0018-desktop-ingest-gateway-device-grant.md) · **Related:** epic [#639](https://github.com/krt-profit/basetool/issues/639), runbook [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md), [`refinery-screenshot-import.md`](refinery-screenshot-import.md) (`REQ-REFINERY-018`), [`security-and-access.md`](security-and-access.md), [`api-conventions.md`](api-conventions.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md)
 
 # Desktop one-click ingest (send-to-basetool)
@@ -95,11 +95,24 @@ device-grant client per [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md
 
 The non-persisted draft returned by the backend is staged in Redis under a key derived from
 `(sub, handoffId)`. The `handoffId` is cryptographically unguessable (≥ 128 bits of
-entropy). The entry has a short TTL (~5 minutes) and is **single-use**: the first successful
+entropy). The entry has a short TTL (~30 minutes) and is **single-use**: the first successful
 read for the correct `sub` consumes (deletes) it. A second read, a wrong `sub`, an expired
 entry, or an unknown id all return "not found" with no draft. No screenshots and no raw
 image bytes are ever staged — only the already-matched draft DTO (ADR-0007/0008: images
 never leave the machine).
+
+The TTL is deliberately longer than the "picked up within seconds" happy path would suggest:
+staging happens the moment the user clicks Send, but opening the pre-filled page is a **separate
+manual click** in the extractor (plus a possible full browser login) *after* staging, so the
+original ~5-minute window expired before pickup for slower users and surfaced as the
+`ingest.handoff.notFound` notice ("Import-Link abgelaufen oder ungültig") on **every** send. The
+value is env-overridable via `APP_INGEST_HANDOFF_TTL`; the entry stays single-use and per-`sub`
+scoped, so the longer window does not relax the replay / IDOR guarantees below. To keep a future
+miss diagnosable without leaking secrets, the stage (gateway) and the consume (frontend) each log a
+**non-reversible hash** of the `sub` and the `handoffId` — never the raw subject (pseudonymous PII)
+or the raw id (a bearer-grade secret) (REQ-OBS-004); the two lines line up by the `handoffId` hash,
+so a **matching** `sub` hash with an absent key indicates expiry/consumption while a **differing**
+`sub` hash indicates a subject mismatch between the device-grant token and the browser session.
 
 **Acceptance**
 

@@ -14,6 +14,8 @@
 
 ### Fixed
 
+- **Extractor: Der „An Basetool senden"-Import-Link läuft nicht mehr vorzeitig ab.** Die Gültigkeit des einmaligen Handoffs wurde von 5 auf 30 Minuten angehoben (env-übersteuerbar via `APP_INGEST_HANDOFF_TTL`), weil das Öffnen der vorbefüllten Seite ein separater manueller Klick nach dem Senden ist — langsamere Nutzer sahen sonst durchgängig „Import-Link abgelaufen oder ungültig", während der manuelle JSON-Import funktionierte. Gateway und Frontend protokollieren den Handoff jetzt zusätzlich mit einem nicht umkehrbaren Subject-/ID-Hash (nie das Rohsubjekt oder die ID), damit ein künftiger Fehlschlag eindeutig als Ablauf oder Subject-Abweichung erkennbar ist (REQ-INGEST-003).
+
 - **Materialbörse: Im Dialog „Material anbieten" klappt die Material-/Item-Auswahlliste nicht mehr sofort beim Öffnen auf und verdeckt so die übrigen Eingabefelder.** Das Dropdown bleibt geschlossen und öffnet sich erst, wenn man in das Auswahlfeld klickt oder tippt; es schließt wieder bei Auswahl, Klick außerhalb oder Escape. Gilt ebenso für die Item-Auswahl im Dialog „Item anbieten" (REQ-MARKET-002).
 
 ## [v1.5.1](https://github.com/krt-profit/basetool/releases/tag/v1.5.1) - 2026-07-17
