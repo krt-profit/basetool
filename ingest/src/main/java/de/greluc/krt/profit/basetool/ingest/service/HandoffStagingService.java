@@ -73,8 +73,20 @@ public class HandoffStagingService {
     String handoffId = URL_ENCODER.encodeToString(raw);
     String value = objectMapper.writeValueAsString(new StagedHandoff(kind, draftJson));
     redisTemplate.opsForValue().set(key(sub, handoffId), value, ingestProperties.getHandoffTtl());
-    // Never log the draft or the id at INFO — only that a handoff of this kind was staged.
-    log.debug("Staged {} handoff for caller", kind);
+    // Diagnostic correlator (REQ-OBS-004): log a NON-reversible hash of the subject and of the
+    // handoff id — never the raw subject (pseudonymous PII), the raw id (a bearer-grade secret that
+    // travels in the browser URL), or the draft. The frontend's consume logs the same two hashes,
+    // so
+    // a stage/consume pair can be lined up to tell a subject mismatch (different sub hash) apart
+    // from
+    // an expired / already-consumed handoff (matching sub hash, key absent) — the exact ambiguity
+    // behind the "Import-Link abgelaufen oder ungültig" reports.
+    log.info(
+        "Staged {} handoff (sub=u-{}, hid=h-{}, ttl={})",
+        kind,
+        mask(sub),
+        mask(handoffId),
+        ingestProperties.getHandoffTtl());
     return handoffId;
   }
 
@@ -105,5 +117,19 @@ public class HandoffStagingService {
    */
   private static @NotNull String key(@NotNull String sub, @NotNull String handoffId) {
     return KEY_PREFIX + sub + ":" + handoffId;
+  }
+
+  /**
+   * Produces a short, non-reversible correlation token for a subject or handoff id so the value can
+   * be logged without leaking the raw subject (pseudonymous PII) or the raw id (a bearer-grade
+   * secret) — REQ-OBS-004. Uses {@link String#hashCode()}, whose algorithm is JVM-independent, so
+   * the frontend's consume-side masking of the same input yields the same token and the two log
+   * lines line up.
+   *
+   * @param value the subject or handoff id to mask; {@code null} yields the literal {@code "none"}
+   * @return the lower-case hex of the value's hash, or {@code "none"} for a {@code null} input
+   */
+  private static @NotNull String mask(String value) {
+    return value == null ? "none" : Integer.toHexString(value.hashCode());
   }
 }

@@ -62,7 +62,13 @@ app:
     frontend-base-url: ${FRONTEND_URL:https://app.profit-base.online}
     refinery-path: /refinery-orders/create
     blueprint-path: /personal-inventory/blueprints
-    handoff-ttl: PT5M
+    # One-time browser handoff lifetime (REQ-INGEST-003). Raised from 5m to 30m: the extractor stages
+    # the draft the moment the user clicks Send, but opening the pre-filled basetool page is a SEPARATE
+    # manual click (plus a possible full browser login), so a 5m window could expire before pickup for
+    # a slower user and surface as "Import-Link abgelaufen oder ungueltig" on every send. The entry
+    # stays single-use and per-subject scoped, so the longer window does not weaken the replay / IDOR
+    # guarantees. Env-overridable so the value can be tuned from .env without rebuilding the image.
+    handoff-ttl: ${APP_INGEST_HANDOFF_TTL:PT30M}
     max-payload-bytes: 2097152
   rate-limit:
     enabled: true
