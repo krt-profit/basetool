@@ -341,6 +341,25 @@ class MaterialboersePageControllerMvcTest {
   }
 
   /**
+   * An unexpected {@code kind} value is NOT reflected into the outbound backend URI: the proxy maps
+   * it through a fixed-literal allow-list and drops anything outside {@code MATERIAL}/{@code ITEM},
+   * so the backend call carries no {@code kind} at all (the picker then lists both kinds). Guards
+   * the SSRF mitigation — no caller-controlled string reaches the backend URL on this hop.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void releasableItemsProxy_dropsUnknownKind() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/material-exchange/releasable-items"), anyTypeRef()))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/materialboerse/releasable-items").param("kind", "evil://example.com"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient).get(eq("/api/v1/material-exchange/releasable-items"), anyTypeRef());
+  }
+
+  /**
    * The remark-edit proxy relays a backend optimistic-lock conflict as 409 with the problem code.
    */
   @Test

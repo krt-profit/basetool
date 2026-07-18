@@ -281,7 +281,7 @@ public class MaterialboersePageController {
    *
    * @param q a material-name fragment, or {@code null}.
    * @param kind {@code MATERIAL} or {@code ITEM} to restrict the picker to that kind, or {@code
-   *     null} for both. A fixed enum token (no free text), so it rides on the pre-encoded base URI.
+   *     null}/anything else for both.
    * @return the picker rows, or the backend error status + body.
    */
   @GetMapping("/releasable-items")
@@ -290,10 +290,33 @@ public class MaterialboersePageController {
       @RequestParam(required = false) String q, @RequestParam(required = false) String kind) {
     UriComponentsBuilder uri =
         UriComponentsBuilder.fromPath("/api/v1/material-exchange/releasable-items");
-    appendIfPresent(uri, "kind", kind);
+    // Never forward the raw request value into the outbound URI: map the caller-supplied kind to a
+    // fixed literal, so only one of the two known enum tokens (or nothing) reaches the backend URL.
+    // The value placed on the URI is a compile-time constant, not user-controlled input — which is
+    // both the correct allow-list validation and what closes the CodeQL SSRF finding on this hop.
+    appendIfPresent(uri, "kind", normaliseKind(kind));
     return proxy(
         "Load Materialbörse releasable items failed",
         () -> backendGetWithQuery(uri, q, RELEASABLE_LIST));
+  }
+
+  /**
+   * Maps the caller-supplied release-picker kind to one of the two known, constant enum tokens,
+   * dropping anything else. Returning a compile-time literal (never the request value) is a strict
+   * allow-list: an unexpected value yields {@code null} (the picker then lists both kinds) instead
+   * of being reflected into the backend URI.
+   *
+   * @param kind the raw request value, or {@code null}.
+   * @return the literal {@code "MATERIAL"} or {@code "ITEM"}, or {@code null} for anything else.
+   */
+  private static String normaliseKind(String kind) {
+    if ("MATERIAL".equals(kind)) {
+      return "MATERIAL";
+    }
+    if ("ITEM".equals(kind)) {
+      return "ITEM";
+    }
+    return null;
   }
 
   /**
