@@ -315,6 +315,32 @@ class MaterialboersePageControllerMvcTest {
   }
 
   /**
+   * The release-picker forwards the Material/Item radio's {@code kind} to the backend as a safe,
+   * pre-encoded query parameter alongside the single-encoded {@code q} URI variable
+   * (REQ-MARKET-002). {@code kind} is a fixed enum token, so it rides on the base URI ({@code
+   * ?kind=ITEM&q={q}}) without the double-encoding guard the free-text {@code q} needs.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void releasableItemsProxy_forwardsKindFilter() throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/material-exchange/releasable-items?kind=ITEM&q={q}"),
+            anyTypeRef(),
+            eq("widget")))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/materialboerse/releasable-items").param("q", "widget").param("kind", "ITEM"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient)
+        .get(
+            eq("/api/v1/material-exchange/releasable-items?kind=ITEM&q={q}"),
+            anyTypeRef(),
+            eq("widget"));
+  }
+
+  /**
    * The remark-edit proxy relays a backend optimistic-lock conflict as 409 with the problem code.
    */
   @Test

@@ -247,22 +247,34 @@ public class MaterialExchangeBoardService {
   /**
    * Returns the caller's own Lager rows eligible for release, for the Materialbörse release picker
    * — <b>both</b> material rows ("Material anbieten") and game-item rows (stock-backed item offers,
-   * REQ-MARKET-014, design §8) — optionally filtered by a name fragment and capped at {@value
-   * #PICKER_LIMIT} rows. Each entry flags whether it already carries an active offer, and is
-   * discriminated by kind so the release modal knows whether picking it releases a material or a
-   * stock-backed item offer. A game-item row renders its item name, {@code PIECE} unit and no
-   * quality; a material row keeps its material name, unit and quality.
+   * REQ-MARKET-014, design §8) — optionally filtered by a name fragment and by row {@code kind},
+   * and capped at {@value #PICKER_LIMIT} rows. Each entry flags whether it already carries an
+   * active offer, and is discriminated by kind so the release modal knows whether picking it
+   * releases a material or a stock-backed item offer. A game-item row renders its item name, {@code
+   * PIECE} unit and no quality; a material row keeps its material name, unit and quality.
+   *
+   * <p>The optional {@code kind} narrows the picker to one row kind for the dialog's Material/Item
+   * radio (REQ-MARKET-002): {@code MATERIAL} returns only material rows, {@code ITEM} only
+   * game-item rows, {@code null} both. The kind gate is pushed into the repository query so it
+   * applies <em>before</em> the {@value #PICKER_LIMIT} cap — filtering the returned list would hide
+   * every row of the wanted kind past the cap.
    *
    * @param query a name fragment (material or item), or {@code null}/blank for the caller's whole
    *     stock.
-   * @return the caller's releasable rows (material and item, owner-scoped), never {@code null}.
+   * @param kind the row kind to return, or {@code null} for both material and item rows.
+   * @return the caller's releasable rows of the selected kind(s), owner-scoped, never {@code null}.
    */
-  public List<MaterialExchangeReleasableItemDto> myReleasableItems(@Nullable String query) {
+  public List<MaterialExchangeReleasableItemDto> myReleasableItems(
+      @Nullable String query, @Nullable MaterialExchangeOfferKind kind) {
     UUID viewerId = requireViewerId();
+    boolean includeMaterial = kind == null || kind == MaterialExchangeOfferKind.MATERIAL;
+    boolean includeItem = kind == null || kind == MaterialExchangeOfferKind.ITEM;
     List<InventoryItem> items =
         inventoryItemRepository.findReleasableForUser(
             viewerId,
             MaterialExchangeQueryParams.normalizeQuery(query),
+            includeMaterial,
+            includeItem,
             PageRequest.of(0, PICKER_LIMIT));
     Set<UUID> released =
         releasedInventoryItemIds(items.stream().map(InventoryItem::getId).toList());

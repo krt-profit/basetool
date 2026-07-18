@@ -66,7 +66,19 @@ A member releases one of **their own** Lager rows via the "Für Börse freigeben
 Lager or the "Material anbieten" CTA on the board. Release opens the offer dialog: a read-only fact
 strip (material · quality as a plain number), an **editable offered-quantity field** ("Menge
 anbieten" in the material's own unit — SCU or Stück/piece, #1182 — defaulting to the row's full stock
-with an "Alles" shortcut) + a Markdown textarea (≤ 20 000 characters, live counter). Material and
+with an "Alles" shortcut) + a Markdown textarea (≤ 20 000 characters, live counter). When started
+from the board CTA ("Material anbieten") rather than a specific Lager checkbox, the dialog leads with
+a **searchable material/item picker** whose dropdown list is **closed on open** and reveals itself
+only when the member clicks into or types in the picker input — it is never force-opened as the modal
+appears (its absolutely-positioned list would otherwise cover the fields below it) — and closes again
+on a selection, an outside click, or Escape. The blueprint-product picker of the "Item anbieten"
+dialog (REQ-MARKET-012) behaves identically. Above that picker a **Material/Item radio** (default
+Material) narrows the combobox to one row kind — the release picker otherwise lists **both** the
+caller's material rows and their stock-backed game-item rows (REQ-MARKET-014). The chosen kind is
+applied **server-side** (`/releasable-items?kind=MATERIAL|ITEM`, gated inside the DB query
+<em>before</em> its row cap) rather than by filtering the returned list, so a row of the wanted kind
+past the cap is never silently hidden — the same reachability guarantee the picker's server-side name
+search protects. Switching kind clears any row already picked. Material and
 quality are read **live** from the linked `InventoryItem`; the **offered quantity is the owner's
 choice** — the whole row or only a part of it (ADR-0086), validated server-side to be **positive and
 at most the item's current amount** (the client never sets material/quality). Releasing an item that
@@ -93,9 +105,19 @@ rejected (400).
 the offer's shown/filtered/sorted amount drops to the remaining stock; when the row is fully booked
 out it is deleted and its offer cascade-removed (no lingering zero-stock offer).
 - [ ] A remark over 20 000 characters is rejected (400).
+- [ ] The board-CTA release dialog opens with the material/item picker dropdown **closed**; the list
+appears only when the picker input is clicked or typed into, and dismisses on a selection, an outside
+click, or Escape.
+- [ ] The board-CTA release dialog carries a Material/Item radio (default Material); picking Item
+lists only the caller's stock-backed game-item rows, Material only material rows. The filter is
+applied server-side (`releasable-items?kind=…`) inside the DB query, so a matching row past the
+picker's row cap is still reachable; switching kind clears any already-picked row.
 
-**Enforced by:** `MaterialExchangeServiceTest`, `MaterialExchangeRepositoryDataTest` · **Code:**
-`MaterialExchangeService#release/updateOffer`, `MaterialExchangeReleaseRequest`,
+**Enforced by:** `MaterialExchangeServiceTest`, `MaterialExchangeRepositoryDataTest`,
+`InventoryItemCatalogQueryDataTest`, `MaterialExchangeControllerTest`,
+`MaterialboardReleaseModalOpensE2eTest`, `MaterialboardItemStockOfferE2eTest` · **Code:**
+`MaterialExchangeService#release/updateOffer`, `MaterialExchangeBoardService#myReleasableItems`,
+`InventoryItemRepository#findReleasableForUser`, `MaterialExchangeReleaseRequest`,
 `MaterialExchangeOfferUpdateRequest`, `V212` offered-amount column, `V210` partial-unique index
 
 ### REQ-MARKET-013 — Stock decrease ratchets the offer down (persisted); an increase never changes it

@@ -211,7 +211,8 @@ class InventoryItemCatalogQueryDataTest {
   void findReleasableForUser_returnsBothMaterialAndItemRows() {
     // When — the caller's releasable rows, unfiltered
     List<InventoryItem> releasable =
-        inventoryItemRepository.findReleasableForUser(user.getId(), null, PageRequest.of(0, 50));
+        inventoryItemRepository.findReleasableForUser(
+            user.getId(), null, true, true, PageRequest.of(0, 50));
 
     // Then — both kinds surface (item rows are no longer dropped by an implicit inner join)
     assertThat(releasable)
@@ -225,7 +226,7 @@ class InventoryItemCatalogQueryDataTest {
     // When — filter by a fragment of the seeded game item's name (lower-cased %fragment%)
     List<InventoryItem> releasable =
         inventoryItemRepository.findReleasableForUser(
-            user.getId(), "%quantum-drive%", PageRequest.of(0, 50));
+            user.getId(), "%quantum-drive%", true, true, PageRequest.of(0, 50));
 
     // Then — only the item row matches (the material row's name does not contain the fragment)
     assertThat(releasable).extracting(InventoryItem::getId).containsExactly(itemRow.getId());
@@ -256,7 +257,7 @@ class InventoryItemCatalogQueryDataTest {
     // When — the release picker's typed search (MaterialExchangeQueryParams.normalizeQuery shape)
     List<InventoryItem> releasable =
         inventoryItemRepository.findReleasableForUser(
-            user.getId(), "%e2e boerse item stock widget%", PageRequest.of(0, 50));
+            user.getId(), "%e2e boerse item stock widget%", true, true, PageRequest.of(0, 50));
 
     // Then — the game-item row surfaces (the typed name search must not drop item rows)
     assertThat(releasable).extracting(InventoryItem::getId).contains(widgetRow.getId());
@@ -269,10 +270,30 @@ class InventoryItemCatalogQueryDataTest {
     // When — filter by a fragment of the seeded material's name (lower-cased %fragment%)
     List<InventoryItem> releasable =
         inventoryItemRepository.findReleasableForUser(
-            user.getId(), "%quantanium%", PageRequest.of(0, 50));
+            user.getId(), "%quantanium%", true, true, PageRequest.of(0, 50));
 
     // Then — only the material row matches (the item row's name does not contain the fragment)
     assertThat(releasable).extracting(InventoryItem::getId).containsExactly(materialRow.getId());
+  }
+
+  // covers REQ-MARKET-002 (the release dialog's Material/Item radio narrows the picker by row kind
+  // in the DB query, before the row cap — a MATERIAL query returns only material rows, an ITEM
+  // query only game-item rows; the kind gate must live here so a wanted-kind row past the cap is
+  // never hidden by a post-query client/service filter)
+  @Test
+  void findReleasableForUser_kindFlagsRestrictRowsByCatalog() {
+    // When — material-only (includeMaterial=true, includeItem=false)
+    List<InventoryItem> materialsOnly =
+        inventoryItemRepository.findReleasableForUser(
+            user.getId(), null, true, false, PageRequest.of(0, 50));
+    // And — item-only (includeMaterial=false, includeItem=true)
+    List<InventoryItem> itemsOnly =
+        inventoryItemRepository.findReleasableForUser(
+            user.getId(), null, false, true, PageRequest.of(0, 50));
+
+    // Then — each flag combination returns exactly its own kind
+    assertThat(materialsOnly).extracting(InventoryItem::getId).containsExactly(materialRow.getId());
+    assertThat(itemsOnly).extracting(InventoryItem::getId).containsExactly(itemRow.getId());
   }
 
   // covers REQ-INV-029/031 (Materialsammlung stays material-only; item earmarks get their own seam)

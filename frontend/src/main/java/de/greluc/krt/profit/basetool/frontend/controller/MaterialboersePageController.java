@@ -276,16 +276,21 @@ public class MaterialboersePageController {
   }
 
   /**
-   * Returns the caller's own Lager rows eligible for release, for the "Material anbieten" picker.
+   * Returns the caller's own Lager rows eligible for release, for the "Material anbieten" picker,
+   * optionally narrowed to one row kind by the dialog's Material/Item radio (REQ-MARKET-002).
    *
    * @param q a material-name fragment, or {@code null}.
+   * @param kind {@code MATERIAL} or {@code ITEM} to restrict the picker to that kind, or {@code
+   *     null} for both. A fixed enum token (no free text), so it rides on the pre-encoded base URI.
    * @return the picker rows, or the backend error status + body.
    */
   @GetMapping("/releasable-items")
   @ResponseBody
-  public ResponseEntity<Object> releasableItems(@RequestParam(required = false) String q) {
+  public ResponseEntity<Object> releasableItems(
+      @RequestParam(required = false) String q, @RequestParam(required = false) String kind) {
     UriComponentsBuilder uri =
         UriComponentsBuilder.fromPath("/api/v1/material-exchange/releasable-items");
+    appendIfPresent(uri, "kind", kind);
     return proxy(
         "Load Materialbörse releasable items failed",
         () -> backendGetWithQuery(uri, q, RELEASABLE_LIST));
