@@ -428,6 +428,90 @@ public class InventoryAggregationService {
   }
 
   /**
+   * Flat companion of {@link #getMyAggregatedInventory(UUID, List, Integer, List, List, boolean,
+   * boolean)} (REQ-INV-034): returns the ids of <em>every</em> material {@link
+   * de.greluc.krt.profit.basetool.backend.model.InventoryItem} the caller owns that matches the
+   * same "Mein Lager" material filter surface — across all stacks and unbounded by the lazy
+   * per-stack pagination. Backs the frontend "Alle markieren" (select-all) so a bulk check-out can
+   * span the whole filtered view, not only the entries currently expanded on screen. Owner-scoped
+   * from the JWT; the {@code WHERE} clause reuses {@link
+   * de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository#findUserEntryIds}, the
+   * same optional-filter contract as the grouped view, so it can never return an id outside that
+   * view.
+   *
+   * @param userId owner id
+   * @param materialIds optional material filter
+   * @param minQuality optional min-quality filter
+   * @param jobOrderIds optional job order filter
+   * @param missionIds optional mission filter
+   * @param personalOnly when {@code true}, narrows to the caller's private stock rows
+   * @param nonPersonalOnly when {@code true}, narrows to the caller's shared stock rows
+   * @return the ids of every matching material entry, in creation order; never {@code null}
+   * @throws NotFoundException when the user id is unknown
+   */
+  public List<UUID> getMyEntryIds(
+      UUID userId,
+      List<UUID> materialIds,
+      Integer minQuality,
+      List<UUID> jobOrderIds,
+      List<UUID> missionIds,
+      boolean personalOnly,
+      boolean nonPersonalOnly) {
+    User user =
+        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+    boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
+    boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
+    boolean hasMissions = missionIds != null && !missionIds.isEmpty();
+    return inventoryItemRepository.findUserEntryIds(
+        user.getId(),
+        hasMaterials,
+        hasMaterials ? materialIds : null,
+        minQuality,
+        hasJobOrders,
+        hasJobOrders ? jobOrderIds : null,
+        hasMissions,
+        hasMissions ? missionIds : null,
+        personalOnly,
+        nonPersonalOnly);
+  }
+
+  /**
+   * Game-item companion of {@link #getMyEntryIds} (REQ-INV-034): returns the ids of every game-item
+   * {@link de.greluc.krt.profit.basetool.backend.model.InventoryItem} the caller owns that matches
+   * the {@code view=items} filter surface, so the "Alle markieren" select-all covers the whole
+   * filtered item tree. Item filter surface only ({@code gameItemIds}, {@code jobOrderIds}) plus
+   * the mutually exclusive personal toggles; no quality floor and no mission filter exist for items
+   * (REQ-INV-031). Owner-scoped from the JWT.
+   *
+   * @param userId owner id
+   * @param gameItemIds optional game-item filter
+   * @param jobOrderIds optional job-order filter
+   * @param personalOnly when {@code true}, narrows to the caller's private stock rows
+   * @param nonPersonalOnly when {@code true}, narrows to the caller's shared stock rows
+   * @return the ids of every matching game-item entry, in creation order; never {@code null}
+   * @throws NotFoundException when the user id is unknown
+   */
+  public List<UUID> getMyItemEntryIds(
+      UUID userId,
+      List<UUID> gameItemIds,
+      List<UUID> jobOrderIds,
+      boolean personalOnly,
+      boolean nonPersonalOnly) {
+    User user =
+        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+    boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
+    boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
+    return inventoryItemRepository.findUserItemEntryIds(
+        user.getId(),
+        hasGameItems,
+        hasGameItems ? gameItemIds : null,
+        hasJobOrders,
+        hasJobOrders ? jobOrderIds : null,
+        personalOnly,
+        nonPersonalOnly);
+  }
+
+  /**
    * Game-item sibling of {@link #getAllAggregatedInventory(List, Integer, List, List)} — the {@code
    * catalog=ITEM} variant of the squadron-wide {@code /grouped} view (REQ-INV-029), scoped by the
    * caller's org-unit predicate exactly like the material variant. Item filter surface only ({@code

@@ -421,6 +421,69 @@ class InventoryPageControllerTest {
     assertEquals("inventory-my :: inventoryTableFragment", view);
   }
 
+  // ── /inventory/my/entry-ids (select-all proxy, REQ-INV-034) ───────────
+
+  @Test
+  void myEntryIds_material_forwardsFiltersAndReturnsIds() {
+    // Given
+    UUID materialId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    UUID entryA = UUID.randomUUID();
+    UUID entryB = UUID.randomUUID();
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of(entryA, entryB));
+
+    // When (material view: no view param)
+    List<UUID> ids =
+        controller.myEntryIds(
+            null, List.of(materialId), 500, List.of(jobOrderId), null, null, false, false);
+
+    // Then
+    assertEquals(List.of(entryA, entryB), ids);
+    org.mockito.ArgumentCaptor<String> urlCaptor =
+        org.mockito.ArgumentCaptor.forClass(String.class);
+    org.mockito.Mockito.verify(backendApiClient).get(urlCaptor.capture(), anyTypeRef());
+    String url = urlCaptor.getValue();
+    assertTrue(
+        url.contains("/api/v1/inventory/my-inventory/entry-ids"),
+        "the select-all proxy must hit the backend entry-ids endpoint");
+    assertTrue(url.contains("materialIds=" + materialId), "materialIds must be forwarded");
+    assertTrue(url.contains("minQuality=500"), "minQuality must be forwarded");
+    assertTrue(url.contains("jobOrderIds=" + jobOrderId), "jobOrderIds must be forwarded");
+    assertFalse(url.contains("catalog=ITEM"), "the material view must not relay catalog=ITEM");
+  }
+
+  @Test
+  void myEntryIds_itemsView_relaysCatalogItemAndGameItemFilters() {
+    // Given
+    UUID gameItemId = UUID.randomUUID();
+    UUID entry = UUID.randomUUID();
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of(entry));
+
+    // When (items view)
+    List<UUID> ids =
+        controller.myEntryIds("items", null, null, null, null, List.of(gameItemId), true, false);
+
+    // Then
+    assertEquals(List.of(entry), ids);
+    org.mockito.ArgumentCaptor<String> urlCaptor =
+        org.mockito.ArgumentCaptor.forClass(String.class);
+    org.mockito.Mockito.verify(backendApiClient).get(urlCaptor.capture(), anyTypeRef());
+    String url = urlCaptor.getValue();
+    assertTrue(url.contains("catalog=ITEM"), "the items view must relay catalog=ITEM");
+    assertTrue(url.contains("gameItemIds=" + gameItemId), "gameItemIds must be forwarded");
+    assertTrue(url.contains("personalOnly=true"), "personalOnly must be forwarded");
+  }
+
+  @Test
+  void myEntryIds_nullBackendResult_returnsEmptyList() {
+    // Given a backend that yields no body
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+
+    // When / Then: never null, so the select-all JS just selects nothing
+    assertEquals(
+        List.of(), controller.myEntryIds(null, null, null, null, null, null, false, false));
+  }
+
   @Test
   void viewAllInventory_shouldReturnAllInventoryPage() {
     Model model = new ConcurrentModel();
