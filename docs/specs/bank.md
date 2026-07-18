@@ -1326,13 +1326,15 @@ the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the
 *responsible* (never "holder"/"Halter"), to avoid colliding with the aUEC-custody `BankHolder`
 (ADR-0039); the German UI uses "Kontoverantwortliche/r".
 
-> **Amended by REQ-BANK-047:** for **request approval** the KRT account (`CARTEL`) no longer routes to
-> the OL collegium alone — the amount-tiered ladder inserts the **Bereichsleiter Profit** as the middle
-> band's approver (`AREA_LEAD_PROFIT`) between the bank employee and the OL (ADR-0066). This is an
+> **Amended by REQ-BANK-047 (middle band corrected to the Bankleitung by ADR-0109):** for **request
+> approval** the KRT account (`CARTEL`) no longer routes to the OL collegium alone — the amount-tiered
+> ladder inserts the **Bankleitung** (`BANK_MANAGEMENT`) as the middle band's approver between the bank
+> employee and the OL (ADR-0066, corrected from the Bereichsleiter Profit by ADR-0109). This is an
 > approval-routing refinement only; the OL stays the KRT account's balance-target/visibility owner. So
-> `resolveResponsibleHolderUserIds(CARTEL)` — used only to *notify* — now returns **all `OL_MEMBER`s ∪
-> the Profit-Bereichsleiter**, so both band approvers are notified about a KRT request (each still sees
-> only its own band in „Fremde Anträge").
+> `resolveResponsibleHolderUserIds(CARTEL)` — used only to *notify* — returns **all `OL_MEMBER`s**; the
+> middle-band Bankleitung is a `BANK_MANAGEMENT` Keycloak role (not an org-unit membership) so it is not
+> notified via this seam but picks the request up in its bank-staff queue (ADR-0109). Each approver
+> still sees only its own band in „Fremde Anträge".
 >
 > **Amended by ADR-0070 (responsible-holder change audit):** a **change** of an account's derived
 > responsible holder is now recorded in the admin bank audit log (REQ-BANK-012) as
@@ -1347,8 +1349,9 @@ the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the
 > user-id sets in its details (ids, not PII), sets `targetUserId` to the sole new holder for a
 > singleton set (else null, for the collegial accounts), and the initiator is the acting user
 > `BankAuditService` snapshots automatically. The affected accounts are the account the org unit owns
-> **plus** — for a `Department.PROFIT` Bereich — the collegial `CARTEL` and the `CARTEL_BANK`
-> singletons (their sets include the Profit-Bereichsleiter, REQ-BANK-047). Coverage spans **every
+> **plus** — for a `Department.PROFIT` Bereich — the `CARTEL_BANK`
+> singleton (its set is the Profit-Bereichsleiter, REQ-BANK-034); since ADR-0109 the `CARTEL` set is
+> OL-only and no longer ripples from a Profit-Bereich leadership change. Coverage spans **every
 > app-driven path** that can change the derivation: the seven direct leadership mutations, the two
 > indirect membership-removal paths (`removeMember` for an SK-Lead, `reconcileStaffelMemberships` for a
 > Staffelleiter), and **`UserService.deleteUser`** — which snapshots all the user's org-unit accounts
@@ -1972,6 +1975,15 @@ renders the filter box + `data-filter-name` + filter-empty note) · **Code:** fr
 
 ### REQ-BANK-047 — KRT-account amount-tiered 3-stage approval ladder
 
+> **Amended by ADR-0109 (owner decision):** two corrections to the original ADR-0066 shape. (1) The
+> **middle band** (`T1 < amount ≤ T2`) routes to the **Bankleitung** (`BANK_MANAGEMENT`), **not** the
+> Bereichsleiter Profit — the approver enum value is `BANK_MANAGEMENT` (renamed from `AREA_LEAD_PROFIT`,
+> V222). (2) A plain employee's over-`T1` **direct** booking is **no longer refused** with `409
+> BANK_CARTEL_APPROVAL_REQUIRED`; it is **auto-filed** as the band-routed `PENDING` request and the
+> endpoint answers **`202`** with a `BankBookingOutcomeDto.pendingRequest`, so the employee is told to
+> notify the Bankleitung rather than hitting a dead end. The band-routing text below is stated in its
+> amended form.
+
 The **KRT account** (`CARTEL`, **not** the bank's own `CARTEL_BANK`) uses an **amount-tiered approval
 ladder** for money *leaving* it (a withdrawal or account↔account transfer request, and the direct
 bank-staff booking) that **replaces** the per-audience approval limits of REQ-BANK-041 on this account
@@ -1982,12 +1994,12 @@ snapshotted per request as `bank_booking_request.required_approver`):
 
 - `amount ≤ T1` → the **bank employee** self-approves (no external approval; `requires_owner_approval =
   false`).
-- `T1 < amount ≤ T2` → the **Bereichsleiter Profit** (the `BEREICHSLEITER` of any `Department.PROFIT`
-  Bereich) must approve (`AREA_LEAD_PROFIT`).
+- `T1 < amount ≤ T2` → the **Bankleitung** (any holder of `ROLE_BANK_MANAGEMENT`) must approve
+  (`BANK_MANAGEMENT`).
 - `amount > T2` → the **Organisationsleitung** (any `OL_MEMBER`) must approve (`ORGANISATIONSLEITUNG`).
 
 An unset `T1` is treated as `0` (an employee self-approves nothing); an unset `T2` as `+∞` (the
-Bereichsleiter Profit covers everything above `T1`, the OL band stays empty). **Deposits are exempt**
+Bankleitung covers everything above `T1`, the OL band stays empty). **Deposits are exempt**
 (REQ-BANK-042 unchanged).
 
 **Who configures — and where:** **only the Bankleitung** (`ROLE_BANK_MANAGEMENT`; admins via the
@@ -2001,32 +2013,43 @@ seam so the bank stays org-unit-blind (REQ-BANK-008, both ArchUnit pins green). 
 `employeeApprovalCeiling`/`areaLeadApprovalCeiling`).
 
 **Approval surface & confirmation.** The two non-staff approvers act in **Org-Einheits-Bank → „Fremde
-Anträge"**, band-routed: the Bereichsleiter Profit sees only the `AREA_LEAD_PROFIT`-band requests, the
-OL only the `ORGANISATIONSLEITUNG`-band ones (admins see all); their in-app grant records
-`owner_approval_granted` and reuses the existing two-step machinery (`BOOKING_REQUEST_OWNER_APPROVAL_
-GRANTED/REVOKED`). A bank employee then confirms with the mandatory
-`BANK_OWNER_APPROVAL_REQUIRED` checkbox exactly as REQ-BANK-041. A `≤ T1` request needs no external
-approval — the employee confirms directly. **Direct-booking cap:** a plain bank employee's **direct**
-withdrawal/transfer from the KRT account above `T1` is refused with **409 `BANK_CARTEL_APPROVAL_REQUIRED`**
-(steering them to the request→approval flow); bank management/admins book directly unrestricted, and the
-request-confirmation path (already approved) is **not** capped.
+Anträge"**, band-routed: the Bankleitung sees only the `BANK_MANAGEMENT`-band requests, the OL only the
+`ORGANISATIONSLEITUNG`-band ones (an admin sees **and approves all three bands** — `canApprove` /
+`canSeeForeignRequest` short-circuit on `isAdmin()` before the band check); their in-app grant records
+`owner_approval_granted`
+and reuses the existing two-step machinery (`BOOKING_REQUEST_OWNER_APPROVAL_GRANTED/REVOKED`). A bank
+employee then confirms with the mandatory `BANK_OWNER_APPROVAL_REQUIRED` checkbox exactly as
+REQ-BANK-041. A `≤ T1` request needs no external approval — the employee confirms directly. Because
+`BANK_MANAGEMENT > BANK_EMPLOYEE` in the role hierarchy, the Bankleitung both grants the approval **and**
+sees the request in the bank-staff queue (`/bank/requests`) where they confirm and book it. **Direct
+booking → auto-request (ADR-0109):** a plain bank employee's **direct** withdrawal/transfer from the KRT
+account above `T1` is **not booked**; it is filed as the band-routed `PENDING` request (Bankleitung /
+Organisationsleitung) and the endpoint answers **`202`** with a `BankBookingOutcomeDto.pendingRequest`
+(the frontend then shows a „Antrag angelegt — der Bankleitung Bescheid geben" notice). Bank
+management/admins book directly unrestricted, and the request-confirmation path (already approved) is
+**not** capped. The holder and any Empfänger from the direct-booking form are not carried onto the
+request — like every booking request they are (re-)recorded by the confirming bank employee
+(REQ-BANK-040); only the amount, note and justification transfer.
 
-**Notifications.** The responsible-holder notification (REQ-BANK-026) for a KRT request reaches **both**
-approver classes (all `OL_MEMBER`s **and** the Profit-Bereichsleiter), so whoever the band approver is
-is notified; each still sees only their own band in „Fremde Anträge".
+**Notifications.** The responsible-holder notification (REQ-BANK-026) for a KRT request reaches all
+`OL_MEMBER`s (the collegial owner + top-band approver). The middle-band approver is the Bankleitung — a
+`BANK_MANAGEMENT` Keycloak realm role, not an org-unit membership, so it is not enumerable through the
+membership-based notification seam; the Bankleitung instead picks the request up in its bank-staff queue
+(reachable via `BANK_MANAGEMENT > BANK_EMPLOYEE`) and the requester notifies them directly (ADR-0109).
 
 **Acceptance**
 
 - [x] A KRT withdrawal/transfer request is stamped `required_approver = null` (≤ T1) /
-  `AREA_LEAD_PROFIT` (T1..T2) / `ORGANISATIONSLEITUNG` (> T2) at creation; a ≤ T1 request needs no
+  `BANK_MANAGEMENT` (T1..T2) / `ORGANISATIONSLEITUNG` (> T2) at creation; a ≤ T1 request needs no
   approval, an over-band request needs the band approver's grant + the confirm checkbox.
-- [x] „Fremde Anträge" routes a KRT band request only to its band approver (Profit-Bereichsleiter /
-  OL); the responsible-holder routing for every other account is unchanged.
+- [x] „Fremde Anträge" routes a KRT band request only to its band approver (Bankleitung / OL); the
+  responsible-holder routing for every other account is unchanged.
 - [x] `T1`/`T2` are settable only via `PATCH …/approval-tiers` gated `BANK_MANAGEMENT`, CARTEL-only,
   `T2 ≥ T1`, audited `CARTEL_APPROVAL_TIERS_SET/CLEARED`; the per-audience limit editor is hidden for
   the KRT account.
-- [x] A plain employee's direct KRT withdrawal/transfer above `T1` → 409 `BANK_CARTEL_APPROVAL_REQUIRED`;
-  management/admin and the request-confirmation path are uncapped.
+- [x] A plain employee's direct KRT withdrawal/transfer above `T1` is **auto-filed** as the band-routed
+  `PENDING` request and answered `202` (`BankBookingOutcomeDto.pendingRequest`), not booked and not a
+  `409`; management/admin and the request-confirmation path are uncapped (ADR-0109).
 - [x] `bankClassesMustNotConsultOrgUnitScope` and `orgUnitAwareBankSeamIsContainedToOneClass` stay green.
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (band routing at create, `canApprove` per band,
@@ -2038,12 +2061,18 @@ is notified; each still sees only their own band in „Fremde Anträge".
 `model/BankAccount#employeeApprovalCeiling/#areaLeadApprovalCeiling`, `model/BankRequestApprover`,
 `model/BankBookingRequest#requiredApprover`, `model/BankAuditEventType#CARTEL_APPROVAL_TIERS_*`,
 `service/BankAccountService#setCartelApprovalTiers`, `service/OrgUnitBankAccessService`
-(`createBookingRequest` KRT branch, `canApprove`, `listRequestsForResponsibleAccounts`,
-`resolveResponsibleHolderUserIds` CARTEL union), `service/BankLedgerService#requireCartelDirectBookingAllowed`,
-`controller/BankAccountController#setCartelApprovalTiers`, `db/migration/V203`, frontend
-`templates/bank-manage.html` + `org-unit-bank-account-detail.html` + `static/js/bank.js` ·
+(`createBookingRequest` KRT branch, `resolveCartelApprovalRouting`, `raiseCartelDirectBookingRequest`,
+`canApprove`, `listRequestsForResponsibleAccounts`, `resolveResponsibleHolderUserIds` CARTEL OL set),
+`service/BankBookingGuards#exceedsCartelDirectBookingCeiling`,
+`controller/BankBookingController#bookWithdrawal/#bookTransfer` (202 auto-request),
+`model/dto/BankBookingOutcomeDto`, `controller/BankAccountController#setCartelApprovalTiers`,
+`db/migration/V203` + `V222` (approver rename), frontend `templates/bank-manage.html` +
+`org-unit-bank-account-detail.html` + `static/js/bank.js` (202 `pendingRequest` notice) +
+`exception/GlobalExceptionHandler` (bank-409 message map) ·
 **ADR:** [ADR-0066](../adr/0066-krt-account-amount-tiered-approval-ladder.md) (supersedes the
-single-approver assumption of [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md)) ·
+single-approver assumption of [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md)),
+amended by [ADR-0109](../adr/0109-krt-middle-band-bankleitung-and-over-ceiling-auto-request.md)
+(middle band → Bankleitung; over-ceiling direct booking → auto-request) ·
 **Issues:** —
 
 ### REQ-BANK-048 — "Mitglieder des Bereichs" audience for Bereichskonten

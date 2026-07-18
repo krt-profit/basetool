@@ -328,6 +328,18 @@
     }
 
     /**
+     * The localized "over-ceiling direct booking was filed as an approval request" notice
+     * (REQ-BANK-047/ADR-0109), sourced from the page (`data-bank-approval-request-filed` on <main>)
+     * so this file stays i18n-free; falls back to the generic text when the attribute is absent.
+     *
+     * @returns {string} the approval-request-filed notice
+     */
+    function approvalRequestFiledMessage() {
+        const main = document.querySelector('main[data-bank-approval-request-filed]');
+        return main ? main.getAttribute('data-bank-approval-request-filed') : genericError();
+    }
+
+    /**
      * Hides and empties every inline error slot of a form.
      *
      * @param {HTMLFormElement} form the bank AJAX form
@@ -677,8 +689,16 @@
             submitter: submitButton,
             toast: false,
             errorMessage: genericError(),
-            onSuccess: function () {
+            onSuccess: function (payload) {
                 handleBankSuccess(form);
+                // REQ-BANK-047/ADR-0109: an over-ceiling KRT withdrawal/transfer is not booked but
+                // filed as an approval request; the outcome body then carries `pendingRequest`
+                // instead of `transaction`. Surface the "request filed, tell the Bankleitung" notice.
+                if (payload && payload.pendingRequest) {
+                    if (typeof window.showFrontendSuccessToast === 'function') {
+                        window.showFrontendSuccessToast(approvalRequestFiledMessage());
+                    }
+                }
             },
             onError: function (status, payload) {
                 // A backend body flag (not the header-based 401 that krtFetch redirects on) telling

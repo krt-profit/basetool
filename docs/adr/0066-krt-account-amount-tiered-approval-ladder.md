@@ -1,6 +1,9 @@
 # ADR-0066 — Bank: KRT-account amount-tiered 3-stage approval ladder, "Mitglieder des Bereichs" audience & members-only ALL_MEMBERS limits
 
-- **Status:** Accepted
+- **Status:** Accepted — the middle-band approver (→ **Bankleitung**, was Bereichsleiter Profit) and
+  the over-ceiling direct-booking behavior (→ **auto-request `202`**, was `409`) are amended by
+  [ADR-0109](0109-krt-middle-band-bankleitung-and-over-ceiling-auto-request.md); the ladder structure
+  below stands.
 - **Date:** 2026-07-02
 - **Deciders:** @greluc
 - **Related:** spec REQ-BANK-047 / REQ-BANK-048 (amends REQ-BANK-034 / REQ-BANK-035 / REQ-BANK-041) ·

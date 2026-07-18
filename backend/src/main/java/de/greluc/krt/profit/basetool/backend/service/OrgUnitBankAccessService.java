@@ -834,40 +834,18 @@ public class OrgUnitBankAccessService {
     // REQ-BANK-041/-046: resolve which approver (if any) the request needs and snapshot it. The
     // org-unit-blind confirm path only reads the boolean; the seam routes the "Fremde Anträge"
     // approval surface by the recorded approver class.
-    BigDecimal applicableLimit;
-    boolean requiresOwnerApproval;
-    BankRequestApprover requiredApprover;
+    ApprovalRouting routing;
     if (account.getType() == BankAccountType.CARTEL) {
-      // The KRT account uses the amount-tiered ladder (REQ-BANK-047): amount <= T1 the bank
-      // employee
-      // self-approves; T1 < amount <= T2 the Bereichsleiter Profit; amount > T2 the
-      // Organisationsleitung. An unset T1 is treated as 0 (no employee self-approval band); an
-      // unset
-      // T2 as +infinity (the Bereichsleiter Profit covers everything above T1, the OL band empty).
-      BigDecimal t1 =
-          account.getEmployeeApprovalCeiling() == null
-              ? BigDecimal.ZERO
-              : account.getEmployeeApprovalCeiling();
-      BigDecimal t2 = account.getAreaLeadApprovalCeiling();
-      applicableLimit = t1;
-      if (request.amount().compareTo(t1) <= 0) {
-        requiresOwnerApproval = false;
-        requiredApprover = null;
-      } else if (t2 == null || request.amount().compareTo(t2) <= 0) {
-        requiresOwnerApproval = true;
-        requiredApprover = BankRequestApprover.AREA_LEAD_PROFIT;
-      } else {
-        requiresOwnerApproval = true;
-        requiredApprover = BankRequestApprover.ORGANISATIONSLEITUNG;
-      }
+      routing = resolveCartelApprovalRouting(account, request.amount());
     } else {
       // Every other request-capable account: a configured per-audience limit lets the requester
       // through up to its ceiling; no matching limit ⇒ the responsible holder's approval is the
       // safe default (REQ-BANK-041).
-      applicableLimit = resolveApplicableLimit(account);
-      requiresOwnerApproval =
-          applicableLimit == null || request.amount().compareTo(applicableLimit) > 0;
-      requiredApprover = requiresOwnerApproval ? BankRequestApprover.RESPONSIBLE_HOLDER : null;
+      BigDecimal limit = resolveApplicableLimit(account);
+      boolean needsApproval = limit == null || request.amount().compareTo(limit) > 0;
+      routing =
+          new ApprovalRouting(
+              needsApproval, limit, needsApproval ? BankRequestApprover.RESPONSIBLE_HOLDER : null);
     }
     // A withdrawal/transfer never carries a split (REQ-BANK-043, DEPOSIT-only).
     return bankBookingRequestService.create(
@@ -877,9 +855,104 @@ public class OrgUnitBankAccessService {
         request.note(),
         request.justification(),
         targetAccountId,
-        requiresOwnerApproval,
-        applicableLimit,
-        requiredApprover,
+        routing.requiresOwnerApproval(),
+        routing.applicableLimit(),
+        routing.requiredApprover(),
+        false,
+        null);
+  }
+
+  /**
+   * The resolved approval routing snapshot for a withdrawal/transfer booking request: whether it
+   * needs an approver at all, the requester's applicable limit (the display ceiling) and which
+   * approver class must sign off (REQ-BANK-041/-046/-047).
+   *
+   * @param requiresOwnerApproval whether confirmation needs the approver's attestation
+   * @param applicableLimit the requester's resolved limit / display ceiling, or {@code null}
+   * @param requiredApprover the approver class, or {@code null} when no approval is needed
+   */
+  private record ApprovalRouting(
+      boolean requiresOwnerApproval,
+      @Nullable BigDecimal applicableLimit,
+      @Nullable BankRequestApprover requiredApprover) {}
+
+  /**
+   * Resolves the KRT ({@code CARTEL}) account amount-band routing (REQ-BANK-047, ADR-0109): {@code
+   * amount <= T1} the bank employee self-approves (no approver); {@code T1 < amount <= T2} the
+   * Bankleitung ({@code BANK_MANAGEMENT}); {@code amount > T2} the Organisationsleitung. An unset
+   * {@code T1} is treated as {@code 0} (no employee self-approval band); an unset {@code T2} as
+   * {@code +infinity} (the Bankleitung covers everything above {@code T1}, the OL band empty). The
+   * applicable limit is always {@code T1} (the ceiling shown to the requester). Shared by the
+   * officer/lead request-create path and the bank-staff over-ceiling auto-request path ({@link
+   * #raiseCartelDirectBookingRequest}).
+   *
+   * @param account the KRT ({@code CARTEL}) account
+   * @param amount the whole-aUEC amount leaving the account
+   * @return the resolved approval routing
+   */
+  @NotNull
+  private ApprovalRouting resolveCartelApprovalRouting(
+      @NotNull BankAccount account, @NotNull BigDecimal amount) {
+    BigDecimal t1 =
+        account.getEmployeeApprovalCeiling() == null
+            ? BigDecimal.ZERO
+            : account.getEmployeeApprovalCeiling();
+    BigDecimal t2 = account.getAreaLeadApprovalCeiling();
+    if (amount.compareTo(t1) <= 0) {
+      return new ApprovalRouting(false, t1, null);
+    }
+    if (t2 == null || amount.compareTo(t2) <= 0) {
+      return new ApprovalRouting(true, t1, BankRequestApprover.BANK_MANAGEMENT);
+    }
+    return new ApprovalRouting(true, t1, BankRequestApprover.ORGANISATIONSLEITUNG);
+  }
+
+  /**
+   * Files a {@code PENDING} approval request for a bank-staff <em>direct</em> withdrawal / transfer
+   * that exceeded the KRT bank-employee ceiling {@code T1} (REQ-BANK-047, ADR-0109). Instead of
+   * rejecting the over-ceiling attempt, {@code BankBookingController} routes it here so it becomes
+   * a band-routed request (Bankleitung for {@code T1..T2}, Organisationsleitung above {@code T2})
+   * that the Bankleitung then approves and confirms in the bank-staff queue. Unlike {@link
+   * #createBookingRequest} this trusts the caller's already-passed {@code BankSecurityService}
+   * capability gate ({@code canWithdraw} / {@code canTransfer} on the account) rather than the
+   * org-unit view eligibility, because the requester is the acting bank employee, not an org-unit
+   * officer. The holder and any Empf&auml;nger from the direct-booking form are intentionally not
+   * carried over — like every booking request they are (re-)recorded by the confirming bank
+   * employee (REQ-BANK-040); only the amount, note and justification (Begr&uuml;ndung) transfer.
+   *
+   * @param accountId the KRT ({@code CARTEL}) source account the attempt debited
+   * @param type {@code WITHDRAWAL} or {@code TRANSFER}
+   * @param amount the whole-aUEC amount leaving the account
+   * @param note the optional note from the direct-booking form
+   * @param justification the justification (Begr&uuml;ndung) from the direct-booking form
+   * @param targetAccountId the transfer destination for a {@code TRANSFER}, else {@code null}
+   * @return the filed pending booking request
+   * @throws NotFoundException when the account does not exist
+   */
+  @NotNull
+  @Transactional
+  public BankBookingRequestDto raiseCartelDirectBookingRequest(
+      @NotNull UUID accountId,
+      @NotNull BankBookingRequestType type,
+      @NotNull BigDecimal amount,
+      @Nullable String note,
+      @Nullable String justification,
+      @Nullable UUID targetAccountId) {
+    BankAccount account =
+        bankAccountRepository
+            .findById(accountId)
+            .orElseThrow(() -> new NotFoundException("Bank account not found"));
+    ApprovalRouting routing = resolveCartelApprovalRouting(account, amount);
+    return bankBookingRequestService.create(
+        accountId,
+        type,
+        amount,
+        note,
+        justification,
+        targetAccountId,
+        routing.requiresOwnerApproval(),
+        routing.applicableLimit(),
+        routing.requiredApprover(),
         false,
         null);
   }
@@ -929,8 +1002,8 @@ public class OrgUnitBankAccessService {
    * Lists the booking requests the caller may act on in the "Fremde Anträge" tab
    * (REQ-BANK-041/-046). For every account the caller is the responsible holder of, all its
    * requests are listed; the KRT account's amount-band-routed requests are additionally surfaced to
-   * their band approver — the {@code AREA_LEAD_PROFIT} band to the Bereichsleiter Profit, the
-   * {@code ORGANISATIONSLEITUNG} band to the OL. An admin sees every account's requests.
+   * their band approver — the {@code BANK_MANAGEMENT} band to the Bankleitung, the {@code
+   * ORGANISATIONSLEITUNG} band to the OL. An admin sees every account's requests.
    *
    * @return the requests the caller may act on; never {@code null}, empty when there are none
    */
@@ -938,13 +1011,11 @@ public class OrgUnitBankAccessService {
   @Transactional(readOnly = true)
   public List<BankBookingRequestDto> listRequestsForResponsibleAccounts() {
     boolean admin = authHelperService.isAdmin();
-    boolean profitBl = isProfitBereichsleiter();
+    boolean bankMgmt = hasBankManagement();
     // One pass over the accounts (findAllByOrderByAccountNoAsc carries @EntityGraph(orgUnit) so
     // isResponsibleHolder's org-unit dereference is N+1-free, REQ-DATA-003): the accounts the
-    // caller
-    // is the responsible holder of, plus the KRT account for the Bereichsleiter Profit (who
-    // approves
-    // its middle band without being its responsible holder, REQ-BANK-047).
+    // caller is the responsible holder of, plus the KRT account for the Bankleitung (who approves
+    // its middle band without being its responsible holder, REQ-BANK-047/ADR-0109).
     Set<UUID> responsibleIds = new LinkedHashSet<>();
     Set<UUID> cartelIds = new LinkedHashSet<>();
     for (BankAccount account : bankAccountRepository.findAllByOrderByAccountNoAsc()) {
@@ -956,7 +1027,7 @@ public class OrgUnitBankAccessService {
       }
     }
     Set<UUID> candidateIds = new LinkedHashSet<>(responsibleIds);
-    if (profitBl) {
+    if (bankMgmt) {
       candidateIds.addAll(cartelIds);
     }
     if (candidateIds.isEmpty()) {
@@ -964,19 +1035,19 @@ public class OrgUnitBankAccessService {
     }
     boolean olMember = ownerScopeService.currentUserIsOlMember();
     return bankBookingRequestService.listForAccounts(candidateIds).stream()
-        .filter(request -> canSeeForeignRequest(request, admin, profitBl, olMember, responsibleIds))
+        .filter(request -> canSeeForeignRequest(request, admin, bankMgmt, olMember, responsibleIds))
         .toList();
   }
 
   /**
-   * Whether a "Fremde Anträge" row is visible to the caller (REQ-BANK-047 band routing): a
-   * KRT-account band-flagged request is shown only to its band approver (the Bereichsleiter Profit
-   * for {@code AREA_LEAD_PROFIT}, the OL for {@code ORGANISATIONSLEITUNG}); every other request
-   * stays visible to the account's responsible holder. Admins see all.
+   * Whether a "Fremde Anträge" row is visible to the caller (REQ-BANK-047/ADR-0109 band routing): a
+   * KRT-account band-flagged request is shown only to its band approver (the Bankleitung for {@code
+   * BANK_MANAGEMENT}, the OL for {@code ORGANISATIONSLEITUNG}); every other request stays visible
+   * to the account's responsible holder. Admins see all.
    *
    * @param request the request row
    * @param admin whether the caller is an admin
-   * @param profitBl whether the caller is a Bereichsleiter Profit
+   * @param bankMgmt whether the caller holds the {@code BANK_MANAGEMENT} role (Bankleitung)
    * @param olMember whether the caller is an OL member
    * @param responsibleIds the ids of accounts the caller is the responsible holder of
    * @return whether the caller may see (and, if flagged and pending, approve) the request
@@ -984,15 +1055,15 @@ public class OrgUnitBankAccessService {
   private static boolean canSeeForeignRequest(
       @NotNull BankBookingRequestDto request,
       boolean admin,
-      boolean profitBl,
+      boolean bankMgmt,
       boolean olMember,
       @NotNull Set<UUID> responsibleIds) {
     if (admin) {
       return true;
     }
     String approver = request.requiredApprover();
-    if (BankRequestApprover.AREA_LEAD_PROFIT.name().equals(approver)) {
-      return profitBl;
+    if (BankRequestApprover.BANK_MANAGEMENT.name().equals(approver)) {
+      return bankMgmt;
     }
     if (BankRequestApprover.ORGANISATIONSLEITUNG.name().equals(approver)) {
       return olMember;
@@ -1004,8 +1075,8 @@ public class OrgUnitBankAccessService {
    * Grants the required approver's in-app approval for an over-limit booking request
    * (REQ-BANK-041/-046), which pre-fills the bank employee's confirmation checkbox. Only the
    * request's required approver — the account's responsible holder, or for a KRT amount band the
-   * Bereichsleiter Profit / Organisationsleitung — or an admin may do this ({@link #canApprove});
-   * the request must currently require approval and still be pending.
+   * Bankleitung / Organisationsleitung — or an admin may do this ({@link #canApprove}); the request
+   * must currently require approval and still be pending.
    *
    * @param requestId the request to approve
    * @return the updated request
@@ -1035,8 +1106,8 @@ public class OrgUnitBankAccessService {
 
   /**
    * Loads and locks a request, authorizes the caller as the request's required approver — the
-   * account's responsible holder, or for a KRT amount band the Bereichsleiter Profit ({@code
-   * AREA_LEAD_PROFIT}) / Organisationsleitung ({@code ORGANISATIONSLEITUNG}); admins always pass
+   * account's responsible holder, or for a KRT amount band the Bankleitung ({@code
+   * BANK_MANAGEMENT}) / Organisationsleitung ({@code ORGANISATIONSLEITUNG}); admins always pass
    * ({@link #canApprove}) — the org-unit-aware half — then delegates the blind mutation + audit to
    * {@link BankBookingRequestService#applyOwnerApprovalWithinTransaction(BankBookingRequest,
    * boolean)}.
@@ -1059,9 +1130,9 @@ public class OrgUnitBankAccessService {
 
   /**
    * {@code true} iff the caller may grant/revoke the in-app approval of a booking request
-   * (REQ-BANK-041/-046): an admin always; for a KRT amount band the band approver (Bereichsleiter
-   * Profit for {@code AREA_LEAD_PROFIT}, OL for {@code ORGANISATIONSLEITUNG}); otherwise the
-   * account's responsible holder. The single-request authorization counterpart of {@link
+   * (REQ-BANK-041/-046): an admin always; for a KRT amount band the band approver (Bankleitung for
+   * {@code BANK_MANAGEMENT}, OL for {@code ORGANISATIONSLEITUNG}); otherwise the account's
+   * responsible holder. The single-request authorization counterpart of {@link
    * #canSeeForeignRequest}.
    *
    * @param request the request entity
@@ -1077,9 +1148,21 @@ public class OrgUnitBankAccessService {
     }
     return switch (approver) {
       case RESPONSIBLE_HOLDER -> isResponsibleHolder(request.getAccount());
-      case AREA_LEAD_PROFIT -> isProfitBereichsleiter();
+      case BANK_MANAGEMENT -> hasBankManagement();
       case ORGANISATIONSLEITUNG -> ownerScopeService.currentUserIsOlMember();
     };
+  }
+
+  /**
+   * {@code true} iff the caller holds the {@code BANK_MANAGEMENT} role (Bankleitung), reachable via
+   * the role hierarchy — the middle-band approver of the KRT amount ladder (REQ-BANK-047/ADR-0109).
+   * Unlike the org-unit responsible-holder predicates this is a plain Keycloak-role check, so it
+   * needs no org-unit dereference.
+   *
+   * @return whether the current caller is (or outranks) the Bankleitung
+   */
+  private boolean hasBankManagement() {
+    return authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT));
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -1206,8 +1289,9 @@ public class OrgUnitBankAccessService {
 
   /**
    * {@code true} iff the caller is the {@code BEREICHSLEITER} of a {@code Department.PROFIT}
-   * Bereich. This is both the responsible holder of the {@code CARTEL_BANK} account (REQ-BANK-037)
-   * and the middle-band approver of the KRT amount ladder (REQ-BANK-047, {@code AREA_LEAD_PROFIT}).
+   * Bereich — the responsible holder of the {@code CARTEL_BANK} account (REQ-BANK-037). Since
+   * ADR-0109 the Profit Bereichsleiter is no longer the KRT middle-band approver (that is the
+   * Bankleitung, {@link #hasBankManagement()}); this predicate is now CARTEL_BANK-only.
    *
    * @return {@code true} iff the caller leads a PROFIT Bereich
    */

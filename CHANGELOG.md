@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Kartellbank: Die mittlere Freigabestufe des KRT-Kontos genehmigt jetzt die Bankleitung statt des Bereichsleiters Profit.** Auszahlungen/Transfers zwischen den beiden Schwellen `T1` und `T2` gehen zur Freigabe an die Bankleitung, darüber weiterhin an die Organisationsleitung; die Anzeige in „KRT-Freigaben" und auf der Kontodetailseite ist entsprechend angepasst (REQ-BANK-047, ADR-0109).
+
+- **Kartellbank: Bucht ein Bankmitarbeiter direkt über seiner Freigabegrenze aus dem KRT-Konto, wird die Buchung jetzt automatisch als Freigabeantrag angelegt statt abgewiesen.** Der Betrag wird nicht gebucht, sondern als band-gerouteter Antrag (Bankleitung bzw. Organisationsleitung) eingereicht; der Mitarbeiter erhält den Hinweis, dass der Antrag erst genehmigt werden muss und er der Bankleitung Bescheid geben soll (REQ-BANK-047, ADR-0109).
+
+### Fixed
+
+- **Kartellbank: Fachliche Buchungskonflikte zeigen wieder eine verständliche Meldung statt „Ein unerwarteter Fehler ist aufgetreten. Unser Team wurde informiert."** Mehrere Bank-Konfliktcodes (u. a. Begründung erforderlich, Freigabe erforderlich, Gebühr übersteigt Betrag, Antrag nicht mehr offen) waren im Frontend auf keine Meldung abgebildet und fielen auf den generischen Text zurück; sie erscheinen jetzt mit ihrer konkreten Ursache im Buchungsdialog (REQ-BANK-047).
+
 ## [v1.5.2](https://github.com/krt-profit/basetool/releases/tag/v1.5.2) - 2026-07-18
 
 ### Added

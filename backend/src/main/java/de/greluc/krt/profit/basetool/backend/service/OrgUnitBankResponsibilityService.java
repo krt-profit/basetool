@@ -89,8 +89,9 @@ public class OrgUnitBankResponsibilityService {
    *
    * <p>Per account type: a Staffelkonto → its {@code STAFFELLEITER}; an SK-Konto → its {@code
    * SK_LEAD}; a Bereichskonto → its {@code BEREICHSLEITER}; the {@code CARTEL}/KRT account → all
-   * {@code OL_MEMBER}s <em>plus</em> the Bereichsleiter Profit (the middle-band approver of the KRT
-   * amount ladder, REQ-BANK-047, so both approver classes are notified); the {@code CARTEL_BANK} →
+   * {@code OL_MEMBER}s (the collegial owner and the top-band approver; since ADR-0109 the KRT
+   * middle band routes to the Bankleitung, a {@code BANK_MANAGEMENT} Keycloak role not enumerable
+   * via org-unit membership, so it is not notified through this seam); the {@code CARTEL_BANK} →
    * the {@code BEREICHSLEITER} of every {@code Department.PROFIT} Bereich; a Sonderkonto → none.
    *
    * @param accountId the account whose responsible holder(s) to resolve
@@ -121,19 +122,17 @@ public class OrgUnitBankResponsibilityService {
               ? Set.of()
               : orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
                   owner, MembershipRole.BEREICHSLEITER);
-      case CARTEL -> {
-        Set<UUID> holders = new LinkedHashSet<>();
-        if (owner != null) {
-          holders.addAll(
-              orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
-                  owner, MembershipRole.OL_MEMBER));
-        }
-        // REQ-BANK-047: the KRT account's amount ladder additionally routes approval to the
-        // Bereichsleiter Profit (middle band), so they are notified about its requests too — each
-        // party still sees only its own band in the "Fremde Anträge" tab.
-        holders.addAll(resolveCartelBankResponsibleHolders());
-        yield holders;
-      }
+      case CARTEL ->
+          // REQ-BANK-047/ADR-0109: the KRT account's responsible holders are the OL members (the
+          // collegial owner and the top-band approver). The middle band now routes to the
+          // Bankleitung (BANK_MANAGEMENT) — a Keycloak realm role, not an org-unit membership, so
+          // it is not enumerable via this membership-based seam; the Bankleitung instead picks the
+          // request up in the bank-staff queue (/bank/requests, reachable via BANK_MANAGEMENT >
+          // BANK_EMPLOYEE) and the requester notifies them directly.
+          owner == null
+              ? Set.of()
+              : orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+                  owner, MembershipRole.OL_MEMBER);
       case CARTEL_BANK -> resolveCartelBankResponsibleHolders();
       case SPECIAL -> Set.of();
     };
@@ -240,8 +239,10 @@ public class OrgUnitBankResponsibilityService {
   /**
    * The bank accounts whose derived responsible holder(s) can change when the given org unit's
    * leadership changes: the account the org unit owns, plus — for a {@code Department.PROFIT}
-   * Bereich — the collegial {@code CARTEL} and the {@code CARTEL_BANK} singletons (their
-   * responsible sets include the Profit-Bereichsleiter, REQ-BANK-034/-047).
+   * Bereich — the {@code CARTEL_BANK} singleton (its responsible set is the Profit-Bereichsleiter,
+   * REQ-BANK-034). Since ADR-0109 the {@code CARTEL}/KRT responsible set is OL-only and so no
+   * longer ripples from a Profit-Bereich change — it is still covered for an OL leadership change
+   * through the owns-account path above (the OL org unit owns the CARTEL account).
    *
    * @param orgUnitId the org unit whose leadership changes
    * @return the affected account ids; never {@code null}, possibly empty
@@ -252,9 +253,6 @@ public class OrgUnitBankResponsibilityService {
     bankAccountRepository.findByOrgUnitId(orgUnitId).ifPresent(account -> ids.add(account.getId()));
     if (isProfitBereich(orgUnitId)) {
       bankAccountRepository
-          .findFirstByType(BankAccountType.CARTEL)
-          .ifPresent(account -> ids.add(account.getId()));
-      bankAccountRepository
           .findFirstByType(BankAccountType.CARTEL_BANK)
           .ifPresent(account -> ids.add(account.getId()));
     }
@@ -263,8 +261,8 @@ public class OrgUnitBankResponsibilityService {
 
   /**
    * {@code true} iff the org unit is a {@code Department.PROFIT} Bereich — whose Bereichsleiter is
-   * a responsible holder of the {@code CARTEL_BANK} account and part of the collegial {@code
-   * CARTEL} set (REQ-BANK-034/-047), so its leadership change ripples onto those two accounts.
+   * the responsible holder of the {@code CARTEL_BANK} account (REQ-BANK-034), so its leadership
+   * change ripples onto that account.
    *
    * @param orgUnitId the org unit to test
    * @return {@code true} for a Profit Bereich

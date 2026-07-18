@@ -81,8 +81,8 @@
         <div class="bank-panel-body">
             <h2 class="sub-h" th:text="#{bank.manage.krt.title}">KRT-Konto Freigabe-Stufen</h2>
             <p class="text-muted" th:text="#{bank.manage.krt.hint}">
-                Lege die zwei Schwellen fest, ab denen Auszahlungen und Transfers vom KRT-Konto durch den
-                Bereichsleiter Profit bzw. die Organisationsleitung freigegeben werden m&uuml;ssen. Bis zur
+                Lege die zwei Schwellen fest, ab denen Auszahlungen und Transfers vom KRT-Konto durch die
+                Bankleitung bzw. die Organisationsleitung freigegeben werden m&uuml;ssen. Bis zur
                 ersten Schwelle gibt ein Bankmitarbeiter selbst frei.</p>
 
             <div th:if="${cartelAccount == null}" class="bank-empty" data-testid="bank-krt-approvals-empty"
@@ -103,12 +103,12 @@
                     <span class="bank-field-error" data-error-for="employeeCeiling"></span>
                 </div>
                 <div class="bank-form-row">
-                    <label for="bank-krt-t2" th:text="#{bank.manage.krt.areaLeadCeiling}">Bereichsleiter Profit bis (aUEC)</label>
+                    <label for="bank-krt-t2" th:text="#{bank.manage.krt.areaLeadCeiling}">Bankleitung bis (aUEC)</label>
                     <input type="number" id="bank-krt-t2" name="areaLeadCeiling" min="0" step="1"
                            inputmode="numeric" data-testid="bank-krt-t2"
                            th:value="${cartelAccount.areaLeadApprovalCeiling() != null ? cartelAccount.areaLeadApprovalCeiling().toBigInteger() : ''}"
                            th:placeholder="#{bank.manage.krt.ceiling.placeholder}">
-                    <span class="bank-field-hint" th:text="#{bank.manage.krt.areaLeadCeiling.hint}">Bis zu diesem Betrag gibt der Bereichsleiter Profit frei; dar&uuml;ber die Organisationsleitung. Leer lassen = keine OL-Stufe.</span>
+                    <span class="bank-field-hint" th:text="#{bank.manage.krt.areaLeadCeiling.hint}">Bis zu diesem Betrag gibt die Bankleitung frei; dar&uuml;ber die Organisationsleitung. Leer lassen = keine OL-Stufe.</span>
                     <span class="bank-field-error" data-error-for="areaLeadCeiling"></span>
                 </div>
                 <span class="bank-field-error" data-error-for="_global"></span>

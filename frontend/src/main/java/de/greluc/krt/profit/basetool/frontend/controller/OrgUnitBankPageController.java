@@ -171,9 +171,9 @@ public class OrgUnitBankPageController {
     model.addAttribute("foreignRequests", foreignRequests);
     // Show the tab when the caller manages a REQUEST-CAPABLE account (canManageSettings on an
     // ORG_UNIT/AREA/CARTEL account == its responsible holder) OR when the band-routed list already
-    // carries a request for them — the latter covers the KRT-account middle-band approver
-    // (Bereichsleiter Profit), who is not the account's responsible holder but sees its
-    // AREA_LEAD_PROFIT-band requests (REQ-BANK-047). SPECIAL is never request-capable, so an
+    // carries a request for them — the latter covers the KRT-account middle-band approver (the
+    // Bankleitung, ADR-0109), who is not the account's responsible holder but sees its
+    // BANK_MANAGEMENT-band requests (REQ-BANK-047). SPECIAL is never request-capable, so an
     // OL/management user who can only configure a Sonderkonto's visibility still does not see the
     // tab
     // unless a routed request exists.

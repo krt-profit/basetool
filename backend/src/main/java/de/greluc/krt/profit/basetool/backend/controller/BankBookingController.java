@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingOutcomeDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankTransactionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
@@ -29,13 +32,17 @@ import de.greluc.krt.profit.basetool.backend.service.BankBookingGuards;
 import de.greluc.krt.profit.basetool.backend.service.BankLedgerService;
 import de.greluc.krt.profit.basetool.backend.service.BankSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.BankTransferFeeService;
+import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankAccessService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
@@ -63,6 +70,7 @@ public class BankBookingController {
   private final BankBookingGuards bankBookingGuards;
   private final BankSecurityService bankSecurityService;
   private final BankTransferFeeService bankTransferFeeService;
+  private final OrgUnitBankAccessService orgUnitBankAccessService;
 
   /**
    * Returns the current in-game transfer-fee rate (ADR-0052, REQ-BANK-033) so the booking modals
@@ -99,24 +107,46 @@ public class BankBookingController {
 
   /**
    * Books a withdrawal from an account the caller may withdraw from (REQ-BANK-009), guarded by the
-   * no-overdraft rule (REQ-BANK-006).
+   * no-overdraft rule (REQ-BANK-006). For the KRT ({@code CARTEL}) account a plain bank employee
+   * may book directly only up to the employee ceiling {@code T1}; above it the attempt is not
+   * rejected but filed as a band-routed approval request (REQ-BANK-047, ADR-0109) and the response
+   * carries a {@code pendingRequest} instead of a {@code transaction} with status {@code 202}.
    *
    * @param request validated withdrawal payload
-   * @return acknowledgement of the created transaction
+   * @return {@code 201} with the booked transaction, or {@code 202} with the filed pending request
    */
-  @Operation(summary = "Book a withdrawal")
+  @Operation(summary = "Book a withdrawal (over-ceiling KRT amounts become an approval request)")
+  @ApiResponses({
+    @ApiResponse(responseCode = "201", description = "Withdrawal booked onto the ledger"),
+    @ApiResponse(
+        responseCode = "202",
+        description = "Over the KRT employee ceiling: filed as a pending approval request")
+  })
   @PostMapping("/withdrawals")
   @PreAuthorize(
       "hasRole('"
           + Roles.BANK_EMPLOYEE
           + "') and @bankSecurityService.canWithdraw(#request.accountId, authentication)")
   @Transactional
-  @ResponseStatus(HttpStatus.CREATED)
-  public BankTransactionDto bookWithdrawal(@RequestBody @Valid BankWithdrawalRequest request) {
-    // REQ-BANK-047: a plain bank employee may directly withdraw from the KRT account only up to the
-    // employee ceiling T1; above it the request → external-approval flow must be used.
-    bankBookingGuards.requireCartelDirectBookingAllowed(request.accountId(), request.amount());
-    return bankLedgerService.bookWithdrawal(request);
+  public ResponseEntity<BankBookingOutcomeDto> bookWithdrawal(
+      @RequestBody @Valid BankWithdrawalRequest request) {
+    // REQ-BANK-047/ADR-0109: a plain bank employee may directly withdraw from the KRT account only
+    // up to the employee ceiling T1; above it the attempt is filed as a band-routed approval
+    // request (Bankleitung / Organisationsleitung) instead of being booked.
+    if (bankBookingGuards.exceedsCartelDirectBookingCeiling(
+        request.accountId(), request.amount())) {
+      BankBookingRequestDto raised =
+          orgUnitBankAccessService.raiseCartelDirectBookingRequest(
+              request.accountId(),
+              BankBookingRequestType.WITHDRAWAL,
+              request.amount(),
+              request.note(),
+              request.justification(),
+              null);
+      return ResponseEntity.accepted().body(BankBookingOutcomeDto.requestRaised(raised));
+    }
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(BankBookingOutcomeDto.booked(bankLedgerService.bookWithdrawal(request)));
   }
 
   /**
@@ -128,23 +158,43 @@ public class BankBookingController {
    * @param authentication the caller's authentication (for the destination-visibility check)
    * @return acknowledgement of the created transaction
    */
-  @Operation(summary = "Book an account-to-account transfer")
+  @Operation(
+      summary = "Book an account-to-account transfer (over-ceiling KRT amounts become a request)")
+  @ApiResponses({
+    @ApiResponse(responseCode = "201", description = "Transfer booked onto the ledger"),
+    @ApiResponse(
+        responseCode = "202",
+        description = "Over the KRT employee ceiling: filed as a pending approval request")
+  })
   @PostMapping("/transfers")
   @PreAuthorize(
       "hasRole('"
           + Roles.BANK_EMPLOYEE
           + "') and @bankSecurityService.canTransfer(#request.sourceAccountId, authentication)")
   @Transactional
-  @ResponseStatus(HttpStatus.CREATED)
-  public BankTransactionDto bookTransfer(
+  public ResponseEntity<BankBookingOutcomeDto> bookTransfer(
       @RequestBody @Valid BankTransferRequest request, Authentication authentication) {
-    // REQ-BANK-047: a plain bank employee may directly transfer FROM the KRT account only up to the
-    // employee ceiling T1; above it the request → external-approval flow must be used.
-    bankBookingGuards.requireCartelDirectBookingAllowed(
-        request.sourceAccountId(), request.amount());
+    // REQ-BANK-047/ADR-0109: a plain bank employee may directly transfer FROM the KRT account only
+    // up to the employee ceiling T1; above it the attempt is filed as a band-routed approval
+    // request (Bankleitung / Organisationsleitung) instead of being booked.
+    if (bankBookingGuards.exceedsCartelDirectBookingCeiling(
+        request.sourceAccountId(), request.amount())) {
+      BankBookingRequestDto raised =
+          orgUnitBankAccessService.raiseCartelDirectBookingRequest(
+              request.sourceAccountId(),
+              BankBookingRequestType.TRANSFER,
+              request.amount(),
+              request.note(),
+              request.justification(),
+              request.destinationAccountId());
+      return ResponseEntity.accepted().body(BankBookingOutcomeDto.requestRaised(raised));
+    }
     boolean destinationVisible =
         bankSecurityService.canSee(request.destinationAccountId(), authentication);
-    return bankLedgerService.bookTransfer(request, destinationVisible);
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(
+            BankBookingOutcomeDto.booked(
+                bankLedgerService.bookTransfer(request, destinationVisible)));
   }
 
   /**

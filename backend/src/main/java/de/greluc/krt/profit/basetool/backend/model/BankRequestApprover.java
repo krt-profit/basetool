@@ -39,11 +39,13 @@ public enum BankRequestApprover {
   RESPONSIBLE_HOLDER,
 
   /**
-   * The Bereichsleiter of the {@code PROFIT} Bereich approves — the middle band of the KRT-account
-   * amount ladder (REQ-BANK-047): an amount above the bank-employee ceiling {@code T1} and at or
-   * below the area-lead ceiling {@code T2}.
+   * The bank management (Bankleitung, any holder of the {@code BANK_MANAGEMENT} role) approves —
+   * the middle band of the KRT-account amount ladder (REQ-BANK-047): an amount above the
+   * bank-employee ceiling {@code T1} and at or below the area-lead ceiling {@code T2}. Supersedes
+   * the original ADR-0066 routing to the Bereichsleiter Profit (ADR-0109): the Bankleitung, not the
+   * Profit Bereichsleiter, is the intended middle-band approver.
    */
-  AREA_LEAD_PROFIT,
+  BANK_MANAGEMENT,
 
   /**
    * The Organisationsleitung (any {@code OL_MEMBER}) approves — the top band of the KRT-account

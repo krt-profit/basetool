@@ -134,25 +134,25 @@ public class BankAccount extends AbstractEntity<UUID> {
    * The KRT-account bank-employee approval ceiling {@code T1} (REQ-BANK-047, V203) — the amount up
    * to which a bank employee may approve a withdrawal / transfer <em>leaving</em> the {@link
    * BankAccountType#CARTEL} account on their own (self-approve, or book directly). Above it the
-   * request must be approved by the Bereichsleiter Profit; {@code null} means no ceiling is
-   * configured yet (treated as {@code 0} — an employee may self-approve nothing). Only meaningful
-   * for the CARTEL account — V203's {@code chk_bank_account_cartel_tiers} CHECK pins it {@code
-   * null} for every other type. Managed exclusively by bank management in the Verwaltung tab;
-   * shares this row's {@code @Version} with rename/close/target (all infrequent). Persisted as
-   * {@code NUMERIC(19,4)} per ADR-0002.
+   * request must be approved by the Bankleitung (or the Organisationsleitung above {@code T2},
+   * ADR-0109); {@code null} means no ceiling is configured yet (treated as {@code 0} — an employee
+   * may self-approve nothing). Only meaningful for the CARTEL account — V203's {@code
+   * chk_bank_account_cartel_tiers} CHECK pins it {@code null} for every other type. Managed
+   * exclusively by bank management in the Verwaltung tab; shares this row's {@code @Version} with
+   * rename/close/target (all infrequent). Persisted as {@code NUMERIC(19,4)} per ADR-0002.
    */
   @Nullable
   @Column(name = "employee_approval_ceiling", precision = 19, scale = 4)
   private BigDecimal employeeApprovalCeiling;
 
   /**
-   * The KRT-account area-lead approval ceiling {@code T2} (REQ-BANK-047, V203) — the amount up to
-   * which the Bereichsleiter Profit approves a withdrawal / transfer leaving the {@link
-   * BankAccountType#CARTEL} account; above it the Organisationsleitung must approve. Must be {@code
-   * >= }{@link #employeeApprovalCeiling} when both are set (V203 CHECK); {@code null} means no
-   * upper band (treated as {@code +∞} — the Bereichsleiter Profit covers everything above {@code
-   * T1}, the OL band stays empty). CARTEL-only, bank-management-managed; shares this row's
-   * {@code @Version}.
+   * The KRT-account area-lead approval ceiling {@code T2} (REQ-BANK-047, V203; the middle-band
+   * approver is the Bankleitung since ADR-0109) — the amount up to which the Bankleitung approves a
+   * withdrawal / transfer leaving the {@link BankAccountType#CARTEL} account; above it the
+   * Organisationsleitung must approve. Must be {@code >= }{@link #employeeApprovalCeiling} when
+   * both are set (V203 CHECK); {@code null} means no upper band (treated as {@code +∞} — the
+   * Bankleitung covers everything above {@code T1}, the OL band stays empty). CARTEL-only,
+   * bank-management-managed; shares this row's {@code @Version}.
    */
   @Nullable
   @Column(name = "area_lead_approval_ceiling", precision = 19, scale = 4)
