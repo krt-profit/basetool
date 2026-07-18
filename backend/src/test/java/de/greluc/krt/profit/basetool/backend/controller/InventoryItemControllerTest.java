@@ -547,6 +547,137 @@ class InventoryItemControllerTest {
     verifyNoInteractions(inventoryItemService);
   }
 
+  // ── GET /my-inventory/entry-ids (select-all, REQ-INV-034) ─────────────
+
+  // covers REQ-INV-034 (material select-all resolves the owner from the JWT and forwards the same
+  // material filter surface as the grouped view, returning the flat id set).
+  @Test
+  void getMyEntryIds_material_resolvesOwnerFromJwt_andForwardsFilters() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    UUID missionId = UUID.randomUUID();
+    UUID entryA = UUID.randomUUID();
+    UUID entryB = UUID.randomUUID();
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(inventoryItemService.getMyEntryIds(
+            ownerId,
+            List.of(materialId),
+            700,
+            List.of(jobOrderId),
+            List.of(missionId),
+            false,
+            false))
+        .thenReturn(List.of(entryA, entryB));
+
+    List<UUID> result =
+        controller.getMyEntryIds(
+            jwt,
+            List.of(materialId),
+            null,
+            700,
+            List.of(jobOrderId),
+            List.of(missionId),
+            false,
+            false,
+            InventoryCatalog.MATERIAL);
+
+    assertThat(result).containsExactly(entryA, entryB);
+    ArgumentCaptor<UUID> ownerCaptor = ArgumentCaptor.forClass(UUID.class);
+    verify(inventoryItemService)
+        .getMyEntryIds(
+            ownerCaptor.capture(),
+            eq(List.of(materialId)),
+            eq(700),
+            eq(List.of(jobOrderId)),
+            eq(List.of(missionId)),
+            eq(false),
+            eq(false));
+    assertThat(ownerCaptor.getValue()).isEqualTo(ownerId);
+    verifyNoInteractions(inventoryAggregationService);
+  }
+
+  // covers REQ-INV-034 (item select-all dispatches to the item id query with the item filter
+  // surface and the personal toggle, never the material facade).
+  @Test
+  void getMyEntryIds_catalogItem_dispatchesWithItemFilters() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    UUID entry = UUID.randomUUID();
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(inventoryAggregationService.getMyItemEntryIds(
+            ownerId, List.of(gameItemId), List.of(jobOrderId), true, false))
+        .thenReturn(List.of(entry));
+
+    List<UUID> result =
+        controller.getMyEntryIds(
+            jwt,
+            null,
+            List.of(gameItemId),
+            null,
+            List.of(jobOrderId),
+            null,
+            true,
+            false,
+            InventoryCatalog.ITEM);
+
+    assertThat(result).containsExactly(entry);
+    verifyNoInteractions(inventoryItemService);
+  }
+
+  // covers REQ-INV-034 + REQ-INV-029/031 (item select-all rejects the material-only filters with
+  // 400, exactly like the grouped item view — never a silently-ignored filter).
+  @Test
+  void getMyEntryIds_catalogItem_rejectsMaterialOnlyFilters() {
+    Jwt jwt = jwt("alice-sub");
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getMyEntryIds(
+                    jwt, null, null, 700, null, null, false, false, InventoryCatalog.ITEM))
+        .isInstanceOf(BadRequestException.class);
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getMyEntryIds(
+                    jwt,
+                    List.of(UUID.randomUUID()),
+                    null,
+                    null,
+                    null,
+                    null,
+                    false,
+                    false,
+                    InventoryCatalog.ITEM))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("materialIds");
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
+  // covers REQ-INV-034 + REQ-INV-029/031 (material select-all rejects a game-item filter with 400).
+  @Test
+  void getMyEntryIds_catalogMaterial_rejectsGameItemIds() {
+    Jwt jwt = jwt("alice-sub");
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                controller.getMyEntryIds(
+                    jwt,
+                    null,
+                    List.of(UUID.randomUUID()),
+                    null,
+                    null,
+                    null,
+                    false,
+                    false,
+                    InventoryCatalog.MATERIAL))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("gameItemIds");
+    verifyNoInteractions(inventoryItemService, inventoryAggregationService);
+  }
+
   // covers REQ-INV-029/031 (catalog=ITEM flat /all rejects the material-only filters with 400)
   @Test
   void getAllInventory_catalogItem_rejectsMinQualityAndMissionIds() {

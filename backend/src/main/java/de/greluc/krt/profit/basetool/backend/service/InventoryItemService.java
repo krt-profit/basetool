@@ -249,6 +249,36 @@ public class InventoryItemService {
   }
 
   /**
+   * Material facade for the "Mein Lager" select-all (REQ-INV-034): returns the ids of every
+   * material inventory entry the caller owns that matches the same filter surface as {@link
+   * #getMyAggregatedInventory}, across all stacks and unbounded by the lazy per-stack pagination.
+   * Delegates to {@link InventoryAggregationService#getMyEntryIds}. The frontend's "Alle markieren"
+   * feeds these ids straight into a bulk check-out so it covers the whole filtered view rather than
+   * only the entries currently expanded on screen.
+   *
+   * @param userId owner id
+   * @param materialIds optional material filter
+   * @param minQuality optional min-quality filter
+   * @param jobOrderIds optional job order filter
+   * @param missionIds optional mission filter
+   * @param personalOnly when {@code true}, narrows to the caller's private stock rows
+   * @param nonPersonalOnly when {@code true}, narrows to the caller's shared stock rows
+   * @return the ids of every matching material entry, in creation order
+   * @throws NotFoundException when the user id is unknown
+   */
+  public List<UUID> getMyEntryIds(
+      UUID userId,
+      List<UUID> materialIds,
+      Integer minQuality,
+      List<UUID> jobOrderIds,
+      List<UUID> missionIds,
+      boolean personalOnly,
+      boolean nonPersonalOnly) {
+    return inventoryAggregationService.getMyEntryIds(
+        userId, materialIds, minQuality, jobOrderIds, missionIds, personalOnly, nonPersonalOnly);
+  }
+
+  /**
    * Convenience overload of {@link #getAllAggregatedInventory(List, Integer, List, List)} without
    * job-order/mission filters.
    *

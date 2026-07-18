@@ -188,6 +188,31 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("/js/inventory-herkunft.js")));
   }
 
+  // REQ-INV-034: the "Alle markieren" (select-all) button renders in the bulk bar BEFORE the
+  // "Markierte ausbuchen" button, carries the select-all trigger + both toggle labels, and the
+  // entry-ids proxy is wired for the JS to fetch the full filtered id set.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewMyInventory_rendersSelectAllButtonBeforeBulkCheckout() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/my"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("id=\"bulkSelectAllBtn\"")))
+        .andExpect(content().string(containsString("data-trigger=\"inv-my-select-all\"")))
+        .andExpect(content().string(containsString("data-text-select")))
+        .andExpect(content().string(containsString("data-text-clear")))
+        // The select-all button must sit before the bulk-checkout button in the bar.
+        .andExpect(
+            content()
+                .string(
+                    stringContainsInOrder(
+                        List.of("id=\"bulkSelectAllBtn\"", "id=\"bulkCheckoutBtn\""))));
+  }
+
   // REQ-FE-016: the Umbuchen modal's target-location select is a server-side-search combobox
   // (remote-locations) on both Lager views — the marker value must sit on the (statically
   // attributed) select, which renders EMPTY (no preloaded catalog options; the modal-opening JS
