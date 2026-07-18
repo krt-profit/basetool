@@ -237,11 +237,12 @@
         </div>
         </th:block>
         <!-- Game-item leaf row (REQ-INV-030/031): no quality cell, no mission split, whole
-             amounts (items are PIECE-like units), no Materialbörse toggle (item offers are a
-             later phase, design §8). The Auftrag split offers only ITEM orders that request this
-             gameItem (requiredGameItemIds — the REQ-ORDERS-018 sibling gate). Action buttons
-             carry a PIECE quantity type and no material id, so the shared modals use
-             whole-number steps and keep SELL disabled (no terminal market data for items). -->
+             amounts (items are PIECE-like units). Carries the "Für Börse freigeben" toggle as a
+             stock-backed item offer (REQ-MARKET-002/014), the item sibling of the material leaf
+             toggle. The Auftrag split offers only ITEM orders that request this gameItem
+             (requiredGameItemIds — the REQ-ORDERS-018 sibling gate). Action buttons carry a PIECE
+             quantity type and no material id, so the shared modals use whole-number steps and keep
+             SELL disabled (no terminal market data for items). -->
         <th:block th:if="${entry.gameItem != null}">
         <div class="tree-row tree-row--leaf" th:data-item-id="${entry.id}">
             <div class="tree-leaf-main">
@@ -314,6 +315,28 @@
                 <span><span th:text="${entry.amount != null ? #numbers.formatInteger(entry.amount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
             </div>
             <div class="tree-cell tree-cell--actions">
+                <!-- "Für Börse freigeben" toggle for a game-item row: a stock-backed item offer
+                     (REQ-MARKET-002/014), the item sibling of the material leaf toggle. It carries
+                     no quality (data-kind="ITEM" makes the shared release modal hide the quality
+                     fact) and a literal PIECE unit; the inv-boerse-toggle handler + release modal
+                     otherwise treat it exactly like a material row. -->
+                <label class="inv-boerse-toggle"
+                       th:with="released=${releasedItemIds != null and releasedItemIds.contains(entry.id)}"
+                       th:title="#{materialboerse.inventory.forExchange}">
+                    <input type="checkbox" class="inv-boerse-checkbox"
+                           th:checked="${released}"
+                           th:data-id="${entry.id}"
+                           th:data-material="${entry.gameItem.name}"
+                           data-kind="ITEM"
+                           th:data-amount="${entry.amount}"
+                           data-quantity-type="PIECE"
+                           data-trigger="inv-boerse-toggle"
+                           th:aria-label="#{materialboerse.inventory.forExchange}"/>
+                    <span class="inv-boerse-status chip"
+                          th:data-boerse-status-for="${entry.id}"
+                          th:classappend="${released} ? 'chip--primary' : 'chip--muted'"
+                          th:text="${released} ? #{materialboerse.inventory.forExchange.on} : #{materialboerse.inventory.forExchange.private}">privat</span>
+                </label>
                 <button type="button" class="btn btn-outline btn-xs btn-icon"
                         th:data-id="${entry.id}"
                         th:data-amount="${entry.amount}"
@@ -602,7 +625,8 @@
         </div>
         </th:block>
         <!-- Game-item leaf row (REQ-INV-030/031): no quality cell, no mission split, whole
-             amounts, no Materialbörse toggle (item offers are a later phase, design §8). The
+             amounts, no Materialbörse toggle (the global view has none for any kind — releasing to
+             the Börse is a personal-Lager, owner-only action, same as the material leaf here). The
              Auftrag split offers only ITEM orders that request this gameItem
              (requiredGameItemIds); chips stay read-only for non-association roles. Action
              buttons carry a PIECE quantity type and no material id, so the shared

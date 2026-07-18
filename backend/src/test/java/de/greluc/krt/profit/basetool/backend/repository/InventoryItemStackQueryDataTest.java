@@ -435,4 +435,211 @@ class InventoryItemStackQueryDataTest {
     assertThat(((GameItem) seeded.get(1)[0]).getId()).isEqualTo(shieldItem.getId());
     assertThat(((Number) seeded.get(1)[1]).doubleValue()).isEqualTo(7.0);
   }
+
+  // --- select-all flat entry-id queries (REQ-INV-034) ------------------------
+
+  /**
+   * The material select-all id query ({@link InventoryItemRepository#findUserEntryIds}) returns the
+   * raw ids of <em>every</em> matching material entry the owner holds — the flat companion of
+   * {@link InventoryItemRepository#findUserStacks} — never rolled up per stack. It must be
+   * owner-scoped (no other user's rows), exclude game-item rows (the {@code i.material IS NOT NULL}
+   * guard, V220), and return separate ids for two entries that share one stack (so a bulk check-out
+   * can span the whole stack, not just its grouped row). Seeds two material entries at the same
+   * location for the owner, one item entry for the owner (must be excluded) and one material entry
+   * for another user (must be excluded).
+   */
+  // covers REQ-INV-034 (material select-all returns all own material entry ids, owner-scoped,
+  // item rows excluded)
+  @Test
+  void findUserEntryIds_returnsAllOwnMaterialEntries_excludesOtherUsersAndItemRows() {
+    User owner = new User();
+    owner.setId(UUID.randomUUID());
+    owner.setUsername("u-" + UUID.randomUUID());
+    userRepository.save(owner);
+
+    User other = new User();
+    other.setId(UUID.randomUUID());
+    other.setUsername("u-" + UUID.randomUUID());
+    userRepository.save(other);
+
+    Location location = new Location();
+    location.setName("Hub-" + UUID.randomUUID());
+    locationRepository.save(location);
+
+    Material material = new Material();
+    material.setName("Quantanium-" + UUID.randomUUID());
+    material.setType(MaterialType.RAW);
+    materialRepository.save(material);
+
+    GameItem gameItem = new GameItem();
+    gameItem.setName("Quantum-Drive-" + UUID.randomUUID());
+    gameItemRepository.save(gameItem);
+
+    InventoryItem ownerEntryOne = new InventoryItem();
+    ownerEntryOne.setUser(owner);
+    ownerEntryOne.setLocation(location);
+    ownerEntryOne.setMaterial(material);
+    ownerEntryOne.setQuality(800);
+    ownerEntryOne.setAmount(10.0);
+    ownerEntryOne.setPersonal(false);
+    inventoryItemRepository.save(ownerEntryOne);
+
+    InventoryItem ownerEntryTwo = new InventoryItem();
+    ownerEntryTwo.setUser(owner);
+    ownerEntryTwo.setLocation(location);
+    ownerEntryTwo.setMaterial(material);
+    ownerEntryTwo.setQuality(800);
+    ownerEntryTwo.setAmount(5.0);
+    ownerEntryTwo.setPersonal(false);
+    inventoryItemRepository.save(ownerEntryTwo);
+
+    InventoryItem ownerItemEntry = new InventoryItem();
+    ownerItemEntry.setUser(owner);
+    ownerItemEntry.setLocation(location);
+    ownerItemEntry.setGameItem(gameItem);
+    ownerItemEntry.setAmount(3.0);
+    ownerItemEntry.setPersonal(false);
+    inventoryItemRepository.save(ownerItemEntry);
+
+    InventoryItem otherEntry = new InventoryItem();
+    otherEntry.setUser(other);
+    otherEntry.setLocation(location);
+    otherEntry.setMaterial(material);
+    otherEntry.setQuality(800);
+    otherEntry.setAmount(99.0);
+    otherEntry.setPersonal(false);
+    inventoryItemRepository.save(otherEntry);
+    entityManager.flush();
+
+    List<UUID> ids =
+        inventoryItemRepository.findUserEntryIds(
+            owner.getId(), false, null, null, false, null, false, null, false, false);
+
+    assertThat(ids)
+        .as(
+            "material select-all returns every own material entry id (both entries of the shared"
+                + " stack), excluding the item row and the other user's row")
+        .containsExactlyInAnyOrder(ownerEntryOne.getId(), ownerEntryTwo.getId());
+  }
+
+  /**
+   * The material select-all id query honours the same mutually exclusive personal / non-personal
+   * toggles as the grouped view: {@code personalOnly = true} returns only the caller's private
+   * entry ids, {@code nonPersonalOnly = true} only the shared ones. Seeds one personal and one
+   * shared material entry for the owner and pins each toggle to its own id.
+   */
+  // covers REQ-INV-034 (material select-all id query respects the personal-only toggles)
+  @Test
+  void findUserEntryIds_personalAndNonPersonalOnly_narrowToMatchingEntries() {
+    User owner = new User();
+    owner.setId(UUID.randomUUID());
+    owner.setUsername("u-" + UUID.randomUUID());
+    userRepository.save(owner);
+
+    Location location = new Location();
+    location.setName("Hub-" + UUID.randomUUID());
+    locationRepository.save(location);
+
+    Material material = new Material();
+    material.setName("Astatine-" + UUID.randomUUID());
+    material.setType(MaterialType.RAW);
+    materialRepository.save(material);
+
+    InventoryItem personal = new InventoryItem();
+    personal.setUser(owner);
+    personal.setLocation(location);
+    personal.setMaterial(material);
+    personal.setQuality(500);
+    personal.setAmount(10.0);
+    personal.setPersonal(true);
+    inventoryItemRepository.save(personal);
+
+    InventoryItem shared = new InventoryItem();
+    shared.setUser(owner);
+    shared.setLocation(location);
+    shared.setMaterial(material);
+    shared.setQuality(600);
+    shared.setAmount(25.0);
+    shared.setPersonal(false);
+    inventoryItemRepository.save(shared);
+    entityManager.flush();
+
+    assertThat(
+            inventoryItemRepository.findUserEntryIds(
+                owner.getId(), false, null, null, false, null, false, null, true, false))
+        .as("personalOnly=true returns only the private entry id")
+        .containsExactly(personal.getId());
+    assertThat(
+            inventoryItemRepository.findUserEntryIds(
+                owner.getId(), false, null, null, false, null, false, null, false, true))
+        .as("nonPersonalOnly=true returns only the shared entry id")
+        .containsExactly(shared.getId());
+    assertThat(
+            inventoryItemRepository.findUserEntryIds(
+                owner.getId(), false, null, null, false, null, false, null, false, false))
+        .as("both toggles false returns both entry ids")
+        .containsExactlyInAnyOrder(personal.getId(), shared.getId());
+  }
+
+  /**
+   * The game-item select-all id query ({@link InventoryItemRepository#findUserItemEntryIds})
+   * returns the ids of every matching game-item entry the owner holds and excludes material rows
+   * (the {@code i.gameItem IS NOT NULL} guard). Seeds two item entries and one material entry for
+   * the owner and asserts only the item ids come back.
+   */
+  // covers REQ-INV-034 (item select-all returns all own item entry ids, material rows excluded)
+  @Test
+  void findUserItemEntryIds_returnsAllOwnItemEntries_excludesMaterialRows() {
+    User owner = new User();
+    owner.setId(UUID.randomUUID());
+    owner.setUsername("u-" + UUID.randomUUID());
+    userRepository.save(owner);
+
+    Location location = new Location();
+    location.setName("Hub-" + UUID.randomUUID());
+    locationRepository.save(location);
+
+    Material material = new Material();
+    material.setName("Quantanium-" + UUID.randomUUID());
+    material.setType(MaterialType.RAW);
+    materialRepository.save(material);
+
+    GameItem gameItem = new GameItem();
+    gameItem.setName("Quantum-Drive-" + UUID.randomUUID());
+    gameItemRepository.save(gameItem);
+
+    InventoryItem itemEntryOne = new InventoryItem();
+    itemEntryOne.setUser(owner);
+    itemEntryOne.setLocation(location);
+    itemEntryOne.setGameItem(gameItem);
+    itemEntryOne.setAmount(2.0);
+    itemEntryOne.setPersonal(false);
+    inventoryItemRepository.save(itemEntryOne);
+
+    InventoryItem itemEntryTwo = new InventoryItem();
+    itemEntryTwo.setUser(owner);
+    itemEntryTwo.setLocation(location);
+    itemEntryTwo.setGameItem(gameItem);
+    itemEntryTwo.setAmount(3.0);
+    itemEntryTwo.setPersonal(false);
+    inventoryItemRepository.save(itemEntryTwo);
+
+    InventoryItem materialEntry = new InventoryItem();
+    materialEntry.setUser(owner);
+    materialEntry.setLocation(location);
+    materialEntry.setMaterial(material);
+    materialEntry.setQuality(800);
+    materialEntry.setAmount(100.0);
+    materialEntry.setPersonal(false);
+    inventoryItemRepository.save(materialEntry);
+    entityManager.flush();
+
+    List<UUID> ids =
+        inventoryItemRepository.findUserItemEntryIds(
+            owner.getId(), false, null, false, null, false, false);
+
+    assertThat(ids)
+        .as("item select-all returns every own item entry id, excluding the material row")
+        .containsExactlyInAnyOrder(itemEntryOne.getId(), itemEntryTwo.getId());
+  }
 }

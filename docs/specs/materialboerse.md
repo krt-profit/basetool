@@ -397,6 +397,16 @@ game-item row releases a **stock-backed item offer**: a `MaterialExchangeOffer` 
 - **No quality, no location.** Like every item offer, the board shows the item name + quantity (Stück),
   no quality; a non-zero min-quality filter excludes it (a stock-backed row carries no quality either).
 
+**Two entry points.** A stock-backed item offer is released either from the board's "Material
+anbieten" picker (which lists the caller's game-item rows alongside their material rows) or from the
+**Mein-Lager Items view**, whose item leaf carries the same per-row "Für Börse freigeben" toggle as
+the material leaf (REQ-MARKET-002) — the item sibling of the material Lager checkbox. Both post the
+same `release` (the backend detects the game-item row and creates the `ITEM` offer); un-checking the
+toggle deactivates the row's active offer (`/items/{inventoryItemId}/deactivate`). The item leaf's
+checked / "Auf Börse" state comes from the batch `released-item-ids` lookup, which is kind-agnostic
+(it keys on the inventory row, not its catalog kind). The toggle is **owner-only** and lives on the
+personal Lager only — the global (`/inventory/all`) item view has none, exactly as the material leaf.
+
 `MaterialExchangeService.updateOffer` is **kind-aware** (fixing the pre-existing defect where it
 dereferenced a null `inventoryItem` on any item offer): a material offer validates `offeredAmount` vs
 stock, a stock-backed item offer `itemQuantity` vs stock, a free-stated item offer `itemQuantity ≥ 1`.
@@ -419,16 +429,22 @@ duplicate.
 - [ ] Editing an item offer works (was impossible — the pre-fix `updateOffer` NPEd on the null Lager
 row); a stock-backed edit re-validates the new quantity against current stock (400 if it exceeds it).
 - [ ] The free-stated item offer (REQ-MARKET-012) remains fully supported.
+- [ ] The Mein-Lager Items-view item leaf carries the "Für Börse freigeben" toggle; checking it
+releases the row's stock-backed item offer and un-checking deactivates it, exactly like the material
+leaf (owner-only; the global item view has no toggle). Its checked state comes from the kind-agnostic
+`released-item-ids` lookup the item stack-entries endpoint now runs.
 
 **Enforced by:** `MaterialExchangeServiceTest`, `MaterialExchangeOfferClampDataTest`,
-`InventoryItemCatalogQueryDataTest`, `MaterialboersePageControllerMvcTest` · **Code:**
+`InventoryItemCatalogQueryDataTest`, `MaterialboersePageControllerMvcTest`,
+`InventoryPageControllerMvcTest` (item-leaf toggle) · **Code:**
 `MaterialExchangeService#release`/`#releaseFromItemStock`/`#updateOffer`,
 `BlueprintProductService#resolveByGameItem`,
 `MaterialExchangeOfferRepository#clampItemQuantityToStock`/`#findBoard`,
 `InventoryItemRepository#findReleasableForUser`, `MaterialExchangeBoardService` (effective item
 quantity + releasable picker), `InventoryCheckoutService#ratchetBoardOffersToStock`,
+`InventoryPageController#viewMyGameItemStackEntries` (item-leaf `releasedItemIds`),
 `db/migration/V221__relax_material_exchange_item_offer_stock_link.sql`, `materialboerse.html`,
-`materialboerse-release.js`
+`inventory-stack-entries.html`, `inventory-materialboerse.js`, `materialboerse-release.js`
 
 ## Out of scope
 

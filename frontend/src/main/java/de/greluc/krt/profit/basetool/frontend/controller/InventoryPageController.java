@@ -626,6 +626,88 @@ public class InventoryPageController {
   }
 
   /**
+   * Ids of every one of the caller's own inventory entries matching the current {@code
+   * /inventory/my} filter — the JSON companion of {@link #viewMyInventory} that backs the "Alle
+   * markieren" (select-all) button (REQ-INV-034). The grouped tree lazy-loads and paginates each
+   * stack, so a client-side "check every visible box" would silently miss collapsed stacks and
+   * later pages; this proxy relays the same filter + view to the backend's {@code
+   * /api/v1/inventory/my-inventory/entry-ids} so the browser can select the complete filtered view
+   * in one call and drive a bulk check-out over it. Owner-scoped by the backend from the JWT.
+   *
+   * <p>The {@code view} switch mirrors {@link #viewMyInventory}: the items view relays {@code
+   * catalog=ITEM} with the {@code gameItemIds} / {@code jobOrderIds} / personal-flag filters (no
+   * quality or mission dimension), the material view relays the material / min-quality / job-order
+   * / mission / personal filters. The free-text-free, id-only params are appended via {@link
+   * org.springframework.web.util.UriComponentsBuilder} so no re-encoding trap applies.
+   *
+   * @param view {@code "items"} for the game-item view, anything else (or absent) for material
+   * @param materialIds optional material id filter (multi; material view only)
+   * @param minQuality optional minimum-quality filter (material view only)
+   * @param jobOrderIds optional job-order id filter (multi; both views)
+   * @param missionIds optional mission id filter (multi; material view only)
+   * @param gameItemIds optional game-item id filter (multi; items view only)
+   * @param personalOnly when true, restrict to the caller's personal entries
+   * @param nonPersonalOnly when true, restrict to the caller's shared entries (mutually exclusive
+   *     with {@code personalOnly})
+   * @return the ids of every matching entry, in creation order; never {@code null}
+   */
+  @GetMapping("/my/entry-ids")
+  @org.springframework.web.bind.annotation.ResponseBody
+  public List<UUID> myEntryIds(
+      @RequestParam(required = false) String view,
+      @RequestParam(required = false) List<UUID> materialIds,
+      @RequestParam(required = false) Integer minQuality,
+      @RequestParam(required = false) List<UUID> jobOrderIds,
+      @RequestParam(required = false) List<UUID> missionIds,
+      @RequestParam(required = false) List<UUID> gameItemIds,
+      @RequestParam(required = false, defaultValue = "false") boolean personalOnly,
+      @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly) {
+    org.springframework.web.util.UriComponentsBuilder uriBuilder =
+        org.springframework.web.util.UriComponentsBuilder.fromPath(
+            "/api/v1/inventory/my-inventory/entry-ids");
+    if (isItemsView(view)) {
+      uriBuilder.queryParam("catalog", "ITEM");
+      if (gameItemIds != null && !gameItemIds.isEmpty()) {
+        for (UUID id : gameItemIds) {
+          uriBuilder.queryParam("gameItemIds", id.toString());
+        }
+      }
+      if (jobOrderIds != null && !jobOrderIds.isEmpty()) {
+        for (UUID id : jobOrderIds) {
+          uriBuilder.queryParam("jobOrderIds", id.toString());
+        }
+      }
+    } else {
+      if (materialIds != null && !materialIds.isEmpty()) {
+        for (UUID id : materialIds) {
+          uriBuilder.queryParam("materialIds", id.toString());
+        }
+      }
+      if (minQuality != null) {
+        uriBuilder.queryParam("minQuality", minQuality);
+      }
+      if (jobOrderIds != null && !jobOrderIds.isEmpty()) {
+        for (UUID id : jobOrderIds) {
+          uriBuilder.queryParam("jobOrderIds", id.toString());
+        }
+      }
+      if (missionIds != null && !missionIds.isEmpty()) {
+        for (UUID id : missionIds) {
+          uriBuilder.queryParam("missionIds", id.toString());
+        }
+      }
+    }
+    if (personalOnly) {
+      uriBuilder.queryParam("personalOnly", true);
+    }
+    if (nonPersonalOnly) {
+      uriBuilder.queryParam("nonPersonalOnly", true);
+    }
+    List<UUID> ids = backendApiClient.get(uriBuilder.build().toUriString(), UUID_LIST);
+    return ids != null ? ids : List.of();
+  }
+
+  /**
    * Fetches one grouped item-inventory result ({@code catalog=ITEM}, REQ-INV-030) from the given
    * backend grouped endpoint, relaying the item view's filter dimensions (gameItems, job orders and
    * — on {@code /my} — the personal flags). Quality and mission filters do not exist for item rows
@@ -909,8 +991,9 @@ public class InventoryPageController {
    * /api/v1/inventory/my-inventory/stack/entries}. Renders the same {@code stackEntriesMy}
    * fragment, whose rows branch per row kind (an item entry renders without quality or mission
    * split and with whole amounts). No mission catalog is loaded (item rows cannot carry mission
-   * allocations, REQ-INV-031) and no Materialbörse released-ids lookup runs (item rows cannot back
-   * an offer yet, design §8).
+   * allocations, REQ-INV-031), but the {@code releasedItemIds} lookup runs exactly like the
+   * material sibling so the item leaf's "Für Börse freigeben" toggle renders its checked / "Auf
+   * Börse" state (stock-backed item offers, REQ-MARKET-002/014).
    *
    * @param gameItemId the stack's game item (from the enclosing group)
    * @param locationId the stack's storage location
@@ -947,6 +1030,7 @@ public class InventoryPageController {
       uriBuilder.queryParam("size", size);
     }
     fetchStackEntriesIntoModel(uriBuilder.build().toUriString(), model, false);
+    addReleasedItemIds(model);
     return "fragments/inventory-stack-entries :: stackEntriesMy";
   }
 

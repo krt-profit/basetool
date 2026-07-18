@@ -487,6 +487,101 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("nonPersonalOnly") boolean nonPersonalOnly);
 
   /**
+   * Flat companion of {@link #findUserStacks} (REQ-INV-034): returns the ids of <em>every</em>
+   * individual material {@link InventoryItem} the calling user owns that matches the "Mein Lager"
+   * material filter surface — across every stack and unbounded by the lazy per-stack pagination —
+   * so the frontend's "Alle markieren" (select-all) can drive a bulk check-out over the complete
+   * filtered view rather than only the entries currently expanded on screen. The {@code WHERE}
+   * clause is byte-for-byte the same optional-filter contract as {@link #findUserStacks} (same
+   * material / min-quality / job-order / mission gates and the mutually exclusive {@code
+   * personalOnly} / {@code nonPersonalOnly} toggles), minus the aggregation: it selects the raw
+   * entry ids instead of the per-stack roll-up, so it can never widen the row set the grouped view
+   * shows. Owner-scoped to {@code :userId} at the data layer (no impersonation). Ordered by {@code
+   * createdAt} for a stable result.
+   *
+   * <p>Material rows only ({@code catalog=MATERIAL}): the {@code i.material IS NOT NULL} guard
+   * keeps game-item rows (V220, REQ-INV-029) out; the item companion is {@link
+   * #findUserItemEntryIds}.
+   *
+   * @param userId the owning user whose entry ids to collect.
+   * @param hasMaterials gates the {@code materialIds} clause.
+   * @param materialIds the materials to narrow to; ignored when {@code hasMaterials} is false.
+   * @param minQuality optional quality floor, or {@code null} for no floor.
+   * @param hasJobOrders gates the {@code jobOrderIds} clause.
+   * @param jobOrderIds the earmarked orders to narrow to; ignored when {@code hasJobOrders} is
+   *     false.
+   * @param hasMissions gates the {@code missionIds} clause.
+   * @param missionIds the earmarked missions to narrow to; ignored when {@code hasMissions} is
+   *     false.
+   * @param personalOnly {@code true} narrows to the caller's private stock rows.
+   * @param nonPersonalOnly {@code true} narrows to the caller's shared stock rows.
+   * @return the ids of every matching material entry the user owns; never {@code null}.
+   */
+  @Query(
+      """
+      SELECT i.id FROM InventoryItem i
+      WHERE i.user.id = :userId AND i.material IS NOT NULL
+      AND (:personalOnly = false OR i.personal = true)
+      AND (:nonPersonalOnly = false OR i.personal = false)
+      AND (:hasMaterials = false OR i.material.id IN :materialIds) AND (:minQuality IS NULL
+      OR i.quality >= :minQuality) AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM
+      InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id IN
+      :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM
+      InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN
+      :missionIds)) ORDER BY i.createdAt ASC
+      """)
+  List<UUID> findUserEntryIds(
+      @Param("userId") UUID userId,
+      @Param("hasMaterials") boolean hasMaterials,
+      @Param("materialIds") List<UUID> materialIds,
+      @Param("minQuality") Integer minQuality,
+      @Param("hasJobOrders") boolean hasJobOrders,
+      @Param("jobOrderIds") List<UUID> jobOrderIds,
+      @Param("hasMissions") boolean hasMissions,
+      @Param("missionIds") List<UUID> missionIds,
+      @Param("personalOnly") boolean personalOnly,
+      @Param("nonPersonalOnly") boolean nonPersonalOnly);
+
+  /**
+   * Game-item companion of {@link #findUserEntryIds} (REQ-INV-034): returns the ids of every
+   * individual game-item {@link InventoryItem} the calling user owns that matches the item-view
+   * filter surface, so the "Alle markieren" select-all covers the whole filtered {@code view=items}
+   * tree and not only the expanded stacks. Same optional-filter contract as {@link
+   * #findUserItemStacks} (game-item / job-order gates and the mutually exclusive personal toggles);
+   * no quality floor and no mission filter exist for items (REQ-INV-031). Owner-scoped to {@code
+   * :userId}; ordered by {@code createdAt} for stability.
+   *
+   * @param userId the owning user whose item entry ids to collect.
+   * @param hasGameItems gates the {@code gameItemIds} clause.
+   * @param gameItemIds the game items to narrow to; ignored when {@code hasGameItems} is false.
+   * @param hasJobOrders gates the {@code jobOrderIds} clause.
+   * @param jobOrderIds the earmarked orders to narrow to; ignored when {@code hasJobOrders} is
+   *     false.
+   * @param personalOnly {@code true} narrows to the caller's private stock rows.
+   * @param nonPersonalOnly {@code true} narrows to the caller's shared stock rows.
+   * @return the ids of every matching game-item entry the user owns; never {@code null}.
+   */
+  @Query(
+      """
+      SELECT i.id FROM InventoryItem i
+      WHERE i.user.id = :userId AND i.gameItem IS NOT NULL
+      AND (:personalOnly = false OR i.personal = true)
+      AND (:nonPersonalOnly = false OR i.personal = false)
+      AND (:hasGameItems = false OR i.gameItem.id IN :gameItemIds)
+      AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja
+      WHERE ja.inventoryItem = i AND ja.jobOrder.id IN :jobOrderIds))
+      ORDER BY i.createdAt ASC
+      """)
+  List<UUID> findUserItemEntryIds(
+      @Param("userId") UUID userId,
+      @Param("hasGameItems") boolean hasGameItems,
+      @Param("gameItemIds") List<UUID> gameItemIds,
+      @Param("hasJobOrders") boolean hasJobOrders,
+      @Param("jobOrderIds") List<UUID> jobOrderIds,
+      @Param("personalOnly") boolean personalOnly,
+      @Param("nonPersonalOnly") boolean nonPersonalOnly);
+
+  /**
    * Lazily loads one global stack's underlying entries, oldest-first, paginated — the per-stack
    * drill-down for the squadron-wide Lager view. The stack is identified by its stock-identity
    * tuple (material, owner, location, quality, optional job order / mission, owning org-unit pool);
