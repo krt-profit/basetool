@@ -36,6 +36,9 @@
                 {
                     itemId: itemId,
                     material: el.getAttribute('data-material'),
+                    // 'ITEM' for a game-item row (a stock-backed item offer, REQ-MARKET-014) — the
+                    // modal then hides the quality fact; absent/null for a material row.
+                    kind: el.getAttribute('data-kind'),
                     quality: el.getAttribute('data-quality'),
                     amount: el.getAttribute('data-amount'),
                     quantityType: el.getAttribute('data-quantity-type'),

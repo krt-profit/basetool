@@ -256,12 +256,14 @@
             qtyInput.value = '';
         }
         if (!isItem) {
-            // A stock-backed item offer edit (REQ-MARKET-014): the amount block edits the whole-unit
-            // item quantity (ctx.quantityType === 'PIECE', ctx.available = the backing row's stock)
-            // and there is no quality — the facts show the item name only.
-            let isStockItemEdit = isEdit && ctx.kind === 'ITEM';
-            setFacts(ctx.material, isStockItemEdit ? null : ctx.quality);
-            toggleQualityFact(!isStockItemEdit);
+            // A stock-backed item row (REQ-MARKET-014), whether an 'edit' of its offer or a fresh
+            // 'lager' release from the Mein-Lager item leaf toggle: the amount block edits the
+            // whole-unit item quantity (ctx.quantityType === 'PIECE', ctx.available = the backing
+            // row's stock) and there is no quality — the facts show the item name only. A material
+            // row (ctx.kind absent) keeps its quality fact.
+            let isStockItem = ctx.kind === 'ITEM';
+            setFacts(ctx.material, isStockItem ? null : ctx.quality);
+            toggleQualityFact(!isStockItem);
             if (isNew) {
                 // No row picked yet: disable the amount field until the picker selection sets its max
                 // (and pickItem decides whether the picked row carries a quality fact).
