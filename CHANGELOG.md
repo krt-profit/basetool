@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Lager/Materialbörse: Items lassen sich jetzt direkt in „Mein Lager" (Ansicht „Items") für die Börse freigeben.** Jede Item-Bestandszeile trägt – wie schon die Material-Zeilen – die Checkbox „Für Börse freigeben"; das Anhaken öffnet den Freigabe-Dialog und stellt den Posten als bestandsgedecktes Item-Angebot ein, das Abhaken nimmt ihn wieder heraus. Bisher war das nur über „Material anbieten" auf der Börse selbst möglich (REQ-MARKET-002/014).
+
 ## [v1.5.1](https://github.com/krt-profit/basetool/releases/tag/v1.5.1) - 2026-07-17
 
 ### Fixed

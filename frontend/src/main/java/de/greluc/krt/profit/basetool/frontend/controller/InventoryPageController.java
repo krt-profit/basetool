@@ -909,8 +909,9 @@ public class InventoryPageController {
    * /api/v1/inventory/my-inventory/stack/entries}. Renders the same {@code stackEntriesMy}
    * fragment, whose rows branch per row kind (an item entry renders without quality or mission
    * split and with whole amounts). No mission catalog is loaded (item rows cannot carry mission
-   * allocations, REQ-INV-031) and no Materialbörse released-ids lookup runs (item rows cannot back
-   * an offer yet, design §8).
+   * allocations, REQ-INV-031), but the {@code releasedItemIds} lookup runs exactly like the
+   * material sibling so the item leaf's "Für Börse freigeben" toggle renders its checked / "Auf
+   * Börse" state (stock-backed item offers, REQ-MARKET-002/014).
    *
    * @param gameItemId the stack's game item (from the enclosing group)
    * @param locationId the stack's storage location
@@ -947,6 +948,7 @@ public class InventoryPageController {
       uriBuilder.queryParam("size", size);
     }
     fetchStackEntriesIntoModel(uriBuilder.build().toUriString(), model, false);
+    addReleasedItemIds(model);
     return "fragments/inventory-stack-entries :: stackEntriesMy";
   }
 

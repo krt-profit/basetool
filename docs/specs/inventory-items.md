@@ -70,10 +70,15 @@ ignored (`minQuality`/`missionIds`/`materialIds` under `ITEM`, `gameItemIds` und
   by `gameItem.name` where the material default was `material.name`.
 - [ ] Peer live-sync refreshes whichever view is active (single `inventory`/`stock`
   seam, REQ-FE-015 — no new section keys).
+- [ ] Each Mein-Lager (`/inventory/my`) item leaf carries the "Für Börse freigeben" toggle —
+  releasing a stock-backed item offer (REQ-MARKET-002/014); its checked / "Auf Börse" state comes
+  from the `releasedItemIds` lookup the item stack-entries endpoint now runs. The global
+  (`/inventory/all`) item view has no toggle (owner-only, personal Lager), exactly as the material
+  leaf.
 
-**Enforced by:** `InventoryItemControllerTest` catalog cases, item-view e2e (PR 3) ·
-**Code:** `InventoryItemController`, `InventoryAggregationService`,
-`InventoryPageController` (PR 3) · **Issues:** —
+**Enforced by:** `InventoryItemControllerTest` catalog cases, `InventoryPageControllerMvcTest`
+item-toggle cases, item-view e2e · **Code:** `InventoryItemController`,
+`InventoryAggregationService`, `InventoryPageController` · **Issues:** —
 
 ### REQ-INV-031 — Item allocations only to qualifying ITEM orders; no mission dimension
 
@@ -129,10 +134,11 @@ book-in section shipped.
 
 ## Out of scope
 
-Materialbörse stock-backed item offers (Phase 5, design §8), non-blueprint items, and the
-"Mein Inventar" boundary (design §11). The order-detail item-stock panel shipped as
-REQ-ORDERS-028 and delivery-consumes-earmarked-stock (best-effort) as REQ-ORDERS-030 (both
-[`orders-item-production.md`](orders-item-production.md)).
+Non-blueprint items and the "Mein Inventar" boundary (design §11). Materialbörse stock-backed
+item offers (design §8) shipped as REQ-MARKET-014 ([`materialboerse.md`](materialboerse.md)) —
+including the Mein-Lager Items-view "Für Börse freigeben" leaf toggle (see REQ-INV-030). The
+order-detail item-stock panel shipped as REQ-ORDERS-028 and delivery-consumes-earmarked-stock
+(best-effort) as REQ-ORDERS-030 (both [`orders-item-production.md`](orders-item-production.md)).
 
 ## Open questions
 
