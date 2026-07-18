@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.3](https://github.com/krt-profit/basetool/releases/tag/v1.5.3) - 2026-07-18
+
 ### Changed
 
 - **Kartellbank: Die mittlere Freigabestufe des KRT-Kontos genehmigt jetzt die Bankleitung statt des Bereichsleiters Profit.** Auszahlungen/Transfers zwischen den beiden Schwellen `T1` und `T2` gehen zur Freigabe an die Bankleitung, darüber weiterhin an die Organisationsleitung; die Anzeige in „KRT-Freigaben" und auf der Kontodetailseite ist entsprechend angepasst (REQ-BANK-047, ADR-0109).
