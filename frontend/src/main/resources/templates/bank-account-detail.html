@@ -24,7 +24,7 @@
 </header>
 
 <main class="bank-detail" th:if="${detail != null}" th:with="acct=${detail.account()}, caps=${detail.capabilities()}"
-      th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available},data-bank-account-id=${acct.id()},data-user-id=${#authentication.name},data-transfer-fee-rate=${transferFeeRate}">
+      th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-approval-request-filed=#{bank.movement.approvalRequestFiled},data-bank-livesync-updates=#{livesync.updates_available},data-bank-account-id=${acct.id()},data-user-id=${#authentication.name},data-transfer-fee-rate=${transferFeeRate}">
     <!-- In-place money writes (REQ-FE-005, #579): deposit/withdraw/transfer/reverse re-render this
          whole body via krtFetch (fragment=accountBody) so the balance and booking history refresh
          without a page reload. The money forms carry no @Version (append-only ledger), so there is no

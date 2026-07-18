@@ -233,7 +233,7 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
    * before a bank employee may confirm it; {@code null} unless {@link #requiresOwnerApproval} is
    * set. For every request-capable account except the KRT account this is {@link
    * BankRequestApprover#RESPONSIBLE_HOLDER}; for a KRT (CARTEL) withdrawal/transfer it is the
-   * amount-band approver ({@link BankRequestApprover#AREA_LEAD_PROFIT} / {@link
+   * amount-band approver ({@link BankRequestApprover#BANK_MANAGEMENT} / {@link
    * BankRequestApprover#ORGANISATIONSLEITUNG}). The org-unit-aware seam resolves the band and, on
    * the "Fremde Anträge" surface, who may act on it; the org-unit-blind confirm path never reads
    * this. Immutable.

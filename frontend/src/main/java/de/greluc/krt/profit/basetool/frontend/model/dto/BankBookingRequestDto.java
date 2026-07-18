@@ -58,8 +58,8 @@ import org.jetbrains.annotations.Nullable;
  *     (REQ-BANK-041)
  * @param applicableLimit the requester's resolved approval limit, or {@code null} = unlimited
  * @param requiredApprover which approver class a flagged request needs (REQ-BANK-041/-046) — {@code
- *     RESPONSIBLE_HOLDER} / {@code AREA_LEAD_PROFIT} / {@code ORGANISATIONSLEITUNG}, or {@code
- *     null} when no approval is needed
+ *     RESPONSIBLE_HOLDER} / {@code BANK_MANAGEMENT} / {@code ORGANISATIONSLEITUNG}, or {@code null}
+ *     when no approval is needed
  * @param ownerApprovalGranted whether the responsible holder has granted in-app approval
  * @param ownerApprovalGrantedByHandle the responsible holder's handle who granted approval, or
  *     {@code null}

@@ -356,6 +356,35 @@ class GlobalExceptionHandlerTest {
     assertEquals(Boolean.FALSE, body.get("reloadHint"));
   }
 
+  @Test
+  void bankOwnerApprovalRequired409_mapsToDedicatedKey_notUnexpected() {
+    // Regression for the "Ein unerwarteter Fehler" incident: booking-request/justification/fee 409
+    // codes were absent from the code→message map and fell through to error.unexpected. They must
+    // now resolve to their dedicated error.bank.* key (here BANK_OWNER_APPROVAL_REQUIRED) so the
+    // user sees the real reason inline instead of the generic text.
+    BackendServiceException ex =
+        new BackendServiceException(
+            "needs approval",
+            null,
+            409,
+            "BANK_OWNER_APPROVAL_REQUIRED",
+            "corr-bank",
+            List.of(),
+            null);
+
+    Object result = handler.handleBackendServiceException(ex, jsonRequest(), new ConcurrentModel());
+
+    assertInstanceOf(ResponseEntity.class, result);
+    ResponseEntity<?> response = (ResponseEntity<?>) result;
+    assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+    @SuppressWarnings("unchecked")
+    Map<String, Object> body = (Map<String, Object>) response.getBody();
+    assertNotNull(body);
+    assertEquals("BANK_OWNER_APPROVAL_REQUIRED", body.get("code"));
+    assertEquals("error.bank.ownerApprovalRequired", body.get("message"));
+    assertEquals(Boolean.FALSE, body.get("reloadHint"));
+  }
+
   // ─── handleNoResourceFoundException ─────────────────────────────────────
 
   @Test

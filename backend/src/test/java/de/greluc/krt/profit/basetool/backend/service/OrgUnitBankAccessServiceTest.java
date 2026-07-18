@@ -1186,7 +1186,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(true),
             eq(new BigDecimal("1000")),
-            eq(BankRequestApprover.AREA_LEAD_PROFIT),
+            eq(BankRequestApprover.BANK_MANAGEMENT),
             eq(false),
             eq(null)))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
@@ -1203,7 +1203,7 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(true),
             eq(new BigDecimal("1000")),
-            eq(BankRequestApprover.AREA_LEAD_PROFIT),
+            eq(BankRequestApprover.BANK_MANAGEMENT),
             eq(false),
             eq(null));
   }
@@ -1292,10 +1292,40 @@ class OrgUnitBankAccessServiceTest {
   }
 
   @Test
-  void createBookingRequest_krtAboveT1_unsetAreaLeadCeiling_routesToBereichsleiterProfit() {
-    // REQ-BANK-047: on the KRT (CARTEL) account an UNSET area-lead ceiling (T2 == null) means the
-    // Bereichsleiter Profit covers everything above T1 and the Organisationsleitung band is empty.
-    // An over-T1 request with T2 unset must route to AREA_LEAD_PROFIT via the `t2 == null ||`
+  void grantOwnerApproval_byAdmin_approvesAnyKrtBand() {
+    // REQ-BANK-047/ADR-0109: an admin may approve every KRT band, not just its band approver.
+    // canApprove short-circuits on isAdmin() before the band switch, so a BANK_MANAGEMENT-band
+    // request is granted WITHOUT stubbing hasReachableRole(BANK_MANAGEMENT) — proving the admin
+    // bypass (the same short-circuit covers the ORGANISATIONSLEITUNG band). A regression that
+    // dropped the admin bypass would fall into the switch, find hasBankManagement() == false and
+    // throw AccessDenied instead of delegating.
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankAccount cartel =
+        typedAccount(
+            accountId, "KB-0003", BankAccountType.CARTEL, squadron(UUID.randomUUID(), "OL", "OL"));
+    BankBookingRequest bookingRequest = new BankBookingRequest();
+    bookingRequest.setAccount(cartel);
+    bookingRequest.setStatus(BankBookingRequestStatus.PENDING);
+    bookingRequest.setRequiresOwnerApproval(true);
+    bookingRequest.setRequiredApprover(BankRequestApprover.BANK_MANAGEMENT);
+    when(authHelperService.isAdmin()).thenReturn(true);
+    when(bankBookingRequestRepository.findByIdForUpdate(requestId))
+        .thenReturn(Optional.of(bookingRequest));
+    when(bankBookingRequestService.applyOwnerApprovalWithinTransaction(bookingRequest, true))
+        .thenReturn(requestDto(accountId, UUID.randomUUID()));
+
+    BankBookingRequestDto dto = service.grantOwnerApproval(requestId);
+
+    assertThat(dto).isNotNull();
+    verify(bankBookingRequestService).applyOwnerApprovalWithinTransaction(bookingRequest, true);
+  }
+
+  @Test
+  void createBookingRequest_krtAboveT1_unsetAreaLeadCeiling_routesToBankManagement() {
+    // REQ-BANK-047/ADR-0109: on the KRT (CARTEL) account an UNSET area-lead ceiling (T2 == null)
+    // means the Bankleitung covers everything above T1 and the Organisationsleitung band is empty.
+    // An over-T1 request with T2 unset must route to BANK_MANAGEMENT via the `t2 == null ||`
     // short-circuit — never NPE on compareTo(null) nor mis-route to ORGANISATIONSLEITUNG. The three
     // existing ladder tests only exercise the both-thresholds-set path, so this pins the null
     // guard.
@@ -1322,14 +1352,14 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(true),
             eq(new BigDecimal("1000")),
-            eq(BankRequestApprover.AREA_LEAD_PROFIT),
+            eq(BankRequestApprover.BANK_MANAGEMENT),
             eq(false),
             eq(null)))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
     service.createBookingRequest(request);
 
-    // The single create call routed to AREA_LEAD_PROFIT with the T1 display ceiling — never
+    // The single create call routed to BANK_MANAGEMENT with the T1 display ceiling — never
     // ORGANISATIONSLEITUNG, whose band is empty when T2 is unset.
     verify(bankBookingRequestService)
         .create(
@@ -1341,7 +1371,99 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(true),
             eq(new BigDecimal("1000")),
-            eq(BankRequestApprover.AREA_LEAD_PROFIT),
+            eq(BankRequestApprover.BANK_MANAGEMENT),
+            eq(false),
+            eq(null));
+  }
+
+  @Test
+  void raiseCartelDirectBookingRequest_middleBand_routesToBankManagement() {
+    // REQ-BANK-047/ADR-0109: the bank-staff over-ceiling auto-request path files a band-routed
+    // request via the SAME create() call as the officer path, but without the canView/canRequest
+    // gate (the caller already passed the BankSecurityService capability gate) and carrying the
+    // direct-booking note + justification. T1 < 3000 <= T2 routes to the Bankleitung.
+    UUID accountId = UUID.randomUUID();
+    BankAccount cartel =
+        typedAccount(
+            accountId, "KB-0003", BankAccountType.CARTEL, squadron(UUID.randomUUID(), "OL", "OL"));
+    cartel.setEmployeeApprovalCeiling(new BigDecimal("1000"));
+    cartel.setAreaLeadApprovalCeiling(new BigDecimal("5000"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(cartel));
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("3000")),
+            eq("note"),
+            eq("reason"),
+            eq(null),
+            eq(true),
+            eq(new BigDecimal("1000")),
+            eq(BankRequestApprover.BANK_MANAGEMENT),
+            eq(false),
+            eq(null)))
+        .thenReturn(requestDto(accountId, UUID.randomUUID()));
+
+    service.raiseCartelDirectBookingRequest(
+        accountId,
+        BankBookingRequestType.WITHDRAWAL,
+        new BigDecimal("3000"),
+        "note",
+        "reason",
+        null);
+
+    verify(bankBookingRequestService)
+        .create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("3000")),
+            eq("note"),
+            eq("reason"),
+            eq(null),
+            eq(true),
+            eq(new BigDecimal("1000")),
+            eq(BankRequestApprover.BANK_MANAGEMENT),
+            eq(false),
+            eq(null));
+  }
+
+  @Test
+  void raiseCartelDirectBookingRequest_topBand_routesToOrganisationsleitung() {
+    // Above T2 the auto-request routes to the Organisationsleitung (REQ-BANK-047/ADR-0109).
+    UUID accountId = UUID.randomUUID();
+    BankAccount cartel =
+        typedAccount(
+            accountId, "KB-0003", BankAccountType.CARTEL, squadron(UUID.randomUUID(), "OL", "OL"));
+    cartel.setEmployeeApprovalCeiling(new BigDecimal("1000"));
+    cartel.setAreaLeadApprovalCeiling(new BigDecimal("5000"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(cartel));
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("9000")),
+            eq(null),
+            eq("reason"),
+            eq(null),
+            eq(true),
+            eq(new BigDecimal("1000")),
+            eq(BankRequestApprover.ORGANISATIONSLEITUNG),
+            eq(false),
+            eq(null)))
+        .thenReturn(requestDto(accountId, UUID.randomUUID()));
+
+    service.raiseCartelDirectBookingRequest(
+        accountId, BankBookingRequestType.WITHDRAWAL, new BigDecimal("9000"), null, "reason", null);
+
+    verify(bankBookingRequestService)
+        .create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("9000")),
+            eq(null),
+            eq("reason"),
+            eq(null),
+            eq(true),
+            eq(new BigDecimal("1000")),
+            eq(BankRequestApprover.ORGANISATIONSLEITUNG),
             eq(false),
             eq(null));
   }

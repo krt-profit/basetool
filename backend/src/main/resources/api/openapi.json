@@ -27190,7 +27190,7 @@
     "/api/v1/bank/withdrawals" : {
       "post" : {
         "tags" : [ "bank-booking-controller" ],
-        "summary" : "Book a withdrawal",
+        "summary" : "Book a withdrawal (over-ceiling KRT amounts become an approval request)",
         "operationId" : "bookWithdrawal",
         "requestBody" : {
           "content" : {
@@ -27204,11 +27204,21 @@
         },
         "responses" : {
           "201" : {
-            "description" : "Created",
+            "description" : "Withdrawal booked onto the ledger",
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/BankTransactionDto"
+                  "$ref" : "#/components/schemas/BankBookingOutcomeDto"
+                }
+              }
+            }
+          },
+          "202" : {
+            "description" : "Over the KRT employee ceiling: filed as a pending approval request",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BankBookingOutcomeDto"
                 }
               }
             }
@@ -27279,7 +27289,7 @@
     "/api/v1/bank/transfers" : {
       "post" : {
         "tags" : [ "bank-booking-controller" ],
-        "summary" : "Book an account-to-account transfer",
+        "summary" : "Book an account-to-account transfer (over-ceiling KRT amounts become a request)",
         "operationId" : "bookTransfer",
         "requestBody" : {
           "content" : {
@@ -27293,11 +27303,21 @@
         },
         "responses" : {
           "201" : {
-            "description" : "Created",
+            "description" : "Transfer booked onto the ledger",
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/BankTransactionDto"
+                  "$ref" : "#/components/schemas/BankBookingOutcomeDto"
+                }
+              }
+            }
+          },
+          "202" : {
+            "description" : "Over the KRT employee ceiling: filed as a pending approval request",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BankBookingOutcomeDto"
                 }
               }
             }
@@ -57175,13 +57195,13 @@
               "$ref" : "#/components/schemas/InventoryAllocationInput"
             }
           },
-          "missionFreeForGameItem" : {
+          "qualityConsistentWithCatalog" : {
             "type" : "boolean"
           },
           "catalogReferenceValid" : {
             "type" : "boolean"
           },
-          "qualityConsistentWithCatalog" : {
+          "missionFreeForGameItem" : {
             "type" : "boolean"
           }
         },
@@ -57418,6 +57438,17 @@
           }
         },
         "required" : [ "accountId", "amount", "holderId" ]
+      },
+      "BankBookingOutcomeDto" : {
+        "type" : "object",
+        "properties" : {
+          "transaction" : {
+            "$ref" : "#/components/schemas/BankTransactionDto"
+          },
+          "pendingRequest" : {
+            "$ref" : "#/components/schemas/BankBookingRequestDto"
+          }
+        }
       },
       "BankTransactionDto" : {
         "type" : "object",

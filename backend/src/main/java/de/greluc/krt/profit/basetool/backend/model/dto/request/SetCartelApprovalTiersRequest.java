@@ -37,7 +37,7 @@ import org.jetbrains.annotations.Nullable;
  * @param employeeCeiling the bank-employee self-approval ceiling {@code T1}, or {@code null} to
  *     clear it (an unset ceiling is treated as {@code 0} at request time)
  * @param areaLeadCeiling the Bereichsleiter-Profit ceiling {@code T2}, or {@code null} to clear it
- *     (an unset ceiling means no OL band — the Bereichsleiter Profit covers everything above T1)
+ *     (an unset ceiling means no OL band — the Bankleitung covers everything above T1)
  * @param version optimistic-locking version the client read (REQ-BANK-018); a mismatch surfaces as
  *     409 {@code OPTIMISTIC_LOCK}
  */

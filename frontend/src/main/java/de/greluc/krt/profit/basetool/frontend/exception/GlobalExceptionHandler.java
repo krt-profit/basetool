@@ -471,6 +471,19 @@ public class GlobalExceptionHandler {
     m.put("BANK_SELF_TRANSFER", "error.bank.selfTransfer");
     m.put("BANK_ALREADY_REVERSED", "error.bank.alreadyReversed");
     m.put("BANK_HOLDER_INACTIVE", "error.bank.holderInactive");
+    // Booking-request lifecycle, split-deposit, justification and fee-inclusive 409s (epic #666 /
+    // REQ-BANK-023/-043/-045/-033) plus the retired KRT direct-booking cap (BANK_CARTEL_APPROVAL_
+    // REQUIRED, kept defensively though ADR-0109 now files a request instead of throwing it).
+    // Without these the codes fell through to error.unexpected ("Ein unerwarteter Fehler ...").
+    m.put("BANK_NOT_REVERSIBLE", "error.bank.notReversible");
+    m.put("BANK_REQUEST_NOT_PENDING", "error.bank.requestNotPending");
+    m.put("BANK_ACCOUNT_HAS_PENDING_REQUESTS", "error.bank.accountHasPendingRequests");
+    m.put("BANK_OWNER_APPROVAL_REQUIRED", "error.bank.ownerApprovalRequired");
+    m.put("BANK_CARTEL_APPROVAL_REQUIRED", "error.bank.cartelApprovalRequired");
+    m.put("BANK_SPLIT_NO_TARGETS", "error.bank.splitNoTargets");
+    m.put("BANK_SPLIT_TOO_SMALL", "error.bank.splitTooSmall");
+    m.put("BANK_JUSTIFICATION_REQUIRED", "error.bank.justificationRequired");
+    m.put("BANK_FEE_EXCEEDS_AMOUNT", "error.bank.feeExceedsAmount");
     m.put("DUPLICATE_ENTITY", "error.conflict.duplicate");
     m.put(BackendServiceException.CODE_SERVICE_UNAVAILABLE, "error.unavailable");
     m.put(BackendServiceException.CODE_BACKEND_TIMEOUT, "error.backendTimeout");
