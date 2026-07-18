@@ -188,6 +188,31 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("/js/inventory-herkunft.js")));
   }
 
+  // REQ-INV-034: the "Alle markieren" (select-all) button renders in the bulk bar BEFORE the
+  // "Markierte ausbuchen" button, carries the select-all trigger + both toggle labels, and the
+  // entry-ids proxy is wired for the JS to fetch the full filtered id set.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewMyInventory_rendersSelectAllButtonBeforeBulkCheckout() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/my"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("id=\"bulkSelectAllBtn\"")))
+        .andExpect(content().string(containsString("data-trigger=\"inv-my-select-all\"")))
+        .andExpect(content().string(containsString("data-text-select")))
+        .andExpect(content().string(containsString("data-text-clear")))
+        // The select-all button must sit before the bulk-checkout button in the bar.
+        .andExpect(
+            content()
+                .string(
+                    stringContainsInOrder(
+                        List.of("id=\"bulkSelectAllBtn\"", "id=\"bulkCheckoutBtn\""))));
+  }
+
   // REQ-FE-016: the Umbuchen modal's target-location select is a server-side-search combobox
   // (remote-locations) on both Lager views — the marker value must sit on the (statically
   // attributed) select, which renders EMPTY (no preloaded catalog options; the modal-opening JS
@@ -1246,9 +1271,10 @@ class InventoryPageControllerMvcTest {
   /**
    * Item stack-entries fragment guard (REQ-INV-030/031): the lazy {@code
    * /inventory/my/game-item-stack/entries} drill-down renders the game-item leaf row — whole-unit
-   * amount, PIECE-typed action buttons, no mission split, no Materialbörse toggle — and its "+
-   * Zuordnen" picker offers only ITEM orders whose lines request the entry's gameItem
-   * (requiredGameItemIds), never unrelated orders.
+   * amount, PIECE-typed action buttons, no mission split — carries the "Für Börse freigeben" toggle
+   * (a stock-backed item offer, REQ-MARKET-002/014; unchecked here since the released-item-ids
+   * lookup returned empty), and its "+ Zuordnen" picker offers only ITEM orders whose lines request
+   * the entry's gameItem (requiredGameItemIds), never unrelated orders.
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
@@ -1324,9 +1350,14 @@ class InventoryPageControllerMvcTest {
                 .param("personal", "false"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("data-item-id=\"" + itemId + "\"")))
-        // No mission dimension on item rows (REQ-INV-031) and no Börse toggle (design §8).
+        // No mission dimension on item rows (REQ-INV-031); the "Für Börse freigeben" toggle renders
+        // as a stock-backed item offer (REQ-MARKET-002/014). data-kind="ITEM" makes the shared
+        // release modal hide the quality fact; released-item-ids returned empty so it is unchecked.
         .andExpect(content().string(not(containsString("data-assoc-field=\"MISSION\""))))
-        .andExpect(content().string(not(containsString("inv-boerse-toggle"))))
+        .andExpect(content().string(containsString("inv-boerse-toggle")))
+        .andExpect(content().string(containsString("data-kind=\"ITEM\"")))
+        .andExpect(content().string(containsString("data-boerse-status-for=\"" + itemId + "\"")))
+        .andExpect(content().string(not(containsString("checked=\"checked\""))))
         // PIECE-typed action buttons keyed on the gameItem, no materialId.
         .andExpect(content().string(containsString("data-quantity-type=\"PIECE\"")))
         .andExpect(content().string(containsString("data-game-item-id=\"" + gameItemId + "\"")))
@@ -1334,6 +1365,71 @@ class InventoryPageControllerMvcTest {
         // Order picker gate: only the order requesting this gameItem is offered.
         .andExpect(content().string(containsString("value=\"" + matchingOrderId + "\"")))
         .andExpect(content().string(not(containsString("value=\"" + unrelatedOrderId + "\""))));
+  }
+
+  /**
+   * Item-leaf "Für Börse freigeben" toggle checked state (REQ-MARKET-002/014): when the batch
+   * released-item-ids lookup reports the row as released, the item leaf's toggle renders checked
+   * with the "Auf Börse" chip ({@code chip--primary}) — the item sibling of the material leaf
+   * toggle for a stock-backed item offer.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
+  void viewMyGameItemStackEntries_rendersBoerseToggleCheckedWhenReleased() throws Exception {
+    UUID itemId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+
+    InventoryItemDto entry =
+        new InventoryItemDto(
+            itemId,
+            new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
+            null,
+            sampleGameItem(gameItemId),
+            new LocationReferenceDto(locationId, "ARC-L1"),
+            null,
+            2.0,
+            false,
+            java.util.List.of(),
+            2.0,
+            java.util.List.of(),
+            null,
+            null,
+            null,
+            1L,
+            Instant.parse("2026-03-01T00:00:00Z"));
+
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              if (url.contains("/inventory/my-inventory/stack/entries")
+                  && url.contains("catalog=ITEM")
+                  && url.contains("gameItemId=" + gameItemId)) {
+                return new PageResponse<>(List.of(entry), 0, 20, 1, 1, Collections.emptyList());
+              }
+              // The batch "Auf Börse" lookup reports this row as released.
+              if (url.contains("/material-exchange/released-item-ids")) {
+                return List.of(itemId);
+              }
+              return Collections.emptyList();
+            });
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(
+            get("/inventory/my/game-item-stack/entries")
+                .param("gameItemId", gameItemId.toString())
+                .param("locationId", locationId.toString())
+                .param("personal", "false"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("inv-boerse-toggle")))
+        // Released → the toggle is checked and the status chip is the primary "Auf Börse" variant.
+        .andExpect(content().string(containsString("checked=\"checked\"")))
+        .andExpect(content().string(containsString("chip--primary")))
+        .andExpect(content().string(containsString("data-boerse-status-for=\"" + itemId + "\"")));
   }
 
   /**

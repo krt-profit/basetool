@@ -336,6 +336,40 @@
 }
 
 /* ---- release / edit modal composition ---- */
+/* Material/Item kind radio above the release picker (REQ-MARKET-002): a slim two-chip segmented
+   row that narrows the combobox below to one row kind. The chosen chip lights up in the brand
+   accent; the native radio stays for keyboard/AT, tinted to match. */
+.mb-modal-kind {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.mb-modal-kind__opt {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: var(--touch-target);
+    padding: 6px 12px;
+    font-family: var(--font-body);
+    font-size: 12px;
+    color: var(--color-gray-1);
+    border: 1px solid var(--color-gray-3);
+    cursor: pointer;
+    user-select: none;
+}
+.mb-modal-kind__opt:hover {
+    border-color: var(--color-primary);
+}
+.mb-modal-kind__opt:has(input:checked) {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    box-shadow: var(--glow-primary);
+}
+.mb-modal-kind__opt input[type='radio'] {
+    width: auto;
+    margin: 0;
+    accent-color: var(--color-primary);
+}
 .mb-modal-picker {
     margin-bottom: 14px;
 }

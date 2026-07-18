@@ -47,6 +47,17 @@
     let itemPickerSeq = 0;
     let itemPickerSearchTimer = null;
     let PICKER_SEARCH_DEBOUNCE_MS = 200;
+    // The two picker dropdowns start CLOSED and open only on an explicit user gesture (clicking into
+    // or typing in the combobox), so the floating, absolutely-positioned listbox never covers the
+    // fields below it the moment the modal opens — the modal auto-focuses the picker input, and a
+    // programmatic focus must not pop the list. renderPicker / renderItemPicker honour these flags
+    // instead of force-showing the list on every render (incl. the modal-open prefetch).
+    let pickerListOpen = false;
+    let itemPickerListOpen = false;
+    // The Material/Item radio above the release picker (REQ-MARKET-002): which row kind the
+    // /releasable-items query is narrowed to ('MATERIAL' | 'ITEM'). A server-side filter, so a row
+    // past the picker's row cap is never hidden. Reset to 'MATERIAL' on every open of 'new' mode.
+    let pickerKind = 'MATERIAL';
 
     function fmt(template, value) {
         return String(template || '').replace('{0}', value);
@@ -234,6 +245,9 @@
             onDone: onDone,
             onCancel: onCancel,
         };
+        // Every open starts with both picker dropdowns closed; the user opens the relevant one.
+        pickerListOpen = false;
+        itemPickerListOpen = false;
         let isNew = mode === 'new';
         let isEdit = mode === 'edit';
         let isItem = mode === 'item';
@@ -256,12 +270,14 @@
             qtyInput.value = '';
         }
         if (!isItem) {
-            // A stock-backed item offer edit (REQ-MARKET-014): the amount block edits the whole-unit
-            // item quantity (ctx.quantityType === 'PIECE', ctx.available = the backing row's stock)
-            // and there is no quality — the facts show the item name only.
-            let isStockItemEdit = isEdit && ctx.kind === 'ITEM';
-            setFacts(ctx.material, isStockItemEdit ? null : ctx.quality);
-            toggleQualityFact(!isStockItemEdit);
+            // A stock-backed item row (REQ-MARKET-014), whether an 'edit' of its offer or a fresh
+            // 'lager' release from the Mein-Lager item leaf toggle: the amount block edits the
+            // whole-unit item quantity (ctx.quantityType === 'PIECE', ctx.available = the backing
+            // row's stock) and there is no quality — the facts show the item name only. A material
+            // row (ctx.kind absent) keeps its quality fact.
+            let isStockItem = ctx.kind === 'ITEM';
+            setFacts(ctx.material, isStockItem ? null : ctx.quality);
+            toggleQualityFact(!isStockItem);
             if (isNew) {
                 // No row picked yet: disable the amount field until the picker selection sets its max
                 // (and pickItem decides whether the picked row carries a quality fact).
@@ -279,6 +295,12 @@
         updateCharCount();
 
         if (isNew) {
+            // Reset the Material/Item radio to Material and prefetch that kind (the user re-picks).
+            pickerKind = 'MATERIAL';
+            let materialRadio = modal.querySelector('[data-mb-kind-radio][value="MATERIAL"]');
+            if (materialRadio) {
+                materialRadio.checked = true;
+            }
             loadPicker('');
         } else if (isItem) {
             let itemInput = q('[data-mb-item-picker-input]');
@@ -347,7 +369,9 @@
     function loadPicker(query) {
         let seq = ++pickerSeq;
         let url =
-            '/materialboerse/releasable-items' + (query ? '?q=' + encodeURIComponent(query) : '');
+            '/materialboerse/releasable-items?kind=' +
+            encodeURIComponent(pickerKind) +
+            (query ? '&q=' + encodeURIComponent(query) : '');
         fetch(url, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
             credentials: 'same-origin',
@@ -381,6 +405,50 @@
         }, PICKER_SEARCH_DEBOUNCE_MS);
     }
 
+    /**
+     * Opens the material picker dropdown (a user clicked into or typed in the combobox). The rows
+     * are already rendered from the modal-open prefetch, so this just reveals them; a still-in-flight
+     * fetch fills them in via renderPicker, which respects pickerListOpen.
+     */
+    function openPickerList() {
+        pickerListOpen = true;
+        let list = q('[data-mb-picker-list]');
+        if (list) {
+            list.hidden = false;
+        }
+    }
+
+    /** Closes the material picker dropdown so it stops covering the fields beneath it. */
+    function closePickerList() {
+        pickerListOpen = false;
+        let list = q('[data-mb-picker-list]');
+        if (list) {
+            list.hidden = true;
+        }
+    }
+
+    /**
+     * Applies the Material/Item radio selection (REQ-MARKET-002): narrows the picker to the chosen
+     * kind and clears any row already picked (the two kinds carry different facts + units), then
+     * reloads the picker from the server filtered to that kind. The list is left closed — the user
+     * opens the combobox to pick from the newly filtered set.
+     * @param kind the chosen row kind ('MATERIAL' or 'ITEM'); anything else falls back to 'MATERIAL'.
+     */
+    function setPickerKind(kind) {
+        pickerKind = kind === 'ITEM' ? 'ITEM' : 'MATERIAL';
+        state.itemId = null;
+        state.quantityType = null;
+        let input = q('[data-mb-picker-input]');
+        if (input) {
+            input.value = '';
+        }
+        setFacts(null, null);
+        toggleQualityFact(pickerKind === 'MATERIAL');
+        setAmountField('', null);
+        closePickerList();
+        loadPicker('');
+    }
+
     function renderPicker() {
         let list = q('[data-mb-picker-list]');
         if (!list) {
@@ -389,7 +457,7 @@
         if (!pickerItems.length) {
             list.innerHTML =
                 '<li class="krt-combobox__notice">' + escapeHtml(i18n.pickerEmpty || '') + '</li>';
-            list.hidden = false;
+            list.hidden = !pickerListOpen;
             return;
         }
         list.innerHTML = pickerItems
@@ -424,7 +492,7 @@
                 );
             })
             .join('');
-        list.hidden = false;
+        list.hidden = !pickerListOpen;
     }
 
     /** Shows or hides the quality fact — item rows (stock-backed item offers) have no quality. */
@@ -449,10 +517,7 @@
         if (input) {
             input.value = li.getAttribute('data-material');
         }
-        let list = q('[data-mb-picker-list]');
-        if (list) {
-            list.hidden = true;
-        }
+        closePickerList();
     }
 
     // -------- item (blueprint-product) picker (item offers, REQ-MARKET-012) --------
@@ -494,6 +559,24 @@
         }, PICKER_SEARCH_DEBOUNCE_MS);
     }
 
+    /** Opens the item (blueprint-product) picker dropdown on an explicit user gesture. */
+    function openItemPickerList() {
+        itemPickerListOpen = true;
+        let list = q('[data-mb-item-picker-list]');
+        if (list) {
+            list.hidden = false;
+        }
+    }
+
+    /** Closes the item picker dropdown so it stops covering the fields beneath it. */
+    function closeItemPickerList() {
+        itemPickerListOpen = false;
+        let list = q('[data-mb-item-picker-list]');
+        if (list) {
+            list.hidden = true;
+        }
+    }
+
     function renderItemPicker() {
         let list = q('[data-mb-item-picker-list]');
         if (!list) {
@@ -504,7 +587,7 @@
                 '<li class="krt-combobox__notice">' +
                 escapeHtml(i18n.itemPickerEmpty || '') +
                 '</li>';
-            list.hidden = false;
+            list.hidden = !itemPickerListOpen;
             return;
         }
         list.innerHTML = productItems
@@ -523,7 +606,7 @@
                 );
             })
             .join('');
-        list.hidden = false;
+        list.hidden = !itemPickerListOpen;
     }
 
     function pickProduct(li) {
@@ -532,10 +615,7 @@
         if (input) {
             input.value = li.getAttribute('data-name');
         }
-        let list = q('[data-mb-item-picker-list]');
-        if (list) {
-            list.hidden = true;
-        }
+        closeItemPickerList();
     }
 
     function submit() {
@@ -644,6 +724,17 @@
                 return;
             }
         }
+        // A click outside either combobox (its input or its listbox) dismisses an open dropdown, so
+        // the floating list never lingers over the other inputs. Clicks on the input / an option
+        // stay inside the .krt-combobox wrapper (data-mb-combobox / data-mb-item-combobox) and are
+        // handled by the dedicated branches below.
+        if (
+            !e.target.closest('[data-mb-combobox]') &&
+            !e.target.closest('[data-mb-item-combobox]')
+        ) {
+            closePickerList();
+            closeItemPickerList();
+        }
         if (e.target.closest('[data-mb-modal-close]') || e.target === modal) {
             cancel();
             return;
@@ -662,6 +753,16 @@
             }
             return;
         }
+        // Clicking into a picker input opens its dropdown. The modal-open auto-focus is a
+        // programmatic focus() with no click, so the list stays closed until the user reaches for it.
+        if (e.target.closest('[data-mb-picker-input]')) {
+            openPickerList();
+            return;
+        }
+        if (e.target.closest('[data-mb-item-picker-input]')) {
+            openItemPickerList();
+            return;
+        }
         let li = e.target.closest('[data-mb-picker-list] .krt-combobox__option');
         if (li) {
             pickItem(li);
@@ -677,11 +778,19 @@
         if (e.target.matches('[data-mb-remark]')) {
             updateCharCount();
         } else if (e.target.matches('[data-mb-picker-input]')) {
+            openPickerList();
             searchPicker(e.target.value);
         } else if (e.target.matches('[data-mb-item-picker-input]')) {
+            openItemPickerList();
             searchItemPicker(e.target.value);
         } else if (e.target.matches('[data-mb-item-qty]')) {
             toggle('[data-mb-qty-error]', false);
+        }
+    });
+
+    document.addEventListener('change', function (e) {
+        if (e.target.matches('[data-mb-kind-radio]')) {
+            setPickerKind(e.target.value);
         }
     });
 
@@ -690,7 +799,15 @@
             return;
         }
         if (e.key === 'Escape') {
-            cancel();
+            // Escape first dismisses an open picker dropdown; only when none is open does it close
+            // the whole modal (mirrors the shared combobox's escape-closes-the-list-first behaviour).
+            if (pickerListOpen || itemPickerListOpen) {
+                e.preventDefault();
+                closePickerList();
+                closeItemPickerList();
+            } else {
+                cancel();
+            }
         } else if (e.key === 'Tab') {
             trapFocus(e);
         }

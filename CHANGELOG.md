@@ -2,9 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Lager/Materialbörse: Items lassen sich jetzt direkt in „Mein Lager" (Ansicht „Items") für die Börse freigeben.** Jede Item-Bestandszeile trägt – wie schon die Material-Zeilen – die Checkbox „Für Börse freigeben"; das Anhaken öffnet den Freigabe-Dialog und stellt den Posten als bestandsgedecktes Item-Angebot ein, das Abhaken nimmt ihn wieder heraus. Bisher war das nur über „Material anbieten" auf der Börse selbst möglich (REQ-MARKET-002/014).
+
+- **Mein Lager: Ein Button „Alle markieren" vor „Markierte ausbuchen" wählt alle Einträge der aktuellen Ansicht aus.** In „Mein Lager" (`/inventory/my`, Material- und Items-Ansicht) markiert der Button jeden Eintrag der aktuellen Filteransicht — auch in eingeklappten Stapeln und über die Seitenblätterung hinweg —, sodass man vor „Markierte ausbuchen" nicht mehr jeden Eintrag einzeln anhaken muss; ein erneuter Klick hebt die Auswahl wieder auf (REQ-INV-034).
+
+### Changed
+
+- **Materialbörse: Der Dialog „Material anbieten" hat jetzt eine Material/Item-Auswahl (Radiobuttons) über dem Auswahlfeld.** Standard ist „Material"; „Item" zeigt nur die eigenen bestandsgedeckten Item-Lagerposten, „Material" nur Materialposten (vorher mischte die Liste beide). Gefiltert wird server-seitig, damit auch bei vielen Posten jeder Eintrag der gewählten Art auffindbar bleibt; ein Wechsel der Art setzt eine bereits getroffene Auswahl zurück (REQ-MARKET-002).
+
 ### Fixed
 
 - **Extractor: Der „An Basetool senden"-Import-Link läuft nicht mehr vorzeitig ab.** Die Gültigkeit des einmaligen Handoffs wurde von 5 auf 30 Minuten angehoben (env-übersteuerbar via `APP_INGEST_HANDOFF_TTL`), weil das Öffnen der vorbefüllten Seite ein separater manueller Klick nach dem Senden ist — langsamere Nutzer sahen sonst durchgängig „Import-Link abgelaufen oder ungültig", während der manuelle JSON-Import funktionierte. Gateway und Frontend protokollieren den Handoff jetzt zusätzlich mit einem nicht umkehrbaren Subject-/ID-Hash (nie das Rohsubjekt oder die ID), damit ein künftiger Fehlschlag eindeutig als Ablauf oder Subject-Abweichung erkennbar ist (REQ-INGEST-003).
+
+- **Materialbörse: Im Dialog „Material anbieten" klappt die Material-/Item-Auswahlliste nicht mehr sofort beim Öffnen auf und verdeckt so die übrigen Eingabefelder.** Das Dropdown bleibt geschlossen und öffnet sich erst, wenn man in das Auswahlfeld klickt oder tippt; es schließt wieder bei Auswahl, Klick außerhalb oder Escape. Gilt ebenso für die Item-Auswahl im Dialog „Item anbieten" (REQ-MARKET-002).
 
 ## [v1.5.1](https://github.com/krt-profit/basetool/releases/tag/v1.5.1) - 2026-07-17
 

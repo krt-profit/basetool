@@ -650,6 +650,58 @@ requirement each frontend page fetched a single `size=1000` slice and silently h
 `InventoryItemController#getInventoryByMaterial` / `#getInventoryByGameItem` (backend paging) ·
 **Issues:** — · **ADR:** ADR-0104
 
+### REQ-INV-034 — "Alle markieren" selects the whole filtered view for bulk check-out (no silent cap)
+
+The "Mein Lager" bulk bar (`/inventory/my`, both the Material and the Items view) offers an **"Alle
+markieren"** button before **"Markierte ausbuchen"** that marks **every** entry of the current
+filtered view for the bulk check-out, so the user need not expand each stack and tick each row by
+hand. Because the grouped tree lazy-loads and paginates each stack (REQ-INV-005), a client-side
+"check every visible box" would silently miss collapsed stacks and any entry past a stack's first
+page; select-all therefore resolves the complete id set **on the server** ([ADR-0104](../adr/0104-no-silent-caps-on-complete-list-surfaces.md)
+no-silent-cap principle).
+
+- **Server-resolved id set.** The button fetches `GET /inventory/my/entry-ids`, which relays the
+  page's active filter + `view` to the backend `GET /api/v1/inventory/my-inventory/entry-ids`. That
+  endpoint returns the ids of every one of the caller's own entries matching the same optional-filter
+  contract as the grouped view (`catalog=MATERIAL` uses material / min-quality / job-order / mission
+  + the mutually exclusive personal toggles; `catalog=ITEM` uses gameItem / job-order + personal, and
+    rejects the material-only filters with 400 exactly like the grouped endpoint, REQ-INV-029/031). It
+    is owner-scoped from the JWT (no impersonation) and can never return an id outside the grouped
+    view.
+- **Selection is a decoupled set, not the DOM.** The frontend holds the selection in a Set that is
+  independent of the lazily-loaded checkboxes: a loaded checkbox's checked state is derived from the
+  set, a stack expanded after select-all comes up already ticked, and the "Markierte ausbuchen"
+  count + POST read the set directly — so the bulk check-out spans the whole filtered view, not only
+  the expanded stacks.
+- **Toggle + safe reset.** The button toggles between "Alle markieren" and "Auswahl aufheben"
+  (clear). The selection is reset whenever the grouped table re-swaps (filter change, post-write
+  refresh, or a live-sync peer refresh, REQ-FE-010/015): the freshly rendered checkboxes come back
+  unticked, and keeping stale ids across a re-render could aim the bulk check-out at an entry a peer
+  already removed (the backend bulk-checkout 404s on any unknown id). Select-all itself does not
+  re-swap the table, so a live selection survives drill-down expansion.
+- **No new mutation.** Select-all is a read that feeds the existing bulk check-out
+  (`POST /inventory/bulk-checkout`, REQ-INV-003); it adds no new write path and no new audit event
+  (the bulk check-out's `INVENTORY_BULK_CHECKED_OUT` audit is unchanged).
+
+**Acceptance**
+
+- [ ] `/inventory/my` (Material and Items view) renders an "Alle markieren" button before "Markierte
+  ausbuchen"; clicking it marks every entry of the current filtered view, including entries in
+  collapsed stacks and beyond a stack's first page, and the count reflects the full total.
+- [ ] `GET /api/v1/inventory/my-inventory/entry-ids` returns exactly the ids of the caller's own
+  entries matching the given filter + catalog, is owner-scoped, and rejects catalog-mismatched
+  filters with 400 like `…/my-inventory/grouped`.
+- [ ] Changing a filter, a modal write, or a peer refresh clears the selection (no stale id reaches
+  the bulk check-out); expanding a stack after select-all shows its rows already ticked.
+
+**Enforced by:** `InventoryItemControllerTest`, `InventoryPageControllerTest`,
+`InventoryPageControllerMvcTest`, `InventoryAggregationServiceTest` · **Code:**
+`InventoryItemController#getMyEntryIds`, `InventoryAggregationService#getMyEntryIds` /
+`#getMyItemEntryIds`, `InventoryItemService#getMyEntryIds`,
+`InventoryItemRepository#findUserEntryIds` / `#findUserItemEntryIds`,
+`InventoryPageController#myEntryIds`, `templates/inventory-my.html`, `static/js/inventory-my.js` ·
+**Issues:** — · **ADR:** ADR-0104
+
 ## Out of scope
 
 - Tenancy / visibility scope of inventory (strict-staffel Lager-View) is governed by

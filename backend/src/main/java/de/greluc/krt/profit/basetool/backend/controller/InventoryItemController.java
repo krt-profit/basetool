@@ -308,6 +308,61 @@ public class InventoryItemController {
   }
 
   /**
+   * Ids of <em>every</em> one of the caller's own inventory entries matching the "Mein Lager"
+   * filter surface — the flat companion of {@link #getMyGroupedInventory} that backs the frontend's
+   * "Alle markieren" select-all (REQ-INV-034). The grouped view lazy-loads and paginates each
+   * stack's entries, so a client-side "check every visible box" would silently miss collapsed
+   * stacks and any entry past the first page; this endpoint returns the complete id set for the
+   * current filter so a bulk check-out can span the whole filtered view. Takes the identical filter
+   * + catalog parameters as {@link #getMyGroupedInventory} and applies the same catalog-mismatch
+   * rejection (REQ-INV-029 / REQ-INV-031), so the id set can never widen beyond what the grouped
+   * view shows. Owner-scoped from the JWT (no impersonation).
+   *
+   * @param jwt the caller's token, resolved to the owning user id
+   * @param materialIds optional material filter ({@code catalog=MATERIAL} only; 400 otherwise)
+   * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only; 400 otherwise)
+   * @param minQuality optional quality floor; rejected for {@code catalog=ITEM}
+   * @param jobOrderIds optional job-order filter (both catalogs)
+   * @param missionIds optional mission filter; rejected for {@code catalog=ITEM}
+   * @param personalOnly when {@code true}, narrows to the caller's private stock rows
+   * @param nonPersonalOnly when {@code true}, narrows to the caller's shared stock rows; mutually
+   *     exclusive with {@code personalOnly}
+   * @param catalog which stock catalog to select from; defaults to {@code MATERIAL}
+   * @return the ids of every matching entry, in creation order
+   */
+  @GetMapping("/my-inventory/entry-ids")
+  @Transactional(readOnly = true)
+  public List<UUID> getMyEntryIds(
+      @AuthenticationPrincipal Jwt jwt,
+      @RequestParam(required = false) List<UUID> materialIds,
+      @RequestParam(required = false) List<UUID> gameItemIds,
+      @RequestParam(required = false) Integer minQuality,
+      @RequestParam(required = false) List<UUID> jobOrderIds,
+      @RequestParam(required = false) List<UUID> missionIds,
+      @RequestParam(required = false, defaultValue = "false") boolean personalOnly,
+      @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly,
+      @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
+    if (catalog == InventoryCatalog.ITEM) {
+      rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
+      return inventoryAggregationService.getMyItemEntryIds(
+          userService.getUserIdFromJwt(jwt),
+          gameItemIds,
+          jobOrderIds,
+          personalOnly,
+          nonPersonalOnly);
+    }
+    rejectItemOnlyFilters(gameItemIds);
+    return inventoryItemService.getMyEntryIds(
+        userService.getUserIdFromJwt(jwt),
+        materialIds,
+        minQuality,
+        jobOrderIds,
+        missionIds,
+        personalOnly,
+        nonPersonalOnly);
+  }
+
+  /**
    * Squadron-wide flat inventory list (admin/logistician view). {@code catalog=MATERIAL} (the
    * default) keeps the historical material contract; {@code catalog=ITEM} lists game-item rows and
    * filters by {@code gameItemIds} / {@code jobOrderIds}. A catalog-mismatched filter ({@code

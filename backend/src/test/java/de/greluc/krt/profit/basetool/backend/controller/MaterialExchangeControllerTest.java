@@ -184,9 +184,11 @@ class MaterialExchangeControllerTest {
                 340.0,
                 "Lorville",
                 false));
-    when(boardService.myReleasableItems("agri")).thenReturn(items);
+    when(boardService.myReleasableItems("agri", MaterialExchangeOfferKind.MATERIAL))
+        .thenReturn(items);
 
-    assertThat(controller.releasableItems("agri")).isSameAs(items);
+    assertThat(controller.releasableItems("agri", MaterialExchangeOfferKind.MATERIAL))
+        .isSameAs(items);
   }
 
   private MaterialExchangeOfferDto sampleDto() {

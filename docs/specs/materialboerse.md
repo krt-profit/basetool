@@ -66,7 +66,19 @@ A member releases one of **their own** Lager rows via the "Für Börse freigeben
 Lager or the "Material anbieten" CTA on the board. Release opens the offer dialog: a read-only fact
 strip (material · quality as a plain number), an **editable offered-quantity field** ("Menge
 anbieten" in the material's own unit — SCU or Stück/piece, #1182 — defaulting to the row's full stock
-with an "Alles" shortcut) + a Markdown textarea (≤ 20 000 characters, live counter). Material and
+with an "Alles" shortcut) + a Markdown textarea (≤ 20 000 characters, live counter). When started
+from the board CTA ("Material anbieten") rather than a specific Lager checkbox, the dialog leads with
+a **searchable material/item picker** whose dropdown list is **closed on open** and reveals itself
+only when the member clicks into or types in the picker input — it is never force-opened as the modal
+appears (its absolutely-positioned list would otherwise cover the fields below it) — and closes again
+on a selection, an outside click, or Escape. The blueprint-product picker of the "Item anbieten"
+dialog (REQ-MARKET-012) behaves identically. Above that picker a **Material/Item radio** (default
+Material) narrows the combobox to one row kind — the release picker otherwise lists **both** the
+caller's material rows and their stock-backed game-item rows (REQ-MARKET-014). The chosen kind is
+applied **server-side** (`/releasable-items?kind=MATERIAL|ITEM`, gated inside the DB query
+<em>before</em> its row cap) rather than by filtering the returned list, so a row of the wanted kind
+past the cap is never silently hidden — the same reachability guarantee the picker's server-side name
+search protects. Switching kind clears any row already picked. Material and
 quality are read **live** from the linked `InventoryItem`; the **offered quantity is the owner's
 choice** — the whole row or only a part of it (ADR-0086), validated server-side to be **positive and
 at most the item's current amount** (the client never sets material/quality). Releasing an item that
@@ -93,9 +105,19 @@ rejected (400).
 the offer's shown/filtered/sorted amount drops to the remaining stock; when the row is fully booked
 out it is deleted and its offer cascade-removed (no lingering zero-stock offer).
 - [ ] A remark over 20 000 characters is rejected (400).
+- [ ] The board-CTA release dialog opens with the material/item picker dropdown **closed**; the list
+appears only when the picker input is clicked or typed into, and dismisses on a selection, an outside
+click, or Escape.
+- [ ] The board-CTA release dialog carries a Material/Item radio (default Material); picking Item
+lists only the caller's stock-backed game-item rows, Material only material rows. The filter is
+applied server-side (`releasable-items?kind=…`) inside the DB query, so a matching row past the
+picker's row cap is still reachable; switching kind clears any already-picked row.
 
-**Enforced by:** `MaterialExchangeServiceTest`, `MaterialExchangeRepositoryDataTest` · **Code:**
-`MaterialExchangeService#release/updateOffer`, `MaterialExchangeReleaseRequest`,
+**Enforced by:** `MaterialExchangeServiceTest`, `MaterialExchangeRepositoryDataTest`,
+`InventoryItemCatalogQueryDataTest`, `MaterialExchangeControllerTest`,
+`MaterialboardReleaseModalOpensE2eTest`, `MaterialboardItemStockOfferE2eTest` · **Code:**
+`MaterialExchangeService#release/updateOffer`, `MaterialExchangeBoardService#myReleasableItems`,
+`InventoryItemRepository#findReleasableForUser`, `MaterialExchangeReleaseRequest`,
 `MaterialExchangeOfferUpdateRequest`, `V212` offered-amount column, `V210` partial-unique index
 
 ### REQ-MARKET-013 — Stock decrease ratchets the offer down (persisted); an increase never changes it
@@ -375,6 +397,16 @@ game-item row releases a **stock-backed item offer**: a `MaterialExchangeOffer` 
 - **No quality, no location.** Like every item offer, the board shows the item name + quantity (Stück),
   no quality; a non-zero min-quality filter excludes it (a stock-backed row carries no quality either).
 
+**Two entry points.** A stock-backed item offer is released either from the board's "Material
+anbieten" picker (which lists the caller's game-item rows alongside their material rows) or from the
+**Mein-Lager Items view**, whose item leaf carries the same per-row "Für Börse freigeben" toggle as
+the material leaf (REQ-MARKET-002) — the item sibling of the material Lager checkbox. Both post the
+same `release` (the backend detects the game-item row and creates the `ITEM` offer); un-checking the
+toggle deactivates the row's active offer (`/items/{inventoryItemId}/deactivate`). The item leaf's
+checked / "Auf Börse" state comes from the batch `released-item-ids` lookup, which is kind-agnostic
+(it keys on the inventory row, not its catalog kind). The toggle is **owner-only** and lives on the
+personal Lager only — the global (`/inventory/all`) item view has none, exactly as the material leaf.
+
 `MaterialExchangeService.updateOffer` is **kind-aware** (fixing the pre-existing defect where it
 dereferenced a null `inventoryItem` on any item offer): a material offer validates `offeredAmount` vs
 stock, a stock-backed item offer `itemQuantity` vs stock, a free-stated item offer `itemQuantity ≥ 1`.
@@ -397,16 +429,22 @@ duplicate.
 - [ ] Editing an item offer works (was impossible — the pre-fix `updateOffer` NPEd on the null Lager
 row); a stock-backed edit re-validates the new quantity against current stock (400 if it exceeds it).
 - [ ] The free-stated item offer (REQ-MARKET-012) remains fully supported.
+- [ ] The Mein-Lager Items-view item leaf carries the "Für Börse freigeben" toggle; checking it
+releases the row's stock-backed item offer and un-checking deactivates it, exactly like the material
+leaf (owner-only; the global item view has no toggle). Its checked state comes from the kind-agnostic
+`released-item-ids` lookup the item stack-entries endpoint now runs.
 
 **Enforced by:** `MaterialExchangeServiceTest`, `MaterialExchangeOfferClampDataTest`,
-`InventoryItemCatalogQueryDataTest`, `MaterialboersePageControllerMvcTest` · **Code:**
+`InventoryItemCatalogQueryDataTest`, `MaterialboersePageControllerMvcTest`,
+`InventoryPageControllerMvcTest` (item-leaf toggle) · **Code:**
 `MaterialExchangeService#release`/`#releaseFromItemStock`/`#updateOffer`,
 `BlueprintProductService#resolveByGameItem`,
 `MaterialExchangeOfferRepository#clampItemQuantityToStock`/`#findBoard`,
 `InventoryItemRepository#findReleasableForUser`, `MaterialExchangeBoardService` (effective item
 quantity + releasable picker), `InventoryCheckoutService#ratchetBoardOffersToStock`,
+`InventoryPageController#viewMyGameItemStackEntries` (item-leaf `releasedItemIds`),
 `db/migration/V221__relax_material_exchange_item_offer_stock_link.sql`, `materialboerse.html`,
-`materialboerse-release.js`
+`inventory-stack-entries.html`, `inventory-materialboerse.js`, `materialboerse-release.js`
 
 ## Out of scope
 

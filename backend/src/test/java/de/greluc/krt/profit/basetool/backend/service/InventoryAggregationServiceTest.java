@@ -208,6 +208,130 @@ class InventoryAggregationServiceTest {
               eq(activeOrgUnitId),
               eq(Set.of(memberOrgUnitId)));
     }
+
+    // covers REQ-INV-034 (material select-all id query: empty filter lists count as no filter)
+    @Test
+    void myEntryIds_emptyFilterLists_treatedAsNoFilter() {
+      UUID userId = UUID.randomUUID();
+      stubUser(userId);
+      when(inventoryItemRepository.findUserEntryIds(
+              any(),
+              anyBoolean(),
+              any(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              anyBoolean()))
+          .thenReturn(List.of());
+
+      service.getMyEntryIds(userId, List.of(), null, List.of(), List.of(), false, false);
+
+      verify(inventoryItemRepository)
+          .findUserEntryIds(
+              eq(userId),
+              eq(false),
+              isNull(),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              isNull(),
+              eq(false),
+              eq(false));
+    }
+
+    // covers REQ-INV-034 (material select-all id query: ids set the flags, minQuality + toggles
+    // pass through, forwarding the same filter surface as the grouped view)
+    @Test
+    void myEntryIds_nonEmptyFilters_setFlagsAndForwardIds() {
+      UUID userId = UUID.randomUUID();
+      UUID materialId = UUID.randomUUID();
+      UUID jobOrderId = UUID.randomUUID();
+      UUID missionId = UUID.randomUUID();
+      UUID entry = UUID.randomUUID();
+      stubUser(userId);
+      when(inventoryItemRepository.findUserEntryIds(
+              any(),
+              anyBoolean(),
+              any(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              any(),
+              anyBoolean(),
+              anyBoolean()))
+          .thenReturn(List.of(entry));
+
+      List<UUID> ids =
+          service.getMyEntryIds(
+              userId,
+              List.of(materialId),
+              700,
+              List.of(jobOrderId),
+              List.of(missionId),
+              true,
+              false);
+
+      assertEquals(List.of(entry), ids);
+      verify(inventoryItemRepository)
+          .findUserEntryIds(
+              eq(userId),
+              eq(true),
+              eq(List.of(materialId)),
+              eq(700),
+              eq(true),
+              eq(List.of(jobOrderId)),
+              eq(true),
+              eq(List.of(missionId)),
+              eq(true),
+              eq(false));
+    }
+
+    // covers REQ-INV-034 (material select-all resolves the owner before querying — unknown user
+    // 404)
+    @Test
+    void myEntryIds_unknownUser_throwsNotFound_withoutQuerying() {
+      UUID userId = UUID.randomUUID();
+      when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+      assertThrows(
+          NotFoundException.class,
+          () -> service.getMyEntryIds(userId, null, null, null, null, false, false));
+
+      verifyNoInteractions(inventoryItemRepository);
+    }
+
+    // covers REQ-INV-034 (item select-all id query: ids set the flags, personal toggle passes
+    // through; no quality/mission dimension exists for items)
+    @Test
+    void myItemEntryIds_nonEmptyFilters_setFlagsAndForwardIds() {
+      UUID userId = UUID.randomUUID();
+      UUID gameItemId = UUID.randomUUID();
+      UUID jobOrderId = UUID.randomUUID();
+      UUID entry = UUID.randomUUID();
+      stubUser(userId);
+      when(inventoryItemRepository.findUserItemEntryIds(
+              any(), anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), anyBoolean()))
+          .thenReturn(List.of(entry));
+
+      List<UUID> ids =
+          service.getMyItemEntryIds(userId, List.of(gameItemId), List.of(jobOrderId), true, false);
+
+      assertEquals(List.of(entry), ids);
+      verify(inventoryItemRepository)
+          .findUserItemEntryIds(
+              eq(userId),
+              eq(true),
+              eq(List.of(gameItemId)),
+              eq(true),
+              eq(List.of(jobOrderId)),
+              eq(true),
+              eq(false));
+    }
   }
 
   // ---------------------------------------------------------------------
