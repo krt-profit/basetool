@@ -25,6 +25,23 @@
             </div>
             <div class="krt-modal-body">
                 <div class="mb-modal-picker" data-mb-picker hidden>
+                    <!-- Material/Item kind radio (REQ-MARKET-002): the releasable-items picker lists
+                         BOTH the caller's material rows and their stock-backed game-item rows; this
+                         radio narrows the combobox below to one kind. The chosen kind rides the
+                         picker's /releasable-items?kind=… query (server-side filter, so a row past
+                         the picker's row cap is never hidden), driven by materialboerse-release.js. -->
+                    <div class="mb-modal-kind" data-mb-kind role="radiogroup"
+                         th:aria-label="#{materialboerse.modal.kind.label}">
+                        <label class="mb-modal-kind__opt">
+                            <input type="radio" name="mb-release-kind" value="MATERIAL"
+                                   data-mb-kind-radio checked/>
+                            <span th:text="#{materialboerse.modal.kind.material}">Material</span>
+                        </label>
+                        <label class="mb-modal-kind__opt">
+                            <input type="radio" name="mb-release-kind" value="ITEM" data-mb-kind-radio/>
+                            <span th:text="#{materialboerse.modal.kind.item}">Item</span>
+                        </label>
+                    </div>
                     <label class="form-label-sm" th:text="#{materialboerse.modal.material.label}">Material</label>
                     <div class="krt-combobox" data-mb-combobox>
                         <input class="krt-combobox__input" type="text" data-mb-picker-input autocomplete="off"

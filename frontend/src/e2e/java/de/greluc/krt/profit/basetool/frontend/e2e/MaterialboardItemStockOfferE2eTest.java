@@ -121,6 +121,10 @@ class MaterialboardItemStockOfferE2eTest {
         assertThat(pickerInput)
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
+        // The picker defaults to Material (REQ-MARKET-002); pick the Item kind so the stock-backed
+        // game-item rows are the ones the combobox lists.
+        page.locator("#mb-modal [data-mb-kind-radio][value=\"ITEM\"]").check();
+
         // Type the item name and gate on the debounced /releasable-items?q=… query it fires,
         // so the picker list has settled before we touch it. The picker REPLACES the
         // [data-mb-picker-list] innerHTML when that response renders; clicking an option

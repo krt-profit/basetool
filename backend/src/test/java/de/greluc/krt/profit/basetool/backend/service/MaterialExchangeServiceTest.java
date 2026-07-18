@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -451,14 +452,40 @@ class MaterialExchangeServiceTest {
     Material piece = material("Ballistic Gatling");
     piece.setQuantityType(QuantityType.PIECE);
     InventoryItem item = item(owner, piece, 500, 12.0);
-    when(inventoryItemRepository.findReleasableForUser(any(), any(), any()))
+    when(inventoryItemRepository.findReleasableForUser(
+            any(), any(), anyBoolean(), anyBoolean(), any()))
         .thenReturn(List.of(item));
     when(offerRepository.findInventoryItemIdsWithStatus(any(), any())).thenReturn(Set.of());
 
-    List<MaterialExchangeReleasableItemDto> items = boardService.myReleasableItems(null);
+    List<MaterialExchangeReleasableItemDto> items = boardService.myReleasableItems(null, null);
 
     assertThat(items).hasSize(1);
     assertThat(items.get(0).quantityType()).isEqualTo(QuantityType.PIECE);
+  }
+
+  /**
+   * The release picker's Material/Item radio narrows the query by kind (REQ-MARKET-002): {@code
+   * MATERIAL} asks the repository for material rows only ({@code includeMaterial=true,
+   * includeItem=false}), {@code ITEM} for game-item rows only, and {@code null} for both. The gate
+   * is pushed into the repository call — before its row cap — so a row of the wanted kind past the
+   * cap is never hidden by a post-query filter.
+   */
+  @Test
+  void myReleasableItems_kindFilterMapsToRepositoryFlags() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(inventoryItemRepository.findReleasableForUser(
+            any(), any(), anyBoolean(), anyBoolean(), any()))
+        .thenReturn(List.of());
+    // No offerRepository stub: an empty picker result short-circuits releasedInventoryItemIds
+    // before it queries the offer repo, so stubbing it would be flagged as unnecessary.
+
+    boardService.myReleasableItems(null, MaterialExchangeOfferKind.MATERIAL);
+    boardService.myReleasableItems(null, MaterialExchangeOfferKind.ITEM);
+    boardService.myReleasableItems(null, null);
+
+    verify(inventoryItemRepository).findReleasableForUser(any(), any(), eq(true), eq(false), any());
+    verify(inventoryItemRepository).findReleasableForUser(any(), any(), eq(false), eq(true), any());
+    verify(inventoryItemRepository).findReleasableForUser(any(), any(), eq(true), eq(true), any());
   }
 
   /**
@@ -822,11 +849,12 @@ class MaterialExchangeServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     GameItem gameItem = gameItem("Power Plant");
     InventoryItem row = itemStockRow(owner, gameItem, 4.0);
-    when(inventoryItemRepository.findReleasableForUser(any(), any(), any()))
+    when(inventoryItemRepository.findReleasableForUser(
+            any(), any(), anyBoolean(), anyBoolean(), any()))
         .thenReturn(List.of(row));
     when(offerRepository.findInventoryItemIdsWithStatus(any(), any())).thenReturn(Set.of());
 
-    List<MaterialExchangeReleasableItemDto> items = boardService.myReleasableItems(null);
+    List<MaterialExchangeReleasableItemDto> items = boardService.myReleasableItems(null, null);
 
     assertThat(items).hasSize(1);
     MaterialExchangeReleasableItemDto dto = items.get(0);

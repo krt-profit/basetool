@@ -44274,6 +44274,14 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "name" : "kind",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "MATERIAL", "ITEM" ]
+          }
         } ],
         "responses" : {
           "200" : {
@@ -57167,13 +57175,13 @@
               "$ref" : "#/components/schemas/InventoryAllocationInput"
             }
           },
-          "qualityConsistentWithCatalog" : {
-            "type" : "boolean"
-          },
           "missionFreeForGameItem" : {
             "type" : "boolean"
           },
           "catalogReferenceValid" : {
+            "type" : "boolean"
+          },
+          "qualityConsistentWithCatalog" : {
             "type" : "boolean"
           }
         },

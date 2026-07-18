@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeItemReleaseRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialExchangeOfferDto;
@@ -229,12 +230,15 @@ public class MaterialExchangeController {
    * picker.
    *
    * @param q a material-name fragment, or {@code null} for the caller's whole stock.
-   * @return the caller's releasable items.
+   * @param kind the row kind to return ({@code MATERIAL} or {@code ITEM}) for the dialog's
+   *     Material/Item radio, or {@code null} for both (REQ-MARKET-002).
+   * @return the caller's releasable items of the selected kind(s).
    */
   @GetMapping("/releasable-items")
   @Operation(summary = "List the caller's own Lager rows eligible for release.")
   public List<MaterialExchangeReleasableItemDto> releasableItems(
-      @RequestParam(required = false) String q) {
-    return boardService.myReleasableItems(q);
+      @RequestParam(required = false) String q,
+      @RequestParam(required = false) MaterialExchangeOfferKind kind) {
+    return boardService.myReleasableItems(q, kind);
   }
 }

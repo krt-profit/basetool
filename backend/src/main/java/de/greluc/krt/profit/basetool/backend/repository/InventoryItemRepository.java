@@ -1136,18 +1136,36 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * NOT NULL} guard is dropped so both kinds surface; the release service branches on the picked
    * row's kind (material offer vs stock-backed item offer).
    *
+   * <p>The {@code includeMaterial} / {@code includeItem} flags gate the row <b>kind</b> so the
+   * release dialog's Material/Item radio can restrict the picker to one kind (REQ-MARKET-002). The
+   * split must happen here, inside the DB query and <em>before</em> the {@link Pageable} cap, not
+   * by filtering the returned list — a post-cap client/service filter would drop every row of the
+   * wanted kind that fell past the row cap, silently hiding the tail (the reachability guarantee
+   * the server-side picker search exists to protect). A material row is discriminated by {@code
+   * i.gameItem IS NULL} and a game-item row by {@code i.gameItem IS NOT NULL} — the same XOR the
+   * service maps to the DTO kind. Passing both flags {@code true} returns both kinds (the
+   * unfiltered default); both {@code false} returns nothing.
+   *
    * @param userId the caller (the picker only ever shows the caller's own rows).
    * @param query a pre-lowercased {@code %fragment%} matched against the material or game-item
    *     name, or {@code null} for no filter.
+   * @param includeMaterial whether material rows (a {@code NULL} game item) are included.
+   * @param includeItem whether game-item rows (a non-{@code NULL} game item) are included.
    * @param pageable the cap on the number of picker rows.
-   * @return the caller's matching Lager rows (material and item), never {@code null}.
+   * @return the caller's matching Lager rows of the selected kind(s), never {@code null}.
    */
   @EntityGraph(attributePaths = {"material", "gameItem", "location"})
   @Query(
       "SELECT i FROM InventoryItem i LEFT JOIN i.material m LEFT JOIN i.gameItem gi "
           + "WHERE i.user.id = :userId "
           + "AND (:query IS NULL OR LOWER(m.name) LIKE :query OR LOWER(gi.name) LIKE :query) "
+          + "AND ((:includeMaterial = TRUE AND i.gameItem IS NULL) "
+          + "OR (:includeItem = TRUE AND i.gameItem IS NOT NULL)) "
           + "ORDER BY COALESCE(m.name, gi.name) ASC")
   List<InventoryItem> findReleasableForUser(
-      @Param("userId") UUID userId, @Param("query") String query, Pageable pageable);
+      @Param("userId") UUID userId,
+      @Param("query") String query,
+      @Param("includeMaterial") boolean includeMaterial,
+      @Param("includeItem") boolean includeItem,
+      Pageable pageable);
 }

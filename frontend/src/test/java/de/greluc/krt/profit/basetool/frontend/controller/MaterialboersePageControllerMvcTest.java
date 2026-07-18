@@ -315,6 +315,51 @@ class MaterialboersePageControllerMvcTest {
   }
 
   /**
+   * The release-picker forwards the Material/Item radio's {@code kind} to the backend as a safe,
+   * pre-encoded query parameter alongside the single-encoded {@code q} URI variable
+   * (REQ-MARKET-002). {@code kind} is a fixed enum token, so it rides on the base URI ({@code
+   * ?kind=ITEM&q={q}}) without the double-encoding guard the free-text {@code q} needs.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void releasableItemsProxy_forwardsKindFilter() throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/material-exchange/releasable-items?kind=ITEM&q={q}"),
+            anyTypeRef(),
+            eq("widget")))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/materialboerse/releasable-items").param("q", "widget").param("kind", "ITEM"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient)
+        .get(
+            eq("/api/v1/material-exchange/releasable-items?kind=ITEM&q={q}"),
+            anyTypeRef(),
+            eq("widget"));
+  }
+
+  /**
+   * An unexpected {@code kind} value is NOT reflected into the outbound backend URI: the proxy maps
+   * it through a fixed-literal allow-list and drops anything outside {@code MATERIAL}/{@code ITEM},
+   * so the backend call carries no {@code kind} at all (the picker then lists both kinds). Guards
+   * the SSRF mitigation — no caller-controlled string reaches the backend URL on this hop.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void releasableItemsProxy_dropsUnknownKind() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/material-exchange/releasable-items"), anyTypeRef()))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/materialboerse/releasable-items").param("kind", "evil://example.com"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient).get(eq("/api/v1/material-exchange/releasable-items"), anyTypeRef());
+  }
+
+  /**
    * The remark-edit proxy relays a backend optimistic-lock conflict as 409 with the problem code.
    */
   @Test
