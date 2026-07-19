@@ -81,6 +81,10 @@
     // Fetch the staged preview (single-use, scoped to the session user server-side) and render it
     // straight into the import modal — no file upload. An expired/foreign/unknown id is a 404,
     // surfaced as a friendly toast. The id is stripped from the URL so a reload does not re-attempt.
+    // The consume is a POST (REQ-INGEST-004): it is a single-use, state-changing GETDEL, so it must
+    // not ride a cacheable/prefetchable GET — the navigational page GET already never consumes, and
+    // keeping the consume off any GET means a speculative prefetch / duplicate load cannot burn the
+    // token before the real pickup (the 2026-07-19 double-GET incident on the refinery surface).
     function loadHandoff() {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('handoff');
@@ -95,7 +99,11 @@
             (endpoints().importStaged || '/personal-inventory/blueprints/import/staged') +
             '?handoff=' +
             encodeURIComponent(id);
-        fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: csrfHeaders({ Accept: 'application/json' }),
+        })
             .then(function (resp) {
                 return resp.ok ? resp.json() : null;
             })
