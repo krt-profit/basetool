@@ -339,7 +339,7 @@ services:
   node-exporter:
     <<: *mon-base
     container_name: node-exporter
-    image: quay.io/prometheus/node-exporter:v1.12.0
+    image: quay.io/prometheus/node-exporter:v1.12.1
     pid: host
     command:
       - --path.rootfs=/host
@@ -521,7 +521,7 @@ services:
   redis-exporter:
     <<: *mon-base
     container_name: redis-exporter
-    image: oliver006/redis_exporter:v1.86.0
+    image: oliver006/redis_exporter:v1.87.0
     cap_drop: [ALL]
     environment:
       REDIS_ADDR: redis://redis:6379
