@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-18.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-19.
 > **Owner area:** INGEST · **Related ADRs:** [ADR-0018](../adr/0018-desktop-ingest-gateway-device-grant.md) · **Related:** epic [#639](https://github.com/krt-profit/basetool/issues/639), runbook [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md), [`refinery-screenshot-import.md`](refinery-screenshot-import.md) (`REQ-REFINERY-018`), [`security-and-access.md`](security-and-access.md), [`api-conventions.md`](api-conventions.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md)
 
 # Desktop one-click ingest (send-to-basetool)
@@ -99,7 +99,9 @@ entropy). The entry has a short TTL (~30 minutes) and is **single-use**: the fir
 read for the correct `sub` consumes (deletes) it. A second read, a wrong `sub`, an expired
 entry, or an unknown id all return "not found" with no draft. No screenshots and no raw
 image bytes are ever staged — only the already-matched draft DTO (ADR-0007/0008: images
-never leave the machine).
+never leave the machine). The single-use consume is triggered off an explicit `POST`, never the
+navigational pre-fill GET, so a browser prefetch or a duplicate page load cannot burn the token
+before the real pickup (REQ-INGEST-004, ADR-0110).
 
 The TTL is deliberately longer than the "picked up within seconds" happy path would suggest:
 staging happens the moment the user clicks Send, but opening the pre-filled page is a **separate
@@ -141,6 +143,24 @@ create flow. A missing, expired, consumed, or foreign-`sub` handoff degrades to 
 empty create form plus a localized, KRT-styled inline notice (no native dialog,
 REQ-UI-008); it never errors the page out.
 
+**The navigational pre-fill GET is a _safe_ request and MUST NOT consume the handoff.** Consuming
+the single-use pickup is a state-changing operation, so it may not ride the cacheable/prefetchable
+page navigation. The pre-fill page GET renders the empty owner-prefilled form and merely carries the
+pending handoff id to its page module; the module then performs the one-time consume via an
+**explicit, script-initiated request that a page prefetch never issues** —
+`POST /refinery-orders/import-handoff` for refinery (swaps the `refineryImportFormBody` fragment in
+place, REQ-FE-005), `POST /personal-inventory/blueprints/import/staged` for blueprints (renders the
+import modal) — and swaps the result in without a reload. This makes the flow robust to a browser
+that speculatively **prefetches** or issues a **duplicate top-level GET** of the pre-fill URL: a
+prefetch fetches inert HTML and runs no script, so it cannot consume, and only the real navigation's
+one consume request burns the token. This closes the **2026-07-19 incident**: a member's Firefox
+loaded `…/create?handoff=<id>` twice ~250&nbsp;ms apart (empty referer, identical UA — a client-side
+prefetch/duplicate-load), the first destructive GET consumed the token and the second rendered
+`ingest.handoff.notFound` on **every** send, while the manual `POST` upload (never duplicated) always
+worked; a Chrome client that issued a single GET succeeded. The two-page-GET fragility was the
+navigational-GET consume, not the TTL (REQ-INGEST-003) or a subject mismatch — both ruled out by the
+masked stage/consume correlator (matching `sub` hash, miss ~2&nbsp;s after staging).
+
 **Acceptance**
 
 - [x] Opening `…/create?handoff=<valid id>` while logged in renders the pre-filled review
@@ -148,11 +168,22 @@ REQ-UI-008); it never errors the page out.
 - [x] Opening it without a session triggers login and lands back on the pre-filled form.
 - [x] An expired/consumed/foreign/unknown handoff renders the normal empty form with an
   inline notice — no stack trace, no persisted data.
+- [x] The navigational pre-fill GET (`GET …/create?handoff=<id>`, `GET …/blueprints?handoff=<id>`)
+  does **not** consume the handoff — a speculative prefetch or a duplicate top-level load of the URL
+  leaves the token intact; only the page's explicit `POST` consume request (`…/import-handoff`,
+  `…/import/staged`) deletes it, exactly once.
 
 **Enforced by:** `IngestHandoffServiceTest` (graceful degradation on miss / expired / foreign-`sub` /
-wrong-kind), `IngestHandoffE2eTest` (end-to-end pre-fill + login-replay landing) · **Code:**
-`RefineryOrderPageController#applyRefineryHandoff`, `PersonalBlueprintImportProxyController`,
-`IngestHandoffService`, `ingest.handoff.notFound` (DE/EN inline notice) · **Issues:** #644
+wrong-kind), `RefineryOrderHandoffMvcTest` (the GET carries `pendingHandoffId` and never invokes
+`IngestHandoffService.consume`; the `POST /refinery-orders/import-handoff` consume + not-found
+fragment), `PersonalBlueprintImportProxyControllerTest` (the `POST …/staged` hit + 404 miss),
+`IngestHandoffE2eTest` (end-to-end pre-fill via the in-place consume + login-replay landing +
+single-use) · **Code:** `RefineryOrderPageController#viewCreateForm` (GET carries `pendingHandoffId`,
+never consumes) + `#importHandoff` (the `POST` consume + swap), `refinery-orders-create.js`
+(`_loadRefineryHandoff`), `PersonalBlueprintImportProxyController#staged` (now `POST`),
+`personal-inventory-blueprints-import.js` (`loadHandoff`), `IngestHandoffService`,
+`ingest.handoff.notFound` (DE/EN inline notice) · **ADR:** [ADR-0110](../adr/0110-ingest-handoff-consume-off-navigational-get.md)
+· **Issues:** #644
 
 ### REQ-INGEST-005 — Size and rate limits
 

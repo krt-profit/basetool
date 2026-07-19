@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,9 +34,12 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportPreviewDt
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportResolutionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportStatus;
+import de.greluc.krt.profit.basetool.frontend.model.dto.HandoffKind;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -59,6 +63,7 @@ class PersonalBlueprintImportProxyControllerTest {
 
   private MockWebServer server;
   private BackendApiClient backendApiClient;
+  private IngestHandoffService ingestHandoffService;
   private PersonalBlueprintImportProxyController controller;
 
   @BeforeEach
@@ -67,11 +72,10 @@ class PersonalBlueprintImportProxyControllerTest {
     server.start();
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
     backendApiClient = mock(BackendApiClient.class);
+    ingestHandoffService = mock(IngestHandoffService.class);
     controller =
         new PersonalBlueprintImportProxyController(
-            webClient,
-            backendApiClient,
-            mock(de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService.class));
+            webClient, backendApiClient, ingestHandoffService);
   }
 
   @AfterEach
@@ -171,5 +175,38 @@ class PersonalBlueprintImportProxyControllerTest {
                 controller.apply(List.of(new BlueprintImportResolutionDto("x", "k", null, null))));
 
     assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatusCode());
+  }
+
+  @Test
+  void staged_onHit_returnsTheConsumedPreview() {
+    var principal = mock(org.springframework.security.oauth2.core.oidc.user.OidcUser.class);
+    when(principal.getSubject()).thenReturn("sub-123");
+    BlueprintImportPreviewDto preview = mock(BlueprintImportPreviewDto.class);
+    when(ingestHandoffService.consume(
+            eq("sub-123"),
+            eq("handoff-abc"),
+            eq(HandoffKind.BLUEPRINT),
+            eq(BlueprintImportPreviewDto.class)))
+        .thenReturn(Optional.of(preview));
+
+    assertSame(preview, controller.staged("handoff-abc", principal));
+  }
+
+  @Test
+  void staged_onMiss_throws404() {
+    var principal = mock(org.springframework.security.oauth2.core.oidc.user.OidcUser.class);
+    when(principal.getSubject()).thenReturn("sub-123");
+    when(ingestHandoffService.consume(
+            eq("sub-123"),
+            eq("expired-id"),
+            eq(HandoffKind.BLUEPRINT),
+            eq(BlueprintImportPreviewDto.class)))
+        .thenReturn(Optional.empty());
+
+    ResponseStatusException ex =
+        assertThrows(
+            ResponseStatusException.class, () -> controller.staged("expired-id", principal));
+
+    assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
   }
 }

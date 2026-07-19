@@ -267,18 +267,17 @@ public class RefineryOrderPageController {
       if (currentUserId != null) {
         form.setOwnerId(currentUserId);
       }
-      // One-click ingest (epic #639, REQ-INGEST-004): a `?handoff=<id>` from the desktop extractor
-      // pre-fills the form from the Redis-staged draft (single-use, scoped to this user) via the
-      // exact draft→form mapping the manual upload uses. An unknown / expired / foreign id degrades
-      // to the fresh form plus a friendly inline notice — never an error page.
-      if (handoff != null && !handoff.isBlank() && principal != null) {
-        RefineryOrderForm prefilled = applyRefineryHandoff(handoff, principal, model);
-        if (prefilled != null) {
-          prefilled.setSource(source);
-          form = prefilled;
-        } else {
-          model.addAttribute("importErrorKey", "ingest.handoff.notFound");
-        }
+      // One-click ingest (epic #639, REQ-INGEST-004): a `?handoff=<id>` from the desktop extractor.
+      // This navigational GET is a SAFE request and must NOT consume the single-use handoff: a
+      // speculative browser prefetch or a duplicate top-level load of this URL would otherwise burn
+      // the token on the first (often invisible) request and leave the real navigation showing the
+      // ingest.handoff.notFound notice on every send (the 2026-07-19 Firefox double-GET incident).
+      // Instead of consuming here, expose the id so the create page's JS can POST it to
+      // importHandoff below -- a script-initiated request a page prefetch never issues -- which
+      // performs the one-time consume and swaps the pre-filled fragment in place, exactly like the
+      // manual upload. Consuming stays off every navigational GET.
+      if (handoff != null && !handoff.isBlank()) {
+        model.addAttribute("pendingHandoffId", handoff);
       }
     }
     populateCreateFormModel(model, form, principal);
@@ -458,6 +457,49 @@ public class RefineryOrderPageController {
     } catch (Exception e) {
       log.error("Refinery import relay failed (ajax)", e);
       model.addAttribute("importErrorKey", "refineryImport.error.failed");
+    }
+    populateCreateFormModel(model, form, principal);
+    return "refinery-orders-create :: refineryImportFormBody";
+  }
+
+  /**
+   * Consumes a one-click ingest handoff and returns the pre-filled create-form fragment for an
+   * in-place swap (epic #639, REQ-INGEST-004). This is the script-initiated counterpart to {@link
+   * #viewCreateForm}'s handoff branch: the navigational {@code GET …/create?handoff=<id>} renders
+   * the empty owner-prefilled form and never consumes, so a speculative browser prefetch or a
+   * duplicate top-level load cannot burn the single-use token (the 2026-07-19 Firefox double-GET
+   * incident); the create page's JS then POSTs the id here exactly once and swaps the returned
+   * {@code refineryImportFormBody} fragment into place.
+   *
+   * <p>Mirrors {@link #importExtractAjax}: on a hit the pre-filled form + the same review flags
+   * (issues, counters) render; on a miss — unknown, expired, already-consumed, wrong-kind or
+   * foreign-{@code sub} — the fresh owner-prefilled form renders with the {@code
+   * ingest.handoff.notFound} inline notice. Kept on this read controller for the same reason as
+   * {@link #importExtractAjax}: it is non-mutating (the single-use consume deletes a transient
+   * Redis pickup, it persists no squadron data) and needs the whole create-page render machinery.
+   *
+   * @param handoff the handoff id the extractor put on the {@code ?handoff=} parameter
+   * @param model the model populated with the pre-filled form + review flags, or the not-found key
+   * @param principal the authenticated user (its Keycloak subject scopes the single-use consume)
+   * @return the {@code refinery-orders-create :: refineryImportFormBody} fragment view name
+   */
+  @PostMapping(value = "/import-handoff", headers = "X-Requested-With=XMLHttpRequest")
+  @PreAuthorize("isAuthenticated()")
+  public String importHandoff(
+      @RequestParam("handoff") String handoff,
+      Model model,
+      @AuthenticationPrincipal OidcUser principal) {
+    RefineryOrderForm form = new RefineryOrderForm();
+    UUID currentUserId = getCurrentUserId(principal);
+    if (currentUserId != null) {
+      form.setOwnerId(currentUserId);
+    }
+    RefineryOrderForm prefilled =
+        principal != null ? applyRefineryHandoff(handoff, principal, model) : null;
+    if (prefilled != null) {
+      form = prefilled;
+    } else {
+      model.addAttribute("importErrorKey", "ingest.handoff.notFound");
     }
     populateCreateFormModel(model, form, principal);
     return "refinery-orders-create :: refineryImportFormBody";

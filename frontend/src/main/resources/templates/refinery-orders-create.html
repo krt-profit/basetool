@@ -470,6 +470,12 @@
     const MSG_RFC_CREATE_FAILED = /*[[#{error.refineryorder.create.failed}]]*/ 'Create failed.';
     const MSG_RFC_IMPORT_FAILED = /*[[#{refineryImport.error.failed}]]*/ 'Import failed.';
 
+    // One-click ingest (epic #639, REQ-INGEST-004): the id of a pending handoff, or null. The GET
+    // render is prefetch-safe (it never consumes the single-use token); the page module POSTs this
+    // id to /refinery-orders/import-handoff once on load to perform the consume and swap in the
+    // pre-filled form. See refinery-orders-create.js#_loadRefineryHandoff.
+    const REFINERY_HANDOFF_ID = /*[[${pendingHandoffId}]]*/ null;
+
     // Refining-method rating/speed labels, hoisted from updateMethodRatings() so the page module's
     // imperative code carries no Thymeleaf interpolation.
     const RATING_LEVELS = {
