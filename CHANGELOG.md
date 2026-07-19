@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sicherheit: Eingebetteter Tomcat auf 11.0.24 angehoben (CVE-2026-59083, CVE-2026-59084).** Der von Spring Boot vorgegebene Tomcat 11.0.23 war über die RewriteValve (Dekodierung von „+" zu einem Leerzeichen beim Umschreiben, wodurch in manchen Konfigurationen eine URL-basierte Sicherheitsregel umgangen werden konnte) sowie über die EncryptInterceptor-Härtung angreifbar; die von der NVD kritisch bewertete Version wird jetzt auf die gepatchte 11.0.24 erzwungen. Der OWASP-Abhängigkeits-Scan ist damit wieder grün — die parallel gemeldeten Vert.x-4.5.x-Funde (CVE-2026-15075/-15076) waren Fehlalarme, da diese Bibliotheken nur auf dem Compile-Klassenpfad des Keycloak-SPI-Moduls liegen, nie ausgeliefert werden und zur Laufzeit vom Keycloak-Container bereitgestellt werden; sie wurden begründet unterdrückt.
+
 ## [v1.5.4](https://github.com/krt-profit/basetool/releases/tag/v1.5.4) - 2026-07-19
 
 ### Fixed

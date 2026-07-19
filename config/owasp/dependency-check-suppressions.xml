@@ -197,4 +197,33 @@
     <cve>CVE-2026-54428</cve>
   </suppress>
 
+  <!--
+    CVE-2026-15075 (the vertx-core HttpClient DefaultRedirectHandler forwards
+    Authorization / Cookie / custom headers verbatim across a cross-origin 30x
+    redirect - an OUTBOUND HttpClient credential leak) and CVE-2026-15076 (the
+    vertx-web-client WebClientSession accepts a Set-Cookie `Domain` for an
+    unrelated host - cross-domain cookie injection) both affect Eclipse Vert.x
+    4.5.29 and earlier (fixed in 4.5.30). The NVD CPE fans the generic
+    "Eclipse Vert.x" product out onto the plain io.vertx:vertx-core / vertx-grpc*
+    coordinates; CVE-2026-15076's vulnerable class actually lives in
+    io.vertx:vertx-web-client, which is not on any classpath in this build at all.
+    Confirmed via `./gradlew :keycloak-spi:dependencyInsight`: vertx-core 4.5.28 and
+    the vertx-grpc* jars are dragged in ONLY by
+    org.keycloak:keycloak-services:26.7.0 -> keycloak-config-api -> Quarkus
+    (quarkus-vertx / quarkus-grpc-common / quarkus-opentelemetry) on the
+    keycloak-spi module's compileOnly classpath. They are absent from every
+    basetool RUNTIME classpath (backend / frontend / ingest / keycloak-spi
+    runtimeClasspath all report "No dependencies matching"). At runtime the SPI
+    runs inside the Keycloak (Quarkus) container, which supplies its own
+    Red Hat-patched Vert.x, so nothing we ship can reach the vulnerable HttpClient
+    redirect or WebClientSession code. CVE-scoped and pinned to the 4.5.x line so a
+    genuinely-vulnerable Vert.x ever entering a real classpath still fails the gate.
+  -->
+  <suppress>
+    <notes>False positive: build-time-only + CPE expansion. CVE-2026-15075 (vertx-core HttpClient cross-origin redirect header leak) and CVE-2026-15076 (vertx-web-client WebClientSession cross-domain cookie injection, whose vulnerable class is not even on the classpath) affect Eclipse Vert.x 4.5.29 and earlier. Our vertx-core / vertx-grpc* 4.5.28 jars are compileOnly transitives of keycloak-services 26.7.0 (via Quarkus) on the keycloak-spi module only, absent from every basetool runtime classpath and container-provided by Keycloak at runtime.</notes>
+    <packageUrl regex="true">^pkg:maven/io\.vertx/vertx-.*@4\.5\..*$</packageUrl>
+    <cve>CVE-2026-15075</cve>
+    <cve>CVE-2026-15076</cve>
+  </suppress>
+
 </suppressions>
