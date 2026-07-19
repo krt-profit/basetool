@@ -206,6 +206,20 @@ rule — no blanket "everything is masked" claim:
   both scrubbed by Alloy `stage.replace` (gated by a `stage.match` on the app label) mirroring the
   Keycloak mask. The streams inherit the global 744h retention — no REQ-OBS-010 IP-retention impact
   once masked.
+- **Idle-container stale-line drop guard (2026-07-19).** Every docker-shipped container stream (the
+  `<svc>-stdout`, `mon-<service>`, `npm`, `postgres-*` streams above) flows through
+  `loki.process.container_mask`, whose first stage drops any entry older than **167h**
+  (`stage.drop older_than`, a 1 h guard below Loki's `reject_old_samples_max_age` of 168h). A near-idle
+  container keeps its last stdout line at the tail, and `loki.source.docker` re-delivers that same line
+  on every tailer reconnect (`could not transfer logs: unexpected EOF`); while it is younger than the
+  reject window Loki silently dedupes the repeat, but once it ages past 168h every re-delivery is
+  400-rejected (`entry has timestamp too old`) and counted as a dropped entry, firing `LokiWriteFailing`
+  continuously (the 2026-07-18 `redis-exporter` incident — line frozen at `2026-07-11T20:05:39Z`,
+  rejected from exactly +168h onward, with the two `postgres-*` exporters and `mon-alertmanager` queued
+  to hit the same wall days later). Dropping such week-old operational stdout at the source is lossless
+  (Loki would reject it regardless) and generic across every current and future idle container. The file
+  streams (npm/host-auth and the 31-day IP-retention paths) do **not** pass through this processor and
+  stamp their timestamp at read time = now, so their deliberate retention is unaffected.
 - Loki labels stay low-cardinality (`app`, `level`, bounded `host`); log lines are never
   turned into per-user labels. The `level` label is carried by the three JSON app streams
   (`backend` / `frontend` / `ingest`), all tailed from their `logs/<app>.json` file sinks through the
@@ -866,7 +880,11 @@ therefore alerts on:
   the file's `loki_source_file_read_lines_total` series — a tailed file keeps its series present even
   when quiet, so absence means the file is not being tailed at all, the permission-drift failure
   `config.alloy` warns about) and `LokiWriteFailing` (shipper-side entry drops) — all warning — cover
-  it. The `<svc>-stdout` container streams (ADR-0095) are deliberately given **no** per-stream liveness
+  it. `LokiWriteFailing` fires on `rate(loki_write_dropped_entries_total[15m]) > 0`; a **persistent**
+  firing with `reason="ingester_error"` and no other symptom is most often the idle-container stale-line
+  re-delivery guarded by the `stage.drop older_than = "167h"` in `loki.process.container_mask` (see
+  REQ-OBS-007) — read the exact rejected stream from Alloy's own `final error sending batch` log line
+  before touching Loki limits. The `<svc>-stdout` container streams (ADR-0095) are deliberately given **no** per-stream liveness
   alert: a native-error breadcrumb is rare by design, so a `rate()`/`absent()` liveness check on such a
   quiet stream would be a permanent false alarm — whole-pipeline silence is still caught by
   `LokiIngestSilent`.
