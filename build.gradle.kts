@@ -186,6 +186,18 @@ subprojects {
     // Gradle constraint would collide instead of winning. Remove once the Boot BOM ships
     // >= 42.7.12 (the OWASP dependencyCheckAggregate gate will keep this honest either way).
     extra["postgresql.version"] = "42.7.12"
+
+    // Second security override in the same vein: the Boot 4 BOM pins the embedded Tomcat to
+    // 11.0.23, which is flagged by CVE-2026-59083 (the RewriteValve decodes `+` to a space while
+    // rewriting a URI, so a security-constraint URL match can be bypassed in some configurations)
+    // and CVE-2026-59084 (EncryptInterceptor hardening). Apache rates both "Low", but the
+    // NVD/CISA auto-score is 9.1 CRITICAL, so both trip the `failBuildOnCVSS = 7.0` gate below.
+    // Both are fixed in 11.0.24 (affects 11.0.0-M1 to 11.0.23) — the latest 11.0.x on Maven
+    // Central and still on the 11.0.x line the Boot 4.1 BOM expects, so no 11.1.x jump. Same
+    // conflict-free mechanism as the PostgreSQL override: io.spring.dependency-management emits the
+    // Boot BOM `tomcat.version` property as a `{strictly ...}` constraint. Remove once the Boot BOM
+    // ships >= 11.0.24 (the OWASP dependencyCheckAggregate gate keeps this honest either way).
+    extra["tomcat.version"] = "11.0.24"
   }
 
   // JaCoCo coverage. Both modules want the same setup: emit XML + CSV + HTML
