@@ -37,7 +37,6 @@ import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -82,17 +81,24 @@ public class PersonalBlueprintImportProxyController {
   /**
    * Returns the one-click ingest handoff staged for the current user (epic #639, REQ-INGEST-004):
    * the desktop extractor sent a blueprint export and opened {@code
-   * /personal-inventory/blueprints?handoff=<id>}; the import JS fetches the staged preview here and
-   * renders it without an upload. Single-use and scoped to the session subject — an unknown,
+   * /personal-inventory/blueprints?handoff=<id>}; the import JS POSTs the id here and renders the
+   * staged preview without an upload. Single-use and scoped to the session subject — an unknown,
    * expired, consumed or foreign id is a 404 (no IDOR leak), which the JS treats as "nothing
    * staged".
+   *
+   * <p>Deliberately a <strong>POST</strong>, not a GET: consuming the handoff is a single-use,
+   * state-changing operation (an atomic Redis {@code GETDEL}), so it must not ride a cacheable /
+   * prefetchable safe method. The navigational page GET ({@code /personal-inventory/blueprints})
+   * already never consumes; keeping the consume itself off any GET means a speculative browser
+   * prefetch or a duplicate load cannot burn the token before the real pickup (REQ-INGEST-004, the
+   * 2026-07-19 double-GET incident that hit the refinery surface).
    *
    * @param handoff the handoff id from the {@code ?handoff=} parameter
    * @param principal the authenticated user (its subject scopes the staged lookup)
    * @return the staged blueprint import preview
    * @throws ResponseStatusException 404 when there is no staged handoff for this user/id
    */
-  @GetMapping("/staged")
+  @PostMapping("/staged")
   public BlueprintImportPreviewDto staged(
       @RequestParam("handoff") String handoff, @AuthenticationPrincipal OidcUser principal) {
     String sub = principal != null ? principal.getSubject() : null;

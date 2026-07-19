@@ -34,7 +34,7 @@
  * bootstrap block of refinery-orders-create.html, which executes immediately before this script.
  */
 
-/* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, RATING_LEVELS, SPEED_LEVELS, MSG_RFC_MATERIAL_INVALID, MSG_RFC_CREATE_FAILED, MSG_RFC_IMPORT_FAILED */
+/* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, RATING_LEVELS, SPEED_LEVELS, MSG_RFC_MATERIAL_INVALID, MSG_RFC_CREATE_FAILED, MSG_RFC_IMPORT_FAILED, REFINERY_HANDOFF_ID */
 
 // Initialize the shared yield-badge module. On the create form the map is empty until the
 // user picks a refinery from the location dropdown (then onLocationChange fetches the map
@@ -550,6 +550,32 @@ document.addEventListener('krt:swapped', function (e) {
     if (c && c.id === 'refineryImportFormContainer') _reinitRefineryForm(true);
 });
 
+// X-Requested-With + krtCsrf headers for the in-place import POSTs (screenshot upload and the
+// one-click handoff consume). Shared so both carry the double-submit-safe CSRF token and the
+// bare-403 refresh-and-retry the same way.
+function _refineryImportHeaders() {
+    const h = { 'X-Requested-With': 'XMLHttpRequest' };
+    const t = window.krtCsrf.token();
+    const n = window.krtCsrf.headerName();
+    if (t && n) h[n] = t;
+    return h;
+}
+
+// Swap a returned refineryImportFormBody fragment into #refineryImportFormContainer and dispatch
+// krt:swapped so the datetime splitter + the create-form re-init pick up the fresh DOM. Shared by
+// the screenshot import and the handoff consume; falls back to a reload only if the stable
+// container is somehow gone.
+function _swapRefineryImportFragment(html) {
+    const container = document.getElementById('refineryImportFormContainer');
+    if (!container) {
+        window.location.reload();
+        return;
+    }
+    container.innerHTML = html;
+    document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container: container } }));
+    if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+}
+
 // #591: in-place screenshot-import. The picker posts the RefineryExtract as multipart; instead of
 // the classic POST->redirect reload, fetch the pre-filled create-form fragment and swap it into
 // #refineryImportFormContainer, then dispatch krt:swapped (the datetime splitter + the create-form
@@ -561,23 +587,20 @@ async function _submitRefineryImport(form) {
         return;
     }
     const fd = new FormData(form);
-    function buildHeaders() {
-        const h = { 'X-Requested-With': 'XMLHttpRequest' };
-        const t = window.krtCsrf.token();
-        const n = window.krtCsrf.headerName();
-        if (t && n) h[n] = t;
-        return h;
-    }
     let res;
     try {
-        res = await fetch(form.action, { method: 'POST', body: fd, headers: buildHeaders() });
+        res = await fetch(form.action, {
+            method: 'POST',
+            body: fd,
+            headers: _refineryImportHeaders(),
+        });
         if (res.status === 403 && window.krtCsrf.refresh) {
             const refreshed = await window.krtCsrf.refresh();
             if (refreshed)
                 res = await fetch(form.action, {
                     method: 'POST',
                     body: fd,
-                    headers: buildHeaders(),
+                    headers: _refineryImportHeaders(),
                 });
         }
     } catch (_e) {
@@ -588,15 +611,7 @@ async function _submitRefineryImport(form) {
         if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
         return;
     }
-    const html = await res.text();
-    const container = document.getElementById('refineryImportFormContainer');
-    if (!container) {
-        window.location.reload();
-        return;
-    }
-    container.innerHTML = html;
-    document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container: container } }));
-    if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+    _swapRefineryImportFragment(await res.text());
 }
 const _refineryImportForm = document.getElementById('refineryImportForm');
 if (_refineryImportForm) {
@@ -604,4 +619,56 @@ if (_refineryImportForm) {
         e.preventDefault();
         _submitRefineryImport(_refineryImportForm);
     });
+}
+
+// One-click ingest (epic #639, REQ-INGEST-004): the extractor opened this page with `?handoff=<id>`.
+// The navigational GET is prefetch-safe -- it does NOT consume the single-use handoff -- so a
+// speculative Firefox/Chrome prefetch or a duplicate top-level load can no longer burn the token
+// (the 2026-07-19 double-GET incident, where a member's Firefox loaded the URL twice ~250ms apart
+// and the first destructive GET consumed it while the second showed the "expired" notice). Once the
+// page's JS runs, POST the id to /refinery-orders/import-handoff -- a request a page prefetch never
+// issues -- to perform the one-time consume and swap the pre-filled fragment into place, exactly the
+// screenshot-import path. The id is stripped from the address bar first so a manual reload does not
+// re-POST a now-consumed handoff. A miss (expired/foreign/unknown) swaps in the fragment carrying
+// the friendly ingest.handoff.notFound notice; a transport failure shows an inline toast and leaves
+// the empty form intact.
+async function _loadRefineryHandoff() {
+    if (typeof REFINERY_HANDOFF_ID === 'undefined' || !REFINERY_HANDOFF_ID) return;
+    const id = REFINERY_HANDOFF_ID;
+    // Drop ?handoff= from the address bar so a manual reload does not re-attempt a consumed id.
+    try {
+        const params = new URLSearchParams(window.location.search);
+        params.delete('handoff');
+        const cleaned =
+            window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', cleaned);
+        }
+    } catch (_e) {
+        /* address-bar cleanup is best-effort; the consume below is what matters */
+    }
+    if (!window.krtCsrf) return;
+    const url = '/refinery-orders/import-handoff?handoff=' + encodeURIComponent(id);
+    let res;
+    try {
+        res = await fetch(url, { method: 'POST', headers: _refineryImportHeaders() });
+        if (res.status === 403 && window.krtCsrf.refresh) {
+            const refreshed = await window.krtCsrf.refresh();
+            if (refreshed)
+                res = await fetch(url, { method: 'POST', headers: _refineryImportHeaders() });
+        }
+    } catch (_e) {
+        if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
+        return;
+    }
+    if (res.redirected || !res.ok) {
+        if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
+        return;
+    }
+    _swapRefineryImportFragment(await res.text());
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _loadRefineryHandoff);
+} else {
+    _loadRefineryHandoff();
 }
