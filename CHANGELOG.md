@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.4](https://github.com/krt-profit/basetool/releases/tag/v1.5.4) - 2026-07-19
+
 ### Fixed
 
 - **Extractor: Der „An Basetool senden"-Import-Link zeigt nicht mehr „Import-Link abgelaufen oder ungültig", wenn der Browser die Seite doppelt lädt.** Bei manchen Nutzern (beobachtet mit Firefox) öffnete der Browser die vorbefüllte Seite zweimal kurz hintereinander; der erste Aufruf verbrauchte den einmaligen Import-Link, der zweite zeigte den Ablauf-Hinweis — jeder Sendevorgang schlug fehl, während der manuelle JSON-Import weiter funktionierte. Der Seitenaufruf verbraucht den Link jetzt nicht mehr; das geschieht erst über eine gezielte Aktion der Seite, die ein vorausschauendes Vorladen des Browsers nicht auslöst. Betrifft Raffinerie- und Blueprint-Import gleichermaßen (REQ-INGEST-004, ADR-0110).
