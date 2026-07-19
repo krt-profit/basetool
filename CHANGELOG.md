@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Monitoring: Der Alarm `LokiWriteFailing` feuert nicht mehr dauerhaft, wenn ein nahezu stiller Container (z. B. `redis-exporter`) seine letzte Logzeile länger als Lokis Annahmefenster von 168 h unverändert stehen lässt.** Alloys Docker-Tailer liefert diese letzte Zeile bei jeder Wiederverbindung erneut; sobald sie 168 h überschritt, wies Loki jede Wiederholung mit „timestamp too old" (HTTP 400) ab, wodurch der Alarm ununterbrochen auslöste (die beiden `postgres`-Exporter und `alertmanager` wären wenige Tage später gefolgt). Ein `stage.drop older_than = "167h"` in der Container-Log-Pipeline verwirft solche veralteten Wiederholungen jetzt generisch an der Quelle, bevor sie Loki erreichen (REQ-OBS-007).
+
 ## [v1.5.3](https://github.com/krt-profit/basetool/releases/tag/v1.5.3) - 2026-07-18
 
 ### Changed
