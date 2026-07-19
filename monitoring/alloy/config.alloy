@@ -255,6 +255,25 @@ loki.source.docker "containers" {
 loki.process "container_mask" {
 	forward_to = [loki.write.default.receiver]
 
+	// (2026-07-19) Drop stale re-delivered container lines BEFORE they reach loki.write. A near-idle
+	// container (redis-exporter, the two postgres exporters and alertmanager log almost nothing after
+	// startup) keeps its last stdout line at the tail; loki.source.docker re-opens the docker tail on
+	// every reconnect ("could not transfer logs: unexpected EOF") and re-delivers that SAME last line.
+	// While it is younger than Loki's reject_old_samples_max_age (168h, loki-config.yml) Loki silently
+	// dedupes the repeat, but once it ages past that window every re-delivery is 400-rejected ("entry
+	// has timestamp too old") and counted as a dropped entry -> loki_write_dropped_entries_total climbs
+	// and LokiWriteFailing fires continuously (the 2026-07-18 redis-exporter incident: line frozen at
+	// 2026-07-11T20:05:39Z, rejected from exactly +168h onward). Dropping entries older than the reject
+	// window here — 167h, a 1h guard below Loki's 168h so Alloy always drops before Loki would reject —
+	// ends the doomed pushes at the source for EVERY container stream generically. Week-old operational
+	// stdout carries no signal and Loki would reject it regardless. The file streams (npm/host-auth, the
+	// deliberate 31-day IP-retention paths) never pass through this processor and stamp their timestamp
+	// at read time = now, so their long retention is untouched.
+	stage.drop {
+		older_than          = "167h"
+		drop_counter_reason = "reject_old_samples_guard"
+	}
+
 	// Grafana logs its Keycloak-OIDC admin logins with `uname=` and the user's e-mail.
 	stage.match {
 		selector = "{app=\"mon-grafana\"}"
