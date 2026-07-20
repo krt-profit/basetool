@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.8](https://github.com/krt-profit/basetool/releases/tag/v1.5.8) - 2026-07-20
+
 ### Fixed
 
 - **Discord-Registrierungen: Ein bereits stecken gebliebener „Verknüpfen"-Antrag lässt sich jetzt durch erneutes Verknüpfen abschließen, statt mit „Ein unerwarteter Fehler ist aufgetreten" abzubrechen.** War der Wegwerf-Discord-Account durch einen früheren Fehlversuch schon aus Keycloak gelöscht, lieferte die Abfrage seiner Discord-Verknüpfung einen `404`, der ungefangen als Server-Fehler durchschlug und den in v1.5.7 ergänzten Rückgriff auf den lokal gespeicherten Discord-Bezug nie erreichte. Ein nicht mehr existierender Keycloak-Benutzer wird bei dieser Abfrage nun als „keine Verknüpfung" behandelt, sodass der lokale Rückgriff greift und der Antrag sauber verknüpft wird (REQ-SEC-026, ADR-0111).
