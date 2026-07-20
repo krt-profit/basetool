@@ -123,6 +123,18 @@ public class NotificationPageController {
   }
 
   /**
+   * Creates the {@link SseEmitter} backing a new browser relay, with the registry's 30-minute
+   * timeout. Extracted as a seam so a test can substitute a mock emitter and assert the relay's
+   * initial request-thread commit (mirrors {@code NotificationStreamService.newEmitter()} on the
+   * backend).
+   *
+   * @return a fresh emitter holding the browser connection open for {@link #STREAM_TIMEOUT_MS}
+   */
+  protected SseEmitter newEmitter() {
+    return new SseEmitter(STREAM_TIMEOUT_MS);
+  }
+
+  /**
    * Renders the full notifications page: the newest {@value #PAGE_LIMIT} notifications plus the
    * paging facts (total count, more-pages flag) that drive the "showing X of Y" hint and the
    * load-more control, so a cap-exceeding inbox is visibly — never silently — truncated
@@ -203,7 +215,7 @@ public class NotificationPageController {
    */
   @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
   public SseEmitter stream(HttpServletRequest request, Authentication authentication) {
-    SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MS);
+    SseEmitter emitter = newEmitter();
     OAuth2AuthorizedClient authorizedClient =
         authorizedClientRepository.loadAuthorizedClient(REGISTRATION_ID, authentication, request);
     if (authorizedClient == null || authorizedClient.getAccessToken() == null) {
@@ -213,6 +225,31 @@ public class NotificationPageController {
       return emitter;
     }
     String bearerToken = authorizedClient.getAccessToken().getTokenValue();
+    // Commit the SSE response NOW, on the request thread, with an initial keep-alive comment.
+    // Load-bearing (ADR-0113) — do NOT remove as "redundant" next to the forwarded backend
+    // `connected`: this relay's first real write is forward() below, invoked on a reactor-netty
+    // event-loop thread, and Spring Web 7 + Tomcat 11 do NOT commit an async SSE response whose
+    // first write lands on a non-container thread (spring-ai #6169) — without this the status line
+    // + headers never reach the browser/NPM and every stream 60s-header-times-out (the
+    // 100%-dead-SSE
+    // incident of 2026-07-20). Spring replays this pre-initialize send on the request (dispatch)
+    // thread when it initializes the emitter, committing the response there, on a container thread
+    // —
+    // the same request-thread-first-write pattern the backend's
+    // NotificationStreamService.subscribe()
+    // already uses. A comment (not a named event) is invisible to EventSource, so it only flushes
+    // the
+    // headers; the forwarded backend events (incl. the backend's own `connected`) follow normally.
+    try {
+      emitter.send(SseEmitter.event().comment("ready"));
+    } catch (IOException | RuntimeException e) {
+      // Browser already gone before we could commit: fail soft, do not wire the relay.
+      log.debug(
+          "Notification stream initial commit failed ({}); completing",
+          e.getClass().getSimpleName());
+      emitter.complete();
+      return emitter;
+    }
     // Count this relay for the whole lifetime of the upstream subscription. doFinally fires exactly
     // once on any terminal signal — upstream complete/error, or a cancel when the browser
     // disconnects and onCompletion/onTimeout dispose the subscription below — so it stays balanced.
