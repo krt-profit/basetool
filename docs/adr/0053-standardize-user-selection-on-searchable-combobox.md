@@ -86,6 +86,19 @@ conversion checklist (grep for `querySelector('select')` / `.selectedOptions` / 
 `.options[` / `.value =` writes / `cloneNode` per site) and the live-row-clone prohibition live in
 REQ-FE-016 (`docs/specs/frontend-ajax-mutations.md`).
 
+**Follow-up (2026-07-20, REQ-FE-011 clearable pickers):** the original enhancement swallowed the
+`<select>`'s empty-value option entirely into the placeholder, so an **optional** picker (a
+non-required `<select>` with an empty option, e.g. a mission unit's responsible person "—
+automatisch: Schiffseigner —") lost the native ability to reset a committed value to none (the "can't
+remove the responsible person" bug). The component now restores **two independent paths** back to
+empty: (1) **delete-to-clear** — emptying the textbox clears the value, and `reconcile` drops the
+committed label so blur no longer restores the removed entry (`optional`, available for every optional
+picker regardless of the empty option's text — the path users take when they miss the row); and (2) a
+selectable **"clear" row** seeded from the empty option's descriptive text (`clearLabel`) at the top
+of the unfiltered list (value `''`, so `commit` drops the committed label + mirrored metadata — the
+discoverable path). Required pickers are unchanged — no clear row, blur snap-back preserved. See
+REQ-FE-011.
+
 ## Alternatives considered
 
 - **Remote `/users/search` combobox for every field** — rejected as the default: it needs per-field
