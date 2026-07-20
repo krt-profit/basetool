@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Edge-Rate-Limiting: Verbindungslimit wieder eng pro Client (500/IP).** Nachdem das Frontend-Netz per ADR-0112 auf natives IPv6 umgestellt wurde und die echte Client-IP (v4 und v6) am Reverse-Proxy ankommt, wurde das gleichzeitige Verbindungslimit von der Sofortmaßnahme 10000 auf 500 pro Client gesenkt — großzügig für echte Nutzer (mehrere Tabs mit SSE/WebSocket), aber wieder eine wirksame Obergrenze gegen Fluten (REQ-SEC-023, ADR-0112).
+
 ### Fixed
 
 - **Benachrichtigungen: Der Live-Push (SSE) funktioniert wieder.** Der Echtzeit-Kanal für die Glocke lieferte serverseitig keine Antwort-Header mehr aus (jeder Stream lief in einen Proxy-Timeout), weil das Frontend-Relay seine Antwort erst beim ersten weitergeleiteten Backend-Event committete — und dieser Schreibzugriff kommt auf Spring Boot 4 / Tomcat 11 aus einem Nicht-Container-Thread, der die Antwort nicht abschließt. Das Relay committet jetzt sofort auf dem Request-Thread (ein unsichtbares initiales SSE-Kommentar); der 60-Sekunden-Poll war durchgehend der Fallback, sodass nur die Live-Aktualisierung betroffen war (REQ-NOTIF-010, ADR-0113).

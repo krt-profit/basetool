@@ -1,6 +1,6 @@
 # ADR-0112 — Restore the real client IP at the NPM edge via native IPv6 on the proxy bridge
 
-- **Status:** Accepted — compose change merged (dual-stack `net-proxy-frontend`, `fd00:28:3::/64`); prod apply pending a scheduled maintenance-window deploy (clean-slate recreate)
+- **Status:** Accepted — deployed 2026-07-20 (dual-stack `net-proxy-frontend`, `fd00:28:3::/64`; real client IPv6 verified in the NPM access log); `limit_conn` retightened 10000 → 500/IP in a follow-up
 - **Date:** 2026-07-20
 - **Deciders:** @greluc
 - **Related:** spec [REQ-SEC-023](../specs/security-and-access.md) · [ADR-0049](0049-config-as-promotable-oci-artifact.md) (config as a promotable OCI artifact) · runbook [`docs/deployment.md`](../deployment.md) → *Edge rate limiting* · the 2026-07-20 edge-rate-limit incident (PR #1382)
