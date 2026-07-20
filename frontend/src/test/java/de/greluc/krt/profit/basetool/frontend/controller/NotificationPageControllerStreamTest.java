@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
@@ -35,6 +36,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.MessageSource;
@@ -222,5 +224,70 @@ class NotificationPageControllerStreamTest {
 
     // Then the live relay is reflected in the gauge — doFinally has not fired, the stream is open
     assertEquals(1.0, registry.get(MetricNames.NOTIFICATION_RELAY_CONNECTIONS).gauge().value());
+  }
+
+  @Test
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  void stream_withValidToken_commitsWithAnInitialSseCommentFromTheRequestThread() throws Exception {
+    // Given a valid token and an upstream that never emits (Flux.never), so the ONLY send is the
+    // controller's own initial commit. The relay MUST flush its response headers from the request
+    // thread (ADR-0113 / spring-ai #6169): its forwarded writes arrive on a reactor-netty thread
+    // that Spring Web 7 + Tomcat 11 never commit, so without an initial request-thread send every
+    // stream header-times-out at the proxy (the 100%-dead-SSE incident).
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    MessageSource messageSource = mock(MessageSource.class);
+    WebClient sseWebClient = mock(WebClient.class);
+    OAuth2AuthorizedClientRepository authorizedClientRepository =
+        mock(OAuth2AuthorizedClientRepository.class);
+    SseEmitter mockEmitter = mock(SseEmitter.class);
+    NotificationPageController controller =
+        new NotificationPageController(
+            backendApiClient,
+            messageSource,
+            sseWebClient,
+            authorizedClientRepository,
+            new SimpleMeterRegistry()) {
+          @Override
+          protected SseEmitter newEmitter() {
+            return mockEmitter;
+          }
+        };
+
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    Authentication authentication = mock(Authentication.class);
+    OAuth2AuthorizedClient client = mock(OAuth2AuthorizedClient.class);
+    OAuth2AccessToken token =
+        new OAuth2AccessToken(
+            OAuth2AccessToken.TokenType.BEARER,
+            "live-token",
+            Instant.now(),
+            Instant.now().plusSeconds(300));
+    when(client.getAccessToken()).thenReturn(token);
+    when(authorizedClientRepository.loadAuthorizedClient(REGISTRATION_ID, authentication, request))
+        .thenReturn(client);
+
+    WebClient.RequestHeadersUriSpec uriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+    WebClient.RequestHeadersSpec headersSpec = mock(WebClient.RequestHeadersSpec.class);
+    WebClient.ResponseSpec responseSpec = mock(WebClient.ResponseSpec.class);
+    when(sseWebClient.get()).thenReturn(uriSpec);
+    when(uriSpec.uri(anyString())).thenReturn(headersSpec);
+    when(headersSpec.headers(any())).thenReturn(headersSpec);
+    when(headersSpec.retrieve()).thenReturn(responseSpec);
+    when(responseSpec.bodyToFlux(anyTypeRef())).thenReturn(Flux.never());
+
+    // When the browser opens the stream
+    controller.stream(request, authentication);
+
+    // Then exactly one send ran synchronously (the request thread) carrying an SSE comment — the
+    // response is committed before any reactor-netty forward could run (none does; Flux.never).
+    ArgumentCaptor<SseEmitter.SseEventBuilder> captor = ArgumentCaptor.captor();
+    verify(mockEmitter).send(captor.capture());
+    String serialized =
+        captor.getValue().build().stream()
+            .map(data -> String.valueOf(data.getData()))
+            .collect(Collectors.joining());
+    assertTrue(
+        serialized.contains(":ready"),
+        "initial commit must be an invisible SSE comment, was: " + serialized);
   }
 }
