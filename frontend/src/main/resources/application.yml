@@ -93,6 +93,23 @@ spring:
   threads:
     virtual:
       enabled: true
+  data:
+    redis:
+      # Bound the Lettuce command + connect timeout (ADR-0114). Without an explicit value Lettuce's
+      # 60 s command-timeout default governs EVERY Redis command — including the reactive PING the
+      # auto-configured RedisReactiveHealthIndicator runs (spring-boot-starter-webflux is on the
+      # classpath, so Boot registers the REACTIVE Redis health contributor, not the blocking one).
+      # `redis` sits in the readiness health group (ADR-0084), which gates the Docker HEALTHCHECK —
+      # and that probe times out after 5 s and flips the container `unhealthy` after 3 misses. An
+      # unbounded PING against a stalled Redis therefore hangs /actuator/health/readiness far past
+      # that window, every probe times out, and the frontend flaps into the maintenance page (the
+      # 2026-07-20 reactive-degradation incident). 2 s is >1000x the sub-millisecond co-located-Redis
+      # RTT yet well inside the 5 s probe window: a stalled Redis now fails the PING fast (a truthful
+      # DOWN) instead of hanging, while a genuine Redis outage still correctly fails readiness because
+      # every request needs the Redis-backed session. Env-overridable so an operator can retune
+      # without a rebuild.
+      timeout: ${SPRING_DATA_REDIS_TIMEOUT:2s}
+      connect-timeout: ${SPRING_DATA_REDIS_CONNECT_TIMEOUT:2s}
   cache:
     type: caffeine
     caffeine:
