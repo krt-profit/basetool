@@ -710,7 +710,7 @@ The same two custom snippets carry a version-controlled per-IP safety net
   (`krt_req_perip`, `krt_conn_perip`, keyed on `$binary_remote_addr`).
 - `docker/maintenance/nginx/server_proxy.conf` applies them in each proxy
   host's `server { }` block: **20 r/s** sustained with **burst 80** (`nodelay`)
-  and at most **60 concurrent connections** per client IP.
+  and at most **10000 concurrent connections** per client key.
 
 These are flood/brute-force ceilings, not fairness limits — a worst-case page
 load (~40 uncached asset requests at once) fits inside the burst, while
@@ -720,6 +720,16 @@ maintenance-page `error_page` wiring above and a flooding client would receive
 the maintenance page with the wrong semantics. Rejected requests appear in the
 per-host access logs (and via `limit_req_log_level warn` in the error log), so
 a sustained flood raises the `EdgeRateLimitSpike` Loki alert.
+
+> **Note — the per-IP key is currently global.** With Docker's userland-proxy
+> enabled and NPM on a user-defined bridge, inbound traffic is SNAT'd to the
+> bridge gateway, so `$binary_remote_addr` is the gateway IP (`172.28.3.1`) for
+> every internet client and all users share one bucket. The `limit_conn` ceiling
+> is therefore set high (**10000**) as a global runaway limit; a 60-cap here
+> caused the 2026-07-20 maintenance-page incident (concurrent SSE + WebSocket
+> connections crossed it). Restoring real client IPs (userland-proxy off / host
+> networking / PROXY protocol) is the follow-up that would let the cap return to
+> a tight per-client value. See REQ-SEC-023.
 
 Stricter per-endpoint limits (e.g. on the Keycloak token/login paths) remain
 possible per proxy host in the NPM UI's Advanced tab, referencing the same
