@@ -329,8 +329,12 @@
             return;
         }
         function showSlot2(show) {
-            slot2.style.display = show ? '' : 'none';
-            addBtn.style.display = show ? 'none' : '';
+            // Visibility here is class-based (krtm-hidden = display:none, ADR-0093): slot 2 starts
+            // hidden via the krtm-hidden class when staffel2Id is null. Toggling inline
+            // style.display cannot beat that class rule, so slot 2 would stay hidden while the add
+            // button vanished. Toggle the class instead so both actually flip.
+            slot2.classList.toggle('krtm-hidden', !show);
+            addBtn.classList.toggle('krtm-hidden', show);
         }
         function clearSlot2() {
             sel2.value = '';

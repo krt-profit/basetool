@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Mitgliederverwaltung: Der Button „Zweite Staffel hinzufügen" öffnet jetzt wieder den Eingabebereich für die zweite Staffel.** Bisher verschwand beim Klick nur der Button, ohne dass der zweite Staffel-Slot erschien: Dessen Sichtbarkeit wird über die CSS-Klasse `krtm-hidden` gesteuert, das Skript versuchte ihn aber über einen Inline-`display`-Stil einzublenden, der die Klasse nicht übersteuert. Der Slot wird jetzt ebenfalls per Klasse ein- und ausgeblendet (REQ-ORG-017, ADR-0093).
+
 - **Edge-Rate-Limiting: „Too many requests" und Wartungsseite bei normaler Nutzung behoben.** Das Verbindungslimit am Reverse-Proxy (NPM) wirkte faktisch global statt pro IP, weil hinter Dockers userland-proxy alle Internet-Clients mit derselben Bridge-Gateway-Adresse ankommen; schon wenige gleichzeitige Nutzer auf der Missionsseite (langlebige SSE-/WebSocket-Verbindungen) überschritten die Grenze von 60, wodurch legitime Anfragen mit 429 abgewiesen wurden und Reconnect-Stürme das Frontend in die Wartungsseite trieben. Das gleichzeitige Verbindungslimit wurde auf 10000 angehoben (REQ-SEC-023).
 
 ## [v1.5.8](https://github.com/krt-profit/basetool/releases/tag/v1.5.8) - 2026-07-20
