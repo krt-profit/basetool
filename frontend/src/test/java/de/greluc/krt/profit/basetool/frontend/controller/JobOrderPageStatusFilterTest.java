@@ -31,7 +31,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.config.CapabilityFlagsAdvice;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import jakarta.servlet.http.Cookie;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,9 +43,16 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+/**
+ * Verifies the job-order overview status filter after it moved off the {@code orders_filter_status}
+ * server cookie onto client-side localStorage: the selected statuses now arrive only as repeatable
+ * {@code status} query parameters (echoed by {@code orders-index.js}), are validated against the
+ * known statuses, and default to {@code OPEN}+{@code IN_PROGRESS} when nothing valid is selected —
+ * and the controller never sets a status cookie any more.
+ */
 @SpringBootTest
 @ActiveProfiles("test")
-class JobOrderPageCookieTest {
+class JobOrderPageStatusFilterTest {
 
   @Autowired private WebApplicationContext context;
 
@@ -62,8 +68,8 @@ class JobOrderPageCookieTest {
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     // The default @WithMockUser is a non-admin, so the orders view's profit gate would otherwise
-    // redirect to /orders/create. Stub the capability as a profit-eligible viewer so these cookie
-    // tests exercise the list path.
+    // redirect to /orders/create. Stub the capability as a profit-eligible viewer so these tests
+    // exercise the list path.
     when(backendApiClient.get(
             "/api/v1/me/capabilities", CapabilityFlagsAdvice.CapabilitiesResponse.class))
         .thenReturn(new CapabilityFlagsAdvice.CapabilitiesResponse(true, true, true));
@@ -71,7 +77,7 @@ class JobOrderPageCookieTest {
 
   @Test
   @WithMockUser
-  void viewOrders_WithoutCookie_ShouldUseDefaultAndSetNoNewCookie() throws Exception {
+  void viewOrders_withoutStatusParam_usesDefaultAndSetsNoCookie() throws Exception {
     when(backendApiClient.get(
             eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
             anyTypeRef()))
@@ -90,58 +96,7 @@ class JobOrderPageCookieTest {
 
   @Test
   @WithMockUser
-  void viewOrders_WithValidCookie_ShouldUseCookie() throws Exception {
-    when(backendApiClient.get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
-
-    mockMvc
-        .perform(get("/orders").cookie(new Cookie("orders_filter_status", "COMPLETED")))
-        .andExpect(status().isOk());
-
-    verify(backendApiClient)
-        .get(eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"), anyTypeRef());
-  }
-
-  @Test
-  @WithMockUser
-  void viewOrders_WithInvalidOldCookie_ShouldFallbackToDefault() throws Exception {
-    when(backendApiClient.get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
-            anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
-
-    mockMvc
-        .perform(get("/orders").cookie(new Cookie("orders_filter_status", "OPEN_IN_PROGRESS")))
-        .andExpect(status().isOk());
-
-    verify(backendApiClient)
-        .get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
-            anyTypeRef());
-  }
-
-  @Test
-  @WithMockUser
-  void viewOrders_WithNewCookieFormat_ShouldUseCookie() throws Exception {
-    when(backendApiClient.get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
-            anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
-
-    mockMvc
-        .perform(get("/orders").cookie(new Cookie("orders_filter_status", "OPEN-IN_PROGRESS")))
-        .andExpect(status().isOk());
-
-    verify(backendApiClient)
-        .get(
-            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
-            anyTypeRef());
-  }
-
-  @Test
-  @WithMockUser
-  void viewOrders_WithQueryParam_ShouldSetNewCookie() throws Exception {
+  void viewOrders_withStatusParam_usesItAndSetsNoCookie() throws Exception {
     when(backendApiClient.get(
             eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
@@ -149,9 +104,44 @@ class JobOrderPageCookieTest {
     mockMvc
         .perform(get("/orders").param("status", "COMPLETED"))
         .andExpect(status().isOk())
-        .andExpect(cookie().value("orders_filter_status", "COMPLETED"));
+        .andExpect(cookie().doesNotExist("orders_filter_status"));
 
     verify(backendApiClient)
         .get(eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=COMPLETED"), anyTypeRef());
+  }
+
+  @Test
+  @WithMockUser
+  void viewOrders_withInvalidStatusParam_fallsBackToDefault() throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
+            anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
+
+    mockMvc
+        .perform(get("/orders").param("status", "BOGUS"))
+        .andExpect(status().isOk())
+        .andExpect(cookie().doesNotExist("orders_filter_status"));
+
+    verify(backendApiClient)
+        .get(
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,IN_PROGRESS"),
+            anyTypeRef());
+  }
+
+  @Test
+  @WithMockUser
+  void viewOrders_withMultipleValidStatusParams_passesThemThrough() throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,COMPLETED"),
+            anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 0, 0L, 0, List.of()));
+
+    mockMvc.perform(get("/orders").param("status", "OPEN", "COMPLETED")).andExpect(status().isOk());
+
+    verify(backendApiClient)
+        .get(
+            eq("/api/v1/orders?page=0&size=100&sort=priority,asc&status=OPEN,COMPLETED"),
+            anyTypeRef());
   }
 }
