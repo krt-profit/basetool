@@ -768,6 +768,36 @@ class KeycloakServiceTest {
   }
 
   /**
+   * {@code readDiscordLink} maps a {@code 404} (the Keycloak user itself no longer exists) to an
+   * empty result rather than propagating it, so the account-linking flow can fall back to the local
+   * {@code discord_user_id} and recover a registration whose throwaway Keycloak user was already
+   * deleted by an earlier partial failure (the stranded conrad7247/MardukSedras case).
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void readDiscordLink_userNotFound_returnsEmpty() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = writeProperties(server);
+      UUID pending = UUID.fromString("00000000-0000-0000-0000-0000000000e5");
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(errorResponse(404));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+      Optional<KeycloakService.DiscordLink> link =
+          assertDoesNotThrow(() -> service.readDiscordLink(pending));
+
+      assertTrue(link.isEmpty());
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
    * Builds enabled write-path Keycloak properties pointed at the mock server (admin URL, realm,
    * client credentials) for the {@code linkDiscordIdentity} / {@code deleteUser} / {@code
    * readDiscordLink} tests.

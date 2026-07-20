@@ -203,7 +203,10 @@ throwaway Discord-registered account. It is orchestrated by
    fallback to the persisted local `discord_user_id`** when Keycloak no longer knows the pending
    user. The fallback recovers a registration whose throwaway Keycloak user was already deleted by an
    earlier partial failure (its `app_user` row, and thus the snowflake, survives the rolled-back DB
-   half); only when both are empty is there nothing to link (`409`).
+   half); only when both are empty is there nothing to link (`409`). For the fallback to be
+   reachable, `readDiscordLink` maps a **`404` (the Keycloak user no longer exists) to empty** rather
+   than letting it propagate as a `500` — a deleted user has no readable link, so the local
+   `discord_user_id` takes over; every other Admin-API error still propagates truthfully.
 3. Keycloak write (idempotent on retry): `POST /users/{targetId}/federated-identity/discord`
    attaches the identity (a `409` for the **same** snowflake is success; a different one is a genuine
    conflict). It requires the sync service account to hold the **`manage-users`** realm-management
@@ -237,7 +240,9 @@ admin acts, no privilege can be inherited before the link, so the merge never wi
 - [x] The Keycloak writes are idempotent (409-same-snowflake / 404-on-delete treated as success);
   the identity-link precedes the DB merge and the throwaway-user **delete follows it**, so a retry
   after a DB failure re-reads the surviving throwaway user and re-applies cleanly. The snowflake
-  resolves from Keycloak with a local `discord_user_id` fallback for the already-deleted-user case.
+  resolves from Keycloak with a local `discord_user_id` fallback for the already-deleted-user case,
+  and `readDiscordLink` maps a `404` (user gone) to empty so that fallback is actually reached
+  instead of surfacing a `500`.
 - [x] A `LINKED` `UserApprovalEvent` is recorded against the surviving account (no PII / free text).
   Discord registration is **not** a unified-audit area, so no `AuditEventType`/viewer-filter change.
 - [ ] Operator: the sync service account is granted `manage-users` (on top of `view-users` /

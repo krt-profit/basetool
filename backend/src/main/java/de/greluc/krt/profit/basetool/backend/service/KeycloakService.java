@@ -535,13 +535,30 @@ public class KeycloakService {
    * optional {@code discord_user_id} claim mapper is absent (the id never reached {@code app_user})
    * — the federated link is always present for an account that logged in via Discord.
    *
+   * <p>A {@code 404} (the Keycloak user itself no longer exists) is deliberately mapped to {@link
+   * Optional#empty()} rather than propagated: it means there is no federated identity to read,
+   * which lets the account-linking flow (REQ-SEC-026) fall back to the locally persisted {@code
+   * discord_user_id} and recover a registration whose throwaway Keycloak user was already deleted
+   * by an earlier partial failure. Every other Admin-API failure still propagates so a transient
+   * hiccup surfaces a truthful error instead of silently discarding a link that does exist.
+   *
    * @param keycloakUserId the Keycloak user id (== the app user id / JWT subject) to read
    * @return the {@code discord} link, or {@link Optional#empty()} when the user has no Discord link
+   *     or no longer exists
    * @throws ExternalServiceException when the admin URL is unconfigured
    */
   public Optional<DiscordLink> readDiscordLink(@NotNull UUID keycloakUserId) {
     requireAdminUrl();
-    return fetchDiscordLink(keycloakUserId, getAccessToken());
+    try {
+      return fetchDiscordLink(keycloakUserId, getAccessToken());
+    } catch (HttpClientErrorException.NotFound userGone) {
+      // The Keycloak user is gone (e.g. an earlier partial link already deleted the throwaway
+      // registration user). No federated identity to read — report "no link" so the caller can fall
+      // back to the local discord_user_id and recover. Log the id only (not PII).
+      log.debug(
+          "Keycloak user {} not found on discord-link read; treating as no link", keycloakUserId);
+      return Optional.empty();
+    }
   }
 
   /**
