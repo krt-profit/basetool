@@ -721,15 +721,19 @@ the maintenance page with the wrong semantics. Rejected requests appear in the
 per-host access logs (and via `limit_req_log_level warn` in the error log), so
 a sustained flood raises the `EdgeRateLimitSpike` Loki alert.
 
-> **Note — the per-IP key is currently global.** With Docker's userland-proxy
-> enabled and NPM on a user-defined bridge, inbound traffic is SNAT'd to the
-> bridge gateway, so `$binary_remote_addr` is the gateway IP (`172.28.3.1`) for
-> every internet client and all users share one bucket. The `limit_conn` ceiling
-> is therefore set high (**10000**) as a global runaway limit; a 60-cap here
-> caused the 2026-07-20 maintenance-page incident (concurrent SSE + WebSocket
-> connections crossed it). Restoring real client IPs (userland-proxy off / host
-> networking / PROXY protocol) is the follow-up that would let the cap return to
-> a tight per-client value. See REQ-SEC-023.
+> **Note — the per-IP key is currently global for IPv6 clients (ADR-0112).** The
+> masking is IPv6-specific. External **IPv4** clients already reach nginx with
+> their real address via the kernel `PREROUTING` DNAT. But `:443` is also
+> published on `[::]:443` while `net-proxy-frontend` is **IPv4-only**, so Docker
+> installs no `ip6tables` DNAT and the userland `docker-proxy` relays every IPv6
+> client through a fresh IPv4 connection sourced from the bridge gateway →
+> `$binary_remote_addr` is `172.28.3.1` for every IPv6 client, and dual-stack
+> browsers prefer IPv6 so almost all real traffic collapses onto one bucket. The
+> `limit_conn` ceiling is therefore set high (**10000**) as a stopgap; a 60-cap
+> caused the 2026-07-20 maintenance-page incident. The real fix — native IPv6 on
+> the bridge so `ip6tables` DNAT preserves the client IPv6, then retighten the cap
+> to ~100/IP — is **ADR-0112** (do **not** disable userland-proxy: it deletes the
+> only IPv6 datapath). See REQ-SEC-023.
 
 Stricter per-endpoint limits (e.g. on the Keycloak token/login paths) remain
 possible per proxy host in the NPM UI's Advanced tab, referencing the same
