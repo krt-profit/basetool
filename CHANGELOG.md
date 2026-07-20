@@ -10,6 +10,8 @@
 
 - **Edge-Rate-Limiting: „Too many requests“ und Wartungsseite bei normaler Nutzung behoben.** Das Verbindungslimit am Reverse-Proxy (NPM) wirkte für IPv6-Clients faktisch global statt pro IP — weil `:443` auch auf IPv6 veröffentlicht ist, das Container-Netz aber nur IPv4 kann, leitet Docker jeden IPv6-Client über die Bridge-Gateway-Adresse weiter, und da Dual-Stack-Browser IPv6 bevorzugen, landete fast aller echte Verkehr in einem gemeinsamen Zähler. Schon wenige gleichzeitige Nutzer auf der Missionsseite überschritten so die 60er-Grenze, wodurch legitime Anfragen mit 429 abgewiesen wurden und Reconnect-Stürme das Frontend in die Wartungsseite trieben. Das Verbindungslimit wurde als Sofortmaßnahme auf 10000 angehoben; der eigentliche Fix (echte Client-IP wiederherstellen) ist als ADR-0112 geplant (REQ-SEC-023).
 
+- **Edge: Natives IPv6 auf dem Proxy-Netz stellt die echte Client-IP wieder her (ADR-0112).** IPv6-Clients kommen jetzt per Kernel-DNAT mit ihrer echten Adresse an — statt über die Bridge-Gateway-IP des userland-Relays — die Voraussetzung, um das Verbindungslimit am Edge wieder eng pro Client (~500/IP) statt global zu setzen. Das Ausrollen erfordert ein kurzes Wartungsfenster (Netz-Recreate); der Live-Wert bleibt vorerst 10000 (REQ-SEC-023).
+
 ## [v1.5.8](https://github.com/krt-profit/basetool/releases/tag/v1.5.8) - 2026-07-20
 
 ### Fixed

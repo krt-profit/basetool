@@ -1061,10 +1061,22 @@ networks:
           gateway: 172.28.2.1
   net-proxy-frontend:
     driver: bridge
+    # Dual-stack (ADR-0112): the published :443 is bound on [::]:443 too, but with an
+    # IPv4-only container Docker installs no ip6tables DNAT, so the userland docker-proxy
+    # relays every IPv6 client through the bridge gateway and nginx sees 172.28.3.1 for all
+    # of them (dual-stack browsers prefer IPv6 -> the edge per-IP limiter collapses to one
+    # global bucket, the 2026-07-20 outage). A real IPv6 subnet makes Docker install the
+    # kernel DNAT ([::]:443 -> [npm-v6]:443) so the client IPv6 is preserved like IPv4 already
+    # is. This edits the pinned `networks:` block, so deploy.sh runs a gated clean-slate
+    # recreate (brief full-stack outage) — apply in a maintenance window. The IPv4 gateway
+    # 172.28.3.1 is unchanged, so the Keycloak /admin SSH-tunnel allow-list is untouched.
+    enable_ipv6: true
     ipam:
       config:
         - subnet: 172.28.3.0/24
           gateway: 172.28.3.1
+        - subnet: fd00:28:3::/64
+          gateway: fd00:28:3::1
   net-proxy-keycloak:
     driver: bridge
     ipam:
