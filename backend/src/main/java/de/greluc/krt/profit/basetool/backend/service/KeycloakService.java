@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.KeycloakSyncProperties;
 import de.greluc.krt.profit.basetool.backend.config.KeycloakTrustSupport;
+import de.greluc.krt.profit.basetool.backend.exception.ExternalServiceException;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -51,7 +53,12 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 /**
- * Read-only client for the Keycloak Admin REST API used by the scheduled user sync.
+ * Client for the Keycloak Admin REST API. The bulk of it is the read-only scheduled user sync;
+ * {@link #linkDiscordIdentity} and {@link #deleteUser} are the only writes — the narrow
+ * account-linking path (REQ-SEC-026) that attaches a Discord federated identity to an existing
+ * account and removes the throwaway Discord user. Those writes require the service account to hold
+ * the {@code manage-users} realm-management role on top of the {@code view-users}/{@code
+ * view-realm} the sync needs.
  *
  * <p>Obtains an admin access token via the {@code client_credentials} grant against the realm's
  * {@code openid-connect/token} endpoint, then pages through {@code /admin/realms/{realm}/users} and
@@ -511,33 +518,177 @@ public class KeycloakService {
   @Nullable
   private String fetchDiscordFederatedId(UUID userId, String token) {
     try {
-      List<Map<String, Object>> identities =
-          adminClient()
-              .get()
-              .uri(
-                  "/admin/realms/{realm}/users/{id}/federated-identity",
-                  properties.getRealm(),
-                  userId)
-              .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
-              .retrieve()
-              .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
-
-      if (identities == null) {
-        return null;
-      }
-      return identities.stream()
-          .filter(i -> DISCORD_IDP_ALIAS.equals(i.get("identityProvider")))
-          .map(i -> (String) i.get("userId"))
-          .filter(Objects::nonNull)
-          .map(String::trim)
-          .filter(id -> !id.isEmpty())
-          .findFirst()
-          .orElse(null);
+      return fetchDiscordLink(userId, token).map(DiscordLink::userId).orElse(null);
     } catch (Exception e) {
       log.warn("Failed to fetch federated identities for user {}", userId, e);
       return null;
     }
   }
+
+  /**
+   * Reads a Keycloak user's {@code discord} federated-identity link (the snowflake plus the stored
+   * Discord username), fetching its own admin token. This is the <em>write-path</em> counterpart of
+   * the best-effort {@link #fetchDiscordFederatedId}: it is <strong>not</strong> best-effort — any
+   * Admin-API failure propagates so the account-linking flow (REQ-SEC-026) surfaces a truthful
+   * error rather than silently proceeding without a snowflake. It is the authoritative source of
+   * the incoming Discord snowflake for a pending registration, so linking works even when the
+   * optional {@code discord_user_id} claim mapper is absent (the id never reached {@code app_user})
+   * — the federated link is always present for an account that logged in via Discord.
+   *
+   * @param keycloakUserId the Keycloak user id (== the app user id / JWT subject) to read
+   * @return the {@code discord} link, or {@link Optional#empty()} when the user has no Discord link
+   * @throws ExternalServiceException when the admin URL is unconfigured
+   */
+  public Optional<DiscordLink> readDiscordLink(@NotNull UUID keycloakUserId) {
+    requireAdminUrl();
+    return fetchDiscordLink(keycloakUserId, getAccessToken());
+  }
+
+  /**
+   * Attaches the {@code discord} federated identity to a Keycloak user via {@code POST
+   * /users/{id}/federated-identity/discord}, requiring the {@code manage-users} realm-management
+   * role. Idempotent: a {@code 409} is treated as success <em>only</em> when the user is already
+   * linked to the <em>same</em> snowflake (a retry of this very link); a {@code 409} for a
+   * <em>different</em> Discord account is a genuine conflict and is raised. The raw snowflake is
+   * never logged.
+   *
+   * @param keycloakUserId the target Keycloak user id (the surviving existing account)
+   * @param discordSnowflake the Discord user id (snowflake) to link; never {@code null}/blank
+   * @param discordUsername the Discord username stored on the link; may be {@code null}/blank
+   * @throws ExternalServiceException when the admin URL is unconfigured, or when the user is
+   *     already linked to a different Discord account
+   */
+  public void linkDiscordIdentity(
+      @NotNull UUID keycloakUserId,
+      @NotNull String discordSnowflake,
+      @Nullable String discordUsername) {
+    requireAdminUrl();
+    Map<String, String> body = new HashMap<>();
+    body.put("identityProvider", DISCORD_IDP_ALIAS);
+    body.put("userId", discordSnowflake);
+    if (discordUsername != null && !discordUsername.isBlank()) {
+      body.put("userName", discordUsername.trim());
+    }
+    String token = getAccessToken();
+    try {
+      adminClient()
+          .post()
+          .uri(
+              "/admin/realms/{realm}/users/{id}/federated-identity/{provider}",
+              properties.getRealm(),
+              keycloakUserId,
+              DISCORD_IDP_ALIAS)
+          .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
+          .contentType(MediaType.APPLICATION_JSON)
+          .body(body)
+          .retrieve()
+          .toBodilessEntity();
+    } catch (HttpClientErrorException.Conflict conflict) {
+      String existing =
+          fetchDiscordLink(keycloakUserId, token).map(DiscordLink::userId).orElse(null);
+      if (discordSnowflake.equals(existing)) {
+        // Retry of this same link — the identity is already attached. Idempotent success.
+        return;
+      }
+      throw new ExternalServiceException(
+          "Keycloak user " + keycloakUserId + " is already linked to a different Discord account");
+    }
+  }
+
+  /**
+   * Hard-deletes a Keycloak user via {@code DELETE /users/{id}}, requiring the {@code manage-users}
+   * realm-management role. Idempotent: a {@code 404} (the user is already gone) is treated as
+   * success. Used by the account-linking flow to dispose of the throwaway Discord-registered user
+   * once its identity has been moved onto the surviving existing account (REQ-SEC-026).
+   *
+   * @param keycloakUserId the Keycloak user id to delete
+   * @throws ExternalServiceException when the admin URL is unconfigured
+   */
+  public void deleteUser(@NotNull UUID keycloakUserId) {
+    requireAdminUrl();
+    try {
+      adminClient()
+          .delete()
+          .uri("/admin/realms/{realm}/users/{id}", properties.getRealm(), keycloakUserId)
+          .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + getAccessToken())
+          .retrieve()
+          .toBodilessEntity();
+    } catch (HttpClientErrorException.NotFound notFound) {
+      // Already absent — idempotent success. Log the id only (it is not PII).
+      log.debug("Keycloak user {} already absent on delete", keycloakUserId);
+    }
+  }
+
+  /**
+   * Reads and parses a user's {@code discord} federated-identity entry from {@code GET
+   * /users/{id}/federated-identity}, shared by the best-effort sync read and the write-path {@link
+   * #readDiscordLink}. Propagates Admin-API failures to the caller (the sync read wraps this in its
+   * own swallow).
+   *
+   * @param userId the Keycloak user id whose federated identities to read
+   * @param token a valid admin access token
+   * @return the {@code discord} link, or {@link Optional#empty()} when the user has no Discord link
+   */
+  private Optional<DiscordLink> fetchDiscordLink(UUID userId, String token) {
+    List<Map<String, Object>> identities =
+        adminClient()
+            .get()
+            .uri(
+                "/admin/realms/{realm}/users/{id}/federated-identity",
+                properties.getRealm(),
+                userId)
+            .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
+            .retrieve()
+            .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+    if (identities == null) {
+      return Optional.empty();
+    }
+    return identities.stream()
+        .filter(i -> DISCORD_IDP_ALIAS.equals(i.get("identityProvider")))
+        .map(KeycloakService::toDiscordLink)
+        .filter(Objects::nonNull)
+        .findFirst();
+  }
+
+  /**
+   * Maps a raw federated-identity JSON map to a {@link DiscordLink}, or {@code null} when it
+   * carries no usable snowflake ({@code userId} absent/blank).
+   *
+   * @param identity one entry from the federated-identity list
+   * @return the parsed link, or {@code null} when the snowflake is missing/blank
+   */
+  @Nullable
+  private static DiscordLink toDiscordLink(Map<String, Object> identity) {
+    if (!(identity.get("userId") instanceof String rawId) || rawId.trim().isEmpty()) {
+      return null;
+    }
+    String userName =
+        (identity.get("userName") instanceof String rawName && !rawName.trim().isEmpty())
+            ? rawName.trim()
+            : null;
+    return new DiscordLink(rawId.trim(), userName);
+  }
+
+  /**
+   * Guards a write against an unconfigured admin URL, failing with a clear message rather than a
+   * downstream NPE when {@link #adminClient()} would build against a {@code null} base URL.
+   *
+   * @throws ExternalServiceException when the Keycloak admin URL is not configured
+   */
+  private void requireAdminUrl() {
+    if (properties.getAdminUrl() == null) {
+      throw new ExternalServiceException("Keycloak admin URL is not configured");
+    }
+  }
+
+  /**
+   * A Keycloak {@code discord} federated-identity link: the Discord snowflake and the stored
+   * Discord username (which may be absent). Never logged.
+   *
+   * @param userId the Discord user id (snowflake)
+   * @param userName the stored Discord username, or {@code null} when the link carries none
+   */
+  public record DiscordLink(@NotNull String userId, @Nullable String userName) {}
 
   private String getAccessToken() {
     MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();

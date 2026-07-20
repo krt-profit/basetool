@@ -22,17 +22,20 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.config.KeycloakSyncProperties;
+import de.greluc.krt.profit.basetool.backend.exception.ExternalServiceException;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.security.KeyStore;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -575,6 +578,211 @@ class KeycloakServiceTest {
     } finally {
       server.shutdown();
     }
+  }
+
+  /**
+   * REQ-SEC-026: {@code linkDiscordIdentity} attaches the {@code discord} federated identity to the
+   * target user via {@code POST /users/{id}/federated-identity/discord}, carrying the snowflake in
+   * the body. On a 204 it must not throw, and the request must target the right endpoint.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void linkDiscordIdentity_postsFederatedIdentityToTheUser() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = writeProperties(server);
+      UUID target = UUID.fromString("00000000-0000-0000-0000-0000000000d4");
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(new MockResponse().setResponseCode(204));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+      service.linkDiscordIdentity(target, "123456789012345678", "conrad7247");
+
+      server.takeRequest(); // token
+      RecordedRequest post = server.takeRequest();
+      assertEquals("POST", post.getMethod());
+      assertTrue(
+          post.getPath().endsWith("/users/" + target + "/federated-identity/discord"),
+          "must POST to the user's discord federated-identity endpoint");
+      String body = post.getBody().readUtf8();
+      assertTrue(body.contains("123456789012345678"), "the snowflake must ride the request body");
+      assertTrue(body.contains("\"identityProvider\":\"discord\""));
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
+   * Idempotency: a {@code 409} whose existing link carries the <em>same</em> snowflake (a retry of
+   * this very link) must be treated as success — the linking orchestrator retries after a partial
+   * failure, so re-attaching an already-present identity must not fail.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void linkDiscordIdentity_conflictWithSameSnowflake_isIdempotentSuccess() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = writeProperties(server);
+      UUID target = UUID.fromString("00000000-0000-0000-0000-0000000000d4");
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(errorResponse(409));
+      server.enqueue(
+          jsonResponse(
+              "[{\"identityProvider\":\"discord\",\"userId\":\"123456789012345678\","
+                  + "\"userName\":\"conrad7247\"}]"));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+      assertDoesNotThrow(
+          () -> service.linkDiscordIdentity(target, "123456789012345678", "conrad7247"));
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
+   * A {@code 409} whose existing link carries a <em>different</em> snowflake is a genuine conflict
+   * (the target is already linked to another Discord account) and must be raised, never silently
+   * swallowed.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void linkDiscordIdentity_conflictWithDifferentSnowflake_throws() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = writeProperties(server);
+      UUID target = UUID.fromString("00000000-0000-0000-0000-0000000000d4");
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(errorResponse(409));
+      server.enqueue(
+          jsonResponse(
+              "[{\"identityProvider\":\"discord\",\"userId\":\"999999999999999999\","
+                  + "\"userName\":\"someone-else\"}]"));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+      assertThrows(
+          ExternalServiceException.class,
+          () -> service.linkDiscordIdentity(target, "123456789012345678", "conrad7247"));
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
+   * {@code deleteUser} hard-deletes the throwaway Discord user via {@code DELETE /users/{id}} on a
+   * 204, targeting the right endpoint.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void deleteUser_deletesTheUser() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = writeProperties(server);
+      UUID pending = UUID.fromString("00000000-0000-0000-0000-0000000000e5");
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(new MockResponse().setResponseCode(204));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+      service.deleteUser(pending);
+
+      server.takeRequest(); // token
+      RecordedRequest delete = server.takeRequest();
+      assertEquals("DELETE", delete.getMethod());
+      assertTrue(delete.getPath().endsWith("/users/" + pending));
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
+   * Idempotency: a {@code 404} on delete (the user is already gone) must be treated as success, so
+   * a retry after a partial failure never fails on the second attempt.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void deleteUser_notFound_isIdempotentSuccess() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = writeProperties(server);
+      UUID pending = UUID.fromString("00000000-0000-0000-0000-0000000000e5");
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(errorResponse(404));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+      assertDoesNotThrow(() -> service.deleteUser(pending));
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
+   * {@code readDiscordLink} returns the target's {@code discord} snowflake and stored username —
+   * the authoritative source of the incoming snowflake for the link flow, working even when the
+   * {@code discord_user_id} claim mapper never persisted it locally.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void readDiscordLink_returnsSnowflakeAndUsername() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = writeProperties(server);
+      UUID pending = UUID.fromString("00000000-0000-0000-0000-0000000000e5");
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(
+          jsonResponse(
+              "[{\"identityProvider\":\"discord\",\"userId\":\"123456789012345678\","
+                  + "\"userName\":\"conrad7247\"}]"));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+      Optional<KeycloakService.DiscordLink> link = service.readDiscordLink(pending);
+
+      assertTrue(link.isPresent());
+      assertEquals("123456789012345678", link.get().userId());
+      assertEquals("conrad7247", link.get().userName());
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
+   * Builds enabled write-path Keycloak properties pointed at the mock server (admin URL, realm,
+   * client credentials) for the {@code linkDiscordIdentity} / {@code deleteUser} / {@code
+   * readDiscordLink} tests.
+   *
+   * @param server the running mock server whose URL becomes the admin base URL.
+   * @return the configured properties.
+   */
+  private static KeycloakSyncProperties writeProperties(MockWebServer server) {
+    KeycloakSyncProperties properties = new KeycloakSyncProperties();
+    properties.setEnabled(true);
+    properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
+    properties.setRealm("iri");
+    properties.setClientId("client");
+    properties.setClientSecret("secret");
+    return properties;
   }
 
   /**

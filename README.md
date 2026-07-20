@@ -30,7 +30,7 @@ runbook. Individual features, plans and decisions are **not** re-documented here
 - **In-app notifications** — a rule-driven notification engine delivering per-user notifications to a personal inbox via polling plus a live SSE push.
 - **Live multi-user sync** — every surface several people share updates in place for all viewers when a peer changes it, over one multiplexed `/ws/sync` WebSocket fanned across replicas by Redis pub/sub.
 - **Activity audit logs** — an immutable, append-only activity trail across the audited areas, on one admin-only page with per-area filters and PDF/JSON export.
-- **Discord login** — optional social login gated (fail-closed) on guild membership and an in-guild role, with an admin approval queue for new sign-ups.
+- **Discord login** — optional social login gated (fail-closed) on guild membership and an in-guild role, with an admin approval queue for new sign-ups (approve, reject, or link a sign-up onto an existing account).
 - **Personal inventory & blueprints** — members maintain their own item list and unlocked crafting blueprints (importable from external extractors), with craftability and org-unit availability overviews.
 - **Org chart & structure** — an interactive hierarchy view (OL → Bereiche → Staffeln/SKs) plus admin structure maintenance.
 - **i18n & Keycloak theme** — every user-visible string is translated (German default, English); a custom Keycloak theme carries the DAS KARTELL corporate design.

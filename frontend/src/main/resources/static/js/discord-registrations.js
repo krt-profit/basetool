@@ -21,10 +21,12 @@
  * Discord-registrations admin page module (/admin/discord-registrations), extracted verbatim from the
  * former inline script of admin/discord-registrations.html (ADR-0069, follow-up to #924).
  *
- * Approve / reject pending Discord registrations in place: each button goes through window.krtFetch,
- * removes the row on success (and re-inserts an empty-state row when the last one is gone), and drives
- * the reject-reason modal (open/cancel/confirm, backdrop + Escape close). Requires window.krtFetch;
- * without it the handler returns early (the server-rendered rows stay as the no-JS state).
+ * Approve / reject / link pending Discord registrations in place: each button goes through
+ * window.krtFetch, removes the row on success (and re-inserts an empty-state row when the last one is
+ * gone), and drives two modals (open/cancel/confirm, backdrop + Escape close) — the reject-reason
+ * modal and the link-to-existing-account modal (a server-searched remote-users account picker,
+ * REQ-SEC-026). Requires window.krtFetch; without it the handler returns early (the server-rendered
+ * rows stay as the no-JS state).
  *
  * The Thymeleaf-interpolated toast/empty strings stay inline in the page bootstrap as the DISCORD_MSG
  * global this module reads (renamed from the original in-handler 'MSG' const to avoid a generic
@@ -40,7 +42,16 @@ document.addEventListener('DOMContentLoaded', function () {
     const body = document.getElementById('registrationsBody');
     const modal = document.getElementById('reject-modal');
     const reasonInput = document.getElementById('reject-reason');
+    const linkModal = document.getElementById('link-modal');
     let rejectTarget = null;
+    let linkTarget = null;
+
+    // The account picker's <select> is progressively enhanced by krt-searchable-select.js, which
+    // moves the id onto a hidden input — so it is looked up lazily on open/confirm, never cached at
+    // load time (the cached reference would point at the removed original <select>).
+    function linkPicker() {
+        return document.getElementById('link-target');
+    }
 
     function removeRow(row) {
         row.remove();
@@ -86,6 +97,20 @@ document.addEventListener('DOMContentLoaded', function () {
         rejectTarget = null;
     }
 
+    function openLink(row) {
+        linkTarget = row;
+        const picker = linkPicker();
+        if (picker && picker.krtCombobox) {
+            picker.krtCombobox.setValue('');
+        }
+        linkModal.style.display = 'flex';
+    }
+
+    function closeLink() {
+        linkModal.style.display = 'none';
+        linkTarget = null;
+    }
+
     body.addEventListener('click', function (event) {
         const btn = event.target.closest('button[data-action]');
         if (!btn) {
@@ -95,8 +120,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!row) {
             return;
         }
-        if (btn.getAttribute('data-action') === 'approve') {
+        const action = btn.getAttribute('data-action');
+        if (action === 'approve') {
             approve(row);
+        } else if (action === 'link') {
+            openLink(row);
         } else {
             openReject(row);
         }
@@ -136,14 +164,62 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    const linkCancelBtn = document.getElementById('link-cancel');
+    if (linkCancelBtn) {
+        linkCancelBtn.addEventListener('click', closeLink);
+    }
+    const linkConfirmBtn = document.getElementById('link-confirm');
+    if (linkConfirmBtn) {
+        linkConfirmBtn.addEventListener('click', function () {
+            if (!linkTarget) {
+                return;
+            }
+            const picker = linkPicker();
+            const targetUserId = picker && picker.value ? picker.value : '';
+            if (!targetUserId) {
+                if (window.showFrontendErrorToast) {
+                    window.showFrontendErrorToast(DISCORD_MSG.linkNoTarget);
+                }
+                return;
+            }
+            const row = linkTarget;
+            const id = row.getAttribute('data-id');
+            const version = row.getAttribute('data-version');
+            window.krtFetch.write({
+                method: 'POST',
+                url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/link',
+                payload: {
+                    targetUserId: targetUserId,
+                    version: version == null ? null : Number(version),
+                },
+                toast: false,
+                errorMessage: DISCORD_MSG.linkError,
+                onSuccess: function () {
+                    if (window.showFrontendSuccessToast) {
+                        window.showFrontendSuccessToast(DISCORD_MSG.linked);
+                    }
+                    closeLink();
+                    removeRow(row);
+                },
+            });
+        });
+    }
+
     window.addEventListener('click', function (event) {
         if (event.target === modal) {
             closeReject();
+        } else if (event.target === linkModal) {
+            closeLink();
         }
     });
     document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape' && window.getComputedStyle(modal).display === 'flex') {
+        if (event.key !== 'Escape') {
+            return;
+        }
+        if (window.getComputedStyle(modal).display === 'flex') {
             closeReject();
+        } else if (linkModal && window.getComputedStyle(linkModal).display === 'flex') {
+            closeLink();
         }
     });
 });

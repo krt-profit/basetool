@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.event.UserApprovalDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.Role;
@@ -38,6 +39,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -67,6 +69,17 @@ public class UserRegistrationService {
   private final UserRepository userRepository;
   private final UserApprovalEventRepository userApprovalEventRepository;
   private final ApplicationEventPublisher eventPublisher;
+  private final KeycloakService keycloakService;
+  private final UserDeletionService userDeletionService;
+
+  /**
+   * Self-injection (lazy {@link ObjectProvider} to avoid an eager construction cycle) so {@link
+   * #linkRegistrationToExistingAccount} — a non-transactional orchestrator around external Keycloak
+   * writes — can invoke its transactional database half {@link #completeLinkTransactionally}
+   * through the Spring proxy rather than by self-invocation (which would bypass the
+   * {@code @Transactional} advice).
+   */
+  private final ObjectProvider<UserRegistrationService> selfProvider;
 
   /**
    * Whether a brand-new non-admin registration must be approved by an admin before it is granted
@@ -218,5 +231,145 @@ public class UserRegistrationService {
     user.setApprovedAt(Instant.now());
     user.setApprovedById(adminId);
     return userRepository.saveAndFlush(user);
+  }
+
+  /**
+   * Links a pending Discord registration onto an existing account (REQ-SEC-026): the Discord
+   * federated identity is moved from the throwaway Discord-registered user onto {@code
+   * targetUserId} in Keycloak, the throwaway Keycloak + {@code app_user} rows are removed, and the
+   * surviving account gains the {@code discord_user_id} (+ captured guild nickname). This is the
+   * admin-driven resolution for a member who already had an account but registered anew via Discord
+   * — typically because their Discord handle differs from their in-app name, so the automatic
+   * collision check never recognised them and let the registration reach the queue.
+   *
+   * <p><strong>Non-transactional orchestrator.</strong> The Keycloak writes are external
+   * side-effects that cannot roll back with a database transaction, so this method runs outside any
+   * transaction ({@link Propagation#NOT_SUPPORTED}); it sequences the Keycloak writes (idempotent
+   * on retry — a re-link of the same identity and a re-delete of an absent user both succeed) and
+   * then commits the database merge through the self-proxied {@link #completeLinkTransactionally}.
+   * The incoming Discord snowflake is read <em>authoritatively from Keycloak</em> ({@link
+   * KeycloakService#readDiscordLink}), not from the possibly-absent local {@code discord_user_id},
+   * so linking works even when the {@code discord_user_id} claim mapper never persisted the id
+   * locally (the reported conrad7247/MadrukSedras case).
+   *
+   * @param pendingId the pending Discord registration to link away
+   * @param targetUserId the existing account to link the Discord identity into
+   * @param version the pending registration's optimistic-lock version; {@code null} bypasses the
+   *     check
+   * @param adminId the acting admin's id (recorded in the audit)
+   * @return the surviving target account, now carrying the Discord link
+   * @throws NotFoundException when the pending registration or the target account is unknown
+   * @throws BusinessConflictException when the pending row is no longer PENDING, the target is not
+   *     a distinct active account, the target is already Discord-linked, or the pending
+   *     registration has no Discord identity to move
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   */
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  @NotNull
+  public User linkRegistrationToExistingAccount(
+      @NotNull UUID pendingId,
+      @NotNull UUID targetUserId,
+      @Nullable Long version,
+      @NotNull UUID adminId) {
+    User pending =
+        userRepository
+            .findById(pendingId)
+            .orElseThrow(() -> new NotFoundException("Pending registration not found"));
+    OptimisticLock.checkOptionalClient(pending.getVersion(), version, User.class, pendingId);
+    if (pending.getApprovalStatus() != ApprovalStatus.PENDING) {
+      throw new BusinessConflictException(
+          "Only a pending registration can be linked; current status is "
+              + pending.getApprovalStatus());
+    }
+    if (targetUserId.equals(pendingId)) {
+      throw new BusinessConflictException("A registration cannot be linked to itself");
+    }
+    User target =
+        userRepository
+            .findById(targetUserId)
+            .orElseThrow(() -> new NotFoundException("Target account not found"));
+    if (target.getApprovalStatus() != ApprovalStatus.ACTIVE) {
+      throw new BusinessConflictException("The target account must be an active account");
+    }
+    if (target.getDiscordUserId() != null && !target.getDiscordUserId().isBlank()) {
+      throw new BusinessConflictException(
+          "The target account is already linked to a Discord account");
+    }
+
+    // Read the incoming Discord identity authoritatively from Keycloak — works even when the
+    // discord_user_id claim mapper never persisted it onto app_user (the reported case).
+    KeycloakService.DiscordLink link =
+        keycloakService
+            .readDiscordLink(pendingId)
+            .orElseThrow(
+                () ->
+                    new BusinessConflictException(
+                        "The pending registration has no Discord identity to link"));
+    String guildNickname = pending.getDiscordGuildNickname();
+
+    // Keycloak side-effects first (idempotent on retry): move the identity onto the target, then
+    // drop the throwaway user. Ordered before the DB merge so a retry after a DB failure re-applies
+    // cleanly.
+    keycloakService.linkDiscordIdentity(targetUserId, link.userId(), link.userName());
+    keycloakService.deleteUser(pendingId);
+
+    return selfProvider
+        .getObject()
+        .completeLinkTransactionally(
+            pendingId, targetUserId, link.userId(), guildNickname, adminId);
+  }
+
+  /**
+   * The transactional database half of {@link #linkRegistrationToExistingAccount}, invoked through
+   * the self-proxy so its {@link Transactional} boundary actually applies (a plain self-invocation
+   * would bypass the proxy). Deletes the throwaway {@code app_user} <em>first</em> — freeing the
+   * unique {@code discord_user_id} before the target claims it — via the FK-safe {@link
+   * UserDeletionService#deleteUser}, after clearing its {@code inKeycloak} flag (its Keycloak user
+   * was already removed in the orchestrator, and the deletion service refuses a still-in-Keycloak
+   * account). It then stamps the surviving target account's {@code discord_user_id} (+ guild
+   * nickname) and writes the {@link ApprovalDecision#LINKED} audit row. On a retry where the
+   * throwaway row is already gone, the delete step is simply skipped.
+   *
+   * @param pendingId the throwaway pending registration to delete (may already be gone on a retry)
+   * @param targetUserId the surviving account to stamp with the Discord link
+   * @param snowflake the Discord user id (snowflake) to record on the surviving account
+   * @param guildNickname the captured guild nickname to carry over, or {@code null}
+   * @param adminId the acting admin's id (recorded in the audit)
+   * @return the surviving target account, now carrying the Discord link
+   * @throws NotFoundException when the target account is unknown
+   */
+  @Transactional
+  @NotNull
+  public User completeLinkTransactionally(
+      @NotNull UUID pendingId,
+      @NotNull UUID targetUserId,
+      @NotNull String snowflake,
+      @Nullable String guildNickname,
+      @NotNull UUID adminId) {
+    userRepository
+        .findById(pendingId)
+        .ifPresent(
+            pending -> {
+              // Its Keycloak user is already deleted; clear the guard so the FK-safe delete runs,
+              // and flush so the row (and its unique discord_user_id) is gone before the target
+              // claims the snowflake below.
+              pending.setInKeycloak(false);
+              userRepository.saveAndFlush(pending);
+              userDeletionService.deleteUser(pendingId);
+            });
+
+    User target =
+        userRepository
+            .findById(targetUserId)
+            .orElseThrow(() -> new NotFoundException("Target account not found"));
+    target.setDiscordUserId(snowflake);
+    if (guildNickname != null && !guildNickname.isBlank()) {
+      target.setDiscordGuildNickname(guildNickname);
+    }
+    User saved = userRepository.saveAndFlush(target);
+    userApprovalEventRepository.save(
+        new UserApprovalEvent(targetUserId, ApprovalDecision.LINKED, null, adminId));
+    log.info("Linked pending registration {} onto existing account {}", pendingId, targetUserId);
+    return saved;
   }
 }

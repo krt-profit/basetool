@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.ApproveRegistrationRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.LinkRegistrationRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PendingRegistrationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RejectRegistrationRequest;
 import de.greluc.krt.profit.basetool.backend.service.UserRegistrationService;
@@ -105,6 +106,28 @@ public class DiscordRegistrationAdminController {
     Long version = body == null ? null : body.version();
     return toDto(
         userRegistrationService.rejectUser(id, reason, version, userService.getUserIdFromJwt(jwt)));
+  }
+
+  /**
+   * Links a pending Discord registration onto an existing account (REQ-SEC-026): moves the Discord
+   * identity onto the chosen account and removes the throwaway Discord-registered account. Used
+   * when a member who already had an account registered anew via Discord (e.g. their Discord handle
+   * differs from their in-app name, so the automatic collision check did not recognise them).
+   *
+   * @param id the pending registration to link away
+   * @param jwt the calling admin's token (for the audit's deciding-admin id)
+   * @param body the target account id + the optimistic-lock version
+   * @return the surviving target account (with its bumped version)
+   */
+  @PostMapping("/{id}/link")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  public PendingRegistrationDto link(
+      @PathVariable UUID id,
+      @AuthenticationPrincipal Jwt jwt,
+      @Valid @RequestBody LinkRegistrationRequest body) {
+    return toDto(
+        userRegistrationService.linkRegistrationToExistingAccount(
+            id, body.targetUserId(), body.version(), userService.getUserIdFromJwt(jwt)));
   }
 
   private PendingRegistrationDto toDto(User user) {

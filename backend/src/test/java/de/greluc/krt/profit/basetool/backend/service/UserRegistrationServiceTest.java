@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.event.UserApprovalDecidedEvent;
@@ -49,15 +50,17 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Mockito unit tests for {@link UserRegistrationService} — the registration approval lifecycle
- * (approve / reject / decide, the pending-queue read) plus the shared {@link
- * UserRegistrationService#stampNewPendingRegistration} fail-safe PENDING stamping, extracted out of
- * {@code UserService} (audit Thema&nbsp;7, #1252).
+ * (approve / reject / decide, the pending-queue read), the admin-driven {@link
+ * UserRegistrationService#linkRegistrationToExistingAccount} merge (REQ-SEC-026), plus the shared
+ * {@link UserRegistrationService#stampNewPendingRegistration} fail-safe PENDING stamping, extracted
+ * out of {@code UserService} (audit Thema&nbsp;7, #1252).
  */
 @ExtendWith(MockitoExtension.class)
 class UserRegistrationServiceTest {
@@ -65,17 +68,31 @@ class UserRegistrationServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private UserApprovalEventRepository userApprovalEventRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private KeycloakService keycloakService;
+  @Mock private UserDeletionService userDeletionService;
+  @Mock private ObjectProvider<UserRegistrationService> selfProvider;
 
   @InjectMocks private UserRegistrationService userRegistrationService;
 
   private static final UUID USER_ID = UUID.randomUUID();
   private static final UUID ADMIN_ID = UUID.randomUUID();
+  private static final UUID TARGET_ID = UUID.randomUUID();
+  private static final String SNOWFLAKE = "123456789012345678";
 
   private static User pendingUser(long version) {
     User u = new User();
     u.setId(USER_ID);
     u.setApprovalStatus(ApprovalStatus.PENDING);
     u.setVersion(version);
+    return u;
+  }
+
+  private static User activeTarget() {
+    User u = new User();
+    u.setId(TARGET_ID);
+    u.setApprovalStatus(ApprovalStatus.ACTIVE);
+    u.setDisplayName("MadrukSedras");
+    u.setVersion(0L);
     return u;
   }
 
@@ -231,6 +248,130 @@ class UserRegistrationServiceTest {
 
       assertFalse(stamped);
       assertEquals(before, user.getApprovalStatus());
+    }
+  }
+
+  /**
+   * Tests for {@link UserRegistrationService#linkRegistrationToExistingAccount} — the admin-driven
+   * merge of a pending Discord registration onto an existing account (REQ-SEC-026).
+   */
+  @Nested
+  class LinkRegistrationTests {
+
+    @Test
+    void linkRegistration_movesIdentity_deletesDuplicate_setsFieldsAndAuditsLinked() {
+      User pending = pendingUser(0L);
+      pending.setDiscordGuildNickname("MadrukSedras");
+      User target = activeTarget();
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(pending));
+      when(userRepository.findById(TARGET_ID)).thenReturn(Optional.of(target));
+      when(keycloakService.readDiscordLink(USER_ID))
+          .thenReturn(Optional.of(new KeycloakService.DiscordLink(SNOWFLAKE, "conrad7247")));
+      when(userRepository.saveAndFlush(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+      when(selfProvider.getObject()).thenReturn(userRegistrationService);
+
+      User result =
+          userRegistrationService.linkRegistrationToExistingAccount(
+              USER_ID, TARGET_ID, 0L, ADMIN_ID);
+
+      // Keycloak side-effects: the identity is read from Keycloak, moved onto the target, and the
+      // throwaway user deleted.
+      verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "conrad7247");
+      verify(keycloakService).deleteUser(USER_ID);
+      // The duplicate app_user is disposed FK-safely, its in-Keycloak guard cleared first.
+      assertFalse(pending.isInKeycloak());
+      verify(userDeletionService).deleteUser(USER_ID);
+      // The surviving account carries the Discord link + the captured nickname.
+      assertEquals(SNOWFLAKE, result.getDiscordUserId());
+      assertEquals("MadrukSedras", result.getDiscordGuildNickname());
+      // The LINKED audit is recorded against the surviving account.
+      ArgumentCaptor<UserApprovalEvent> audit = ArgumentCaptor.forClass(UserApprovalEvent.class);
+      verify(userApprovalEventRepository).save(audit.capture());
+      assertEquals(ApprovalDecision.LINKED, audit.getValue().getDecision());
+      assertEquals(TARGET_ID, audit.getValue().getUserId());
+      assertEquals(ADMIN_ID, audit.getValue().getDecidedById());
+    }
+
+    @Test
+    void linkRegistration_staleVersion_throws409_andTouchesNothing() {
+      User pending = pendingUser(5L);
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(pending));
+
+      assertThrows(
+          ObjectOptimisticLockingFailureException.class,
+          () ->
+              userRegistrationService.linkRegistrationToExistingAccount(
+                  USER_ID, TARGET_ID, 3L, ADMIN_ID));
+
+      verifyNoInteractions(keycloakService);
+      verify(userApprovalEventRepository, never()).save(any());
+    }
+
+    @Test
+    void linkRegistration_targetAlreadyDiscordLinked_throwsConflict_andWritesNothing() {
+      User pending = pendingUser(0L);
+      User target = activeTarget();
+      target.setDiscordUserId("999999999999999999");
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(pending));
+      when(userRepository.findById(TARGET_ID)).thenReturn(Optional.of(target));
+
+      assertThrows(
+          BusinessConflictException.class,
+          () ->
+              userRegistrationService.linkRegistrationToExistingAccount(
+                  USER_ID, TARGET_ID, 0L, ADMIN_ID));
+
+      verifyNoInteractions(keycloakService);
+      verify(userApprovalEventRepository, never()).save(any());
+    }
+
+    @Test
+    void linkRegistration_pendingHasNoDiscordIdentity_throwsConflict_andDoesNotWrite() {
+      User pending = pendingUser(0L);
+      User target = activeTarget();
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(pending));
+      when(userRepository.findById(TARGET_ID)).thenReturn(Optional.of(target));
+      when(keycloakService.readDiscordLink(USER_ID)).thenReturn(Optional.empty());
+
+      assertThrows(
+          BusinessConflictException.class,
+          () ->
+              userRegistrationService.linkRegistrationToExistingAccount(
+                  USER_ID, TARGET_ID, 0L, ADMIN_ID));
+
+      verify(keycloakService, never()).linkDiscordIdentity(any(), any(), any());
+      verify(keycloakService, never()).deleteUser(any());
+    }
+
+    @Test
+    void linkRegistration_targetNotActive_throwsConflict() {
+      User pending = pendingUser(0L);
+      User target = activeTarget();
+      target.setApprovalStatus(ApprovalStatus.PENDING);
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(pending));
+      when(userRepository.findById(TARGET_ID)).thenReturn(Optional.of(target));
+
+      assertThrows(
+          BusinessConflictException.class,
+          () ->
+              userRegistrationService.linkRegistrationToExistingAccount(
+                  USER_ID, TARGET_ID, 0L, ADMIN_ID));
+
+      verifyNoInteractions(keycloakService);
+    }
+
+    @Test
+    void linkRegistration_toItself_throwsConflict() {
+      User pending = pendingUser(0L);
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(pending));
+
+      assertThrows(
+          BusinessConflictException.class,
+          () ->
+              userRegistrationService.linkRegistrationToExistingAccount(
+                  USER_ID, USER_ID, 0L, ADMIN_ID));
+
+      verifyNoInteractions(keycloakService);
     }
   }
 }

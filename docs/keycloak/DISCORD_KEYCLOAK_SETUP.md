@@ -142,10 +142,13 @@ already used for user sync (its service account needs `view-users` **and** `view
 
 ### 3d. (Optional) Capture the per-guild server nickname for the approval queue
 
-To show each pending user's **das-kartell server nickname** in the admin approval queue
-(REQ-DATA-008), capture the Discord `nick` and carry it into a token claim, mirroring
-`discord_user_id`. This is **optional and fail-open** — skip it and the nickname column simply stays
-empty; it never affects the login or the membership gate.
+To show each pending user's **das-kartell server name** in the admin approval queue (REQ-DATA-008),
+capture the guild display name — the Discord `nick`, or the global display name (`user.global_name`)
+when the member set no per-guild nick — and carry it into a token claim, mirroring `discord_user_id`.
+(The provider injects `nick ?? global_name` into `guild_nick`, so a member who appears in the server
+under their global name is still recognisable in the queue.) This is **optional and fail-open** —
+skip it and the nickname column simply stays empty; it never affects the login or the membership
+gate.
 
 1. **Provide the guild id.** The nickname comes from the guild-member call, so the identity provider
    (the SPI inside Keycloak) needs the das-kartell guild id. It is **already wired** into the
@@ -182,6 +185,18 @@ empty; it never affects the login or the membership gate.
 The backend reads the `discord_guild_nickname` claim and persists it on `app_user` for display in the
 approval queue. Discord caps a server nickname at 32 characters; the SPI and backend bound it
 defensively.
+
+### 3e. (Required for admin-mediated linking) Grant the sync service account `manage-users`
+
+The admin **"Verknüpfen"** action — linking a pending Discord registration onto an existing account
+from the approval queue (REQ-SEC-026, [ADR-0111](../adr/0111-admin-mediated-discord-registration-linking.md)) —
+is the **only** feature that has the backend *write* to Keycloak: it moves the `discord` federated
+identity onto the chosen existing account (`POST /users/{id}/federated-identity/discord`) and deletes
+the throwaway Discord-registered user (`DELETE /users/{id}`). Both use the **same `backend-service`
+admin client** as the user sync, which must therefore hold the **`manage-users`** realm-management
+role **on top of** `view-users` + `view-realm`. Grant it under *Clients → `backend-service` → Service
+account roles* → assign the `manage-users` role of the `realm-management` client. Without it the link
+action fails with `403` at the Keycloak write; approve / reject and the read-only sync are unaffected.
 
 ---
 

@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-06-22
 - **Deciders:** @greluc, Claude
-- **Related:** spec REQ-DATA-006 · REQ-SEC-019 · supersedes the import-attribute half of [ADR-0030](0030-discord-federation-first-login-membership-gate.md) for the *link claim* · resolves discord-integration.md open decision #2 · runbook `docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`
+- **Related:** spec REQ-DATA-006 · REQ-SEC-019 · supersedes the import-attribute half of [ADR-0030](0030-discord-federation-first-login-membership-gate.md) for the *link claim* · resolves discord-integration.md open decision #2 · extended by [ADR-0111](0111-admin-mediated-discord-registration-linking.md) (admin-mediated linking) · runbook `docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`
 
 ## Context
 
@@ -30,8 +30,10 @@ Root cause, confirmed against the Keycloak 26 source:
 So the link signal was tied to *how and when* the account was linked, not to *whether* it is linked.
 This was [discord-integration.md](../specs/discord-integration.md) **open decision #2** ("link an
 existing credential account to a Discord identity, or only forward via Discord login?"). We resolve
-it: an existing account **may** be linked to Discord (via the Keycloak Account Console, the only path
-that exists today), and such a link **must** be recognised exactly like a Discord registration.
+it: an existing account **may** be linked to Discord (via the Keycloak Account Console, the only
+self-service path at the time; [ADR-0111](0111-admin-mediated-discord-registration-linking.md) later
+added an admin-mediated path from the approval queue), and such a link **must** be recognised exactly
+like a Discord registration.
 
 ## Decision
 

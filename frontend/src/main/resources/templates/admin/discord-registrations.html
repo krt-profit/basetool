@@ -69,6 +69,8 @@
                             <div class="reg-actions">
                                 <button type="button" class="btn btn--cta" data-action="approve"
                                         th:text="#{admin.discordRegistrations.approve}">Freigeben</button>
+                                <button type="button" class="btn btn-outline" data-action="link"
+                                        th:text="#{admin.discordRegistrations.link}">Verknüpfen</button>
                                 <button type="button" class="btn btn-outline-danger" data-action="reject"
                                         th:text="#{admin.discordRegistrations.reject}">Ablehnen</button>
                             </div>
@@ -94,14 +96,36 @@
             </div>
         </div>
     </div>
+
+    <!-- Link-to-existing-account modal (no native dialogs, REQ-UI). Server-searched account picker
+         (remote-users combobox) so an admin can find the existing account even when the Discord
+         handle differs from the in-app name (REQ-SEC-026). -->
+    <div id="link-modal" class="modal krtm-display-none-z-index-3100-25fb">
+        <div class="modal-content hud-box krtm-max-width-520px-acb4">
+            <h2 class="mt-0" th:text="#{admin.discordRegistrations.link.modal.title}">Mit bestehendem Account verbinden</h2>
+            <label for="link-target" th:text="#{admin.discordRegistrations.link.modal.accountLabel}">Bestehender Account</label>
+            <select id="link-target" data-krt-combobox="remote-users"
+                    th:attr="data-combobox-placeholder=#{admin.discordRegistrations.link.modal.accountPlaceholder}">
+                <option value="" th:text="#{admin.discordRegistrations.link.modal.accountPlaceholder}">-- Account wählen --</option>
+            </select>
+            <p class="reg-when mt-2" th:text="#{admin.discordRegistrations.link.modal.hint}">Nutze die Suche, wenn der Discord-Name abweicht.</p>
+            <div class="flex-center-gap krtm-margin-top-1rem-a6cb">
+                <button type="button" class="btn btn-ghost" id="link-cancel" th:text="#{general.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn--cta" id="link-confirm" th:text="#{admin.discordRegistrations.link}">Verknüpfen</button>
+            </div>
+        </div>
+    </div>
 </main>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const DISCORD_MSG = {
         approved: /*[[#{admin.discordRegistrations.approved}]]*/ 'Registrierung freigegeben.',
         rejected: /*[[#{admin.discordRegistrations.rejected}]]*/ 'Registrierung abgelehnt.',
+        linked: /*[[#{admin.discordRegistrations.linked}]]*/ 'Registrierung verknüpft.',
         approveError: /*[[#{error.admin.discordRegistrations.approve}]]*/ 'Freigabe fehlgeschlagen.',
         rejectError: /*[[#{error.admin.discordRegistrations.reject}]]*/ 'Ablehnung fehlgeschlagen.',
+        linkError: /*[[#{error.admin.discordRegistrations.link}]]*/ 'Verknüpfung fehlgeschlagen.',
+        linkNoTarget: /*[[#{error.admin.discordRegistrations.link.noTarget}]]*/ 'Bitte einen Account auswählen.',
         empty: /*[[#{admin.discordRegistrations.empty}]]*/ 'Keine offenen Registrierungen.'
     };
 </script>

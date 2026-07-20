@@ -71,12 +71,14 @@ public class DiscordIdentityProvider
   public static final String PROFILE_URL = API_BASE_URL + "/users/@me";
 
   /**
-   * Synthetic field injected into the brokered {@code /users/@me} profile JSON to carry the user's
-   * per-guild server nickname ({@code nick}). It lets a standard <em>Attribute Importer</em> mapper
-   * map the nickname to the {@code discord_guild_nickname} user attribute exactly the way {@code
-   * id} maps to {@code discord_user_id} — Discord's {@code /users/@me} payload itself has no
-   * nickname, which is per-guild and only available via the guild-member call. Absent when no
-   * nickname was captured. Epic #720 / REQ-DATA-008.
+   * Synthetic field injected into the brokered {@code /users/@me} profile JSON to carry the name
+   * the guild displays for the user — the per-guild {@code nick} if set, otherwise the account's
+   * global display name ({@code user.global_name}, see {@link
+   * DiscordGuildNicknameReader#readGuildDisplayName}). It lets a standard <em>Attribute
+   * Importer</em> mapper map that name to the {@code discord_guild_nickname} user attribute exactly
+   * the way {@code id} maps to {@code discord_user_id} — Discord's {@code /users/@me} payload
+   * itself has no per-guild name, which is only available via the guild-member call. Absent when
+   * neither a nickname nor a global name was captured. Epic #720 / REQ-DATA-008.
    */
   public static final String GUILD_NICK_PROFILE_FIELD = "guild_nick";
 
@@ -197,16 +199,20 @@ public class DiscordIdentityProvider
   }
 
   /**
-   * Best-effort: fetches the user's per-guild server nickname and injects it into the profile JSON
-   * under {@link #GUILD_NICK_PROFILE_FIELD} so a standard <em>Attribute Importer</em> mapper can
-   * carry it onward to the {@code discord_guild_nickname} user attribute. Runs on every Discord
-   * login (so the nickname stays current with the mapper's FORCE sync mode), but is skipped — with
-   * no Discord call — when {@link #GUILD_ID_ENV} is unset or the profile is not a JSON object. It
-   * <strong>never throws</strong>: a missing or failed nickname capture must never break or delay
-   * the login beyond the reader's bounded timeout (REQ-DATA-008), in deliberate contrast to the
-   * fail-closed membership gate.
+   * Best-effort: fetches the name the guild displays for the user — the per-guild {@code nick} if
+   * set, otherwise the account's global display name ({@code user.global_name}) — and injects it
+   * into the profile JSON under {@link #GUILD_NICK_PROFILE_FIELD} so a standard <em>Attribute
+   * Importer</em> mapper can carry it onward to the {@code discord_guild_nickname} user attribute.
+   * The {@code global_name} fallback ({@link DiscordGuildNicknameReader#readGuildDisplayName}) is
+   * what keeps a member who never set an explicit server nickname from surfacing as a blank in the
+   * admin approval queue (the reported conrad7247/MadrukSedras case). Runs on every Discord login
+   * (so the value stays current with the mapper's FORCE sync mode), but is skipped — with no
+   * Discord call — when {@link #GUILD_ID_ENV} is unset or the profile is not a JSON object. It
+   * <strong>never throws</strong>: a missing or failed capture must never break or delay the login
+   * beyond the reader's bounded timeout (REQ-DATA-008), in deliberate contrast to the fail-closed
+   * membership gate.
    *
-   * @param profile the parsed {@code /users/@me} profile, mutated in place when a nickname is found
+   * @param profile the parsed {@code /users/@me} profile, mutated in place when a name is found
    * @param accessToken the user's brokered Discord access token (scope {@code guilds.members.read})
    */
   private void enrichWithGuildNickname(JsonNode profile, String accessToken) {
@@ -215,8 +221,8 @@ public class DiscordIdentityProvider
       return;
     }
     NICKNAME_READER
-        .readNickname(API_BASE_URL, guildId, accessToken)
-        .ifPresent(nick -> objectProfile.put(GUILD_NICK_PROFILE_FIELD, nick));
+        .readGuildDisplayName(API_BASE_URL, guildId, accessToken)
+        .ifPresent(name -> objectProfile.put(GUILD_NICK_PROFILE_FIELD, name));
   }
 
   /**

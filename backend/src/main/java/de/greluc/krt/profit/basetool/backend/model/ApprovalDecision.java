@@ -23,8 +23,11 @@ package de.greluc.krt.profit.basetool.backend.model;
  * The admin decision recorded on a {@link UserApprovalEvent} audit row (epic #720, Track 1).
  *
  * <p>Distinct from {@link ApprovalStatus} (the current account state): a decision is the immutable
- * audit of a single admin action that moved the account into {@link ApprovalStatus#ACTIVE} or
- * {@link ApprovalStatus#REJECTED}.
+ * audit of a single admin action. {@link #APPROVED} / {@link #REJECTED} move the decided account
+ * into {@link ApprovalStatus#ACTIVE} / {@link ApprovalStatus#REJECTED}; {@link #LINKED} is recorded
+ * on the surviving <em>existing</em> account and does not change its status (it was already {@link
+ * ApprovalStatus#ACTIVE}) — it captures that a Discord registration was linked into it
+ * (REQ-SEC-026).
  */
 public enum ApprovalDecision {
 
@@ -32,5 +35,12 @@ public enum ApprovalDecision {
   APPROVED,
 
   /** An admin rejected the registration (account moved to {@link ApprovalStatus#REJECTED}). */
-  REJECTED
+  REJECTED,
+
+  /**
+   * An admin linked a pending Discord registration onto an existing account: the Discord identity
+   * was moved to this (surviving) account and the throwaway Discord-registered account removed. The
+   * row is written against the surviving account's id; its status is unchanged (REQ-SEC-026).
+   */
+  LINKED
 }
