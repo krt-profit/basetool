@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.6](https://github.com/krt-profit/basetool/releases/tag/v1.5.6) - 2026-07-20
+
 ### Added
 
 - **Discord-Registrierungen: „Verknüpfen" verbindet einen Freigabeantrag mit einem bestehenden Account.** Meldet sich ein Mitglied, das bereits einen Account hat, über Discord an und taucht als neuer Freigabeantrag auf (etwa weil sein Discord-Name vom Basetool-Namen abweicht), kann ein Admin den Antrag jetzt in der Freigabe-Liste per Account-Suche mit dem bestehenden Account verknüpfen, statt einen zweiten Account anzulegen — die Discord-Anmeldung wandert auf den Bestandsaccount und der doppelte Antrag wird entfernt (REQ-SEC-026). Setzt das Keycloak-Recht `manage-users` für das Sync-Service-Konto voraus.
