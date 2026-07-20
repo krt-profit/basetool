@@ -47,7 +47,7 @@ subnet** (`enable_ipv6: true` + an IPv6 subnet in the top-level `networks:` bloc
 installs the `ip6tables` `nat` DNAT rule `[::]:443 → [npm-v6]:443` and IPv6 ingress traverses the
 kernel DNAT path exactly like IPv4 — preserving the client's source address end-to-end. Once real
 per-client IPs reach nginx (IPv4 already, IPv6 after this change), we retighten `limit_conn
-krt_conn_perip` from the 10000 stopgap back to ~100 per client, and add an `http.conf` `map` that
+krt_conn_perip` from the 10000 stopgap back to ~500 per client, and add an `http.conf` `map` that
 derives the limiter key by collapsing IPv6 to its `/64` prefix (IPv4 stays the full address), so a
 subscriber's rotating privacy-extension addresses do not fragment the bucket.
 
@@ -61,7 +61,7 @@ Sequencing is strict and gated: keep `iri-deploy.timer` stopped during the windo
 `limit_conn 10000` in place until real IPs are **confirmed** from an external dual-stack host (the
 `[Client …]` access-log grep shows real GUAs / IPv4, and `ip6tables -t nat -S DOCKER | grep 443`
 is non-empty); only **then**, in a **separate** bundle change (touching only `docker/maintenance`,
-an in-band `up -d`, no outage), retighten `limit_conn` to ~100 and add the `/64` key map; re-enable
+an in-band `up -d`, no outage), retighten `limit_conn` to ~500 and add the `/64` key map; re-enable
 the timer once the bundle matches the deployed state. The confirmation gate must sit **between**
 restoring IPs and retightening, so a mistaken IP fix can never re-arm a tight cap on the
 still-shared gateway key.

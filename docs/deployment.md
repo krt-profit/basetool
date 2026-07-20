@@ -732,7 +732,7 @@ a sustained flood raises the `EdgeRateLimitSpike` Loki alert.
 > `limit_conn` ceiling is therefore set high (**10000**) as a stopgap; a 60-cap
 > caused the 2026-07-20 maintenance-page incident. The real fix — native IPv6 on
 > the bridge so `ip6tables` DNAT preserves the client IPv6, then retighten the cap
-> to ~100/IP — is **ADR-0112** (do **not** disable userland-proxy: it deletes the
+> to ~500/IP — is **ADR-0112** (do **not** disable userland-proxy: it deletes the
 > only IPv6 datapath). See REQ-SEC-023.
 
 Stricter per-endpoint limits (e.g. on the Keycloak token/login paths) remain
