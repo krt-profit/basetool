@@ -197,21 +197,27 @@ throwaway Discord-registered account. It is orchestrated by
    checked via `OptimisticLock.checkOptionalClient`) and must still be `PENDING` — else a `409`
    (`BusinessConflictException`). The target must be a **distinct, active** account that is **not
    already Discord-linked** — else a `409`.
-2. The incoming Discord **snowflake is read authoritatively from Keycloak**
-   (`KeycloakService.readDiscordLink`, `GET /users/{pendingId}/federated-identity`), **not** from the
-   possibly-absent local `discord_user_id` — so linking works even when the `discord_user_id` claim
-   mapper never persisted the id locally (as in the reported environment, evidenced by the empty
-   nickname).
-3. Keycloak writes (idempotent on retry): `POST /users/{targetId}/federated-identity/discord`
+2. The incoming Discord **snowflake is resolved authoritatively from Keycloak**
+   (`KeycloakService.readDiscordLink`, `GET /users/{pendingId}/federated-identity`) — so linking
+   works even when the `discord_user_id` claim mapper never persisted the id locally — **with a
+   fallback to the persisted local `discord_user_id`** when Keycloak no longer knows the pending
+   user. The fallback recovers a registration whose throwaway Keycloak user was already deleted by an
+   earlier partial failure (its `app_user` row, and thus the snowflake, survives the rolled-back DB
+   half); only when both are empty is there nothing to link (`409`).
+3. Keycloak write (idempotent on retry): `POST /users/{targetId}/federated-identity/discord`
    attaches the identity (a `409` for the **same** snowflake is success; a different one is a genuine
-   conflict), then `DELETE /users/{pendingId}` removes the throwaway Keycloak user (a `404` is
-   success). These require the sync service account to hold the **`manage-users`** realm-management
-   role — the only Keycloak **write** the backend makes (`KeycloakService` is otherwise read-only).
-4. The DB merge (transactional, self-proxied) deletes the throwaway `app_user` **first** — freeing
-   the unique `discord_user_id` — via the FK-safe `UserDeletionService.deleteUser` (after clearing
-   its `inKeycloak` flag), then stamps the surviving account's `discord_user_id` (+ captured guild
+   conflict). It requires the sync service account to hold the **`manage-users`** realm-management
+   role — one of the only two Keycloak **writes** the backend makes (`KeycloakService` is otherwise
+   read-only).
+4. The DB merge (transactional, self-proxied) deletes the throwaway `app_user` — freeing the unique
+   `discord_user_id` — via the FK-safe `UserDeletionService.deleteUser` (after clearing its
+   `inKeycloak` flag), then stamps the surviving account's `discord_user_id` (+ captured guild
    nickname) and writes an `ApprovalDecision.LINKED` audit row (against the surviving account, no
-   PII).
+   PII). The `LINKED` value is whitelisted by the `chk_user_approval_event_decision` check constraint
+   as of **V223** — the missing value originally rolled every link back with a `23514` violation.
+5. Only **after** the DB merge commits is the throwaway Keycloak user removed (`DELETE
+   /users/{pendingId}`, a `404` is success). Deleting it **last** is what makes a retry safe: a
+   rolled-back DB half leaves the throwaway Keycloak user intact for a clean re-read next attempt.
 
 REQ-SEC-022's login-time deny is **unchanged**: a confidently-colliding first-login is still denied
 and redirected to self-service linking; this action resolves the registrations that the fail-open
@@ -228,8 +234,10 @@ admin acts, no privilege can be inherited before the link, so the merge never wi
 - [x] The action is optimistic-locked (stale / non-`PENDING` → `409`), rejects a self / non-active /
   already-linked target (`409`), and the frontend proxy relays the backend `409` verbatim
   (`propagateBackendError`) so `krt-fetch.js` keeps its reload-vs-toast distinction.
-- [x] The Keycloak writes are idempotent (409-same-snowflake / 404-on-delete treated as success) and
-  ordered before the DB merge, so a retry after a DB failure re-applies cleanly.
+- [x] The Keycloak writes are idempotent (409-same-snowflake / 404-on-delete treated as success);
+  the identity-link precedes the DB merge and the throwaway-user **delete follows it**, so a retry
+  after a DB failure re-reads the surviving throwaway user and re-applies cleanly. The snowflake
+  resolves from Keycloak with a local `discord_user_id` fallback for the already-deleted-user case.
 - [x] A `LINKED` `UserApprovalEvent` is recorded against the surviving account (no PII / free text).
   Discord registration is **not** a unified-audit area, so no `AuditEventType`/viewer-filter change.
 - [ ] Operator: the sync service account is granted `manage-users` (on top of `view-users` /

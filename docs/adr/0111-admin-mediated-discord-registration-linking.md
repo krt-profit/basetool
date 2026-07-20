@@ -44,9 +44,15 @@ fail-open precheck let through.
   **non-transactional orchestrator** (external Keycloak writes cannot roll back with a DB
   transaction — the same shape as `OperationService.setPayoutStatus`). It optimistic-locks + PENDING-
   guards the pending row and validates the target (distinct, active, not already Discord-linked),
-  reads the incoming **snowflake authoritatively from Keycloak** (`readDiscordLink`, so it works even
-  when the `discord_user_id` claim mapper never persisted the id locally), performs the Keycloak
-  writes, then commits the DB merge through a self-proxied transactional method.
+  resolves the incoming **snowflake authoritatively from Keycloak** (`readDiscordLink`, so it works
+  even when the `discord_user_id` claim mapper never persisted the id locally) **with a fallback to
+  the persisted local `discord_user_id`** (recovery when the throwaway Keycloak user was already
+  deleted by an earlier partial failure), links the identity onto the target, commits the DB merge
+  through a self-proxied transactional method, and **only then deletes the throwaway Keycloak user**.
+  Deleting it *last* — after the DB is consistent — is what makes a retry safe: a rolled-back DB half
+  leaves the throwaway Keycloak user intact so the next attempt re-reads it cleanly. (The original
+  order deleted it *before* the DB merge; a DB failure then stranded the registration on an empty
+  Keycloak read — corrected 2026-07-20 together with V223 below.)
 - **Keycloak writes (the only writes the backend makes).** `linkDiscordIdentity`
   (`POST /users/{id}/federated-identity/discord`) and `deleteUser` (`DELETE /users/{id}`), both
   **idempotent** on retry (a `409` for the *same* snowflake and a `404` on delete are treated as
@@ -72,8 +78,13 @@ fail-open precheck let through.
   merge never widens access. The link is a deliberate admin action, not the silent subject-only
   matching REQ-DATA-006 forbids; it is effected at the Keycloak federated-identity layer (onto the
   surviving subject), so recognition then flows through the existing REQ-DATA-006 paths.
-- **No DB migration.** `discord_user_id` / `discord_guild_nickname` already exist; `LINKED` is an
-  `@Enumerated(STRING)` value; the collision context is not persisted.
+- **DB migration V223 (corrected 2026-07-20).** The original decision claimed "no DB migration" on
+  the grounds that `discord_user_id` / `discord_guild_nickname` already exist and `LINKED` is an
+  `@Enumerated(STRING)` value. That overlooked the `chk_user_approval_event_decision` **check
+  constraint** from V173, which whitelisted only `('APPROVED', 'REJECTED')` — so inserting the
+  `LINKED` audit row failed at flush with a `23514` violation and rolled the whole link back (every
+  link attempt `409`ed; the reported conrad7247/MardukSedras case). **V223** widens the whitelist to
+  include `LINKED`. The collision context is still not persisted.
 - **Not a unified-audit area.** Discord registration stays outside the ten audited areas (ADR-0051);
   the `LINKED` event lives in the bespoke `user_approval_event` trail, not `AuditEventType`.
 

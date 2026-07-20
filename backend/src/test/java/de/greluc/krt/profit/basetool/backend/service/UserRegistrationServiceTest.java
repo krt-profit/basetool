@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -47,6 +48,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -275,12 +277,15 @@ class UserRegistrationServiceTest {
               USER_ID, TARGET_ID, 0L, ADMIN_ID);
 
       // Keycloak side-effects: the identity is read from Keycloak, moved onto the target, and the
-      // throwaway user deleted.
-      verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "conrad7247");
-      verify(keycloakService).deleteUser(USER_ID);
+      // throwaway user deleted. The throwaway Keycloak user MUST be deleted LAST — after the DB
+      // merge (which itself FK-safely disposes the duplicate app_user) — so a rolled-back DB half
+      // leaves the pending identity intact for a clean retry.
+      InOrder order = inOrder(keycloakService, userDeletionService);
+      order.verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "conrad7247");
+      order.verify(userDeletionService).deleteUser(USER_ID);
+      order.verify(keycloakService).deleteUser(USER_ID);
       // The duplicate app_user is disposed FK-safely, its in-Keycloak guard cleared first.
       assertFalse(pending.isInKeycloak());
-      verify(userDeletionService).deleteUser(USER_ID);
       // The surviving account carries the Discord link + the captured nickname.
       assertEquals(SNOWFLAKE, result.getDiscordUserId());
       assertEquals("MadrukSedras", result.getDiscordGuildNickname());
@@ -290,6 +295,36 @@ class UserRegistrationServiceTest {
       assertEquals(ApprovalDecision.LINKED, audit.getValue().getDecision());
       assertEquals(TARGET_ID, audit.getValue().getUserId());
       assertEquals(ADMIN_ID, audit.getValue().getDecidedById());
+    }
+
+    @Test
+    void linkRegistration_recoversViaLocalDiscordId_whenKeycloakUserAlreadyGone() {
+      // Recovery after a partial failure that already deleted the throwaway Keycloak user: Keycloak
+      // no longer knows the pending user, but its app_user row still carries the snowflake locally.
+      // The link must still complete off the local discord_user_id (the reported stranded case).
+      User pending = pendingUser(0L);
+      pending.setUsername("conrad7247");
+      pending.setDiscordUserId(SNOWFLAKE);
+      User target = activeTarget();
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(pending));
+      when(userRepository.findById(TARGET_ID)).thenReturn(Optional.of(target));
+      when(keycloakService.readDiscordLink(USER_ID)).thenReturn(Optional.empty());
+      when(userRepository.saveAndFlush(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+      when(selfProvider.getObject()).thenReturn(userRegistrationService);
+
+      User result =
+          userRegistrationService.linkRegistrationToExistingAccount(
+              USER_ID, TARGET_ID, 0L, ADMIN_ID);
+
+      // The identity resolved from the local snowflake (username carried as the Discord handle) is
+      // linked onto the target, the throwaway user deleted, and the LINKED audit recorded.
+      verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "conrad7247");
+      verify(keycloakService).deleteUser(USER_ID);
+      verify(userDeletionService).deleteUser(USER_ID);
+      assertEquals(SNOWFLAKE, result.getDiscordUserId());
+      ArgumentCaptor<UserApprovalEvent> audit = ArgumentCaptor.forClass(UserApprovalEvent.class);
+      verify(userApprovalEventRepository).save(audit.capture());
+      assertEquals(ApprovalDecision.LINKED, audit.getValue().getDecision());
     }
 
     @Test
@@ -327,6 +362,8 @@ class UserRegistrationServiceTest {
 
     @Test
     void linkRegistration_pendingHasNoDiscordIdentity_throwsConflict_andDoesNotWrite() {
+      // Neither Keycloak nor the local app_user carries a Discord identity (pendingUser leaves
+      // discord_user_id null), so the local fallback is empty too and there is nothing to link.
       User pending = pendingUser(0L);
       User target = activeTarget();
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(pending));
