@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Discord-Registrierungen: „Verknüpfen" schlägt nicht mehr mit einer Datenbankfehlermeldung fehl.** Das Verknüpfen eines Freigabeantrags mit einem bestehenden Account (v1.5.6) brach beim Schreiben des Audit-Eintrags immer mit einer Constraint-Verletzung ab, weil der neue Vorgangstyp `LINKED` in der Prüfbedingung der Freigabe-Historie fehlte (Migration V223 ergänzt ihn). Zusätzlich wird der Wegwerf-Discord-Account in Keycloak jetzt erst **nach** dem erfolgreichen Datenbank-Abgleich gelöscht und der Discord-Bezug notfalls aus dem lokalen Datensatz gelesen, sodass ein zuvor stecken gebliebener Antrag durch erneutes „Verknüpfen" sauber abgeschlossen werden kann (REQ-SEC-026, ADR-0111).
+
 ## [v1.5.6](https://github.com/krt-profit/basetool/releases/tag/v1.5.6) - 2026-07-20
 
 ### Added

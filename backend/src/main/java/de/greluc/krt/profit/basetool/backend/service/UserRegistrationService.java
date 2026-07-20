@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -244,13 +245,21 @@ public class UserRegistrationService {
    *
    * <p><strong>Non-transactional orchestrator.</strong> The Keycloak writes are external
    * side-effects that cannot roll back with a database transaction, so this method runs outside any
-   * transaction ({@link Propagation#NOT_SUPPORTED}); it sequences the Keycloak writes (idempotent
-   * on retry — a re-link of the same identity and a re-delete of an absent user both succeed) and
-   * then commits the database merge through the self-proxied {@link #completeLinkTransactionally}.
-   * The incoming Discord snowflake is read <em>authoritatively from Keycloak</em> ({@link
-   * KeycloakService#readDiscordLink}), not from the possibly-absent local {@code discord_user_id},
-   * so linking works even when the {@code discord_user_id} claim mapper never persisted the id
-   * locally (the reported conrad7247/MadrukSedras case).
+   * transaction ({@link Propagation#NOT_SUPPORTED}). It moves the identity onto the target, commits
+   * the database merge through the self-proxied {@link #completeLinkTransactionally}, and only
+   * <em>then</em> deletes the throwaway Keycloak user. Deleting it <em>last</em> — after the DB is
+   * consistent — is what makes a retry safe: if the DB merge fails and rolls back, the throwaway
+   * Keycloak user still exists, so the next attempt re-reads its identity cleanly rather than
+   * stranding the registration. Each Keycloak write is itself idempotent (a re-link of the same
+   * identity and a delete of an already-gone user both succeed).
+   *
+   * <p>The incoming Discord snowflake is resolved <em>authoritatively from Keycloak</em> ({@link
+   * KeycloakService#readDiscordLink}) with a fallback to the persisted local {@code
+   * discord_user_id} (see {@link #resolveDiscordLink}): the Keycloak read makes linking work even
+   * when the claim mapper never persisted the id locally, and the local fallback recovers a
+   * registration whose throwaway Keycloak user was already deleted by an earlier partial failure
+   * (the reported conrad7247/MardukSedras case, stranded by the missing {@code LINKED}
+   * check-constraint value — see V223).
    *
    * @param pendingId the pending Discord registration to link away
    * @param targetUserId the existing account to link the Discord identity into
@@ -296,27 +305,74 @@ public class UserRegistrationService {
           "The target account is already linked to a Discord account");
     }
 
-    // Read the incoming Discord identity authoritatively from Keycloak — works even when the
-    // discord_user_id claim mapper never persisted it onto app_user (the reported case).
-    KeycloakService.DiscordLink link =
-        keycloakService
-            .readDiscordLink(pendingId)
-            .orElseThrow(
-                () ->
-                    new BusinessConflictException(
-                        "The pending registration has no Discord identity to link"));
+    // Resolve the incoming Discord identity: authoritatively from Keycloak (works even when the
+    // discord_user_id claim mapper never persisted it onto app_user — the original motivation),
+    // falling back to the persisted local discord_user_id when Keycloak no longer knows the pending
+    // user. The fallback makes the flow recoverable after a partial failure that already removed
+    // the throwaway Keycloak user (the delete below is non-transactional and does not roll back),
+    // so a retry can still complete instead of stranding the registration on an empty Keycloak
+    // read.
+    KeycloakService.DiscordLink link = resolveDiscordLink(pending);
     String guildNickname = pending.getDiscordGuildNickname();
 
-    // Keycloak side-effects first (idempotent on retry): move the identity onto the target, then
-    // drop the throwaway user. Ordered before the DB merge so a retry after a DB failure re-applies
-    // cleanly.
+    // Move the identity onto the target (idempotent: a re-link of the same snowflake is a no-op),
+    // then commit the database merge, and only THEN drop the throwaway Keycloak user. Deleting the
+    // throwaway user LAST — after the DB is consistent — is what makes a retry safe: if the DB
+    // merge fails and rolls back, the pending Keycloak user still exists, so the next attempt reads
+    // its identity cleanly. The delete is itself idempotent (a 404 for an already-gone user = ok).
     keycloakService.linkDiscordIdentity(targetUserId, link.userId(), link.userName());
+    User result =
+        selfProvider
+            .getObject()
+            .completeLinkTransactionally(
+                pendingId, targetUserId, link.userId(), guildNickname, adminId);
     keycloakService.deleteUser(pendingId);
+    return result;
+  }
 
-    return selfProvider
-        .getObject()
-        .completeLinkTransactionally(
-            pendingId, targetUserId, link.userId(), guildNickname, adminId);
+  /**
+   * Resolves the Discord identity to move off a pending registration, preferring the authoritative
+   * Keycloak federated identity and falling back to the locally persisted {@code discord_user_id}
+   * when Keycloak no longer knows the pending user. The Keycloak read covers the case where the
+   * {@code discord_user_id} claim mapper never persisted the snowflake locally; the local fallback
+   * covers recovery after a partial link failure has already deleted the throwaway Keycloak user
+   * (its {@code app_user} row, and thus the snowflake, survives the rolled-back DB half). The
+   * fallback carries the pending row's {@code username} as the Discord username — for a Discord
+   * registration that is the Discord handle — which {@link KeycloakService#linkDiscordIdentity}
+   * treats as optional.
+   *
+   * @param pending the managed pending registration being linked away; never {@code null}
+   * @return the Discord identity to link onto the target account
+   * @throws BusinessConflictException when neither Keycloak nor the local row carries a Discord
+   *     identity
+   */
+  @NotNull
+  private KeycloakService.DiscordLink resolveDiscordLink(@NotNull User pending) {
+    return keycloakService
+        .readDiscordLink(pending.getId())
+        .or(() -> localDiscordLink(pending))
+        .orElseThrow(
+            () ->
+                new BusinessConflictException(
+                    "The pending registration has no Discord identity to link"));
+  }
+
+  /**
+   * Builds a {@link KeycloakService.DiscordLink} from the pending row's locally persisted {@code
+   * discord_user_id}, or {@link Optional#empty()} when it carries none. Used only as the recovery
+   * fallback of {@link #resolveDiscordLink} when Keycloak no longer knows the pending user.
+   *
+   * @param pending the pending registration whose local Discord snowflake to read; never {@code
+   *     null}
+   * @return the local Discord identity, or empty when {@code discord_user_id} is absent/blank
+   */
+  @NotNull
+  private static Optional<KeycloakService.DiscordLink> localDiscordLink(@NotNull User pending) {
+    String local = pending.getDiscordUserId();
+    if (local == null || local.isBlank()) {
+      return Optional.empty();
+    }
+    return Optional.of(new KeycloakService.DiscordLink(local.trim(), pending.getUsername()));
   }
 
   /**
