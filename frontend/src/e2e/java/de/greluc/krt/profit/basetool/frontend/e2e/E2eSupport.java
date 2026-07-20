@@ -447,17 +447,36 @@ final class E2eSupport {
 
   /**
    * Picks the first real option of a KRT searchable combobox — the equivalent of a native {@code
-   * selectOption(new SelectOption().setIndex(1))}, since the combobox does not render its
-   * empty-value placeholder as a list option. Opens the popup by focusing the textbox, then clicks
-   * the first {@code role=option} in this combobox's own wrapper — scoped like {@link
-   * #selectComboboxByValue} so another combobox's stale, hidden option list on the same page cannot
-   * shadow the match.
+   * selectOption(new SelectOption().setIndex(1))}. Opens the popup by focusing the textbox, then
+   * clicks the first {@code role=option} with a NON-empty {@code data-value} in this combobox's own
+   * wrapper — the {@code :not([data-value=''])} filter skips the optional picker's selectable
+   * "clear" row (empty value, REQ-FE-011), so this still lands on the first genuine entry. Scoped
+   * like {@link #selectComboboxByValue} so another combobox's stale, hidden option list on the same
+   * page cannot shadow the match.
    *
    * @param comboInput the visible combobox textbox the enhancer rendered
    */
   static void selectComboboxFirstOption(Locator comboInput) {
     comboInput.click();
-    comboInput.locator("xpath=..").locator("li[role='option']").first().click();
+    comboInput
+        .locator("xpath=..")
+        .locator("li[role='option']:not([data-value=''])")
+        .first()
+        .click();
+  }
+
+  /**
+   * Clears a KRT searchable combobox back to "no selection" by picking its "clear" row — the empty
+   * placeholder option an OPTIONAL picker (a non-required {@code <select>} with a descriptive empty
+   * option) re-exposes at the top of its unfiltered list (REQ-FE-011). Opens the popup by focusing
+   * the textbox, then clicks the {@code role=option} carrying an empty {@code data-value} in this
+   * combobox's own wrapper (scoped like {@link #selectComboboxByValue}).
+   *
+   * @param comboInput the visible combobox textbox the enhancer rendered
+   */
+  static void clearCombobox(Locator comboInput) {
+    comboInput.click();
+    comboInput.locator("xpath=..").locator("li[role='option'][data-value='']").first().click();
   }
 
   /**

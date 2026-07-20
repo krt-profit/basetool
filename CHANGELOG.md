@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Missionen: Ein einmal eingetragener Verantwortlicher einer Einheit lässt sich im „Einheit bearbeiten"-Dialog wieder entfernen.** Bisher bot das Auswahlfeld keinen Weg zurück auf „automatisch: Schiffseigner": der Eintrag „— automatisch —" war nicht auswählbar und ein geleertes Feld sprang beim Verlassen auf den alten Namen zurück. Zurücksetzen geht jetzt auf zwei Wegen — über die anwählbare „— automatisch —"-Zeile im Dropdown oder durch schlichtes Löschen des Textes im Feld (das geleerte Feld bleibt leer). Gilt für alle optionalen Benutzer-Auswahlfelder (REQ-FE-011, ADR-0053).
+
 - **Mitgliederverwaltung: Der Button „Zweite Staffel hinzufügen" öffnet jetzt wieder den Eingabebereich für die zweite Staffel.** Bisher verschwand beim Klick nur der Button, ohne dass der zweite Staffel-Slot erschien: Dessen Sichtbarkeit wird über die CSS-Klasse `krtm-hidden` gesteuert, das Skript versuchte ihn aber über einen Inline-`display`-Stil einzublenden, der die Klasse nicht übersteuert. Der Slot wird jetzt ebenfalls per Klasse ein- und ausgeblendet (REQ-ORG-017, ADR-0093).
 
 - **Edge-Rate-Limiting: „Too many requests" und Wartungsseite bei normaler Nutzung behoben.** Das Verbindungslimit am Reverse-Proxy (NPM) wirkte faktisch global statt pro IP, weil hinter Dockers userland-proxy alle Internet-Clients mit derselben Bridge-Gateway-Adresse ankommen; schon wenige gleichzeitige Nutzer auf der Missionsseite (langlebige SSE-/WebSocket-Verbindungen) überschritten die Grenze von 60, wodurch legitime Anfragen mit 429 abgewiesen wurden und Reconnect-Stürme das Frontend in die Wartungsseite trieben. Das gleichzeitige Verbindungslimit wurde auf 10000 angehoben (REQ-SEC-023).

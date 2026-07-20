@@ -184,12 +184,31 @@
 
         // Harvest the option set; the empty-value option (if any) seeds the placeholder. In remote
         // mode only a seeded preselected option is harvested (edit mode); the rest arrives per fetch.
+        //
+        // A non-required <select> with an empty-value option is an OPTIONAL picker whose value can be
+        // reset to none. There are TWO independent paths back to empty, and both matter (the native
+        // <select> the combobox replaces let you re-pick the empty option; swallowing it entirely
+        // into the placeholder removed every way back — the "can't remove the responsible person"
+        // bug):
+        //   • `optional` gates DELETE-TO-CLEAR — emptying the textbox clears the value, and reconcile
+        //     drops the committed label so blur no longer restores the removed entry. Enabled for
+        //     every optional picker, regardless of the empty option's text, because users who miss
+        //     the dropdown row reach for the delete key instead.
+        //   • `clearLabel` (the empty option's descriptive text, when present) additionally seeds a
+        //     selectable "clear" ROW in the list (see renderOptions) — the discoverable path.
         let items = [];
         let placeholder = opts.placeholder || data.comboboxPlaceholder || '';
+        let optional = false;
+        let clearLabel = '';
         Array.prototype.forEach.call(select.options, function (option) {
             if (option.value === '') {
+                const emptyText = option.textContent.trim();
                 if (!placeholder) {
-                    placeholder = option.textContent.trim();
+                    placeholder = emptyText;
+                }
+                if (!select.required) {
+                    optional = true;
+                    clearLabel = emptyText;
                 }
                 return;
             }
@@ -452,10 +471,23 @@
                   : items.slice();
             const truncated = matches.length > maxResults;
 
-            matches.slice(0, maxResults).forEach(function (it, idx) {
+            // Lead the UNFILTERED list with a selectable "clear" row when the optional picker's empty
+            // option carries descriptive text (`clearLabel`), so a committed value can be reset to
+            // none via the dropdown too. Hidden while a query is typed (the user is searching for an
+            // entry, not clearing). Its value is '' so commit() treats picking it as a clear, and it
+            // carries no highlight query. (Delete-to-clear works even without this row — see reconcile.)
+            const rows = clearLabel && !q ? [makeItem('', clearLabel)] : [];
+            Array.prototype.push.apply(rows, matches.slice(0, maxResults));
+
+            rows.forEach(function (it, idx) {
                 const li = document.createElement('li');
                 li.id = listboxId + '-opt-' + idx;
                 li.className = 'krt-combobox__option';
+                // The clear row reads as "no selection": muted styling, and commit() below drops the
+                // committed label/metadata for its empty value.
+                if (it.value === '') {
+                    li.classList.add('krt-combobox__option--clear');
+                }
                 li.setAttribute('role', 'option');
                 li.setAttribute('aria-selected', it.value === hidden.value ? 'true' : 'false');
                 // Expose the option value in the DOM (as a native <option value> did), so callers /
@@ -566,10 +598,12 @@
             const next = item ? item.value : '';
             const changed = hidden.value !== next;
             hidden.value = next;
-            // Mirror before the change event below, so change listeners reading the hidden
-            // input's dataset (unit/step refreshers) already see the new option's metadata.
-            mirrorItemData(item);
-            committedLabel = item ? item.label : '';
+            // An empty value is the "clear" row / no selection: it carries no committed label or
+            // mirrored option metadata, so the textbox falls back to its placeholder. Mirror before
+            // the change event below, so change listeners reading the hidden input's dataset
+            // (unit/step refreshers) already see the new option's metadata.
+            mirrorItemData(next ? item : null);
+            committedLabel = next ? item.label : '';
             input.value = committedLabel;
             input.setCustomValidity('');
             close();
@@ -606,6 +640,15 @@
                 hidden.value = '';
                 mirrorItemData(null);
                 hidden.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            // Emptying the textbox of an OPTIONAL picker is an explicit clear (delete-to-clear): drop
+            // the committed label so blur (which snaps the box back to committedLabel) leaves it empty
+            // instead of restoring the just-removed entry — the core of the "can't remove the
+            // responsible person" bug, and the path users take when they miss the dropdown clear row.
+            // Required pickers keep the snap-back so a stray keystroke never loses a mandatory
+            // selection.
+            if (optional && !input.value.trim()) {
+                committedLabel = '';
             }
             input.setCustomValidity(input.value.trim() ? texts.invalid : '');
         }

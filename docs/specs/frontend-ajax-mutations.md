@@ -776,6 +776,24 @@ non-users and carry only a handle — so they are searchable comboboxes that fil
 separate username/display-name term). Deviation beyond these carve-outs needs prior approval by
 @greluc and a spec amendment first.
 
+**Optional pickers stay clearable — via two paths.** A picker whose backing `<select>` is **not**
+`required` and has an empty-value option is optional: a committed value must be resettable back to
+none — matching the native `<select>`, where the empty option is re-selectable. **Both** paths back
+to empty are required:
+
+- **Delete-to-clear** (always available for an optional picker): emptying the textbox clears the
+  hidden value **and** drops the committed label, so blur no longer snaps the box back to the
+  just-removed entry. This must work regardless of whether the empty option carries descriptive text
+  — it is the path users take when they miss the dropdown row.
+- **The "clear" row** (when the empty option carries descriptive text, e.g. the mission unit's
+  responsible person "— automatisch: Schiffseigner —"): that text seeds a selectable row at the top
+  of the unfiltered list (hidden while a query is typed; value `''`, so committing it clears the
+  hidden value, the visible label and any mirrored option metadata) — the discoverable path.
+
+A required picker keeps the blur snap-back so a stray keystroke never loses a mandatory selection,
+and renders no clear row. Swallowing the empty option entirely (no clear row **and** blur restoring
+the old value on delete) is the "can't remove the responsible person" defect and is incomplete.
+
 **Acceptance**
 
 - [ ] Every field that selects a registered user is a `krt-searchable-select` combobox (carries
@@ -788,6 +806,9 @@ separate username/display-name term). Deviation beyond these carve-outs needs pr
   `name`); code that pre-selects a value after enhancement shows the matching label, not a blank box.
 - [ ] Guest-capable mission fields still accept a free-text non-user name; holder pickers filter by
   handle.
+- [ ] An optional picker (non-required `<select>` with an empty option) can be cleared back to none
+  by **both** paths: emptying the textbox (delete-to-clear — the box stays empty, not snapping back to
+  the removed entry on blur) and, when the empty option has descriptive text, picking its "clear" row.
 
 **Enforced by:** `AdminPersonalBlueprintsPageControllerMvcTest`
 (`view_userPicker_isRemoteSearchCombobox_withoutRosterPreload` — the rendered picker carries the
@@ -797,10 +818,15 @@ separate username/display-name term). Deviation beyond these carve-outs needs pr
 `UserProxyControllerTest` (the `search-bank` + single-user `/users/{id}` proxies) · the
 converted-picker flows drive the combobox end-to-end (open → pick → submit) in `BankBookingE2eTest`,
 `BankOrgUnitRequestsE2eTest`, `MissionFinanceEntryE2eTest` and `RefineryOrderCreateE2eTest` (via
-`E2eSupport.selectComboboxByValue` / `selectComboboxFirstOption`) · **Code:**
+`E2eSupport.selectComboboxByValue` / `selectComboboxFirstOption`); `MissionUnitResponsibleClearE2eTest`
+covers clearing an optional picker back to none via BOTH paths — the clear row
+(`E2eSupport.clearCombobox`) and delete-to-clear (emptying the textbox + blur) · **Code:**
 `krt-searchable-select.js` (`makeItem` + `data-search` local filter, the marker→`remoteSource`
-registry lookup in `autoConfig`, global `enhanceWithin` on `DOMContentLoaded` + `krt:swapped`,
-`id`/`data-*` passthrough, `setValue` API, `window.krtEnhanceComboboxes`), `krt-user-search.js`
+registry lookup in `autoConfig`, the `optional`/`clearLabel` empty-option detection + selectable clear
+row in `renderOptions`, the empty-value clear semantics in `commit` + the delete-to-clear label reset
+in `reconcile`, global `enhanceWithin` on
+`DOMContentLoaded` + `krt:swapped`, `id`/`data-*` passthrough, `setValue` API,
+`window.krtEnhanceComboboxes`), `krt-user-search.js`
 (the `remote-users` / `remote-bank-users` `window.krtComboboxRemoteSources` entries),
 `fragments/head.html` (global load + `window.krtComboboxI18n`), `UserController.searchUsersForBank` /
 `UserProxyController`, and the converted templates/selects · **ADR:** ADR-0053, ADR-0089
