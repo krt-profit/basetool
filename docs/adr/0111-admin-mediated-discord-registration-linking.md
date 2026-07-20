@@ -47,7 +47,10 @@ fail-open precheck let through.
   resolves the incoming **snowflake authoritatively from Keycloak** (`readDiscordLink`, so it works
   even when the `discord_user_id` claim mapper never persisted the id locally) **with a fallback to
   the persisted local `discord_user_id`** (recovery when the throwaway Keycloak user was already
-  deleted by an earlier partial failure), links the identity onto the target, commits the DB merge
+  deleted by an earlier partial failure — for which `readDiscordLink` maps a `404` "user not found"
+  to *empty* rather than a `500`, so the local fallback is actually reached; corrected 2026-07-20,
+  the initial fallback only handled the user-still-exists-but-no-link case), links the identity onto
+  the target, commits the DB merge
   through a self-proxied transactional method, and **only then deletes the throwaway Keycloak user**.
   Deleting it *last* — after the DB is consistent — is what makes a retry safe: a rolled-back DB half
   leaves the throwaway Keycloak user intact so the next attempt re-reads it cleanly. (The original
