@@ -823,18 +823,22 @@ inside the burst. Two invariants:
   `limit_req_log_level warn` in the error log) and a sustained 429 rate raises the
   `EdgeRateLimitSpike` Loki alert.
 
-**Known limitation — the key is currently global, not per-IP.** Docker's userland-proxy is enabled
-and NPM runs on a user-defined bridge, so inbound published-port traffic is SNAT'd to the bridge
-gateway before nginx sees it: `$binary_remote_addr` resolves to the gateway (`172.28.3.1`) for
-**every** internet client, not the real remote address. All external users therefore share a single
-bucket, and any per-IP limit is effectively a global cap. A 60-connection ceiling on this shared
-bucket caused a user-facing outage on 2026-07-20 — concurrent long-lived `/notifications/stream`
+**Known limitation — the key is currently global for IPv6 clients (ADR-0112).** The masking is
+IPv6-specific, not a general SNAT. External **IPv4** clients already reach nginx with their real
+address via the kernel `PREROUTING` DNAT (real IPv4s appear in the access log). But `:443` is also
+published on `[::]:443` while the `net-proxy-frontend` bridge is **IPv4-only**, so Docker installs
+no `ip6tables` DNAT and the userland `docker-proxy` becomes the sole IPv6 datapath — an L4 relay
+that opens a fresh IPv4 connection to the container sourced from the bridge gateway, so
+`$binary_remote_addr` is `172.28.3.1` for **every IPv6 client**. Because dual-stack browsers prefer
+IPv6 (Happy Eyeballs), almost all real traffic collapses onto that one bucket, and a 60-connection
+cap on it caused the user-facing outage on 2026-07-20 — concurrent long-lived `/notifications/stream`
 (SSE) and `/ws/sync` (WebSocket) connections crossed 60, the edge 429'd legitimate users, and the
 resulting reconnect storm degraded the frontend into the maintenance page. The `limit_conn` ceiling
-was therefore raised to **10000** so legitimate concurrency is never rejected. Restoring real
-client-IP propagation (userland-proxy off / host networking / PROXY protocol) so the key identifies
-one client again — allowing a return to a tight per-IP cap — is the tracked follow-up; until then
-`limit_conn` is a global runaway ceiling, not a per-client fairness limit.
+was therefore raised to **10000** so legitimate concurrency is never rejected. The real fix —
+enabling native IPv6 on the bridge so `ip6tables` DNAT preserves the client IPv6, after which the
+cap returns to a tight per-IP value — is **ADR-0112** (do **not** disable userland-proxy: it deletes
+the only IPv6 datapath); until then `limit_conn` is a global runaway ceiling for IPv6 traffic, not a
+per-client fairness limit.
 
 Stricter per-endpoint limits (e.g. the Keycloak login/token paths) may reference the same zones
 from a proxy host's Advanced tab in the NPM UI; that is unversioned host state and out of this
