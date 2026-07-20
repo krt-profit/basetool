@@ -233,6 +233,19 @@ the error through the MVC `@ExceptionHandler` and log a spurious ERROR per drop 
 stream failure never inflates the frontend error log (the dominant frontend ERROR source during a
 backend/Keycloak blip); the browser reconnects and the poll keeps the badge fresh.
 
+**The frontend relay commits its response on the request thread (ADR-0113).** Right after resolving
+the bearer and before wiring the reactor `sseWebClient` subscription, the relay sends an immediate
+initial SSE **comment** from the request thread. This is load-bearing, not decoration: the relay's
+forwarded writes (`forward()`) run on a reactor-netty event-loop thread, and Spring Web 7 + Tomcat 11
+do **not** commit an async `SseEmitter` response whose first write lands on a non-container thread
+(spring-ai #6169) — so without the initial request-thread commit the status line + headers never
+reach the browser/proxy and every stream header-times-out (the 2026-07-20 100%-dead-SSE incident,
+best-effort so the poll masked it). Spring replays the pre-initialize send on the request (dispatch)
+thread when it initializes the emitter, committing the response there; the comment is invisible to
+`EventSource`, so it only flushes headers and the forwarded events (including the backend's own
+`connected`) follow. Mirrors the backend's already-working request-thread first write
+(`NotificationStreamService.subscribe()`).
+
 **Registry consistency & bounds (#1109 Wave 6).** The per-`sub` emitter registry is a FIFO `Queue`
 mutated atomically under the map entry's bin lock (`ConcurrentHashMap.compute`), so a new
 subscription and an old stream completing concurrently for the same `sub` can no longer orphan a live

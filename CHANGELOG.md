@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Benachrichtigungen: Der Live-Push (SSE) funktioniert wieder.** Der Echtzeit-Kanal für die Glocke lieferte serverseitig keine Antwort-Header mehr aus (jeder Stream lief in einen Proxy-Timeout), weil das Frontend-Relay seine Antwort erst beim ersten weitergeleiteten Backend-Event committete — und dieser Schreibzugriff kommt auf Spring Boot 4 / Tomcat 11 aus einem Nicht-Container-Thread, der die Antwort nicht abschließt. Das Relay committet jetzt sofort auf dem Request-Thread (ein unsichtbares initiales SSE-Kommentar); der 60-Sekunden-Poll war durchgehend der Fallback, sodass nur die Live-Aktualisierung betroffen war (REQ-NOTIF-010, ADR-0113).
+
 ## [v1.5.9](https://github.com/krt-profit/basetool/releases/tag/v1.5.9) - 2026-07-20
 
 ### Fixed
