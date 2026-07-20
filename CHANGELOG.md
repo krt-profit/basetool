@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Discord-Registrierungen: „Verknüpfen" verbindet einen Freigabeantrag mit einem bestehenden Account.** Meldet sich ein Mitglied, das bereits einen Account hat, über Discord an und taucht als neuer Freigabeantrag auf (etwa weil sein Discord-Name vom Basetool-Namen abweicht), kann ein Admin den Antrag jetzt in der Freigabe-Liste per Account-Suche mit dem bestehenden Account verknüpfen, statt einen zweiten Account anzulegen — die Discord-Anmeldung wandert auf den Bestandsaccount und der doppelte Antrag wird entfernt (REQ-SEC-026). Setzt das Keycloak-Recht `manage-users` für das Sync-Service-Konto voraus.
+
 ## [v1.5.5](https://github.com/krt-profit/basetool/releases/tag/v1.5.5) - 2026-07-20
 
 ### Changed
@@ -11,6 +15,8 @@
 - **Aufträge: Der Statusfilter der Auftragsübersicht wird jetzt wie der Staffelfilter im Browser (localStorage) statt in einem Cookie gespeichert.** Das 30-Tage-Cookie `orders_filter_status` entfällt ersatzlos; die zuletzt gewählten Status werden clientseitig gemerkt und serverseitig angewandt (REQ-ORDERS-027).
 
 ### Fixed
+
+- **Discord-Registrierungen: Der Server-Nickname wird jetzt auch angezeigt, wenn ein Mitglied keinen eigenen Server-Nickname gesetzt hat.** Bisher blieb die Spalte leer, sobald ein Mitglied im Server unter seinem globalen Anzeigenamen auftritt (ohne separaten Server-Nickname); erfasst wird nun der im Server angezeigte Name (Server-Nickname, sonst globaler Anzeigename), damit ein Admin den Antrag einer Person zuordnen kann (REQ-DATA-008).
 
 - **Sicherheit: Eingebetteter Tomcat auf 11.0.24 angehoben (CVE-2026-59083, CVE-2026-59084).** Der von Spring Boot vorgegebene Tomcat 11.0.23 war über die RewriteValve (Dekodierung von „+" zu einem Leerzeichen beim Umschreiben, wodurch in manchen Konfigurationen eine URL-basierte Sicherheitsregel umgangen werden konnte) sowie über die EncryptInterceptor-Härtung angreifbar; die von der NVD kritisch bewertete Version wird jetzt auf die gepatchte 11.0.24 erzwungen. Der OWASP-Abhängigkeits-Scan ist damit wieder grün — die parallel gemeldeten Vert.x-4.5.x-Funde (CVE-2026-15075/-15076) waren Fehlalarme, da diese Bibliotheken nur auf dem Compile-Klassenpfad des Keycloak-SPI-Moduls liegen, nie ausgeliefert werden und zur Laufzeit vom Keycloak-Container bereitgestellt werden; sie wurden begründet unterdrückt.
 

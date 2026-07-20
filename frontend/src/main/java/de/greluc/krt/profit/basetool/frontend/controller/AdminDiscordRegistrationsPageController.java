@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.ApproveRegistrationRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.LinkRegistrationRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PendingRegistrationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RejectRegistrationRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -145,6 +146,33 @@ public class AdminDiscordRegistrationsPageController {
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Reject registration {} failed", id, e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  /**
+   * Links a pending Discord registration onto an existing account in place (krtFetch), relaying a
+   * backend conflict as {@code problem+json} so the client surfaces the reload-confirm instead of
+   * silently overwriting (REQ-SEC-026).
+   *
+   * @param id the registration to link away
+   * @param body the JSON-bound target account id + optimistic-lock version
+   * @return the surviving account on success, the relayed backend status on conflict/failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/{id}/link", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> linkAjax(
+      @PathVariable @NotNull UUID id,
+      @Nullable @RequestBody(required = false) LinkRegistrationRequest body) {
+    try {
+      return ResponseEntity.ok(
+          backendApiClient.post(
+              BACKEND_BASE + "/" + id + "/link", body, PendingRegistrationDto.class));
+    } catch (BackendServiceException e) {
+      log.debug("Link registration {} failed", id, e);
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Link registration {} failed", id, e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }

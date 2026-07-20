@@ -144,10 +144,11 @@ convention `cleanup…ForGuest` is structurally enforced by the ArchUnit rule
 > Discord sign-up lands without approval in `PENDING` (REQ-SEC-017): the entire
 > authority assembly is short-circuited to the single authority `ROLE_PENDING_APPROVAL`
 > — no realm roles, no permissions, no OrgUnit roles, **and no `ROLE_GUEST`**.
-> Such users are routed in the frontend to an "approval pending" page until
-> an admin approves them under `/admin/discord-registrations` (then `ACTIVE`) or rejects
-> them (`REJECTED`, stays without access). Roles/units are assigned **manually** after approval
-> (Track 1).
+> Such users are routed in the frontend to an "approval pending" page until,
+> under `/admin/discord-registrations`, an admin approves them (then `ACTIVE`), **links** the
+> registration onto an existing account (REQ-SEC-026 — for a member who already had an account but
+> registered anew via Discord), or rejects them (`REJECTED`, stays without access). Roles/units are
+> assigned **manually** after approval (Track 1).
 
 ---
 

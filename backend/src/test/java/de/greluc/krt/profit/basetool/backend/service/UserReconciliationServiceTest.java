@@ -52,6 +52,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.oauth2.jwt.Jwt;
 
@@ -79,6 +80,9 @@ class UserReconciliationServiceTest {
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private UserApprovalEventRepository userApprovalEventRepository;
   @Mock private UserService userService;
+  @Mock private KeycloakService keycloakService;
+  @Mock private UserDeletionService userDeletionService;
+  @Mock private ObjectProvider<UserRegistrationService> selfProvider;
 
   private UserRegistrationService userRegistrationService;
   private UserReconciliationService userReconciliationService;
@@ -88,7 +92,13 @@ class UserReconciliationServiceTest {
   @BeforeEach
   void setUp() {
     userRegistrationService =
-        new UserRegistrationService(userRepository, userApprovalEventRepository, eventPublisher);
+        new UserRegistrationService(
+            userRepository,
+            userApprovalEventRepository,
+            eventPublisher,
+            keycloakService,
+            userDeletionService,
+            selfProvider);
     setField(userRegistrationService, "requireApproval", true);
     userReconciliationService =
         new UserReconciliationService(

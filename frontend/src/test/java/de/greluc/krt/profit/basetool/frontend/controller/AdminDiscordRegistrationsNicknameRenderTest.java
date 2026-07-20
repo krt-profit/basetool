@@ -21,11 +21,14 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PendingRegistrationDto;
@@ -37,6 +40,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -44,11 +48,12 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Full Thymeleaf render test for the Discord registration-approval queue's server-nickname column
- * (REQ-DATA-008). Pins that a pending registration's captured per-guild nickname is rendered next
- * to the name so an admin sees it at the approval decision, while a registration without a captured
- * nickname falls back to the muted em-dash (no nickname value leaks for it). The assertions key off
- * the controlled nickname value, so they are locale-independent.
+ * Full Thymeleaf render / proxy tests for the Discord registration-approval queue. Covers the
+ * server-nickname column (REQ-DATA-008) — a captured per-guild nickname is shown next to the name,
+ * a registration without one falls back to the muted em-dash — and the admin
+ * link-to-existing-account action (REQ-SEC-026): the "Verknüpfen" button and the remote-users
+ * account picker render, and the {@code linkAjax} proxy forwards to the backend. The render
+ * assertions key off controlled values / stable markers, so they are locale-independent.
  */
 @SpringBootTest
 class AdminDiscordRegistrationsNicknameRenderTest {
@@ -101,6 +106,59 @@ class AdminDiscordRegistrationsNicknameRenderTest {
     assertThat(countOccurrences(html, "VanguardPilot"))
         .as("the captured server nickname is shown for exactly the one row that has it")
         .isEqualTo(1);
+  }
+
+  @Test
+  void queue_rendersLinkActionAndAccountPicker() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/admin/registrations"), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new PendingRegistrationDto(
+                    UUID.randomUUID(),
+                    "conrad7247",
+                    null,
+                    Instant.parse("2026-07-20T00:00:00Z"),
+                    1L)));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/admin/discord-registrations")
+                    .with(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("the per-row link action + the link modal with the remote-users account picker render")
+        .contains("data-action=\"link\"")
+        .contains("id=\"link-modal\"")
+        .contains("id=\"link-target\"")
+        .contains("data-krt-combobox=\"remote-users\"");
+  }
+
+  @Test
+  void linkAjax_forwardsToBackend_andReturnsOk() throws Exception {
+    UUID id = UUID.randomUUID();
+    UUID target = UUID.randomUUID();
+    when(backendApiClient.post(
+            eq("/api/v1/admin/registrations/" + id + "/link"),
+            any(),
+            eq(PendingRegistrationDto.class)))
+        .thenReturn(
+            new PendingRegistrationDto(
+                target, "MadrukSedras", null, Instant.parse("2026-07-20T00:00:00Z"), 2L));
+
+    mockMvc
+        .perform(
+            post("/admin/discord-registrations/" + id + "/link")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"targetUserId\":\"" + target + "\",\"version\":1}")
+                .with(csrf())
+                .with(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+        .andExpect(status().isOk());
   }
 
   /**

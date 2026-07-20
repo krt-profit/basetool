@@ -38,7 +38,11 @@ import org.junit.jupiter.api.Test;
  * in-process HTTP server. Covers: nickname captured on HTTP 200; empty result when {@code nick} is
  * null / blank / absent; and the fail-open empties on a non-200 status, a malformed body and a
  * timeout — capturing a nickname must never throw, so a Discord hiccup can never break the login.
- * The pure {@link DiscordGuildNicknameReader#extractNick(String)} parsing is checked directly too.
+ * Also covers the two views of the member object: {@link
+ * DiscordGuildNicknameReader#readGuildDisplayName} falling back to {@code user.global_name} (the
+ * approval-queue label), and {@link DiscordGuildNicknameReader#readNickname} staying nick-only (the
+ * conservative precheck candidate). The pure {@code extractNick} / {@code extractGuildDisplayName}
+ * parsing is checked directly too.
  */
 class DiscordGuildNicknameReaderTest {
 
@@ -136,10 +140,69 @@ class DiscordGuildNicknameReaderTest {
         DiscordGuildNicknameReader.extractNick("{\"nick\":\"Wing Lead\"}"));
   }
 
+  @Test
+  void readGuildDisplayName_fallsBackToGlobalNameWhenNickAbsent() throws IOException {
+    // The reported conrad7247/MadrukSedras case: no per-guild nick, server name is the global name.
+    HttpServer server =
+        start(respond(200, "{\"nick\":null,\"user\":{\"global_name\":\"MadrukSedras\"}}"));
+    try {
+      assertEquals(Optional.of("MadrukSedras"), readDisplay(server, Duration.ofSeconds(2)));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void readGuildDisplayName_prefersNickOverGlobalName() throws IOException {
+    HttpServer server =
+        start(respond(200, "{\"nick\":\"Wing Lead\",\"user\":{\"global_name\":\"Ignored\"}}"));
+    try {
+      assertEquals(Optional.of("Wing Lead"), readDisplay(server, Duration.ofSeconds(2)));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void readNickname_ignoresGlobalName_soThePrecheckStaysConservative() throws IOException {
+    // readNickname (the precheck candidate) must NOT fall back to the global name — otherwise a
+    // common display name could trigger a false account-collision denial at first-broker login.
+    HttpServer server =
+        start(respond(200, "{\"nick\":null,\"user\":{\"global_name\":\"MadrukSedras\"}}"));
+    try {
+      assertTrue(read(server, Duration.ofSeconds(2)).isEmpty());
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void extractGuildDisplayName_nickElseGlobalNameElseEmpty() {
+    assertEquals(
+        Optional.of("Nick"),
+        DiscordGuildNicknameReader.extractGuildDisplayName(
+            "{\"nick\":\"Nick\",\"user\":{\"global_name\":\"Global\"}}"));
+    assertEquals(
+        Optional.of("Global"),
+        DiscordGuildNicknameReader.extractGuildDisplayName(
+            "{\"nick\":\"   \",\"user\":{\"global_name\":\"Global\"}}"));
+    assertTrue(
+        DiscordGuildNicknameReader.extractGuildDisplayName("{\"user\":{\"global_name\":null}}")
+            .isEmpty());
+    assertTrue(DiscordGuildNicknameReader.extractGuildDisplayName("{}").isEmpty());
+    assertTrue(DiscordGuildNicknameReader.extractGuildDisplayName("not json").isEmpty());
+  }
+
   private static Optional<String> read(HttpServer server, Duration requestTimeout) {
     DiscordGuildNicknameReader reader =
         new DiscordGuildNicknameReader(HttpClient.newHttpClient(), requestTimeout);
     return reader.readNickname(baseUrl(server), GUILD, TOKEN);
+  }
+
+  private static Optional<String> readDisplay(HttpServer server, Duration requestTimeout) {
+    DiscordGuildNicknameReader reader =
+        new DiscordGuildNicknameReader(HttpClient.newHttpClient(), requestTimeout);
+    return reader.readGuildDisplayName(baseUrl(server), GUILD, TOKEN);
   }
 
   private static String baseUrl(HttpServer server) {

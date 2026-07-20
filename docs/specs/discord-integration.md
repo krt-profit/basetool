@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
-> **Owner area:** AUTH/SEC · **Related ADRs:** ADR-0030 (federation + first-login gate); ADR-0036 (Discord link recognised from the federated identity); ADR-0051 (account-existence precheck denies a colliding first-login); role/unit sync (planned — Track 2)
+> **Owner area:** AUTH/SEC · **Related ADRs:** ADR-0030 (federation + first-login gate); ADR-0036 (Discord link recognised from the federated identity); ADR-0051 (account-existence precheck denies a colliding first-login); ADR-0111 (admin-mediated linking of a Discord registration to an existing account); role/unit sync (planned — Track 2)
 
 # Discord integration — login, membership gate & admin approval
 
@@ -24,7 +24,9 @@ Every Basetool user MAY carry a single Discord account id. The `app_user.discord
 (nullable, **unique**, text) records the Discord user id (numeric snowflake). The source of truth is
 the Keycloak **federated-identity link** (`discord` alias), not the import-time user attribute, so
 the link is recognised for an account however and *whenever* it was linked — registered via Discord
-**or** an existing credential account linked later (ADR-0036). It reaches the backend two ways, both
+**or** an existing credential account linked later, whether the member self-linked via the Keycloak
+Account Console (ADR-0036) or an admin linked a pending registration onto it from the approval queue
+(REQ-SEC-026, ADR-0111). It reaches the backend two ways, both
 persisting onto this column: (1) the `discord_user_id` token claim, emitted by the SPI
 `DiscordFederatedIdentityMapper` from the federated link on **every** login (so even a pure
 credential login of a linked user carries it), persisted by `UserService.syncUser(Jwt)`; and (2) the
@@ -173,6 +175,75 @@ truststore, and a TLS failure simply fails open.
 - [x] The two krt-theme login bundles (de/en) carry `discordAccountAlreadyExists`.
 
 **Enforced by:** `BackendAccountCheckerTest` (fail-open HTTP matrix) · `DiscordGuildRoleGateAuthenticatorTest` (deny-on-exists with the right message key, allow-on-not-exists, fail-open on unknown, skip on linking / unconfigured / non-HTTPS) · `DiscordAccountExistenceServiceTest` (candidate normalisation + name/e-mail split + empty-candidate short-circuit) · `DiscordAccountExistenceControllerTest` (shared-secret gate: 503 unconfigured / 401 bad / 200 exists) · `DiscordSpiPrecheckPropertiesTest` (blank secret valid, <32-char secret rejected, ≥32-char secret valid) · **Code:** `DiscordGuildRoleGateAuthenticator`, `BackendAccountChecker`, `BackendTrustSupport`, `DiscordGuildRoleGateAuthenticatorFactory`, `DiscordAccountExistenceController`, `DiscordAccountExistenceService`, `DiscordSpiPrecheckProperties`, `UserRepository#existsByLowerUsernameOrDisplayNameIn` / `#existsByLowerEmail`, krt-theme `messages_*.properties` · **Decision:** ADR-0051
+
+### REQ-SEC-026 — Admin-mediated linking of a Discord registration to an existing account
+
+A member who already has a Basetool account but signs in via Discord **can slip past the fail-open
+collision precheck (REQ-SEC-022)** and land in the PENDING approval queue as a seemingly-new
+registration — typically because their Discord **username** differs from their in-app/server name
+(the reported conrad7247/MadrukSedras case). For exactly this, an admin can **link** such a pending
+registration onto the existing account from the approval queue (`/admin/discord-registrations`,
+ADMIN-gated) instead of approving a duplicate: the third **"Verknüpfen"** action opens a
+server-searched account picker (the `remote-users` combobox over `/users/search`, so the admin finds
+the account by its real name even when the Discord handle differs) and links it.
+
+Linking moves the Discord identity onto the **surviving existing account** and disposes of the
+throwaway Discord-registered account. It is orchestrated by
+`UserRegistrationService.linkRegistrationToExistingAccount` as a **non-transactional orchestrator**
+(Keycloak writes are external side-effects that cannot roll back with the DB, mirroring the
+`OperationService.setPayoutStatus` pattern):
+
+1. The pending row is optimistic-locked (client `version` echoed from `PendingRegistrationDto`,
+   checked via `OptimisticLock.checkOptionalClient`) and must still be `PENDING` — else a `409`
+   (`BusinessConflictException`). The target must be a **distinct, active** account that is **not
+   already Discord-linked** — else a `409`.
+2. The incoming Discord **snowflake is read authoritatively from Keycloak**
+   (`KeycloakService.readDiscordLink`, `GET /users/{pendingId}/federated-identity`), **not** from the
+   possibly-absent local `discord_user_id` — so linking works even when the `discord_user_id` claim
+   mapper never persisted the id locally (as in the reported environment, evidenced by the empty
+   nickname).
+3. Keycloak writes (idempotent on retry): `POST /users/{targetId}/federated-identity/discord`
+   attaches the identity (a `409` for the **same** snowflake is success; a different one is a genuine
+   conflict), then `DELETE /users/{pendingId}` removes the throwaway Keycloak user (a `404` is
+   success). These require the sync service account to hold the **`manage-users`** realm-management
+   role — the only Keycloak **write** the backend makes (`KeycloakService` is otherwise read-only).
+4. The DB merge (transactional, self-proxied) deletes the throwaway `app_user` **first** — freeing
+   the unique `discord_user_id` — via the FK-safe `UserDeletionService.deleteUser` (after clearing
+   its `inKeycloak` flag), then stamps the surviving account's `discord_user_id` (+ captured guild
+   nickname) and writes an `ApprovalDecision.LINKED` audit row (against the surviving account, no
+   PII).
+
+REQ-SEC-022's login-time deny is **unchanged**: a confidently-colliding first-login is still denied
+and redirected to self-service linking; this action resolves the registrations that the fail-open
+precheck let through. Because a `PENDING` account carries **zero** authorities (REQ-SEC-017) until an
+admin acts, no privilege can be inherited before the link, so the merge never widens access.
+
+**Acceptance**
+
+- [x] A third **link** action on the ADMIN-only approval queue links a pending Discord registration
+  onto an admin-chosen existing account via a server-searched account picker (`remote-users`).
+- [x] The Discord federated identity is moved onto the surviving account in Keycloak and the
+  throwaway Keycloak user + `app_user` row are removed; the surviving account gains `discord_user_id`
+  (+ guild nickname). The snowflake is read authoritatively from Keycloak.
+- [x] The action is optimistic-locked (stale / non-`PENDING` → `409`), rejects a self / non-active /
+  already-linked target (`409`), and the frontend proxy relays the backend `409` verbatim
+  (`propagateBackendError`) so `krt-fetch.js` keeps its reload-vs-toast distinction.
+- [x] The Keycloak writes are idempotent (409-same-snowflake / 404-on-delete treated as success) and
+  ordered before the DB merge, so a retry after a DB failure re-applies cleanly.
+- [x] A `LINKED` `UserApprovalEvent` is recorded against the surviving account (no PII / free text).
+  Discord registration is **not** a unified-audit area, so no `AuditEventType`/viewer-filter change.
+- [ ] Operator: the sync service account is granted `manage-users` (on top of `view-users` /
+  `view-realm`) before deploy, or the link action `403`s at the Keycloak write.
+
+**Enforced by:** `UserRegistrationServiceTest` (link happy path + guards: stale version, non-PENDING,
+self / non-active / already-linked target, no-Discord-identity) · `KeycloakServiceTest`
+(`linkDiscordIdentity` / `deleteUser` writes + 409/404 idempotency, `readDiscordLink`) ·
+`AdminDiscordRegistrationsNicknameRenderTest` (link button + account picker render, `linkAjax`
+forward) · `DtoOpenApiContractTest` (frontend mirror ⊆ committed `openapi.json`) ·
+`MessageBundleConsistencyTest` (key parity) · **Code:** `UserRegistrationService`,
+`DiscordRegistrationAdminController`, `KeycloakService`, `UserDeletionService`, `ApprovalDecision`,
+`LinkRegistrationRequest` (backend + frontend), `AdminDiscordRegistrationsPageController`,
+`admin/discord-registrations.html`, `discord-registrations.js`, `messages*.properties` · **Decision:** ADR-0111
 
 ### REQ-SEC-017 — PENDING approval withholds all authorities (fail-safe default)
 
@@ -341,27 +412,36 @@ name-less body, empty-admins no-op) · `PendingRegistrationMailEventListenerTest
 ### REQ-DATA-008 — Discord guild nickname captured at login & shown at approval (admin-only)
 
 To let an admin recognise who a pending Discord registration actually is, Basetool captures the
-user's **per-guild server nickname** — the Discord `nick` they carry inside the `das-kartell` guild,
-distinct from the global `username` / `global_name` — and shows it beside the name in the admin
-registration-approval queue. The `app_user.discord_guild_nickname` column (nullable, `VARCHAR(255)`)
-holds it. Capture is **best-effort and fail-open**: `DiscordIdentityProvider` fetches the
-guild-member object (`GET /users/@me/guilds/{guildId}/member`, guild id from the `DISCORD_GUILD_ID`
-env var, scope `guilds.members.read`), injects the `nick` into the brokered profile JSON under
-`guild_nick`, and a Keycloak Attribute Importer + protocol mapper carry it into the
-`discord_guild_nickname` token claim (mirroring `discord_user_id`); the backend persists it in
-`UserService.syncUser`. Any failure — no nickname set, capture mappers absent, env var unset, Discord
-error/timeout — simply leaves it `null`; it must **never** block or delay the login, in deliberate
-contrast to the fail-closed membership gate (REQ-SEC-016). It refreshes on every Discord login
-(mapper sync mode FORCE). It is **display-only** (grants nothing), **admin-only** (carried solely in
-the approval-queue `PendingRegistrationDto`, never in any shared `UserDto`), and **never logged** (it
-is a name — REQ-OBS).
+name the guild **displays** for the user — the per-guild `nick` they set inside the `das-kartell`
+guild, **falling back to the account's global display name (`user.global_name`) when no per-guild
+nick is set** — and shows it beside the name in the admin registration-approval queue. The fallback
+matters because Discord renders a member as `nick ?? global_name ?? username`: a member who never
+set a server nickname would otherwise surface as a blank em-dash even though the guild clearly shows
+their global name (the reported conrad7247/MadrukSedras case, where the Discord handle differs from
+the recognisable server name). The `app_user.discord_guild_nickname` column (nullable,
+`VARCHAR(255)`) holds it. Capture is **best-effort and fail-open**: `DiscordIdentityProvider` fetches
+the guild-member object (`GET /users/@me/guilds/{guildId}/member`, guild id from the
+`DISCORD_GUILD_ID` env var, scope `guilds.members.read`) via
+`DiscordGuildNicknameReader.readGuildDisplayName` (nick, else `user.global_name`), injects the
+resulting name into the brokered profile JSON under `guild_nick`, and a Keycloak Attribute Importer +
+protocol mapper carry it into the `discord_guild_nickname` token claim (mirroring `discord_user_id`);
+the backend persists it in `UserReconciliationService.syncUser`. Any failure — no nickname **and** no
+global name, capture mappers absent, env var unset, Discord error/timeout — simply leaves it `null`;
+it must **never** block or delay the login, in deliberate contrast to the fail-closed membership gate
+(REQ-SEC-016). It refreshes on every Discord login (mapper sync mode FORCE). It is **display-only**
+(grants nothing), **admin-only** (carried solely in the approval-queue `PendingRegistrationDto`,
+never in any shared `UserDto`), and **never logged** (it is a name — REQ-OBS). The
+first-broker-login collision precheck's nickname candidate deliberately stays **nick-only**
+(`readNickname`), so broadening the display never widens that anti-duplicate name match.
 
 **Acceptance**
 
 - [ ] `app_user.discord_guild_nickname` exists: nullable `VARCHAR(255)` (V178); `ddl-auto: validate`
   boots clean against the migration.
-- [x] The Keycloak SPI reads `nick` best-effort and **fails open** — a Discord error/timeout or an
-  absent nickname yields no value and never breaks the login (`DiscordGuildNicknameReaderTest`).
+- [x] The Keycloak SPI reads the guild display name best-effort and **fails open** — `nick` if set,
+  else `user.global_name`; a Discord error/timeout or neither name present yields no value and never
+  breaks the login. The precheck's `readNickname` view stays nick-only
+  (`DiscordGuildNicknameReaderTest`).
 - [x] `UserService.syncUser(Jwt)` persists a non-blank `discord_guild_nickname` claim (trimmed,
   length-bounded) and leaves the field `null` when the claim is absent (`UserServiceDiscordSyncTest`).
 - [x] The admin approval queue renders the captured nickname beside the name; a registration with no
@@ -395,5 +475,8 @@ is a name — REQ-OBS).
   may be linked to Discord via the Keycloak Account Console and is recognised exactly like a Discord
   registration. The link is sourced from the Keycloak federated identity (SPI claim mapper +
   Admin-API backfill), not the import-time attribute, so the member-list indicator lights up for it
-  on every login method.
+  on every login method. **Extended (ADR-0111 / REQ-SEC-026):** an admin can also link a pending
+  Discord registration onto the existing account directly from the approval queue — for members whose
+  Discord handle differs from their in-app name, so the automatic collision check never recognised
+  them and the registration reached the queue.
 
