@@ -193,14 +193,18 @@ class MissionUnitResponsibleClearE2eTest {
         clearAction.run(page, responsibleCombo);
 
         // Save in place (the unit edit swaps the crew pane via AJAX — no Post/Redirect/Get). Mark
-        // the
-        // window so we can prove no full reload happened, then web-first-wait for the re-rendered
-        // edit
-        // button to carry an empty responsible id (which also proves the clear was persisted).
+        // the window to prove no full reload happened, then web-first-wait for the re-rendered edit
+        // button to no longer carry a responsible id — which also proves the clear was persisted,
+        // since the crew pane re-renders from the backend's fresh state. Thymeleaf omits an
+        // empty-valued th:data-* attribute entirely (as it does for this button's data-ship /
+        // data-frequency when empty) and the click handler reads it back with `|| ''`, so a cleared
+        // unit carries NO responsible id: the attribute is absent (or, were it ever rendered,
+        // empty). Assert it holds no non-empty value rather than a literal "".
         page.evaluate("window.__krtNoReload = true;");
         page.locator("#edit-unit-form button[type='submit']").click();
         assertThat(page.locator(".edit-unit-btn[data-name='" + unitName + "']"))
-            .hasAttribute("data-responsible", "");
+            .not()
+            .hasAttribute("data-responsible", Pattern.compile(".+"));
         assertEquals(
             Boolean.TRUE,
             page.evaluate("window.__krtNoReload === true"),
