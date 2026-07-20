@@ -43,10 +43,7 @@ import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -63,7 +60,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -176,10 +172,11 @@ public class JobOrderPageController {
    * Renders the job-order list ({@code /orders}). Two filters drive the view:
    *
    * <ul>
-   *   <li>Status filter — three-stage precedence: explicit query parameter wins, otherwise the
-   *       {@code orders_filter_status} cookie (validated against {@link #VALID_STATUSES}),
-   *       otherwise the default of {@code OPEN} + {@code IN_PROGRESS}. Persisted in a 30-day
-   *       cookie.
+   *   <li>Status filter — the selected statuses arrive as repeatable {@code status} query
+   *       parameters (validated against {@link #VALID_STATUSES}); an empty or all-invalid selection
+   *       falls back to the default of {@code OPEN} + {@code IN_PROGRESS}. The selection is
+   *       persisted client-side in localStorage by {@code orders-index.js} (not a server cookie),
+   *       so the controller simply honours the statuses it receives.
    *   <li>Squadron filter (multi-select, REQ-ORDERS-027) — a repeatable {@code squadronId} query
    *       parameter names the selected squadrons (matching responsible OR requesting side). An
    *       empty/absent selection means "all squadrons" (no narrowing), the default. Its state is
@@ -189,11 +186,9 @@ public class JobOrderPageController {
    *
    * @param status optional explicit status filter
    * @param squadronId optional repeatable squadron display filter (empty = all squadrons)
-   * @param cookieStatus previous persisted status filter from the cookie
    * @param page zero-based page index, defaulted/clamped to 0 (REQ-ORDERS-020)
    * @param size requested page size; only {@link #PAGE_SIZES} are honoured, else {@link
    *     #DEFAULT_PAGE_SIZE}
-   * @param response servlet response, used to update the persistence cookies
    * @param fragment when {@code "results"}, only the results-table fragment is rendered for an
    *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page
    * @param model Thymeleaf model populated with orders, the page envelope ({@code ordersPage}), the
@@ -206,12 +201,10 @@ public class JobOrderPageController {
   public String viewOrders(
       @RequestParam(required = false) List<String> status,
       @RequestParam(required = false) List<UUID> squadronId,
-      @CookieValue(name = "orders_filter_status", required = false) String cookieStatus,
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
       @ModelAttribute("canViewOwnJobOrders") boolean canViewOwnJobOrders,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      HttpServletResponse response,
       @RequestParam(required = false) String fragment,
       Model model) {
     // Non-profit ordering-squad members (canViewJobOrders=false) still see the orders THEY placed —
@@ -223,26 +216,14 @@ public class JobOrderPageController {
       return "redirect:/orders/create";
     }
     model.addAttribute("requesterView", requesterView);
-    if (status == null || status.isEmpty()) {
-      if (cookieStatus != null && !cookieStatus.isBlank()) {
-        List<String> parsed = Arrays.asList(cookieStatus.split("-"));
-        boolean allValid = parsed.stream().allMatch(VALID_STATUSES::contains);
-        if (allValid) {
-          status = parsed;
-        } else {
-          status = List.of("OPEN", "IN_PROGRESS");
-        }
-      } else {
-        status = List.of("OPEN", "IN_PROGRESS");
-      }
-    } else {
-      Cookie cookie = new Cookie("orders_filter_status", String.join("-", status));
-      cookie.setPath("/orders");
-      cookie.setMaxAge(30 * 24 * 60 * 60); // 30 days
-      cookie.setHttpOnly(true);
-      cookie.setSecure(true);
-      response.addCookie(cookie);
-    }
+    // Status filter (REQ-ORDERS-027): the selected statuses arrive as repeatable `status` query
+    // params, echoed by orders-index.js from its per-browser localStorage (no server cookie). They
+    // are validated against the known statuses for defence-in-depth; an empty, absent or
+    // all-invalid selection falls back to the default OPEN + IN_PROGRESS queue view.
+    List<String> requestedStatuses = (status == null) ? List.of() : status;
+    List<String> validStatuses =
+        requestedStatuses.stream().filter(VALID_STATUSES::contains).toList();
+    status = validStatuses.isEmpty() ? List.of("OPEN", "IN_PROGRESS") : validStatuses;
 
     // Squadron display filter (multi-select, REQ-ORDERS-027): the picker's selected squadron ids
     // arrive as repeatable squadronId params (echoed by orders-index.js from its per-user
