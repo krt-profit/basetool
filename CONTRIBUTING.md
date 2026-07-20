@@ -202,12 +202,12 @@ point.
 
 The README is the canonical place. The relevant sections:
 
-- [§4.1 Prerequisites](README.md#41-prerequisites) — Java 25 + Docker + Compose.
-- [§4.2 Local development setup](README.md#42-local-development-setup-running-the-apps-from-gradle) — recommended for active development (apps on the host JVM, dependencies in containers).
-- [§4.3 Full dev stack with Compose](README.md#43-running-the-full-dev-stack-with-docker-compose) — when you need the whole thing in containers.
-- [§4.4 Local test stack](README.md#44-running-the-local-test-stack) — when you need an isolated stack with throwaway credentials. **Use this every time you spin up a stack from a worktree.** Never re-use the production `.env`, the production `keystore.p12`, or the shared `realm-export.json` — see [CLAUDE.md → Testing](CLAUDE.md) for the rationale.
-- [§4.5 Running tests](README.md#45-running-tests) — Gradle wrapper only, never the IDE test runner.
-- [§4.6 Linting, static analysis, SBOM](README.md#46-linting-static-analysis-and-sbom) — `./gradlew check`, Checkstyle, SpotBugs, Spotless, CycloneDX.
+- [Prerequisites](README.md#prerequisites) — Java 25 + Docker + Compose.
+- [Local development (apps from Gradle)](README.md#local-development-apps-from-gradle) — recommended for active development (apps on the host JVM, dependencies in containers).
+- [Full stack via Docker Compose](README.md#full-stack-via-docker-compose) — when you need the whole thing in containers.
+- [Running the local test stack](README.md#running-the-local-test-stack) — when you need an isolated stack with throwaway credentials. **Use this every time you spin up a stack from a worktree.** Never re-use the production `.env`, the production `keystore.p12`, or the shared `realm-export.json` — see [CLAUDE.md → Testing](CLAUDE.md) for the rationale.
+- [Running tests](README.md#tests) — Gradle wrapper only, never the IDE test runner.
+- [Linting, static analysis and SBOM](README.md#linting-static-analysis-and-sbom) — `./gradlew check`, Checkstyle, SpotBugs, Spotless, CycloneDX.
 
 Hard project rule: **always use the Gradle wrapper** (`./gradlew`).
 Never the IDE test runner; never `mvn`; never a system-installed Gradle.
@@ -752,7 +752,7 @@ bugs that shipped. The short version:
   to verify a change. The recovery for a leaked secret is more
   expensive than always using the `.env.test` / throwaway `keystore.p12` /
   stripped `realm-export.json` route described in
-  [README §4.4](README.md#44-running-the-local-test-stack) and
+  [README → Running the local test stack](README.md#running-the-local-test-stack) and
   [CLAUDE.md → Testing](CLAUDE.md).
 
 ---
