@@ -11,7 +11,7 @@
 > the role seeds in
 > [`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/DataInitializer.java)
 > and the authority converter
-> [`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/CustomJwtGrantedAuthoritiesConverter.java).
+> [`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/CustomJwtGrantedAuthoritiesConverter.java).
 > **When this document and the code disagree, the code always wins**
 > (`@PreAuthorize` + `SecurityConfig`).
 
@@ -205,7 +205,7 @@ public route at all. See [`docs/specs/observability.md`](docs/specs/observabilit
 `LOGISTICIAN` and `MISSION_MANAGER` are **not** Keycloak roles, but **flags per
 OrgUnit membership** (`org_unit_membership.is_logistician` /
 `is_mission_manager`). The
-[`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/CustomJwtGrantedAuthoritiesConverter.java)
+[`CustomJwtGrantedAuthoritiesConverter`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/CustomJwtGrantedAuthoritiesConverter.java)
 promotes these into two authority surfaces:
 
 - **Flat** `ROLE_LOGISTICIAN` / `ROLE_MISSION_MANAGER`, as soon as **any**

@@ -76,9 +76,11 @@ The following are **in scope** for this policy:
   `keycloak-spi/`, `ingest/`, `scripts/`, build configuration, Flyway
   migrations).
 - Published container images under
-  [`ghcr.io/krt-profit/basetool-backend`](https://github.com/krt-profit/basetool/pkgs/container/basetool-backend)
+  [`ghcr.io/krt-profit/basetool-backend`](https://github.com/krt-profit/basetool/pkgs/container/basetool-backend),
+  [`ghcr.io/krt-profit/basetool-frontend`](https://github.com/krt-profit/basetool/pkgs/container/basetool-frontend),
   and
-  [`ghcr.io/krt-profit/basetool-frontend`](https://github.com/krt-profit/basetool/pkgs/container/basetool-frontend).
+  [`ghcr.io/krt-profit/basetool-ingest`](https://github.com/krt-profit/basetool/pkgs/container/basetool-ingest)
+  (the internet-facing gateway).
 - GitHub Actions workflows under `.github/workflows/` and their pinned
   actions.
 - The Docker Compose definitions and deployment scripts shipped in this
