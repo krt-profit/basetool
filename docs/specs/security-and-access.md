@@ -809,7 +809,7 @@ finding L3.
 next free number.)
 
 Every public proxy host behind nginx-proxy-manager carries a **version-controlled** per-IP safety
-net at the edge: `limit_req` (20 r/s sustained, burst 80, `nodelay`) and `limit_conn` (60
+net at the edge: `limit_req` (20 r/s sustained, burst 80, `nodelay`) and `limit_conn` (10000
 concurrent connections) keyed on `$binary_remote_addr`, delivered through the custom snippets the
 repo already injects into NPM (`docker/maintenance/nginx/http.conf` defines the zones,
 `server_proxy.conf` applies them in every proxy host's `server` block). The values are
@@ -823,6 +823,19 @@ inside the burst. Two invariants:
   `limit_req_log_level warn` in the error log) and a sustained 429 rate raises the
   `EdgeRateLimitSpike` Loki alert.
 
+**Known limitation — the key is currently global, not per-IP.** Docker's userland-proxy is enabled
+and NPM runs on a user-defined bridge, so inbound published-port traffic is SNAT'd to the bridge
+gateway before nginx sees it: `$binary_remote_addr` resolves to the gateway (`172.28.3.1`) for
+**every** internet client, not the real remote address. All external users therefore share a single
+bucket, and any per-IP limit is effectively a global cap. A 60-connection ceiling on this shared
+bucket caused a user-facing outage on 2026-07-20 — concurrent long-lived `/notifications/stream`
+(SSE) and `/ws/sync` (WebSocket) connections crossed 60, the edge 429'd legitimate users, and the
+resulting reconnect storm degraded the frontend into the maintenance page. The `limit_conn` ceiling
+was therefore raised to **10000** so legitimate concurrency is never rejected. Restoring real
+client-IP propagation (userland-proxy off / host networking / PROXY protocol) so the key identifies
+one client again — allowing a return to a tight per-IP cap — is the tracked follow-up; until then
+`limit_conn` is a global runaway ceiling, not a per-client fairness limit.
+
 Stricter per-endpoint limits (e.g. the Keycloak login/token paths) may reference the same zones
 from a proxy host's Advanced tab in the NPM UI; that is unversioned host state and out of this
 requirement's scope. The backend's application-level Bucket4j limiter (REQ-SEC-009 family) is
@@ -830,8 +843,11 @@ unchanged and remains the precise, per-subject layer behind this coarse edge net
 
 **Acceptance**
 
-- [ ] A burst above rate+burst from one IP receives 429 responses (not the maintenance page, not
-  503) while other client IPs are unaffected.
+- [ ] A burst above rate+burst receives 429 responses (not the maintenance page, not 503). (Per-IP
+  isolation — "other client IPs unaffected" — holds only once real client-IP propagation is
+  restored; see the known-limitation note above.)
+- [ ] Legitimate concurrency (many members each holding the mission page's SSE + WebSocket) does not
+  exhaust `limit_conn` and is never 429'd.
 - [ ] A normal page load (asset fan-out within the burst) is never limited.
 - [ ] A sustained 429 rate at the edge raises `EdgeRateLimitSpike`.
 
