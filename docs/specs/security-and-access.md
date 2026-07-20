@@ -809,7 +809,7 @@ finding L3.
 next free number.)
 
 Every public proxy host behind nginx-proxy-manager carries a **version-controlled** per-IP safety
-net at the edge: `limit_req` (20 r/s sustained, burst 80, `nodelay`) and `limit_conn` (10000
+net at the edge: `limit_req` (20 r/s sustained, burst 80, `nodelay`) and `limit_conn` (500
 concurrent connections) keyed on `$binary_remote_addr`, delivered through the custom snippets the
 repo already injects into NPM (`docker/maintenance/nginx/http.conf` defines the zones,
 `server_proxy.conf` applies them in every proxy host's `server` block). The values are
@@ -823,22 +823,21 @@ inside the burst. Two invariants:
   `limit_req_log_level warn` in the error log) and a sustained 429 rate raises the
   `EdgeRateLimitSpike` Loki alert.
 
-**Known limitation — the key is currently global for IPv6 clients (ADR-0112).** The masking is
-IPv6-specific, not a general SNAT. External **IPv4** clients already reach nginx with their real
-address via the kernel `PREROUTING` DNAT (real IPv4s appear in the access log). But `:443` is also
-published on `[::]:443` while the `net-proxy-frontend` bridge is **IPv4-only**, so Docker installs
-no `ip6tables` DNAT and the userland `docker-proxy` becomes the sole IPv6 datapath — an L4 relay
-that opens a fresh IPv4 connection to the container sourced from the bridge gateway, so
-`$binary_remote_addr` is `172.28.3.1` for **every IPv6 client**. Because dual-stack browsers prefer
-IPv6 (Happy Eyeballs), almost all real traffic collapses onto that one bucket, and a 60-connection
-cap on it caused the user-facing outage on 2026-07-20 — concurrent long-lived `/notifications/stream`
-(SSE) and `/ws/sync` (WebSocket) connections crossed 60, the edge 429'd legitimate users, and the
-resulting reconnect storm degraded the frontend into the maintenance page. The `limit_conn` ceiling
-was therefore raised to **10000** so legitimate concurrency is never rejected. The real fix —
-enabling native IPv6 on the bridge so `ip6tables` DNAT preserves the client IPv6, after which the
-cap returns to a tight per-IP value — is **ADR-0112** (do **not** disable userland-proxy: it deletes
-the only IPv6 datapath); until then `limit_conn` is a global runaway ceiling for IPv6 traffic, not a
-per-client fairness limit.
+**Real client IP restored (ADR-0112).** The masking was IPv6-specific: `:443` is published on
+`[::]:443` while the container network was IPv4-only, so Docker installed no `ip6tables` DNAT and the
+userland `docker-proxy` relayed every IPv6 client through the bridge gateway (`$binary_remote_addr` =
+`172.28.3.1`); dual-stack browsers prefer IPv6, so almost all real traffic collapsed onto one bucket,
+and a 60-connection cap on it caused the 2026-07-20 outage (long-lived `/notifications/stream` (SSE)
+and `/ws/sync` (WebSocket) connections crossed 60, the edge 429'd legitimate users, the frontend
+degraded into the maintenance page). ADR-0112 made `net-proxy-frontend` dual-stack (`fd00:28:3::/64`)
+so the kernel DNAT preserves the client IPv6 for **this host** (`profit-base.online`); real v4 and v6
+client addresses now reach nginx, so the per-IP limit is meaningful again and `limit_conn` was
+tightened from the 10000 stopgap to **500** concurrent connections per client. Two residual notes:
+the other proxy hosts (keycloak/ingest/grafana) are still IPv4-only, so IPv6 clients to those still
+key on the bridge gateway — harmless, their concurrent-connection load stays far under 500; and IPv6
+is keyed on the full `/128`, so a `/64` collapse (per-subscriber, anti address-rotation) via an
+`http.conf` map remains an optional follow-up. Do **not** disable userland-proxy: it deletes the only
+IPv6 datapath.
 
 Stricter per-endpoint limits (e.g. the Keycloak login/token paths) may reference the same zones
 from a proxy host's Advanced tab in the NPM UI; that is unversioned host state and out of this
@@ -847,11 +846,11 @@ unchanged and remains the precise, per-subject layer behind this coarse edge net
 
 **Acceptance**
 
-- [ ] A burst above rate+burst receives 429 responses (not the maintenance page, not 503). (Per-IP
-  isolation — "other client IPs unaffected" — holds only once real client-IP propagation is
-  restored; see the known-limitation note above.)
+- [ ] A burst above rate+burst from one client IP receives 429 responses (not the maintenance page,
+  not 503) while other client IPs are unaffected (real per-client IPs on `profit-base.online` via
+  ADR-0112).
 - [ ] Legitimate concurrency (many members each holding the mission page's SSE + WebSocket) does not
-  exhaust `limit_conn` and is never 429'd.
+  exhaust the 500 per-IP `limit_conn` and is never 429'd.
 - [ ] A normal page load (asset fan-out within the burst) is never limited.
 - [ ] A sustained 429 rate at the edge raises `EdgeRateLimitSpike`.
 

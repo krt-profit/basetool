@@ -710,7 +710,7 @@ The same two custom snippets carry a version-controlled per-IP safety net
   (`krt_req_perip`, `krt_conn_perip`, keyed on `$binary_remote_addr`).
 - `docker/maintenance/nginx/server_proxy.conf` applies them in each proxy
   host's `server { }` block: **20 r/s** sustained with **burst 80** (`nodelay`)
-  and at most **10000 concurrent connections** per client key.
+  and at most **500 concurrent connections** per client IP.
 
 These are flood/brute-force ceilings, not fairness limits — a worst-case page
 load (~40 uncached asset requests at once) fits inside the burst, while
@@ -721,19 +721,15 @@ the maintenance page with the wrong semantics. Rejected requests appear in the
 per-host access logs (and via `limit_req_log_level warn` in the error log), so
 a sustained flood raises the `EdgeRateLimitSpike` Loki alert.
 
-> **Note — the per-IP key is currently global for IPv6 clients (ADR-0112).** The
-> masking is IPv6-specific. External **IPv4** clients already reach nginx with
-> their real address via the kernel `PREROUTING` DNAT. But `:443` is also
-> published on `[::]:443` while `net-proxy-frontend` is **IPv4-only**, so Docker
-> installs no `ip6tables` DNAT and the userland `docker-proxy` relays every IPv6
-> client through a fresh IPv4 connection sourced from the bridge gateway →
-> `$binary_remote_addr` is `172.28.3.1` for every IPv6 client, and dual-stack
-> browsers prefer IPv6 so almost all real traffic collapses onto one bucket. The
-> `limit_conn` ceiling is therefore set high (**10000**) as a stopgap; a 60-cap
-> caused the 2026-07-20 maintenance-page incident. The real fix — native IPv6 on
-> the bridge so `ip6tables` DNAT preserves the client IPv6, then retighten the cap
-> to ~500/IP — is **ADR-0112** (do **not** disable userland-proxy: it deletes the
-> only IPv6 datapath). See REQ-SEC-023.
+> **Note — real client IP restored (ADR-0112).** The IPv6-specific masking is
+> fixed on `profit-base.online`: `net-proxy-frontend` is now dual-stack
+> (`fd00:28:3::/64`) so the kernel `ip6tables` DNAT preserves the client IPv6, and
+> both v4 and v6 clients reach nginx directly. `limit_conn` is therefore tightened
+> from the 10000 stopgap to **500** per client. Residual: the other proxy hosts
+> (keycloak/ingest/grafana) are still IPv4-only (IPv6 clients there still key on the
+> bridge gateway, but stay far under 500), and IPv6 is keyed on the full `/128`
+> (a `/64` collapse is an optional follow-up). Do **not** disable userland-proxy.
+> See REQ-SEC-023 / ADR-0112.
 
 Stricter per-endpoint limits (e.g. on the Keycloak token/login paths) remain
 possible per proxy host in the NPM UI's Advanced tab, referencing the same
