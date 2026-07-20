@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.9](https://github.com/krt-profit/basetool/releases/tag/v1.5.9) - 2026-07-20
+
 ### Fixed
 
 - **Missionen: Ein einmal eingetragener Verantwortlicher einer Einheit lässt sich im „Einheit bearbeiten"-Dialog wieder entfernen.** Bisher bot das Auswahlfeld keinen Weg zurück auf „automatisch: Schiffseigner": der Eintrag „— automatisch —" war nicht auswählbar und ein geleertes Feld sprang beim Verlassen auf den alten Namen zurück. Zurücksetzen geht jetzt auf zwei Wegen — über die anwählbare „— automatisch —"-Zeile im Dropdown oder durch schlichtes Löschen des Textes im Feld (das geleerte Feld bleibt leer). Gilt für alle optionalen Benutzer-Auswahlfelder (REQ-FE-011, ADR-0053).
