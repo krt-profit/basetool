@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:45e0ac89-8df9-470c-9703-59e6d3499df4" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:b8da820e-1000-4495-b2a4-3fd902e70149" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-07-19T10:26:21Z</timestamp>
+    <timestamp>2026-07-20T11:50:34Z</timestamp>
     <tools>
       <components>
         <component type="application">
           <author>CycloneDX</author>
           <name>cyclonedx-gradle-plugin</name>
-          <version>3.2.4</version>
+          <version>3.3.0</version>
         </component>
       </components>
     </tools>
@@ -19,7 +19,7 @@
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-profit/basetool/actions/runs/29683306572</url>
+          <url>https://github.com/krt-profit/basetool/actions/runs/29739915992</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-profit/basetool</url>
@@ -326,8 +326,7 @@
       <group>com.fasterxml.jackson</group>
       <name>jackson-bom</name>
       <version>2.21.4</version>
-      <description>Bill of Materials pom for getting full, complete set of compatible versions
-of Jackson components maintained by FasterXML.com</description>
+      <description>Bill of Materials pom for getting full, complete set of compatible versions of Jackson components maintained by FasterXML.com</description>
       <licenses>
         <license>
           <id>Apache-2.0</id>
@@ -352,8 +351,7 @@ of Jackson components maintained by FasterXML.com</description>
       <group>com.fasterxml</group>
       <name>classmate</name>
       <version>1.7.3</version>
-      <description>Library for introspecting types with full generic information
-        including resolving of field and method types.</description>
+      <description>Library for introspecting types with full generic information including resolving of field and method types.</description>
       <hashes>
         <hash alg="MD5">d1a4a85ab782827adfa82772e3b5f483</hash>
         <hash alg="SHA-1">f61c7e7b81e9249b0f6a05914eff9d54fb09f4a0</hash>
@@ -475,8 +473,7 @@ of Jackson components maintained by FasterXML.com</description>
       <group>com.nimbusds</group>
       <name>nimbus-jose-jwt</name>
       <version>10.9</version>
-      <description>Java library for Javascript Object Signing and Encryption (JOSE) and
-        JSON Web Tokens (JWT)</description>
+      <description>Java library for Javascript Object Signing and Encryption (JOSE) and JSON Web Tokens (JWT)</description>
       <hashes>
         <hash alg="MD5">5982206678d76d60ec3744d907de7f31</hash>
         <hash alg="SHA-1">59fa8df26e59665566d9795036e005d149d1fcf3</hash>
@@ -680,8 +677,7 @@ of Jackson components maintained by FasterXML.com</description>
       <group>commons-logging</group>
       <name>commons-logging</name>
       <version>1.3.6</version>
-      <description>Apache Commons Logging is a thin adapter allowing configurable bridging to other,
-    well-known logging systems.</description>
+      <description>Apache Commons Logging is a thin adapter allowing configurable bridging to other, well-known logging systems.</description>
       <hashes>
         <hash alg="MD5">fe0ccbe8971fed954a0ad6528fe3ef24</hash>
         <hash alg="SHA-1">63e78ca6cd446c0ad166d14f03ed99e7efb3896d</hash>
@@ -720,9 +716,7 @@ of Jackson components maintained by FasterXML.com</description>
       <group>io.lettuce</group>
       <name>lettuce-core</name>
       <version>7.5.2.RELEASE</version>
-      <description>Advanced and thread-safe Java Redis client for synchronous, asynchronous,
-        and reactive usage. Supports Cluster, Sentinel, Pipelining, Auto-Reconnect, Codecs
-        and much more.</description>
+      <description>Advanced and thread-safe Java Redis client for synchronous, asynchronous, and reactive usage. Supports Cluster, Sentinel, Pipelining, Auto-Reconnect, Codecs and much more.</description>
       <hashes>
         <hash alg="MD5">999cbc66cdc995d0cdebe8e5e204190d</hash>
         <hash alg="SHA-1">e67339dc0eb3ceac40fad8213cc2750b7944bb75</hash>
@@ -1118,9 +1112,7 @@ of Jackson components maintained by FasterXML.com</description>
       <group>io.netty</group>
       <name>netty-codec-http3</name>
       <version>4.2.15.Final</version>
-      <description>Netty is an asynchronous event-driven network application framework for
-    rapid development of maintainable high performance protocol servers and
-    clients.</description>
+      <description>Netty is an asynchronous event-driven network application framework for rapid development of maintainable high performance protocol servers and clients.</description>
       <hashes>
         <hash alg="MD5">6f2f98bd4e1d83ae22188d27faac082f</hash>
         <hash alg="SHA-1">39c3e24013ecb21832aebb36609de45c5cb111cd</hash>
@@ -2531,8 +2523,7 @@ of Jackson components maintained by FasterXML.com</description>
       <group>net.bytebuddy</group>
       <name>byte-buddy</name>
       <version>1.18.10</version>
-      <description>Byte Buddy is a Java library for creating Java classes at run time.
-        This artifact is a build of Byte Buddy with all ASM dependencies repackaged into its own name space.</description>
+      <description>Byte Buddy is a Java library for creating Java classes at run time. This artifact is a build of Byte Buddy with all ASM dependencies repackaged into its own name space.</description>
       <hashes>
         <hash alg="MD5">058f205c90d1563d2cb90d9e3567cef8</hash>
         <hash alg="SHA-1">5b34812ced047973a6d42654d50c3b69124ce587</hash>
@@ -2620,15 +2611,7 @@ of Jackson components maintained by FasterXML.com</description>
       <group>org.apache.commons</group>
       <name>commons-lang3</name>
       <version>3.20.0</version>
-      <description>Apache Commons Lang, a package of Java utility classes for the
-  classes that are in java.lang's hierarchy, or are considered to be so
-  standard as to justify existence in java.lang.
-
-  The code is tested using the latest revision of the JDK for supported
-  LTS releases: 8, 11, 17, 21 and 25 currently.
-  See https://github.com/apache/commons-lang/blob/master/.github/workflows/maven.yml
-  
-  Please ensure your build environment is up-to-date and kindly report any build issues.</description>
+      <description>Apache Commons Lang, a package of Java utility classes for the classes that are in java.lang's hierarchy, or are considered to be so standard as to justify existence in java.lang. The code is tested using the latest revision of the JDK for supported LTS releases: 8, 11, 17, 21 and 25 currently. See https://github.com/apache/commons-lang/blob/master/.github/workflows/maven.yml Please ensure your build environment is up-to-date and kindly report any build issues.</description>
       <hashes>
         <hash alg="MD5">4b29562ded527aa074e1d44f8646dac5</hash>
         <hash alg="SHA-1">65897b3e5731220962e659e001904af3c3cbeba9</hash>
@@ -2666,10 +2649,7 @@ of Jackson components maintained by FasterXML.com</description>
       <group>org.apache.logging.log4j</group>
       <name>log4j-api</name>
       <version>2.25.4</version>
-      <description>The logging API of the Log4j project.
-    Library and application code can log through this API.
-    It contains a simple built-in implementation (`SimpleLogger`) for trivial use cases.
-    Production applications are recommended to use Log4j API in combination with a fully-fledged implementation, such as Log4j Core.</description>
+      <description>The logging API of the Log4j project. Library and application code can log through this API. It contains a simple built-in implementation (`SimpleLogger`) for trivial use cases. Production applications are recommended to use Log4j API in combination with a fully-fledged implementation, such as Log4j Core.</description>
       <hashes>
         <hash alg="MD5">5efb17ae45b749c1fbfedb3d93375cfc</hash>
         <hash alg="SHA-1">89ff2217b193fb187b134aa6ebcbfa8a28b018a9</hash>
@@ -2696,8 +2676,7 @@ of Jackson components maintained by FasterXML.com</description>
       <group>org.apache.logging.log4j</group>
       <name>log4j-to-slf4j</name>
       <version>2.25.4</version>
-      <description>Forwards the Log4j API calls to SLF4J.
-    (Refer to the `log4j-slf4j[2]-impl` artifacts for forwarding SLF4J to the Log4j API.)</description>
+      <description>Forwards the Log4j API calls to SLF4J. (Refer to the `log4j-slf4j[2]-impl` artifacts for forwarding SLF4J to the Log4j API.)</description>
       <hashes>
         <hash alg="MD5">b3d45f5534aa71da607e403ce1519977</hash>
         <hash alg="SHA-1">68df56640a5d245192e91bd2ac89e504b477cc10</hash>
@@ -2720,79 +2699,79 @@ of Jackson components maintained by FasterXML.com</description>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.23?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.24?type=jar">
       <group>org.apache.tomcat.embed</group>
       <name>tomcat-embed-core</name>
-      <version>11.0.23</version>
+      <version>11.0.24</version>
       <description>Core Tomcat implementation</description>
       <hashes>
-        <hash alg="MD5">ce900a488f01b4891de44983d35c9c85</hash>
-        <hash alg="SHA-1">19f68be0972add443a53b68cffe8fefb4d5d467f</hash>
-        <hash alg="SHA-256">53c4038175e4180182a0d27ef777ddafe7289d9a7acc43d367e556b071f03075</hash>
-        <hash alg="SHA-512">dac351d0ac357dc85b8f2ebe8bf69465c394d3048f356f85e4776432126299fd360c55951e138becc6977b525136911e44b2df9eefe4c76fb30579897d0aa11a</hash>
-        <hash alg="SHA-384">72301df524692526acb9d6b1b6c00faf97b934d74a23d18c8dad06882e302b40c022b73061e572d22690df466caec8be</hash>
-        <hash alg="SHA3-384">04d5cbd2e42819af5190ca2b649058bd6f41974a98cecfe3ec0eed322d1b6d947a86ba020c81a34a9e849cea9b75ef9a</hash>
-        <hash alg="SHA3-256">77835fd06b7bc66378603f73936bdfd60260f135f18d70c4d80524e19727994d</hash>
-        <hash alg="SHA3-512">591cfac28c4c1f3236b2db918449f4b9f58fdef4d0730eb8620a14526f87db61e2d4d7a52473c4e406a0cfb11b85bda305314c33c630c92d8f1463fadc39da8e</hash>
+        <hash alg="MD5">87410cbfa90c782419859efb70e1fd91</hash>
+        <hash alg="SHA-1">0172bb449cba1a8ffcffa249727907602a4cc899</hash>
+        <hash alg="SHA-256">e7b966dcaac8c5ffa4f10e44031ebf5b71f2123560c08ac8b7120028615aea08</hash>
+        <hash alg="SHA-512">9b19f196c80c0be933feef4258547dbcf32a8d30dca33f3e69f898c95208b74adfa3dc9cc09dcd59d37e5f669a50f64e6ac04b3f3c32e26c9a2714c11ee33dfd</hash>
+        <hash alg="SHA-384">b94ac5e4a642698c47137dcf986348ab8346995ad764243a51cc26a89a122e5e7dd3098501c87b9d1f903637d90befaf</hash>
+        <hash alg="SHA3-384">8217f63b252e6edd3327569cfb91ab74677417c652bffae1fcdbaa93943ae94fbd262554f03b050bdc8187ba5ea260d1</hash>
+        <hash alg="SHA3-256">345cb2c2445d336719dace681d7dff8f404835570aed8d648c54320629a30804</hash>
+        <hash alg="SHA3-512">e2acf943eb4afe8aa9d9c9a7bba7770e98d974cdd490be153dc279357920b9cc5db109d5917b1c8dc705d1d4a6280c9c6908e44be84f1f81c74d341e4d9826b9</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.23?type=jar</purl>
+      <purl>pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.24?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.23?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.24?type=jar">
       <group>org.apache.tomcat.embed</group>
       <name>tomcat-embed-el</name>
-      <version>11.0.23</version>
+      <version>11.0.24</version>
       <description>Core Tomcat implementation</description>
       <hashes>
-        <hash alg="MD5">c9323a063917170e04dc0c70a3818d78</hash>
-        <hash alg="SHA-1">0c150c217d8f54250882cce29fa02b07db909c3d</hash>
-        <hash alg="SHA-256">bf917bed94ca89a0155a5f448ded801d8c0869eb1622d4b0243059f3ed213120</hash>
-        <hash alg="SHA-512">23293e051ccbe42725b414d30c77a7abca5a6d99fdd342eedc57a79d07352e288543bdb35ed3b711eaa97e70186e91833de0de600c8385ddf33452ca6d37d132</hash>
-        <hash alg="SHA-384">7748f689a23b6b07eaaca632b552fd6c071096c781f9435b4a40946e2552ec33d62a289d6c48de41e8b1428ba9b91137</hash>
-        <hash alg="SHA3-384">310d7f538ae5954861d7fbeb433a33c8c4cfeef897022fae5bc92ac66cc921b737b70ccd3b3bac247fb95d9e813f16cc</hash>
-        <hash alg="SHA3-256">6c63416f016359d996e067de63a04b49fc37389361eea8ce25bc0e09da50311f</hash>
-        <hash alg="SHA3-512">c36abbc6221f82dd2f6f2ebe375b2b0d8e42cfd14497afd764a97b20e81a919f71ad7369ddf9f8a5e07def0911a9069f618a31c4601dbd8bce176abd245e54c2</hash>
+        <hash alg="MD5">cb6b040782afb670264116a994b0bcae</hash>
+        <hash alg="SHA-1">3eafa072a45e67081452e56576ab4fe68b525fb5</hash>
+        <hash alg="SHA-256">ad0546f12dace008aacce18ba13222137760b310ca719e173d3e13021b9af6c6</hash>
+        <hash alg="SHA-512">33488782406e10935a2a755b9627ea70f8a38cb7bf8a6b868a950db7444a746f4dab543ad68e1cab90965171fa98479c23e92f513a9ff782e39e6eaf5704d404</hash>
+        <hash alg="SHA-384">78cd6394e0324841e200ce885b91525f1380597a48cd9496103a6da63f86307d04a222b19e338bf6c1f40c7a2754ee3b</hash>
+        <hash alg="SHA3-384">6189c7b86a23d9cc0c5c87a65231d55589594a71168198924380a24ef7a82d2d1bc2613314361c6805063d5436794763</hash>
+        <hash alg="SHA3-256">44dd5dd480623c36ace04a4d9e2bd62660e8732e4300ca153abf5c1fa5ad6f6e</hash>
+        <hash alg="SHA3-512">fff65e91a26d1a886c6febdbc124e58db4dfac231de8a424651869a8d6b5f1aadb5f8e81dbbea87873ad6929534233864b8aa0f2c4f753773164a27c24568979</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.23?type=jar</purl>
+      <purl>pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.24?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.23?type=jar">
+    <component type="library" bom-ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.24?type=jar">
       <group>org.apache.tomcat.embed</group>
       <name>tomcat-embed-websocket</name>
-      <version>11.0.23</version>
+      <version>11.0.24</version>
       <description>Core Tomcat implementation</description>
       <hashes>
-        <hash alg="MD5">3b64df466320826bb602c7e1fd8428db</hash>
-        <hash alg="SHA-1">07c393c1d995ab72da3a4254ff5eb3bd24cdf216</hash>
-        <hash alg="SHA-256">ca7a58b288c7ceabb7589f0b27405fddadda61cc087ee45a91e8444d640ec05f</hash>
-        <hash alg="SHA-512">5d7519d98d23bc870f5d961ac8602dd65c4df6b7e1fb7b862fb4319e6e0d1a8ffb9711f5aff2201e5fc5f2f592ebc427273b5c0ba897b0f24cbdbb798faaeb46</hash>
-        <hash alg="SHA-384">7c904316487e38b99e5841e2e83b91835260164154d921504188dd90e112662056fcb0547d7d799796578e210f28f285</hash>
-        <hash alg="SHA3-384">a9a5bcc16e19096b60cf792d72a2f5efd720f87382520df7c74bfaff9709a567206cd69a82ba5157b15e40ed0fe395d0</hash>
-        <hash alg="SHA3-256">56a17b7fc7316987a2491e3e159776934c68c8d8ea838d5c5248c97878e783c7</hash>
-        <hash alg="SHA3-512">3cbc656e6e8d36e077aee7ecb8da74061ece30a3d237e98c7d91e4e48b379214cc83772961da8c31a2b0bf3169c6e536c0e609ed3aaf9de98754bcce5808e3ca</hash>
+        <hash alg="MD5">4276fc81c04ef0458c5111a0726ad22b</hash>
+        <hash alg="SHA-1">8cd43556888f042c90115d54b124a4648f2b413f</hash>
+        <hash alg="SHA-256">825160101f0da4a10e19b5730c2ae2f99f8c2c7a7211ac05562726c5e97ab91e</hash>
+        <hash alg="SHA-512">65a96354d0c437e8ec408cec8d364c8eb6803465c8592dc63456a018e4c1e706389b6765d258fc68ee1d70ac80d73c9c3a91e3bed13ad9694b436919b8913357</hash>
+        <hash alg="SHA-384">45436567644d3d64ae776a1755851262e791472829f277be7f90042689e56c0fa64df5440baa29106638e878bc7ef252</hash>
+        <hash alg="SHA3-384">7c4fa7314f66ff2ec671edb036f159981bcceba4fb260e9f66ff2ab731164b91fdb9b070afa156048fe429bbffbe3bb4</hash>
+        <hash alg="SHA3-256">f9de292b5b4fa629f3480b72fa773329d9b970d99a4864b064573d0505c92bfa</hash>
+        <hash alg="SHA3-512">acbbe65effd0e68cdc09c4b8fd0abf5aa34bead39213958561487574cc3a92fc5a9e2783f4e0a46a494ef24c4b53f5b77f418e0ff47effd7ce1c3e11cf81c8e5</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.23?type=jar</purl>
+      <purl>pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.24?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -2802,8 +2781,7 @@ of Jackson components maintained by FasterXML.com</description>
       <group>org.aspectj</group>
       <name>aspectjweaver</name>
       <version>1.9.25.1</version>
-      <description>The AspectJ weaver applies aspects to Java classes. It can be used as a Java agent in order to apply load-time
-		weaving (LTW) during class-loading and also contains the AspectJ runtime classes.</description>
+      <description>The AspectJ weaver applies aspects to Java classes. It can be used as a Java agent in order to apply load-time weaving (LTW) during class-loading and also contains the AspectJ runtime classes.</description>
       <hashes>
         <hash alg="MD5">7a88f606f52185a15a1527c968f55dfb</hash>
         <hash alg="SHA-1">a713c790da4d794c7dfb542b550d4e44898d5e23</hash>
@@ -3019,12 +2997,7 @@ of Jackson components maintained by FasterXML.com</description>
       <group>org.hdrhistogram</group>
       <name>HdrHistogram</name>
       <version>2.2.2</version>
-      <description>HdrHistogram supports the recording and analyzing sampled data value
-        counts across a configurable integer value range with configurable value
-        precision within the range. Value precision is expressed as the number of
-        significant digits in the value recording, and provides control over value
-        quantization behavior across the value range and the subsequent value
-        resolution at any given level.</description>
+      <description>HdrHistogram supports the recording and analyzing sampled data value counts across a configurable integer value range with configurable value precision within the range. Value precision is expressed as the number of significant digits in the value recording, and provides control over value quantization behavior across the value range and the subsequent value resolution at any given level.</description>
       <hashes>
         <hash alg="MD5">41f807bf0c681d6f692c408a6e217eaf</hash>
         <hash alg="SHA-1">7959933ebcc0f05b2eaa5af0a0c8689fa257b15c</hash>
@@ -6644,7 +6617,7 @@ of Jackson components maintained by FasterXML.com</description>
       <group>redis.clients.authentication</group>
       <name>redis-authx-core</name>
       <version>0.1.1-beta2</version>
-      <description>Redis AuthX Core is the core lib of an extension for Redis Java  Clients to support token-based authentication.</description>
+      <description>Redis AuthX Core is the core lib of an extension for Redis Java Clients to support token-based authentication.</description>
       <hashes>
         <hash alg="MD5">f31eb733d8fb8ee53f186efea30d0357</hash>
         <hash alg="SHA-1">4037345ff29fb22c737bab2ed116a34262718ae5</hash>
@@ -6748,8 +6721,7 @@ of Jackson components maintained by FasterXML.com</description>
       <group>tools.jackson</group>
       <name>jackson-bom</name>
       <version>3.1.4</version>
-      <description>Bill of Materials pom for getting full, complete set of compatible versions
-of Jackson 3.x components maintained by FasterXML.com</description>
+      <description>Bill of Materials pom for getting full, complete set of compatible versions of Jackson 3.x components maintained by FasterXML.com</description>
       <licenses>
         <license>
           <id>Apache-2.0</id>
@@ -7175,10 +7147,10 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.apache.logging.log4j/log4j-api@2.25.4?type=jar"/>
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.23?type=jar"/>
-    <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.23?type=jar"/>
-    <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.23?type=jar">
-      <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.23?type=jar"/>
+    <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.24?type=jar"/>
+    <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.24?type=jar"/>
+    <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.24?type=jar">
+      <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.24?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.aspectj/aspectjweaver@1.9.25.1?type=jar"/>
     <dependency ref="pkg:maven/org.eclipse.angus/angus-activation@2.0.3?type=jar">
@@ -7463,9 +7435,9 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-tomcat-runtime@4.1.0?type=jar">
       <dependency ref="pkg:maven/jakarta.annotation/jakarta.annotation-api@3.0.0?type=jar"/>
-      <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.23?type=jar"/>
-      <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.23?type=jar"/>
-      <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.23?type=jar"/>
+      <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.24?type=jar"/>
+      <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.24?type=jar"/>
+      <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.24?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-tomcat@4.1.0?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-web-server@4.1.0?type=jar"/>
     </dependency>
@@ -7499,7 +7471,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
     </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-tomcat@4.1.0?type=jar">
       <dependency ref="pkg:maven/jakarta.annotation/jakarta.annotation-api@3.0.0?type=jar"/>
-      <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.23?type=jar"/>
+      <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.24?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-web-server@4.1.0?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-transaction@4.1.0?type=jar">
@@ -7508,7 +7480,7 @@ of Jackson 3.x components maintained by FasterXML.com</description>
       <dependency ref="pkg:maven/org.springframework/spring-tx@7.0.8?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-validation@4.1.0?type=jar">
-      <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.23?type=jar"/>
+      <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.24?type=jar"/>
       <dependency ref="pkg:maven/org.hibernate.validator/hibernate-validator@9.1.0.Final?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot@4.1.0?type=jar"/>
     </dependency>

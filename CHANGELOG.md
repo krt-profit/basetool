@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.5](https://github.com/krt-profit/basetool/releases/tag/v1.5.5) - 2026-07-20
+
 ### Changed
 
 - **Datenschutz: Die Datenschutzerklärung wurde auf den aktuellen Stand des Basetools gebracht.** Ergänzt bzw. präzisiert wurden u.a. die Materialbörse (organisationsweite Sichtbarkeit von Angeboten), das persönliche Inventar, Beförderungs-/Bewertungsdaten, Angaben zu nicht registrierten Personen, die technische Ablaufverfolgung (Tracing, 14 Tage) und die Aufbewahrungsfristen (Anwendungsprotokolle 31 Tage, Metriken 180 Tage, Benachrichtigungen 90 Tage) sowie die korrekte Lösch- und Aufbewahrungslogik für Bankbuchungen. Der veraltete Cookie-Hinweis zu `orders_filter_status` entfällt.
