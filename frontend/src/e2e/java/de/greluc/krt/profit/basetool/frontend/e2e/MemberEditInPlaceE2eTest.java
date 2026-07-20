@@ -145,6 +145,43 @@ class MemberEditInPlaceE2eTest {
     }
   }
 
+  /**
+   * Clicks "Zweite Staffel hinzufügen" and asserts the second Staffel slot is actually revealed
+   * (REQ-ORG-017). Regression guard for the class-vs-inline visibility trap (ADR-0093): slot 2
+   * starts hidden through the {@code krtm-hidden} class, so the toggle script must flip that class
+   * — a stale attempt to override it with an inline {@code style.display} left the button vanishing
+   * while the slot stayed hidden.
+   *
+   * <p>{@code test-member} is seeded with no squadron membership, so the add button renders visible
+   * and slot 2 hidden. This is a pure client-side toggle (no backend write), so it mutates nothing.
+   */
+  @Test
+  void revealsSecondStaffelSlotOnAdd() {
+    String baseUrl = STACK.baseUrl();
+    try (BrowserContext context = authedContext()) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, baseUrl + "/members/" + memberUserId + "/edit?source=members");
+        page.waitForLoadState();
+        assertThat(page.locator("#member-edit-form")).isVisible();
+
+        // Precondition: no second Staffel yet → the add button shows, slot 2 is hidden.
+        assertThat(page.locator("#staffel-add-2")).isVisible();
+        assertThat(page.locator("#staffel-slot-2")).isHidden();
+
+        page.locator("#staffel-add-2").click();
+
+        // The fix: the class-based toggle reveals slot 2 and hides the button (before the fix the
+        // button vanished but slot 2 never appeared).
+        assertThat(page.locator("#staffel-slot-2")).isVisible();
+        assertThat(page.locator("#staffel-add-2")).isHidden();
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "member-edit-second-staffel");
+        throw failure;
+      }
+    }
+  }
+
   // ---------------------------------------------------------------------- helpers --
 
   /**
