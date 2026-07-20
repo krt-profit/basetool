@@ -189,9 +189,9 @@ backend change is needed and the order-list endpoint gains no query; the badge r
 **Code:** `templates/orders-index.html`, `JobOrderDto.responsibleOrgUnit`,
 `.order-responsible-label` (`styles.css`), `orders.index.responsible` (i18n) · **Issues:** #1188
 
-### REQ-ORDERS-027 — Overview: collapsible material sublist + multi-squadron filter
+### REQ-ORDERS-027 — Overview: collapsible material sublist + status & squadron filters
 
-Two order-overview affordances, both persisted per-user in the browser's `localStorage` (the same
+Three order-overview affordances, all persisted per-user in the browser's `localStorage` (the same
 client-side persistence the Lager tree uses, REQ-INV-002 — not a server cookie):
 
 **Collapsible material sublist.** Each order row's **Materialien** cell (REQ-ORDERS-017) MUST be
@@ -218,6 +218,17 @@ result). The filter is a pure display preference layered on the caller's visibil
 load the client re-fetches only when the server did not already render the persisted selection (so a
 pagination reload carrying the ids is not clobbered back to page 1).
 
+**Status filter.** The status checkboxes (`OPEN`, `IN_PROGRESS`, `REJECTED`, `COMPLETED`) that
+narrow the queue are persisted in `localStorage` too (key `orders_status_filter`) and re-applied on
+load — they were **formerly persisted in a 30-day server cookie (`orders_filter_status`), which has
+been removed**. Because the queue is paginated server-side (REQ-ORDERS-020), the filter is applied
+**server-side**: the selected statuses are echoed as repeatable `status` query params, validated
+against the known statuses in `JobOrderPageController.viewOrders` for defence-in-depth, and an empty,
+absent or all-invalid selection falls back to the default `OPEN`+`IN_PROGRESS`. On load the client
+re-fetches the results fragment only when the persisted status (or squadron) selection differs from
+what the server already rendered, and both restores share a **single** re-fetch to avoid a double
+swap.
+
 **Acceptance**
 
 - [ ] Each order row's material sublist starts collapsed; toggling it expands/collapses it, and the
@@ -228,9 +239,13 @@ pagination reload carrying the ids is not clobbered back to page 1).
   localStorage across reloads.
 - [ ] The backend list endpoint accepts repeatable `squadronId` params; an empty/absent selection
   applies no squadron narrowing.
+- [ ] The status checkboxes persist in `localStorage` (`orders_status_filter`) across reloads and no
+  `orders_filter_status` cookie is set; an empty/all-invalid selection falls back to
+  `OPEN`+`IN_PROGRESS`.
 
 **Enforced by:** `JobOrderListRenderTest` / `JobOrderPaginationMvcTest` (frontend render + filter
-threading), `JobOrderControllerTest` (`getAllJobOrders_forwardsSquadronIdFilter`),
+threading), `JobOrderPageStatusFilterTest` (status query-param validation + no status cookie),
+`JobOrderControllerTest` (`getAllJobOrders_forwardsSquadronIdFilter`),
 `JobOrderServiceAssigneeAndListTest` / `JobOrderScopeQueryIntegrationTest` (scoped multi-squadron
 query) · **Code:** `templates/orders-index.html`, `static/js/orders-index.js`,
 `JobOrderPageController.viewOrders` / `fetchActiveSquadrons` / `buildPaginationBaseUrl`,

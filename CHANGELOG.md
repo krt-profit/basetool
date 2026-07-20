@@ -6,6 +6,14 @@
 
 - **Discord-Registrierungen: „Verknüpfen" verbindet einen Freigabeantrag mit einem bestehenden Account.** Meldet sich ein Mitglied, das bereits einen Account hat, über Discord an und taucht als neuer Freigabeantrag auf (etwa weil sein Discord-Name vom Basetool-Namen abweicht), kann ein Admin den Antrag jetzt in der Freigabe-Liste per Account-Suche mit dem bestehenden Account verknüpfen, statt einen zweiten Account anzulegen — die Discord-Anmeldung wandert auf den Bestandsaccount und der doppelte Antrag wird entfernt (REQ-SEC-026). Setzt das Keycloak-Recht `manage-users` für das Sync-Service-Konto voraus.
 
+## [v1.5.5](https://github.com/krt-profit/basetool/releases/tag/v1.5.5) - 2026-07-20
+
+### Changed
+
+- **Datenschutz: Die Datenschutzerklärung wurde auf den aktuellen Stand des Basetools gebracht.** Ergänzt bzw. präzisiert wurden u.a. die Materialbörse (organisationsweite Sichtbarkeit von Angeboten), das persönliche Inventar, Beförderungs-/Bewertungsdaten, Angaben zu nicht registrierten Personen, die technische Ablaufverfolgung (Tracing, 14 Tage) und die Aufbewahrungsfristen (Anwendungsprotokolle 31 Tage, Metriken 180 Tage, Benachrichtigungen 90 Tage) sowie die korrekte Lösch- und Aufbewahrungslogik für Bankbuchungen. Der veraltete Cookie-Hinweis zu `orders_filter_status` entfällt.
+
+- **Aufträge: Der Statusfilter der Auftragsübersicht wird jetzt wie der Staffelfilter im Browser (localStorage) statt in einem Cookie gespeichert.** Das 30-Tage-Cookie `orders_filter_status` entfällt ersatzlos; die zuletzt gewählten Status werden clientseitig gemerkt und serverseitig angewandt (REQ-ORDERS-027).
+
 ### Fixed
 
 - **Discord-Registrierungen: Der Server-Nickname wird jetzt auch angezeigt, wenn ein Mitglied keinen eigenen Server-Nickname gesetzt hat.** Bisher blieb die Spalte leer, sobald ein Mitglied im Server unter seinem globalen Anzeigenamen auftritt (ohne separaten Server-Nickname); erfasst wird nun der im Server angezeigte Name (Server-Nickname, sonst globaler Anzeigename), damit ein Admin den Antrag einer Person zuordnen kann (REQ-DATA-008).

@@ -310,10 +310,10 @@ function restoreSquadronFilter() {
     const saved = readSquadronFilter();
     if (saved === null) {
         updateSquadronHeaderText();
-        return;
+        return false;
     }
     const boxes = squadronBoxes();
-    if (boxes.length === 0) return;
+    if (boxes.length === 0) return false;
     const serverChecked = boxes
         .filter((b) => b.checked)
         .map((b) => b.value)
@@ -329,9 +329,71 @@ function restoreSquadronFilter() {
     const allBox = document.getElementById('sqAll');
     if (allBox) allBox.checked = boxes.every((b) => b.checked);
     updateSquadronHeaderText();
-    const differs =
-        serverChecked.length !== savedSel.length || serverChecked.some((v, i) => v !== savedSel[i]);
-    if (differs) applyOrdersFilter();
+    return (
+        serverChecked.length !== savedSel.length || serverChecked.some((v, i) => v !== savedSel[i])
+    );
+}
+
+// ---- Status filter (default OPEN+IN_PROGRESS, localStorage-persisted, REQ-ORDERS-027) -----------
+// The status checkboxes were formerly persisted in a server cookie (orders_filter_status); they now
+// use the same per-browser localStorage + query-param echo as the squadron filter, so no cookie is
+// set. Absence of the key means "no saved preference" (leave the server default = OPEN+IN_PROGRESS).
+const ORDERS_STATUS_FILTER_KEY = 'orders_status_filter';
+
+function statusBoxes() {
+    return Array.prototype.slice.call(
+        document.querySelectorAll('#orders-filter-form input[name="status"]'),
+    );
+}
+
+function readStatusFilter() {
+    try {
+        const raw = localStorage.getItem(ORDERS_STATUS_FILTER_KEY);
+        return raw === null ? null : JSON.parse(raw);
+    } catch (_e) {
+        return null;
+    }
+}
+
+function writeStatusFilter(values) {
+    try {
+        localStorage.setItem(ORDERS_STATUS_FILTER_KEY, JSON.stringify(values));
+    } catch (_e) {
+        /* quota / private mode: skip persistence */
+    }
+}
+
+function persistStatusFilter() {
+    writeStatusFilter(
+        statusBoxes()
+            .filter((b) => b.checked)
+            .map((b) => b.value),
+    );
+}
+
+// Apply the persisted status selection on load. Returns whether it differs from what the server
+// already rendered, so the caller can trigger a single results re-fetch. An empty saved selection is
+// ignored (treated as "no preference"), mirroring the former cookie's empty->default behaviour.
+function restoreStatusFilter() {
+    const saved = readStatusFilter();
+    if (saved === null || saved.length === 0) return false;
+    const boxes = statusBoxes();
+    if (boxes.length === 0) return false;
+    const serverChecked = boxes
+        .filter((b) => b.checked)
+        .map((b) => b.value)
+        .sort();
+    const savedSet = {};
+    saved.forEach((s) => {
+        savedSet[s] = true;
+    });
+    boxes.forEach((b) => {
+        b.checked = savedSet[b.value] === true;
+    });
+    const savedSel = saved.slice().sort();
+    return (
+        serverChecked.length !== savedSel.length || serverChecked.some((v, i) => v !== savedSel[i])
+    );
 }
 
 // Document-delegated so the toggles survive the queue's fragment swaps.
@@ -354,12 +416,16 @@ document.addEventListener('click', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
     colorOrderAges(document);
     restoreOrderMaterials(document);
-    restoreSquadronFilter();
+    // Restore both persisted filters (status + squadron), then re-fetch the results fragment once if
+    // either differs from what the server rendered — avoids a double swap when both were customised.
+    const statusDiffers = restoreStatusFilter();
+    const squadronDiffers = restoreSquadronFilter();
+    if ((statusDiffers || squadronDiffers) && window.krtFetch) applyOrdersFilter();
 
     // In-place status + squadron filter (epic #571 / #573). The form id was renamed off the generic
     // "filter-form" so the sidebar's generic change->submit auto-reload no longer fires here. The
     // squadron checkboxes are handled by the delegated handlers above (they also persist + re-fetch);
-    // only the status inputs bind directly here.
+    // only the status inputs bind directly here (persisting to localStorage on change).
     const filterForm = document.getElementById('orders-filter-form');
     if (filterForm && window.krtFetch) {
         filterForm.addEventListener('submit', (event) => {
@@ -367,7 +433,10 @@ document.addEventListener('DOMContentLoaded', () => {
             applyOrdersFilter();
         });
         filterForm.querySelectorAll('input[name="status"]').forEach((el) => {
-            el.addEventListener('change', applyOrdersFilter);
+            el.addEventListener('change', () => {
+                persistStatusFilter();
+                applyOrdersFilter();
+            });
         });
     }
 });
