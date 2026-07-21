@@ -810,7 +810,8 @@ next free number.)
 
 Every public proxy host behind nginx-proxy-manager carries a **version-controlled** per-IP safety
 net at the edge: `limit_req` (20 r/s sustained, burst 80, `nodelay`) and `limit_conn` (500
-concurrent connections) keyed on `$binary_remote_addr`, delivered through the custom snippets the
+concurrent connections) keyed on the real client IP (`$krt_limit_key`: the full IPv4 address, or an
+IPv6 client's `/64` network prefix), delivered through the custom snippets the
 repo already injects into NPM (`docker/maintenance/nginx/http.conf` defines the zones,
 `server_proxy.conf` applies them in every proxy host's `server` block). The values are
 flood/brute-force **ceilings**, not fairness limits — a legitimate worst-case page load fits
@@ -832,12 +833,17 @@ and `/ws/sync` (WebSocket) connections crossed 60, the edge 429'd legitimate use
 degraded into the maintenance page). ADR-0112 made `net-proxy-frontend` dual-stack (`fd00:28:3::/64`)
 so the kernel DNAT preserves the client IPv6 for **this host** (`profit-base.online`); real v4 and v6
 client addresses now reach nginx, so the per-IP limit is meaningful again and `limit_conn` was
-tightened from the 10000 stopgap to **500** concurrent connections per client. Two residual notes:
-the other proxy hosts (keycloak/ingest/grafana) are still IPv4-only, so IPv6 clients to those still
-key on the bridge gateway — harmless, their concurrent-connection load stays far under 500; and IPv6
-is keyed on the full `/128`, so a `/64` collapse (per-subscriber, anti address-rotation) via an
-`http.conf` map remains an optional follow-up. Do **not** disable userland-proxy: it deletes the only
-IPv6 datapath.
+tightened from the 10000 stopgap to **500** concurrent connections per client. Two follow-ups have
+since landed. **(1) IPv6 is keyed on its `/64`.** `http.conf` maps the limiter key to
+`$krt_limit_key` — the full IPv4 address, or an IPv6 client's `/64` network prefix — so a
+subscriber's rotating SLAAC privacy addresses (which vary only in the low 64 bits) share one bucket
+instead of each minting a fresh one and diluting the cap. **(2) The other proxy hosts need no IPv6
+subnet.** There is a single public `:443` ingress: the published-port DNAT targets NPM's dual-stack
+leg on `net-proxy-frontend` (`[fd00:28:3::2]` / `172.28.3.2`) and NPM selects the vhost by SNI only
+after accepting the connection, so keycloak/ingest/grafana already key on the real client IP too. The
+bridge-gateway addresses that dominate those hosts' logs are internal hairpin traffic (blackbox
+probes + the apps' OIDC hairpins to `keycloak.profit-base.online`), not masked external clients
+(verified 2026-07-20). Do **not** disable userland-proxy: it deletes the only IPv6 datapath.
 
 Stricter per-endpoint limits (e.g. the Keycloak login/token paths) may reference the same zones
 from a proxy host's Advanced tab in the NPM UI; that is unversioned host state and out of this
@@ -847,8 +853,8 @@ unchanged and remains the precise, per-subject layer behind this coarse edge net
 **Acceptance**
 
 - [ ] A burst above rate+burst from one client IP receives 429 responses (not the maintenance page,
-  not 503) while other client IPs are unaffected (real per-client IPs on `profit-base.online` via
-  ADR-0112).
+  not 503) while other client IPs are unaffected (real per-client IPs on every vhost via the shared
+  `net-proxy-frontend` v6 ingress, ADR-0112; IPv6 keyed on the `/64`).
 - [ ] Legitimate concurrency (many members each holding the mission page's SSE + WebSocket) does not
   exhaust the 500 per-IP `limit_conn` and is never 429'd.
 - [ ] A normal page load (asset fan-out within the burst) is never limited.
