@@ -1,6 +1,6 @@
 # ADR-0112 — Restore the real client IP at the NPM edge via native IPv6 on the proxy bridge
 
-- **Status:** Accepted — deployed 2026-07-20 (dual-stack `net-proxy-frontend`, `fd00:28:3::/64`; real client IPv6 verified in the NPM access log); `limit_conn` retightened 10000 → 500/IP in a follow-up
+- **Status:** Accepted — deployed 2026-07-20 (dual-stack `net-proxy-frontend`, `fd00:28:3::/64`; real client IPv6 verified in the NPM access log). Follow-ups landed: `limit_conn` retightened 10000 → 500/IP, and the `http.conf` `/64` limiter-key collapse. Verified non-issue: keycloak/ingest/grafana need no IPv6 subnet — all vhosts share the single `net-proxy-frontend` `:443` ingress (see Consequences)
 - **Date:** 2026-07-20
 - **Deciders:** @greluc
 - **Related:** spec [REQ-SEC-023](../specs/security-and-access.md) · [ADR-0049](0049-config-as-promotable-oci-artifact.md) (config as a promotable OCI artifact) · runbook [`docs/deployment.md`](../deployment.md) → *Edge rate limiting* · the 2026-07-20 edge-rate-limit incident (PR #1382)
@@ -83,6 +83,21 @@ still-shared gateway key.
 - If the maintenance window cannot be scheduled promptly, dropping the host's AAAA record routes
   live traffic onto the already-correct IPv4 path (real IPs, at the cost of IPv6-only clients) as a
   zero-touch interim until this lands.
+- **The other proxy hosts (keycloak/ingest/grafana) need no IPv6 subnet of their own.** There is a
+  single public `:443` ingress: the published-port DNAT targets NPM's dual-stack leg on
+  `net-proxy-frontend` (`[fd00:28:3::2]` for v6, `172.28.3.2` for v4) and NPM selects the vhost by
+  SNI only *after* accepting the connection, so every vhost already keys `limit_conn` / `limit_req`
+  on the real client IP. The bridge-gateway addresses (`172.28.3.1` / `fd00:28:3::1`) that dominate
+  those hosts' access logs are internal hairpin traffic — the blackbox-exporter health probes and
+  the apps' own OIDC hairpins to `keycloak.profit-base.online` (ReactorNetty / Java) SNAT'd to the
+  gateway — not masked external clients. Dual-stacking those bridges would neither help them nor be
+  free: each is a pinned-subnet clean-slate recreate, and a second v6-capable bridge would make the
+  single published-port v6 DNAT target non-deterministic. Verified 2026-07-20 in the NPM per-vhost
+  access logs, so the earlier "other hosts still key on the gateway" residual note is retired.
+- The IPv6 limiter key is collapsed to the client's `/64` via an `http.conf` `map` (`$krt_limit_key`;
+  IPv4 keeps its full address), so a subscriber's rotating SLAAC privacy addresses (RFC 4941, which
+  vary only in the low 64 bits) share one bucket rather than each minting a fresh one and diluting
+  the per-IP cap.
 
 ## Alternatives considered
 

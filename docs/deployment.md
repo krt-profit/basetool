@@ -707,7 +707,8 @@ The same two custom snippets carry a version-controlled per-IP safety net
 (REQ-SEC-023) that applies to **every** proxy host:
 
 - `docker/maintenance/nginx/http.conf` defines the shared-memory zones
-  (`krt_req_perip`, `krt_conn_perip`, keyed on `$binary_remote_addr`).
+  (`krt_req_perip`, `krt_conn_perip`) and the `$krt_limit_key` map: the limiter
+  keys on the full IPv4 address, or an IPv6 client's `/64` network prefix.
 - `docker/maintenance/nginx/server_proxy.conf` applies them in each proxy
   host's `server { }` block: **20 r/s** sustained with **burst 80** (`nodelay`)
   and at most **500 concurrent connections** per client IP.
@@ -722,14 +723,16 @@ per-host access logs (and via `limit_req_log_level warn` in the error log), so
 a sustained flood raises the `EdgeRateLimitSpike` Loki alert.
 
 > **Note — real client IP restored (ADR-0112).** The IPv6-specific masking is
-> fixed on `profit-base.online`: `net-proxy-frontend` is now dual-stack
-> (`fd00:28:3::/64`) so the kernel `ip6tables` DNAT preserves the client IPv6, and
-> both v4 and v6 clients reach nginx directly. `limit_conn` is therefore tightened
-> from the 10000 stopgap to **500** per client. Residual: the other proxy hosts
-> (keycloak/ingest/grafana) are still IPv4-only (IPv6 clients there still key on the
-> bridge gateway, but stay far under 500), and IPv6 is keyed on the full `/128`
-> (a `/64` collapse is an optional follow-up). Do **not** disable userland-proxy.
-> See REQ-SEC-023 / ADR-0112.
+> fixed for every vhost: `net-proxy-frontend` is dual-stack (`fd00:28:3::/64`) so
+> the kernel `ip6tables` DNAT preserves the client IPv6, and — because all vhosts
+> share the one published `:443` ingress on NPM's `net-proxy-frontend` leg — both
+> v4 and v6 clients reach nginx with their real IP on keycloak/ingest/grafana too,
+> not just `profit-base.online`. `limit_conn` is tightened from the 10000 stopgap
+> to **500** per client, and IPv6 is keyed on its `/64` (the `$krt_limit_key` map).
+> The bridge-gateway addresses (`172.28.3.1` / `fd00:28:3::1`) that dominate those
+> hosts' logs are internal hairpin traffic (blackbox probes + OIDC hairpins), not
+> masked external clients — so those bridges need no IPv6 subnet. Do **not**
+> disable userland-proxy. See REQ-SEC-023 / ADR-0112.
 
 Stricter per-endpoint limits (e.g. on the Keycloak token/login paths) remain
 possible per proxy host in the NPM UI's Advanced tab, referencing the same
