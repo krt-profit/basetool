@@ -401,9 +401,15 @@ class JobOrderHandoverReportServiceTest {
         extractAllText(
             service.generateHandoverReport(jobOrderId, handoverId, ZoneId.of("Europe/Berlin")));
 
-    // Then
-    assertTrue(text.contains("12:30"), "Time must be shifted to Europe/Berlin CEST (12:30)");
-    assertFalse(text.contains("10:30"), "UTC 10:30 must NOT appear when zone is Europe/Berlin");
+    // Then – anchor on the "(Lokalzeit)" suffix of the handover-time meta cell so the assertion
+    // targets the handover time itself and can never collide with the footer's UTC generation
+    // timestamp (rendered as "... HH:mm UTC" via Instant.now()), which would otherwise flake
+    // whenever CI happens to run at 10:30 UTC.
+    assertTrue(
+        text.contains("12:30 (Lokalzeit)"), "Time must be shifted to Europe/Berlin CEST (12:30)");
+    assertFalse(
+        text.contains("10:30 (Lokalzeit)"),
+        "UTC 10:30 must NOT appear as the handover time when zone is Europe/Berlin");
   }
 
   @Test
