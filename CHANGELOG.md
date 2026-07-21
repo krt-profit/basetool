@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Materialbörse: Mitglieder können jetzt Gesuche einstellen, nicht nur Angebote.** Neben „Alle Angebote"/„Meine Angebote" gibt es jetzt die Tabs „Alle Gesuche"/„Meine Gesuche"; die Buttons wechseln je nach Ansicht zwischen „Material anbieten"/„Item anbieten" und „Material suchen"/„Item suchen". Ein Gesuch nennt ein Material oder craftbares Item, eine Markdown-Beschreibung, optional eine Mindestqualität und die gewünschte Menge (SCU oder Stück); andere Mitglieder signalisieren „Ich kann liefern" und der Suchende wird benachrichtigt — Standort und Lieferantennamen bleiben wie bei Angeboten privat bzw. nur für den Suchenden sichtbar (REQ-MARKET-015…020, ADR-0116).
+
 ### Changed
 
 - **Edge-Rate-Limiting: Verbindungslimit wieder eng pro Client (500/IP).** Nachdem das Frontend-Netz per ADR-0112 auf natives IPv6 umgestellt wurde und die echte Client-IP (v4 und v6) am Reverse-Proxy ankommt, wurde das gleichzeitige Verbindungslimit von der Sofortmaßnahme 10000 auf 500 pro Client gesenkt — großzügig für echte Nutzer (mehrere Tabs mit SSE/WebSocket), aber wieder eine wirksame Obergrenze gegen Fluten (REQ-SEC-023, ADR-0112).

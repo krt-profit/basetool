@@ -99,5 +99,15 @@ public enum NotificationType {
    * because the notification is delivered only to the owner (REQ-MARKET-006 anonymity is
    * owner-only).
    */
-  MATERIAL_EXCHANGE_INTEREST_REGISTERED
+  MATERIAL_EXCHANGE_INTEREST_REGISTERED,
+
+  /**
+   * A member signalled they can supply a Materialbörse request (Gesuch) — "Ich kann liefern"
+   * (REQ-MARKET-020). The seeded default rule notifies the request's owner (the Suchende); the
+   * frontend renders it under {@code notifications.type.MATERIAL_REQUEST_FULFILLMENT_SIGNALLED}
+   * with the {@code lieferant} and {@code material} render parameters. Disclosing the supplier's
+   * name to the owner is permitted because the notification is delivered only to the owner
+   * (REQ-MARKET-019 anonymity is owner-only).
+   */
+  MATERIAL_REQUEST_FULFILLMENT_SIGNALLED
 }

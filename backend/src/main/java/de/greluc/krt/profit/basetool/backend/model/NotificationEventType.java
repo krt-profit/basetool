@@ -78,5 +78,12 @@ public enum NotificationEventType {
    * A member registered interest in a Materialbörse offer (#1187, REQ-MARKET-011). The default rule
    * notifies the offer's owner (the Anbieter) via the {@code EVENT_RECIPIENT} selector.
    */
-  MATERIAL_EXCHANGE_INTEREST_REGISTERED
+  MATERIAL_EXCHANGE_INTEREST_REGISTERED,
+
+  /**
+   * A member signalled they can supply a Materialbörse request (Gesuch) — "Ich kann liefern"
+   * (REQ-MARKET-020). The default rule notifies the request's owner (the Suchende) via the {@code
+   * EVENT_RECIPIENT} selector.
+   */
+  MATERIAL_REQUEST_FULFILLMENT_SIGNALLED
 }

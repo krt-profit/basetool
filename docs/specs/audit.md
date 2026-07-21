@@ -107,7 +107,14 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   details payload carries only bounded facts — the offer `kind`, plus for a material offer the item id
   / quality / **offered amount** (and the item's current stock on release) / re-release flag and for an
   item offer the blueprint `product` key / `qty`, and always the remark **length** — **never** the
-  remark body, the anbieter/interessent handle, or the item's location.
+  remark body, the anbieter/interessent handle, or the item's location. **Requests (Gesuche)** on the
+  same board (REQ-MARKET-015…020) add five sibling event types under the same domain: request post
+  (`MARKET_REQUEST_CREATED`), request edit (`MARKET_REQUEST_UPDATED`), request deactivate
+  (`MARKET_REQUEST_DEACTIVATED`), fulfilment signal (`MARKET_REQUEST_INTEREST_SIGNALLED`) and its
+  withdrawal (`MARKET_REQUEST_INTEREST_WITHDRAWN`), listed in the same Materialbörse viewer tab. Their
+  details carry only bounded facts — the request `kind`, the material id or blueprint `product` key,
+  the `minQuality`, the desired `amt` / `qty`, and the description **length** — never the description
+  body, the requester/supplier handle, or any location.
 
 The audit table is **business data, not logging** — the [`observability.md`](observability.md) rule
 (never write names, emails or tokens to the **log stream**) is unaffected and still applies. User

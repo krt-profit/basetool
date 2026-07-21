@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.model.P4kImportJobStatus;
 import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
@@ -60,6 +61,7 @@ class BusinessMetricsCollectorTest {
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private P4kImportJobRepository p4kImportJobRepository;
   @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
+  @Mock private MaterialExchangeRequestRepository materialExchangeRequestRepository;
 
   private SimpleMeterRegistry registry;
   private BusinessMetricsCollector collector;
@@ -77,6 +79,7 @@ class BusinessMetricsCollectorTest {
             refineryOrderRepository,
             p4kImportJobRepository,
             materialExchangeOfferRepository,
+            materialExchangeRequestRepository,
             new TaskMetrics(registry));
     // @PostConstruct is not invoked for a plain unit-constructed bean.
     collector.registerGauges();

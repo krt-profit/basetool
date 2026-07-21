@@ -475,6 +475,23 @@ public enum AuditEventType {
   /** A member withdrew their interest from an offer ("Interesse zurückziehen"). */
   MARKET_INTEREST_WITHDRAWN(AuditDomain.MARKET),
 
+  /**
+   * A wanted-listing (Gesuch) was posted to the Materialbörse (a request became publicly listed).
+   */
+  MARKET_REQUEST_CREATED(AuditDomain.MARKET),
+
+  /** A request's desired quantity / minimum quality / description was edited by its owner. */
+  MARKET_REQUEST_UPDATED(AuditDomain.MARKET),
+
+  /** A request was withdrawn from the board (deactivated) by its owner. */
+  MARKET_REQUEST_DEACTIVATED(AuditDomain.MARKET),
+
+  /** A member signalled they can supply a request ("Ich kann liefern"). */
+  MARKET_REQUEST_INTEREST_SIGNALLED(AuditDomain.MARKET),
+
+  /** A member withdrew their fulfilment signal from a request. */
+  MARKET_REQUEST_INTEREST_WITHDRAWN(AuditDomain.MARKET),
+
   /** The Materialbörse audit log was exported as a PDF or JSON for a period. */
   MARKET_AUDIT_EXPORTED(AuditDomain.MARKET),
 

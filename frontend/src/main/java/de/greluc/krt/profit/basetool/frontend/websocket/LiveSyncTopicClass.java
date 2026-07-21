@@ -209,13 +209,16 @@ public enum LiveSyncTopicClass {
       Roles.MEMBER_AUTHORITIES),
 
   /**
-   * Global Materialbörse board room: the material-exchange trade board (REQ-MARKET-010). A single
-   * global room carrying one opaque {@code board} section key; every peer re-pulls its own {@code
-   * KRT_MEMBER}-gated board fragment, so no board data crosses the socket. No editor-presence dots.
-   * A subscribe is authorized by the socket's authentication alone (no probe path, no capability,
-   * no role gate) — the same "authenticated member" bar the board page itself already carries.
+   * Global Materialbörse board room: the material-exchange trade board (REQ-MARKET-010/018). A
+   * single global room carrying two opaque section keys — {@code board} for the offers (Angebote)
+   * and {@code requests} for the wanted-listings (Gesuche); every peer re-pulls its own {@code
+   * KRT_MEMBER}-gated board fragment for whichever section changed, so no board data crosses the
+   * socket. No editor-presence dots. A subscribe is authorized by the socket's authentication alone
+   * (no probe path, no capability, no role gate) — the same "authenticated member" bar the board
+   * page itself already carries.
    */
-  MATERIALBOARD("materialboard", false, Set.of("board"), false, "materialboard", null, null),
+  MATERIALBOARD(
+      "materialboard", false, Set.of("board", "requests"), false, "materialboard", null, null),
 
   /**
    * Global shared-Lager room for the squadron inventory (the shared {@code /inventory/all} view,

@@ -168,6 +168,13 @@ class DatabaseIndexMigrationTest {
         "status",
         "'OPEN'",
         "'IN_PROGRESS'");
+    // V224 (REQ-MARKET-015, ADR-0116): the Materialbörse wanted-listings (Gesuche) tables — the
+    // status/owner board-filter indexes and the idempotent one-signal-per-(request, user) unique
+    // index on the fulfilment-signal child table.
+    assertIndexExists(jdbc, "material_exchange_request", "idx_material_exchange_request_status");
+    assertIndexExists(jdbc, "material_exchange_request", "idx_material_exchange_request_owner");
+    assertIndexExists(
+        jdbc, "material_exchange_request_interest", "uq_material_exchange_request_interest");
   }
 
   private static void assertIndexExists(JdbcTemplate jdbc, String table, String indexName) {

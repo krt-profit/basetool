@@ -707,18 +707,24 @@ craftable item (one an active blueprint produces), where the member states the q
 REQ-MARKET-012). Reads are gated on `KRT_MEMBER` (authenticated-but-role-less **guests do not see
 it**); every write is **owner-scoped** in `MaterialExchangeService` (not by role). Interessenten
 names are disclosed only to the offer's owner; every other viewer sees only the count. The item's
-location is never exposed to the board (REQ-MARKET-004/006).
+location is never exposed to the board (REQ-MARKET-004/006). The board also carries **requests
+(Gesuche)** — the inverse listing, where a member posts what they *want* (material or craftable item,
+optional min quality, desired quantity) and others signal "Ich kann liefern"; the supplier names stay
+owner-only exactly like the interessenten of an offer (REQ-MARKET-015…020).
 
 | Action                                                                      | Guest | Member     | Log.       | MM         | Officer    | Admin      |
 |:----------------------------------------------------------------------------|:-----:|:-----------|:-----------|:-----------|:-----------|:-----------|
-| View board / offer detail (`hasRole('KRT_MEMBER')`)                         |   ❌   | ✅          | ✅          | ✅          | ✅          | ✅          |
+| View board / offer & request detail (`hasRole('KRT_MEMBER')`)               |   ❌   | ✅          | ✅          | ✅          | ✅          | ✅          |
 | Release own Lager row / edit own remark / deactivate own offer (owner-only) |   ❌   | ✅¹         | ✅¹         | ✅¹         | ✅¹         | ✅¹         |
 | List a craftable item with a stated quantity (own offer)                    |   ❌   | ✅          | ✅          | ✅          | ✅          | ✅          |
 | Register / withdraw interest in a foreign offer                             |   ❌   | ✅          | ✅          | ✅          | ✅          | ✅          |
-| See interessenten names                                                     |   ❌   | owner only | owner only | owner only | owner only | owner only |
+| Post own request / edit / deactivate own request (owner-only)               |   ❌   | ✅¹         | ✅¹         | ✅¹         | ✅¹         | ✅¹         |
+| Signal / withdraw "Ich kann liefern" on a foreign request                   |   ❌   | ✅          | ✅          | ✅          | ✅          | ✅          |
+| See interessenten (offer) / supplier (request) names                        |   ❌   | owner only | owner only | owner only | owner only | owner only |
 
-¹ Only for the caller's **own** offers / own Lager items (enforced in the service, not by role).
-Every Materialbörse mutation is audited under `AuditDomain.MARKET` (see [`docs/specs/audit.md`](docs/specs/audit.md)).
+¹ Only for the caller's **own** offers / requests / own Lager items (enforced in the service, not by
+role). Every Materialbörse mutation — offers and requests — is audited under `AuditDomain.MARKET` (see
+[`docs/specs/audit.md`](docs/specs/audit.md)).
 
 ---
 

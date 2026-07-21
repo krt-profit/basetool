@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="de">
+<body>
+<!--
+  Materialbörse Gesuche create / edit modal (REQ-MARKET-015/016). Included on the Materialbörse
+  board page. The logic lives in materialgesuch-modal.js (window.krtMaterialRequest); strings come
+  from window.materialgesuchI18n (bootstrapped below, merged so the host page can add its own).
+  Unlike the offer modal there is no backing Lager row: the material/item is chosen from the
+  catalogue, the desired quantity is a free number, and an optional minimum quality applies to both
+  kinds.
+-->
+<th:block th:fragment="requestModal">
+    <div id="mg-modal" class="krt-modal-overlay">
+        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true"
+             aria-labelledby="mg-modal-title" data-mg-modal>
+            <div class="krt-modal-head">
+                <h2 id="mg-modal-title" data-mg-modal-title
+                    th:text="#{materialgesuch.modal.request.title}">Material suchen</h2>
+                <button type="button" class="btn btn-ghost btn-icon" data-mg-modal-close
+                        th:aria-label="#{materialboerse.modal.close}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg>
+                </button>
+            </div>
+            <div class="krt-modal-body">
+                <div class="mb-modal-picker" data-mg-picker hidden>
+                    <!-- Material/Item kind radio: switches between the material-catalogue combobox and
+                         the blueprint-product combobox (a request has no Lager row). -->
+                    <div class="mb-modal-kind" data-mg-kind role="radiogroup"
+                         th:aria-label="#{materialgesuch.modal.kind.label}">
+                        <label class="mb-modal-kind__opt">
+                            <input type="radio" name="mg-request-kind" value="MATERIAL"
+                                   data-mg-kind-radio checked/>
+                            <span th:text="#{materialboerse.modal.kind.material}">Material</span>
+                        </label>
+                        <label class="mb-modal-kind__opt">
+                            <input type="radio" name="mg-request-kind" value="ITEM" data-mg-kind-radio/>
+                            <span th:text="#{materialboerse.modal.kind.item}">Item</span>
+                        </label>
+                    </div>
+                    <div data-mg-material-block>
+                        <label class="form-label-sm" th:text="#{materialgesuch.modal.material.label}">Material</label>
+                        <div class="krt-combobox" data-mg-combobox>
+                            <input class="krt-combobox__input" type="text" data-mg-picker-input autocomplete="off"
+                                   th:placeholder="#{materialgesuch.modal.material.placeholder}"/>
+                            <ul class="krt-combobox__listbox" role="listbox" data-mg-picker-list hidden></ul>
+                        </div>
+                    </div>
+                    <div data-mg-item-block hidden>
+                        <label class="form-label-sm" th:text="#{materialgesuch.modal.item.label}">Item</label>
+                        <div class="krt-combobox" data-mg-item-combobox>
+                            <input class="krt-combobox__input" type="text" data-mg-item-picker-input autocomplete="off"
+                                   th:placeholder="#{materialgesuch.modal.item.placeholder}"/>
+                            <ul class="krt-combobox__listbox" role="listbox" data-mg-item-picker-list hidden></ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="facts-bar mb-modal-facts" data-mg-subject-facts hidden>
+                    <span><span class="fact-k" th:text="#{materialgesuch.modal.subject.label}">Gesucht</span><span class="fact-v" data-mg-fact-subject>—</span></span>
+                </div>
+                <div class="mb-modal-qty" data-mg-quality-block>
+                    <label class="form-label-sm" for="mg-min-quality" th:text="#{materialgesuch.modal.minQuality.label}">Mindestqualität (optional)</label>
+                    <input id="mg-min-quality" type="number" min="0" max="1000" step="10" inputmode="numeric"
+                           data-mg-min-quality th:placeholder="#{materialgesuch.modal.minQuality.placeholder}"/>
+                    <span class="mb-modal-qty-error" data-mg-quality-error hidden th:text="#{materialgesuch.modal.minQuality.invalid}">Bitte eine Qualität zwischen 0 und 1000 angeben.</span>
+                </div>
+                <div class="mb-modal-qty" data-mg-qty-block>
+                    <label class="form-label-sm" for="mg-qty">
+                        <span th:text="#{materialgesuch.modal.quantity.label}">Menge</span>
+                        <span class="mb-modal-qty-unit" data-mg-qty-unit th:text="#{material.quantity.scu}">SCU</span>
+                    </label>
+                    <input id="mg-qty" type="number" min="0" step="0.001" inputmode="decimal" data-mg-qty
+                           th:placeholder="#{materialgesuch.modal.quantity.placeholder}"/>
+                    <span class="mb-modal-qty-error" data-mg-qty-error hidden th:text="#{materialgesuch.modal.quantity.invalid}">Bitte eine Menge größer als 0 angeben.</span>
+                </div>
+                <label class="form-label-sm mb-modal-remark-label" for="mg-remark">
+                    <span th:text="#{materialgesuch.modal.remark.label}">Beschreibung</span>
+                    <span class="mb-modal-remark-hint" th:text="#{materialgesuch.modal.remark.hint}">— was bietest du im Gegenzug? (Markdown, max. 20.000 Zeichen)</span>
+                </label>
+                <textarea id="mg-remark" data-mg-remark rows="8" maxlength="20000"
+                          th:placeholder="#{materialgesuch.modal.remark.placeholder}"></textarea>
+                <div class="mb-modal-footnote">
+                    <span class="mb-modal-privacy">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg>
+                        <span th:text="#{materialgesuch.modal.privacy.note}">Standort/Übergabeort bleiben privat.</span>
+                    </span>
+                    <span data-mg-charcount>0 / 20.000</span>
+                </div>
+            </div>
+            <div class="krt-modal-foot">
+                <button type="button" class="btn btn-ghost" data-mg-modal-close th:text="#{materialboerse.modal.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn--cta" data-mg-modal-submit>
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-check"/></svg>
+                    <span data-mg-submit-label th:text="#{materialgesuch.modal.submit.create}">Veröffentlichen</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    <script th:inline="javascript" th:attr="nonce=${cspNonce}">
+        window.materialgesuchI18n = Object.assign(window.materialgesuchI18n || {}, {
+            requestTitle: /*[[#{materialgesuch.modal.request.title}]]*/ 'Material suchen',
+            itemRequestTitle: /*[[#{materialgesuch.modal.itemRequest.title}]]*/ 'Item suchen',
+            editTitle: /*[[#{materialgesuch.modal.edit.title}]]*/ 'Gesuch bearbeiten',
+            submitCreate: /*[[#{materialgesuch.modal.submit.create}]]*/ 'Veröffentlichen',
+            submitSave: /*[[#{materialgesuch.modal.submit.save}]]*/ 'Speichern',
+            created: /*[[#{materialgesuch.toast.created}]]*/ 'Gesuch veröffentlicht.',
+            updated: /*[[#{materialgesuch.toast.updated}]]*/ 'Gesuch aktualisiert.',
+            error: /*[[#{notification.error.save}]]*/ 'Fehler.',
+            charCounter: /*[[#{materialboerse.modal.remark.counter}]]*/ '{0} / 20.000',
+            materialPickerEmpty: /*[[#{materialgesuch.modal.material.empty}]]*/ 'Keine Materialien gefunden.',
+            itemPickerEmpty: /*[[#{materialgesuch.modal.item.empty}]]*/ 'Keine craftbaren Items gefunden.',
+            subjectRequired: /*[[#{materialgesuch.modal.subject.required}]]*/ 'Bitte ein Material oder Item wählen.',
+            quantityInvalid: /*[[#{materialgesuch.modal.quantity.invalid}]]*/ 'Bitte eine Menge größer als 0 angeben.',
+            minQualityInvalid: /*[[#{materialgesuch.modal.minQuality.invalid}]]*/ 'Bitte eine Qualität zwischen 0 und 1000 angeben.',
+            unitScu: /*[[#{material.quantity.scu}]]*/ 'SCU',
+            unitPiece: /*[[#{material.quantity.piece}]]*/ 'Stück',
+            conflict: window.materialgesuchI18n && window.materialgesuchI18n.conflict ? window.materialgesuchI18n.conflict : {
+                title: /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
+                reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Neu laden.',
+                reloadLabel: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Neu laden',
+                dismissLabel: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
+                reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Neu laden?'
+            }
+        });
+    </script>
+    <script th:src="@{/js/materialgesuch-modal.js}" defer th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>
