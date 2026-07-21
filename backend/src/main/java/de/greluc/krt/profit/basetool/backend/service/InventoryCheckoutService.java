@@ -60,6 +60,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -570,7 +571,7 @@ public class InventoryCheckoutService {
               .with(
                   "financeEntries",
                   financeEntryIds.stream()
-                      .filter(id -> id != null)
+                      .filter(Objects::nonNull)
                       .map(UUID::toString)
                       .reduce((a, b) -> a + "," + b)
                       .orElse("-"))
