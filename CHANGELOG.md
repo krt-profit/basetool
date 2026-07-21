@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Materialbörse: Beim Öffnen wurden kurzzeitig beide Boards (Angebote und Gesuche) übereinander angezeigt.** Auf der Standardansicht (Angebote) rendert der Server jetzt wieder nur das Angebots-Board; zuvor wurde das Gesuche-Board wegen einer Thymeleaf-Vorrangfalle (`th:replace` schlägt `th:if` auf demselben Element) bedingungslos zusätzlich eingefügt, bis ein Tab-Wechsel es wegräumte (REQ-MARKET-015).
+
+- **Materialbörse-Gesuche: Kosmetik im „Material/Item suchen"-Dialog.** Das Beschreibungsfeld nutzt jetzt die volle Dialogbreite (statt der schmalen Standardbreite eines Textfelds), und die leere „Gesucht —"-Zeile unter der Material-/Item-Auswahl erscheint nicht mehr beim Erstellen — diese Zeile ist nur beim Bearbeiten eines Gesuchs sinnvoll und war nur wegen eines CSS-Vorrangproblems im Erstellen-Dialog sichtbar (REQ-MARKET-015).
+
 ## [v1.5.10](https://github.com/krt-profit/basetool/releases/tag/v1.5.10) - 2026-07-21
 
 ### Added

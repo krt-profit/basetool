@@ -146,7 +146,10 @@ class MaterialgesuchPageControllerMvcTest {
         .andExpect(content().string(containsString("data-mg-edit")))
         // The "Alle Gesuche" tab shows the stubbed request count (1) — proving the request-counts
         // lookup is honoured, not shadowed by the detail stub; every other tab-count renders 0.
-        .andExpect(content().string(containsString("<span class=\"tab-count\">1</span>")));
+        .andExpect(content().string(containsString("<span class=\"tab-count\">1</span>")))
+        // Symmetric guard to the offers-mode test: the requests view renders only the request
+        // board, never the offers board's own list wrapper on top of it.
+        .andExpect(content().string(not(containsString("id=\"mb-listwrap\""))));
   }
 
   /** A PIECE material request renders its desired amount in the piece unit, never SCU (#1182). */
