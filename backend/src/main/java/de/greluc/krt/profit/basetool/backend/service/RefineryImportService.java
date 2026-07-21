@@ -328,8 +328,26 @@ public class RefineryImportService {
   }
 
   /**
-   * Resolves a raw method read case-insensitively against {@code refining_method.name} — UEX stores
-   * title case ({@code "Ferron Exchange"}), the screen renders uppercase.
+   * Resolves a raw method read against {@code refining_method} — the closed UEX enum of nine methods
+   * (title-cased master data, e.g. {@code "Ferron Exchange"}; the screen renders uppercase). Three
+   * deterministic-then-fuzzy stages, stopping at the first hit:
+   *
+   * <ol>
+   *   <li>exact case-insensitive name (the fast path; UEX title case vs. the uppercase screen);
+   *   <li>unique canonical-core fold (spacing / punctuation drift, mirroring {@link
+   *       #matchRefineryLocation});
+   *   <li>fuzzy NEAREST-match over the closed enum via the reused {@link BlueprintFuzzyMatcher},
+   *       accepting the top candidate at or above {@link
+   *       RefineryImportProperties#getMethodFuzzyAcceptThreshold()}.
+   * </ol>
+   *
+   * <p>Stage 3 is what recovers the VLM's one systematic method mis-read: the model autocorrects the
+   * game's {@code "DINYX SOLVENTATION"} to the real English word and emits {@code "DINYX SOLVATION"},
+   * which no exact lookup can resolve. Because the nine methods are highly distinct, the intended
+   * method wins by a wide margin (~0.83 vs. ≤ ~0.36 for the runner-up), so a low threshold recovers
+   * the mis-read without risking a wrong silent snap; non-method text peaks near 0.4 and stays
+   * unresolved. The import is a review-before-save draft, so the user still confirms the pre-filled
+   * method before persisting.
    *
    * @param rawName verbatim screen read; null/blank yields empty
    * @return the matched refining method, or empty
@@ -338,7 +356,42 @@ public class RefineryImportService {
     if (!StringUtils.hasText(rawName)) {
       return Optional.empty();
     }
-    return refiningMethodRepository.findByNameIgnoreCase(rawName.trim());
+    String trimmed = rawName.trim();
+    Optional<RefiningMethod> exact = refiningMethodRepository.findByNameIgnoreCase(trimmed);
+    if (exact.isPresent()) {
+      return exact;
+    }
+
+    List<RefiningMethod> candidates = refiningMethodRepository.findAll();
+    if (candidates.isEmpty()) {
+      return Optional.empty();
+    }
+
+    String canonical = MaterialNameCanonicalizer.canonicalCore(trimmed);
+    if (canonical != null && !canonical.isEmpty()) {
+      List<RefiningMethod> canonicalHits =
+          candidates.stream()
+              .filter(m -> canonical.equals(MaterialNameCanonicalizer.canonicalCore(m.getName())))
+              .toList();
+      if (canonicalHits.size() == 1) {
+        return Optional.of(canonicalHits.getFirst());
+      }
+    }
+
+    String fuzzyKey = MaterialNameCanonicalizer.fuzzyKey(trimmed);
+    if (fuzzyKey == null || fuzzyKey.isEmpty()) {
+      return Optional.empty();
+    }
+    List<BlueprintFuzzyMatcher.Scored<RefiningMethod>> ranked =
+        fuzzyMatcher.topMatches(
+            fuzzyKey,
+            candidates,
+            m -> MaterialNameCanonicalizer.fuzzyKey(m.getName()),
+            Comparator.comparing(
+                RefiningMethod::getName, Comparator.nullsLast(String::compareToIgnoreCase)),
+            1,
+            properties.getMethodFuzzyAcceptThreshold());
+    return ranked.isEmpty() ? Optional.empty() : Optional.of(ranked.getFirst().candidate());
   }
 
   /**
