@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.11](https://github.com/krt-profit/basetool/releases/tag/v1.5.11) - 2026-07-21
+
 ### Fixed
 
 - **Materialbörse: Beim Öffnen wurden kurzzeitig beide Boards (Angebote und Gesuche) übereinander angezeigt.** Auf der Standardansicht (Angebote) rendert der Server jetzt wieder nur das Angebots-Board; zuvor wurde das Gesuche-Board wegen einer Thymeleaf-Vorrangfalle (`th:replace` schlägt `th:if` auf demselben Element) bedingungslos zusätzlich eingefügt, bis ein Tab-Wechsel es wegräumte (REQ-MARKET-015).
