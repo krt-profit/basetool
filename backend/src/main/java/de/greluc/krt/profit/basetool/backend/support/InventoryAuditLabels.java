@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.support;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
+import java.util.Objects;
 
 /**
  * Shared renderers for the audit-subject strings of an inventory row, so the item-CRUD service and
@@ -67,7 +68,7 @@ public final class InventoryAuditLabels {
   public static String jobOrderRef(InventoryItem item) {
     return item.getJobOrderAllocations().stream()
         .map(InventoryJobOrderAllocation::getJobOrder)
-        .filter(jobOrder -> jobOrder != null)
+        .filter(Objects::nonNull)
         .findFirst()
         .map(jobOrder -> "#" + jobOrder.getDisplayId())
         .orElse("-");
@@ -84,7 +85,7 @@ public final class InventoryAuditLabels {
   public static String missionName(InventoryItem item) {
     return item.getMissionAllocations().stream()
         .map(InventoryMissionAllocation::getMission)
-        .filter(mission -> mission != null)
+        .filter(Objects::nonNull)
         .findFirst()
         .map(mission -> mission.getName())
         .orElse("-");
