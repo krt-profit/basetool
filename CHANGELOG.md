@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.10](https://github.com/krt-profit/basetool/releases/tag/v1.5.10) - 2026-07-21
+
 ### Added
 
 - **Materialbörse: Mitglieder können jetzt Gesuche einstellen, nicht nur Angebote.** Neben „Alle Angebote"/„Meine Angebote" gibt es jetzt die Tabs „Alle Gesuche"/„Meine Gesuche"; die Buttons wechseln je nach Ansicht zwischen „Material anbieten"/„Item anbieten" und „Material suchen"/„Item suchen". Ein Gesuch nennt ein Material oder craftbares Item, eine Markdown-Beschreibung, optional eine Mindestqualität und die gewünschte Menge (SCU oder Stück); andere Mitglieder signalisieren „Ich kann liefern" und der Suchende wird benachrichtigt — Standort und Lieferantennamen bleiben wie bei Angeboten privat bzw. nur für den Suchenden sichtbar (REQ-MARKET-015…020, ADR-0116).
