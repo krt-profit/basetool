@@ -176,6 +176,20 @@
             .od-prod-demand-value {
                 color: var(--color-white);
             }
+            /* Earmarked warehouse stock, rendered inline in the item expand row beneath the
+               per-unit demand (REQ-ORDERS-028). The reused label becomes a block heading above a
+               compact table. */
+            .od-item-stock-inline {
+                margin-top: 10px;
+            }
+            .od-item-stock-inline .od-prod-demand-label {
+                display: block;
+                flex: none;
+                margin-bottom: 4px;
+            }
+            .od-item-stock-inline .data-table {
+                font-size: 0.8rem;
+            }
 
             /* Tab panes (mission-detail pattern): hidden by default, shown when the JS controller
                (orders-detail.js) adds .on to the active pane. Scoped to .tab-panes so it never
@@ -430,11 +444,21 @@
                 <div class="kpi-value" th:text="|${kpi.delivered} / ${kpi.amount}|">11 / 18</div>
                 <div class="progress-mini krtm-margin-top-0-5rem-fc21"><i th:attr="data-krtm-width=${kpi.deliveredPct}"></i></div>
             </div>
+            <!-- Offene Menge: SCU and PIECE demand are incommensurable, so they render as two separate
+                 numbers. An SCU-only order shows just the SCU figure (unchanged), a PIECE-only order
+                 just the whole-unit figure, a mixed order both. The SCU line also covers the empty
+                 fallback (no materials → "0 SCU"). -->
             <div class="kpi-total">
                 <div class="kpi-label" th:text="${order.type == 'ITEM'} ? #{orders.detail.kpi.openMaterialAmount} : #{orders.detail.kpi.openAmount}">Offene Menge</div>
                 <div class="kpi-value">
-                    <span th:text="${#numbers.formatDecimal(kpi.openAmount, 1, 'DEFAULT', 3, 'DEFAULT')}">1.160</span>
-                    <span class="kpi-unit" th:text="#{material.quantity.scu}">SCU</span>
+                    <div th:if="${kpi.hasScuMaterial or !kpi.hasPieceMaterial}">
+                        <span th:text="${#numbers.formatDecimal(kpi.openAmountScu, 1, 'DEFAULT', 3, 'DEFAULT')}">1.160</span>
+                        <span class="kpi-unit" th:text="#{material.quantity.scu}">SCU</span>
+                    </div>
+                    <div th:if="${kpi.hasPieceMaterial}">
+                        <span th:text="${#numbers.formatInteger(kpi.openAmountPiece, 1)}">3</span>
+                        <span class="kpi-unit" th:text="#{material.quantity.piece}">Stück</span>
+                    </div>
                 </div>
             </div>
             <div th:if="${kpi.supportsClaims}" class="kpi-total">
@@ -579,12 +603,16 @@
         <!-- The Herstellung surface folds into this table (#1317 follow-up): logisticians get a
              leading chevron that reveals the per-unit material demand, and a trailing "Herstellung
              erfassen" button per line; there is no separate Herstellung tab. Manufactured and
-             delivered both carry a progress bar. The production columns render only for logisticians;
-             requesters/read-only viewers see the plain status columns. -->
-        <table class="data-table">
+             delivered both carry a progress bar. The trailing production column renders only for
+             logisticians; requesters/read-only viewers see the plain status columns.
+             The leading chevron column now renders for every non-requester viewer: the expand row
+             carries the per-unit demand (logisticians) AND the earmarked warehouse stock — who holds
+             each unit and where — for this item (REQ-ORDERS-028, the item sibling of the material
+             drill-down). itemColCount tracks the actual column span for the sub-rows. -->
+        <table class="data-table" th:with="itemColCount=${requesterView ? 5 : (isLogistician ? 7 : 6)}">
             <thead>
             <tr>
-                <th th:if="${isLogistician}" class="od-prod-expand-col"></th>
+                <th th:unless="${requesterView}" class="od-prod-expand-col"></th>
                 <th th:text="#{orders.detail.item.name}">Item</th>
                 <th th:text="#{orders.detail.item.amount}">Anzahl</th>
                 <th th:text="#{orders.detail.item.manufactured}">Hergestellt</th>
@@ -595,13 +623,16 @@
             </thead>
             <tbody>
             <th:block th:each="item : ${order.items}"
-                th:with="mfg=${item.manufacturedAmount != null ? item.manufacturedAmount : 0},dlv=${item.deliveredAmount != null ? item.deliveredAmount : 0},amt=${item.amount != null ? item.amount : 0},complete=${(item.amount != null ? item.amount : 0) > 0 and (item.manufacturedAmount != null ? item.manufacturedAmount : 0) >= (item.amount != null ? item.amount : 0)},hasDemand=${item.materials != null and !item.materials.isEmpty()},demandId='od-prod-demand-' + ${item.id}">
+                th:with="mfg=${item.manufacturedAmount != null ? item.manufacturedAmount : 0},dlv=${item.deliveredAmount != null ? item.deliveredAmount : 0},amt=${item.amount != null ? item.amount : 0},complete=${(item.amount != null ? item.amount : 0) > 0 and (item.manufacturedAmount != null ? item.manufacturedAmount : 0) >= (item.amount != null ? item.amount : 0)},hasDemand=${item.materials != null and !item.materials.isEmpty()},demandId='od-prod-demand-' + ${item.id},stockGroup=${(item.gameItem != null and itemStockByGameItem != null) ? itemStockByGameItem.get(item.gameItem.id()) : null},stockEntries=${stockGroup != null ? stockGroup.entries : null},hasStock=${stockEntries != null and !stockEntries.isEmpty()},canExpand=${(isLogistician and hasDemand) or hasStock}">
             <tr>
-                <td th:if="${isLogistician}" class="od-prod-expand-cell">
-                    <button th:if="${hasDemand}" type="button" class="od-prod-toggle"
+                <!-- Leading expand column: any non-requester viewer can reveal the item's details;
+                     the chevron shows when there is something to expand (per-unit demand for a
+                     logistician, or earmarked warehouse stock for anyone). -->
+                <td th:unless="${requesterView}" class="od-prod-expand-cell">
+                    <button th:if="${canExpand}" type="button" class="od-prod-toggle"
                             data-trigger="od-toggle-demand" aria-expanded="false"
                             th:attr="aria-controls=${demandId}"
-                            th:aria-label="#{orders.detail.production.perUnit}">
+                            th:aria-label="#{orders.detail.item.expand}">
                         <svg class="krt-icon od-prod-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
                     </button>
                 </td>
@@ -649,13 +680,13 @@
                     </button>
                 </td>
             </tr>
-            <!-- Collapsible "Bedarf je Stück" sub-row (mirrors the bank request table's Notiz /
-                 Begründung detail row): the per-material per-unit demand, hidden by default and
-                 revealed by the chevron. Logisticians only; the JS scales requiredQuantity to the
-                 entered unit count exactly as the backend does. -->
-            <tr class="od-prod-demand-row" th:if="${isLogistician and hasDemand}" th:id="${demandId}" hidden>
-                <td colspan="7" class="od-prod-demand-cell">
-                    <div class="od-prod-demand-body">
+            <!-- Collapsible detail sub-row (mirrors the bank request table's Notiz / Begründung detail
+                 row): hidden by default, revealed by the chevron. Holds two stacked blocks — the
+                 per-unit material demand (logisticians only; the JS scales requiredQuantity to the
+                 entered unit count exactly as the backend does) and the earmarked warehouse stock. -->
+            <tr class="od-prod-demand-row" th:if="${!requesterView and canExpand}" th:id="${demandId}" hidden>
+                <td th:attr="colspan=${isLogistician ? 7 : 6}" class="od-prod-demand-cell">
+                    <div class="od-prod-demand-body" th:if="${isLogistician and hasDemand}">
                         <span class="od-prod-demand-label" th:text="#{orders.detail.production.perUnit}">Bedarf je Stück</span>
                         <span class="od-prod-demand-value">
                             <th:block th:each="m,st : ${item.materials}" th:with="perUnit=${amt > 0 ? (m.requiredQuantity != null ? m.requiredQuantity : 0) / amt : 0}">
@@ -667,11 +698,41 @@
                             </th:block>
                         </span>
                     </div>
+                    <!-- Earmarked warehouse stock for this item (REQ-ORDERS-028): who holds each unit
+                         and where, read-only. Collecting / marking delivered happens on the
+                         Itemsammelübersicht page. Owner/location are blanked by the backend for a
+                         requesting-side viewer of an SK-public order (REQ-ORDERS-029) — render a dash
+                         so a redacted cell reads as "hidden" rather than empty. -->
+                    <div th:if="${hasStock}" class="od-item-stock-inline">
+                        <span class="od-prod-demand-label" th:text="#{orders.detail.itemStock.title}">Item-Bestand</span>
+                        <div class="table-responsive krtm-margin-top-0-5rem-fc21">
+                            <table class="data-table">
+                                <thead>
+                                <tr>
+                                    <th th:text="#{orders.detail.itemStock.col.owner}">Besitzer</th>
+                                    <th th:text="#{orders.detail.itemStock.col.location}">Standort</th>
+                                    <th th:text="#{orders.detail.itemStock.col.amount}">Menge</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="entry : ${stockEntries}">
+                                    <td th:text="${entry.ownerName != null ? entry.ownerName : '—'}"></td>
+                                    <td th:text="${entry.location != null ? entry.location : '—'}"></td>
+                                    <td>
+                                        <span th:text="|${#numbers.formatInteger(entry.allocatedQuantity, 1)} #{material.quantity.piece}|">1 Stück</span>
+                                        <small th:if="${entry.quantity > entry.allocatedQuantity}" class="text-muted"
+                                               th:text="#{orders.detail.itemStock.ofStock(${#numbers.formatInteger(entry.quantity, 1)})}">von 4 im Bestand</small>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </td>
             </tr>
             </th:block>
             <tr th:if="${order.items == null or order.items.isEmpty()}">
-                <td th:attr="colspan=${isLogistician ? 7 : 5}" class="text-center text-muted" th:text="#{orders.detail.items.empty}">Keine Items vorhanden.</td>
+                <td th:attr="colspan=${itemColCount}" class="text-center text-muted" th:text="#{orders.detail.items.empty}">Keine Items vorhanden.</td>
             </tr>
             </tbody>
         </table>
@@ -689,78 +750,6 @@
             </ul>
         </div>
 
-        <!-- Item-Bestand (REQ-ORDERS-028): the game-item stock earmarked to THIS order, grouped per
-             game item — the item sibling of the Materialsammlung. In-place AJAX swap container: a
-             delivered flip, a production book-in or a Lager-side (un)earmark re-renders it via
-             GET /orders/{id}?fragment=item-stock (live-sync section key `item-stock`). Omitted for
-             the requester view (mirroring the aggregated pane); the live-sync receiver silently
-             skips the missing container. -->
-        <div id="order-item-stock-results" class="mt-2" th:unless="${requesterView}"><th:block th:fragment="itemStockSection">
-        <h3 class="section-title" th:text="#{orders.detail.itemStock.title}">Item-Bestand</h3>
-        <p th:if="${itemStock == null or itemStock.isEmpty()}" class="text-muted"
-           data-testid="order-item-stock-empty"
-           th:text="#{orders.detail.itemStock.empty}">Kein Item-Bestand für diesen Auftrag vorhanden.</p>
-        <div th:unless="${itemStock == null or itemStock.isEmpty()}" data-testid="order-item-stock-panel">
-            <div th:each="group : ${itemStock}" class="mt-2" th:data-game-item-id="${group.gameItem != null ? group.gameItem.id() : ''}">
-                <div class="flex-between krtm-flex-wrap-wrap-gap-1rem-659b">
-                    <h4 class="krtm-margin-0-5rem-0-0-7775">
-                        <span th:text="${group.gameItem != null ? group.gameItem.name() : '-'}">Item</span>
-                        <small th:if="${group.gameItem != null and group.gameItem.manufacturer() != null}"
-                               class="text-muted" th:text="${group.gameItem.manufacturer()}">Hersteller</small>
-                    </h4>
-                    <!-- Per-group context: how much of the earmarked stock this order holds vs. its
-                         own line progress (hergestellt/bestellt, REQ-ORDERS-025). An orphaned
-                         earmark (order no longer requests the item) shows 0/0 — REQ-ORDERS-019
-                         flags it separately on the Verknüpft tab. -->
-                    <span class="chip chip--muted"
-                          th:text="#{orders.detail.itemStock.context(${group.allocatedTotal}, ${group.manufacturedAmount}, ${group.orderedAmount})}">1 zugeordnet · 1/3 hergestellt</span>
-                </div>
-                <div class="table-responsive">
-                    <table class="data-table">
-                        <thead>
-                        <tr>
-                            <th th:text="#{orders.detail.itemStock.col.owner}">Besitzer</th>
-                            <th th:text="#{orders.detail.itemStock.col.location}">Standort</th>
-                            <th th:text="#{orders.detail.itemStock.col.amount}">Menge</th>
-                            <th class="text-center" th:text="#{orders.detail.itemStock.col.delivered}">Geliefert</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <!-- data-version carries the entry's optimistic-lock token for the delivered
-                             PATCH echo; the post-success section re-render refreshes it on every row
-                             (the DOM version sync). -->
-                        <tr th:each="entry : ${group.entries}"
-                            th:data-inventory-id="${entry.inventoryEntryId}"
-                            th:data-version="${entry.version}">
-                            <!-- Owner/location are blanked by the backend for a requesting-side
-                                 viewer of an SK-public order (REQ-ORDERS-029); render a dash so a
-                                 redacted cell reads as "hidden" rather than empty. -->
-                            <td th:text="${entry.ownerName != null ? entry.ownerName : '—'}"></td>
-                            <td th:text="${entry.location != null ? entry.location : '—'}"></td>
-                            <td>
-                                <span th:text="|${#numbers.formatInteger(entry.allocatedQuantity, 1)} #{material.quantity.piece}|">1 Stück</span>
-                                <small th:if="${entry.quantity > entry.allocatedQuantity}"
-                                       class="text-muted"
-                                       th:text="#{orders.detail.itemStock.ofStock(${#numbers.formatInteger(entry.quantity, 1)})}">von 4 im Bestand</small>
-                            </td>
-                            <td class="text-center">
-                                <!-- Mirrors the Materialsammlung's delivered toggle: PATCH
-                                     /inventory/{id}/delivered with this order's id + the entry
-                                     version (delegated via krtEvents, survives the fragment swap). -->
-                                <input type="checkbox"
-                                       class="krtm-width-22px-height-22px-cursor-pointer-accent-b072"
-                                       data-trigger="od-item-stock-delivered"
-                                       th:data-inventory-id="${entry.inventoryEntryId}"
-                                       th:data-job-order-id="${order.id}"
-                                       th:checked="${entry.delivered}">
-                            </td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-        </th:block></div>
         </section>
 
         <!-- ITEM orders — pane "Aggregierte Materialien". -->
@@ -779,6 +768,7 @@
                 <th th:text="#{orders.detail.aggregated.material}">Material</th>
                 <th th:text="#{orders.detail.aggregated.quality}">Qualität</th>
                 <th th:text="#{orders.detail.aggregated.amount}">Gesamtmenge</th>
+                <th th:text="#{orders.detail.aggregated.stock}">Vorhanden</th>
                 <th th:if="${showClaims}" th:text="#{orders.detail.claims}">Eingetragen</th>
                 <th th:if="${showClaims}" th:text="#{orders.detail.open}">Offen</th>
             </tr>
@@ -804,6 +794,14 @@
                 <td th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
                     <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(agg.totalQuantity, 1)} #{material.quantity.piece}|"></span>
                     <span th:case="*" th:text="|${#numbers.formatDecimal(agg.totalQuantity, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
+                </td>
+                <!-- "Vorhanden": the linked-inventory stock earmarked to this order for the material
+                     at or above the bucket's quality floor (agg.currentStock). The gap to
+                     Gesamtmenge is the still-to-procure amount, distinct from the claim "Offen"
+                     (Σ-claims) below. -->
+                <td th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
+                    <span th:case="'PIECE'" th:text="|${agg.currentStock != null ? #numbers.formatInteger(agg.currentStock, 1) : '0'} #{material.quantity.piece}|"></span>
+                    <span th:case="*" th:text="|${agg.currentStock != null ? #numbers.formatDecimal(agg.currentStock, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                 </td>
                 <td th:if="${showClaims}" data-claim-control>
                     <span th:if="${agg.claims == null or agg.claims.isEmpty()}" class="text-muted">&#8212;</span>
@@ -846,7 +844,7 @@
                 </td>
             </tr>
             <tr th:if="${order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty()}">
-                <td colspan="3" class="text-center text-muted" th:text="#{orders.detail.aggregated.empty}">Keine Materialien abgeleitet.</td>
+                <td colspan="4" class="text-center text-muted" th:text="#{orders.detail.aggregated.empty}">Keine Materialien abgeleitet.</td>
             </tr>
             </tbody>
         </table>
@@ -1156,7 +1154,7 @@
              order is fully delivered). -->
         <div class="krtm-margin-top-1-5rem-display-flex-gap-1rem-flex-767d" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
             <button th:if="${hasOutstandingItemLines}" type="button" class="btn btn-outline krtm-min-height-44px-1df5" data-testid="item-handover-open" data-trigger="open-modal-display" data-modal-id="item-handover-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clipboard-check"/></svg> <span th:text="#{orders.detail.itemHandover}">Item-Übergabe protokollieren</span></button>
-            <a th:href="@{/orders/{id}/material-collection(id=${order.id})}" class="btn btn-ghost krtm-min-height-44px-display-inline-flex-align-it-37c8"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-list"/></svg> <span th:text="#{orders.detail.materialCollection}">Materialsammelübersicht</span></a>
+            <a th:href="@{/orders/{id}/item-collection(id=${order.id})}" class="btn btn-ghost krtm-min-height-44px-display-inline-flex-align-it-37c8"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-list"/></svg> <span th:text="#{orders.detail.itemCollection}">Itemsammelübersicht</span></a>
         </div>
         <!-- Delivery is gated by manufacture (REQ-ORDERS-025). Two distinct empty states, since both
              leave hasOutstandingItemLines false: when the order is NOT yet fully delivered there is
@@ -1729,12 +1727,6 @@
         // Book-in section (REQ-INV-032): the location gate's toast when the Enter-key path slips
         // past the disabled button.
         bookInLocationRequired: /*[[#{orders.production.bookIn.locationRequired}]]*/ 'Bitte einen Lagerort w\u00e4hlen.'
-    };
-
-    // Item-Bestand panel (REQ-ORDERS-028) strings consumed by the page module's delivered toggle.
-    const ITEM_STOCK_I18N = {
-        deliveredUpdated: /*[[#{orders.detail.itemStock.toast.deliveredUpdated}]]*/ 'Lieferstatus aktualisiert.',
-        deliveredError: /*[[#{orders.detail.itemStock.toast.error}]]*/ 'Fehler beim Speichern.'
     };
 
     // Live multi-user sync (REQ-FE-010 / REQ-FE-015, ADR-0094): window.orderId keys the order:{id}
