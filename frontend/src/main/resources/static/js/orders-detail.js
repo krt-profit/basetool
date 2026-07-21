@@ -34,7 +34,7 @@
  * synchronous script at the same end-of-body position, never with defer.
  */
 
-/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_QUALITY_GOOD, MSG_QUALITY_NONE, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_OWNER, MSG_LOCATION, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, PRODUCTION_I18N, ITEM_STOCK_I18N */
+/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_QUALITY_GOOD, MSG_QUALITY_NONE, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_OWNER, MSG_LOCATION, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, PRODUCTION_I18N */
 
 let cachedInventoryItems = [];
 let isInventoryCached = false;
@@ -52,7 +52,12 @@ const ORDER_SECTIONS = {
     materials: { container: '#order-materials-results', fragmentValue: 'materials' },
     aggregated: { container: '#order-aggregated-results', fragmentValue: 'aggregated' },
     items: { container: '#order-items-results', fragmentValue: 'items' },
-    'item-stock': { container: '#order-item-stock-results', fragmentValue: 'item-stock' },
+    // The earmarked item stock is now rendered inline in each ordered item's expand row (part of the
+    // `items` fragment), so the `item-stock` wire key — still broadcast by the Lager pages, the
+    // production book-in and the item-handover consumption, and still whitelisted on the relay —
+    // re-renders the items section. Keeping the key aliased (rather than dropping it) means those
+    // external broadcasters need no change and stay in sync.
+    'item-stock': { container: '#order-items-results', fragmentValue: 'items' },
     handovers: { container: '#order-handovers-results', fragmentValue: 'handovers' },
     'item-handovers': {
         container: '#order-item-handovers-results',
@@ -595,11 +600,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     _swapOrderSection(orderId, 'order-item-handovers-results', 'item-handovers');
                     _swapOrderSection(orderId, 'item-handover-lines', 'item-handover-lines');
                     _swapOrderSection(orderId, 'order-header-results', 'header');
-                    // The delivery consumed the order's earmarked item stock (REQ-ORDERS-030), so the
-                    // Item-Bestand panel changed — re-render + broadcast its `item-stock` section too
-                    // (mirrors the production booking success path). The key exists at all three
-                    // REQ-FE-010 mirror points, so no seam-map change is needed.
-                    _swapOrderSection(orderId, 'order-item-stock-results', 'item-stock');
+                    // The delivery consumed the order's earmarked item stock (REQ-ORDERS-030); that
+                    // stock is now rendered inline in the ordered-items table, so the `items` swap
+                    // above already refreshes it — no separate item-stock swap needed.
                     // The same consumption drew stock out of the Lager, so poke the global inventory
                     // room's existing `stock` seam — Lager viewers re-pull their fragments without a
                     // reload (design §6.5).
@@ -2279,8 +2282,8 @@ function bookProduction() {
             }
             showFrontendSuccessToast(PRODUCTION_I18N.booked);
             if (window.krtRefreshOrderSection) {
-                // `item-stock` rides along (REQ-ORDERS-028): the book-in auto-earmarks the
-                // produced units to this order by default, so the Item-Bestand panel changes too.
+                // The book-in auto-earmarks the produced units to this order by default; that stock
+                // is rendered inline in the ordered-items table, so re-rendering `items` refreshes it.
                 window.krtRefreshOrderSection([
                     'items',
                     'aggregated',
@@ -2288,7 +2291,6 @@ function bookProduction() {
                     'kpi',
                     'item-handovers',
                     'item-handover-lines',
-                    'item-stock',
                 ]);
             }
             // The booking now also books the produced units in as Lager item stock
@@ -2300,48 +2302,6 @@ function bookProduction() {
             }
         },
     });
-}
-
-// ---- Item-Bestand panel (REQ-ORDERS-028) ---------------------------------------------------------
-// Persist a delivered flip of an item earmark in place, mirroring the Materialsammlung's toggle
-// (material-collection.js onDeliveredToggle): PATCH /inventory/{id}/delivered with THIS order's id
-// (Variante C / REQ-INV-027 — delivered is the per-(entry, order) slice marker) and the entry's
-// @Version read off the row. On success the whole `item-stock` section is re-rendered through the
-// order seam — that swap rewrites every row's data-version from the fresh fragment (the DOM version
-// sync of the CLAUDE concurrency rules) AND broadcasts the section to peers viewing this order
-// (REQ-FE-015). On failure the native checkbox is reverted so it never lies until a reload. The
-// checkbox is disabled for the round-trip (a change-event control is not covered by krtFetch's
-// submit-button double-submit guard). No `inventory`/`stock` poke: like the material toggle, a
-// delivered flip changes no Lager-rendered state.
-async function onItemStockDeliveredToggle(cb) {
-    const inventoryId = cb.getAttribute('data-inventory-id');
-    const row = cb.closest('tr[data-inventory-id]');
-    if (!window.krtFetch || !row) return;
-    const previous = !cb.checked; // state before this toggle, for revert-on-failure
-    cb.disabled = true;
-    const result = await window.krtFetch.write({
-        method: 'PATCH',
-        url: '/inventory/' + inventoryId + '/delivered',
-        payload: {
-            delivered: cb.checked,
-            jobOrderId: cb.getAttribute('data-job-order-id'),
-            version: parseInt(row.getAttribute('data-version'), 10),
-        },
-        containerSelector: row,
-        toast: false,
-        errorMessage: ITEM_STOCK_I18N.deliveredError,
-        onSuccess: function () {
-            window.showFrontendSuccessToast(ITEM_STOCK_I18N.deliveredUpdated);
-            if (window.krtRefreshOrderSection) {
-                return window.krtRefreshOrderSection(['item-stock']);
-            }
-            return undefined;
-        },
-    });
-    cb.disabled = false;
-    if (!result || !result.ok) {
-        cb.checked = previous;
-    }
 }
 
 // CSP-safe delegated bindings (replaces the 18 inline on*= handlers in this template).
@@ -2400,10 +2360,6 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     });
     window.krtEvents.on('change', 'od-production-personal-toggle', function () {
         _prodSyncPersonalAllocate();
-    });
-    // Item-Bestand delivered toggle (REQ-ORDERS-028): delegated, so it survives the section swap.
-    window.krtEvents.on('change', 'od-item-stock-delivered', function (el) {
-        onItemStockDeliveredToggle(el);
     });
     window.krtEvents.on('click', 'od-toggle-demand', _odToggleDemandRow);
     window.krtEvents.on('click', 'od-download-report', function (el) {

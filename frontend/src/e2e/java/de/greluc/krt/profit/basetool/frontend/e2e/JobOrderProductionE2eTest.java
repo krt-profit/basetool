@@ -68,10 +68,10 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * manufacturedAmount} is 1 (read back through the backend) and the item-handover control has
  * appeared (delivery unlocked); the produced stock is visible in the shared Lager's item view
  * (REQ-INV-032); since the book-in auto-earmarks the produced unit to the order, the order detail's
- * Item-Bestand panel lists the earmarked stock with its per-(entry, order) delivered toggle; and
- * flipping that toggle persists the delivered marker in place (REQ-ORDERS-028). The actor is {@code
- * test-admin}, which satisfies the production role gate through the role hierarchy and is an
- * IRIDIUM member (the order's responsible unit).
+ * "Bestellte Items" tab shows the earmarked stock inline in the item's expand row (REQ-ORDERS-028);
+ * and marking it delivered on the item-collection page persists the per-(entry, order) delivered
+ * marker (REQ-ORDERS-030/031). The actor is {@code test-admin}, which satisfies the production role
+ * gate through the role hierarchy and is an IRIDIUM member (the order's responsible unit).
  */
 @Tag("e2e")
 class JobOrderProductionE2eTest {
@@ -115,8 +115,9 @@ class JobOrderProductionE2eTest {
    * of the single unit through the production modal (consuming the linked stock and booking the
    * produced unit in, REQ-INV-032), and asserts the persisted manufactured amount, the now-unlocked
    * item-handover control, and the produced item stock — grown by exactly one unit and visible on
-   * the shared Lager's item view. Finally it asserts the order-detail Item-Bestand panel lists the
-   * auto-earmarked stock and flipping its delivered toggle persists the marker (REQ-ORDERS-028).
+   * the shared Lager's item view. Finally it asserts the order-detail "Bestellte Items" tab shows
+   * the auto-earmarked stock inline in the item's expand row (REQ-ORDERS-028), and marking it
+   * delivered on the item-collection page persists the marker (REQ-ORDERS-030/031).
    */
   @Test
   void booksProductionConsumingLinkedStockAndUnlocksDelivery() {
@@ -189,25 +190,31 @@ class JobOrderProductionE2eTest {
             .containsText(Pattern.compile("(?<!\\d)" + Math.round(stockAfter) + "(?!\\d)"));
 
         // REQ-ORDERS-028: the produced unit was auto-earmarked to the order ("dem Auftrag
-        // zuordnen" defaults on), so the order detail's Item-Bestand panel on the "Bestellte
-        // Items" tab lists the earmarked stock — the widget's group with one entry row carrying
-        // the per-(entry, order) delivered toggle.
+        // zuordnen" defaults on), so the order detail's "Bestellte Items" tab shows the earmarked
+        // stock inline in the item's expand row — expand the line and the stock block lists the
+        // earmarked whole unit (read-only; collecting happens on the Itemsammelübersicht page).
         E2eSupport.navigate(page, baseUrl + "/orders/" + id + "?tab=items");
-        Locator itemStockPanel = page.getByTestId("order-item-stock-panel");
-        assertThat(itemStockPanel)
+        Locator expandToggle =
+            page.locator("button.od-prod-toggle[data-trigger='od-toggle-demand']").first();
+        assertThat(expandToggle)
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
-        assertThat(itemStockPanel).containsText(ORDERABLE_ITEM_NAME);
-        Locator deliveredToggle =
-            itemStockPanel.locator(
-                "input[data-trigger='od-item-stock-delivered'][data-job-order-id='" + id + "']");
-        assertThat(deliveredToggle).hasCount(1);
+        expandToggle.click();
+        Locator inlineStock = page.locator(".od-item-stock-inline").first();
+        assertThat(inlineStock).isVisible();
+        assertThat(inlineStock.locator("tbody tr")).hasCount(1);
 
-        // REQ-ORDERS-028 (delivered flip): the per-(entry, order) toggle starts unchecked, and
-        // flipping it persists via PATCH /inventory/{id}/delivered (the Materialsammlung's write)
-        // and re-renders the `item-stock` section in place. Await the PATCH so the mutation is not
-        // dropped, then prove both halves: the re-rendered checkbox reflects the new state, and the
-        // marker is persisted (read back through the item-stock endpoint, not the optimistic
-        // checkbox).
+        // REQ-ORDERS-030 (delivered flip): collecting / marking delivered happens on the
+        // Itemsammelübersicht page (analogous to the Materialsammlung). The per-(entry, order)
+        // toggle starts unchecked; flipping it persists via PATCH /inventory/{id}/delivered. Await
+        // the PATCH so the mutation is not dropped, then prove both halves: the re-rendered
+        // checkbox
+        // reflects the new state, and the marker is persisted (read back through the item-stock
+        // endpoint, not the optimistic checkbox).
+        E2eSupport.navigate(page, baseUrl + "/orders/" + id + "/item-collection");
+        Locator deliveredToggle =
+            page.locator("input.delivered-checkbox[data-job-order-id='" + id + "']").first();
+        assertThat(deliveredToggle)
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertThat(deliveredToggle).not().isChecked();
         assertFalse(earmarkDelivered(seeder, id), "the fresh earmark starts undelivered");
         page.waitForResponse(

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+    <title th:text="#{item.collection.title} + ' - ' + ${appTitle}">Itemsammelübersicht - Profit Basetool</title>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box flex-between krtm-flex-wrap-wrap-gap-1rem-659b">
+        <h1 th:text="#{item.collection.title}" class="krtm-letter-spacing-0-08em-0157">Itemsammelübersicht</h1>
+        <a th:href="@{/orders/{id}(id=${jobOrderId})}" class="btn btn-ghost krtm-min-height-44px-display-inline-flex-align-it-37c8" th:text="#{item.collection.back}">Zurück zum Auftrag</a>
+    </div>
+
+    <div class="hud-box mt-2" id="item-collection-results">
+        <th:block th:fragment="collectionResults">
+        <div th:if="${itemStock == null or itemStock.isEmpty()}" class="krtm-color-var-color-gray-2-font-family-lato-sans-9437" th:text="#{item.collection.empty}">
+            Kein Item-Bestand für diesen Auftrag vorhanden.
+        </div>
+
+        <div th:unless="${itemStock == null or itemStock.isEmpty()}" class="table-responsive">
+            <table class="data-table" id="item-collection-table">
+                <thead>
+                <tr>
+                    <th th:text="#{item.collection.col.owner}">Besitzer</th>
+                    <th th:text="#{item.collection.col.location}">Standort</th>
+                    <th th:text="#{item.collection.col.item}">Item</th>
+                    <th th:text="#{item.collection.col.quantity}">Menge</th>
+                    <th th:text="#{item.collection.col.delivered}">Geliefert</th>
+                </tr>
+                </thead>
+                <tbody>
+                <!-- The item stock is grouped per game item; flatten to one row per earmarked entry,
+                     carrying the group's game-item name into the Item column. data-amount is the
+                     entry's FULL physical stock (whole units) — an owner/location change transfers
+                     the whole row, which carries the order earmark onto the new item. -->
+                <th:block th:each="group : ${itemStock}">
+                <tr th:each="entry : ${group.entries}"
+                    th:data-inventory-id="${entry.inventoryEntryId}"
+                    th:data-version="${entry.version}"
+                    th:data-amount="${entry.quantity}">
+                    <td>
+                        <!-- Server-side searchable combobox (remote-users): seed only this entry's
+                             current owner; the roster is searched on demand. -->
+                        <select class="owner-select krt-select krtm-min-height-44px-width-100-min-width-140px-ba-ded1"
+                                data-role="owner-select" data-krt-combobox="remote-users"
+                                th:data-inventory-id="${entry.inventoryEntryId}">
+                            <option th:if="${entry.ownerId != null}"
+                                    th:value="${entry.ownerId}"
+                                    th:selected="true"
+                                    th:text="${entry.ownerName}"></option>
+                            <!-- Owner is blanked by the backend for a requesting-side viewer of an
+                                 SK-public order (REQ-ORDERS-029); show a dash placeholder. -->
+                            <option th:if="${entry.ownerId == null}" selected disabled>—</option>
+                        </select>
+                    </td>
+                    <td>
+                        <select class="location-select krt-select krtm-min-height-44px-width-100-min-width-140px-ba-ded1"
+                                th:data-inventory-id="${entry.inventoryEntryId}">
+                            <!-- Location is blanked by the backend for a requesting-side viewer of an
+                                 SK-public order (REQ-ORDERS-029); a dash placeholder stays selected so
+                                 the redacted row does not default-select an arbitrary location. -->
+                            <option th:if="${entry.locationId == null}" selected disabled>—</option>
+                            <option th:each="loc : ${locations}"
+                                    th:value="${loc.id}"
+                                    th:text="${loc.name}"
+                                    th:selected="${loc.id == entry.locationId}"></option>
+                        </select>
+                    </td>
+                    <td th:text="${group.gameItem != null ? group.gameItem.name() : '-'}" class="krtm-font-family-lato-sans-serif-437e"></td>
+                    <td class="krtm-font-family-lato-sans-serif-437e">
+                        <span th:text="|${#numbers.formatInteger(entry.allocatedQuantity, 1)} #{material.quantity.piece}|">3 Stück</span>
+                        <small th:if="${entry.quantity > entry.allocatedQuantity}"
+                               class="text-muted"
+                               th:text="#{item.collection.quantity.ofStock(${#numbers.formatInteger(entry.quantity, 1)})}">von 10 im Bestand</small>
+                    </td>
+                    <td class="text-center">
+                        <input type="checkbox"
+                               class="delivered-checkbox krtm-width-22px-height-22px-cursor-pointer-accent-b072"
+                               th:data-inventory-id="${entry.inventoryEntryId}"
+                               th:data-job-order-id="${jobOrderId}"
+                               th:checked="${entry.delivered}">
+                    </td>
+                </tr>
+                </th:block>
+                </tbody>
+            </table>
+        </div>
+        </th:block>
+    </div>
+</main>
+
+<style th:attr="nonce=${cspNonce}">
+    .krt-select:focus {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 1px;
+    }
+    @media (max-width: 768px) {
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    }
+</style>
+
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    // Thymeleaf-interpolated toast strings only; the imperative logic lives in the
+    // item-collection.js page module loaded immediately after this bootstrap (ADR-0069).
+    /*<![CDATA[*/
+    const MSG_OWNER_UPDATED   = /*[[#{item.collection.toast.ownerUpdated}]]*/ 'Besitzer aktualisiert.';
+    const MSG_LOCATION_UPDATED = /*[[#{item.collection.toast.locationUpdated}]]*/ 'Standort aktualisiert.';
+    const MSG_DELIVERED_UPDATED = /*[[#{item.collection.toast.deliveredUpdated}]]*/ 'Lieferstatus aktualisiert.';
+    const MSG_ERROR_GENERIC   = /*[[#{item.collection.toast.error}]]*/ 'Fehler beim Speichern.';
+    // REQ-FE-010: keys the order:{id} live-sync room this page's module joins.
+    window.orderId = /*[[${jobOrderId}]]*/ null;
+    /*]]>*/
+</script>
+<script th:src="@{/js/item-collection.js}" th:attr="nonce=${cspNonce}"></script>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+</body>
+</html>

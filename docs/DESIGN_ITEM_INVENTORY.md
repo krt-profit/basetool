@@ -731,8 +731,9 @@ the core feature stays forward-compatible:
    the Materialsammlung seams stay), fragment + live-sync section keys per the
    three-mirror rule. `FE`/`INV`/`ORDERS`/`UI`, `e2e`. **Shipped** as REQ-ORDERS-028
    ([`orders-item-production.md`](specs/orders-item-production.md)) — endpoint
-   `GET /api/v1/orders/{id}/item-stock`, `itemStockSection` fragment, `order:{id}`
-   section key `item-stock`.
+   `GET /api/v1/orders/{id}/item-stock`. Later reorganised (REQ-ORDERS-028/031): the stock
+   now renders inline in each ordered item's expand row, and collecting it (owner/location
+   transfer + delivered) moved to the standalone Itemsammelübersicht page.
 5. **Phase 5 — Materialbörse stock-backed item offers** (§8): **directly after PR 3/4 as
    part of the same epic** (owner decision 2026-07-16 — not backlogged), including the
    kind-aware `updateOffer` fix. `MARKET`/`INV`.

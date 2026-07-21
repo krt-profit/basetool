@@ -228,6 +228,14 @@ class JobOrderItemDetailRenderTest {
     assertThat(html).as("GOOD quality badge").contains("quality-good");
     assertThat(html).as("NONE quality badge").contains("quality-none");
 
+    // Then: the aggregated table surfaces the "Vorhanden" (linked stock) column, rendering each
+    // bucket's currentStock — acryliPlex's 3.0 SCU distinguishes it from its 7.5 SCU Gesamtmenge.
+    // The German render (Accept-Language: de) formats the decimal with a comma separator.
+    assertThat(html).as("Vorhanden column header (de)").contains("Vorhanden");
+    assertThat(html)
+        .as("linked-stock value rendered in the Vorhanden column")
+        .contains("3,000 SCU");
+
     // Then: the no-materials banner appears and names the unresolved sub-assembly line.
     int bannerIndex = html.indexOf("alert-warning");
     assertThat(bannerIndex).as("no-materials warning banner").isGreaterThan(0);
@@ -245,8 +253,8 @@ class JobOrderItemDetailRenderTest {
         .as("aggregated drill-down rows carry the material id")
         .contains("data-material-id=");
     assertThat(html)
-        .as("material-collection link renders for the item order")
-        .contains("/material-collection");
+        .as("item-collection link renders for the item order")
+        .contains("/item-collection");
 
     // Then: the MATERIAL requirement table is still gated out for item orders — assert on its
     // unique
@@ -333,14 +341,12 @@ class JobOrderItemDetailRenderTest {
     // suppressed when a claim button (rather than a plain cell) is clicked.
     assertThat(html).as("claim controls guard the drill-down").contains("data-claim-control");
 
-    // Then: the Materialsammelübersicht link targets the per-order material-collection page.
-    assertThat(html)
-        .as("material-collection link")
-        .contains("/orders/" + orderId + "/material-collection");
+    // Then: the Itemsammelübersicht link targets the per-order item-collection page.
+    assertThat(html).as("item-collection link").contains("/orders/" + orderId + "/item-collection");
   }
 
   @Test
-  void itemOrderDetail_AllDelivered_StillShowsMaterialCollectionButton() throws Exception {
+  void itemOrderDetail_AllDelivered_StillShowsItemCollectionButton() throws Exception {
     // Given: a fully-delivered item order (3 ordered, 3 delivered -> 0 outstanding). The handover
     // button is gated out, but the Materialsammelübersicht button must stay reachable in the
     // handover toolbar — mirroring the status-independent MATERIAL handover toolbar.
@@ -398,10 +404,10 @@ class JobOrderItemDetailRenderTest {
     assertThat(html)
         .as("handover button hidden once fully delivered")
         .doesNotContain("data-testid=\"item-handover-open\"");
-    // ...but the Materialsammelübersicht button is still rendered in the toolbar.
+    // ...but the Itemsammelübersicht button is still rendered in the toolbar.
     assertThat(html)
-        .as("material-collection button stays reachable after delivery")
-        .contains("/orders/" + orderId + "/material-collection");
+        .as("item-collection button stays reachable after delivery")
+        .contains("/orders/" + orderId + "/item-collection");
     // Delivery-gating message split (REQ-ORDERS-025): once every ordered unit is delivered
     // (isFullyDelivered), the "all items delivered" note shows and the produce-first hint does not.
     assertThat(html)
@@ -704,11 +710,94 @@ class JobOrderItemDetailRenderTest {
     assertThat(html).as("no claim chips on a private order").doesNotContain("claim-chip");
   }
 
+  @Test
+  void kpiOpenAmount_SplitsScuAndPieceIntoSeparateNumbers() throws Exception {
+    // Given: a MATERIAL order mixing an SCU material (10 required, 2.5 in stock -> 7.5 SCU open)
+    // and
+    // a PIECE material (5 required, 1 in stock -> 4 Stück open). SCU and pieces are
+    // incommensurable,
+    // so the "Offene Menge" KPI tile must render them as two separate numbers, not 7.5 + 4 = 11.5.
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    JobOrderMaterialDto scuMat =
+        new JobOrderMaterialDto(
+            UUID.randomUUID(), material("Agricium", "SCU"), null, 10.0, 2.5, List.of(), null, 1L);
+    JobOrderMaterialDto pieceMat =
+        new JobOrderMaterialDto(
+            UUID.randomUUID(),
+            material("Power Plant", "PIECE"),
+            null,
+            5.0,
+            1.0,
+            List.of(),
+            null,
+            1L);
+    JobOrderDto order =
+        new JobOrderDto(
+            orderId,
+            11,
+            null,
+            null,
+            "Handle",
+            null,
+            1,
+            "OPEN",
+            "MATERIAL",
+            true,
+            List.of(scuMat, pieceMat),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            Instant.now(),
+            1L,
+            false);
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(order);
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // Scope the assertions to the KPI band (between #order-kpi-results and the tab navigation) so
+    // the
+    // material-table amounts below cannot satisfy them by accident.
+    int kpiStart = html.indexOf("order-kpi-results");
+    int kpiEnd = html.indexOf("tab-nav", kpiStart);
+    assertThat(kpiStart).as("KPI band present").isGreaterThan(0);
+    assertThat(kpiEnd).as("tab navigation follows the KPI band").isGreaterThan(kpiStart);
+    String kpiBand = html.substring(kpiStart, kpiEnd);
+
+    // The SCU sum is 7,500 (German decimal comma) and stays SCU; the piece sum is 4 and renders
+    // with
+    // the Stück unit. Neither is the summed 11,500 that the old single-accumulator tile would show.
+    assertThat(kpiBand).as("open SCU sum rendered as SCU").contains("7,500");
+    assertThat(kpiBand)
+        .as("open PIECE sum rendered with the Stück unit (split happened)")
+        .contains("Stück");
+    assertThat(kpiBand).as("open PIECE value is the piece sum (4)").contains(">4<");
+    assertThat(kpiBand)
+        .as("SCU and pieces are never summed into one figure")
+        .doesNotContain("11,500");
+  }
+
   private JobOrderDto oneLineItemOrder(UUID orderId) {
+    return oneLineItemOrder(orderId, UUID.randomUUID());
+  }
+
+  private JobOrderDto oneLineItemOrder(UUID orderId, UUID gameItemId) {
     JobOrderItemDto line =
         new JobOrderItemDto(
             UUID.randomUUID(),
-            new GameItemReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "WEAPON"),
+            new GameItemReferenceDto(gameItemId, "A03 Sniper Rifle", "WEAPON"),
             new BlueprintReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "wiki-a03"),
             3,
             0,
@@ -1012,14 +1101,17 @@ class JobOrderItemDetailRenderTest {
         .getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef(), eq(true));
   }
 
-  // ---- Item-Bestand panel (REQ-ORDERS-028) ----
+  // ---- Earmarked item stock, rendered inline in the item expand row (REQ-ORDERS-028) ----
 
-  /** One earmarked-stock group of the Item-Bestand panel, for the render tests below. */
+  /**
+   * One earmarked-stock group for the inline-expand render tests. {@code gameItemId} must match the
+   * ordered line's game item so the template's per-item lookup finds the stock.
+   */
   private static de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto
-      itemStockGroup(UUID entryId) {
+      itemStockGroup(UUID entryId, UUID gameItemId) {
     return new de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto(
         new de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto(
-            UUID.randomUUID(), "Cirrus Optic Scope", "Behring", "WEAPON_ATTACHMENT"),
+            gameItemId, "Cirrus Optic Scope", "Behring", "WEAPON_ATTACHMENT"),
         3,
         1,
         3L,
@@ -1036,18 +1128,19 @@ class JobOrderItemDetailRenderTest {
                 false)));
   }
 
-  // covers REQ-ORDERS-028 (the ITEM order's detail page renders the earmarked item stock grouped
-  // per game item, with the per-entry delivered toggle carrying the order id + entry version the
-  // PATCH echoes)
+  // covers REQ-ORDERS-028 (the earmarked item stock is rendered inline in the ordered item's expand
+  // row — who holds each unit and where — read-only, with NO delivered toggle: collecting moves to
+  // the Itemsammelübersicht page)
   @Test
-  void itemOrder_rendersItemStockPanelWithDeliveredToggle() throws Exception {
+  void itemOrder_rendersEarmarkedStockInlineInItemExpand() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     UUID entryId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
-        .thenReturn(oneLineItemOrder(orderId));
+        .thenReturn(oneLineItemOrder(orderId, gameItemId));
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId + "/item-stock"), anyTypeRef()))
-        .thenReturn(List.of(itemStockGroup(entryId)));
+        .thenReturn(List.of(itemStockGroup(entryId, gameItemId)));
 
     String html =
         mockMvc
@@ -1060,44 +1153,37 @@ class JobOrderItemDetailRenderTest {
             .getResponse()
             .getContentAsString();
 
-    // Then: the swap container and the populated panel render with the group's game item and its
-    // ordered/manufactured context chip.
-    assertThat(html).as("item-stock swap container").contains("id=\"order-item-stock-results\"");
-    assertThat(html).as("populated panel").contains("data-testid=\"order-item-stock-panel\"");
-    assertThat(html).as("game-item group name").contains("Cirrus Optic Scope");
+    // The ordered line is expandable, and its expand row carries the earmarked stock heading, the
+    // owner, the location and the this-order slice with the total-stock context (whole units).
     assertThat(html)
-        .as("group context chip (allocated/manufactured/ordered)")
-        .contains("zugeordnet");
-    // Then: the entry row carries the version the delivered PATCH echoes, and the allocated share
-    // is shown with the entry's total stock as context (whole units).
-    assertThat(html)
-        .as("entry row keyed by entry id")
-        .contains("data-inventory-id=\"" + entryId + "\"");
-    assertThat(html).as("entry row carries the entry @Version").contains("data-version=\"7\"");
+        .as("expand chevron on the item row")
+        .contains("data-trigger=\"od-toggle-demand\"");
+    assertThat(html).as("inline earmarked-stock block").contains("class=\"od-item-stock-inline\"");
+    assertThat(html).as("stock owner rendered inline").contains("Alice");
+    assertThat(html).as("stock location rendered inline").contains("Lorville");
     assertThat(html).as("total-stock context on a partial earmark").contains("von 4 im Bestand");
-    // Then: the delivered toggle is the delegated krtEvents control bound to THIS order.
+    // The inline view is read-only: the delivered toggle (and the removed standalone panel) are
+    // gone.
     assertThat(html)
-        .as("delivered toggle trigger")
-        .contains("data-trigger=\"od-item-stock-delivered\"");
+        .as("no delivered toggle in the read-only inline stock")
+        .doesNotContain("data-trigger=\"od-item-stock-delivered\"");
     assertThat(html)
-        .as("delivered toggle carries the order id for the per-slice PATCH")
-        .contains("data-job-order-id=\"" + orderId + "\"");
-    assertThat(html)
-        .as("no empty state next to a populated panel")
-        .doesNotContain("data-testid=\"order-item-stock-empty\"");
+        .as("the standalone Item-Bestand panel is removed")
+        .doesNotContain("data-testid=\"order-item-stock-panel\"");
   }
 
   // covers REQ-ORDERS-029 (the backend blanks owner/location for a requesting-side viewer; the
-  // panel must render a dash rather than an empty cell, while keeping the amount/progress)
+  // inline stock must render a dash rather than an empty cell, while keeping the amount/progress)
   @Test
   void itemOrder_redactedOwnerLocation_rendersDash() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     UUID entryId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
     de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto redacted =
         new de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto(
             new de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto(
-                UUID.randomUUID(), "Cirrus Optic Scope", "Behring", "WEAPON_ATTACHMENT"),
+                gameItemId, "Cirrus Optic Scope", "Behring", "WEAPON_ATTACHMENT"),
             3,
             1,
             3L,
@@ -1105,7 +1191,7 @@ class JobOrderItemDetailRenderTest {
                 new de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockEntryDto(
                     entryId, 7L, null, null, null, null, 4L, 3L, false)));
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
-        .thenReturn(oneLineItemOrder(orderId));
+        .thenReturn(oneLineItemOrder(orderId, gameItemId));
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId + "/item-stock"), anyTypeRef()))
         .thenReturn(List.of(redacted));
 
@@ -1120,14 +1206,17 @@ class JobOrderItemDetailRenderTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(html).as("panel still renders").contains("data-testid=\"order-item-stock-panel\"");
+    assertThat(html)
+        .as("inline earmarked stock still renders")
+        .contains("class=\"od-item-stock-inline\"");
     assertThat(html).as("blanked owner/location render as a dash").contains("<td>—</td>");
     assertThat(html).as("progress is kept on a redacted row").contains("von 4 im Bestand");
   }
 
-  // covers REQ-ORDERS-028 (empty state)
+  // covers REQ-ORDERS-028 (no earmarked stock -> no inline stock block; a line with material demand
+  // is still expandable for the demand)
   @Test
-  void itemOrder_noEarmarkedItemStock_rendersEmptyState() throws Exception {
+  void itemOrder_noEarmarkedStock_rendersNoInlineStock() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
@@ -1146,28 +1235,31 @@ class JobOrderItemDetailRenderTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(html).as("empty state rendered").contains("data-testid=\"order-item-stock-empty\"");
     assertThat(html)
-        .as("no populated panel without earmarked stock")
-        .doesNotContain("data-testid=\"order-item-stock-panel\"");
+        .as("no inline earmarked-stock block without stock")
+        .doesNotContain("class=\"od-item-stock-inline\"");
+    // The line still carries material demand, so its expand chevron is present for the demand
+    // block.
+    assertThat(html).as("demand still expandable").contains("data-trigger=\"od-toggle-demand\"");
   }
 
-  // covers REQ-ORDERS-028 (the `item-stock` live-sync section swap returns the panel alone)
+  // covers REQ-ORDERS-028 (the `items` fragment swap carries the inline earmarked stock)
   @Test
-  void itemOrder_itemStockFragment_rendersOnlyThePanel() throws Exception {
+  void itemOrder_itemsFragment_includesInlineStock() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     UUID entryId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
-        .thenReturn(oneLineItemOrder(orderId));
+        .thenReturn(oneLineItemOrder(orderId, gameItemId));
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId + "/item-stock"), anyTypeRef()))
-        .thenReturn(List.of(itemStockGroup(entryId)));
+        .thenReturn(List.of(itemStockGroup(entryId, gameItemId)));
 
     String html =
         mockMvc
             .perform(
                 get("/orders/" + orderId)
-                    .param("fragment", "item-stock")
+                    .param("fragment", "items")
                     .header("Accept-Language", "de")
                     .with(authentication(logisticianToken(userId))))
             .andExpect(status().isOk())
@@ -1176,17 +1268,17 @@ class JobOrderItemDetailRenderTest {
             .getContentAsString();
 
     assertThat(html)
-        .as("the swapped fragment carries the panel")
-        .contains("data-testid=\"order-item-stock-panel\"")
-        .contains("Cirrus Optic Scope");
+        .as("the items fragment carries the inline earmarked stock")
+        .contains("Alice")
+        .contains("Lorville");
     assertThat(html)
-        .as("a fragment swap returns the panel alone, not the whole page")
+        .as("a fragment swap returns the section alone, not the whole page")
         .doesNotContain("<html");
   }
 
-  // covers REQ-ORDERS-028 (a MATERIAL order renders no Item-Bestand panel and never fetches it)
+  // covers REQ-ORDERS-028 (a MATERIAL order renders no inline item stock and never fetches it)
   @Test
-  void materialOrder_hasNoItemStockPanel() throws Exception {
+  void materialOrder_hasNoItemStock() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     JobOrderMaterialDto mat =
@@ -1225,8 +1317,8 @@ class JobOrderItemDetailRenderTest {
             .getContentAsString();
 
     assertThat(html)
-        .as("no item-stock container on a material order")
-        .doesNotContain("order-item-stock-results");
+        .as("no inline item stock on a material order")
+        .doesNotContain("class=\"od-item-stock-inline\"");
     verify(backendApiClient, never())
         .get(eq("/api/v1/orders/" + orderId + "/item-stock"), anyTypeRef());
   }

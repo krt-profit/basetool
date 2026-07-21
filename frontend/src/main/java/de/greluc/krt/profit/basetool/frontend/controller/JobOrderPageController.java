@@ -547,19 +547,29 @@ public class JobOrderPageController {
         }
       }
 
-      // Item-Bestand panel (REQ-ORDERS-028): the game-item stock earmarked to this order, grouped
-      // per game item — the item sibling of the Materialsammlung, rendered on the "Bestellte
-      // Items" tab. Only an ITEM order renders the panel and the requester view omits it
-      // (mirroring the aggregated pane), so the fetch is scoped to the full page and the panel's
-      // own `item-stock` section swap; isolated so a failure degrades to the panel's empty state.
+      // Item stock (REQ-ORDERS-028): the game-item stock earmarked to this order, grouped per game
+      // item — the item sibling of the material drill-down, rendered inline in each ordered item's
+      // expand row on the "Bestellte Items" tab. Only an ITEM order carries it and the requester
+      // view omits it (mirroring the aggregated pane), so the fetch is scoped to the full page and
+      // the `items` section swap. `itemStockByGameItem` keys each group by its game-item id so the
+      // template matches an ordered line to its earmarked stock in O(1). Isolated so a failure
+      // degrades to "no stock" rather than failing the page.
       if ("ITEM".equals(order.type())
           && !requesterView
-          && (fragment == null || "item-stock".equalsIgnoreCase(fragment))) {
+          && (fragment == null || "items".equalsIgnoreCase(fragment))) {
         try {
-          model.addAttribute(
-              "itemStock",
+          List<JobOrderItemStockGroupDto> stock =
               backendApiClient.get(
-                  "/api/v1/orders/" + id + "/item-stock", LIST_OF_ITEM_STOCK_GROUP));
+                  "/api/v1/orders/" + id + "/item-stock", LIST_OF_ITEM_STOCK_GROUP);
+          Map<UUID, JobOrderItemStockGroupDto> byGameItem = new LinkedHashMap<>();
+          if (stock != null) {
+            for (JobOrderItemStockGroupDto group : stock) {
+              if (group.gameItem() != null && group.gameItem().id() != null) {
+                byGameItem.put(group.gameItem().id(), group);
+              }
+            }
+          }
+          model.addAttribute("itemStockByGameItem", byGameItem);
         } catch (Exception e) {
           log.debug("Item stock unavailable for order {}: {}", id, e.getMessage());
         }
@@ -599,7 +609,6 @@ public class JobOrderPageController {
         case "kpi" -> "orders-detail :: kpiSection";
         case "handovers" -> "orders-detail :: materialHandoverSection";
         case "items" -> "orders-detail :: itemsSection";
-        case "item-stock" -> "orders-detail :: itemStockSection";
         case "item-handovers" -> "orders-detail :: itemHandoverSection";
         case "item-handover-lines" -> "orders-detail :: itemHandoverLines";
         case "blueprint-owners" -> "orders-detail :: blueprintOwnersSection";
@@ -1007,14 +1016,19 @@ public class JobOrderPageController {
    * material requirements are fulfilled (currentStock ≥ amount) with a percentage bar, the
    * still-open material quantity (Σ max(0, amount − stock)), the claim count and the handover
    * count. For an ITEM order: delivered vs. ordered whole units with a bar, the still-open
-   * aggregated-material quantity, the claim count and the item-handover count. All sums null-guard
-   * the redacted requester view (where stock/claims are absent) so the tiles render zeros rather
-   * than throwing.
+   * aggregated-material quantity, the claim count and the item-handover count. The still-open
+   * quantity is split by the material's quantity type into an SCU sum ({@code openAmountScu}) and a
+   * whole-unit/PIECE sum ({@code openAmountPiece}) — SCU and pieces are incommensurable, so they
+   * are reported as two separate numbers with per-type presence flags ({@code
+   * hasScuMaterial}/{@code hasPieceMaterial}) driving which numbers the tile renders. All sums
+   * null-guard the redacted requester view (where stock/claims are absent) so the tiles render
+   * zeros rather than throwing.
    *
    * @param order the loaded order (any kind)
    * @return an insertion-ordered map of KPI values keyed for the fragment ({@code fulfilled},
    *     {@code total}, {@code fulfilledPct}, {@code delivered}, {@code amount}, {@code
-   *     deliveredPct}, {@code openAmount}, {@code claims}, {@code handovers})
+   *     deliveredPct}, {@code openAmountScu}, {@code openAmountPiece}, {@code hasScuMaterial},
+   *     {@code hasPieceMaterial}, {@code claims}, {@code handovers})
    */
   private Map<String, Object> computeKpi(JobOrderDto order) {
     Map<String, Object> kpi = new LinkedHashMap<>();
@@ -1024,7 +1038,10 @@ public class JobOrderPageController {
     kpi.put("delivered", 0);
     kpi.put("amount", 0);
     kpi.put("deliveredPct", 0);
-    kpi.put("openAmount", 0.0);
+    kpi.put("openAmountScu", 0.0);
+    kpi.put("openAmountPiece", 0.0);
+    kpi.put("hasScuMaterial", false);
+    kpi.put("hasPieceMaterial", false);
     kpi.put("claims", 0);
     kpi.put("handovers", 0);
     // Only SK-public orders carry material claims (the backend populates openAmount for them); a
@@ -1035,7 +1052,10 @@ public class JobOrderPageController {
       return kpi;
     }
 
-    double openAmount = 0.0;
+    double openAmountScu = 0.0;
+    double openAmountPiece = 0.0;
+    boolean hasScuMaterial = false;
+    boolean hasPieceMaterial = false;
     int claims = 0;
     boolean supportsClaims = false;
     if ("ITEM".equals(order.type())) {
@@ -1051,7 +1071,16 @@ public class JobOrderPageController {
         for (var agg : order.aggregatedMaterials()) {
           double required = agg.totalQuantity() != null ? agg.totalQuantity() : 0.0;
           double stock = agg.currentStock() != null ? agg.currentStock() : 0.0;
-          openAmount += Math.max(0.0, required - stock);
+          double open = Math.max(0.0, required - stock);
+          // SCU and PIECE demand are incommensurable — accumulate into separate sums (a null
+          // material defaults to SCU, mirroring the template's quantity-type null-guard).
+          if (agg.material() != null && "PIECE".equals(agg.material().quantityType())) {
+            hasPieceMaterial = true;
+            openAmountPiece += open;
+          } else {
+            hasScuMaterial = true;
+            openAmountScu += open;
+          }
           claims += agg.claims() != null ? agg.claims().size() : 0;
           if (agg.openAmount() != null) {
             supportsClaims = true;
@@ -1073,7 +1102,16 @@ public class JobOrderPageController {
           if (stock >= required) {
             fulfilled++;
           }
-          openAmount += Math.max(0.0, required - stock);
+          double open = Math.max(0.0, required - stock);
+          // SCU and PIECE demand are incommensurable — accumulate into separate sums (a null
+          // material defaults to SCU, mirroring the template's quantity-type null-guard).
+          if (mat.material() != null && "PIECE".equals(mat.material().quantityType())) {
+            hasPieceMaterial = true;
+            openAmountPiece += open;
+          } else {
+            hasScuMaterial = true;
+            openAmountScu += open;
+          }
           claims += mat.claims() != null ? mat.claims().size() : 0;
           if (mat.openAmount() != null) {
             supportsClaims = true;
@@ -1085,7 +1123,10 @@ public class JobOrderPageController {
       kpi.put("fulfilledPct", total > 0 ? (fulfilled * 100 / total) : 0);
       kpi.put("handovers", order.handovers() != null ? order.handovers().size() : 0);
     }
-    kpi.put("openAmount", openAmount);
+    kpi.put("openAmountScu", openAmountScu);
+    kpi.put("openAmountPiece", openAmountPiece);
+    kpi.put("hasScuMaterial", hasScuMaterial);
+    kpi.put("hasPieceMaterial", hasPieceMaterial);
     kpi.put("claims", claims);
     kpi.put("supportsClaims", supportsClaims);
     return kpi;
