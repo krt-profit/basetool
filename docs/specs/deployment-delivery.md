@@ -83,8 +83,15 @@ pin **and** the host config tree swapped in this deploy.
   single resolved digest set or none.
 - [ ] When the new images fail to become healthy within `IRI_HEALTH_TIMEOUT`, the previous
   digest pin **and** the previous config tree are restored before the run exits non-zero.
+- [ ] The container readiness probe cannot hang past the Docker `HEALTHCHECK` timeout: every
+  readiness-group health indicator is bounded so `/actuator/health/readiness` returns *within* the
+  probe window (frontend: the reactive Redis `PING` is capped by `spring.data.redis.timeout` = 2 s,
+  well below the 5 s HEALTHCHECK timeout — ADR-0114). A slow/stalled dependency therefore yields a
+  fast, truthful `DOWN`, so the health gate and the deploy `--wait` see a real, timely signal
+  instead of a probe that never completed.
 
-**Enforced by:** `scripts/deploy.sh` (rollback block) · **Runbook:** `docs/deployment.md` → *What happens on the server*
+**Enforced by:** `scripts/deploy.sh` (rollback block) · `frontend/src/main/resources/application.yml`
+(`spring.data.redis.timeout` / `connect-timeout`, ADR-0114) · **Runbook:** `docs/deployment.md` → *What happens on the server*
 
 ### REQ-OPS-004 — Host configuration delivered as a promotable, digest-pinned artifact
 

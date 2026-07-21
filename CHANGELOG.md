@@ -12,6 +12,8 @@
 
 - **Benachrichtigungen: Der Live-Push (SSE) funktioniert wieder.** Der Echtzeit-Kanal für die Glocke lieferte serverseitig keine Antwort-Header mehr aus (jeder Stream lief in einen Proxy-Timeout), weil das Frontend-Relay seine Antwort erst beim ersten weitergeleiteten Backend-Event committete — und dieser Schreibzugriff kommt auf Spring Boot 4 / Tomcat 11 aus einem Nicht-Container-Thread, der die Antwort nicht abschließt. Das Relay committet jetzt sofort auf dem Request-Thread (ein unsichtbares initiales SSE-Kommentar); der 60-Sekunden-Poll war durchgehend der Fallback, sodass nur die Live-Aktualisierung betroffen war (REQ-NOTIF-010, ADR-0113).
 
+- **Stabilität: Ein langsames oder blockiertes Redis kann das Frontend nicht mehr in die Wartungsseite kippen.** Die Bereitschaftsprüfung (Readiness) bezieht den Redis-Zustand ein; dessen reaktiver PING lief ohne gesetztes Kommando-Timeout in Lettuces 60-Sekunden-Standard und konnte den Health-Endpunkt minutenlang blockieren, sodass der Docker-Healthcheck (5-Sekunden-Fenster) scheiterte und der Container als „unhealthy" in die Wartungsseite kippte. Das Redis-Kommando- und Verbindungs-Timeout ist jetzt auf 2 s begrenzt (per Umgebungsvariable änderbar) — ein hängendes Redis wird schnell und ehrlich als „nicht bereit" gemeldet statt zu blockieren, ein echter Redis-Ausfall lässt die Readiness weiterhin korrekt fehlschlagen (REQ-OPS-003, ADR-0114).
+
 ## [v1.5.9](https://github.com/krt-profit/basetool/releases/tag/v1.5.9) - 2026-07-20
 
 ### Fixed
