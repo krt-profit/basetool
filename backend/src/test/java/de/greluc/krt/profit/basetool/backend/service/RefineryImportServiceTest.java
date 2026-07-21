@@ -680,6 +680,35 @@ class RefineryImportServiceTest {
   }
 
   @Test
+  void buildDraft_recoversTheVlmMethodAutocorrect() {
+    // Given — the terminal read "DINYX SOLVATION", the VLM's autocorrect of the game's
+    // "DINYX SOLVENTATION"; the closed-enum nearest-match must resolve it, not flag it unresolved.
+    RefiningMethod dinyx = refiningMethod("Dinyx Solventation");
+    Mockito.when(refiningMethodRepository.findAll()).thenReturn(List.of(dinyx, ferronExchange));
+    RefineryExtractOrderDto order =
+        new RefineryExtractOrderDto(
+            "SETUP",
+            true,
+            0.92,
+            "LEVSKI",
+            "DINYX SOLVATION",
+            null,
+            null,
+            48928.0,
+            1258L,
+            null,
+            null,
+            List.of(quotedGood(0, "STILERON (ORE)")));
+
+    // When
+    RefineryImportDraftDto draft = service.buildDraft(extract(1, order), CALLER_ID);
+
+    // Then
+    assertThat(draft.order().refiningMethod().id()).isEqualTo(dinyx.getId());
+    assertThat(issues(draft, ImportIssueCode.UNRESOLVED_METHOD)).isEmpty();
+  }
+
+  @Test
   void buildDraft_derivesStartedAtFromTheLatestCapture() {
     // Given — a scrolled three-capture order; the LAST capture marks the order start
     // (REQ-REFINERY-017), and an image without a capture time must not disturb the max
@@ -753,6 +782,24 @@ class RefineryImportServiceTest {
   }
 
   @Test
+  void matchMethod_snapsAMisReadToTheClosedEnumButRejectsNonMethodText() {
+    // The VLM autocorrects the game's "DINYX SOLVENTATION" to the real word and emits
+    // "DINYX SOLVATION" (PHASE0 method taxonomy); no exact lookup resolves it, so the closed-enum
+    // nearest-match must recover the intended method.
+    RefiningMethod dinyx = refiningMethod("Dinyx Solventation");
+    RefiningMethod electro = refiningMethod("Electrostarolysis");
+    Mockito.when(refiningMethodRepository.findAll())
+        .thenReturn(List.of(dinyx, electro, ferronExchange));
+
+    // Stage 3 (fuzzy nearest-match over the nine distinct methods) recovers the autocorrect.
+    assertThat(service.matchMethod("DINYX SOLVATION")).contains(dinyx);
+    // Stage 2 (canonical fold) resolves spacing / punctuation drift before the fuzzy stage.
+    assertThat(service.matchMethod("ferron-exchange")).contains(ferronExchange);
+    // Non-method panel text peaks below the accept threshold and stays unresolved (no wrong snap).
+    assertThat(service.matchMethod("PROCESSING SELECTION")).isEmpty();
+  }
+
+  @Test
   void matchRefineryLocation_matchesByCanonicalFold() {
     assertThat(service.matchRefineryLocation("LEVSKI")).contains(levski);
     assertThat(service.matchRefineryLocation("Orison")).isEmpty();
@@ -809,6 +856,13 @@ class RefineryImportServiceTest {
 
   private static RefineryExtractImageDto image(String name, Instant capturedAt) {
     return new RefineryExtractImageDto(name, 1920, 1080, "vlm", capturedAt);
+  }
+
+  private static RefiningMethod refiningMethod(String name) {
+    RefiningMethod method = new RefiningMethod();
+    method.setId(UUID.randomUUID());
+    method.setName(name);
+    return method;
   }
 
   private static RefineryExtractGoodDto quotedGood(int rowIndex, String rawMaterialName) {
