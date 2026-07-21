@@ -94,8 +94,12 @@ class MaterialgesuchPageControllerMvcTest {
         .thenReturn(new MaterialExchangeCountsDto(1, 0));
     when(backendApiClient.get(contains("/material-requests?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(request), 0, 200, 1, 1, List.of()));
-    // Detail lookup (any /material-requests/<id> that is not /counts).
-    when(backendApiClient.get(contains("/material-requests/"), anyClass())).thenReturn(request);
+    // Detail lookup: match the concrete request id, NOT the broad "/material-requests/" prefix.
+    // The prefix also matches "/material-requests/counts", and Mockito's last-matching-stub-wins
+    // would then route the counts call here (returning a MaterialRequestDto), so loadRequestCounts
+    // would hit a swallowed ClassCastException and silently render 0/0 instead of the stub.
+    when(backendApiClient.get(contains("/material-requests/" + request.id()), anyClass()))
+        .thenReturn(request);
   }
 
   private MaterialRequestDto materialRequest() {
@@ -139,7 +143,10 @@ class MaterialgesuchPageControllerMvcTest {
         // A material request carries its stated minimum quality as a fact.
         .andExpect(content().string(containsString("600")))
         // The owner (mine) sees the edit CTA.
-        .andExpect(content().string(containsString("data-mg-edit")));
+        .andExpect(content().string(containsString("data-mg-edit")))
+        // The "Alle Gesuche" tab shows the stubbed request count (1) — proving the request-counts
+        // lookup is honoured, not shadowed by the detail stub; every other tab-count renders 0.
+        .andExpect(content().string(containsString("<span class=\"tab-count\">1</span>")));
   }
 
   /** A PIECE material request renders its desired amount in the piece unit, never SCU (#1182). */

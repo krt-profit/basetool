@@ -44,6 +44,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -308,7 +309,7 @@ public class MaterialRequestBoardService {
   private static Set<UUID> ownerIdsOf(Collection<MaterialExchangeRequest> requests) {
     return requests.stream()
         .map(MaterialRequestBoardService::ownerIdOf)
-        .filter(id -> id != null)
+        .filter(Objects::nonNull)
         .collect(Collectors.toSet());
   }
 
@@ -358,7 +359,7 @@ public class MaterialRequestBoardService {
                     ownerId,
                     ownerRows.stream()
                         .map(row -> orgUnitsById.get(row.getId().getOrgUnitId()))
-                        .filter(ou -> ou != null)
+                        .filter(Objects::nonNull)
                         .sorted(ORG_UNIT_BADGE_ORDER)
                         .map(
                             ou ->
