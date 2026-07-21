@@ -30,6 +30,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -53,6 +55,13 @@ class RoleHierarchyTest {
   @MockitoBean private MeterRegistry meterRegistry;
 
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
+
+  // filterChain now injects the pool-hardened authorization_code token client (ADR-0115), which in
+  // production comes from WebClientConfig; this SecurityConfig-only slice mocks it like the other
+  // collaborators so the context still loads.
+  @MockitoBean
+  private OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
+      oauthAuthorizationCodeTokenResponseClient;
 
   @Autowired private RoleHierarchy roleHierarchy;
 

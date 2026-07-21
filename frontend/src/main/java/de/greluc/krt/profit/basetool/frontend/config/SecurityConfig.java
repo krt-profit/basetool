@@ -106,7 +106,11 @@ public class SecurityConfig {
       org.springframework.beans.factory.ObjectProvider<
               org.springframework.security.core.session.SessionRegistry>
           sessionRegistryProvider,
-      AuthenticationSuccessHandler oauth2LoginSuccessHandler)
+      AuthenticationSuccessHandler oauth2LoginSuccessHandler,
+      org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient<
+              org.springframework.security.oauth2.client.endpoint
+                  .OAuth2AuthorizationCodeGrantRequest>
+          oauthAuthorizationCodeTokenResponseClient)
       throws Exception {
     SmartOidcLogoutSuccessHandler oidcLogoutSuccessHandler =
         new SmartOidcLogoutSuccessHandler(clientRegistrationRepository, "{baseUrl}");
@@ -226,6 +230,14 @@ public class SecurityConfig {
                     // signal — KeycloakLoginErrorSpike's event regex misses code-to-token errors.
                     .failureHandler(new LoginFailureMetricsHandler(meterRegistry, "/?error"))
                     .successHandler(oauth2LoginSuccessHandler)
+                    // ADR-0115: run the authorization_code token exchange on the pool-hardened
+                    // OAuth token client (idle-evicting frontend-oauth-pool) instead of
+                    // reactor-netty's un-evicting global pool, closing the Keycloak-hairpin
+                    // PrematureClose on the login path as well as the refresh path.
+                    .tokenEndpoint(
+                        token ->
+                            token.accessTokenResponseClient(
+                                oauthAuthorizationCodeTokenResponseClient))
                     .authorizationEndpoint(
                         auth ->
                             auth.authorizationRequestResolver(
