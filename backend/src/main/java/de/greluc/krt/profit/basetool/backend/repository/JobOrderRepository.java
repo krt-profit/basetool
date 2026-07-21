@@ -78,25 +78,35 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   Optional<JobOrder> findById(UUID id);
 
   /**
-   * Loads every job-order in {@code OPEN} or {@code IN_PROGRESS} status together with its materials
-   * and handover items in one query, ordered by ascending {@code priority} (most-important first;
-   * orders without a priority sort last) and then by descending {@code displayId} as a stable
-   * tiebreaker — mirroring the Auftragsverwaltung's default {@code priority,asc} ranking so the
-   * warehouse (Lager) job-order filter and per-row pickers present the same order. Eager-fetch path
-   * matches what the active-orders board renders, so there is no N+1.
+   * Loads every job-order in {@code OPEN} or {@code IN_PROGRESS} status together with the material
+   * requirements the active-order lookup projects, ordered by ascending {@code priority}
+   * (most-important first; orders without a priority sort last) and then by descending {@code
+   * displayId} as a stable tiebreaker — mirroring the Auftragsverwaltung's default {@code
+   * priority,asc} ranking so the warehouse (Lager) job-order filter and per-row pickers present the
+   * same order. Eager-fetch path matches exactly what {@link
+   * de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService#findAllActiveReference()}
+   * reads, so there is no N+1.
    *
    * <p>The item lines ({@code items} → {@code items.materials} → {@code items.materials.material})
-   * are fetched too so the Lager picker can compute an ITEM order's required materials ({@code
+   * are fetched so the picker can compute an ITEM order's required materials ({@code
    * JobOrderItemService.requiredMaterialIds}) without an N+1 per ITEM order; {@code items.gameItem}
    * (a to-one path, no row explosion) joins the graph so the requested-game-item set ({@code
-   * JobOrderItemService.requiredGameItemIds}, REQ-INV-031) resolves N+1-free too. A row explosion
-   * across the {@code materials} and {@code items.materials} collection paths does not occur in
-   * practice: the two order kinds are mutually exclusive, so for any given order exactly one of the
-   * two collections is non-empty. The {@code handovers} branch fetched here is MATERIAL-only (an
-   * ITEM order's deliveries live on the separate {@code itemHandovers} collection, which is
-   * deliberately NOT fetched), so it too stays empty for an ITEM order. <strong>Do not add {@code
-   * itemHandovers} (or any second ITEM-side collection) to this graph:</strong> combined with
-   * {@code items.materials} it would be a genuine cartesian product on ITEM orders.
+   * JobOrderItemService.requiredGameItemIds}, REQ-INV-031) resolves N+1-free too. The {@code
+   * materials} and {@code items.materials} branches never explode against each other: the two order
+   * kinds are mutually exclusive, so for any given order exactly one branch is non-empty. Like
+   * every other multi-collection fetch query here, the result relies on Hibernate's automatic
+   * de-duplication of fetch-join roots, so each active order appears exactly once in the returned
+   * list — no {@code DISTINCT} is needed (REQ-ORDERS-018).
+   *
+   * <p><strong>Handovers are deliberately NOT fetched here</strong> — neither the MATERIAL {@code
+   * handovers} nor the ITEM {@code itemHandovers} side. The lookup projection reads only the order
+   * handle, status, requesting org unit and the required-material/-game-item sets, never a
+   * handover. Beyond being dead weight, a MATERIAL order legitimately carries both material lines
+   * <em>and</em> handovers, so eager-fetching {@code handovers} alongside {@code materials} turned
+   * the query into a {@code materials × handovers} cartesian product <em>at the SQL level</em> —
+   * extra result-set rows Hibernate has to read and then discard while de-duplicating the roots
+   * (Hibernate collapses them, so no duplicate root ever reached the picker, but the wasted rows
+   * were real). Keep this graph free of any handover branch; the picker never needs it.
    */
   @EntityGraph(
       attributePaths = {
@@ -106,9 +116,6 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "items.gameItem",
         "items.materials",
         "items.materials.material",
-        "handovers",
-        "handovers.items",
-        "handovers.items.material",
         "responsibleOrgUnit",
         "requestingOrgUnit"
       })

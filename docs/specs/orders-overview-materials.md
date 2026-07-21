@@ -78,6 +78,16 @@ kind-agnostic `JobOrderReferenceDto.requiredMaterialIds` (served by `/api/v1/ord
 rather than the MATERIAL-only `materials` list; a picker fed by the full order list and filtered
 on `materials` would silently drop every `ITEM` order.
 
+The lookup projection (`/api/v1/orders/lookup`) MUST list each active order **at most once**, even
+when it carries several material or item lines and one or more handovers, so a picker never renders
+a duplicated `<option>`. Hibernate de-duplicates the roots of a fetch-join result, so the returned
+list already carries each order once; the lookup additionally MUST NOT eager-fetch collections it
+does not read — in particular **no handover collection** — because a MATERIAL order carries both
+material lines and handovers, so joining `handovers` alongside `materials` would multiply the SQL
+result into a `materials × handovers` cartesian (extra rows Hibernate reads and then discards while
+collapsing the roots). `findAllActiveWithMaterials` therefore fetches only the material/item
+requirement branches, in `priority ASC NULLS LAST, displayId DESC` order.
+
 **GameItem sibling (REQ-INV-031).** A **game-item** stock row
 ([`inventory-items.md`](inventory-items.md)) may only be linked to an `ITEM` order whose lines
 request that gameItem, gated on `JobOrderItemService.requiredGameItemIds` /
@@ -95,10 +105,13 @@ two gates are parallel, not a replacement.
   plus the order the row is already assigned to.
 - [ ] The refinery store dialog's "Auftrag" dropdown for an output material offers only orders
   that require that material (both order kinds, `ITEM` orders included).
+- [ ] The lookup lists each active order at most once (no duplicate `<option>`) even for an order
+  with multiple material or item lines plus a handover.
 
 **Enforced by:** `InventoryItemServiceTest` (create/update gate),
 `JobOrderItemServiceTest` (`requiredMaterialIds`),
-`InventoryPageControllerMvcTest` / `RefineryOrderStoreJobOrderDropdownTest` (picker filters) ·
+`InventoryPageControllerMvcTest` / `RefineryOrderStoreJobOrderDropdownTest` (picker filters),
+`JobOrderRepositoryActiveLookupOrderingTest` (lookup ordering + distinct roots) ·
 **Code:** `InventoryItemService.createInventoryItem` / `updateInventoryItem`,
 `JobOrderItemService.requiredMaterialIds`, `JobOrderReferenceDto.requiredMaterialIds`,
 `JobOrderService.findAllActiveReference`, `templates/fragments/inventory-stack-entries.html`,
