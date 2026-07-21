@@ -376,6 +376,14 @@
 .mb-modal-facts {
     margin-bottom: 14px;
 }
+/* The request modal's subject-facts strip (data-mg-subject-facts) is edit-only: materialgesuch-modal.js
+   sets `hidden` on it in create mode. The `hidden` attribute must win over the .facts-bar flex display
+   (the UA [hidden] rule loses to a class, the same trap the .mb-modal-qty guard covers), otherwise the
+   empty "Gesucht —" placeholder leaks into the create/search modal. The offer facts bar never carries
+   `hidden`, so it is unaffected. */
+.mb-modal-facts[hidden] {
+    display: none;
+}
 /* Item-offer quantity field (item mode only, REQ-MARKET-012). */
 .mb-modal-qty {
     display: flex;
@@ -436,7 +444,8 @@
     font-weight: 400;
     text-transform: none;
 }
-#mb-modal textarea {
+#mb-modal textarea,
+#mg-modal textarea {
     width: 100%;
     box-sizing: border-box;
 }

@@ -62,9 +62,13 @@
     <div id="mb-board">
         <!-- Full-page render shows the board of the active mode; a fragment swap targets
              `materialboerse :: board` (offers) or `fragments/materialgesuch-board :: requestBoard`
-             directly, so these mode guards never interfere with an in-place swap. -->
-        <th:block th:if="${activeMode == 'requests'}"
-                  th:replace="~{fragments/materialgesuch-board :: requestBoard}"></th:block>
+             directly, so these mode guards never interfere with an in-place swap. The requestBoard
+             include sits inside its own th:if wrapper (NOT th:if + th:replace on one element): th:replace
+             has higher precedence than th:if, so combined on one tag the fragment would be included
+             unconditionally and both boards would render at once on the offers view (until a swap). -->
+        <th:block th:if="${activeMode == 'requests'}">
+            <th:block th:replace="~{fragments/materialgesuch-board :: requestBoard}"></th:block>
+        </th:block>
         <th:block th:unless="${activeMode == 'requests'}">
         <th:block th:fragment="board">
             <div class="mb-toolbar">

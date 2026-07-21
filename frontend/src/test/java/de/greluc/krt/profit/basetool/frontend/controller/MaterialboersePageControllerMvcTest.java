@@ -131,6 +131,30 @@ class MaterialboersePageControllerMvcTest {
   }
 
   /**
+   * The default offers-mode full page renders ONLY the offers board — never the Gesuche (requests)
+   * board stacked on top of it. Regression for the Thymeleaf attribute-precedence trap where {@code
+   * th:if} and {@code th:replace} sat on one {@code th:block}: {@code th:replace} outranks {@code
+   * th:if}, so the request-board fragment was included unconditionally and both boards rendered at
+   * once on page open (until a tab switch swapped one away). The request board's own wrapper
+   * markers ({@code id="mg-listwrap"}, {@code data-mg-search}) must be absent here.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void page_offersMode_rendersOnlyOffersBoardNotRequestsBoard() throws Exception {
+    stubBoard();
+
+    mockMvc
+        .perform(get("/materialboerse"))
+        .andExpect(status().isOk())
+        // The offers board is present ...
+        .andExpect(content().string(containsString("id=\"mb-listwrap\"")))
+        .andExpect(content().string(containsString("data-mb-search")))
+        // ... and the request board is NOT included on top of it.
+        .andExpect(content().string(not(containsString("id=\"mg-listwrap\""))))
+        .andExpect(content().string(not(containsString("data-mg-search"))));
+  }
+
+  /**
    * A PIECE material renders its amount as an integer count in the piece unit ("12 Piece"), never
    * as SCU — the regression from issue #1182 where every offer was shown as SCU. The locale is
    * pinned to English via {@code ?lang} so the assertion stays ASCII.
