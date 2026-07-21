@@ -48,6 +48,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
@@ -232,7 +233,7 @@ public class JobOrderPageController {
     // the
     // requester "Meine Auftraege" list (which is keyed on the caller's own requesting units).
     List<UUID> selectedSquadronIds =
-        (squadronId == null) ? List.of() : squadronId.stream().filter(id -> id != null).toList();
+        (squadronId == null) ? List.of() : squadronId.stream().filter(Objects::nonNull).toList();
     int effectivePage = page == null || page < 0 ? 0 : page;
     int effectiveSize = size != null && PAGE_SIZES.contains(size) ? size : DEFAULT_PAGE_SIZE;
 
@@ -1353,7 +1354,7 @@ public class JobOrderPageController {
     log.debug(
         "JobOrder: Checking logistician status for user u-{}. Original authorities: {}."
             + " Reachable authorities: {}",
-        Integer.toHexString(java.util.Objects.hashCode(principal.getName())),
+        Integer.toHexString(Objects.hashCode(principal.getName())),
         authorities,
         reachableAuthorities);
     boolean result =

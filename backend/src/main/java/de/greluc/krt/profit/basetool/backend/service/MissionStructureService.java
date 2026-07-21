@@ -44,6 +44,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -302,7 +303,7 @@ public class MissionStructureService {
       boolean alreadyAssignedInMission =
           mission.getAssignedUnits().stream()
               .map(MissionUnit::getShip)
-              .filter(assigned -> assigned != null)
+              .filter(Objects::nonNull)
               .anyMatch(assigned -> assigned.getId().equals(shipId));
       if (!alreadyAssignedInMission && !isOwnerRegisteredParticipant(mission, ship)) {
         throw new IllegalArgumentException(
@@ -357,7 +358,7 @@ public class MissionStructureService {
     UUID ownerId = ship.getOwner().getId();
     return mission.getParticipants().stream()
         .map(MissionParticipant::getUser)
-        .filter(user -> user != null)
+        .filter(Objects::nonNull)
         .anyMatch(user -> user.getId().equals(ownerId));
   }
 
@@ -386,7 +387,7 @@ public class MissionStructureService {
     Set<UUID> participantUserIds =
         mission.getParticipants().stream()
             .map(MissionParticipant::getUser)
-            .filter(user -> user != null)
+            .filter(Objects::nonNull)
             .map(User::getId)
             .collect(java.util.stream.Collectors.toSet());
     if (!participantUserIds.isEmpty()) {
