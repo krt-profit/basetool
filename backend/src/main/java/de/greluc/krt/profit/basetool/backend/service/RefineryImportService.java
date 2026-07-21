@@ -328,9 +328,9 @@ public class RefineryImportService {
   }
 
   /**
-   * Resolves a raw method read against {@code refining_method} — the closed UEX enum of nine methods
-   * (title-cased master data, e.g. {@code "Ferron Exchange"}; the screen renders uppercase). Three
-   * deterministic-then-fuzzy stages, stopping at the first hit:
+   * Resolves a raw method read against {@code refining_method} — the closed UEX enum of nine
+   * methods (title-cased master data, e.g. {@code "Ferron Exchange"}; the screen renders
+   * uppercase). Three deterministic-then-fuzzy stages, stopping at the first hit:
    *
    * <ol>
    *   <li>exact case-insensitive name (the fast path; UEX title case vs. the uppercase screen);
@@ -341,13 +341,13 @@ public class RefineryImportService {
    *       RefineryImportProperties#getMethodFuzzyAcceptThreshold()}.
    * </ol>
    *
-   * <p>Stage 3 is what recovers the VLM's one systematic method mis-read: the model autocorrects the
-   * game's {@code "DINYX SOLVENTATION"} to the real English word and emits {@code "DINYX SOLVATION"},
-   * which no exact lookup can resolve. Because the nine methods are highly distinct, the intended
-   * method wins by a wide margin (~0.83 vs. ≤ ~0.36 for the runner-up), so a low threshold recovers
-   * the mis-read without risking a wrong silent snap; non-method text peaks near 0.4 and stays
-   * unresolved. The import is a review-before-save draft, so the user still confirms the pre-filled
-   * method before persisting.
+   * <p>Stage 3 is what recovers the VLM's one systematic method mis-read: the model autocorrects
+   * the game's {@code "DINYX SOLVENTATION"} to the real English word and emits {@code "DINYX
+   * SOLVATION"}, which no exact lookup can resolve. Because the nine methods are highly distinct,
+   * the intended method wins by a wide margin (~0.83 vs. ≤ ~0.36 for the runner-up), so a low
+   * threshold recovers the mis-read without risking a wrong silent snap; non-method text peaks near
+   * 0.4 and stays unresolved. The import is a review-before-save draft, so the user still confirms
+   * the pre-filled method before persisting.
    *
    * @param rawName verbatim screen read; null/blank yields empty
    * @return the matched refining method, or empty
