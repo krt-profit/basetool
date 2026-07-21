@@ -16,6 +16,8 @@
 
 - **Lager-Einbuchen: Die Auftrags-Auswahl beim Zuordnen zeigt jetzt zuverlässig die passenden Aufträge.** Im Einbuchen-Formular filterte die „Aufträge zuordnen"-Auswahl nach den Materialzeilen des Auftrags — die bei Fertigungsaufträgen (Item-Aufträge) leer sind. Dadurch fehlten je nach gewähltem Material mal alle, mal nur einige Aufträge, oder es erschienen vor der Materialauswahl alle. Der Filter nutzt jetzt die auftragsartunabhängige Menge der benötigten Materialien (`requiredMaterialIds`), sodass auch Fertigungsaufträge auftauchen, deren Bauplan das Material verbraucht (REQ-ORDERS-018).
 
+- **Login/Session: Gelegentliche „Fehler beim Laden" bzw. erzwungene Neuanmeldungen durch abgerissene Keycloak-Verbindungen behoben.** Die Token-Aufrufe des Frontends an Keycloak (Login und automatische Token-Erneuerung) laufen über den öffentlichen Reverse-Proxy und nutzten Spring Securitys Standard-Verbindungspool, der veraltete Keepalive-Verbindungen nicht aussortiert; griff eine Token-Erneuerung auf eine bereits vom Proxy geschlossene Verbindung zu, brach sie mit einem Verbindungsfehler ab. Beide Token-Wege bekommen jetzt einen eigenen Verbindungspool, der ungenutzte Verbindungen vor dem Keepalive-Timeout des Proxys wegräumt; reine Transportänderung ohne Auswirkung auf die Token-Erneuerungslogik (REQ-SEC-012, ADR-0115).
+
 ## [v1.5.9](https://github.com/krt-profit/basetool/releases/tag/v1.5.9) - 2026-07-20
 
 ### Fixed
