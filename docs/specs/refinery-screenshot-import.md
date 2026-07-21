@@ -138,8 +138,12 @@ and the user-facing message wording were widened.
 
 `rawLocationName` resolves by unique canonical name against the refinery-equipped
 locations only (`LocationRepository.findLocationsWithRefinery()` — the create-form
-picker source); `rawMethodName` resolves case-insensitively against
-`refining_method.name`. An unresolved or absent value leaves the draft field `null` and
+picker source); `rawMethodName` resolves against the closed nine-method `refining_method`
+enum in three deterministic-then-fuzzy stages — exact case-insensitive name, unique
+canonical-core fold, then a fuzzy nearest-match at or above
+`krt.refinery-import.method-fuzzy-accept-threshold` (default 0.6) — so the local VLM's
+systematic autocorrect (`DINYX SOLVATION` for *Dinyx Solventation*) still resolves. An
+unresolved or absent value leaves the draft field `null` and
 adds `UNRESOLVED_LOCATION` / `UNRESOLVED_METHOD` (WARNING) — the normal case for
 pre-cropped panel input, which never contains the terminal header. `expenses` and
 `durationMinutes` are copied verbatim; `status` defaults to `OPEN`; the owner defaults
@@ -149,6 +153,12 @@ stay with the create flow.
 
 *Amended 2026-06-11:* `startedAt` originally stayed with the create flow ("now" at save
 time); REQ-REFINERY-017 now derives it from the contract's per-image `capturedAt`.
+
+*Amended 2026-07-21:* `rawMethodName` originally resolved by exact case-insensitive name
+only; it now runs a canonical-fold + fuzzy nearest-match over the closed method enum so
+the VLM's `DINYX SOLVATION` mis-read resolves. The nine method names are distinct enough
+(mis-read ~0.83 vs. runner-up ≤ ~0.36, non-method text ~0.4) that the low accept
+threshold cannot mis-snap.
 
 ### REQ-REFINERY-009 — Issue model (cross-module contract)
 
