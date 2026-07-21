@@ -773,6 +773,62 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
+   * Book-in-form picker-filter guard (REQ-ORDERS-018): the {@code /inventory/input} order dropdown
+   * carries a per-option {@code data-materials} CSV that the client filter ({@code
+   * inventory-input.js#filterOrderSelects}) keys on. It must be the order's kind-agnostic {@code
+   * requiredMaterialIds}, not its {@code materials} MATERIAL-lines — an ITEM (crafting) order has
+   * no {@code job_order_material} rows, so an empty {@code materials} list rendered {@code
+   * data-materials=""} and the filter silently hid every ITEM order whose blueprint consumes the
+   * picked material (the reported "no/all/some orders" unreliability). Stubs an ITEM order with an
+   * empty {@code materials} list but a populated {@code requiredMaterialIds}, and asserts the
+   * option exposes the required material id in {@code data-materials}.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewInputPage_ShouldKeyOrderDataMaterialsOnRequiredMaterialIds() throws Exception {
+    UUID materialId = UUID.randomUUID();
+    UUID itemOrderId = UUID.randomUUID();
+
+    // An ITEM order: empty MATERIAL-lines list, so only requiredMaterialIds surfaces the material
+    // its blueprint consumes — exactly the case the old order.materials-based CSV dropped.
+    JobOrderReferenceDto itemOrder =
+        new JobOrderReferenceDto(
+            itemOrderId,
+            71,
+            "craft-1",
+            "IN_PROGRESS",
+            null,
+            List.of(),
+            List.of(materialId),
+            List.of());
+
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              if (url.contains("/orders/lookup")) {
+                return List.of(itemOrder);
+              }
+              return Collections.emptyList();
+            });
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/input"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-input"))
+        // The ITEM order's option must tie its value to a data-materials CSV holding the required
+        // material id; the old order.materials source rendered data-materials="" here.
+        .andExpect(
+            content()
+                .string(
+                    stringContainsInOrder(
+                        "value=\"" + itemOrderId + "\"", "data-materials=\"" + materialId + "\"")))
+        .andExpect(content().string(not(containsString("data-materials=\"\""))));
+  }
+
+  /**
    * Same as {@link #viewMyStackEntries_ShouldRenderEntryRowsWithMissionFallbackOption()} for the
    * logistician/admin stack-entries drill-down ({@code /inventory/all/stack/entries} → {@code
    * stackEntriesAdmin} fragment), which additionally carries the owning {@code userId} in the stack

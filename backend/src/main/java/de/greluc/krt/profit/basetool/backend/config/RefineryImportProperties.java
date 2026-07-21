@@ -52,6 +52,21 @@ public class RefineryImportProperties {
   private Double fuzzyAcceptThreshold = 0.9;
 
   /**
+   * Minimum {@code BlueprintFuzzyMatcher} score at which the nearest refining method is accepted
+   * for the draft. Deliberately lower than {@link #fuzzyAcceptThreshold}: refining methods are a
+   * CLOSED set of nine very distinct UEX names, so a mis-read snaps unambiguously to its intended
+   * method — the VLM's known autocorrect {@code "DINYX SOLVATION"} → {@code "Dinyx Solventation"}
+   * scores ~0.83 while every other method stays below ~0.36, and non-method text (e.g. a stray
+   * panel label) peaks near 0.4. The 0.6 default sits comfortably between that noise ceiling and
+   * the mis-read floor. An open-catalogue material match, by contrast, must clear the stricter 0.9
+   * bar.
+   */
+  @NotNull
+  @DecimalMin("0.5")
+  @DecimalMax("1.0")
+  private Double methodFuzzyAcceptThreshold = 0.6;
+
+  /**
    * Minimum score for a candidate to be offered as a suggestion at all (the pick-list floor, far
    * below {@link #fuzzyAcceptThreshold}). Mirrors {@code BlueprintFuzzyMatcher.DEFAULT_THRESHOLD}.
    */
