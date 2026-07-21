@@ -70,13 +70,18 @@ kind-agnostic: for a `MATERIAL` order its material lines, for an `ITEM` order th
 derived and snapshotted from the ordered items' blueprints (`JobOrderItemService.requiredMaterialIds`).
 Every job-order picker that links stock to an order MUST hide an order that does not require the
 material being linked, and MAY still list the order the row is **already** assigned to, so an
-existing (possibly orphaned) link stays visible and clearable. This covers both the Lager
-"Auftrag" picker and the refinery store ("Einlagern") dialog's per-item "Auftrag" picker, which
-links the refined output material to an order that needs it. The picker filter MUST be correct
+existing (possibly orphaned) link stays visible and clearable. This covers all three linking
+pickers: the Lager stack-entry "Auftrag" picker (in-place association edit), the Lager book-in
+create form's per-row "Aufträge zuordnen" allocation picker (`inventory-input.html`), and the
+refinery store ("Einlagern") dialog's per-item "Auftrag" picker, which links the refined output
+material to an order that needs it. The picker filter MUST be correct
 for `ITEM` orders too — these carry no `job_order_material` rows, so every picker keys on the
 kind-agnostic `JobOrderReferenceDto.requiredMaterialIds` (served by `/api/v1/orders/lookup`)
 rather than the MATERIAL-only `materials` list; a picker fed by the full order list and filtered
-on `materials` would silently drop every `ITEM` order.
+on `materials` would silently drop every `ITEM` order. The book-in form applies the same gate
+client-side: each order option carries a `data-materials` CSV built from `requiredMaterialIds`
+(the item-mode sibling `data-game-items` from `requiredGameItemIds`), and `inventory-input.js`
+filters the rows to the option whose CSV contains the picked material/game item.
 
 The lookup projection (`/api/v1/orders/lookup`) MUST list each active order **at most once**, even
 when it carries several material or item lines and one or more handovers, so a picker never renders
@@ -103,6 +108,9 @@ two gates are parallel, not a replacement.
 - [ ] The same link succeeds when the order requires the material (both order kinds).
 - [ ] The Lager "Auftrag" dropdown for a row offers only orders that require that row's material,
   plus the order the row is already assigned to.
+- [ ] The Lager book-in form's "Aufträge zuordnen" dropdown offers only orders that require the
+  picked material/game item (both order kinds, `ITEM` orders included) — its `data-materials` CSV
+  is keyed on `requiredMaterialIds`, not the MATERIAL-only `materials` list.
 - [ ] The refinery store dialog's "Auftrag" dropdown for an output material offers only orders
   that require that material (both order kinds, `ITEM` orders included).
 - [ ] The lookup lists each active order at most once (no duplicate `<option>`) even for an order
@@ -110,11 +118,13 @@ two gates are parallel, not a replacement.
 
 **Enforced by:** `InventoryItemServiceTest` (create/update gate),
 `JobOrderItemServiceTest` (`requiredMaterialIds`),
-`InventoryPageControllerMvcTest` / `RefineryOrderStoreJobOrderDropdownTest` (picker filters),
+`InventoryPageControllerMvcTest` (stack-entry picker + book-in form `data-materials`) /
+`RefineryOrderStoreJobOrderDropdownTest` (picker filters),
 `JobOrderRepositoryActiveLookupOrderingTest` (lookup ordering + distinct roots) ·
 **Code:** `InventoryItemService.createInventoryItem` / `updateInventoryItem`,
 `JobOrderItemService.requiredMaterialIds`, `JobOrderReferenceDto.requiredMaterialIds`,
 `JobOrderService.findAllActiveReference`, `templates/fragments/inventory-stack-entries.html`,
+`templates/inventory-input.html` / `static/js/inventory-input.js`,
 `RefineryOrderPageController.fetchActiveJobOrders`, `templates/refinery-orders-details.html`
 
 ### REQ-ORDERS-019 — Order detail surfaces orphaned linked inventory

@@ -53,15 +53,25 @@ import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.ReactorClientHttpRequestFactory;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.http.converter.FormHttpMessageConverter;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientProvider;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientProviderBuilder;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest;
+import org.springframework.security.oauth2.client.endpoint.OAuth2RefreshTokenGrantRequest;
+import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizationCodeTokenResponseClient;
+import org.springframework.security.oauth2.client.endpoint.RestClientRefreshTokenTokenResponseClient;
+import org.springframework.security.oauth2.client.http.OAuth2ErrorResponseErrorHandler;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.client.web.reactive.function.client.ServletOAuth2AuthorizedClientExchangeFilterFunction;
+import org.springframework.security.oauth2.core.http.converter.OAuth2AccessTokenResponseHttpMessageConverter;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -133,6 +143,41 @@ public class WebClientConfig {
    * tracing disabled (the default) the registry only feeds metrics; no tracing machinery runs.
    */
   private final io.micrometer.observation.ObservationRegistry observationRegistry;
+
+  /**
+   * Dedicated reactor-netty connection pool for the OAuth2 token-endpoint backchannel to Keycloak
+   * (the {@code authorization_code} exchange at login and the recurring {@code refresh_token}
+   * grant).
+   *
+   * <p>Spring Security's default {@code RestClient}-based token-response clients run on
+   * reactor-netty's <b>global</b> connection pool, which has <b>no idle eviction</b>. The token
+   * endpoint ({@code spring.security.oauth2.client.provider.keycloak.token-uri}, derived from the
+   * public {@code issuer-uri}) is reached over the public NPM edge, which reaps idle keep-alive
+   * sockets after ~60&ndash;75&nbsp;s; a refresh grant that reuses such a server-closed socket
+   * fails with reactor-netty's {@code PrematureCloseException}, surfacing as an intermittent
+   * auth-path 5xx / forced re-login.
+   *
+   * <p>This pool evicts idle connections after 20&nbsp;s &mdash; comfortably <b>below</b> the
+   * upstream keep-alive &mdash; and sweeps them in the background every 10&nbsp;s, so a stale
+   * socket is discarded before it can be handed to a token call. {@code metrics(true)} exposes
+   * {@code reactor.netty.connection.provider.*} tagged {@code frontend-oauth-pool}, mirroring the
+   * {@code frontend-pool} / {@code frontend-sse-pool} request pools. It is a pure transport swap:
+   * the token request, the refresh-token replay semantics and the REQ-SEC-012 single-flight
+   * behaviour are unchanged (ADR-0115).
+   *
+   * <p>Initialised at the field (not via the Lombok constructor): a constant-config shared resource
+   * with no injected dependency, so {@code @RequiredArgsConstructor} leaves it out of the generated
+   * constructor.
+   */
+  private final reactor.netty.resources.ConnectionProvider oauthTokenPool =
+      reactor.netty.resources.ConnectionProvider.builder("frontend-oauth-pool")
+          .maxConnections(20)
+          .maxIdleTime(java.time.Duration.ofSeconds(20))
+          .maxLifeTime(java.time.Duration.ofSeconds(60))
+          .pendingAcquireTimeout(java.time.Duration.ofSeconds(5))
+          .evictInBackground(java.time.Duration.ofSeconds(10))
+          .metrics(true)
+          .build();
 
   /**
    * Builds the Netty SSL context for the backend WebClient. Three behaviours, picked by active
@@ -359,6 +404,84 @@ public class WebClientConfig {
   }
 
   /**
+   * Builds a {@link RestClient} for the OAuth2 token endpoint that replicates Spring Security's
+   * default token-response-client HTTP stack &mdash; a {@link FormHttpMessageConverter} for the
+   * {@code application/x-www-form-urlencoded} grant request, an {@link
+   * OAuth2AccessTokenResponseHttpMessageConverter} for the token JSON, and an {@link
+   * OAuth2ErrorResponseErrorHandler} &mdash; and swaps <b>only</b> the transport for a
+   * reactor-netty {@link HttpClient} bound to the idle-evicting {@link #oauthTokenPool}. Only
+   * {@code setRestClient} is overridden on the token client, so its own parameters/headers
+   * converters are untouched: this is a transport-only change, neutral to the refresh-token replay
+   * semantics of REQ-SEC-012 (ADR-0115).
+   *
+   * <p>No explicit {@code secure(...)} call: reactor-netty negotiates TLS per request from the URL
+   * scheme, so the {@code https} Keycloak endpoint uses the default system trust store (its edge
+   * cert is publicly trusted) while an {@code http} endpoint (e.g. a test double) stays plaintext.
+   * Both token clients share the single {@link #oauthTokenPool}, so pool metrics stay one series.
+   *
+   * @return a {@code RestClient} whose transport is the idle-evicting OAuth pool
+   */
+  private RestClient oauthTokenRestClient() {
+    HttpClient httpClient =
+        HttpClient.create(oauthTokenPool)
+            .option(
+                ChannelOption.CONNECT_TIMEOUT_MILLIS,
+                Math.toIntExact(httpProperties.connectTimeout().toMillis()))
+            .responseTimeout(httpProperties.responseTimeout());
+    return RestClient.builder()
+        .configureMessageConverters(
+            converters ->
+                converters
+                    .disableDefaults()
+                    .addCustomConverter(new FormHttpMessageConverter())
+                    .addCustomConverter(new OAuth2AccessTokenResponseHttpMessageConverter()))
+        .defaultStatusHandler(new OAuth2ErrorResponseErrorHandler())
+        .requestFactory(new ReactorClientHttpRequestFactory(httpClient))
+        .build();
+  }
+
+  /**
+   * Token-response client for the {@code refresh_token} grant, hardened onto {@link
+   * #oauthTokenPool}.
+   *
+   * <p>This is the hot Keycloak backchannel: every active session refreshes its access token on
+   * expiry, so it is the path most exposed to reusing a stale, upstream-reaped keep-alive socket
+   * (the {@code PrematureClose} hairpin). Consumed by {@link #authorizedClientManager} as the
+   * {@code refreshToken} provider's token client, replacing Spring Security's default global-pool
+   * client (ADR-0115).
+   *
+   * @return the refresh-token response client on the idle-evicting OAuth pool
+   */
+  @Bean
+  public OAuth2AccessTokenResponseClient<OAuth2RefreshTokenGrantRequest>
+      oauthRefreshTokenResponseClient() {
+    RestClientRefreshTokenTokenResponseClient client =
+        new RestClientRefreshTokenTokenResponseClient();
+    client.setRestClient(oauthTokenRestClient());
+    return client;
+  }
+
+  /**
+   * Token-response client for the {@code authorization_code} grant (the login token exchange),
+   * hardened onto {@link #oauthTokenPool}.
+   *
+   * <p>Wired into the security filter chain via {@code
+   * oauth2Login().tokenEndpoint().accessTokenResponseClient(...)} ({@code SecurityConfig}) so the
+   * interactive login exchange no longer runs on reactor-netty's un-evicting global pool either
+   * &mdash; closing the same {@code PrematureClose} hairpin on the login path (ADR-0115).
+   *
+   * @return the authorization-code response client on the idle-evicting OAuth pool
+   */
+  @Bean
+  public OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
+      oauthAuthorizationCodeTokenResponseClient() {
+    RestClientAuthorizationCodeTokenResponseClient client =
+        new RestClientAuthorizationCodeTokenResponseClient();
+    client.setRestClient(oauthTokenRestClient());
+    return client;
+  }
+
+  /**
    * OAuth2 authorised-client manager providing {@code authorization_code} and {@code refresh_token}
    * flows for the authenticated backend WebClient.
    *
@@ -368,14 +491,31 @@ public class WebClientConfig {
    * grant per expiry window. Without it, concurrent requests each replay the same refresh token and
    * Keycloak's reuse detection revokes the whole token family, surfacing as a flood of {@code
    * client_authorization_required} until the user logs in again (REQ-SEC-012, ADR-0019).
+   *
+   * <p>The {@code refresh_token} provider is given the {@link #oauthRefreshTokenResponseClient()
+   * pool-hardened refresh-token response client} (ADR-0115) so the recurring refresh grant runs on
+   * the idle-evicting {@link #oauthTokenPool} instead of reactor-netty's un-evicting global pool.
+   * This is a transport swap only; the single-flight and no-request-scope guards above are
+   * unchanged.
+   *
+   * @param clientRegistrationRepository the OAuth2 client registrations (Keycloak)
+   * @param authorizedClientRepository the session-backed authorized-client store
+   * @param oauthRefreshTokenResponseClient the pool-hardened refresh-token response client
+   * @return the single-flight authorized-client manager
    */
   @Bean
   public OAuth2AuthorizedClientManager authorizedClientManager(
       ClientRegistrationRepository clientRegistrationRepository,
-      OAuth2AuthorizedClientRepository authorizedClientRepository) {
+      OAuth2AuthorizedClientRepository authorizedClientRepository,
+      OAuth2AccessTokenResponseClient<OAuth2RefreshTokenGrantRequest>
+          oauthRefreshTokenResponseClient) {
 
     OAuth2AuthorizedClientProvider authorizedClientProvider =
-        OAuth2AuthorizedClientProviderBuilder.builder().authorizationCode().refreshToken().build();
+        OAuth2AuthorizedClientProviderBuilder.builder()
+            .authorizationCode()
+            .refreshToken(
+                refresh -> refresh.accessTokenResponseClient(oauthRefreshTokenResponseClient))
+            .build();
 
     DefaultOAuth2AuthorizedClientManager delegate =
         new DefaultOAuth2AuthorizedClientManager(
