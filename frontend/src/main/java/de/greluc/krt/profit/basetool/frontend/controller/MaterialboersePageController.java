@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeOfferDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeReleasableItemDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialRequestDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
@@ -73,6 +74,14 @@ public class MaterialboersePageController {
   private static final ParameterizedTypeReference<PageResponse<MaterialExchangeOfferDto>>
       OFFERS_PAGE = new ParameterizedTypeReference<>() {};
 
+  /** Captured generic type for the paged Gesuche (requests) board response. */
+  private static final ParameterizedTypeReference<PageResponse<MaterialRequestDto>> REQUESTS_PAGE =
+      new ParameterizedTypeReference<>() {};
+
+  /** Captured generic type for a raw, forwarded backend payload (the material-catalog picker). */
+  private static final ParameterizedTypeReference<Object> RAW =
+      new ParameterizedTypeReference<>() {};
+
   /** Captured generic type for the releasable-items picker response. */
   private static final ParameterizedTypeReference<List<MaterialExchangeReleasableItemDto>>
       RELEASABLE_LIST = new ParameterizedTypeReference<>() {};
@@ -87,24 +96,32 @@ public class MaterialboersePageController {
   /** Cap on the number of blueprint-products the item-offer type-ahead requests. */
   private static final int PRODUCT_PICKER_LIMIT = 25;
 
+  /** Cap on the number of catalogue materials the material-request type-ahead requests. */
+  private static final int MATERIAL_PICKER_LIMIT = 25;
+
   private final BackendApiClient backendApiClient;
 
   /**
    * Renders the Materialbörse page, or just its {@code board} region / {@code detail} pane for an
-   * in-place swap.
+   * in-place swap. The board carries two modes — offers (Angebote) and requests (Gesuche) —
+   * selected by {@code mode}; both count pairs are always loaded so the shared four-tab bar stays
+   * accurate regardless of the active mode.
    *
-   * @param tab {@code "mein"} for "Meine Angebote", else "Alle Angebote".
-   * @param q the search fragment (material or player), or {@code null}.
+   * @param mode {@code "requests"} for the Gesuche board, anything else for the Angebote board.
+   * @param tab {@code "mein"} for "Meine …", else "Alle …".
+   * @param q the search fragment (material/item or player), or {@code null}.
    * @param minQuality the minimum quality filter 0–1000, or {@code null}.
-   * @param minAmount the minimum quantity filter in SCU, or {@code null}.
+   * @param minAmount the minimum quantity filter, or {@code null}.
    * @param sort the sort key ({@code qual} / {@code menge} / {@code mat} / {@code neu}).
-   * @param selected the offer id to show in the detail pane, or {@code null} for the first.
-   * @param fragment {@code "board"} or {@code "detail"} for an AJAX swap, else the full page.
+   * @param selected the offer/request id to show in the detail pane, or {@code null} for the first.
+   * @param fragment {@code "board"} / {@code "list"} / {@code "detail"} for an AJAX swap, else the
+   *     full page.
    * @param model the Thymeleaf model.
    * @return the view name or fragment selector.
    */
   @GetMapping
   public String board(
+      @RequestParam(required = false) String mode,
       @RequestParam(required = false) String tab,
       @RequestParam(required = false) String q,
       @RequestParam(required = false) Integer minQuality,
@@ -113,26 +130,51 @@ public class MaterialboersePageController {
       @RequestParam(required = false) String selected,
       @RequestParam(required = false) String fragment,
       Model model) {
+    boolean requests = "requests".equals(mode);
+
+    // A detail swap needs no counts/tab-bar; return the pane directly for the active mode.
     if ("detail".equals(fragment)) {
+      if (requests) {
+        model.addAttribute("selectedRequest", loadRequestDetail(selected));
+        return "fragments/materialgesuch-board :: requestDetail";
+      }
       model.addAttribute("selectedOffer", loadDetail(selected));
       return "materialboerse :: detail";
     }
 
     String activeTab = "mein".equals(tab) ? "mein" : "alle";
-    List<MaterialExchangeOfferDto> offers = loadOffers(activeTab, q, minQuality, minAmount, sort);
-    MaterialExchangeOfferDto selectedOffer = loadDetail(pickSelectedId(offers, selected));
-    MaterialExchangeCountsDto counts = loadCounts();
 
-    model.addAttribute("offers", offers);
-    model.addAttribute("selectedOffer", selectedOffer);
-    model.addAttribute("countAll", counts.all());
-    model.addAttribute("countMine", counts.mine());
+    // Both count pairs feed the shared four-tab bar, whichever mode is active.
+    MaterialExchangeCountsDto offerCounts = loadCounts();
+    MaterialExchangeCountsDto requestCounts = loadRequestCounts();
+    model.addAttribute("countAll", offerCounts.all());
+    model.addAttribute("countMine", offerCounts.mine());
+    model.addAttribute("countReqAll", requestCounts.all());
+    model.addAttribute("countReqMine", requestCounts.mine());
+    model.addAttribute("activeMode", requests ? "requests" : "offers");
     model.addAttribute("activeTab", activeTab);
     model.addAttribute("filterQ", q);
     model.addAttribute("filterMinQuality", minQuality);
     model.addAttribute("filterMinAmount", minAmount);
     model.addAttribute("filterSort", sort == null ? "qual" : sort);
 
+    if (requests) {
+      List<MaterialRequestDto> reqs = loadRequests(activeTab, q, minQuality, minAmount, sort);
+      model.addAttribute("requests", reqs);
+      model.addAttribute(
+          "selectedRequest", loadRequestDetail(pickSelectedRequestId(reqs, selected)));
+      if ("board".equals(fragment)) {
+        return "fragments/materialgesuch-board :: requestBoard";
+      }
+      if ("list".equals(fragment)) {
+        return "fragments/materialgesuch-board :: requestList";
+      }
+      return "materialboerse";
+    }
+
+    List<MaterialExchangeOfferDto> offers = loadOffers(activeTab, q, minQuality, minAmount, sort);
+    model.addAttribute("offers", offers);
+    model.addAttribute("selectedOffer", loadDetail(pickSelectedId(offers, selected)));
     if ("board".equals(fragment)) {
       return "materialboerse :: board";
     }
@@ -319,6 +361,124 @@ public class MaterialboersePageController {
     return null;
   }
 
+  // ============================ Gesuche (requests) proxies ============================
+
+  /**
+   * Posts a material wanted-listing to the board ("Material suchen").
+   *
+   * @param body the {@code {materialId, minQuality, requestedAmount, remark}} payload.
+   * @return the backend result, or its error status + body.
+   */
+  @PostMapping("/requests/ajax")
+  @ResponseBody
+  public ResponseEntity<Object> createMaterialRequest(@RequestBody Map<String, Object> body) {
+    return proxy(
+        "Create Materialbörse request failed",
+        () -> backendApiClient.post("/api/v1/material-requests", body, Object.class));
+  }
+
+  /**
+   * Posts a craftable-item wanted-listing to the board ("Item suchen").
+   *
+   * @param body the {@code {productKey, minQuality, quantity, remark}} payload.
+   * @return the backend result, or its error status + body.
+   */
+  @PostMapping("/item-requests/ajax")
+  @ResponseBody
+  public ResponseEntity<Object> createItemRequest(@RequestBody Map<String, Object> body) {
+    return proxy(
+        "Create Materialbörse item request failed",
+        () -> backendApiClient.post("/api/v1/material-requests/item", body, Object.class));
+  }
+
+  /**
+   * Edits a request's desired quantity, minimum quality and description ("Gesuch bearbeiten").
+   *
+   * @param id the request id.
+   * @param body the {@code {desiredAmount, minQuality, remark, version}} payload.
+   * @return the backend result, or its error status + body.
+   */
+  @PutMapping("/requests/{id}/ajax")
+  @ResponseBody
+  public ResponseEntity<Object> updateRequest(
+      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
+    return proxy(
+        "Update Materialbörse request failed",
+        () -> backendApiClient.put("/api/v1/material-requests/" + id, body, Object.class));
+  }
+
+  /**
+   * Deactivates a request by id ("Gesuch zurückziehen").
+   *
+   * @param id the request id.
+   * @return the backend result, or its error status + body.
+   */
+  @PostMapping("/requests/{id}/deactivate/ajax")
+  @ResponseBody
+  public ResponseEntity<Object> deactivateRequest(@PathVariable @NotNull UUID id) {
+    return proxy(
+        "Deactivate Materialbörse request failed",
+        () ->
+            backendApiClient.post(
+                "/api/v1/material-requests/" + id + "/deactivate", null, Object.class));
+  }
+
+  /**
+   * Signals that the caller can supply a request ("Ich kann liefern").
+   *
+   * @param id the request id.
+   * @return the backend result, or its error status + body.
+   */
+  @PostMapping("/requests/{id}/interest/ajax")
+  @ResponseBody
+  public ResponseEntity<Object> signalFulfillment(@PathVariable @NotNull UUID id) {
+    return proxy(
+        "Signal Materialbörse fulfilment failed",
+        () ->
+            backendApiClient.post(
+                "/api/v1/material-requests/" + id + "/interest", null, Object.class));
+  }
+
+  /**
+   * Withdraws the caller's fulfilment signal from a request ("doch nicht liefern").
+   *
+   * @param id the request id.
+   * @return the backend result, or its error status + body.
+   */
+  @DeleteMapping("/requests/{id}/interest/ajax")
+  @ResponseBody
+  public ResponseEntity<Object> withdrawFulfillment(@PathVariable @NotNull UUID id) {
+    return proxy(
+        "Withdraw Materialbörse fulfilment failed",
+        () ->
+            backendApiClient.delete("/api/v1/material-requests/" + id + "/interest", Object.class));
+  }
+
+  /**
+   * Returns catalogue materials matching a name fragment, for the "Material suchen" type-ahead — a
+   * member-gated proxy over the backend material search. Unlike the offer picker (the caller's own
+   * Lager rows), a request picks from the whole material catalogue.
+   *
+   * @param q a material-name fragment, or {@code null} for the first materials.
+   * @return the matching materials page (raw), or the backend error status + body.
+   */
+  @GetMapping("/request-materials")
+  @ResponseBody
+  public ResponseEntity<Object> requestMaterials(@RequestParam(required = false) String q) {
+    String base =
+        UriComponentsBuilder.fromPath("/api/v1/materials/search")
+            .queryParam("size", MATERIAL_PICKER_LIMIT)
+            .toUriString();
+    // Pass the free-text fragment as a URI-template variable so the WebClient encodes it exactly
+    // once (the #371 frontend→backend re-encoding contract); the backend param name is `search`.
+    return proxy(
+        "Load Materialbörse request materials failed",
+        () ->
+            q == null || q.isBlank()
+                ? backendApiClient.get(base, RAW)
+                : backendApiClient.get(base + "&search={search}", RAW, q));
+  }
+
   /**
    * Loads the board offers for a tab with the toolbar filters applied.
    *
@@ -405,6 +565,96 @@ public class MaterialboersePageController {
       return requested;
     }
     return offers.isEmpty() ? null : offers.get(0).id().toString();
+  }
+
+  /**
+   * Loads the board requests (Gesuche) for a tab with the toolbar filters applied.
+   *
+   * @param tab the active tab ({@code alle} / {@code mein}).
+   * @param q the search fragment, or {@code null}.
+   * @param minQuality the minimum quality floor, or {@code null}.
+   * @param minAmount the minimum desired quantity, or {@code null}.
+   * @param sort the sort key, or {@code null}.
+   * @return the requests, never {@code null} (empty on a backend error).
+   */
+  private List<MaterialRequestDto> loadRequests(
+      String tab, String q, Integer minQuality, Double minAmount, String sort) {
+    UriComponentsBuilder uri =
+        UriComponentsBuilder.fromPath("/api/v1/material-requests")
+            .queryParam("tab", tab)
+            .queryParam("size", BOARD_SIZE);
+    appendIfPresent(uri, "minQuality", minQuality);
+    appendIfPresent(uri, "minAmount", minAmount);
+    appendIfPresent(uri, "sort", sort);
+    try {
+      PageResponse<MaterialRequestDto> page = backendGetWithQuery(uri, q, REQUESTS_PAGE);
+      return page == null ? List.of() : page.content();
+    } catch (BackendServiceException e) {
+      log.debug("Failed to load Materialbörse Gesuche board", e);
+      return List.of();
+    } catch (Exception e) {
+      log.error("Failed to load Materialbörse Gesuche board", e);
+      return List.of();
+    }
+  }
+
+  /**
+   * Loads one request's detail (supplier names included only when the caller is the owner).
+   *
+   * @param id the request id as a string, or {@code null}.
+   * @return the request detail, or {@code null} if absent/unparseable.
+   */
+  private MaterialRequestDto loadRequestDetail(String id) {
+    UUID requestId = parseUuid(id);
+    if (requestId == null) {
+      return null;
+    }
+    try {
+      return backendApiClient.get(
+          "/api/v1/material-requests/" + requestId, MaterialRequestDto.class);
+    } catch (BackendServiceException e) {
+      log.debug("Failed to load Materialbörse request {}", requestId, e);
+      return null;
+    } catch (Exception e) {
+      log.error("Failed to load Materialbörse request {}", requestId, e);
+      return null;
+    }
+  }
+
+  /**
+   * Loads the request board tab counts, defaulting to zero on a backend error.
+   *
+   * @return the counts.
+   */
+  private MaterialExchangeCountsDto loadRequestCounts() {
+    try {
+      MaterialExchangeCountsDto counts =
+          backendApiClient.get("/api/v1/material-requests/counts", MaterialExchangeCountsDto.class);
+      return counts == null ? new MaterialExchangeCountsDto(0, 0) : counts;
+    } catch (BackendServiceException e) {
+      log.debug("Failed to load Materialbörse Gesuche counts", e);
+      return new MaterialExchangeCountsDto(0, 0);
+    } catch (Exception e) {
+      log.error("Failed to load Materialbörse Gesuche counts", e);
+      return new MaterialExchangeCountsDto(0, 0);
+    }
+  }
+
+  /**
+   * Chooses the request id to show in the detail pane — the requested one if present, else the
+   * first request.
+   *
+   * @param requests the board list.
+   * @param requested the requested request id as a string, or {@code null}.
+   * @return the selected request id as a string, or {@code null} if the list is empty.
+   */
+  private static String pickSelectedRequestId(List<MaterialRequestDto> requests, String requested) {
+    UUID requestedId = parseUuid(requested);
+    if (requestedId != null
+        && requests.stream().anyMatch(request -> requestedId.equals(request.id()))) {
+      return requested;
+    }
+    return requests.isEmpty() ? null : requests.get(0).id().toString();
   }
 
   /**

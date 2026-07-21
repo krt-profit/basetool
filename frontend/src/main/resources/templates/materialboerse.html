@@ -31,32 +31,75 @@
             <h1 th:text="#{materialboerse.title}">Materialbörse</h1>
         </div>
         <div class="mb-head-cta">
-            <button type="button" class="btn btn--cta" data-mb-open-release="new">
-                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
-                <span th:text="#{materialboerse.cta.offer}">Material anbieten</span>
-            </button>
-            <button type="button" class="btn btn-outline" data-mb-open-item="item">
-                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
-                <span th:text="#{materialboerse.cta.offerItem}">Item anbieten</span>
-            </button>
+            <!-- Offer CTAs (Angebote mode) and request CTAs (Gesuche mode) both render; the active
+                 pair is shown per activeMode and toggled by materialboerse.js on a tab switch. -->
+            <div class="mb-cta-group" data-mb-cta-group="offers"
+                 th:hidden="${activeMode == 'requests'}">
+                <button type="button" class="btn btn--cta" data-mb-open-release="new">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                    <span th:text="#{materialboerse.cta.offer}">Material anbieten</span>
+                </button>
+                <button type="button" class="btn btn-outline" data-mb-open-item="item">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                    <span th:text="#{materialboerse.cta.offerItem}">Item anbieten</span>
+                </button>
+            </div>
+            <div class="mb-cta-group" data-mb-cta-group="requests"
+                 th:hidden="${activeMode != 'requests'}">
+                <button type="button" class="btn btn--cta" data-mg-open-request="new">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
+                    <span th:text="#{materialgesuch.cta.request}">Material suchen</span>
+                </button>
+                <button type="button" class="btn btn-outline" data-mg-open-item-request="item">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-search"/></svg>
+                    <span th:text="#{materialgesuch.cta.requestItem}">Item suchen</span>
+                </button>
+            </div>
         </div>
     </div>
 
     <!-- ===================== board (swappable region) ===================== -->
     <div id="mb-board">
+        <!-- Full-page render shows the board of the active mode; a fragment swap targets
+             `materialboerse :: board` (offers) or `fragments/materialgesuch-board :: requestBoard`
+             directly, so these mode guards never interfere with an in-place swap. -->
+        <th:block th:if="${activeMode == 'requests'}"
+                  th:replace="~{fragments/materialgesuch-board :: requestBoard}"></th:block>
+        <th:block th:unless="${activeMode == 'requests'}">
         <th:block th:fragment="board">
             <div class="mb-toolbar">
-                <div class="mb-tabrow">
+                <!-- Shared four-tab bar (Angebote + Gesuche); defined here and re-used by the
+                     Gesuche board fragment via ~{materialboerse :: mbtabs}. Each tab carries its
+                     (mode, tab) pair; the active one is (activeMode, activeTab). -->
+                <div class="mb-tabrow" th:fragment="mbtabs">
                     <div class="tab-nav" role="tablist" aria-label="Materialbörse">
-                        <button type="button" class="tab" th:classappend="${activeTab == 'alle'} ? 'active' : ''"
-                                data-mb-tab="alle" role="tab" th:aria-selected="${activeTab == 'alle'}">
+                        <button type="button" class="tab"
+                                th:classappend="${activeMode == 'offers' and activeTab == 'alle'} ? 'active' : ''"
+                                data-mb-mode="offers" data-mb-tab="alle" role="tab"
+                                th:aria-selected="${activeMode == 'offers' and activeTab == 'alle'}">
                             <span th:text="#{materialboerse.tab.all}">Alle Angebote</span>
                             <span class="tab-count" th:text="${countAll}">0</span>
                         </button>
-                        <button type="button" class="tab" th:classappend="${activeTab == 'mein'} ? 'active' : ''"
-                                data-mb-tab="mein" role="tab" th:aria-selected="${activeTab == 'mein'}">
+                        <button type="button" class="tab"
+                                th:classappend="${activeMode == 'offers' and activeTab == 'mein'} ? 'active' : ''"
+                                data-mb-mode="offers" data-mb-tab="mein" role="tab"
+                                th:aria-selected="${activeMode == 'offers' and activeTab == 'mein'}">
                             <span th:text="#{materialboerse.tab.mine}">Meine Angebote</span>
                             <span class="tab-count" th:text="${countMine}">0</span>
+                        </button>
+                        <button type="button" class="tab"
+                                th:classappend="${activeMode == 'requests' and activeTab == 'alle'} ? 'active' : ''"
+                                data-mb-mode="requests" data-mb-tab="alle" role="tab"
+                                th:aria-selected="${activeMode == 'requests' and activeTab == 'alle'}">
+                            <span th:text="#{materialgesuch.tab.all}">Alle Gesuche</span>
+                            <span class="tab-count" th:text="${countReqAll}">0</span>
+                        </button>
+                        <button type="button" class="tab"
+                                th:classappend="${activeMode == 'requests' and activeTab == 'mein'} ? 'active' : ''"
+                                data-mb-mode="requests" data-mb-tab="mein" role="tab"
+                                th:aria-selected="${activeMode == 'requests' and activeTab == 'mein'}">
+                            <span th:text="#{materialgesuch.tab.mine}">Meine Gesuche</span>
+                            <span class="tab-count" th:text="${countReqMine}">0</span>
                         </button>
                     </div>
                 </div>
@@ -267,10 +310,13 @@
             </th:block>
             </div>
         </th:block>
+        </th:block>
     </div>
 
     <!-- ===================== release / edit modal (shared fragment) ===================== -->
     <th:block th:replace="~{fragments/materialboerse-modal :: releaseModal}"/>
+    <!-- ===================== request create / edit modal (Gesuche) ===================== -->
+    <th:block th:replace="~{fragments/materialgesuch-modal :: requestModal}"/>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}"/>
@@ -305,6 +351,25 @@
             dismissLabel: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
             reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Neu laden?'
         }
+    });
+    // Gesuche (requests) board strings — used by the request branches of materialboerse.js and the
+    // request modal (materialgesuch-modal.js merges its own modal strings into this object).
+    window.materialgesuchI18n = Object.assign(window.materialgesuchI18n || {}, {
+        created: /*[[#{materialgesuch.toast.created}]]*/ 'Gesuch veröffentlicht.',
+        updated: /*[[#{materialgesuch.toast.updated}]]*/ 'Gesuch aktualisiert.',
+        deactivated: /*[[#{materialgesuch.toast.deactivated}]]*/ 'Gesuch zurückgezogen.',
+        interestAdded: /*[[#{materialgesuch.toast.interestAdded}]]*/ 'Als Lieferant eingetragen.',
+        interestRemoved: /*[[#{materialgesuch.toast.interestRemoved}]]*/ 'Eintrag zurückgezogen.',
+        error: /*[[#{notification.error.save}]]*/ 'Fehler.',
+        deactivateConfirmTitle: /*[[#{materialgesuch.action.deactivate.confirm.title}]]*/ 'Gesuch zurückziehen?',
+        deactivateConfirmBody: /*[[#{materialgesuch.action.deactivate.confirm.body}]]*/ 'Das Gesuch ist danach nicht mehr öffentlich sichtbar.',
+        confirmYes: /*[[#{materialgesuch.action.deactivate.confirm.yes}]]*/ 'Zurückziehen',
+        confirmNo: /*[[#{materialboerse.modal.cancel}]]*/ 'Abbrechen',
+        agoHours: /*[[#{materialgesuch.ago.hours}]]*/ 'vor {0} Std',
+        agoDayOne: /*[[#{materialgesuch.ago.dayOne}]]*/ 'vor 1 Tag',
+        agoDays: /*[[#{materialgesuch.ago.days}]]*/ 'vor {0} Tagen',
+        agoNow: /*[[#{materialgesuch.ago.now}]]*/ 'gerade eben',
+        conflict: window.materialboerseI18n.conflict
     });
 </script>
 <script th:src="@{/js/materialboerse.js}" defer th:attr="nonce=${cspNonce}"></script>

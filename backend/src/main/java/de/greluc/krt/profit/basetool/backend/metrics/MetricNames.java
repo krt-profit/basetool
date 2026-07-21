@@ -181,6 +181,11 @@ public final class MetricNames {
   /** Gauge {@code basetool_material_exchange_active_count} — active Materialbörse offers. */
   public static final String MATERIAL_EXCHANGE_ACTIVE = "basetool.material.exchange.active.count";
 
+  /**
+   * Gauge {@code basetool_material_request_open_count} — active Materialbörse requests (Gesuche).
+   */
+  public static final String MATERIAL_REQUEST_OPEN = "basetool.material.request.open.count";
+
   /** Gauge {@code basetool_p4k_import_job_pending_count} — tag {@code status}. */
   public static final String P4K_IMPORT_JOB_PENDING = "basetool.p4k.import.job.pending.count";
 

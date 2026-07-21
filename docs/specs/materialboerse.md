@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-17.
-> **Owner area:** MARKET · **Related ADRs:** ADR-0082, ADR-0086, ADR-0087, ADR-0101, ADR-0108
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-21.
+> **Owner area:** MARKET · **Related ADRs:** ADR-0082, ADR-0086, ADR-0087, ADR-0101, ADR-0108, ADR-0116
 
 # Materialbörse — material-exchange trade board
 
@@ -24,6 +24,19 @@ Either way other members register interest and the anbieter takes the negotiatio
 design is fixed by the DAS KARTELL design proposal `proposals/materialboerse-final.html` (locked
 master-detail layout). Data model + visibility decisions are recorded in ADR-0082 (offer model),
 ADR-0086 (partial offers) and ADR-0087 (item offers).
+
+The board also carries the **inverse** listing — a **request (Gesuch)**: instead of releasing owned
+stock, a member advertises what they **want** — a material or a craftable item, with a free-form
+Markdown description, an optional minimum quality (0–1000, for both kinds) and a desired quantity
+(SCU or Stück). A request has **no backing Lager row** (it is closest to a free-stated item offer),
+so none of the offer's stock-derived rules apply (no clamp-on-read, no ratchet, no
+one-active-per-row). Other members signal "Ich kann liefern" and the requester is notified; the
+supplier names stay owner-only exactly like the interessenten of an offer. Requests live on the same
+`/materialboerse` page under two extra tabs ("Alle Gesuche" / "Meine Gesuche"), and the two CTAs
+relabel from "Material anbieten" / "Item anbieten" to "Material suchen" / "Item suchen" when a
+Gesuche tab is active. The request model is a **sibling aggregate** (`MaterialExchangeRequest`, its
+own table) rather than a discriminator on the offer, recorded in ADR-0116; the requirements are
+REQ-MARKET-015…020.
 
 ## Requirements
 
@@ -445,6 +458,145 @@ quantity + releasable picker), `InventoryCheckoutService#ratchetBoardOffersToSto
 `InventoryPageController#viewMyGameItemStackEntries` (item-leaf `releasedItemIds`),
 `db/migration/V221__relax_material_exchange_item_offer_stock_link.sql`, `materialboerse.html`,
 `inventory-stack-entries.html`, `inventory-materialboerse.js`, `materialboerse-release.js`
+
+### REQ-MARKET-015 — Post a request (Gesuch) for a material or item
+
+A `KRT_MEMBER` posts a wanted-listing via the "Material suchen" / "Item suchen" CTAs (shown when a
+Gesuche tab is active). A request is one of two kinds (`MaterialExchangeRequestKind` ∈
+`{MATERIAL, ITEM}`, a **sibling aggregate** to the offer, ADR-0116): a **material** request names a
+catalogue `Material` (picked from the material-catalogue type-ahead, not the caller's Lager) and a
+desired quantity in the material's own unit (SCU or Stück per `Material.quantityType`); an **item**
+request names a craftable item (blueprint product, validated through
+`BlueprintProductService.resolveByProductKey(...)` exactly like an item offer, REQ-MARKET-012) and a
+whole-piece quantity. **Either kind** may carry an optional **minimum quality** (0–1000) — a stated
+requester preference, kept even for an item request although items have no intrinsic quality — plus a
+free-form Markdown description (≤ 20 000 chars). There is **no backing Lager row**: owner + org unit
+are stamped from the acting member (like a free-stated item offer), so none of the offer's
+stock-derived rules apply (no clamp-on-read, no ratchet, no one-active-per-row — a member may post
+several requests for the same subject). The board is org-wide and member-only, and renders each
+request's subject, the requester's affiliation badges, the desired quantity, the min quality when
+set, when it was posted, and the supplier count — the same shape as REQ-MARKET-001. `Standort` is
+never exposed (REQ-MARKET-004 holds verbatim), and posting is signal-only (REQ-MARKET-003).
+
+**Acceptance**
+- [ ] A material request stores its material id, desired amount and optional min quality; an item
+request resolves + snapshots the blueprint product (404 if the key resolves to no active blueprint)
+and stores the whole-piece quantity + optional min quality. Neither carries a Lager row.
+- [ ] A min quality outside 0–1000 is rejected (DB `CHECK`); a non-positive amount / non-whole item
+quantity is rejected (400).
+- [ ] A `GUEST` gets 403; a `KRT_MEMBER` sees requests from every squadron.
+
+**Enforced by:** `MaterialRequestServiceTest`, `MaterialExchangeRequestRepositoryDataTest`,
+`MaterialRequestControllerTest`, `MaterialgesuchPageControllerMvcTest` · **Code:**
+`MaterialRequestService#createMaterialRequest/#createItemRequest`, `MaterialExchangeRequest`,
+`MaterialRequestCreateRequest`, `MaterialItemRequestCreateRequest`, `MaterialRequestController`,
+`db/migration/V224__add_material_exchange_request.sql`
+
+### REQ-MARKET-016 — Request lifecycle (edit / deactivate), owner-only, optimistic-locked
+
+Only the owner may edit a request's **desired quantity, minimum quality and description** ("Gesuch
+bearbeiten", version-guarded via `support.OptimisticLock`, 409 on mismatch; a material request
+re-validates the amount as positive, an item request as a positive whole number) or deactivate it
+("Gesuch zurückziehen"). A deactivated request is retained for the audit trail but never listed. The
+subject (material / item) itself is fixed once posted — an edit changes only quantity/quality/remark.
+
+**Acceptance**
+- [ ] A non-owner edit/deactivate is rejected (403); a stale-version edit is a 409.
+- [ ] Deactivating an already-deactivated request records no second audit event.
+
+**Enforced by:** `MaterialRequestServiceTest` · **Code:** `MaterialRequestService#updateRequest`/
+`#deactivate`, `MaterialRequestUpdateRequest`
+
+### REQ-MARKET-017 — Fulfilment interest ("Ich kann liefern"), owner-only supplier anonymity
+
+Any member who can supply a request signals it ("Ich kann liefern"); the requester (owner) alone
+sees the supplier names, every other viewer sees only the count — the request-side mirror of
+REQ-MARKET-006. A member cannot signal on their own request; the signal is idempotent and guarded by
+a unique `(request, user)` constraint through the CLAUDE.md non-transactional find-or-create retry
+(`ObjectProvider<Self>` self-proxy, `REQUIRES_NEW` inner method, catch `DataIntegrityViolationException`).
+Withdrawing removes the signal (idempotent). Supplier identities never cross the live-sync socket.
+
+**Acceptance**
+- [ ] A non-owner request-detail response carries only the supplier count, never names; an owner
+response carries the names.
+- [ ] Signalling on one's own request is rejected (403); a duplicate signal is a no-op; a concurrent
+duplicate is an idempotent success, never a 500.
+
+**Enforced by:** `MaterialRequestServiceTest`, `MaterialExchangeRequestRepositoryDataTest` · **Code:**
+`MaterialRequestService#signalFulfillment`/`#withdrawFulfillment`, `MaterialRequestBoardService#detailDto`,
+`MaterialExchangeRequestInterest`
+
+### REQ-MARKET-018 — UI: one board, four tabs, mode-aware CTAs, live update, live multi-user sync
+
+`/materialboerse` renders offers and requests as two modes of **one** master-detail board with a
+shared four-tab bar ("Alle Angebote" / "Meine Angebote" / "Alle Gesuche" / "Meine Gesuche", each with
+a filter-independent count). The two CTAs relabel to "Material suchen" / "Item suchen" in requests
+mode. Filters mirror the offers board (search, min quality on the request's stated floor, min desired
+quantity, sort); the create/edit modal carries the Material/Item radio, the catalogue pickers
+(material search + blueprint product), the optional min-quality field (both kinds) and the desired
+quantity (SCU/Stück, no stock cap). Every interaction updates the DOM in place through `krtFetch`
+(REQ-FE-001…014, no full-page reload); the description renders server-side via `@markdown`; no native
+dialogs. Because several members see the board at once, a peer's request create / deactivate /
+fulfilment change propagates over the shared `materialboard` `/ws/sync` room (REQ-FE-015, ADR-0094)
+on a **new `requests` section key** beside the offers' `board` key — wired at all three
+mirror points at once (acting-client broadcast ↔ `LiveSyncTopicClass.MATERIALBOARD` accept-list ↔
+receiving-client apply map, REQ-FE-010) and pinned by `LiveSyncSectionMapParityTest`. The receiver
+refreshes only the visible board (the `requests` key never re-pulls the offers list and vice-versa).
+
+**Acceptance**
+- [ ] Switching tabs, filters, sort and every write never triggers a full-page reload; the CTAs
+relabel per mode.
+- [ ] A request create/deactivate/fulfilment by one member refreshes the Gesuche board of another
+member viewing it, with no description body, supplier identity or location crossing the socket.
+- [ ] The `MATERIALBOARD` whitelist is exactly `{board, requests}` and every `sendChanged` key across
+the materialboerse modules is whitelisted (parity test).
+
+**Enforced by:** `MaterialgesuchPageControllerMvcTest`, `LiveSyncSectionMapParityTest`,
+`MaterialboardRequestModalE2eTest`, CI Playwright · **Code:** `materialboerse.html`,
+`fragments/materialgesuch-board.html`, `fragments/materialgesuch-modal.html`, `materialboerse.js`,
+`materialgesuch-modal.js`, `LiveSyncTopicClass.MATERIALBOARD`
+
+### REQ-MARKET-019 — Audited area (requests)
+
+Every state-mutating request activity (create, edit, deactivate, fulfilment signal, fulfilment
+withdraw) writes exactly one `audit_event` row under `AuditDomain.MARKET`, in the business
+transaction, with a PII-free `key=value` details payload (`kind` / material-id or product-key /
+`minQuality` / `amt` or `qty` / description **length** only — never the description body, never
+usernames, never location). The subject label is the material name or the item's display name. The
+new event types are `MARKET_REQUEST_CREATED` / `MARKET_REQUEST_UPDATED` / `MARKET_REQUEST_DEACTIVATED`
+/ `MARKET_REQUEST_INTEREST_SIGNALLED` / `MARKET_REQUEST_INTEREST_WITHDRAWN`; the unified audit viewer's
+Materialbörse tab lists them (no new domain). See `docs/specs/audit.md` (REQ-AUDIT-001/002).
+
+**Acceptance**
+- [ ] Each request mutation records its `MARKET_REQUEST_*` event; no description body or handle
+appears in `details`.
+
+**Enforced by:** `MaterialRequestServiceTest`, `docs/specs/audit.md` coverage · **Code:**
+`MaterialRequestService`, `AuditEventType`, `AdminAuditLogPageController`
+
+### REQ-MARKET-020 — Notify the requester when a member signals fulfilment
+
+When a member signals they can supply a request (REQ-MARKET-017), the request's owner receives an
+in-app notification (the request-side mirror of REQ-MARKET-011). This reuses the data-driven engine
+(REQ-NOTIF-007, ADR-0015): the signal path publishes a `MaterialRequestFulfillmentSignalledEvent`
+carrying the owner as the directed recipient (`contextRecipientSub`), and a seeded default rule (V225)
+resolves it through a single `EVENT_RECIPIENT` selector with `exclude_actor = TRUE`. The notification
+is emitted only on a genuinely new signal, after commit (REQ-NOTIF-002). The supplier's name is a
+render parameter — a permitted disclosure because the notification reaches only the owner
+(REQ-MARKET-019 owner-only anonymity). Adding the `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` event /
+notification types needs no schema migration (open enums, REQ-NOTIF-003).
+
+**Acceptance**
+- [ ] Signalling fulfilment on an active request notifies the owner (after commit), excluding the
+signalling member; a duplicate signal emits nothing.
+- [ ] The notification renders via `notifications.type.MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` (DE +
+EN + base bundles, `{lieferant}`/`{material}` placeholders).
+
+**Enforced by:** `MaterialRequestServiceTest`, `MessageBundleConsistencyTest` · **Code:**
+`MaterialRequestService#signalFulfillmentInNewTransaction`,
+`event/MaterialRequestFulfillmentSignalledEvent`, `model/NotificationEventType`,
+`model/NotificationType`,
+`db/migration/V225__seed_material_exchange_request_fulfillment_notification_rule.sql`
 
 ## Out of scope
 

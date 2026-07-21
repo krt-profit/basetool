@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Materialbörse: Mitglieder können jetzt Gesuche einstellen, nicht nur Angebote.** Neben „Alle Angebote"/„Meine Angebote" gibt es jetzt die Tabs „Alle Gesuche"/„Meine Gesuche"; die Buttons wechseln je nach Ansicht zwischen „Material anbieten"/„Item anbieten" und „Material suchen"/„Item suchen". Ein Gesuch nennt ein Material oder craftbares Item, eine Markdown-Beschreibung, optional eine Mindestqualität und die gewünschte Menge (SCU oder Stück); andere Mitglieder signalisieren „Ich kann liefern" und der Suchende wird benachrichtigt — Standort und Lieferantennamen bleiben wie bei Angeboten privat bzw. nur für den Suchenden sichtbar (REQ-MARKET-015…020, ADR-0116).
+
 - **Aufträge: Neue Itemsammelübersicht zum Einsammeln der hergestellten Items.** Analog zur Materialsammelübersicht gibt es für Item-Aufträge jetzt eine eigene Sammelseite (erreichbar über die Item-Übergaben-Werkzeugleiste), auf der die dem Auftrag zugeordneten Items eingesammelt werden: Besitzer und Standort lassen sich umbuchen (die Auftragszuordnung bleibt dabei erhalten) und jede Einheit als geliefert markieren. Der bisher irrtümlich auf die Materialsammelübersicht zeigende Link bei Item-Aufträgen führt jetzt hierher (REQ-ORDERS-031).
 
 - **Auftragsdetails: Die aggregierte Materialliste zeigt jetzt eine Spalte „Vorhanden".** Zwischen „Gesamtmenge" und „Eingetragen" steht die dem Auftrag aus dem Lager zugeordnete Menge je Material. So ist auf einen Blick erkennbar, wie viel schon beschafft ist — die Lücke zur Gesamtmenge ist der noch zu beschaffende Rest, klar getrennt von der Spalte „Offen" (noch ausstehende Staffel-Eintragungen) (REQ-ORDERS-026).

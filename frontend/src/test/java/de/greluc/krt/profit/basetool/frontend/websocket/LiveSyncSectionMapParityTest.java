@@ -216,12 +216,15 @@ class LiveSyncSectionMapParityTest {
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.ORGUNIT_BANK.allowedSections());
   }
 
-  /** The materialboard broadcast whitelist is exactly the single {@code board} key (F4). */
+  /**
+   * The materialboard broadcast whitelist is exactly the offers ({@code board}) and requests
+   * ({@code requests}) section keys (F4; REQ-MARKET-010/018).
+   */
   @Test
-  void materialboardTopicClass_pinsTheSingleBoardSection() {
+  void materialboardTopicClass_pinsTheBoardAndRequestsSections() {
     assertThat(LiveSyncTopicClass.MATERIALBOARD.allowedSections())
-        .as("MATERIALBOARD whitelist is exactly {board}")
-        .containsExactly("board");
+        .as("MATERIALBOARD whitelist is exactly {board, requests}")
+        .containsExactlyInAnyOrder("board", "requests");
   }
 
   /**
@@ -245,6 +248,8 @@ class LiveSyncSectionMapParityTest {
         List.of(
             "/static/js/materialboerse.js",
             "/static/js/materialboerse-release.js",
+            // REQ-MARKET-018: the Gesuche create/edit modal broadcasts the `requests` section key.
+            "/static/js/materialgesuch-modal.js",
             "/static/js/inventory-materialboerse.js",
             // #1309: a stock-reducing inventory write clamps offers, so it pokes the board too.
             "/static/js/inventory-admin.js",

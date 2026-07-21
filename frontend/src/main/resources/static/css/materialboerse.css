@@ -476,3 +476,22 @@
 .inv-boerse-status {
     font-size: 10px;
 }
+
+/* ===================== Gesuche (requests) mode =====================
+   The board is one page with two modes (Angebote / Gesuche). The head shows one CTA pair per mode;
+   the inactive group is hidden by the [hidden] attribute (the guard must beat the inline-flex
+   display, the same UA-loses-to-a-class trap the .mb-modal-qty guard covers). */
+.mb-cta-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.mb-cta-group[hidden] {
+    display: none;
+}
+/* Desired-quantity unit label in the request modal (mirrors .mb-modal-amount-unit). */
+.mb-modal-qty-unit {
+    font-size: 11px;
+    color: var(--color-gray-2-text);
+}

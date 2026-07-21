@@ -24,7 +24,7 @@ runbook. Individual features, plans and decisions are **not** re-documented here
 - **Hangar & inventory** — track ships and personal inventories per member, with a server-paginated org-unit fleet overview and personal hangar.
 - **Lager (warehouse)** — org-scoped, append-only stock tracking: book stock in/out, transfer it (Umbuchen), earmark slices to job orders and missions, and track both materials (with quality) and craftable game items.
 - **Refinery & materials** — refinery job orders, material handovers and a planet-aware materials matrix; new orders can be pre-filled from a desktop-extractor screenshot JSON.
-- **Materialbörse** — a central, org-wide material-exchange trade board for materials and craftable items; handover and location stay off-tool and private.
+- **Materialbörse** — a central, org-wide material-exchange trade board where members both **offer** owned stock (Angebote) and post **requests** (Gesuche) for materials and craftable items; requests carry an optional minimum quality and a desired quantity, and other members signal "Ich kann liefern". Handover and location stay off-tool and private.
 - **Kartellbank** — an organization bank on a double-entry, append-only ledger with accounts, a holder registry, per-account grants, tiered approval ladders and PDF statements; gated by dedicated Keycloak bank roles.
 - **User & role administration** — manage members, per-Staffel capability flags and graded leadership ranks via a delegated *Leitung* page.
 - **In-app notifications** — a rule-driven notification engine delivering per-user notifications to a personal inbox via polling plus a live SSE push.

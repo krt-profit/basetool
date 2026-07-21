@@ -988,7 +988,7 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `bank:{accountId}`       | account, bookings, chart                                                                                                      | no            | staff account read, falling back to the org-unit account read; refused only when both explicitly deny |
 | `bank` (staff-global)    | grid, requestQueue, manage, grants                                                                                            | no            | `ROLE_BANK_EMPLOYEE` (local check)                                                                    |
 | `orgunit-bank` (global)  | orgUnitBank, orgUnitBankSettings                                                                                              | no            | member-or-above (the `/org-unit-bank` page gate, local check)                                         |
-| `materialboard` (global) | board                                                                                                                         | no            | authenticated                                                                                         |
+| `materialboard` (global) | board, requests                                                                                                               | no            | authenticated                                                                                         |
 | `inventory` (global)     | stock                                                                                                                         | no            | authenticated (every viewer re-fetches its own owner/org-unit-scoped view)                            |
 
 The `inventory` room is the squadron Lager (#1307/#1309): a single opaque `stock` section stands for
@@ -1114,7 +1114,9 @@ requester-refused queue + bank dual-auth matrix) · `RedisLiveSyncFanoutTest` +
 `LiveSyncLocalBus`, `RedisLiveSyncFanout`, `krt-live-sync.js`, the per-page seam maps
 (`MISSION_SECTIONS`, `OPERATION_SECTIONS`, `ORDER_SECTIONS`, orders-queue seam, bank
 `BANK_ACCOUNT_SECTIONS` / `ORGUNIT_ACCOUNT_SECTIONS` / `BANK_STAFF_SECTIONS` /
-`ORGUNIT_BANK_SECTIONS`, materialboard) · **ADR:** ADR-0094 · **Issues:** #1102, #1115, #1120
+`ORGUNIT_BANK_SECTIONS`, materialboard — two section keys: `board` (Angebote) and `requests`
+(Gesuche, REQ-MARKET-018), broadcast by `materialboerse.js` / `materialgesuch-modal.js`, pinned by
+`LiveSyncSectionMapParityTest`) · **ADR:** ADR-0094 · **Issues:** #1102, #1115, #1120
 
 ### REQ-FE-016 — Catalog pickers (material / game item / location) are searchable comboboxes
 

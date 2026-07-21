@@ -279,6 +279,11 @@ public class AdminAuditLogPageController {
               "MARKET_REMARK_UPDATED",
               "MARKET_INTEREST_REGISTERED",
               "MARKET_INTEREST_WITHDRAWN",
+              "MARKET_REQUEST_CREATED",
+              "MARKET_REQUEST_UPDATED",
+              "MARKET_REQUEST_DEACTIVATED",
+              "MARKET_REQUEST_INTEREST_SIGNALLED",
+              "MARKET_REQUEST_INTEREST_WITHDRAWN",
               "MARKET_AUDIT_EXPORTED",
               "MARKET_AUDIT_PURGED"));
 

@@ -523,6 +523,12 @@ transaction per pass) rather than per-scrape.
   **both** offer kinds (material and item, REQ-MARKET-012), via `countByStatus(ACTIVE)`
   (REQ-MARKET-*, REQ-OBS-011). Counts only; the board never emits a per-offer, per-user, per-kind or
   location label.
+- `basetool_material_request_open_count{status="ACTIVE"}` gauge sampled by the same collector — the
+  number of active Materialbörse requests (Gesuche) on the board, spanning both request kinds
+  (material and item, REQ-MARKET-015), via `MaterialExchangeRequestRepository.countByStatus(ACTIVE)`
+  (REQ-MARKET-018, REQ-OBS-011). Counts only, equally label-frugal (no per-request/per-user/per-kind
+  label). Requests reuse `AuditDomain.MARKET`, so they inherit the existing
+  `AuditDomainSilenceAnomaly` exclusion — no alert change is needed.
 - `basetool_bank_audit_events_total{event_type}` counter at the single `BankAuditService.record`
   choke point (`event_type` = the bounded `BankAuditEventType` enum). The bank keeps a physically
   separate `bank_audit_event` table excluded from `AuditDomain`, so before #1041 item 10 the most
