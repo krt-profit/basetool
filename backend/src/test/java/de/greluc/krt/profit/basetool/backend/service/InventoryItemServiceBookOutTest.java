@@ -1460,6 +1460,48 @@ class InventoryItemServiceBookOutTest {
       assertNull(moved.getQuality());
       assertEquals(4.0, moved.getAmount());
     }
+
+    // covers REQ-ORDERS-031 (a full-amount item transfer — the Itemsammelübersicht page's only mode
+    // — carries the order earmark, jobOrder link + amount + delivered, onto the moved row, so
+    // collecting earmarked item stock never silently un-earmarks it from the order)
+    @Test
+    void transfer_itemRow_fullAmount_carriesJobOrderEarmarkOntoMovedRow() {
+      UUID targetUserId = UUID.randomUUID();
+      User targetUser = new User();
+      targetUser.setId(targetUserId);
+      JobOrder order = new JobOrder();
+      order.setId(UUID.randomUUID());
+      InventoryItem item = newGameItemRow(4.0, 1L);
+      InventoryAllocations.addJobOrder(item, order, 4.0, true);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      when(userRepository.findById(targetUserId)).thenReturn(Optional.of(targetUser));
+      when(inventoryItemRepository.save(any(InventoryItem.class)))
+          .thenAnswer(inv -> inv.getArgument(0));
+
+      // When — move the full 4 whole units with no explicit reduction plan (the collection page's
+      // only mode): the default plan is "all slices in full", so the earmark rides onto the target.
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(4.0, targetUserId, null, CheckoutType.TRANSFER, null, null, 1L),
+          OWNER_ID,
+          false);
+
+      // Then — the moved row keeps the game item AND the order earmark with its delivered flag.
+      ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
+      InventoryItem moved =
+          captor.getAllValues().stream()
+              .filter(i -> i.getUser() == targetUser)
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("expected the moved item row to be saved"));
+      assertSame(item.getGameItem(), moved.getGameItem());
+      var slice = InventoryAllocations.jobOrderSlice(moved, order.getId());
+      org.junit.jupiter.api.Assertions.assertNotNull(
+          slice, "the order earmark must ride onto the moved item row");
+      assertEquals(4.0, slice.getAmount(), 1e-9);
+      org.junit.jupiter.api.Assertions.assertTrue(
+          slice.getDelivered(), "the delivered marker must be inherited");
+    }
   }
 
   // ---------------------------------------------------------------

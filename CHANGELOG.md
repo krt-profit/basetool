@@ -6,7 +6,15 @@
 
 - **Materialbörse: Mitglieder können jetzt Gesuche einstellen, nicht nur Angebote.** Neben „Alle Angebote"/„Meine Angebote" gibt es jetzt die Tabs „Alle Gesuche"/„Meine Gesuche"; die Buttons wechseln je nach Ansicht zwischen „Material anbieten"/„Item anbieten" und „Material suchen"/„Item suchen". Ein Gesuch nennt ein Material oder craftbares Item, eine Markdown-Beschreibung, optional eine Mindestqualität und die gewünschte Menge (SCU oder Stück); andere Mitglieder signalisieren „Ich kann liefern" und der Suchende wird benachrichtigt — Standort und Lieferantennamen bleiben wie bei Angeboten privat bzw. nur für den Suchenden sichtbar (REQ-MARKET-015…020, ADR-0116).
 
+- **Aufträge: Neue Itemsammelübersicht zum Einsammeln der hergestellten Items.** Analog zur Materialsammelübersicht gibt es für Item-Aufträge jetzt eine eigene Sammelseite (erreichbar über die Item-Übergaben-Werkzeugleiste), auf der die dem Auftrag zugeordneten Items eingesammelt werden: Besitzer und Standort lassen sich umbuchen (die Auftragszuordnung bleibt dabei erhalten) und jede Einheit als geliefert markieren. Der bisher irrtümlich auf die Materialsammelübersicht zeigende Link bei Item-Aufträgen führt jetzt hierher (REQ-ORDERS-031).
+
+- **Auftragsdetails: Die aggregierte Materialliste zeigt jetzt eine Spalte „Vorhanden".** Zwischen „Gesamtmenge" und „Eingetragen" steht die dem Auftrag aus dem Lager zugeordnete Menge je Material. So ist auf einen Blick erkennbar, wie viel schon beschafft ist — die Lücke zur Gesamtmenge ist der noch zu beschaffende Rest, klar getrennt von der Spalte „Offen" (noch ausstehende Staffel-Eintragungen) (REQ-ORDERS-026).
+
 ### Changed
+
+- **Auftragsdetails: Der einem Item zugeordnete Lagerbestand wird jetzt direkt beim Aufklappen der Item-Zeile angezeigt.** Im Tab „Bestellte Items" zeigt jede aufgeklappte Item-Zeile unter dem Bedarf je Stück, bei wem und wo die dem Auftrag zugeordneten Einheiten liegen — analog zur Materialliste. Der bisherige separate „Item-Bestand"-Block darunter entfällt; das Einsammeln (Umbuchen und Als-geliefert-Markieren) passiert auf der neuen Itemsammelübersicht (REQ-ORDERS-028).
+
+- **Auftragsdetails: Die Kennzahl „Offene Menge" trennt jetzt SCU- und Stück-Material.** Bisher wurden SCU- und Stück-Mengen zu einer einzigen, fälschlich als „SCU" beschrifteten Zahl addiert. Die Kachel zeigt die offene Menge jetzt je Einheit als eigene Zahl (SCU bzw. Stück); ein Auftrag mit nur einer Einheitenart zeigt weiterhin genau eine Zahl (REQ-ORDERS-026).
 
 - **Edge-Rate-Limiting: Verbindungslimit wieder eng pro Client (500/IP).** Nachdem das Frontend-Netz per ADR-0112 auf natives IPv6 umgestellt wurde und die echte Client-IP (v4 und v6) am Reverse-Proxy ankommt, wurde das gleichzeitige Verbindungslimit von der Sofortmaßnahme 10000 auf 500 pro Client gesenkt — großzügig für echte Nutzer (mehrere Tabs mit SSE/WebSocket), aber wieder eine wirksame Obergrenze gegen Fluten (REQ-SEC-023, ADR-0112).
 

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-16.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-21.
 > **Owner area:** ORDERS/UI · **Related ADRs:** [ADR-0099](../adr/0099-job-order-item-production-booking.md),
 > [ADR-0101](../adr/0101-inventory-game-item-rows.md) (production book-in)
 
@@ -20,8 +20,10 @@ KPI band above a `.tab-nav`, one `.tab-pane` per section, so a `MATERIAL` and an
 show only the tabs that apply to it.
 
 This spec governs both halves — the production-booking domain (`REQ-ORDERS-025`) and the tab/KPI
-presentation (`REQ-ORDERS-026`) — plus the order-detail **Item-Bestand panel** that surfaces the
-item stock earmarked to the order (`REQ-ORDERS-028`, the item sibling of the Materialsammlung) and
+presentation (`REQ-ORDERS-026`) — plus the order-detail **inline item stock** that surfaces the
+item stock earmarked to the order (`REQ-ORDERS-028`, the item sibling of the material drill-down),
+the **Itemsammelübersicht** page where the earmarked units are collected (`REQ-ORDERS-031`, the item
+sibling of the Materialsammlung) and
 the **owner/location redaction** that hides the fulfilling side's inventory owner and Standort from a
 requesting-side viewer of an SK-public order (`REQ-ORDERS-029`, ADR-0107). The decision behind the
 booking flow is [ADR-0099](../adr/0099-job-order-item-production-booking.md).
@@ -210,6 +212,14 @@ adopting the mission-detail tab pattern (`REQ-MISSION-004`).
 - **`ITEM`** — *Items geliefert* (`delivered / amount` with a mini progress bar), *Offene Menge*
   (material), the claims tile, and *Übergaben*.
 
+The **_Offene Menge_ tile splits the still-open quantity by unit type**: SCU-measured and
+whole-unit (PIECE) materials are incommensurable, so the tile reports up to two separate numbers
+(`kpi.openAmountScu` formatted as SCU, `kpi.openAmountPiece` as whole *Stück*), each rendered only
+when the order actually contains a material of that unit type (`kpi.hasScuMaterial` /
+`kpi.hasPieceMaterial`). An order with only one unit type shows a single number; a mixed order shows
+both; an order with no open demand still shows `0` SCU. The tile never adds SCU and pieces into one
+figure.
+
 The **claims KPI tile is shown only for SK-public orders** — the tile renders only when the order
 supports material claims (`kpi.supportsClaims`), i.e. a public Spezialkommando order that can carry
 Eintragungen ([`orders-material-claims.md`](orders-material-claims.md)); a strict-staffel order that
@@ -250,10 +260,23 @@ modal consumes stays on the main row, so booking is unaffected; a booking re-ren
 Items* section rather than a separate production section. Requesters/read-only viewers see the plain
 status columns without the chevron, demand sub-row or button.
 
+**Aggregierte-Materialien-Spalten.** The *Aggregierte Materialien* pane lists, per material+quality
+bucket, *Material*, *Qualität*, *Gesamtmenge* (required), **_Vorhanden_**, and — for SK-public
+orders only — the claim columns *Eingetragen* (Σ claims) and *Offen* (`totalQuantity − Σ claims`).
+*Vorhanden* sits **between *Gesamtmenge* and *Eingetragen*** and shows the linked-inventory stock
+earmarked to the order for that material at or above the bucket's quality floor
+(`AggregatedMaterialDto.currentStock`, the same value the order-overview list renders as collection
+progress); it is always shown (strict-staffel and SK-public orders alike). The gap
+*Gesamtmenge − Vorhanden* is the still-to-procure amount and is distinct from the claim *Offen*,
+which is the amount squadrons have not yet signed up (eingetragen) for.
+
 **Acceptance**
 
 - [ ] A `MATERIAL` order shows the material KPI tiles and the material tab set; an `ITEM` order shows
   the item KPI tiles and the item tab set.
+- [ ] The *Offene Menge* tile shows the open SCU sum and the open whole-unit (*Stück*) sum as two
+  separate numbers when the order mixes unit types, a single number when only one type is present,
+  and never sums SCU and pieces together.
 - [ ] The claims KPI tile renders only for an SK-public order (claims supported); a strict-staffel
   order omits it.
 - [ ] The *Bestellte Items* tab shows the chevron/demand sub-row and the *Herstellung erfassen*
@@ -267,6 +290,9 @@ status columns without the chevron, demand sub-row or button.
 - [ ] On the *Bestellte Items* tab a line's per-unit demand is hidden behind a chevron and revealed
   in a sub-row on click; both Hergestellt and Geliefert render a progress bar; booking a production
   run from that tab still works (its machine-readable demand stays on the main row).
+- [ ] The *Aggregierte Materialien* pane shows a *Vorhanden* column (linked stock,
+  `AggregatedMaterialDto.currentStock`) between *Gesamtmenge* and the claim columns, for both
+  strict-staffel and SK-public item orders.
 - [ ] The Item-Übergaben tab shows the "record production first" hint while the order is not fully
   delivered and nothing is manufactured-but-undelivered, and the "all delivered" note only once every
   ordered unit is delivered (`isFullyDelivered`).
@@ -279,18 +305,19 @@ booking flow + the produce-first hint) ·
 **Code:** `orders-detail.html` (`kpiSection` fragment, `.tab-nav` + `.tab-panes`), `orders-detail.js`
 (tab controller, `ORDER_SECTIONS` seam map), `JobOrderPageController` · **Issues:** #1182
 
-### REQ-ORDERS-028 — Order detail surfaces the earmarked item stock (Item-Bestand panel)
+### REQ-ORDERS-028 — Order detail surfaces the earmarked item stock (inline in the item expand row)
 
 An `ITEM` order's detail page MUST surface the **game-item stock earmarked to the order**
 ([`inventory-items.md`](inventory-items.md) REQ-INV-029/031) — the item sibling of the material
-Materialsammlung — as an **Item-Bestand panel** on the *Bestellte Items* tab. The panel groups the
-order's linked game-item rows **per game item** (name-sorted): each group shows the item (name +
-manufacturer) and a context chip with the order's own progress — the whole-unit sum of the
-earmarked slices plus `manufacturedAmount`/`orderedAmount` from the order's matching lines
-(REQ-ORDERS-025; both `0` for an orphaned earmark, which REQ-ORDERS-019 keeps flagging on the
-*Verknüpft* tab). Each entry row shows owner, location, the **THIS-order earmark slice** in whole
-units (with the entry's total stock as context when the row is only partially earmarked), and a
-**delivered toggle** for the per-(entry, order) delivered marker (Variante C, REQ-INV-027).
+drill-down — **inline in each ordered item's expand row** on the *Bestellte Items* tab. The leading
+expand chevron is available to every non-requester viewer; expanding a line reveals, beneath the
+per-unit material demand (logisticians only), a read-only **earmarked-stock** block listing the game
+item's linked rows: each row shows owner, location and the **THIS-order earmark slice** in whole
+units (with the entry's total stock as context when the row is only partially earmarked). A line
+with neither material demand nor earmarked stock has no chevron; a line with stock but no demand is
+still expandable. The block is **read-only** — collecting the units (owner/location transfer and the
+per-(entry, order) delivered marker, Variante C / REQ-INV-027) happens on the Itemsammelübersicht
+page (REQ-ORDERS-031), the item sibling of the Materialsammlung.
 
 **Backend.** `GET /api/v1/orders/{id}/item-stock` (`JobOrderItemStockController`) returns the
 grouped shape (`JobOrderItemStockGroupDto` → `JobOrderItemStockEntryDto`), gated exactly like the
@@ -298,52 +325,42 @@ sibling per-order stock reads: `isAuthenticated() and @ownerScopeService.canSeeJ
 unknown order is 404. The projection reuses the entity-graphed
 `InventoryItemRepository.findGameItemRowsByJobOrderIdOrdered` (owner/location display order kept
 inside each group) and reads each entry's this-order slice off the `@BatchSize`-batched allocation
-collection — no N+1. The entry `version` is the row's `@Version` (0 for a still-`null` persisted
-version), which the delivered toggle echoes.
+collection — no N+1. `JobOrderPageController` keys the groups by game-item id (`itemStockByGameItem`)
+so the template matches each ordered line to its earmarked stock in O(1), loading the stock on the
+full page and the `items` section swap.
 
-**Delivered toggle.** The toggle PATCHes the existing `/inventory/{id}/delivered` (entry id +
-`jobOrderId` + version echo — the same write the Materialsammlung uses, backend gate
-`canEditInventoryItem`, stale version → 409). On success the panel's whole `item-stock` section is
-re-rendered in place through the order seam, refreshing **every** row's `data-version` (the DOM
-version sync rule), and the section is broadcast to peers; on failure the checkbox reverts.
+**Live update & peer sync (REQ-FE-001/010/015).** The earmarked stock is part of the `items`
+fragment (`itemsSection`, container `#order-items-results`), so it re-renders with the ordered-items
+table. The `item-stock` `order:{id}` section key stays whitelisted on the relay
+(`LiveSyncTopicClass.ORDER`) and in the `ORDER_SECTIONS` seam map, where it is **aliased to the
+items container/fragment** — so the existing external broadcasters (`inventory-my.js` /
+`inventory-admin.js` `broadcastOrdersChanged`, which send `materials`/`aggregated`/`item-stock` to
+each affected `order:{id}` room) keep refreshing the inline stock unchanged, and
+`LiveSyncSectionMapParityTest` (key set-equality) stays green. The inline stock refreshes live on: a
+production booking (its success list re-renders `items` — the book-in auto-earmarks the produced
+units), an item handover that consumes the earmark (`REQ-ORDERS-030` — re-renders `items` and pokes
+`inventory`/`stock`), a Lager-side earmark change, and a collection on the Itemsammelübersicht page
+(REQ-ORDERS-031, which broadcasts `items`). A section whose container a page does not render is
+silently skipped.
 
-**Live update & peer sync (REQ-FE-001/010/015).** The panel is an AJAX-swappable fragment
-(`itemStockSection`, container `#order-item-stock-results`) with the **new `order:{id}` section key
-`item-stock`**, registered at all three mirror points in the same change: the `ORDER_SECTIONS` seam
-map in `orders-detail.js` (drives both the broadcast and the receive-side apply), the relay's
-`LiveSyncTopicClass.ORDER` whitelist, and — because receivers derive their container map from the
-same seam map — the receiving apply path; `LiveSyncSectionMapParityTest` pins the set-equality. The
-panel refreshes live on: a peer's delivered flip (`item-stock` broadcast), a production booking
-(its success refresh list gains `item-stock` — the book-in auto-earmarks the produced units), an item
-handover that consumes the earmark (`REQ-ORDERS-030` — its success path likewise re-renders and
-broadcasts `item-stock` and pokes `inventory`/`stock`), and a Lager-side earmark change
-(`inventory-my.js` / `inventory-admin.js` `broadcastOrdersChanged` now sends
-`materials`/`aggregated`/`item-stock` to each affected `order:{id}` room; a section whose container a
-page does not render is silently skipped).
-
-**Redaction.** The panel renders only for an `ITEM` order and is omitted from the
-requester-redacted view (REQ-ORDERS-023), mirroring the *Aggregierte Materialien* pane. A
-requester-only viewer (`redacted == true`) additionally cannot reach the endpoint at all — it is
-gated on `canSeeJobOrder`, which a requester-only viewer fails (403). For a caller who *can* see the
-order but is on the **requesting** side of an **SK-public** order, the per-entry owner and location
-are blanked by the backend (REQ-ORDERS-029, ADR-0107) — the panel still renders the amounts and the
-delivered marker, with owner/location shown as `—`. An order with no earmarked item stock renders an
-empty-state message.
+**Redaction.** The inline stock renders only for an `ITEM` order and is omitted from the
+requester-redacted view (REQ-ORDERS-023), mirroring the *Aggregierte Materialien* pane — a
+requester-only viewer (`redacted == true`) additionally cannot reach the endpoint at all
+(`canSeeJobOrder` → 403). For a caller who *can* see the order but is on the **requesting** side of
+an **SK-public** order, the per-entry owner and location are blanked by the backend (REQ-ORDERS-029,
+ADR-0107) — the inline stock still renders the amounts, with owner/location shown as `—`. A line
+with no earmarked item stock renders no stock block (no empty-state message).
 
 **Acceptance**
 
-- [ ] An `ITEM` order with game-item rows earmarked to it lists them on the *Bestellte Items* tab,
-  grouped per game item with the allocated/manufactured/ordered context chip; a `MATERIAL` order
-  renders no panel (and the frontend never fetches the endpoint for it); an `ITEM` order without
-  earmarks shows the empty state.
-- [ ] Each entry row shows the THIS-order slice (whole units) — never a sibling order's slice —
-  plus the entry total as context on a partial earmark, and the delivered checkbox reflects the
-  per-(entry, order) marker.
-- [ ] Flipping the delivered toggle persists via `PATCH /inventory/{id}/delivered` with the order
-  id + entry version, re-renders the section in place (fresh `data-version` on every row, no
-  reload) and reaches a peer viewing the same order; a failed write reverts the checkbox.
-- [ ] A production booking with auto-earmark makes the produced stock appear in the panel without
-  a reload (own view and peers); a Lager-side (un)earmark of an item row refreshes peers' panels.
+- [ ] An `ITEM` order with game-item rows earmarked to it shows them inline in the matching ordered
+  line's expand row (owner, location, THIS-order slice — never a sibling order's slice — plus the
+  entry total as context on a partial earmark); a `MATERIAL` order renders no inline stock (and the
+  frontend never fetches the endpoint for it); a line without earmarks shows no stock block.
+- [ ] The expand chevron is available to every non-requester viewer; a line with only material
+  demand (logistician) or only earmarked stock is still expandable.
+- [ ] The inline stock is read-only — no delivered toggle; collecting (owner/location transfer +
+  delivered) happens on the Itemsammelübersicht page (REQ-ORDERS-031).
 - [ ] `GET /api/v1/orders/{id}/item-stock` is reachable only by a caller who can see the order
   (403 otherwise, 404 for an unknown order).
 - [ ] The `item-stock` key is present at the seam map **and** the relay whitelist
@@ -351,21 +368,20 @@ empty-state message.
 
 **Enforced by:** `JobOrderItemStockControllerTest` + `InventoryItemServiceTest`
 (`getItemStockForJobOrder` grouping / slice / delivered / orphan context / 404),
-`JobOrderItemDetailRenderTest` (panel + empty state + fragment swap + MATERIAL-order absence),
-`LiveSyncSectionMapParityTest`, `JobOrderProductionE2eTest` (panel populated after a booked
-production with auto-earmark, then the delivered toggle flipped and its marker persisted)
-· **Code:** `JobOrderItemStockController`,
+`JobOrderItemDetailRenderTest` (inline stock in the item expand + read-only + `items` fragment swap +
+MATERIAL-order absence), `LiveSyncSectionMapParityTest`, `JobOrderProductionE2eTest` (inline stock
+visible after a booked production with auto-earmark) · **Code:** `JobOrderItemStockController`,
 `InventoryAggregationService.getItemStockForJobOrder`, `JobOrderItemStockGroupDto` /
-`JobOrderItemStockEntryDto`, `JobOrderPageController.viewOrderDetail` (`itemStockSection`
-dispatch), `orders-detail.html` (`itemStockSection` fragment), `orders-detail.js`
-(`ORDER_SECTIONS['item-stock']`, `onItemStockDeliveredToggle`), `LiveSyncTopicClass.ORDER`,
+`JobOrderItemStockEntryDto`, `JobOrderPageController.viewOrderDetail` (`itemStockByGameItem`,
+`items` dispatch), `orders-detail.html` (`itemsSection` item expand rows), `orders-detail.js`
+(`ORDER_SECTIONS['item-stock']` aliased to the items container), `LiveSyncTopicClass.ORDER`,
 `inventory-my.js` / `inventory-admin.js` (`broadcastOrdersChanged`) · **Issues:** — · **Design:**
 [`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md) §10 PR 4 / §11.2
 
 ### REQ-ORDERS-029 — Requesting-side viewers see redacted inventory owner/location
 
 The four per-order reads that expose the **owner identity and location** of the stock linked to a
-job order — the Item-Bestand panel (`GET /orders/{id}/item-stock`, REQ-ORDERS-028), the material
+job order — the inline item stock (`GET /orders/{id}/item-stock`, REQ-ORDERS-028), the material
 collection (`GET /orders/{id}/material-collection`), and the two inventory pickers
 (`GET /orders/{id}/materials/{matId}/inventory`, `GET /orders/{id}/inventory/orphaned`) — MUST blank
 the per-entry owner and location for a caller who can see the order but is **not entitled to its
@@ -387,8 +403,8 @@ nested `user` + `owningSquadron` on the picker `InventoryItemDto`) and the locat
 context are always kept, so the requesting side still sees the order's progress. The redactor
 reconstructs each record field-by-field (never a wither) so a newly added owner/location field is a
 compile error until it is classified (mirrors `MissionGuestRedactor`, REQ-SEC-007). The frontend
-renders a blanked owner/location as `—` (item-stock panel, material-collection page); the JS
-drill-down / orphaned / Herstellung surfaces already fall back to a dash.
+renders a blanked owner/location as `—` (inline item stock, Itemsammelübersicht + material-collection
+pages); the JS drill-down / orphaned / Herstellung surfaces already fall back to a dash.
 
 A requester-**only** viewer (`redacted == true`, i.e. `!canSeeJobOrder`) is refused all four
 endpoints with `403` and never reaches the redactor at all.
@@ -405,7 +421,8 @@ is deliberately kept uniform rather than widening the picker gate to `… or can
 - [ ] A squadron-responsible order is unaffected — every viewer who passes `canSeeJobOrder` sees
   owner/location.
 - [ ] A requester-only viewer (`redacted`) gets `403` on all four endpoints.
-- [ ] The redacted item-stock panel / material-collection page render `—` for owner/location.
+- [ ] The redacted inline item stock / Itemsammelübersicht / material-collection page render `—`
+  for owner/location.
 
 **Enforced by:** `OwnerScopeServiceTest.CanSeeJobOrderInventoryOwnersTests` (the gate — squadron /
 SK-member / requesting-side / admin / unknown), `JobOrderInventoryOwnerRedactorTest` (the three
@@ -470,10 +487,11 @@ save + completion) the audit **and** the stock-backed item-offer ratchet run onc
 collect-then-run shape as the material handover's `clampOfferedAmountToStock`.
 
 **Live update & peer sync (`REQ-FE-001/010/015`).** A successful item handover re-renders the `items` /
-`item-handovers` / `item-handover-lines` / `header` sections **and** the `item-stock` panel
-(`REQ-ORDERS-028`) in place on `order:{id}`, and pokes the global `inventory`/`stock` seam so Lager
-viewers see the drawn-down stock — mirroring the production-booking success path. All keys pre-exist at
-the three live-sync mirror points; no seam-map change.
+`item-handovers` / `item-handover-lines` / `header` sections in place on `order:{id}` — the earmarked
+item stock consumed by the delivery (`REQ-ORDERS-028`) is rendered inline in the `items` table, so the
+`items` re-render refreshes it — and pokes the global `inventory`/`stock` seam so Lager viewers see the
+drawn-down stock, mirroring the production-booking success path. All keys pre-exist at the three
+live-sync mirror points; no seam-map change.
 
 **Rationale / no ADR.** This is a behaviour refinement of an already-decided feature (owner decision
 2026-07-16, [`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md) §10 Phase 6 / §11.1), building on
@@ -493,8 +511,8 @@ choice, so the rationale is captured in this requirement rather than in a separa
   `manufacturedAmount − deliveredAmount`.
 - [ ] A delivery that consumes several earmarked rows and completes the order bumps the order
   `@Version` once (no 409); each consumed row records one `INVENTORY_HANDED_OVER`.
-- [ ] The success response re-renders the ordered-items / handover / `item-stock` sections in place and
-  reaches a peer (and Lager viewers) without a reload.
+- [ ] The success response re-renders the ordered-items (incl. inline earmarked stock) / handover
+  sections in place and reaches a peer (and Lager viewers) without a reload.
 - [ ] A non-depleted consumed row backing an active stock-backed Materialbörse item offer ratchets
   that offer's `itemQuantity` down to the row's reduced stock; a depleted row's offer is
   cascade-removed with the row.
@@ -508,8 +526,65 @@ after a UI handover) · **Code:** `JobOrderItemHandoverService.createItemHandove
 `InventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate`,
 `InventoryAllocations.reduceJobOrder`, `MaterialExchangeOfferRepository.clampItemQuantityToStock`,
 `AuditEventType.INVENTORY_HANDED_OVER`, `orders-detail.js`
-(item-handover success `item-stock` + `inventory`/`stock` broadcast) · **Issues:** — · **Design:**
+(item-handover success `items` + `inventory`/`stock` broadcast) · **Issues:** — · **Design:**
 [`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md) §10 Phase 6 / §11.1
+
+### REQ-ORDERS-031 — Itemsammelübersicht (item collection page)
+
+An `ITEM` order MUST offer an **Itemsammelübersicht** page (`/orders/{id}/item-collection`) — the
+item sibling of the Materialsammlung (`material-collection`) — where a user collects the game-item
+stock earmarked to the order: reassign each entry's **owner and location** (a full-amount transfer)
+and mark each **this-order slice delivered**. It is reached from the *Item-Übergaben* toolbar
+(replacing the material-collection link ITEM orders previously reused).
+
+**Read.** The page reuses `GET /api/v1/orders/{id}/item-stock` (REQ-ORDERS-028) — the same grouped
+earmarked-stock projection the order-detail inline stock renders — flattening the per-game-item
+groups to one row per earmarked entry (owner, location, the game item, the this-order slice in whole
+units with the entry's total stock as context, and a delivered toggle).
+`ItemCollectionPageController` (`isAuthenticated()`) loads the stock and the cached location lookup,
+tolerating partial failure; the backend read stays gated on `canSeeJobOrder` with the REQ-ORDERS-029
+owner/location redaction, so a requesting-side viewer of an SK-public order sees the amounts with
+owner/location as `—`.
+
+**Writes.** The two row controls reuse the existing generic inventory endpoints, exactly like the
+Materialsammlung: an owner/location change POSTs `/inventory/{id}/transfer` (`type=TRANSFER`) moving
+the row's **full amount**, which deletes the source item and appends a new target item that
+**carries the order earmark** — the `InventoryJobOrderAllocation` (jobOrder link + amount +
+`delivered`) rides onto the moved row (`InventoryCheckoutService.applyTransferInherit`; verified for
+a game-item row by `InventoryItemServiceBookOutTest`). The JS re-keys the `<tr>` to the returned
+target id/version. The delivered checkbox PATCHes `/inventory/{id}/delivered` with `{delivered,
+jobOrderId, version}` (the per-(entry, order) marker, Variante C / REQ-INV-027). Both writes are
+gated `canEditInventoryItem` (403 for a viewer who cannot edit).
+
+**Live update & peer sync (REQ-FE-001/010/015).** The page joins the `order:{id}` room and, on its
+own writes, broadcasts the order's **`items`** section — the order-detail renders the earmarked
+stock inline in the ordered-items table (REQ-ORDERS-028), so no new section key is introduced; the
+page's `ITEM_COLLECTION_SECTIONS` seam map (`items` → its own container) is a **subset** of the
+`LiveSyncTopicClass.ORDER` whitelist (`LiveSyncSectionMapParityTest`). A peer's delivered flip / row
+move re-fetches the page's `collectionResults` fragment in place.
+
+**Acceptance**
+
+- [ ] The *Item-Übergaben* toolbar links to `/orders/{id}/item-collection` (not the
+  material-collection page); the page lists one row per earmarked item entry with owner, location,
+  game item, this-order slice and a delivered toggle; an order with no earmarked item stock shows
+  the empty state.
+- [ ] Changing a row's owner or location transfers the full amount and the moved item keeps the
+  order earmark (it stays on the page and stays earmarked); the row re-keys to the new id/version.
+- [ ] Flipping the delivered toggle persists via `PATCH /inventory/{id}/delivered` with the order id
+  + version, and reaches a peer viewing the same order / the order-detail inline stock without a
+    reload.
+- [ ] A requesting-side viewer of an SK-public order sees the amounts with owner/location as `—`
+  (REQ-ORDERS-029).
+
+**Enforced by:** `ItemCollectionPageControllerTest` (model + fragment + partial-failure),
+`ItemCollectionRenderTest` (flattened rows + empty state), `InventoryItemServiceBookOutTest`
+(`transfer_itemRow_fullAmount_carriesJobOrderEarmarkOntoMovedRow`), `LiveSyncSectionMapParityTest`
+(`ITEM_COLLECTION_SECTIONS` subset), `JobOrderProductionE2eTest` (delivered flip on the page
+persists) · **Code:** `ItemCollectionPageController`, `item-collection.html`, `item-collection.js`
+(`ITEM_COLLECTION_SECTIONS`), `orders-detail.html` (Item-Übergaben toolbar link),
+`InventoryCheckoutService.bookOutTransfer` / `applyTransferInherit` · **Issues:** — · **Design:**
+[`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md)
 
 ## Out of scope
 
