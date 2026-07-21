@@ -467,6 +467,24 @@ registration), so the manager's `contextAttributesMapper` is overridden to retur
 entirely. This is orthogonal to the rotation/reuse-detection mitigation above and to single-flight;
 it MUST hold regardless of either.
 
+**2026-07-20 — a third, rotation-independent cause: the token backchannel reused an edge-reaped
+keep-alive socket.** With rotation off and the `scope` leak severed, an intermittent forced re-login
+remained; its cause is transport, not protocol. The frontend's `authorization_code` and
+`refresh_token` grants call Keycloak's token endpoint, whose URL derives from the public `issuer-uri`,
+so they hairpin **out through the public NPM edge**. Spring Security 7's default `RestClient`
+token-response clients run on reactor-netty's **global** connection pool which — unlike the app's own
+`frontend-pool` / `frontend-sse-pool` (ADR-0078) — has **no idle eviction** (verified from the shipped
+bytecode). The edge reaps idle keep-alive sockets after ~60–75 s, so a refresh grant reusing one fails
+with reactor-netty's `PrematureCloseException`, surfacing as an intermittent auth-path 5xx / forced
+re-login (the `refresh_token` grant is the hot, exposed path — every active session refreshes on
+access-token expiry). Both token-response clients are given a dedicated, idle-evicting pool
+(`frontend-oauth-pool`, `maxIdleTime` 20 s below the edge keep-alive, `evictInBackground` 10 s,
+`metrics(true)`) by replacing **only** the token client's `RestClient` transport — its
+`FormHttpMessageConverter` + `OAuth2AccessTokenResponseHttpMessageConverter` and the
+`OAuth2ErrorResponseErrorHandler` are preserved, and **no** retry is added (a retry would replay the
+refresh token and trip reuse detection). It is a transport-only change, orthogonal and neutral to
+rotation, single-flight and the scope-leak fix (ADR-0115).
+
 **Acceptance**
 
 - [ ] A `client_authorization_required` on an HTML navigation redirects (302) to the Keycloak login
@@ -492,14 +510,20 @@ it MUST hold regardless of either.
   fallback) to `SsoReAuthenticationEntryPoint` returns `401 + X-Reauthenticate` and is NOT redirected,
   leaving the session's single saved OAuth2 authorization request untouched; a top-level navigation
   still commences the `prompt=none` silent SSO and sets the `SSO_ATTEMPTED` loop-guard cookie.
+- [ ] The frontend OAuth2 token backchannel (login `authorization_code` and recurring `refresh_token`
+  grants) runs on a dedicated reactor-netty pool (`frontend-oauth-pool`) whose idle eviction is below
+  the edge keep-alive, so a refresh does not reuse an edge-reaped socket and fail with
+  `PrematureCloseException`; the `RestClient` transport swap preserves the form-request +
+  token-response converters and the OAuth2 error handler (a real `refresh_token` grant still
+  round-trips) and adds no retry that would replay the refresh token (ADR-0115).
 
 **Enforced by:** `SingleFlightAuthorizedClientManagerTest`, `OAuth2ScopeRequestParamLeakTest`,
-`NotificationPageControllerStreamTest`, `GlobalExceptionHandlerTest`,
-`BackendApiClientResilienceTest`, `SsoReAuthenticationEntryPointTest` · **Code:**
-`SingleFlightAuthorizedClientManager`, `WebClientConfig`, `ReauthenticationRequiredException`,
-`BackendApiClient`, `GlobalExceptionHandler`, `NotificationPageController`,
-`SsoReAuthenticationEntryPoint`, `krt-fetch.js` · **Issues:** ingest-rollout
-regression, #1137 · **ADR:** ADR-0019
+`WebClientConfigOauthTokenPoolTest`, `NotificationPageControllerStreamTest`,
+`GlobalExceptionHandlerTest`, `BackendApiClientResilienceTest`, `SsoReAuthenticationEntryPointTest`
+· **Code:** `SingleFlightAuthorizedClientManager`, `WebClientConfig`,
+`ReauthenticationRequiredException`, `BackendApiClient`, `GlobalExceptionHandler`,
+`NotificationPageController`, `SsoReAuthenticationEntryPoint`, `krt-fetch.js` · **Issues:**
+ingest-rollout regression, #1137 · **ADR:** ADR-0019, ADR-0115
 
 ### REQ-SEC-013 — Frontend role checks read the Authentication token, not the OidcUser principal
 
