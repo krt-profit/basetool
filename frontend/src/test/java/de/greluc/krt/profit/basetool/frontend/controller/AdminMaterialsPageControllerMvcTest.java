@@ -130,10 +130,11 @@ class AdminMaterialsPageControllerMvcTest {
         .andExpect(content().string(containsString("</html>")));
   }
 
-  // covers the create-modal flag-checkbox regression — the page-scoped .form-group input rule ties
-  // the global KRT square-checkbox rule at (0,1,1) and, rendering after styles.css, would win and
-  // stretch the five flag checkboxes into full-width padded bars. Pins the :not() exclusion so the
-  // page rule can never re-capture checkbox/radio inputs.
+  // covers the create-modal flag-checkbox regression (#1405) — the page-scoped .form-group input
+  // rule ties the global KRT square-checkbox rule at (0,1,1) and, rendering after styles.css,
+  // would win and stretch the five flag checkboxes into full-width padded bars. Pins the
+  // zero-specificity :where(:not(...)) exclusion so the page rule can never re-capture
+  // checkbox/radio inputs while still ranking below the (0,2,0) combobox input rule.
   @Test
   @WithMockUser(roles = "ADMIN")
   void listMaterials_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
@@ -153,7 +154,7 @@ class AdminMaterialsPageControllerMvcTest {
             content()
                 .string(
                     containsString(
-                        ".form-group input:not([type='checkbox']):not([type='radio'])")));
+                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
   // covers #582 — the category-create twin (X-Requested-With + JSON body) relays to the backend and
