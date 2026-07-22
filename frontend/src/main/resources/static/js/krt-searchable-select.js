@@ -806,8 +806,12 @@
 
     // Builds the config for an auto-initialised combobox: shared i18n defaults from
     // `window.krtComboboxI18n`, each overridable per-control by a `data-combobox-*` attribute. Keeps
-    // the shared user-picker strings in ONE place (head.html) while still letting a single control
-    // customise its wording.
+    // the shared picker strings in ONE place (head.html) while still letting a single control
+    // customise its wording. The placeholder and no-results text additionally honour a per-kind
+    // default keyed by the marker value (`krtComboboxI18n.kinds['remote-materials']` etc.), so a
+    // material/location/item/account picker announces what it searches instead of inheriting the
+    // user-picker wording — precedence: data-combobox-* attribute > kinds[marker] > top-level
+    // default (the user wording: every bare `data-krt-combobox` picker is a user/holder picker).
     //
     // A backend-backed picker opts in declaratively via the MARKER VALUE: `data-krt-combobox` set to
     // a key registered in `window.krtComboboxRemoteSources` (e.g. `remote-users` /
@@ -821,9 +825,10 @@
         const d = select.dataset;
         const remoteSources = window.krtComboboxRemoteSources || {};
         const remoteSource = remoteSources[d.krtCombobox];
+        const kind = (i18n.kinds || {})[d.krtCombobox] || {};
         return {
-            placeholder: d.comboboxPlaceholder || i18n.placeholder,
-            noResultsText: d.comboboxNoResults || i18n.noResults,
+            placeholder: d.comboboxPlaceholder || kind.placeholder || i18n.placeholder,
+            noResultsText: d.comboboxNoResults || kind.noResults || i18n.noResults,
             hintText: d.comboboxHint || i18n.hint,
             invalidText: d.comboboxInvalid || i18n.invalid,
             loadingText: d.comboboxLoading || i18n.loading,
