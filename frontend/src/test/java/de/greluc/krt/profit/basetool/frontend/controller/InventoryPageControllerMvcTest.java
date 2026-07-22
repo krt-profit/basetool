@@ -253,6 +253,88 @@ class InventoryPageControllerMvcTest {
                             + " data-krt-combobox=\"remote-locations\"></select>")));
   }
 
+  // REQ-INV-026: the Umbuchen modal's merge-stock opt-in renders in the shared .check-row layout
+  // (checkbox left, explicit-for label + .form-hint help stacked right) and starts hidden — the
+  // page JS reveals it per-open for SCU rows only. The krtm-hidden class must sit on the row so the
+  // .check-row.krtm-hidden display override keeps working.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewMyInventory_umbuchenMergeRowUsesSharedCheckRowLayout() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/my"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "id=\"umbuchenMergeRow\" class=\"form-group check-row mb-1 krtm-hidden\"")))
+        .andExpect(
+            content()
+                .string(
+                    stringContainsInOrder(
+                        "id=\"umbuchenMergeRow\"",
+                        "id=\"umbuchenMergeStock\"",
+                        "for=\"umbuchenMergeStock\"",
+                        "class=\"form-hint\"")));
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewAllInventory_umbuchenMergeRowUsesSharedCheckRowLayout() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/all"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "id=\"umbuchenMergeRow\" class=\"form-group check-row mb-1 krtm-hidden\"")))
+        .andExpect(
+            content()
+                .string(
+                    stringContainsInOrder(
+                        "id=\"umbuchenMergeRow\"",
+                        "id=\"umbuchenMergeStock\"",
+                        "for=\"umbuchenMergeStock\"",
+                        "class=\"form-hint\"")));
+  }
+
+  // REQ-INV-026: the Einbuchen form's personal-entry and merge-stock checkbox rows both use the
+  // shared .check-row layout, in document order personal row (visible) before merge row (hidden
+  // until inventory-input.js reveals it for an SCU material).
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewInputPage_personalAndMergeRowsUseSharedCheckRowLayout() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/input"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-input"))
+        .andExpect(
+            content()
+                .string(
+                    stringContainsInOrder(
+                        "class=\"form-group check-row\"",
+                        "id=\"personal\"",
+                        "for=\"personal\"",
+                        "class=\"form-hint\"",
+                        "class=\"form-group check-row krtm-hidden\" id=\"merge-stock-row\"",
+                        "id=\"mergeStock\"",
+                        "for=\"mergeStock\"",
+                        "class=\"form-hint\"")));
+  }
+
   // REQ-FE-016: the Einbuchen form's material AND location selects are server-side-search
   // comboboxes (remote-materials / remote-locations) — the marker values are asserted in document
   // order so each is pinned to its own select, not satisfied by the page's remote-users user
