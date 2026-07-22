@@ -637,12 +637,12 @@
 
             <!-- REQ-INV-026: per-action stock-merge opt-in for the moved / rebooked quantity. Shown
                  by inventory-my.js only for an SCU material (PIECE always merges). -->
-            <div id="umbuchenMergeRow" class="form-group mb-1 krtm-hidden">
-                <label class="flex-gap-sm cursor-pointer m-0">
-                    <input type="checkbox" id="umbuchenMergeStock" class="m-0">
-                    <span th:text="#{inventory.merge.label}">Mit vorhandenem Bestand zusammenführen</span>
-                </label>
-                <span class="krtm-font-size-0-8rem-color-var-color-gray-2-marg-f610" th:text="#{inventory.merge.help}">Fügt diese Menge mit vorhandenem, gleichartigem Bestand zu einem Eintrag zusammen. Gilt nur für diese Buchung.</span>
+            <div id="umbuchenMergeRow" class="form-group check-row mb-1 krtm-hidden">
+                <input type="checkbox" id="umbuchenMergeStock">
+                <div>
+                    <label for="umbuchenMergeStock" th:text="#{inventory.merge.label}">Mit vorhandenem Bestand zusammenführen</label>
+                    <p class="form-hint" th:text="#{inventory.merge.help}">Fügt diese Menge mit vorhandenem, gleichartigem Bestand zu einem Eintrag zusammen. Gilt nur für diese Buchung.</p>
+                </div>
             </div>
 
             <div class="mt-2-flex-gap">

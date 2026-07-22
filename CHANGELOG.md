@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Lager: Die Checkbox „Mit vorhandenem Bestand zusammenführen" sieht jetzt überall gleich aus.** Die Umbuchen-Dialoge (Mein Lager, Globales Lager) und das Einbuchen-Formular nutzen für die Zusammenführen- und Persönlich-Checkboxen jetzt dasselbe Layout wie die Profilseite: Checkbox links, Beschriftung mit Hilfetext rechts gestapelt (REQ-INV-026).
+
 ### Fixed
 
 - **Admin-Bereich: Checkboxen in „Missionsdaten" und „Materialien verwalten" werden wieder als kompakte KRT-Kästchen dargestellt.** Eine seitenweite Formularfeld-Regel streckte die Checkboxen (Führungsposition/Einsatzleiter im Job-Dialog, die Flag-Schalter im Material-Anlegen-Dialog) auf volle Breite mit Innenabstand; die Regel klammert Checkboxen und Radios jetzt aus.

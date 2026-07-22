@@ -979,13 +979,6 @@
     border-left: 1px solid var(--color-gray-3);
 }
 /* 1x */
-.krtm-display-flex-align-items-center-gap-0-5rem-m-c9b5 {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 1rem;
-}
-/* 1x */
 .krtm-display-flex-align-items-center-gap-0-75rem-5618 {
     display: flex;
     align-items: center;
@@ -1254,12 +1247,6 @@
     margin-bottom: 1rem;
 }
 /* 1x */
-.krtm-font-size-0-8rem-color-var-color-gray-2-marg-f610 {
-    font-size: 0.8rem;
-    color: var(--color-gray-2-text);
-    margin-left: 0.5rem;
-}
-/* 1x */
 .krtm-font-size-0-8rem-color-var-color-gray-2-marg-8f50 {
     font-size: 0.8rem;
     color: var(--color-gray-2-text);
@@ -1448,11 +1435,6 @@
 .krtm-margin-0-display-inline-3bbd {
     margin: 0;
     display: inline;
-}
-/* 1x */
-.krtm-margin-0-display-inline-block-00ba {
-    margin: 0;
-    display: inline-block;
 }
 /* 1x */
 .krtm-margin-0-flex-0-0-auto-fa3b {
@@ -1688,12 +1670,6 @@
     cursor: pointer;
     accent-color: var(--color-primary);
 }
-/* 1x */
-.krtm-width-auto-margin-0-5449 {
-    width: auto;
-    margin: 0;
-}
-
 /* --- Support classes for migrated conditional (th:style) values. The modal pair is toggled
    at runtime by common-handlers.js via classList; .krtm-modal-open wins the default-none
    .krt-modal-overlay and .krtm-hidden wins the default-flex .modal (this sheet is loaded last). --- */
