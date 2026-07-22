@@ -98,6 +98,39 @@ groups:
           summary: "Keycloak ERROR-level log rate elevated"
           description: "Keycloak is logging ERRORs at an elevated rate — check the Discord SPI fail-open precheck path in particular."
 
+      # Keycloak OAuth backchannel failing (2026-07-22 incident): the frontend's token grants
+      # (refresh_token + authorization_code, ADR-0115 pool) died for 41 minutes with
+      # PrematureCloseException while the edge, Keycloak and all metrics-level probes stayed green —
+      # zero alerts fired. Each such line is one genuinely lost token grant (not retried by design,
+      # REQ-SEC-012): sustained occurrences mean idle sessions cannot refresh and NEW LOGINS are at
+      # risk, since the login code exchange shares the same transport. Pattern verified against the
+      # real prod lines of the incident (logger reactor.netty HttpClientConnect, stack_trace
+      # PrematureCloseException, remote keycloak.profit-base.online in the same JSON line).
+      - alert: FrontendKeycloakBackchannelFailing
+        expr: 'sum(count_over_time({app="frontend"} |~ "PrematureCloseException" |~ "keycloak" [10m])) > 10'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Frontend->Keycloak token backchannel failing (PrematureClose)"
+          description: "The frontend logs a sustained rate of PrematureCloseException against the Keycloak token endpoint — refresh grants are being lost and logins may fail. 2026-07-22 pattern: a transient L4 fault on the public hairpin stalled token POST bodies; the edge reaped each attempt after ~60s. Check the hairpin path (NPM, conntrack) and frontend re-auth rates."
+
+      # A health contributor crossing Spring Boot's 10s slow-indicator threshold is always
+      # pathological (the Docker HEALTHCHECK budget is 5s): during the 2026-07-22 incident the
+      # frontend's reactive Redis PING hung for 161-836 SECONDS, readiness hung with it and the
+      # container sat unhealthy for ~15 minutes — with no alert anywhere. Pattern verified against
+      # the real prod lines ("Health contributor org.springframework...ReactiveHealthIndicatorAdapter
+      # (redis) took 836643ms to respond"); backend included — its prod-enabled Redis indicator runs
+      # without a Lettuce timeout bound and can log the same line.
+      - alert: HealthContributorHanging
+        expr: 'sum by (app) (count_over_time({app=~"backend|frontend"} |~ "Health contributor .+ took" [10m])) > 0'
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow/hanging health contributor ({{ $labels.app }})"
+          description: "A Spring Boot health contributor took >10s to respond (logged by HealthEndpointSupport) — readiness and the Docker healthcheck (5s budget) are already failing while the app looks alive. 2026-07-22 pattern: a hung reactive Redis PING queued successive checks for minutes. Check the named contributor and the container's health state."
+
       - alert: SshFailedAuthSpike
         expr: sum(rate({app="host-auth"} |~ "Failed password|authentication failure|Invalid user" [5m])) > 0.3
         for: 5m
