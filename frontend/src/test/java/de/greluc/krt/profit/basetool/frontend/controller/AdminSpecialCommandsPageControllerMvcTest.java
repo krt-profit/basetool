@@ -108,6 +108,26 @@ class AdminSpecialCommandsPageControllerMvcTest {
         .andExpect(content().string(containsString("id=\"sc-results\"")));
   }
 
+  // covers the .form-group checkbox regression class (PR #1405) — the page-scoped .form-group
+  // input rule ties the global KRT square-checkbox rule at (0,1,1) and, rendering after
+  // styles.css, would win and stretch any .form-group checkbox/radio into a full-width padded
+  // bar. Pins the :where() exclusion so the page rule can never capture checkbox/radio inputs.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void list_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/special-commands"), anyTypeRef()))
+        .thenReturn(oneSpecialCommand());
+
+    mockMvc
+        .perform(get("/admin/special-commands"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+  }
+
   // covers REQ-FE-002 — fragment=results renders only the inner SK-list block: the row is present,
   // but the swap-target wrapper, the create modal and the toolbar button (all outside the fragment)
   // are not.

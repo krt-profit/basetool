@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- **Hangar: Die „Fitted (Einsatzbereit)"-Checkbox im Schiff-Dialog wird wieder als sauberes KRT-Quadrat dargestellt.** Die seitenweite Formularfeld-CSS-Regel zog Innenabstand und Rahmen der Checkbox mit; der frühere Teil-Fix stellte nur die Breite wieder her. Checkboxen und Radios sind jetzt auf allen Seiten mit dieser seitenweiten Formularfeld-Regel ausgenommen — auch vorsorglich dort, wo heute noch keine Checkbox in einer Formulargruppe steht (REQ-UI-001).
+
 - **Admin-Bereich: Checkboxen in „Missionsdaten" und „Materialien verwalten" werden wieder als kompakte KRT-Kästchen dargestellt.** Eine seitenweite Formularfeld-Regel streckte die Checkboxen (Führungsposition/Einsatzleiter im Job-Dialog, die Flag-Schalter im Material-Anlegen-Dialog) auf volle Breite mit Innenabstand; die Regel klammert Checkboxen und Radios jetzt aus.
 
 - **Lager/Aufträge: Material-, Ort-, Item- und Konto-Auswahlfelder zeigen jetzt einen passenden Suchhinweis.** Bisher stand in vielen dieser Comboboxen (z. B. Material und Ort beim Einbuchen) irrtümlich der Nutzer-Platzhalter „Nutzer suchen oder wählen…"; jetzt nennt jedes Feld, was es durchsucht — auch die „Keine Treffer"-Meldung ist je Feldart korrekt (REQ-FE-011/016).
