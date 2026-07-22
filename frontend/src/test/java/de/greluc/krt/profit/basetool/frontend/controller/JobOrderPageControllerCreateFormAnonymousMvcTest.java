@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -104,6 +105,27 @@ class JobOrderPageControllerCreateFormAnonymousMvcTest {
         .getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef(), eq(true));
     verify(backendApiClient, never())
         .getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef());
+  }
+
+  // The Material <-> Item order-kind radios must keep the global 1.2rem KRT circle styling: the
+  // page's blanket `.form-group input` rule excludes radio/checkbox inputs via a zero-specificity
+  // :where(), so it can neither inflate them with its 0.75rem padding nor outrank the combobox
+  // rule that reserves right padding for the dropdown chevron. Guards the selector text so a
+  // revert to the unfiltered blanket rule fails the build.
+  @Test
+  @WithAnonymousUser
+  void viewCreateForm_blanketInputRuleExcludesRadioAndCheckboxControls() throws Exception {
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), eq(true)))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/orders/create"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
   @Test
