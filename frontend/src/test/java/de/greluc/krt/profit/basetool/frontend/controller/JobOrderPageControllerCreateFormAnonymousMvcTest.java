@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -106,14 +107,14 @@ class JobOrderPageControllerCreateFormAnonymousMvcTest {
         .getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef());
   }
 
-  // covers the .form-group checkbox regression class (PR #1407) — the page-scoped .form-group
-  // input rule ties the global KRT square/round rule at (0,1,1) and, rendering after styles.css,
-  // stretched the order-kind radios into full-width padded bars (their krtm-width-auto utility at
-  // (0,1,0) loses the cascade to the page rule). Pins the :not() exclusion so the page rule can
-  // never re-capture checkbox/radio inputs.
+  // The Material <-> Item order-kind radios must keep the global 1.2rem KRT circle styling: the
+  // page's blanket `.form-group input` rule excludes radio/checkbox inputs via a zero-specificity
+  // :where(), so it can neither inflate them with its 0.75rem padding nor outrank the combobox
+  // rule that reserves right padding for the dropdown chevron. Guards the selector text so a
+  // revert to the unfiltered blanket rule fails the build.
   @Test
   @WithAnonymousUser
-  void viewCreateForm_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
+  void viewCreateForm_blanketInputRuleExcludesRadioAndCheckboxControls() throws Exception {
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), eq(true)))
         .thenReturn(Collections.emptyList());
 
@@ -123,8 +124,8 @@ class JobOrderPageControllerCreateFormAnonymousMvcTest {
         .andExpect(
             content()
                 .string(
-                    Matchers.containsString(
-                        ".form-group input:not([type='checkbox']):not([type='radio'])")));
+                    containsString(
+                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
   @Test

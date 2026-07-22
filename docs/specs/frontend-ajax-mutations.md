@@ -738,8 +738,17 @@ versa. The enhancer is loaded **globally** from `fragments/head.html` and auto-i
 `select[data-krt-combobox]` on `DOMContentLoaded` **and** on `krt:swapped` (so pickers inside swapped
 fragments are upgraded); `window.krtEnhanceComboboxes(root)` upgrades pickers a page builds
 dynamically (cloned modal/selector rows). Shared default labels live once in `window.krtComboboxI18n`
-(`userSelect.search.*`). A new or changed user-selection surface that ships a plain `<select>` or a
-hand-rolled picker is **incomplete**.
+(head.html): the top-level default keeps the **user wording** (`userSelect.search.*` — every picker
+opting in with a bare `data-krt-combobox` is a locally-populated user/holder picker), plus a
+**`kinds` map keyed by the remote-source marker value** that gives each source kind its own
+placeholder and no-results wording (`userSelect.search.*` for `remote-users`/`remote-bank-users`,
+`materialSelect.search.*` / `locationSelect.search.*` / the item and bank-account strings for the
+catalog and account sources) — a material picker must never greet the user with the user-picker
+text. Per-control precedence: `data-combobox-*` attribute > `kinds[marker]` > top-level default.
+The map is **gate-enforced**: `ComboboxKindsParityTest` asserts set-equality between the markers
+registered in the remote-source registry files and the `kinds` keys in head.html, so registering a
+source without its wording (or orphaning a `kinds` entry) is a red build. A new or changed
+user-selection surface that ships a plain `<select>` or a hand-rolled picker is **incomplete**.
 
 **Server-side search mode for the all-users pickers (#1193, ADR-0085/ADR-0089).** At the 5000-account
 target, a picker that preloads the full (or admin-"all-squadrons") roster ships thousands of
@@ -1136,7 +1145,10 @@ values are registered in `krt-catalog-search.js`: `remote-materials`,
 `remote-materials-joborder` (orders lines), `remote-materials-raw` (refinery inputs),
 `remote-locations`, and `remote-game-items` (the inventory item mode's bookable-item picker — the
 one **authenticated** relay, `GET /inventory/item-search`, onto the role-gated backend
-`/api/v1/inventory/item-catalog`, REQ-INV-029). Server-rendered edit/redisplay states seed exactly
+`/api/v1/inventory/item-catalog`, REQ-INV-029). Each marker carries its kind-specific default
+placeholder / no-results wording via the `krtComboboxI18n.kinds` map (REQ-FE-011) — the material and
+location pickers say "Material/Ort suchen oder wählen…", never the user-picker text.
+Server-rendered edit/redisplay states seed exactly
 **one** selected `<option>` (gated `th:if`) so the label and its metadata survive enhancement;
 programmatic fills use `krtCombobox.setValue(value, label, data?)` — in remote mode a bare
 `setValue(value)` cannot resolve a label and clears the field, so every call site passes the label

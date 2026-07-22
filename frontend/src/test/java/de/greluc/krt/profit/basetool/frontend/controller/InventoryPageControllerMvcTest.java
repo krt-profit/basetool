@@ -49,6 +49,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
+import jakarta.servlet.http.Cookie;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -312,6 +313,92 @@ class InventoryPageControllerMvcTest {
                         "id=\"quality\"",
                         "id=\"mode-item-fields\"",
                         "id=\"gameItemId\"")));
+  }
+
+  // The Einbuchen form's two opt-in checkboxes (personal entry + REQ-INV-026 stock merge) must
+  // share ONE row format: both render as a `form-group check-row` (checkbox left, label + muted
+  // form-hint stacked right) instead of the former ad-hoc single-line flex rows whose long merge
+  // label wrapped around the checkbox. Asserted in document order so each class match is pinned
+  // to its own row.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewInputPage_checkboxRowsShareCheckRowFormat() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/input"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-input"))
+        .andExpect(
+            content()
+                .string(
+                    stringContainsInOrder(
+                        "class=\"form-group check-row\"",
+                        "id=\"personal\"",
+                        "class=\"form-hint\"",
+                        "class=\"form-group check-row krtm-hidden\" id=\"merge-stock-row\"",
+                        "id=\"mergeStock\"",
+                        "class=\"form-hint\"")));
+  }
+
+  // Two page-CSS guards for the Einbuchen form: (1) the blanket `.form-group input` rule excludes
+  // radio/checkbox inputs via a zero-specificity :where(), so the Material <-> Item radios keep
+  // the global 1.2rem KRT circle styling and the rule cannot outrank the combobox chevron
+  // padding; (2) the (0,3,0) `.form-group.check-row.krtm-hidden` override must exist — the
+  // (0,2,0) check-row flex rule would otherwise beat the (0,1,0) `.krtm-hidden` utility and the
+  // REQ-INV-026 merge opt-in row could never be hidden for PIECE materials.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewInputPage_pageCssExcludesTogglesAndKeepsMergeRowHideable() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/input"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")))
+        .andExpect(content().string(containsString(".form-group.check-row.krtm-hidden")));
+  }
+
+  // REQ-FE-011/REQ-FE-016: the shared combobox i18n bootstrap (fragments/head.html) must carry a
+  // per-source `kinds` entry for EVERY registered remote-source marker, so a material/location/
+  // item/account picker greets the user with its own placeholder instead of the user-picker
+  // wording. (Set-parity with the JS registries is separately gated by ComboboxKindsParityTest.)
+  // The two German material/location placeholders are asserted by prefix (the umlaut tail is
+  // unicode-escaped by the Thymeleaf JS serializer); German is pinned via the KRT_LOCALE cookie —
+  // the CookieLocaleResolver ignores Accept-Language once a default locale is set.
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewInputPage_comboboxKindsMapCoversEveryRemoteSource() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/input").cookie(new Cookie("KRT_LOCALE", "de")))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    stringContainsInOrder(
+                        "kinds: {",
+                        "'remote-users':",
+                        "'remote-bank-users':",
+                        "'remote-materials':",
+                        "'remote-materials-joborder':",
+                        "'remote-materials-raw':",
+                        "'remote-locations':",
+                        "'remote-game-items':",
+                        "'remote-bank-accounts':")))
+        .andExpect(content().string(containsString("Material suchen oder w")))
+        .andExpect(content().string(containsString("Ort suchen oder w")));
   }
 
   // covers REQ-INV-031 (design §5.3/§6.6): the /inventory/item-search proxy behind the

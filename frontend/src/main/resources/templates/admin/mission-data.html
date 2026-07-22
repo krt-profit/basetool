@@ -15,13 +15,12 @@
             font-family: var(--font-body);
             font-size: 0.8rem;
         }
-        /* Exclude checkboxes/radios: the full-width padded field styling would otherwise win the
-           specificity tie against the global KRT 1.2rem square rule (page <style> renders after
-           styles.css) and stretch the job-type modal's leadership/mission-lead checkboxes into
-           full-width bars (their krtm-width-auto utility at (0,1,0) loses to this (0,1,1) rule). */
-        .form-group input:not([type='checkbox']):not([type='radio']),
-        .form-group select,
-        .form-group textarea {
+        /* Checkboxes (the job-type modal's leadership / mission-lead toggles) and radios are
+           excluded: width:100% + the 0.5rem padding would stretch the 1.2rem KRT squares
+           (styles.css) full-width. The exclusions sit in :where() so they add ZERO specificity —
+           the rule keeps the plain `.form-group input` weight (0,1,1) and stays below the
+           (0,2,0) combobox rule `.krt-combobox .krt-combobox__input`. */
+        .form-group input:where(:not([type='checkbox']):not([type='radio'])), .form-group select, .form-group textarea {
             width: 100%;
             padding: 0.5rem;
             background-color: var(--color-surface-input);
@@ -313,14 +312,14 @@
                 </div>
                 <div class="form-group" id="jt-leadership-group">
                     <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-8e71">
-                        <input type="checkbox" name="isLeadershipRole" id="jt-leadership" class="krtm-width-auto-7e37" th:checked="*{isLeadershipRole}">
+                        <input type="checkbox" name="isLeadershipRole" id="jt-leadership" th:checked="*{isLeadershipRole}">
                         <span th:text="#{admin.job_type.is_leadership_role}">Führungsposition</span>
                     </label>
                     <div th:if="${#fields.hasErrors('isLeadershipRole')}" th:errors="*{isLeadershipRole}" class="field-error"></div>
                 </div>
                 <div class="form-group" id="jt-missionlead-group">
                     <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-8e71">
-                        <input type="checkbox" name="isMissionLead" id="jt-missionlead" class="krtm-width-auto-7e37" th:checked="*{isMissionLead}">
+                        <input type="checkbox" name="isMissionLead" id="jt-missionlead" th:checked="*{isMissionLead}">
                         <span th:text="#{admin.job_type.is_mission_lead}">Einsatzleiter</span>
                     </label>
                     <small class="form-hint" th:text="#{admin.job_type.is_mission_lead.hint}">Nur eine Mission-F&uuml;hrungsposition kann der Einsatzleiter sein.</small>

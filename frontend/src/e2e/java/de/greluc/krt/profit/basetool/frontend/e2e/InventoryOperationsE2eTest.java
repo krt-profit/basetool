@@ -562,6 +562,14 @@ class InventoryOperationsE2eTest {
           E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
           page.waitForLoadState();
 
+          // REQ-FE-016: the catalog pickers announce what they search — the material/location
+          // comboboxes must carry their kind-specific placeholder, not the user-picker wording
+          // (which contains neither "material" nor "Ort"/"location" in either locale).
+          assertThat(page.locator(".krt-combobox:has(#materialId) .krt-combobox__input"))
+              .hasAttribute("placeholder", Pattern.compile("(?i).*material.*"));
+          assertThat(page.locator(".krt-combobox:has(#locationId) .krt-combobox__input"))
+              .hasAttribute("placeholder", Pattern.compile("(?i).*(ort|location).*"));
+
           E2eSupport.selectComboboxFirstOption(
               page.locator(".krt-combobox:has(#materialId) .krt-combobox__input"));
           E2eSupport.selectComboboxFirstOption(
