@@ -2,15 +2,17 @@
 
 ## [Unreleased]
 
+## [v1.5.12](https://github.com/krt-profit/basetool/releases/tag/v1.5.12) - 2026-07-22
+
+### Added
+
+- **Monitoring: Zwei neue Log-Alerts schließen die Lücke, durch die der 41-Minuten-Vorfall am 22.07.2026 ohne einen einzigen Alarm blieb.** `FrontendKeycloakBackchannelFailing` schlägt an, wenn Token-Aufrufe an Keycloak anhaltend mit Verbindungsabbrüchen scheitern; `HealthContributorHanging` meldet jeden Health-Contributor, der länger als 10 s braucht (Backend und Frontend) — beides Zustände, in denen Login/Session-Erneuerung bzw. der Container-Healthcheck bereits leiden, während alle bisherigen Alarme grün blieben (REQ-OBS-014).
+
 ### Fixed
 
 - **Login/Session: Hängende Token-Aufrufe an Keycloak brechen jetzt nach Sekunden sauber ab statt minutenlang zu blockieren.** Beim Vorfall am 22.07.2026 blieben Token-Erneuerungen 41 Minuten lang mitten im Senden stecken (transiente Netzstörung auf dem Proxy-Pfad) — clientseitig griff kein Timeout, erst der Proxy kappte jede Verbindung nach ~60 s, und jeder Abbruch war eine verlorene Erneuerung. Der Token-Client hat jetzt Lese-/Schreib-Timeouts (3 s) wie der übrige Backend-Transport; ein hängender Aufruf mündet schnell in die stille Neuanmeldung (REQ-SEC-012, ADR-0117).
 
 - **Stabilität: Die Redis-Bereitschaftsprüfung kann nicht mehr minutenlang hängen.** Trotz des 2-Sekunden-Timeouts aus v1.5.10 stauten sich beim Vorfall am 22.07.2026 Health-Checks bis zu 14 Minuten hinter einer blockierten Lettuce-Verbindungsanforderung, die kein Kommando-Timeout erreicht. Die Redis-Prüfung ist jetzt zusätzlich auf Health-Ebene hart auf 3 s begrenzt und meldet danach ehrlich „nicht bereit" (ADR-0118).
-
-### Added
-
-- **Monitoring: Zwei neue Log-Alerts schließen die Lücke, durch die der 41-Minuten-Vorfall am 22.07.2026 ohne einen einzigen Alarm blieb.** `FrontendKeycloakBackchannelFailing` schlägt an, wenn Token-Aufrufe an Keycloak anhaltend mit Verbindungsabbrüchen scheitern; `HealthContributorHanging` meldet jeden Health-Contributor, der länger als 10 s braucht (Backend und Frontend) — beides Zustände, in denen Login/Session-Erneuerung bzw. der Container-Healthcheck bereits leiden, während alle bisherigen Alarme grün blieben (REQ-OBS-014).
 
 ## [v1.5.11](https://github.com/krt-profit/basetool/releases/tag/v1.5.11) - 2026-07-21
 
