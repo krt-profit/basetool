@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Lager: Die Checkbox „Mit vorhandenem Bestand zusammenführen" sieht jetzt überall gleich aus.** Die Umbuchen-Dialoge (Mein Lager, Globales Lager) und das Einbuchen-Formular nutzen für die Zusammenführen- und Persönlich-Checkboxen jetzt dasselbe Layout wie die Profilseite: Checkbox links, Beschriftung mit Hilfetext rechts gestapelt (REQ-INV-026).
+
 ### Fixed
 
 - **Hangar: Die „Fitted (Einsatzbereit)"-Checkbox im Schiff-Dialog wird wieder als sauberes KRT-Quadrat dargestellt.** Die seitenweite Formularfeld-CSS-Regel zog Innenabstand und Rahmen der Checkbox mit; der frühere Teil-Fix stellte nur die Breite wieder her. Checkboxen und Radios sind jetzt auf allen Seiten mit dieser seitenweiten Formularfeld-Regel ausgenommen — auch vorsorglich dort, wo heute noch keine Checkbox in einer Formulargruppe steht (REQ-UI-001).

@@ -1615,6 +1615,43 @@ label:has(+ [required])::after {
     max-width: var(--measure);
 }
 
+/* Checkbox opt-in row — checkbox left, label + .form-hint help stacked right.
+   Shared by the profile blueprint-sharing toggle and the REQ-INV-026 stock-merge
+   opt-ins (Einbuchen form + the Umbuchen modals of both Lager views). */
+.check-row {
+    display: flex;
+    gap: var(--space-3);
+    align-items: flex-start;
+}
+
+.check-row input[type='checkbox'] {
+    flex: none;
+    margin-top: 0.15rem;
+}
+
+.check-row label {
+    margin: 0;
+    color: var(--color-gray-1);
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-sm);
+    cursor: pointer;
+}
+
+/* A per-page `.form-group label` rule (block display + bottom margin, e.g. the
+   inventory-input field labels) ties the (0,1,1) label rule above and loads after
+   this sheet — re-pin the tight label/hint stack at (0,2,1) for the
+   form-group-hosted rows. */
+.form-group.check-row label {
+    margin: 0;
+}
+
+/* The merge-stock rows are toggled via .krtm-hidden (inline-migration.css). That
+   utility only wins the display tie against the flex rule above through sheet
+   order — make the hide deterministic instead of order-dependent. */
+.check-row.krtm-hidden {
+    display: none;
+}
+
 /* Layout Utility Classes */
 .mt-1 {
     margin-top: var(--space-4);
@@ -5554,25 +5591,8 @@ input[type='range'] {
     border-top: var(--border-hairline);
 }
 
-/* Blueprint-sharing checkbox row. */
-.profile-page .check-row {
-    display: flex;
-    gap: var(--space-3);
-    align-items: flex-start;
-}
-
-.profile-page .check-row input[type='checkbox'] {
-    flex: none;
-    margin-top: 0.15rem;
-}
-
-.profile-page .check-row label {
-    margin: 0;
-    color: var(--color-gray-1);
-    font-weight: var(--fw-bold);
-    font-size: var(--fs-sm);
-    cursor: pointer;
-}
+/* The blueprint-sharing checkbox row uses the shared .check-row component (forms
+   section above). */
 
 /* Access & security note. */
 .profile-page .acct-note {
