@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Admin-Materialien: Die fünf Flag-Checkboxen im „Material anlegen"-Dialog werden wieder als quadratische Checkboxen dargestellt.** Eine seitenweite CSS-Regel für Formularfelder zog die Checkboxen fälschlich auf volle Breite mit Innenabstand; Checkboxen und Radios sind jetzt von der Regel ausgenommen (REQ-UI-001).
+
 ## [v1.5.12](https://github.com/krt-profit/basetool/releases/tag/v1.5.12) - 2026-07-22
 
 ### Added

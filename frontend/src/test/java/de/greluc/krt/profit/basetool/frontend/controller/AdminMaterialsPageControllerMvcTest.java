@@ -130,6 +130,32 @@ class AdminMaterialsPageControllerMvcTest {
         .andExpect(content().string(containsString("</html>")));
   }
 
+  // covers the create-modal flag-checkbox regression — the page-scoped .form-group input rule ties
+  // the global KRT square-checkbox rule at (0,1,1) and, rendering after styles.css, would win and
+  // stretch the five flag checkboxes into full-width padded bars. Pins the :not() exclusion so the
+  // page rule can never re-capture checkbox/radio inputs.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listMaterials_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
+    when(backendApiClient.get(
+            eq("/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page=0"),
+            anyTypeRef()))
+        .thenReturn(
+            new PageResponse<MaterialDto>(
+                Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList()));
+    when(backendApiClient.get(eq("/api/v1/material-categories"), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/admin/materials"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        ".form-group input:not([type='checkbox']):not([type='radio'])")));
+  }
+
   // covers #582 — the category-create twin (X-Requested-With + JSON body) relays to the backend and
   // returns the created MaterialCategoryDto so the page appends it without reloading.
   @Test
