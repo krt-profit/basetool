@@ -19,13 +19,16 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
@@ -91,6 +94,24 @@ class AdminUexPageControllerMvcTest {
         false,
         null,
         false);
+  }
+
+  // covers the .form-group checkbox regression class (PR #1407) — the page-scoped .form-group
+  // input rule ties the global KRT square-checkbox rule at (0,1,1) and, rendering after
+  // styles.css, would win and stretch any .form-group checkbox/radio into a full-width padded
+  // bar. Pins the :not() exclusion so the page rule can never capture checkbox/radio inputs.
+  // The GET handler degrades to the error banner on unstubbed fetches, still rendering the head.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listData_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
+    mockMvc
+        .perform(get("/admin/uex-data"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        ".form-group input:not([type='checkbox']):not([type='radio'])")));
   }
 
   // covers #582 — the terminal toggle-visibility twin (X-Requested-With) flips the hidden flag off

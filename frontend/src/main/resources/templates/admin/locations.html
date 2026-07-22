@@ -13,7 +13,13 @@
             font-family: var(--font-body);
             font-size: 0.8rem;
         }
-        .form-group input, .form-group select, .form-group textarea {
+        /* Exclude checkboxes/radios: the full-width padded field styling would otherwise win the
+           specificity tie against the global KRT 1.2rem square rule (page <style> renders after
+           styles.css) — no .form-group checkbox/radio exists here today, but that latent trap is
+           exactly how the admin/materials flag checkboxes broke when they were added later. */
+        .form-group input:not([type='checkbox']):not([type='radio']),
+        .form-group select,
+        .form-group textarea {
             width: 100%;
             padding: 0.5rem;
             background-color: var(--color-surface-input);

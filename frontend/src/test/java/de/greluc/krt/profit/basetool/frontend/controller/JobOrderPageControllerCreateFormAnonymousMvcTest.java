@@ -106,6 +106,27 @@ class JobOrderPageControllerCreateFormAnonymousMvcTest {
         .getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef());
   }
 
+  // covers the .form-group checkbox regression class (PR #1407) — the page-scoped .form-group
+  // input rule ties the global KRT square/round rule at (0,1,1) and, rendering after styles.css,
+  // stretched the order-kind radios into full-width padded bars (their krtm-width-auto utility at
+  // (0,1,0) loses the cascade to the page rule). Pins the :not() exclusion so the page rule can
+  // never re-capture checkbox/radio inputs.
+  @Test
+  @WithAnonymousUser
+  void viewCreateForm_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), eq(true)))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/orders/create"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    Matchers.containsString(
+                        ".form-group input:not([type='checkbox']):not([type='radio'])")));
+  }
+
   @Test
   @WithAnonymousUser
   void viewCreateForm_AsAnonymousGuest_PopulatesPickersAndPreselectsIntakeSk() throws Exception {

@@ -94,6 +94,29 @@ class HangarPageControllerMvcTest {
     mockMvc.perform(get("/hangar")).andExpect(status().isOk()).andExpect(view().name("hangar"));
   }
 
+  // covers the .form-group checkbox regression class (PR #1407) — the page-scoped .form-group
+  // input rule ties the global KRT square-checkbox rule at (0,1,1) and, rendering after
+  // styles.css, would deform the ship modal's "Fitted" checkbox into a padded surface box. Pins
+  // the :not() exclusion and the removal of the old width:auto override, which only restored the
+  // width and, with the exclusion in place, would instead shrink the global 1.2rem square.
+  @Test
+  @WithMockUser
+  void viewHangar_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
+    PageResponse<ShipDto> ships = new PageResponse<>(List.of(), 0, 10, 0, 1, List.of());
+    when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))
+        .thenReturn(ships);
+
+    mockMvc
+        .perform(get("/hangar"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(".form-group input:not([type='checkbox']):not([type='radio'])")))
+        .andExpect(
+            content().string(org.hamcrest.Matchers.not(containsString(".form-group input[type="))));
+  }
+
   @Test
   @WithMockUser
   void viewHangar_ShouldRenderServerSideSearchFormWhenHangarHasShips() throws Exception {

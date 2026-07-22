@@ -15,7 +15,13 @@
             font-family: var(--font-body);
             font-size: 0.8rem;
         }
-        .form-group input, .form-group select, .form-group textarea {
+        /* Exclude checkboxes/radios: the full-width padded field styling would otherwise win the
+           specificity tie against the global KRT 1.2rem square rule (page <style> renders after
+           styles.css) and stretch the job-type modal's leadership/mission-lead checkboxes into
+           full-width bars (their krtm-width-auto utility at (0,1,0) loses to this (0,1,1) rule). */
+        .form-group input:not([type='checkbox']):not([type='radio']),
+        .form-group select,
+        .form-group textarea {
             width: 100%;
             padding: 0.5rem;
             background-color: var(--color-surface-input);

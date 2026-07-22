@@ -121,6 +121,24 @@ class AdminMaterialAliasesPageControllerMvcTest {
     verify(backendApiClient, never()).get(eq("/api/v1/materials/lookup"), anyTypeRef());
   }
 
+  // covers the .form-group checkbox regression class (PR #1407) — the page-scoped .form-group
+  // input rule ties the global KRT square-checkbox rule at (0,1,1) and, rendering after
+  // styles.css, would win and stretch any .form-group checkbox/radio into a full-width padded
+  // bar. Pins the :not() exclusion so the page rule can never capture checkbox/radio inputs.
+  // The list() handler swallows backend failures, so no stubbing is needed.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listPage_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
+    mockMvc
+        .perform(get("/admin/material-aliases"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        ".form-group input:not([type='checkbox']):not([type='radio'])")));
+  }
+
   // covers #582 — the create twin (X-Requested-With + JSON body) relays to the backend and returns
   // the persisted alias.
   @Test

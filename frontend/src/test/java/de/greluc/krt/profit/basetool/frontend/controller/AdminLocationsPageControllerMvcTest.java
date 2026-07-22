@@ -109,6 +109,29 @@ class AdminLocationsPageControllerMvcTest {
         .andExpect(content().string(containsString("</html>")));
   }
 
+  // covers the .form-group checkbox regression class (PR #1407) — the page-scoped .form-group
+  // input rule ties the global KRT square-checkbox rule at (0,1,1) and, rendering after
+  // styles.css, would win and stretch any .form-group checkbox/radio into a full-width padded
+  // bar. Pins the :not() exclusion so the page rule can never capture checkbox/radio inputs.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listData_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
+    PageResponse<LocationDto> page = new PageResponse<>(List.of(), 0, 1000, 0, 1, List.of());
+    when(backendApiClient.get(
+            eq("/api/v1/locations?size=1000&sort=name,asc&includeHidden=true&page=0"),
+            anyTypeRef()))
+        .thenReturn(page);
+
+    mockMvc
+        .perform(get("/admin/locations"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        ".form-group input:not([type='checkbox']):not([type='radio'])")));
+  }
+
   // covers #582 — the toggle-visibility twin (X-Requested-With) flips the hidden flag off a
   // freshly-read record and returns the persisted LocationDto so the page re-renders the row in
   // place. The second get() returns the toggled record.

@@ -14,7 +14,14 @@
             font-size: 0.9rem;
             font-weight: 700;
         }
-        .form-group input, .form-group select, .form-group textarea {
+        /* Exclude checkboxes/radios: the full-width padded field styling would otherwise win the
+           specificity tie against the global KRT 1.2rem square rule (page <style> renders after
+           styles.css) and deform the ship modal's "Fitted" checkbox. The old width:auto override
+           only restored the width (padding/border stayed wrong) and would now shrink the global
+           1.2rem square, so it is removed rather than kept. */
+        .form-group input:not([type='checkbox']):not([type='radio']),
+        .form-group select,
+        .form-group textarea {
             width: 100%;
             padding: 0.5rem;
             background-color: var(--color-surface-input);
@@ -22,9 +29,6 @@
             color: var(--color-gray-1);
             font-family: var(--font-body);
             box-sizing: border-box;
-        }
-        .form-group input[type="checkbox"] {
-            width: auto;
         }
         #ship-modal .btn {
             font-family: var(--font-body);

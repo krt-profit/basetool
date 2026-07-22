@@ -126,7 +126,15 @@ class MaterialsPageControllerMvcTest {
         // The datalist that carries the autocomplete names must have rendered with the material as
         // an option — that's the data source the surrounding script now reads from.
         .andExpect(content().string(containsString("<datalist id=\"materialNames-data\">")))
-        .andExpect(content().string(containsString("<option value=\"Aluminum\">")));
+        .andExpect(content().string(containsString("<option value=\"Aluminum\">")))
+        // covers the .form-group checkbox regression class (PR #1407): the page-scoped rule must
+        // carry the :not() exclusion so it can never capture a checkbox/radio (the grouping
+        // toggle sits right next to the filter's .form-group) and stretch it into a padded bar.
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        ".form-group input:not([type='checkbox']):not([type='radio'])")));
   }
 
   /**
@@ -217,6 +225,14 @@ class MaterialsPageControllerMvcTest {
         // The datalist that carries the terminal names must be rendered with the price's terminal
         // as an option — that's the data source the surrounding script now reads from.
         .andExpect(content().string(containsString("id=\"terminalNames-data\"")))
-        .andExpect(content().string(containsString("value=\"Area18\"")));
+        .andExpect(content().string(containsString("value=\"Area18\"")))
+        // covers the .form-group checkbox regression class (PR #1407): the page-scoped rule must
+        // carry the :not() exclusion so it can never capture a checkbox/radio and stretch it into
+        // a full-width padded bar (it ties the global KRT square rule and renders after it).
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        ".form-group input:not([type='checkbox']):not([type='radio'])")));
   }
 }

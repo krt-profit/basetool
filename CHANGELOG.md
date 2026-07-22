@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Hangar: Die „Fitted (Einsatzbereit)"-Checkbox im Schiff-Dialog wird wieder als sauberes KRT-Quadrat dargestellt.** Die seitenweite Formularfeld-CSS-Regel zog Innenabstand und Rahmen der Checkbox mit; der frühere Teil-Fix stellte nur die Breite wieder her. Checkboxen und Radios sind jetzt von der Regel ausgenommen (REQ-UI-001).
+
+- **Admin-Missionsdaten: Die Checkboxen „Führungsposition" und „Einsatzleiter" im Jobtyp-Dialog werden wieder als quadratische Checkboxen dargestellt statt als seitenbreite Balken.** Die seitenweite Formularfeld-CSS-Regel gewann den Spezifitätsgleichstand gegen den globalen Checkbox-Stil; Checkboxen und Radios sind jetzt von der Regel ausgenommen (REQ-UI-001).
+
+- **Auftrag erstellen: Die Auswahl „Materialauftrag/Item-Auftrag" wird wieder als runde Radio-Buttons dargestellt statt als seitenbreite Balken.** Dieselbe CSS-Vorrangfalle wie oben; Checkboxen und Radios sind jetzt auf allen Seiten mit dieser seitenweiten Formularfeld-Regel ausgenommen — auch vorsorglich dort, wo heute noch keine Checkbox in einer Formulargruppe steht (REQ-UI-001).
+
 ## [v1.5.12](https://github.com/krt-profit/basetool/releases/tag/v1.5.12) - 2026-07-22
 
 ### Added
