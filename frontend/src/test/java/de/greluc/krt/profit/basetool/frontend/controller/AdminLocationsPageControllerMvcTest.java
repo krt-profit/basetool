@@ -109,10 +109,10 @@ class AdminLocationsPageControllerMvcTest {
         .andExpect(content().string(containsString("</html>")));
   }
 
-  // covers the .form-group checkbox regression class (PR #1407) — the page-scoped .form-group
+  // covers the .form-group checkbox regression class (PR #1405) — the page-scoped .form-group
   // input rule ties the global KRT square-checkbox rule at (0,1,1) and, rendering after
   // styles.css, would win and stretch any .form-group checkbox/radio into a full-width padded
-  // bar. Pins the :not() exclusion so the page rule can never capture checkbox/radio inputs.
+  // bar. Pins the :where() exclusion so the page rule can never capture checkbox/radio inputs.
   @Test
   @WithMockUser(roles = "ADMIN")
   void listData_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
@@ -129,7 +129,7 @@ class AdminLocationsPageControllerMvcTest {
             content()
                 .string(
                     containsString(
-                        ".form-group input:not([type='checkbox']):not([type='radio'])")));
+                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
   // covers #582 — the toggle-visibility twin (X-Requested-With) flips the hidden flag off a

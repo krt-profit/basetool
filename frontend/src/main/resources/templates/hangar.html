@@ -14,14 +14,14 @@
             font-size: 0.9rem;
             font-weight: 700;
         }
-        /* Exclude checkboxes/radios: the full-width padded field styling would otherwise win the
-           specificity tie against the global KRT 1.2rem square rule (page <style> renders after
-           styles.css) and deform the ship modal's "Fitted" checkbox. The old width:auto override
-           only restored the width (padding/border stayed wrong) and would now shrink the global
-           1.2rem square, so it is removed rather than kept. */
-        .form-group input:not([type='checkbox']):not([type='radio']),
-        .form-group select,
-        .form-group textarea {
+        /* Checkboxes (the ship modal's "Fitted" toggle) and radios are excluded: width:100% +
+           the 0.5rem padding would deform the 1.2rem KRT squares (styles.css). The exclusions
+           sit in :where() so they add ZERO specificity — the rule keeps the plain `.form-group
+           input` weight (0,1,1) and stays below the (0,2,0) combobox rule `.krt-combobox
+           .krt-combobox__input`. The page's old checkbox-only width:auto override is removed:
+           it only restored the width, and with the exclusion in place its (0,2,1) weight would
+           instead shrink the global 1.2rem square. */
+        .form-group input:where(:not([type='checkbox']):not([type='radio'])), .form-group select, .form-group textarea {
             width: 100%;
             padding: 0.5rem;
             background-color: var(--color-surface-input);

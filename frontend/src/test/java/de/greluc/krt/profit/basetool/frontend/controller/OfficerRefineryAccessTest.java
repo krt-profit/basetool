@@ -279,13 +279,13 @@ class OfficerRefineryAccessTest {
                             + " data-krt-combobox=\"remote-materials-raw\"")))
         .andExpect(
             content().string(not(containsString("id=\"refinery-material-options-template\""))))
-        // covers the .form-group checkbox regression class (PR #1407): the page-scoped rule must
-        // carry the :not() exclusion so it can never capture a checkbox/radio and stretch it into
+        // covers the .form-group checkbox regression class (PR #1405): the page-scoped rule must
+        // carry the :where() exclusion so it can never capture a checkbox/radio and stretch it into
         // a full-width padded bar (it ties the global KRT square rule and renders after it).
         .andExpect(
             content()
                 .string(
                     containsString(
-                        ".form-group input:not([type='checkbox']):not([type='radio'])")));
+                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 }
