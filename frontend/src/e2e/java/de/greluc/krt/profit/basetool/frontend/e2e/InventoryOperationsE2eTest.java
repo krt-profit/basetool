@@ -564,11 +564,15 @@ class InventoryOperationsE2eTest {
 
           // REQ-FE-016: the catalog pickers announce what they search — the material/location
           // comboboxes must carry their kind-specific placeholder, not the user-picker wording
-          // (which contains neither "material" nor "Ort"/"location" in either locale).
+          // (which contains neither "material" nor "Ort"/"location" in either locale). Case
+          // insensitivity must come from the CASE_INSENSITIVE flag: Playwright evaluates the
+          // pattern as a JS RegExp in the browser, which rejects Java's inline "(?i)" group.
           assertThat(page.locator(".krt-combobox:has(#materialId) .krt-combobox__input"))
-              .hasAttribute("placeholder", Pattern.compile("(?i).*material.*"));
+              .hasAttribute(
+                  "placeholder", Pattern.compile(".*material.*", Pattern.CASE_INSENSITIVE));
           assertThat(page.locator(".krt-combobox:has(#locationId) .krt-combobox__input"))
-              .hasAttribute("placeholder", Pattern.compile("(?i).*(ort|location).*"));
+              .hasAttribute(
+                  "placeholder", Pattern.compile(".*(ort|location).*", Pattern.CASE_INSENSITIVE));
 
           E2eSupport.selectComboboxFirstOption(
               page.locator(".krt-combobox:has(#materialId) .krt-combobox__input"));
