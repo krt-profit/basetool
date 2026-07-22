@@ -6,6 +6,16 @@
 
 - **Lager: Die Checkbox „Mit vorhandenem Bestand zusammenführen" sieht jetzt überall gleich aus.** Die Umbuchen-Dialoge (Mein Lager, Globales Lager) und das Einbuchen-Formular nutzen für die Zusammenführen- und Persönlich-Checkboxen jetzt dasselbe Layout wie die Profilseite: Checkbox links, Beschriftung mit Hilfetext rechts gestapelt (REQ-INV-026).
 
+### Fixed
+
+- **Admin-Bereich: Checkboxen in „Missionsdaten" und „Materialien verwalten" werden wieder als kompakte KRT-Kästchen dargestellt.** Eine seitenweite Formularfeld-Regel streckte die Checkboxen (Führungsposition/Einsatzleiter im Job-Dialog, die Flag-Schalter im Material-Anlegen-Dialog) auf volle Breite mit Innenabstand; die Regel klammert Checkboxen und Radios jetzt aus.
+
+- **Lager/Aufträge: Material-, Ort-, Item- und Konto-Auswahlfelder zeigen jetzt einen passenden Suchhinweis.** Bisher stand in vielen dieser Comboboxen (z. B. Material und Ort beim Einbuchen) irrtümlich der Nutzer-Platzhalter „Nutzer suchen oder wählen…"; jetzt nennt jedes Feld, was es durchsucht — auch die „Keine Treffer"-Meldung ist je Feldart korrekt (REQ-FE-011/016).
+
+- **Lager einbuchen / Auftrag erstellen: Die Material/Item-Auswahlknöpfe (Radio-Buttons) sind wieder normal groß.** Ein seitenweiter Eingabefeld-Stil hatte die Radio-Buttons zu übergroßen Ovalen aufgeblasen; sie erscheinen jetzt als reguläre KRT-Radio-Kreise neben ihrer Beschriftung (REQ-FE-016).
+
+- **Lager einbuchen: Die Optionen „Persönlicher Eintrag" und „Mit vorhandenem Bestand zusammenführen" haben jetzt dasselbe Format.** Beide Zeilen zeigen die Checkbox links und daneben Beschriftung mit Hilfetext untereinander; zuvor lief der lange Text der Zusammenführen-Option unschön um die Checkbox herum (REQ-INV-026).
+
 ## [v1.5.12](https://github.com/krt-profit/basetool/releases/tag/v1.5.12) - 2026-07-22
 
 ### Added

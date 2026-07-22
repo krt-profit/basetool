@@ -14,7 +14,13 @@
             font-weight: 700;
             font-size: 0.9rem;
         }
-        .form-group input:not([type='checkbox']), .form-group select {
+        /* Radios are excluded alongside checkboxes: the 0.75rem padding + surface background
+           would inflate the 1.2rem KRT radio circle (styles.css) into an oversized oval. The
+           exclusions sit in :where() so they add ZERO specificity — the rule stays at the plain
+           `.form-group input` weight (0,1,1) and keeps losing to the (0,2,0) combobox rule
+           `.krt-combobox .krt-combobox__input`, whose right padding reserves room for the
+           dropdown chevron (styles.css documents that it must outrank per-page input padding). */
+        .form-group input:where(:not([type='checkbox']):not([type='radio'])), .form-group select {
             width: 100%;
             padding: 0.75rem;
             background-color: var(--color-surface-input);
@@ -22,6 +28,29 @@
             color: var(--color-gray-1);
             font-family: var(--font-body);
             box-sizing: border-box;
+        }
+        /* Checkbox rows share ONE format (profile-page .check-row precedent): checkbox left,
+           label + muted .form-hint stacked right, so a long label wraps inside its own column
+           instead of reflowing around the checkbox. */
+        .form-group.check-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+        .form-group.check-row input[type='checkbox'] {
+            flex: none;
+            margin: 0.15rem 0 0;
+        }
+        .form-group.check-row label {
+            margin: 0;
+            cursor: pointer;
+        }
+        /* The merge row is toggled via .krtm-hidden (inline-migration.css), which is only
+           (0,1,0) and relies on equal specificity + being loaded last. The (0,2,0) flex rule
+           above would override it, so re-assert the hide at higher specificity — without this
+           the REQ-INV-026 opt-in would be stuck visible even for PIECE materials. */
+        .form-group.check-row.krtm-hidden {
+            display: none;
         }
     </style>
     </th:block>
@@ -87,14 +116,14 @@
                         <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-0218">
                             <input type="radio" name="inventoryCatalogMode" value="material"
                                    th:attr="checked=*{gameItemId == null} ? 'checked' : null"
-                                   data-trigger="inv-input-mode-toggle" class="krtm-width-auto-7e37"
+                                   data-trigger="inv-input-mode-toggle"
                                    data-testid="inventory-mode-material" />
                             <span th:text="#{inventory.form.item.mode.material}">Material</span>
                         </label>
                         <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-0218">
                             <input type="radio" name="inventoryCatalogMode" value="item"
                                    th:attr="checked=*{gameItemId != null} ? 'checked' : null"
-                                   data-trigger="inv-input-mode-toggle" class="krtm-width-auto-7e37"
+                                   data-trigger="inv-input-mode-toggle"
                                    data-testid="inventory-mode-item" />
                             <span th:text="#{inventory.form.item.mode.item}">Item</span>
                         </label>

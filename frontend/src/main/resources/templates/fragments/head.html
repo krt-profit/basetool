@@ -142,17 +142,63 @@
     <!--
       Shared default labels for the searchable combobox (krt-searchable-select.js). Defined on a
       dedicated global, like `window.krtScuI18n` above, so they are localised in ONE place and the
-      ~20 user-selection pickers across the app need only the `data-krt-combobox` marker (a single
-      control may still override any string via a `data-combobox-*` attribute). Read by the
-      combobox's global auto-initialiser at enhance time, so order vs. the script below is moot.
+      ~20 pickers across the app need only the `data-krt-combobox` marker (a single control may
+      still override any string via a `data-combobox-*` attribute). Read by the combobox's global
+      auto-initialiser at enhance time, so order vs. the script below is moot.
+
+      `kinds` maps a remote-source marker value to ITS default placeholder / no-results wording, so
+      a material picker never greets the user with the user-picker text ("Nutzer suchen…" on the
+      book-in material field; wording kept non-literal here — MockMvc tests assert member pages do
+      not contain the book-in action's German label, and this fragment renders on every page).
+      Precedence per control: data-combobox-* attribute > kinds[marker] > the top-level default.
+      The top-level default keeps the USER wording on purpose: every picker that opts in with a
+      bare `data-krt-combobox` (no marker value) is a locally-populated user/holder picker
+      (mission responsible/finance, bank holder pickers), and rebasing the default would silently
+      strip their wording. The map is gate-enforced against the source registries
+      (krt-user-search.js / krt-catalog-search.js / krt-bank-account-search.js) by
+      ComboboxKindsParityTest — registering a remote source without a kinds entry is a red build.
     -->
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.krtComboboxI18n = {
-            placeholder: /*[[#{userSelect.search.placeholder}]]*/ 'Search or select…',
-            noResults: /*[[#{userSelect.search.noResults}]]*/ 'No matches',
+            placeholder: /*[[#{userSelect.search.placeholder}]]*/ 'Search or select a user…',
+            noResults: /*[[#{userSelect.search.noResults}]]*/ 'No matching users',
             hint: /*[[#{userSelect.search.hint}]]*/ 'Keep typing to narrow the list…',
             invalid: /*[[#{userSelect.search.invalid}]]*/ 'Please select an entry from the list.',
-            loading: /*[[#{userSelect.search.loading}]]*/ 'Searching…'
+            loading: /*[[#{userSelect.search.loading}]]*/ 'Searching…',
+            kinds: {
+                'remote-users': {
+                    placeholder: /*[[#{userSelect.search.placeholder}]]*/ 'Search or select a user…',
+                    noResults: /*[[#{userSelect.search.noResults}]]*/ 'No matching users'
+                },
+                'remote-bank-users': {
+                    placeholder: /*[[#{userSelect.search.placeholder}]]*/ 'Search or select a user…',
+                    noResults: /*[[#{userSelect.search.noResults}]]*/ 'No matching users'
+                },
+                'remote-materials': {
+                    placeholder: /*[[#{materialSelect.search.placeholder}]]*/ 'Search or select a material…',
+                    noResults: /*[[#{materialSelect.search.noResults}]]*/ 'No matching materials'
+                },
+                'remote-materials-joborder': {
+                    placeholder: /*[[#{materialSelect.search.placeholder}]]*/ 'Search or select a material…',
+                    noResults: /*[[#{materialSelect.search.noResults}]]*/ 'No matching materials'
+                },
+                'remote-materials-raw': {
+                    placeholder: /*[[#{materialSelect.search.placeholder}]]*/ 'Search or select a material…',
+                    noResults: /*[[#{materialSelect.search.noResults}]]*/ 'No matching materials'
+                },
+                'remote-locations': {
+                    placeholder: /*[[#{locationSelect.search.placeholder}]]*/ 'Search or select a location…',
+                    noResults: /*[[#{locationSelect.search.noResults}]]*/ 'No matching locations'
+                },
+                'remote-game-items': {
+                    placeholder: /*[[#{orders.create.item.search.placeholder}]]*/ 'Search or select an item…',
+                    noResults: /*[[#{orders.create.item.search.noResults}]]*/ 'No matching items'
+                },
+                'remote-bank-accounts': {
+                    placeholder: /*[[#{bank.account.search.placeholder}]]*/ 'Search or select an account…',
+                    noResults: /*[[#{bank.account.search.noResults}]]*/ 'No matching accounts'
+                }
+            }
         };
     </script>
     <!--

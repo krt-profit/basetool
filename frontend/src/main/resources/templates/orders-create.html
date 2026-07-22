@@ -14,7 +14,13 @@
             font-weight: 700;
             font-size: 0.9rem;
         }
-        .form-group input, .form-group select, .form-group textarea {
+        /* Radios (the Material <-> Item order-kind toggle) and checkboxes are excluded: the
+           0.75rem padding + surface background would inflate the 1.2rem KRT controls
+           (styles.css) into oversized ovals/squares. The exclusions sit in :where() so they add
+           ZERO specificity — the rule stays at the plain `.form-group input` weight (0,1,1) and
+           keeps losing to the (0,2,0) combobox rule `.krt-combobox .krt-combobox__input`, whose
+           right padding reserves room for the dropdown chevron. */
+        .form-group input:where(:not([type='checkbox']):not([type='radio'])), .form-group select, .form-group textarea {
             width: 100%;
             padding: 0.75rem;
             background-color: var(--color-surface-input);
@@ -141,14 +147,14 @@
                     <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-0218">
                         <input type="radio" name="orderModeToggle" value="material"
                                th:attr="checked=${editOrderId == null} ? 'checked' : null"
-                               data-trigger="order-mode-toggle" class="krtm-width-auto-7e37"
+                               data-trigger="order-mode-toggle"
                                data-testid="order-mode-material" />
                         <span th:text="#{orders.create.kind.material}">Materialauftrag</span>
                     </label>
                     <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-0218">
                         <input type="radio" name="orderModeToggle" value="item"
                                th:attr="checked=${editOrderId != null} ? 'checked' : null"
-                               data-trigger="order-mode-toggle" class="krtm-width-auto-7e37"
+                               data-trigger="order-mode-toggle"
                                data-testid="order-mode-item" />
                         <span th:text="#{orders.create.kind.item}">Item-Auftrag</span>
                     </label>
