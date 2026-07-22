@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
+import okhttp3.mockwebserver.SocketPolicy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -83,14 +84,27 @@ class WebClientConfigOauthTokenPoolTest {
 
   /** Builds the real {@link WebClientConfig} with light test doubles for its collaborators. */
   private static WebClientConfig buildConfig() {
-    Environment environment = mock(Environment.class);
-    return new WebClientConfig(
-        new AppBackendProperties("https://backend:11261"),
+    return buildConfig(
         new AppHttpProperties(
             Duration.ofSeconds(2),
             Duration.ofSeconds(5),
             Duration.ofSeconds(3),
-            Duration.ofSeconds(3)),
+            Duration.ofSeconds(3)));
+  }
+
+  /**
+   * Builds the real {@link WebClientConfig} with light test doubles for its collaborators and the
+   * given HTTP timeout knobs, letting individual tests pick timeout constellations that make one
+   * specific transport bound observable (see {@link
+   * #stalledTokenEndpointFailsWithinTheClientSideBound()}).
+   *
+   * @param httpProperties the timeout constellation the config under test should run with
+   */
+  private static WebClientConfig buildConfig(AppHttpProperties httpProperties) {
+    Environment environment = mock(Environment.class);
+    return new WebClientConfig(
+        new AppBackendProperties("https://backend:11261"),
+        httpProperties,
         mock(WebClientLoggingFilter.class),
         mock(ActiveSquadronRelayFilter.class),
         mock(UserLocaleRelayFilter.class),
@@ -157,6 +171,40 @@ class WebClientConfigOauthTokenPoolTest {
     assertThatExceptionOfType(OAuth2AuthorizationException.class)
         .isThrownBy(() -> client.getTokenResponse(request))
         .satisfies(ex -> assertThat(ex.getError().getErrorCode()).isEqualTo("invalid_grant"));
+  }
+
+  @Test
+  void stalledTokenEndpointFailsWithinTheClientSideBound() {
+    // ADR-0115 follow-up (2026-07-22 incident): reactor-netty's responseTimeout only arms once the
+    // request has been FULLY written, so a token exchange that stalled mid-request had no
+    // client-side bound at all and hung until the edge reaped the socket after ~60s — one lost
+    // refresh grant per attempt. The ReadTimeoutHandler/WriteTimeoutHandler pair added in
+    // oauthTokenRestClient() closes that gap. This test makes the idle-read bound observable: the
+    // fake token endpoint accepts the connection but never responds, the read timeout is 500ms and
+    // the responseTimeout a deliberately long 30s — only the ReadTimeoutHandler can fail the
+    // exchange quickly, so an elapsed time far below the responseTimeout proves the handler is
+    // wired (a regression dropping the doOnConnected handlers blocks for the full 30s and trips
+    // the elapsed assertion).
+    server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE));
+
+    OAuth2AccessTokenResponseClient<OAuth2RefreshTokenGrantRequest> client =
+        buildConfig(
+                new AppHttpProperties(
+                    Duration.ofSeconds(2),
+                    Duration.ofSeconds(30),
+                    Duration.ofMillis(500),
+                    Duration.ofMillis(500)))
+            .oauthRefreshTokenResponseClient();
+    OAuth2RefreshTokenGrantRequest request = refreshRequest(server.url("/token").toString());
+
+    Instant start = Instant.now();
+    assertThatExceptionOfType(OAuth2AuthorizationException.class)
+        .isThrownBy(() -> client.getTokenResponse(request));
+    assertThat(Duration.between(start, Instant.now()))
+        .as(
+            "a stalled token exchange must fail via the idle-read bound, not the 30s"
+                + " responseTimeout")
+        .isLessThan(Duration.ofSeconds(10));
   }
 
   /**

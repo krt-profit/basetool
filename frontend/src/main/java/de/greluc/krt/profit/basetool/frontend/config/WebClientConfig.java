@@ -419,6 +419,16 @@ public class WebClientConfig {
    * cert is publicly trusted) while an {@code http} endpoint (e.g. a test double) stays plaintext.
    * Both token clients share the single {@link #oauthTokenPool}, so pool metrics stay one series.
    *
+   * <p><b>Every phase of the exchange is bounded.</b> {@code responseTimeout} only arms once the
+   * request has been <em>fully written</em>; a token POST whose body write stalls (peer stops
+   * reading mid-request) is invisible to it and used to hang until the edge reaped the connection
+   * after ~60&nbsp;s &mdash; the 2026-07-22 incident: every minute a burst of fresh token
+   * connections died with {@code PrematureCloseException: ... while sending request body}, each one
+   * a lost refresh grant with no client-side bound. The {@link ReadTimeoutHandler} /{@link
+   * WriteTimeoutHandler} pair (mirroring the backend WebClient transport above) closes that gap:
+   * any read silence or unfinished write beyond the configured read/write timeouts fails the
+   * exchange in seconds instead of leaving it to the edge's idle reaper.
+   *
    * @return a {@code RestClient} whose transport is the idle-evicting OAuth pool
    */
   private RestClient oauthTokenRestClient() {
@@ -427,7 +437,15 @@ public class WebClientConfig {
             .option(
                 ChannelOption.CONNECT_TIMEOUT_MILLIS,
                 Math.toIntExact(httpProperties.connectTimeout().toMillis()))
-            .responseTimeout(httpProperties.responseTimeout());
+            .responseTimeout(httpProperties.responseTimeout())
+            .doOnConnected(
+                conn ->
+                    conn.addHandlerLast(
+                            new ReadTimeoutHandler(
+                                httpProperties.readTimeout().toMillis(), TimeUnit.MILLISECONDS))
+                        .addHandlerLast(
+                            new WriteTimeoutHandler(
+                                httpProperties.writeTimeout().toMillis(), TimeUnit.MILLISECONDS)));
     return RestClient.builder()
         .configureMessageConverters(
             converters ->
