@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -144,6 +145,24 @@ class AdminSettingsPageControllerMvcTest {
 
     // Same eviction guarantee on the classic (no-JS) save path.
     verify(backendApiClient).clearStaticDataCache();
+  }
+
+  // covers the .form-group checkbox regression class (PR #1405) — the page-scoped .form-group
+  // input rule ties the global KRT square-checkbox rule at (0,1,1) and, rendering after
+  // styles.css, would win and stretch any .form-group checkbox/radio into a full-width padded
+  // bar. Pins the :where() exclusion so the page rule can never capture checkbox/radio inputs.
+  // The GET handler degrades every backend fetch to defaults, so no stubbing is needed.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void viewSettings_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
+    mockMvc
+        .perform(get("/admin/settings"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
   // Partial-save guarantee (AJAX): when an early setting PUT lands but a later one throws, the

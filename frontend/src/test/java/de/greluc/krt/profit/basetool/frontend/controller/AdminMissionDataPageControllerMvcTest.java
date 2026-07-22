@@ -168,6 +168,26 @@ class AdminMissionDataPageControllerMvcTest {
         .andExpect(content().string(containsString("id=\"freqtypes-results\"")));
   }
 
+  // covers the .form-group checkbox regression class (PR #1405) — the page-scoped .form-group
+  // input rule tied the global KRT square-checkbox rule at (0,1,1) and, rendering after
+  // styles.css, stretched the job-type modal's leadership/mission-lead checkboxes into full-width
+  // padded bars. Pins the zero-specificity :where() exclusion so the page rule can never
+  // re-capture checkbox/radio inputs (and never outranks the (0,2,0) combobox rule).
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void list_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
+    stubAllThree();
+
+    mockMvc
+        .perform(get("/admin/mission-data"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+  }
+
   // covers REQ-FE-002 — ?fragment=squadrons-results renders only the squadron table.
   @Test
   @WithMockUser(roles = "ADMIN")

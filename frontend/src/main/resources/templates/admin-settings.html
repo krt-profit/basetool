@@ -13,7 +13,13 @@
                 font-family: var(--font-body);
                 font-size: 0.8rem;
             }
-            .form-group input, .form-group select, .form-group textarea {
+            /* Checkboxes and radios are excluded: width:100% + the padding would stretch the
+               1.2rem KRT squares (styles.css) full-width. The exclusions sit in :where() so they
+               add ZERO specificity — the rule keeps the plain `.form-group input` weight (0,1,1)
+               and stays below the (0,2,0) combobox rule `.krt-combobox .krt-combobox__input`.
+               The promotion/profit toggles sit outside .form-group today; the exclusion closes
+               the latent trap that broke admin/materials when its checkboxes were added later. */
+            .form-group input:where(:not([type='checkbox']):not([type='radio'])), .form-group select, .form-group textarea {
                 width: 100%;
                 padding: 0.5rem;
                 background-color: var(--color-surface-input);
