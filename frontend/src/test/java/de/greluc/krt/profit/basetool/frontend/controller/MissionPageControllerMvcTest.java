@@ -1021,6 +1021,26 @@ class MissionPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "OFFICER")
+  void missionDetail_AssetShapedPath_ShouldReturn404NotWarn400() throws Exception {
+    // A crawler resolving head.html's script filenames relative to /missions/... hits the /{id}
+    // route and fails UUID conversion. REQ-OBS-001 asset-shaped carve-out: such a path names no
+    // resource, so the full MVC pipeline must ship the 404 error page (the ModelAndView status
+    // wins over the handler's @ResponseStatus(BAD_REQUEST) at render time), not a 400.
+    mockMvc
+        .perform(get("/missions/common-handlers.js"))
+        .andExpect(status().isNotFound())
+        .andExpect(view().name("error/error"));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_UndottedMalformedId_ShouldKeep400() throws Exception {
+    // A truncated pasted link has no filename extension — the honest 400 for a malformed id stays.
+    mockMvc.perform(get("/missions/8bd4a2de")).andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
   void updateActualTime_Success_ShouldReturn200WithRefreshedMission() throws Exception {
     UUID missionId = UUID.randomUUID();
     MissionDto current =

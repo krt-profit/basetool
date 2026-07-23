@@ -28,7 +28,9 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandoverItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
+import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverItemCreateDto;
@@ -37,7 +39,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverReposito
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderMaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.util.ArrayList;
@@ -48,6 +50,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,7 +79,7 @@ public class JobOrderHandoverService {
   private final JobOrderService jobOrderService;
   private final UserService userService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
-  private final SquadronRepository squadronRepository;
+  private final OrgUnitRepository orgUnitRepository;
   private final AuditService auditService;
 
   /**
@@ -178,9 +181,17 @@ public class JobOrderHandoverService {
         .ifPresent(
             current -> {
               handover.setExecutingUser(current);
+              // Polymorphic load + unproxy instead of a Squadron-typed findById: the executing
+              // Staffel id routinely equals the order's responsibleOrgUnit, which this transaction
+              // already holds as a base-typed OrgUnit proxy — a subclass-typed load would force
+              // Hibernate to narrow that proxy (HHH000179, breaks ==). The base-typed find reuses
+              // the persistence-context instance; unproxy yields the concrete Squadron.
               orgUnitMembershipQueryService
                   .findExecutingStaffelForOrder(current.getId(), responsibleOrgUnitId)
-                  .flatMap(squadronRepository::findById)
+                  .flatMap(orgUnitRepository::findById)
+                  .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
+                  .filter(Squadron.class::isInstance)
+                  .map(Squadron.class::cast)
                   .ifPresent(handover::setExecutingSquadron);
             });
 

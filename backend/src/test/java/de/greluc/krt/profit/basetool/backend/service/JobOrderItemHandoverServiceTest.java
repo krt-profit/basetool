@@ -49,7 +49,7 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import java.time.Instant;
 import java.util.List;
@@ -81,7 +81,7 @@ class JobOrderItemHandoverServiceTest {
   @Mock private JobOrderService jobOrderService;
   @Mock private UserService userService;
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
-  @Mock private SquadronRepository squadronRepository;
+  @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private AuditService auditService;
   @InjectMocks private JobOrderItemHandoverService service;
 

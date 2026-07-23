@@ -60,7 +60,9 @@ class ShipMapperTest {
         "staffelMembershipResolver",
         new de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver(
             org.mockito.Mockito.mock(
-                de.greluc.krt.profit.basetool.backend.repository.SquadronRepository.class)));
+                de.greluc.krt.profit.basetool.backend.repository.SquadronRepository.class),
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository.class)));
     ReflectionTestUtils.setField(mapper, "userMapper", userMapper);
     ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
   }

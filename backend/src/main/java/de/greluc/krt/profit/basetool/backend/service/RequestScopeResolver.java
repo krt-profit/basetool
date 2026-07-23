@@ -26,7 +26,6 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,6 +35,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -131,7 +131,6 @@ public class RequestScopeResolver {
       RequestScopeResolver.class.getName() + ".canViewJobOrders";
 
   private final AuthHelperService authHelper;
-  private final SquadronRepository squadronRepository;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final OrgUnitRepository orgUnitRepository;
   private final OrgUnitCascadeService orgUnitCascadeService;
@@ -815,7 +814,7 @@ public class RequestScopeResolver {
    * not silently retag history.
    *
    * <p>Result is memoised per {@link HttpServletRequest} so repeated calls in one request collapse
-   * to a single {@code squadronRepository.findById} round-trip.
+   * to a single {@code orgUnitRepository.findById} round-trip.
    *
    * @return the {@link Squadron} for the current effective context, or empty when none applies.
    */
@@ -825,7 +824,18 @@ public class RequestScopeResolver {
     if (cached.isPresent()) {
       return cached.get();
     }
-    Optional<Squadron> resolved = currentSquadronId().flatMap(squadronRepository::findById);
+    // Polymorphic load + unproxy instead of a Squadron-typed findById (the R2.d repository swap
+    // announced on currentOrgUnit()): the effective Staffel id is frequently already present in the
+    // caller's persistence context as a base-typed OrgUnit proxy (e.g. an aggregate's owning unit),
+    // and a subclass-typed load would force Hibernate to narrow that proxy (HHH000179, breaks ==).
+    // The instanceof filter replaces the SQL discriminator filter 1:1 — a non-Staffel id still
+    // resolves to empty.
+    Optional<Squadron> resolved =
+        currentSquadronId()
+            .flatMap(orgUnitRepository::findById)
+            .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
+            .filter(Squadron.class::isInstance)
+            .map(Squadron.class::cast);
     request.setAttribute(CACHE_KEY_CURRENT_SQUADRON, resolved);
     return resolved;
   }

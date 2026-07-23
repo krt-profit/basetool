@@ -137,7 +137,10 @@ class RefineryImportServiceTest {
     ReflectionTestUtils.setField(
         userMapper,
         "staffelMembershipResolver",
-        new StaffelMembershipResolver(Mockito.mock(SquadronRepository.class)));
+        new StaffelMembershipResolver(
+            Mockito.mock(SquadronRepository.class),
+            Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository.class)));
 
     service =
         new RefineryImportService(

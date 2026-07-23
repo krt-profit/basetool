@@ -24,6 +24,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -43,6 +45,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -68,6 +71,14 @@ public class GlobalExceptionHandler {
   private static final String DEFAULT_MESSAGE_KEY = "error.unexpected";
   private static final String DEFAULT_TITLE_KEY = "error.generic.title";
   private static final String FORBIDDEN_UNAUTHENTICATED_KEY = "error.forbidden.unauthenticated";
+
+  /**
+   * Matches request URIs whose final path segment looks like a static-asset filename (a dot
+   * followed by a 1-8 character alphanumeric extension, e.g. {@code /missions/common-handlers.js}).
+   * Feeds {@link #isAssetShapedUuidMismatch} — crawler requests shaped like this name no resource
+   * and are answered with 404 + DEBUG instead of 400 + WARN (REQ-OBS-001).
+   */
+  private static final Pattern ASSET_SHAPED_PATH = Pattern.compile(".*/[^/]+\\.[A-Za-z0-9]{1,8}$");
 
   private final MessageSource messageSource;
 
@@ -192,6 +203,15 @@ public class GlobalExceptionHandler {
   /**
    * Renders a 400 error page when an MVC path / query parameter cannot be coerced to its declared
    * type. The rejected value is intentionally not logged because it may carry PII.
+   *
+   * <p>Asset-shaped carve-out (REQ-OBS-001): crawlers occasionally resolve the shared script
+   * filenames of {@code fragments/head.html} relative to a page's URL and request e.g. {@code GET
+   * /missions/common-handlers.js}, which binds to a {@code /{id}} mapping and fails UUID
+   * conversion. Such a path names no resource, so when the required type is {@link UUID} and the
+   * final path segment looks like a static-asset filename the handler renders the 404 page instead
+   * of a 400 and logs at DEBUG — pure bot noise must not pollute the WARN stream. Every other type
+   * mismatch (a garbled id on a real navigation, a broken {@code data-*} echo) keeps the 400 + WARN
+   * signal.
    */
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
   @ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -199,6 +219,36 @@ public class GlobalExceptionHandler {
       @NotNull MethodArgumentTypeMismatchException ex,
       @NotNull Model model,
       @NotNull HttpServletRequest request) {
+    Locale locale = LocaleContextHolder.getLocale();
+    if (isAssetShapedUuidMismatch(ex, request)) {
+      // Do NOT log ex.getValue() - request parameter values may carry PII (REQ-OBS-004).
+      log.debug(
+          "Asset-shaped path failed UUID conversion, treating as 404 for {} {} [parameter={}]",
+          request.getMethod(),
+          request.getRequestURI(),
+          ex.getName());
+      if (wantsJson(request)) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("code", "NOT_FOUND");
+        body.put("status", 404);
+        body.put("title", resolve("error.404.title", locale, "Not Found"));
+        body.put(
+            "message",
+            resolve("error.404.message", locale, "The requested resource could not be found."));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(body);
+      }
+      // ModelAndView.setStatus overrides the method-level @ResponseStatus(BAD_REQUEST) at render
+      // time, so the error page ships with an honest 404 for this branch only.
+      ModelAndView notFound = new ModelAndView("error/error", HttpStatus.NOT_FOUND);
+      notFound.addObject("error", resolve("error.404.title", locale, "Not Found"));
+      notFound.addObject(
+          "message",
+          resolve("error.404.message", locale, "The requested resource could not be found."));
+      notFound.addObject("status", "404");
+      return notFound;
+    }
     // Do NOT log ex.getValue() - request parameter values may carry PII.
     log.warn(
         "Frontend type mismatch for {} {} [parameter={}, targetType={}]",
@@ -206,7 +256,6 @@ public class GlobalExceptionHandler {
         request.getRequestURI(),
         ex.getName(),
         ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "n/a");
-    Locale locale = LocaleContextHolder.getLocale();
     String message =
         resolve("error.validation.failed", locale, "Invalid parameter " + ex.getName());
     if (wantsJson(request)) {
@@ -221,6 +270,28 @@ public class GlobalExceptionHandler {
     model.addAttribute("message", message);
     model.addAttribute("status", "400");
     return "error/error";
+  }
+
+  /**
+   * Decides whether a failed path-variable conversion was caused by a static-asset-shaped request
+   * path rather than a genuinely malformed identifier. True only when <em>both</em> hold: the
+   * declared target type is {@link UUID} (so a legitimately dotted route parameter of another type
+   * can never be misclassified — keep this guard if a dotted route ever gains a UUID parameter) and
+   * the final path segment carries a short alphanumeric filename extension (e.g. {@code
+   * common-handlers.js}). All seven bare {@code /{id}} detail routes take pure UUIDs, which never
+   * contain a dot, so a truncated pasted link keeps its 400 + WARN.
+   *
+   * @param ex the conversion failure raised during handler argument resolution
+   * @param request the current request; its URI (not the rejected value) feeds the filename check
+   * @return {@code true} when the mismatch should be treated as a 404 for a nonexistent asset
+   */
+  private static boolean isAssetShapedUuidMismatch(
+      @NotNull MethodArgumentTypeMismatchException ex, @NotNull HttpServletRequest request) {
+    if (ex.getRequiredType() != UUID.class) {
+      return false;
+    }
+    String uri = request.getRequestURI();
+    return uri != null && ASSET_SHAPED_PATH.matcher(uri).matches();
   }
 
   /**
