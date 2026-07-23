@@ -67,6 +67,112 @@
         return tab ? tab.getAttribute('data-mb-mode') || 'offers' : 'offers';
     }
 
+    // -------- per-browser filter persistence (REQ-UI-017) --------------------
+
+    // One JSON object under a single key: the active (mode, tab) pair plus each board's
+    // minQuality / minAmount / sort. The search inputs ([data-mb-search] / [data-mg-search]) are
+    // deliberately NOT persisted. Absent key = no saved preference = the server-rendered
+    // defaults. Guarded so privacy modes that deny storage degrade to the defaults instead of
+    // breaking the board.
+    let FILTER_PREF_KEY = 'materialboerse_filters';
+    let SORT_KEYS = ['qual', 'menge', 'mat', 'neu'];
+
+    function defaultBoardFilters() {
+        return { minQuality: '', minAmount: '', sort: 'qual' };
+    }
+
+    function readFilterPref() {
+        try {
+            let raw = localStorage.getItem(FILTER_PREF_KEY);
+            return raw === null ? null : JSON.parse(raw);
+        } catch (_e) {
+            return null; // corrupt value / storage unavailable: fall back to the defaults
+        }
+    }
+
+    function writeFilterPref(value) {
+        try {
+            localStorage.setItem(FILTER_PREF_KEY, JSON.stringify(value));
+        } catch (_e) {
+            /* storage unavailable */
+        }
+    }
+
+    // Copies one board's saved filter values onto its defaults, dropping anything stale or
+    // malformed (an unknown sort key falls back to the default).
+    function mergeBoardFilters(target, saved) {
+        if (!saved || typeof saved !== 'object') {
+            return;
+        }
+        if (typeof saved.minQuality === 'string') {
+            target.minQuality = saved.minQuality;
+        }
+        if (typeof saved.minAmount === 'string') {
+            target.minAmount = saved.minAmount;
+        }
+        if (SORT_KEYS.indexOf(saved.sort) >= 0) {
+            target.sort = saved.sort;
+        }
+    }
+
+    function normalizeFilterPref(saved) {
+        let state = {
+            mode: 'offers',
+            tab: 'alle',
+            offers: defaultBoardFilters(),
+            requests: defaultBoardFilters(),
+        };
+        if (!saved || typeof saved !== 'object') {
+            return state;
+        }
+        if (saved.mode === 'requests') {
+            state.mode = 'requests';
+        }
+        if (saved.tab === 'mein') {
+            state.tab = 'mein';
+        }
+        mergeBoardFilters(state.offers, saved.offers);
+        mergeBoardFilters(state.requests, saved.requests);
+        return state;
+    }
+
+    let rawFilterPref = readFilterPref();
+    let filterState = normalizeFilterPref(rawFilterPref);
+
+    // Snapshots the current widget state into localStorage, immediately on every tab / filter /
+    // sort / reset interaction (not debounced with the re-fetch). Only the visible board's
+    // toolbar exists in the DOM, so its values are merged into the kept state keyed by which
+    // widgets are present — the hidden board's stored values survive untouched.
+    function persistFilters() {
+        if (activeTabEl()) {
+            filterState.mode = activeMode();
+            filterState.tab = activeTab();
+        }
+        if (document.querySelector('[data-mb-minquality]')) {
+            filterState.offers.minQuality = val('[data-mb-minquality]');
+            filterState.offers.minAmount = val('[data-mb-minamount]');
+            filterState.offers.sort = val('[data-mb-sort]') || 'qual';
+        }
+        if (document.querySelector('[data-mg-minquality]')) {
+            filterState.requests.minQuality = val('[data-mg-minquality]');
+            filterState.requests.minAmount = val('[data-mg-minamount]');
+            filterState.requests.sort = val('[data-mg-sort]') || 'qual';
+        }
+        writeFilterPref(filterState);
+    }
+
+    // Reads a filter input's value, falling back to the persisted state (REQ-UI-017) when the
+    // widget is not in the DOM — only the visible board's toolbar is rendered, so a cross-mode
+    // board swap would otherwise silently drop the target board's persisted filters. The swap
+    // URL then carries them and the server echoes them into the swapped-in toolbar.
+    function filterVal(selector, savedValue) {
+        let el = document.querySelector(selector);
+        if (el) {
+            return el.value.trim();
+        }
+        return savedValue == null ? '' : String(savedValue);
+    }
+
     // -------- offer swaps ----------------------------------------------------
 
     function params() {
@@ -76,15 +182,15 @@
         if (qv) {
             p.set('q', qv);
         }
-        let minQ = val('[data-mb-minquality]');
+        let minQ = filterVal('[data-mb-minquality]', filterState.offers.minQuality);
         if (minQ) {
             p.set('minQuality', minQ);
         }
-        let minA = val('[data-mb-minamount]');
+        let minA = filterVal('[data-mb-minamount]', filterState.offers.minAmount);
         if (minA) {
             p.set('minAmount', minA);
         }
-        let sort = val('[data-mb-sort]');
+        let sort = filterVal('[data-mb-sort]', filterState.offers.sort);
         if (sort) {
             p.set('sort', sort);
         }
@@ -135,15 +241,15 @@
         if (qv) {
             p.set('q', qv);
         }
-        let minQ = val('[data-mg-minquality]');
+        let minQ = filterVal('[data-mg-minquality]', filterState.requests.minQuality);
         if (minQ) {
             p.set('minQuality', minQ);
         }
-        let minA = val('[data-mg-minamount]');
+        let minA = filterVal('[data-mg-minamount]', filterState.requests.minAmount);
         if (minA) {
             p.set('minAmount', minA);
         }
-        let sort = val('[data-mg-sort]');
+        let sort = filterVal('[data-mg-sort]', filterState.requests.sort);
         if (sort) {
             p.set('sort', sort);
         }
@@ -475,6 +581,7 @@
             let fromMode = activeMode();
             setActiveTabEl(el);
             toggleCtaGroups(toMode);
+            persistFilters(); // REQ-UI-017: keep the (mode, tab) selection across visits
             if (toMode !== fromMode) {
                 if (toMode === 'requests') {
                     selectedRequestId = null;
@@ -497,6 +604,7 @@
             setInputVal('[data-mb-minquality]', '');
             setInputVal('[data-mb-minamount]', '');
             setActiveTabEl(tabEl('offers', 'alle'));
+            persistFilters(); // REQ-UI-017: a reset persists the cleared state
             selectedId = null;
             swapList();
             return;
@@ -506,6 +614,7 @@
             setInputVal('[data-mg-minquality]', '');
             setInputVal('[data-mg-minamount]', '');
             setActiveTabEl(tabEl('requests', 'alle'));
+            persistFilters(); // REQ-UI-017: a reset persists the cleared state
             selectedRequestId = null;
             swapRequestList();
             return;
@@ -560,18 +669,22 @@
 
     document.addEventListener('input', function (e) {
         if (e.target.matches('[data-mb-search], [data-mb-minquality], [data-mb-minamount]')) {
+            persistFilters(); // REQ-UI-017: persist immediately, not with the debounced fetch
             debouncedList();
         } else if (
             e.target.matches('[data-mg-search], [data-mg-minquality], [data-mg-minamount]')
         ) {
+            persistFilters(); // REQ-UI-017: persist immediately, not with the debounced fetch
             debouncedRequestList();
         }
     });
 
     document.addEventListener('change', function (e) {
         if (e.target.matches('[data-mb-sort]')) {
+            persistFilters();
             swapList();
         } else if (e.target.matches('[data-mg-sort]')) {
+            persistFilters();
             swapRequestList();
         }
     });
@@ -610,5 +723,78 @@
         selectedRequestId = readSelectedRequestId();
     });
 
+    // Writes a saved value into a rendered toolbar widget; reports whether it actually changed.
+    function setIfDifferent(selector, value) {
+        let el = document.querySelector(selector);
+        if (!el || el.value.trim() === value) {
+            return false;
+        }
+        el.value = value;
+        return true;
+    }
+
+    // Writes one board's saved values into its rendered toolbar; reports whether anything changed.
+    function applySavedBoardFilters(prefix, saved) {
+        let changed = setIfDifferent('[data-' + prefix + '-minquality]', saved.minQuality);
+        changed = setIfDifferent('[data-' + prefix + '-minamount]', saved.minAmount) || changed;
+        changed = setIfDifferent('[data-' + prefix + '-sort]', saved.sort) || changed;
+        return changed;
+    }
+
+    // Applies the persisted (mode, tab) + filter selection at init (REQ-UI-017). A URL carrying
+    // explicit board query params (deep link — the swaps themselves run history:false) is
+    // authoritative: the rendered state is adopted and re-persisted; only a bare URL restores
+    // from storage. When the restored state differs from the server-rendered defaults, the
+    // existing tab-activation / swap path is driven exactly once.
+    function restoreFilters() {
+        if (/[?&](mode|tab|q|minQuality|minAmount|sort|selected)=/.test(window.location.search)) {
+            persistFilters();
+            return;
+        }
+        if (rawFilterPref === null) {
+            return; // no saved preference: keep the server-rendered defaults
+        }
+        let target = tabEl(filterState.mode, filterState.tab);
+        if (!target) {
+            return;
+        }
+        if (filterState.mode !== activeMode()) {
+            // Cross-mode restore: activate the saved tab and swap the whole board once. The swap
+            // URL picks the saved filters up through the filterVal fallback and the server echoes
+            // them into the swapped-in toolbar.
+            setActiveTabEl(target);
+            toggleCtaGroups(filterState.mode);
+            if (filterState.mode === 'requests') {
+                selectedRequestId = null;
+                swapRequestBoard();
+            } else {
+                selectedId = null;
+                swapBoard();
+            }
+            return;
+        }
+        // Same mode: write the saved values into the rendered toolbar, then re-render the list
+        // once — only if anything differs from what the server rendered.
+        let differs =
+            filterState.mode === 'requests'
+                ? applySavedBoardFilters('mg', filterState.requests)
+                : applySavedBoardFilters('mb', filterState.offers);
+        if (filterState.tab !== activeTab()) {
+            setActiveTabEl(target);
+            differs = true;
+        }
+        if (!differs) {
+            return;
+        }
+        if (filterState.mode === 'requests') {
+            selectedRequestId = null;
+            swapRequestList();
+        } else {
+            selectedId = null;
+            swapList();
+        }
+    }
+
     applyAgo(document);
+    restoreFilters();
 })();

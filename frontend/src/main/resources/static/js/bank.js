@@ -2575,3 +2575,216 @@
     document.addEventListener('krt:swapped', apply);
     apply();
 })();
+
+// ------------------------------------------------------------------------------------------------
+// Grants view + entity-filter persistence (REQ-UI-017): the /bank/grants grouping ("Nach Konto" /
+// "Nach Mitarbeiter") and the per-view account/employee filter are full-page navigations
+// (`?view=` tab links, `?view=&accountId=/userId=` filter selects), so the choice is persisted per
+// user in localStorage and replayed through a one-time location.replace on a BARE /bank/grants
+// load — the server then renders the saved grouping with the tab active and the filter widget
+// preselected (the account combobox is seeded via `selectedAccount`, the employee select via
+// `selectedUserId`). An explicit view/accountId/userId in the address bar is authoritative and is
+// re-persisted; the replace target always carries `view`, so the redirect cannot loop. A filter
+// change is additionally persisted right away by a second delegated change listener — it runs
+// after the navigation handler above in the same synchronous dispatch, and the localStorage write
+// still lands before the page unloads. Both filters are id-valued selects (no free text).
+// ------------------------------------------------------------------------------------------------
+(function () {
+    function storageKey() {
+        const main = document.querySelector('main[data-user-id]');
+        const uid = main ? main.getAttribute('data-user-id') : 'unknown';
+        return 'bank_grants_view_' + uid;
+    }
+
+    function onGrantsPage() {
+        return !!document.querySelector('[data-role="bank-grants-filter"]');
+    }
+
+    function readSaved() {
+        try {
+            const raw = localStorage.getItem(storageKey());
+            if (raw === null) {
+                return null;
+            }
+            const parsed = JSON.parse(raw) || {};
+            return {
+                view: parsed.view === 'employee' ? 'employee' : 'account',
+                accountId: typeof parsed.accountId === 'string' ? parsed.accountId : null,
+                userId: typeof parsed.userId === 'string' ? parsed.userId : null,
+            };
+        } catch {
+            return null;
+        }
+    }
+
+    function writeSaved(state) {
+        try {
+            localStorage.setItem(storageKey(), JSON.stringify(state));
+        } catch {
+            /* localStorage unavailable (private mode): the filter simply will not persist. */
+        }
+    }
+
+    // The address-bar state, normalised like the controller normalises it: any view other than
+    // `employee` means the default per-account grouping, and only the active view's entity id
+    // is meaningful (the controller ignores the other one).
+    function urlState() {
+        const params = new URLSearchParams(window.location.search);
+        const view =
+            (params.get('view') || '').toLowerCase() === 'employee' ? 'employee' : 'account';
+        return {
+            view: view,
+            accountId: view === 'account' ? params.get('accountId') : null,
+            userId: view === 'employee' ? params.get('userId') : null,
+        };
+    }
+
+    // On load, reconcile the saved per-user grouping with the address bar. Explicit query params
+    // are adopted and re-persisted; a bare URL replays a saved non-default state via ONE
+    // location.replace so the server renders the whole page (matrix + preselected filter) for it.
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!onGrantsPage()) {
+            return;
+        }
+        if (/[?&](view|accountId|userId)=/.test(window.location.search)) {
+            writeSaved(urlState());
+            return;
+        }
+        const saved = readSaved();
+        if (saved === null) {
+            writeSaved(urlState());
+            return;
+        }
+        if (saved.view === 'employee' || saved.accountId || saved.userId) {
+            const params = new URLSearchParams();
+            params.set('view', saved.view);
+            if (saved.view === 'account' && saved.accountId) {
+                params.set('accountId', saved.accountId);
+            }
+            if (saved.view === 'employee' && saved.userId) {
+                params.set('userId', saved.userId);
+            }
+            window.location.replace('/bank/grants?' + params.toString());
+        }
+    });
+
+    // A filter pick persists immediately, before the grants module's navigation lands. The changed
+    // control carries the same data-view/data-param attributes the navigation handler reads
+    // (combobox-enhanced hidden input or native select alike).
+    document.addEventListener('change', function (event) {
+        const select = event.target.closest
+            ? event.target.closest('[data-role="bank-grants-filter"]')
+            : null;
+        if (!select) {
+            return;
+        }
+        const view = select.getAttribute('data-view') === 'employee' ? 'employee' : 'account';
+        writeSaved({
+            view: view,
+            accountId: view === 'account' && select.value ? select.value : null,
+            userId: view === 'employee' && select.value ? select.value : null,
+        });
+    });
+})();
+
+// ------------------------------------------------------------------------------------------------
+// Balance-chart range persistence (REQ-UI-017): ONE global per-user preference shared by both
+// account-detail surfaces (bank-staff /bank/accounts/{id} and org-unit
+// /org-unit-bank/accounts/{id}, REQ-BANK-049) — the same key scheme as bank_panel_collapse above.
+// A range click swaps only the chart fragment (data-swap links, history:false), so the chosen
+// range is captured on the krt:swapped of the two chart containers — which ONLY a range change
+// swaps; a money write re-renders the enclosing accountBody instead — and replayed on load by
+// clicking the matching range link once, driving the exact bindSwap interception the page's
+// inline script installs. An explicit `chartRange=` in the address bar (the no-JS fallback
+// navigation) is authoritative and is re-persisted. A money-write accountBody re-render still
+// resets the chart to its server default (90d) by design; the saved preference only replays on
+// the next full page load.
+// ------------------------------------------------------------------------------------------------
+(function () {
+    const CHART_CONTAINER_IDS = ['bank-chart-results', 'org-unit-bank-chart-results'];
+
+    function storageKey() {
+        const main = document.querySelector('main[data-user-id]');
+        const uid = main ? main.getAttribute('data-user-id') : 'unknown';
+        return 'bank_chart_range_' + uid;
+    }
+
+    function chartContainer() {
+        for (let i = 0; i < CHART_CONTAINER_IDS.length; i++) {
+            const el = document.getElementById(CHART_CONTAINER_IDS[i]);
+            if (el) {
+                return el;
+            }
+        }
+        return null;
+    }
+
+    // The active range is rendered as the inert `.is-active` span; its data-range attribute is
+    // the server's `chartRange` model value (fragments/bank-balance-chart.html).
+    function renderedRange() {
+        const active = document.querySelector('.bank-chart-range-btn.is-active[data-range]');
+        return active ? active.getAttribute('data-range') : null;
+    }
+
+    function readSaved() {
+        try {
+            const raw = localStorage.getItem(storageKey());
+            if (raw === null) {
+                return null;
+            }
+            const parsed = JSON.parse(raw) || {};
+            return typeof parsed.range === 'string' ? parsed.range : null;
+        } catch {
+            return null;
+        }
+    }
+
+    function writeSaved(range) {
+        try {
+            localStorage.setItem(storageKey(), JSON.stringify({ range: range }));
+        } catch {
+            /* localStorage unavailable (private mode): the choice simply will not persist. */
+        }
+    }
+
+    // On load, reconcile the saved per-user range with the server-rendered chart. An explicit
+    // `chartRange=` in the address bar is adopted and re-persisted; otherwise a differing saved
+    // range is replayed by clicking its range link exactly once — no matching link (unknown key,
+    // or the saved range IS the rendered one) means nothing happens, which also validates the
+    // stored value without duplicating the server's range list client-side.
+    document.addEventListener('DOMContentLoaded', function () {
+        const container = chartContainer();
+        if (!container) {
+            return;
+        }
+        if (/[?&]chartRange=/.test(window.location.search)) {
+            const rendered = renderedRange();
+            if (rendered) {
+                writeSaved(rendered);
+            }
+            return;
+        }
+        const saved = readSaved();
+        if (saved === null || saved === renderedRange()) {
+            return;
+        }
+        const link = container.querySelector('a.bank-chart-range-btn[data-range="' + saved + '"]');
+        if (link) {
+            link.click();
+        }
+    });
+
+    // Persist the range whenever one of the chart containers itself swaps: only a range click
+    // (user's, or the one-time replay above) does that, and the freshly rendered fragment is the
+    // authoritative source for the now-active range.
+    document.addEventListener('krt:swapped', function (event) {
+        const container = event.detail && event.detail.container;
+        if (!container || CHART_CONTAINER_IDS.indexOf(container.id) === -1) {
+            return;
+        }
+        const rendered = renderedRange();
+        if (rendered) {
+            writeSaved(rendered);
+        }
+    });
+})();

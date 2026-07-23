@@ -271,6 +271,82 @@ function formatNumber(num) {
     return new Intl.NumberFormat('de-DE').format(num);
 }
 
+// ===================== Per-browser filter persistence (REQ-UI-017) =============================
+// One JSON object under a single localStorage key: {shipId: string|null, systems: [...]|null}.
+// `shipId` stores the selected ship (null when none is selected — the server-preselected
+// default then stays); `systems` stores the checked star-system subset, or null when zero or
+// all boxes are checked (= "no filter", keeping later-added systems included). Absence of the
+// key keeps the server-rendered defaults. All storage access is guarded so privacy modes that
+// deny it degrade to the defaults instead of breaking the page.
+const PROFIT_FILTER_KEY = 'profit_calculation_filters';
+
+function readProfitFilterPref() {
+    try {
+        const raw = localStorage.getItem(PROFIT_FILTER_KEY);
+        const parsed = raw === null ? null : JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (_e) {
+        return null; // corrupt value / storage unavailable: fall back to the defaults
+    }
+}
+
+function writeProfitFilterPref(value) {
+    try {
+        localStorage.setItem(PROFIT_FILTER_KEY, JSON.stringify(value));
+    } catch (_e) {
+        /* storage unavailable */
+    }
+}
+
+// Snapshots the current ship + system selection into localStorage. Called immediately on every
+// filter change (ship select, system select-all toggle, single system toggle).
+function persistProfitFilters() {
+    const shipSelect = document.getElementById('shipSelect');
+    const boxes = document.getElementsByClassName('sysCheck');
+    const picked = [];
+    for (let i = 0; i < boxes.length; i++) {
+        if (boxes[i].checked) picked.push(boxes[i].value);
+    }
+    writeProfitFilterPref({
+        shipId: shipSelect && shipSelect.value !== '' ? shipSelect.value : null,
+        systems: picked.length === 0 || picked.length === boxes.length ? null : picked,
+    });
+}
+
+// Applies the saved selection to the widgets before the initial fetch. The saved ship is
+// adopted only when its option still exists (a stale id keeps the server-preselected default);
+// saved system values whose checkbox no longer exists are dropped silently, and an
+// entirely-stale subset falls back to the all-checked default. The select-all box and the
+// dropdown header text are re-synced via updateSelectState.
+function restoreProfitFilters() {
+    const saved = readProfitFilterPref();
+    if (!saved || typeof saved !== 'object') return;
+    const shipSelect = document.getElementById('shipSelect');
+    if (shipSelect && typeof saved.shipId === 'string' && saved.shipId !== '') {
+        for (let i = 0; i < shipSelect.options.length; i++) {
+            if (shipSelect.options[i].value === saved.shipId) {
+                shipSelect.value = saved.shipId;
+                break;
+            }
+        }
+    }
+    if (Array.isArray(saved.systems) && saved.systems.length > 0) {
+        const boxes = document.getElementsByClassName('sysCheck');
+        if (boxes.length === 0) return;
+        let any = false;
+        for (let i = 0; i < boxes.length; i++) {
+            const on = saved.systems.indexOf(boxes[i].value) >= 0;
+            boxes[i].checked = on;
+            if (on) any = true;
+        }
+        if (!any) {
+            // Entirely-stale subset: fall back to the all-checked "no filter" default.
+            for (let i = 0; i < boxes.length; i++) boxes[i].checked = true;
+        }
+        updateSelectState('sysAll', 'sysCheck', 'systemHeader');
+    }
+}
+
 // Load initial data if default ship is selected
 window.addEventListener('DOMContentLoaded', () => {
     // Handle clicks outside of multi-select to close them
@@ -282,6 +358,10 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Restore the persisted ship + system selection first (REQ-UI-017); the single initial
+    // fetch below then already runs with the restored state — no second fetch is triggered.
+    restoreProfitFilters();
+
     const shipId = document.getElementById('shipSelect').value;
     if (shipId) {
         updateProfitCalculation();
@@ -292,7 +372,11 @@ window.addEventListener('DOMContentLoaded', () => {
 // ship-select onchange, multi-select toggle, two "toggle-all + recompute" change patterns
 // on the system filter, and the seven sortable-header onclick handlers).
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-    window.krtEvents.on('change', 'profit-update', updateProfitCalculation);
+    // Each filter change persists the selection per browser (REQ-UI-017) before the re-fetch.
+    window.krtEvents.on('change', 'profit-update', function () {
+        persistProfitFilters();
+        updateProfitCalculation();
+    });
     window.krtEvents.on('click', 'profit-toggle-multi', function (el) {
         toggleMultiSelect(el.getAttribute('data-multi-target'));
     });
@@ -302,6 +386,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             el.getAttribute('data-check-class'),
             el.getAttribute('data-header-id'),
         );
+        persistProfitFilters();
         updateProfitCalculation();
     });
     window.krtEvents.on('change', 'profit-update-state', function (el) {
@@ -310,6 +395,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             el.getAttribute('data-check-class'),
             el.getAttribute('data-header-id'),
         );
+        persistProfitFilters();
         updateProfitCalculation();
     });
     window.krtEvents.on('click', 'profit-sort', function (el) {

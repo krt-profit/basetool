@@ -328,8 +328,13 @@
         };
         /*]]>*/
     </script>
-    <script th:src="@{/js/personal-inventory-blueprints.js}" th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/personal-inventory-blueprints-import.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
+<!-- Loaded UNCONDITIONALLY (after the optional bootstrap block above, so the i18n/endpoints
+     globals are set first whenever a member IS selected): the module carries the member-selection
+     persistence (REQ-UI-017), which must run on the BARE page — no member selected yet — to
+     replay the saved member via a one-time location.replace. Every element and bootstrap access
+     in it is null-guarded, so without a selected member it is inert beyond that persistence. -->
+<script th:src="@{/js/personal-inventory-blueprints.js}" th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

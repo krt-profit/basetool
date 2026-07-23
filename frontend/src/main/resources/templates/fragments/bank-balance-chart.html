@@ -19,15 +19,18 @@
          links re-rendering only the enclosing chart container in place (bindSwap, history:false). The
          no-JS fallback follows the link and reloads the page with ?chartRange=. -->
     <div class="bank-chart-toolbar">
+        <!-- data-range carries the raw range key for the per-user range persistence in bank.js
+             (REQ-UI-017): the active span is read back as the rendered range and the links are
+             the replay targets on load. -->
         <div class="bank-chart-ranges" role="group" th:aria-label="#{bank.chart.range.label}">
             <th:block th:each="r : ${chartRanges}">
                 <span th:if="${r == chartRange}" class="bank-chart-range-btn is-active"
                       aria-current="true" th:text="#{'bank.chart.range.' + ${r}}"
-                      th:attr="data-testid='bank-chart-range-' + ${r}">90 Tage</span>
+                      th:attr="data-testid='bank-chart-range-' + ${r},data-range=${r}">90 Tage</span>
                 <a th:unless="${r == chartRange}" class="bank-chart-range-btn" data-swap
                    th:href="@{${chartBaseUrl}(chartRange=${r})}"
                    th:text="#{'bank.chart.range.' + ${r}}"
-                   th:attr="data-testid='bank-chart-range-' + ${r}">90 Tage</a>
+                   th:attr="data-testid='bank-chart-range-' + ${r},data-range=${r}">90 Tage</a>
             </th:block>
         </div>
     </div>
