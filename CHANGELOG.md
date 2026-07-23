@@ -2,9 +2,12 @@
 
 ## [Unreleased]
 
+## [v1.5.14](https://github.com/krt-profit/basetool/releases/tag/v1.5.14) - 2026-07-23
+
 ### Fixed
 
 - **Stabilität: Wiederkehrende Hibernate-Warnungen „Narrowing proxy to class Squadron/SpecialCommand" im Backend-Log beseitigt.** Mehrere Services luden eine Org-Einheit subklassen-typisiert nach, obwohl dieselbe Zeile in der Transaktion schon als Basis-Proxy vorlag (Missionsdetail, Eigentümer-Stempeln, Auftrags-Übergabe); sie laden jetzt polymorph über das OrgUnit-Repository — das entfernt die Warnung samt `==`-Identitätsbruch und spart zudem Abfragen (REQ-DATA-013, ADR-0119).
+
 - **Log-Hygiene: Bot-Anfragen wie `GET /missions/common-handlers.js` erzeugen keine WARN-Zeilen und keinen 400er mehr.** Crawler, die Skript-Dateinamen relativ zur Seiten-URL auflösen, trafen die `/{id}`-Routen und scheiterten an der UUID-Konvertierung; solche asset-förmigen Pfade liefern jetzt ehrlich die 404-Seite und loggen nur noch auf DEBUG — echte fehlerhafte IDs behalten 400 + WARN (REQ-OBS-001).
 
 ## [v1.5.13](https://github.com/krt-profit/basetool/releases/tag/v1.5.13) - 2026-07-22
