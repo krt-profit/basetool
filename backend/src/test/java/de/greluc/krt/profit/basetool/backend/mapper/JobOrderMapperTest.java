@@ -69,7 +69,9 @@ class JobOrderMapperTest {
         "staffelMembershipResolver",
         new de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver(
             org.mockito.Mockito.mock(
-                de.greluc.krt.profit.basetool.backend.repository.SquadronRepository.class)));
+                de.greluc.krt.profit.basetool.backend.repository.SquadronRepository.class),
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository.class)));
     var materialMapper = Mappers.getMapper(MaterialMapper.class);
     var handoverMapper = Mappers.getMapper(JobOrderHandoverMapper.class);
     ReflectionTestUtils.setField(handoverMapper, "materialMapper", materialMapper);

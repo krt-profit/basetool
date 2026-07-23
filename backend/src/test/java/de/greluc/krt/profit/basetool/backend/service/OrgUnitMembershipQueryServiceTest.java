@@ -115,7 +115,8 @@ class OrgUnitMembershipQueryServiceTest {
     // StaffelMembershipResolver (tested independently in StaffelMembershipResolverTest). Delegate
     // the mock to a real instance backed by the squadron-repo mock so the single-Staffel fast path
     // stays load-free and the two-Staffel name-sort runs through the real resolver.
-    StaffelMembershipResolver realResolver = new StaffelMembershipResolver(squadronRepository);
+    StaffelMembershipResolver realResolver =
+        new StaffelMembershipResolver(squadronRepository, orgUnitRepository);
     lenient()
         .when(staffelMembershipResolver.resolveNameSortedStaffelIds(any()))
         .thenAnswer(
@@ -150,7 +151,7 @@ class OrgUnitMembershipQueryServiceTest {
     UUID bravoId = UUID.randomUUID();
     when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
         .thenReturn(List.of(staffelRow(userId, bravoId), staffelRow(userId, alphaId)));
-    when(squadronRepository.findAllById(any()))
+    when(orgUnitRepository.findAllById(any()))
         .thenReturn(List.of(squadron(bravoId, "Bravo"), squadron(alphaId, "Alpha")));
 
     assertEquals(List.of(alphaId, bravoId), queryService.findStaffelMembershipOrgUnitIds(userId));
@@ -278,8 +279,7 @@ class OrgUnitMembershipQueryServiceTest {
     List<OrgUnitMembershipOptionDto> options = queryService.listOptionsForUser(userId);
 
     assertTrue(options.isEmpty(), "no memberships → empty option list");
-    verify(squadronRepository, never()).findById(any());
-    verify(specialCommandRepository, never()).findById(any());
+    verify(orgUnitRepository, never()).findAllById(any());
   }
 
   @Test
@@ -293,7 +293,7 @@ class OrgUnitMembershipQueryServiceTest {
     staffel.setId(squadronId);
     staffel.setName("IRIDIUM");
     staffel.setShorthand("IRI");
-    when(squadronRepository.findById(squadronId)).thenReturn(Optional.of(staffel));
+    when(orgUnitRepository.findAllById(any())).thenReturn(List.of(staffel));
 
     List<OrgUnitMembershipOptionDto> options = queryService.listOptionsForUser(userId);
 
@@ -327,19 +327,17 @@ class OrgUnitMembershipQueryServiceTest {
     staffel.setId(staffelId);
     staffel.setName("IRIDIUM");
     staffel.setShorthand("IRI");
-    when(squadronRepository.findById(staffelId)).thenReturn(Optional.of(staffel));
 
     SpecialCommand skBravo = new SpecialCommand();
     skBravo.setId(skBravoId);
     skBravo.setName("Bravo");
     skBravo.setShorthand("BRV");
-    when(specialCommandRepository.findById(skBravoId)).thenReturn(Optional.of(skBravo));
 
     SpecialCommand skAlpha = new SpecialCommand();
     skAlpha.setId(skAlphaId);
     skAlpha.setName("Alpha");
     skAlpha.setShorthand("ALF");
-    when(specialCommandRepository.findById(skAlphaId)).thenReturn(Optional.of(skAlpha));
+    when(orgUnitRepository.findAllById(any())).thenReturn(List.of(staffel, skBravo, skAlpha));
 
     List<OrgUnitMembershipOptionDto> options = queryService.listOptionsForUser(userId);
 
@@ -359,7 +357,7 @@ class OrgUnitMembershipQueryServiceTest {
     row.setId(new OrgUnitMembershipId(userId, orgUnitId));
     row.setKind(OrgUnitKind.SQUADRON);
     when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(row));
-    when(squadronRepository.findById(orgUnitId)).thenReturn(Optional.empty());
+    when(orgUnitRepository.findAllById(any())).thenReturn(List.of());
 
     List<OrgUnitMembershipOptionDto> options = queryService.listOptionsForUser(userId);
 

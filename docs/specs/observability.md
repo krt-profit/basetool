@@ -52,6 +52,16 @@ probe noise, with bots, scanners and pre-login navigation adding more. The
 log level, so the signal survives for the dashboard/alerts; every other 4xx — including `403
 ACCESS_DENIED`, the security-relevant "authenticated but not allowed" case — stays at `WARN`.
 
+The frontend's `GlobalExceptionHandler` applies the same expected-noise demotion to **asset-shaped
+path-variable type mismatches**: when a request path whose final segment carries a filename
+extension (e.g. `GET /missions/common-handlers.js`, a crawler resolving the shared script names of
+`fragments/head.html` relative to a page URL) fails `UUID` path-variable conversion, the handler
+renders the **404** error page (such a path names no resource — a 400 would mislabel it) and logs at
+`DEBUG`, not `WARN`. Both keys are required — target type `UUID` *and* the dotted final segment — so
+a genuinely malformed id on a real navigation (e.g. a truncated pasted link, no dot) keeps its
+`400` + `WARN` signal, as does every non-UUID type mismatch. The rejected parameter value itself is
+never logged at any level (REQ-OBS-004: it may carry PII).
+
 `RequestLoggingFilter` escalates the access-log line to `WARN` (`Slow request …`) when a request
 exceeds `app.logging.slow-request-threshold-ms` (2000 ms), **except the notification SSE relay**
 (`/api/v1/notifications/stream` on the backend, `/notifications/stream` on the frontend), which stays

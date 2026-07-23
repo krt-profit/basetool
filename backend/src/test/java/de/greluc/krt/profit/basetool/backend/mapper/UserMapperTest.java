@@ -26,6 +26,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
@@ -34,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.util.HashSet;
@@ -53,19 +55,24 @@ class UserMapperTest {
   private UserMapper mapper;
   private OrgUnitMembershipRepository membershipRepository;
   private SquadronRepository squadronRepository;
+  private OrgUnitRepository orgUnitRepository;
 
   @BeforeEach
   void setUp() {
     // Post-R9 D3 (V101): the mapper derives squadron + flag fields from the membership table. Wire
-    // the membership repository plus a real StaffelMembershipResolver (backed by the squadron-repo
-    // mock) so the name-sort path is exercised end-to-end; we are not running inside a Spring
-    // context.
+    // the membership repository plus a real StaffelMembershipResolver (backed by the repo mocks —
+    // the polymorphic OrgUnitRepository serves the multi-row batch, the SquadronRepository the
+    // single-row existsById fast path) so the name-sort path is exercised end-to-end; we are not
+    // running inside a Spring context.
     mapper = Mappers.getMapper(UserMapper.class);
     membershipRepository = mock(OrgUnitMembershipRepository.class);
     squadronRepository = mock(SquadronRepository.class);
+    orgUnitRepository = mock(OrgUnitRepository.class);
     ReflectionTestUtils.setField(mapper, "membershipRepository", membershipRepository);
     ReflectionTestUtils.setField(
-        mapper, "staffelMembershipResolver", new StaffelMembershipResolver(squadronRepository));
+        mapper,
+        "staffelMembershipResolver",
+        new StaffelMembershipResolver(squadronRepository, orgUnitRepository));
   }
 
   /** Builds a {@code SQUADRON}-kind membership row pointing the user at the given squadron. */
@@ -193,8 +200,10 @@ class UserMapperTest {
     // repository/input order — decides the primary.
     when(membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON))
         .thenReturn(List.of(staffelRow(user.getId(), bravoId), staffelRow(user.getId(), alphaId)));
-    when(squadronRepository.findAllById(any()))
-        .thenReturn(List.of(squadron(bravoId, "Bravo", "BRV"), squadron(alphaId, "Alpha", "ALP")));
+    when(orgUnitRepository.findAllById(any()))
+        .thenReturn(
+            List.of(
+                (OrgUnit) squadron(bravoId, "Bravo", "BRV"), squadron(alphaId, "Alpha", "ALP")));
 
     UserDto dto = mapper.toDto(user);
 

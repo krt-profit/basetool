@@ -83,6 +83,10 @@ class PromotionFeatureFlagServiceGateTest {
 
   @Mock private AuthHelperService authHelper;
   @Mock private SquadronRepository squadronRepository;
+
+  @Mock
+  private de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository orgUnitRepository;
+
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private HttpServletRequest request;
   @Mock private MissionRepository missionRepository;
@@ -115,7 +119,8 @@ class PromotionFeatureFlagServiceGateTest {
     // StaffelMembershipResolver; back the mock with a real instance so the single-Staffel
     // resolution
     // these tests rely on runs through the real resolver.
-    StaffelMembershipResolver realResolver = new StaffelMembershipResolver(squadronRepository);
+    StaffelMembershipResolver realResolver =
+        new StaffelMembershipResolver(squadronRepository, orgUnitRepository);
     lenient()
         .when(staffelMembershipResolver.resolveNameSortedStaffelIds(any()))
         .thenAnswer(
@@ -126,14 +131,14 @@ class PromotionFeatureFlagServiceGateTest {
 
     // #922 L3 split: the promotion-flag methods on the OwnerScopeService facade delegate to
     // RequestScopeResolver. Wire a real resolver (fed the same mocks) into the facade so the
-    // direct-facade gate tests exercise the real flag resolution. The orgUnitRepository / cascade
-    // deps are never reached on the promotion path, so plain mocks satisfy the constructor.
+    // direct-facade gate tests exercise the real flag resolution. currentSquadron() resolves the
+    // pinned/home Staffel through the polymorphic orgUnitRepository (HHH000179 fix); the cascade
+    // dep is never reached on the promotion path, so a plain mock satisfies the constructor.
     RequestScopeResolver requestScopeResolver =
         new RequestScopeResolver(
             authHelper,
-            squadronRepository,
             orgUnitMembershipRepository,
-            mock(de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository.class),
+            orgUnitRepository,
             mock(OrgUnitCascadeService.class),
             staffelMembershipResolver,
             request);
@@ -156,7 +161,7 @@ class PromotionFeatureFlagServiceGateTest {
     UUID pinnedId = UUID.randomUUID();
     when(authHelper.isAdmin()).thenReturn(true);
     when(request.getHeader("X-Active-Org-Unit-Id")).thenReturn(pinnedId.toString());
-    when(squadronRepository.findById(pinnedId)).thenReturn(Optional.of(squadron(pinnedId, true)));
+    when(orgUnitRepository.findById(pinnedId)).thenReturn(Optional.of(squadron(pinnedId, true)));
 
     assertTrue(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
     ownerScopeService.assertPromotionFeatureEnabled();
@@ -170,7 +175,7 @@ class PromotionFeatureFlagServiceGateTest {
     UUID pinnedId = UUID.randomUUID();
     when(authHelper.isAdmin()).thenReturn(true);
     when(request.getHeader("X-Active-Org-Unit-Id")).thenReturn(pinnedId.toString());
-    when(squadronRepository.findById(pinnedId)).thenReturn(Optional.of(squadron(pinnedId, false)));
+    when(orgUnitRepository.findById(pinnedId)).thenReturn(Optional.of(squadron(pinnedId, false)));
 
     assertFalse(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
     AccessDeniedException ex =
@@ -188,7 +193,7 @@ class PromotionFeatureFlagServiceGateTest {
     // Post-R9 D3 (V101): home Staffel via org_unit_membership.
     when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
         .thenReturn(List.of(staffelMembership(userId, squadronId)));
-    when(squadronRepository.findById(squadronId))
+    when(orgUnitRepository.findById(squadronId))
         .thenReturn(Optional.of(squadron(squadronId, true)));
 
     assertTrue(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());
@@ -203,7 +208,7 @@ class PromotionFeatureFlagServiceGateTest {
     when(authHelper.currentUserId()).thenReturn(Optional.of(userId));
     when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
         .thenReturn(List.of(staffelMembership(userId, squadronId)));
-    when(squadronRepository.findById(squadronId))
+    when(orgUnitRepository.findById(squadronId))
         .thenReturn(Optional.of(squadron(squadronId, false)));
 
     assertFalse(ownerScopeService.isPromotionFeatureEnabledForCurrentScope());

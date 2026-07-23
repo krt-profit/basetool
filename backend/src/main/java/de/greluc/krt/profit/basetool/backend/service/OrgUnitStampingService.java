@@ -27,14 +27,13 @@ import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SpecialCommandRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -60,8 +59,6 @@ public class OrgUnitStampingService {
   private final RequestScopeResolver requestScopeResolver;
   private final AccessGateService accessGateService;
   private final AuthHelperService authHelper;
-  private final SquadronRepository squadronRepository;
-  private final SpecialCommandRepository specialCommandRepository;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final OrgUnitRepository orgUnitRepository;
 
@@ -161,8 +158,15 @@ public class OrgUnitStampingService {
       stampedOrgUnitId = owningOrgUnitId;
     }
 
-    return squadronRepository
+    // Polymorphic load + unproxy instead of a Squadron-typed findById: the stamped id often equals
+    // an org unit this transaction already holds as a base-typed OrgUnit proxy (the aggregate's
+    // owning unit), and a subclass-typed load would force Hibernate to narrow that proxy
+    // (HHH000179, breaks ==). The kind check moves from the SQL discriminator filter into Java.
+    return orgUnitRepository
         .findById(stampedOrgUnitId)
+        .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
+        .filter(Squadron.class::isInstance)
+        .map(Squadron.class::cast)
         .orElseThrow(
             () ->
                 new BadRequestException(
@@ -332,13 +336,13 @@ public class OrgUnitStampingService {
 
   /**
    * Applies the §5.5.1 picker-output matrix for a user known to have at least one membership, then
-   * resolves the chosen id to its concrete {@link OrgUnit} subtype (Staffel via {@link
-   * SquadronRepository}, Spezialkommando via {@link SpecialCommandRepository}, and — epic #692
-   * Phase 4 / REQ-ORG-016 — a {@code BEREICH} / {@code ORGANISATIONSLEITUNG} owner via the
-   * polymorphic {@link OrgUnitRepository}). Shared tail of {@link
-   * #resolveOrgUnitForPickerOutput(User, UUID)} and {@link
-   * #resolveOrgUnitForPickerOutputNullable(User, UUID)} — the empty-membership branch differs
-   * between the two callers and is handled by each before delegating here.
+   * resolves the chosen id to its concrete {@link OrgUnit} subtype in one polymorphic {@link
+   * OrgUnitRepository} load (every kind may own an aggregate since epic #692 Phase 4 /
+   * REQ-ORG-016); the result is unproxied so callers receive the concrete {@link Squadron} /
+   * SpecialCommand / Bereich / OL instance without a subclass-typed re-load that would narrow an
+   * existing base proxy (HHH000179). Shared tail of {@link #resolveOrgUnitForPickerOutput(User,
+   * UUID)} and {@link #resolveOrgUnitForPickerOutputNullable(User, UUID)} — the empty-membership
+   * branch differs between the two callers and is handled by each before delegating here.
    *
    * <p>The auto-stamp ({@code owningOrgUnitId == null}) and {@code >1 → force a choice} rules stay
    * keyed on the target user's DIRECT memberships, so a leader's default owner is their own
@@ -405,26 +409,19 @@ public class OrgUnitStampingService {
       stampedOrgUnitId = owningOrgUnitId;
     }
 
-    // Resolve to the concrete subtype. Staffel-side: SquadronRepository (discriminator filter
-    // matches). SK-side: SpecialCommandRepository. Epic #692 Phase 4 (REQ-ORG-016): a Bereich or
-    // Organisationsleitung may own an aggregate directly, so a non-Squadron/non-SK id falls through
-    // to the polymorphic OrgUnitRepository and is accepted iff it resolves to a BEREICH / OL row.
-    // The picker output was validated above, so any other miss is a hard contract violation (400).
-    Optional<Squadron> sq = squadronRepository.findById(stampedOrgUnitId);
-    if (sq.isPresent()) {
-      return sq.get();
-    }
-    OrgUnit specialCommand =
-        specialCommandRepository.findById(stampedOrgUnitId).map(s -> (OrgUnit) s).orElse(null);
-    if (specialCommand != null) {
-      return specialCommand;
-    }
+    // Resolve to the concrete subtype in ONE polymorphic load. Every OrgUnitKind may own an
+    // aggregate here (Staffel, SK, and — epic #692 Phase 4 / REQ-ORG-016 — Bereich / OL), so no
+    // kind filter applies; the picker output was validated above, so a miss is a hard contract
+    // violation (400). Deliberately NOT a subclass-typed
+    // SquadronRepository/SpecialCommandRepository
+    // probe: the stamped id often equals an org unit this transaction already holds as a base-typed
+    // OrgUnit proxy (e.g. the source aggregate's owning unit on a same-unit transfer), and a
+    // subclass-typed load would force Hibernate to narrow that proxy (HHH000179, breaks ==). The
+    // base-typed find reuses the persistence-context instance; unproxy yields the concrete subtype
+    // for callers that pattern-match on it.
     return orgUnitRepository
         .findById(stampedOrgUnitId)
-        .filter(
-            ou ->
-                ou.getKind() == OrgUnitKind.BEREICH
-                    || ou.getKind() == OrgUnitKind.ORGANISATIONSLEITUNG)
+        .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
         .orElseThrow(
             () ->
                 new BadRequestException(

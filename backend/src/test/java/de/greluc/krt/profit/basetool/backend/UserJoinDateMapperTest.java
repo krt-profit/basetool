@@ -51,7 +51,9 @@ class UserJoinDateMapperTest {
         userMapper,
         "staffelMembershipResolver",
         new de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver(
-            Mockito.mock(SquadronRepository.class)));
+            Mockito.mock(SquadronRepository.class),
+            Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository.class)));
   }
 
   @Test

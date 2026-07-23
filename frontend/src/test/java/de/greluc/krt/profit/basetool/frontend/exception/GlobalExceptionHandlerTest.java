@@ -47,6 +47,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
+import org.springframework.web.servlet.ModelAndView;
 
 /**
  * Unit tests for {@link GlobalExceptionHandler} verifying that backend Problem+JSON error {@code
@@ -449,6 +450,98 @@ class GlobalExceptionHandlerTest {
 
     assertEquals(
         "error/error", handler.handleTypeMismatch(ex, new ConcurrentModel(), htmlRequest()));
+  }
+
+  @Test
+  void typeMismatch_assetShapedPath_htmlRequest_returns404ModelAndView() {
+    // A crawler resolving head.html's script filenames relative to /missions/... produces a UUID
+    // mismatch on a path that names no resource — the handler must answer 404, not 400
+    // (REQ-OBS-001 asset-shaped carve-out).
+    org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex =
+        Mockito.mock(
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class);
+    when(ex.getName()).thenReturn("id");
+    Mockito.<Class<?>>when(ex.getRequiredType()).thenReturn((Class) java.util.UUID.class);
+    HttpServletRequest req = Mockito.mock(HttpServletRequest.class);
+    when(req.getHeader("Accept")).thenReturn("text/html");
+    when(req.getRequestURI()).thenReturn("/missions/common-handlers.js");
+
+    Object result = handler.handleTypeMismatch(ex, new ConcurrentModel(), req);
+
+    assertInstanceOf(ModelAndView.class, result);
+    ModelAndView mav = (ModelAndView) result;
+    assertEquals("error/error", mav.getViewName());
+    assertEquals(HttpStatus.NOT_FOUND, mav.getStatus());
+    assertEquals("error.404.title", mav.getModel().get("error"));
+    assertEquals("error.404.message", mav.getModel().get("message"));
+    assertEquals("404", mav.getModel().get("status"));
+  }
+
+  @Test
+  void typeMismatch_assetShapedPath_jsonRequest_returns404Json() {
+    org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex =
+        Mockito.mock(
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class);
+    when(ex.getName()).thenReturn("id");
+    Mockito.<Class<?>>when(ex.getRequiredType()).thenReturn((Class) java.util.UUID.class);
+    HttpServletRequest req = Mockito.mock(HttpServletRequest.class);
+    when(req.getHeader("Accept")).thenReturn(MediaType.APPLICATION_JSON_VALUE);
+    when(req.getRequestURI()).thenReturn("/orders/scu-decimal-input.js");
+
+    Object result = handler.handleTypeMismatch(ex, new ConcurrentModel(), req);
+
+    assertInstanceOf(ResponseEntity.class, result);
+    ResponseEntity<?> response = (ResponseEntity<?>) result;
+    assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    @SuppressWarnings("unchecked")
+    Map<String, Object> body = (Map<String, Object>) response.getBody();
+    assertNotNull(body);
+    assertEquals("NOT_FOUND", body.get("code"));
+    assertEquals(404, body.get("status"));
+    assertEquals("error.404.title", body.get("title"));
+  }
+
+  @Test
+  void typeMismatch_assetShapedPath_nonUuidTarget_keeps400() {
+    // The carve-out is double-keyed: a dotted URI alone must NOT flip the response — only a UUID
+    // target type qualifies, so a legitimately dotted route with a non-UUID parameter keeps its
+    // honest 400 + WARN.
+    org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex =
+        Mockito.mock(
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class);
+    when(ex.getName()).thenReturn("count");
+    Mockito.<Class<?>>when(ex.getRequiredType()).thenReturn((Class) Integer.class);
+    HttpServletRequest req = Mockito.mock(HttpServletRequest.class);
+    when(req.getHeader("Accept")).thenReturn("text/html");
+    when(req.getRequestURI()).thenReturn("/api/proxy/audit/bank/export.json");
+    Model model = new ConcurrentModel();
+
+    Object result = handler.handleTypeMismatch(ex, model, req);
+
+    assertEquals("error/error", result);
+    assertEquals("error.400.title", model.getAttribute("error"));
+    assertEquals("400", model.getAttribute("status"));
+  }
+
+  @Test
+  void typeMismatch_uuidTarget_undottedPath_keeps400() {
+    // A truncated pasted link (e.g. /missions/8bd4a2de) has no filename extension — it stays a
+    // genuine 400 so human navigation errors keep their WARN signal.
+    org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex =
+        Mockito.mock(
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class);
+    when(ex.getName()).thenReturn("id");
+    Mockito.<Class<?>>when(ex.getRequiredType()).thenReturn((Class) java.util.UUID.class);
+    HttpServletRequest req = Mockito.mock(HttpServletRequest.class);
+    when(req.getHeader("Accept")).thenReturn("text/html");
+    when(req.getRequestURI()).thenReturn("/missions/8bd4a2de");
+    Model model = new ConcurrentModel();
+
+    Object result = handler.handleTypeMismatch(ex, model, req);
+
+    assertEquals("error/error", result);
+    assertEquals("error.400.title", model.getAttribute("error"));
+    assertEquals("400", model.getAttribute("status"));
   }
 
   // ─── handleAccessDenied ─────────────────────────────────────────────────

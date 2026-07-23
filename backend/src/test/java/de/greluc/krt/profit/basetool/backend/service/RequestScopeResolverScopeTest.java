@@ -30,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -62,7 +61,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class RequestScopeResolverScopeTest {
 
   @Mock private AuthHelperService authHelper;
-  @Mock private SquadronRepository squadronRepository;
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private OrgUnitCascadeService orgUnitCascadeService;

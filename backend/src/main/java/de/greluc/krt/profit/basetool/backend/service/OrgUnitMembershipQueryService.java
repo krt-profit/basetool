@@ -37,9 +37,12 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
@@ -164,12 +167,13 @@ public class OrgUnitMembershipQueryService {
    * the user id itself is unknown — the picker treats both cases the same.
    *
    * <p>Inheritance look-up: the membership row carries an opaque {@code org_unit_id} plus the
-   * denormalised {@code kind} discriminator, so a polymorphic load through a single {@code
-   * OrgUnitRepository} would require introducing one (still deferred per R2.a's repository
-   * decision). Branching on {@code kind} and dispatching to the existing {@link SquadronRepository}
-   * / {@link SpecialCommandRepository} avoids that dependency and stays consistent with how the
-   * rest of the service already treats the two kinds (the {@code addMember} / {@code removeMember}
-   * paths already only touch the SK side).
+   * denormalised {@code kind} discriminator. All rows are resolved in <em>one</em> batch through
+   * the polymorphic {@link OrgUnitRepository} and matched back against the row's {@code kind} —
+   * deliberately NOT via subclass-typed {@code SquadronRepository} / {@code
+   * SpecialCommandRepository} loads, which would force Hibernate to narrow an org-unit id the
+   * surrounding transaction already holds as a base-typed proxy (HHH000179, breaks ==). The
+   * kind-match keeps the old discriminator-filter semantics: a row whose denormalised kind drifted
+   * from the org-unit row is skipped, as is any non-Staffel/non-SK membership.
    *
    * @param userId the user whose memberships to enumerate; never {@code null}.
    * @return picker-friendly DTOs for each membership; never {@code null}, possibly empty.
@@ -179,32 +183,23 @@ public class OrgUnitMembershipQueryService {
     if (rows.isEmpty()) {
       return List.of();
     }
+    Map<UUID, OrgUnit> units = loadOrgUnitsById(rows);
     List<OrgUnitMembershipOptionDto> options = new ArrayList<>(rows.size());
     for (OrgUnitMembership row : rows) {
-      UUID orgUnitId = row.getId().getOrgUnitId();
-      if (row.getKind() == OrgUnitKind.SQUADRON) {
-        Optional<Squadron> sq = squadronRepository.findById(orgUnitId);
-        sq.ifPresent(
-            s ->
-                options.add(
-                    new OrgUnitMembershipOptionDto(
-                        s.getId(),
-                        s.getName(),
-                        s.getShorthand(),
-                        OrgUnitKind.SQUADRON,
-                        s.isProfitEligible())));
-      } else if (row.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
-        Optional<SpecialCommand> sc = specialCommandRepository.findById(orgUnitId);
-        sc.ifPresent(
-            s ->
-                options.add(
-                    new OrgUnitMembershipOptionDto(
-                        s.getId(),
-                        s.getName(),
-                        s.getShorthand(),
-                        OrgUnitKind.SPECIAL_COMMAND,
-                        s.isProfitEligible())));
+      OrgUnit unit = units.get(row.getId().getOrgUnitId());
+      if (unit == null
+          || unit.getKind() != row.getKind()
+          || (row.getKind() != OrgUnitKind.SQUADRON
+              && row.getKind() != OrgUnitKind.SPECIAL_COMMAND)) {
+        continue;
       }
+      options.add(
+          new OrgUnitMembershipOptionDto(
+              unit.getId(),
+              unit.getName(),
+              unit.getShorthand(),
+              row.getKind(),
+              unit.isProfitEligible()));
     }
     options.sort(
         Comparator.<OrgUnitMembershipOptionDto, Integer>comparing(
@@ -477,21 +472,45 @@ public class OrgUnitMembershipQueryService {
     if (rows.isEmpty()) {
       return List.of();
     }
+    // One polymorphic batch load feeds the name sort — the previous per-row subclass-typed
+    // findById calls inside the comparator were both an N+1 and a proxy-narrowing source
+    // (HHH000179) whenever the transaction already held one of the ids as a base-typed proxy.
+    // The kind-match preserves the old discriminator-filter semantics (a drifted or
+    // non-Staffel/non-SK row sorts under the empty name, exactly as its typed lookup missed
+    // before).
+    Map<UUID, OrgUnit> units = loadOrgUnitsById(rows);
     List<OrgUnitMembership> sorted = new ArrayList<>(rows);
     sorted.sort(
         Comparator.<OrgUnitMembership, Integer>comparing(
                 m -> m.getKind() == OrgUnitKind.SQUADRON ? 0 : 1)
             .thenComparing(
                 m -> {
-                  UUID orgUnitId = m.getId().getOrgUnitId();
-                  return m.getKind() == OrgUnitKind.SQUADRON
-                      ? squadronRepository.findById(orgUnitId).map(Squadron::getName).orElse("")
-                      : specialCommandRepository
-                          .findById(orgUnitId)
-                          .map(SpecialCommand::getName)
-                          .orElse("");
+                  OrgUnit unit = units.get(m.getId().getOrgUnitId());
+                  OrgUnitKind expected =
+                      m.getKind() == OrgUnitKind.SQUADRON
+                          ? OrgUnitKind.SQUADRON
+                          : OrgUnitKind.SPECIAL_COMMAND;
+                  return unit != null && unit.getKind() == expected ? unit.getName() : "";
                 },
                 String.CASE_INSENSITIVE_ORDER));
     return sorted;
+  }
+
+  /**
+   * Resolves the org units behind the given membership rows in one polymorphic {@link
+   * OrgUnitRepository} batch, keyed by id. The base-typed query reuses any org-unit instance the
+   * surrounding transaction already tracks (instead of narrowing it through a subclass-typed load,
+   * HHH000179) and drops dangling ids — a membership whose org unit no longer resolves is simply
+   * absent from the map.
+   *
+   * @param rows the membership rows whose org units to load; never {@code null}, non-empty.
+   * @return the resolved org units keyed by id; never {@code null}, possibly smaller than {@code
+   *     rows} when ids dangle.
+   */
+  @NotNull
+  private Map<UUID, OrgUnit> loadOrgUnitsById(@NotNull List<OrgUnitMembership> rows) {
+    List<UUID> ids = rows.stream().map(r -> r.getId().getOrgUnitId()).distinct().toList();
+    return orgUnitRepository.findAllById(ids).stream()
+        .collect(Collectors.toMap(OrgUnit::getId, Function.identity()));
   }
 }

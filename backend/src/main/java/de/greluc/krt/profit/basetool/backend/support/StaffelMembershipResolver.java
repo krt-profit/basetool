@@ -19,13 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.support;
 
+import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
@@ -60,18 +63,22 @@ import org.springframework.stereotype.Service;
  * ADR-0047).
  *
  * <p>A row whose squadron no longer resolves (a dangling membership) is skipped — dropped by the
- * batch {@link SquadronRepository#findAllById(Iterable)} on the multi-row path and by an {@code
- * existsById} check on the single-row fast path — so the resolver never throws on a bad-data edge
- * case and treats a dangling row identically whether the user holds one Staffel or two. It carries
- * no {@code @Transactional} of its own on purpose: it is a pure read helper that participates in
- * whichever transaction (if any) the caller already holds, matching how the three call sites read
- * the squadron table inline before the extraction.
+ * polymorphic {@code OrgUnitRepository#findAllById} batch (plus its {@code instanceof Squadron}
+ * filter) on the multi-row path and by a {@link SquadronRepository#existsById(Object)} check on the
+ * single-row fast path — so the resolver never throws on a bad-data edge case and treats a dangling
+ * row identically whether the user holds one Staffel or two. The multi-row path loads base-typed on
+ * purpose: a Squadron-typed query would narrow an org-unit id the surrounding transaction already
+ * tracks as a base-typed proxy (HHH000179, breaks ==). It carries no {@code @Transactional} of its
+ * own on purpose: it is a pure read helper that participates in whichever transaction (if any) the
+ * caller already holds, matching how the three call sites read the squadron table inline before the
+ * extraction.
  */
 @Service
 @RequiredArgsConstructor
 public class StaffelMembershipResolver {
 
   private final SquadronRepository squadronRepository;
+  private final OrgUnitRepository orgUnitRepository;
 
   /**
    * Resolves the given {@code SQUADRON}-kind membership rows to their owning {@link Squadron}
@@ -90,7 +97,16 @@ public class StaffelMembershipResolver {
       return List.of();
     }
     List<UUID> staffelIds = squadronRows.stream().map(r -> r.getId().getOrgUnitId()).toList();
-    return squadronRepository.findAllById(staffelIds).stream()
+    // Polymorphic batch load + unproxy instead of a Squadron-typed query: this resolver runs for
+    // every embedded UserDto, frequently inside a transaction that already tracks one of the
+    // Staffel ids as a base-typed OrgUnit proxy (e.g. a mission's owningOrgUnit) — a
+    // subclass-typed query would force Hibernate to narrow that proxy (HHH000179, breaks ==). The
+    // instanceof filter replaces the SQL discriminator filter 1:1 and still drops dangling rows
+    // (absent from the batch result).
+    return orgUnitRepository.findAllById(staffelIds).stream()
+        .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
+        .filter(Squadron.class::isInstance)
+        .map(Squadron.class::cast)
         .sorted(Comparator.comparing(Squadron::getName, String.CASE_INSENSITIVE_ORDER))
         .toList();
   }

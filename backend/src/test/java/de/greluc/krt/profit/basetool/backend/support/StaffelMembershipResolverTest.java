@@ -27,10 +27,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
+import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import java.util.List;
 import java.util.UUID;
@@ -52,12 +55,14 @@ class StaffelMembershipResolverTest {
 
   @Mock private SquadronRepository squadronRepository;
 
+  @Mock private OrgUnitRepository orgUnitRepository;
+
   @InjectMocks private StaffelMembershipResolver resolver;
 
   @Test
   void resolveNameSortedStaffelIds_empty_returnsEmptyAndNeverHitsSquadronTable() {
     assertTrue(resolver.resolveNameSortedStaffelIds(List.of()).isEmpty());
-    verifyNoInteractions(squadronRepository);
+    verifyNoInteractions(squadronRepository, orgUnitRepository);
   }
 
   @Test
@@ -73,7 +78,7 @@ class StaffelMembershipResolverTest {
     // The single-Staffel case is already its own primary — only a cheap existence check, no name
     // sort and no full entity load.
     verify(squadronRepository).existsById(squadronId);
-    verify(squadronRepository, never()).findAllById(any());
+    verify(orgUnitRepository, never()).findAllById(any());
   }
 
   @Test
@@ -96,8 +101,8 @@ class StaffelMembershipResolverTest {
     UUID alphaId = UUID.randomUUID();
     UUID bravoId = UUID.randomUUID();
     // Rows + entities in non-alphabetical order to prove the sort decides, not the input order.
-    when(squadronRepository.findAllById(any()))
-        .thenReturn(List.of(squadron(bravoId, "Bravo"), squadron(alphaId, "alpha")));
+    when(orgUnitRepository.findAllById(any()))
+        .thenReturn(List.of((OrgUnit) squadron(bravoId, "Bravo"), squadron(alphaId, "alpha")));
 
     List<UUID> result =
         resolver.resolveNameSortedStaffelIds(
@@ -113,7 +118,8 @@ class StaffelMembershipResolverTest {
     UUID aliveId = UUID.randomUUID();
     UUID danglingId = UUID.randomUUID();
     // Only the live squadron resolves; the dangling row is silently dropped by the batch load.
-    when(squadronRepository.findAllById(any())).thenReturn(List.of(squadron(aliveId, "Alpha")));
+    when(orgUnitRepository.findAllById(any()))
+        .thenReturn(List.of((OrgUnit) squadron(aliveId, "Alpha")));
 
     List<UUID> result =
         resolver.resolveNameSortedStaffelIds(
@@ -125,7 +131,7 @@ class StaffelMembershipResolverTest {
   @Test
   void resolveNameSortedStaffeln_empty_returnsEmptyAndNeverHitsSquadronTable() {
     assertTrue(resolver.resolveNameSortedStaffeln(List.of()).isEmpty());
-    verifyNoInteractions(squadronRepository);
+    verifyNoInteractions(squadronRepository, orgUnitRepository);
   }
 
   @Test
@@ -135,7 +141,7 @@ class StaffelMembershipResolverTest {
     UUID bravoId = UUID.randomUUID();
     Squadron alpha = squadron(alphaId, "Alpha");
     Squadron bravo = squadron(bravoId, "Bravo");
-    when(squadronRepository.findAllById(any())).thenReturn(List.of(bravo, alpha));
+    when(orgUnitRepository.findAllById(any())).thenReturn(List.of((OrgUnit) bravo, alpha));
 
     List<Squadron> result =
         resolver.resolveNameSortedStaffeln(
@@ -144,7 +150,27 @@ class StaffelMembershipResolverTest {
     assertEquals(List.of(alpha, bravo), result);
     // The single-row fast path of the id variant does NOT apply here — the entity variant always
     // batch-loads, even for one row, because the caller needs the squadron's name + shorthand.
-    verify(squadronRepository).findAllById(any());
+    verify(orgUnitRepository).findAllById(any());
+  }
+
+  @Test
+  void resolveNameSortedStaffeln_filtersNonSquadronKinds() {
+    // The polymorphic batch (HHH000179 narrowing fix) may surface any OrgUnit kind; the resolver
+    // must keep the old Squadron-typed query's discriminator semantics and drop non-Staffel rows.
+    UUID userId = UUID.randomUUID();
+    UUID staffelId = UUID.randomUUID();
+    UUID skId = UUID.randomUUID();
+    Squadron staffel = squadron(staffelId, "Alpha");
+    SpecialCommand sk = new SpecialCommand();
+    sk.setId(skId);
+    sk.setName("SK Logistik");
+    when(orgUnitRepository.findAllById(any())).thenReturn(List.of(sk, staffel));
+
+    List<Squadron> result =
+        resolver.resolveNameSortedStaffeln(
+            List.of(staffelRow(userId, skId), staffelRow(userId, staffelId)));
+
+    assertEquals(List.of(staffel), result);
   }
 
   /** Builds a {@code SQUADRON}-kind membership row pointing the user at the given squadron. */

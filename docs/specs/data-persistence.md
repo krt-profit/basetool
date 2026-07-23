@@ -531,6 +531,36 @@ per-mission finance fragment renders the breakdown and an error state).
 (`OperationPayoutStatusDto`), `OperationRepository.findAllReferenceScoped` (status / recency bound),
 `JobOrderPageController.viewOrderDetail` (users gated to the full render). See ADR-0081.
 
+### REQ-DATA-013 — OrgUnit hierarchy rows load polymorphically, never subclass-typed (ADR-0119)
+
+A row of the single-table `OrgUnit` hierarchy (`Squadron` / `SpecialCommand` / `Bereich` /
+`Organisationsleitung`) must not be loaded through a **subclass-typed** repository or
+`em.find(Subclass, id)` on any path where the same id can already sit in the persistence context as
+a **base-typed lazy proxy** — fourteen aggregates hold LAZY `@ManyToOne OrgUnit` associations
+(`Mission.owningOrgUnit`, `JobOrder.responsibleOrgUnit`, `InventoryItem.owningOrgUnit`, …), so on
+service paths that touch such an aggregate this is the normal case, not the exception. A
+subclass-typed load then forces Hibernate to *narrow* the proxy (`HHH000179 Narrowing proxy to
+class …Squadron/SpecialCommand — this operation breaks ==`), minting a second instance for the same
+row and breaking `==` identity within the session.
+
+Instead, load through the polymorphic `OrgUnitRepository` (`findById` / one `findAllById` batch,
+which reuses the tracked instance) and dispatch on `getKind()` — or, where the concrete subtype is
+required (an association typed `Squadron`, an `instanceof` filter), unproxy it via
+`Hibernate.unproxy(ou, OrgUnit.class)` and pattern-match; a base proxy is never `instanceof` a
+subclass, so the unproxy step is mandatory before any type test. The in-Java kind check replaces the
+subclass repository's SQL discriminator filter 1:1. Pure non-loading queries on subclass
+repositories (`existsById`, `findAllByActiveTrue` list screens, count/aggregate queries) remain
+fine.
+
+**Enforced by:** `OrgUnitStampingService.resolveStampedOrgUnit` / `resolveSquadronForPickerOutput`
+(one polymorphic load replacing the Squadron→SK→base probe chain),
+`RequestScopeResolver.currentSquadron`, `StaffelMembershipResolver.resolveNameSortedStaffeln`,
+`OrgUnitMembershipQueryService.listOptionsForUser` / `findAllMembershipsForUser` (batched, also
+de-N+1-ing the sort comparator), `JobOrderHandoverService` / `JobOrderItemHandoverService`
+(executing-Staffel stamp), with `JobOrderOrgUnitResolver` as the pre-existing canonical pattern.
+Covered by `StaffelMembershipResolverTest`, `OwnerScopeServiceTest`,
+`OrgUnitMembershipQueryServiceTest`, `PromotionFeatureFlagServiceGateTest`.
+
 ## Out of scope
 
 **Material-amount SCU-scale storage and rounding** (the `@PrePersist`/`@PreUpdate` HALF_UP-to-three-
