@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.15](https://github.com/krt-profit/basetool/releases/tag/v1.5.15) - 2026-07-23
+
 ### Changed
 
 - **Filter bleiben jetzt app-weit pro Browser erhalten.** Alle Auswahl-Filter (Checkboxen, Mehrfachauswahlen, Dropdowns, Umschalter) werden im localStorage gespeichert und beim nächsten Öffnen wiederhergestellt — u. a. Materialbörse, Mein/Globales Lager, Raffinerie-Aufträge, Profitberechnung, Missionen/Operationen („Vergangene anzeigen"), Beförderung, Bank-Freigaben, Bank-Chart-Zeitraum sowie die Admin-Filterseiten. Text-Suchfelder und Datumsbereiche starten bewusst weiterhin frisch (REQ-UI-017, ADR-0120).
