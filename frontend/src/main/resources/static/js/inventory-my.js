@@ -402,6 +402,172 @@ function personalFlagChecked(materialId, itemId) {
     return el ? el.checked : false;
 }
 
+// ===================== Per-browser filter persistence (REQ-UI-017) =============================
+// One JSON object under a single localStorage key holds BOTH views' filter states
+// ({material: {...}, items: {...}}), so switching between the Material and the Items view keeps
+// each view's own selection. A multi-select dimension stores its checked values, or null when
+// zero or all boxes are checked — both mean "no filter" on this page (zero checked is the
+// rendered default; all checked sends every id for the same result). Absence of the key keeps
+// the server-rendered defaults. The URL wins: this page mirrors its filters into the address
+// bar via history.replaceState, so a load WITH filter query params adopts that state and
+// re-persists it — only a bare URL restores from storage. All storage access is guarded so
+// privacy modes that deny it degrade to the defaults instead of breaking the page.
+const MY_INVENTORY_FILTER_KEY = 'inventory_my_filters';
+
+// The filter query params this page mirrors into the URL. The view= switch is server-rendered
+// navigation, not a filter, so it never counts as one (a /inventory/my?view=items URL is still
+// "bare" and restores the items view's stored filters).
+const MY_INVENTORY_FILTER_PARAMS = [
+    'materialIds',
+    'gameItemIds',
+    'minQuality',
+    'jobOrderIds',
+    'missionIds',
+    'personalOnly',
+    'nonPersonalOnly',
+];
+
+function readMyInventoryFilterPref() {
+    try {
+        const raw = localStorage.getItem(MY_INVENTORY_FILTER_KEY);
+        const parsed = raw === null ? null : JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (_e) {
+        return null; // corrupt value / storage unavailable: fall back to the defaults
+    }
+}
+
+function writeMyInventoryFilterPref(value) {
+    try {
+        localStorage.setItem(MY_INVENTORY_FILTER_KEY, JSON.stringify(value));
+    } catch (_e) {
+        /* storage unavailable */
+    }
+}
+
+// Checked values of a multi-select dimension, or null when zero or all boxes are checked (= "no
+// filter"). Storing null — not the full option list — keeps catalog options added later
+// included automatically.
+function myInventoryFilterSelection(className) {
+    const boxes = document.getElementsByClassName(className);
+    const picked = [];
+    for (let i = 0; i < boxes.length; i++) {
+        if (boxes[i].checked) picked.push(boxes[i].value);
+    }
+    return picked.length === 0 || picked.length === boxes.length ? null : picked;
+}
+
+// Snapshot of the ACTIVE view's widget state — only that view's filter form exists in the DOM
+// (REQ-INV-030), so the other view's slot is never touched by a persist.
+function snapshotMyInventoryFilters() {
+    if (lagerIsItemsView()) {
+        return {
+            gameItems: myInventoryFilterSelection('gameItemCheck'),
+            jobOrders: myInventoryFilterSelection('jobOrderCheck'),
+            personalOnly: personalFlagChecked('personalOnly', 'itemPersonalOnly'),
+            nonPersonalOnly: personalFlagChecked('nonPersonalOnly', 'itemNonPersonalOnly'),
+        };
+    }
+    const minQualitySelect = document.getElementById('minQuality');
+    return {
+        materials: myInventoryFilterSelection('matCheck'),
+        minQuality: minQualitySelect ? minQualitySelect.value : '',
+        jobOrders: myInventoryFilterSelection('jobOrderCheck'),
+        missions: myInventoryFilterSelection('missionCheck'),
+        personalOnly: personalFlagChecked('personalOnly', 'itemPersonalOnly'),
+        nonPersonalOnly: personalFlagChecked('nonPersonalOnly', 'itemNonPersonalOnly'),
+    };
+}
+
+// Persists the active view's current widget state into its slot of the shared two-view JSON.
+// Called from filterMyInventory, so every filter change — including the reset button's cleared
+// state — is stored immediately; a state-preserving re-run (live-sync refresh, modal write) just
+// rewrites the same snapshot.
+function persistMyInventoryFilters() {
+    const stored = readMyInventoryFilterPref() || {};
+    stored[lagerIsItemsView() ? 'items' : 'material'] = snapshotMyInventoryFilters();
+    writeMyInventoryFilterPref(stored);
+}
+
+// Applies a saved multi-select subset to its checkbox family. Saved values whose checkbox no
+// longer exists are dropped silently; an entirely-stale subset leaves every box unchecked — this
+// page's all-unchecked "no filter" default. The select-all box and the dropdown header text are
+// re-synced via updateSelectState. Returns whether any box ended up checked (i.e. the widget now
+// differs from the bare-URL rendered default).
+function applyMySavedSelection(saved, checkClass, allId, headerId) {
+    if (!Array.isArray(saved) || saved.length === 0) return false;
+    const boxes = document.getElementsByClassName(checkClass);
+    if (boxes.length === 0) return false;
+    let any = false;
+    for (let i = 0; i < boxes.length; i++) {
+        const on = saved.indexOf(boxes[i].value) >= 0;
+        boxes[i].checked = on;
+        if (on) any = true;
+    }
+    updateSelectState(allId, checkClass, headerId);
+    return any;
+}
+
+// Restores the active view's saved filter state on a bare-URL load and returns whether the
+// widgets now differ from the rendered default — the caller then triggers the page's existing
+// fragment re-fetch exactly once. A load WITH filter query params adopts the server-rendered
+// URL state instead and re-persists it (URL wins).
+function restoreMyInventoryFilters() {
+    let params;
+    try {
+        params = new URLSearchParams(window.location.search);
+    } catch (_e) {
+        return false;
+    }
+    if (MY_INVENTORY_FILTER_PARAMS.some((p) => params.has(p))) {
+        persistMyInventoryFilters();
+        return false;
+    }
+    const stored = readMyInventoryFilterPref();
+    const saved = stored ? stored[lagerIsItemsView() ? 'items' : 'material'] : null;
+    if (!saved || typeof saved !== 'object') return false;
+    let changed = false;
+    // [saved subset, checkbox class, select-all id, header id] per multi-select family of the
+    // active view (the jobOrder family renders item-prefixed all/header ids in the items view).
+    let families;
+    if (lagerIsItemsView()) {
+        families = [
+            [saved.gameItems, 'gameItemCheck', 'gameItemAll', 'gameItemHeader'],
+            [saved.jobOrders, 'jobOrderCheck', 'itemJobOrderAll', 'itemJobOrderHeader'],
+        ];
+    } else {
+        families = [
+            [saved.materials, 'matCheck', 'matAll', 'materialHeader'],
+            [saved.jobOrders, 'jobOrderCheck', 'jobOrderAll', 'jobOrderHeader'],
+            [saved.missions, 'missionCheck', 'missionAll', 'missionHeader'],
+        ];
+        const minQualitySelect = document.getElementById('minQuality');
+        if (minQualitySelect && typeof saved.minQuality === 'string' && saved.minQuality !== '') {
+            minQualitySelect.value = saved.minQuality;
+            // A stale quality (no matching option) resets the select to '' — keep the default.
+            if (minQualitySelect.value === saved.minQuality) changed = true;
+        }
+    }
+    families.forEach(function (f) {
+        if (applyMySavedSelection(f[0], f[1], f[2], f[3])) changed = true;
+    });
+    // The personal flags are mutually exclusive (see togglePersonalFilter); on a corrupt
+    // both-true state personalOnly wins so the pair never intersects to an empty result.
+    const personalBox =
+        document.getElementById('personalOnly') || document.getElementById('itemPersonalOnly');
+    const nonPersonalBox =
+        document.getElementById('nonPersonalOnly') ||
+        document.getElementById('itemNonPersonalOnly');
+    if (personalBox && saved.personalOnly === true) {
+        personalBox.checked = true;
+        changed = true;
+    } else if (nonPersonalBox && saved.nonPersonalOnly === true) {
+        nonPersonalBox.checked = true;
+        changed = true;
+    }
+    return changed;
+}
+
 function filterMyInventory() {
     // REQ-INV-030: the rebuilt fragment URL is derived from the page's own filter state PLUS the
     // active view, so a filter change, a modal write and a live-sync peer refresh all re-render
@@ -415,6 +581,9 @@ function filterMyInventory() {
     // filtered view. "Alle markieren" itself does not re-swap the table, so a live selection survives
     // drill-down expansion.
     clearBulkSelection();
+    // Persist the current filter selection per browser (REQ-UI-017) — every filter change,
+    // including the reset button, funnels through here, so the snapshot is always current.
+    persistMyInventoryFilters();
     const itemsView = lagerIsItemsView();
     const activeMaterials = collectMyChecked('matCheck');
     const activeGameItems = collectMyChecked('gameItemCheck');
@@ -577,6 +746,10 @@ if (
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    // Restore the persisted per-browser filter state first (REQ-UI-017): on a bare URL the
+    // saved selection is applied to the widgets, and — only when it differs from the rendered
+    // default — the existing fragment re-fetch runs exactly once at the end of this handler.
+    const filtersRestored = restoreMyInventoryFilters();
     if (document.getElementsByClassName('matCheck').length > 0) {
         updateSelectState('matAll', 'matCheck', 'materialHeader');
     }
@@ -595,6 +768,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (document.getElementsByClassName('missionCheck').length > 0) {
         updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     }
+    if (filtersRestored) filterMyInventory();
 });
 
 // ===================== Lager tree expand/collapse view-state persistence (REQ-INV-002) =========

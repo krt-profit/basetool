@@ -121,15 +121,48 @@
 
     // Include-inactive toggle -> in-place swap of the SK list (REQ-FE-002), with the URL kept in
     // sync so a refresh re-renders the same filter. Edit/Delete are document-delegated above, so the
-    // swapped-in rows need no re-init.
+    // swapped-in rows need no re-init. The toggle is persisted per browser (REQ-UI-017): an
+    // explicit ?includeInactive= in the address bar wins and is re-persisted; a bare load replays
+    // a differing saved value through the existing change handler (one #sc-results swap).
+    const SC_FILTER_PREF_KEY = 'admin_special_commands_filter';
     const includeInactive = document.getElementById('includeInactive');
     if (includeInactive && window.krtFetch) {
+        const persistScFilter = function () {
+            try {
+                localStorage.setItem(
+                    SC_FILTER_PREF_KEY,
+                    JSON.stringify({ includeInactive: includeInactive.checked }),
+                );
+            } catch (_e) {
+                /* storage unavailable */
+            }
+        };
         includeInactive.addEventListener('change', function () {
+            persistScFilter();
             const url =
                 '/admin/special-commands' +
                 (includeInactive.checked ? '?includeInactive=true' : '');
             window.krtFetch.swap({ url: url, container: '#sc-results', history: true });
         });
+
+        if (/[?&]includeInactive=/.test(window.location.search)) {
+            // Deep link / refresh: the server pre-checked the box; adopt + re-persist.
+            persistScFilter();
+        } else {
+            let saved;
+            try {
+                saved = JSON.parse(localStorage.getItem(SC_FILTER_PREF_KEY));
+            } catch (_e) {
+                saved = null;
+            }
+            if (saved && typeof saved === 'object') {
+                const want = saved.includeInactive === true;
+                if (want !== includeInactive.checked) {
+                    includeInactive.checked = want;
+                    includeInactive.dispatchEvent(new Event('change'));
+                }
+            }
+        }
     }
 
     // ---- In-place CRUD (#582): create/edit/delete/activate save via the AJAX twins and re-swap

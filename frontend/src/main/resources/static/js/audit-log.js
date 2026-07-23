@@ -88,6 +88,71 @@
     };
 
     // ---------------------------------------------------------------------------
+    // Event-type filter persistence (REQ-UI-017): ONLY the #audit-event select is kept, per audit
+    // domain, in one localStorage object ({ <domain>: eventType }) — never the from/to period or
+    // the actor text field (dates and free text are deliberately not persisted). An explicit
+    // ?eventType= in the address bar is authoritative and is re-persisted; on a bare load a saved
+    // type is restored only if the active domain's option list still contains it, then the
+    // existing in-place filter swap runs exactly once. The reset link clears the saved type too
+    // (it wipes the select programmatically, which fires no change event).
+    // ---------------------------------------------------------------------------
+    const EVENT_FILTER_PREF_KEY = 'admin_audit_filter';
+    const eventSelect = document.getElementById('audit-event');
+    const domainField = form ? form.querySelector('input[name="domain"]') : null;
+    const activeDomain = domainField ? domainField.value : '';
+
+    const readEventFilterPrefs = function () {
+        try {
+            const raw = localStorage.getItem(EVENT_FILTER_PREF_KEY);
+            const parsed = raw === null ? null : JSON.parse(raw);
+            return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (_e) {
+            return {};
+        }
+    };
+
+    const persistEventType = function () {
+        try {
+            const prefs = readEventFilterPrefs();
+            if (eventSelect.value) {
+                prefs[activeDomain] = eventSelect.value;
+            } else {
+                // Absent key = the server default (all events of the domain).
+                delete prefs[activeDomain];
+            }
+            localStorage.setItem(EVENT_FILTER_PREF_KEY, JSON.stringify(prefs));
+        } catch (_e) {
+            /* storage unavailable */
+        }
+    };
+
+    if (eventSelect && activeDomain && form && resultsContainer && window.krtFetch) {
+        // Persist every pick immediately (the debounced swap is wired separately above); the reset
+        // listener runs after the module's own reset handler in the same dispatch, so the select is
+        // already cleared when the saved value is dropped.
+        eventSelect.addEventListener('change', persistEventType);
+        if (resetLink) {
+            resetLink.addEventListener('click', persistEventType);
+        }
+
+        if (/[?&]eventType=/.test(window.location.search)) {
+            // Deep link / back-forward: the server preselected the option; adopt + re-persist.
+            persistEventType();
+        } else {
+            const saved = readEventFilterPrefs()[activeDomain];
+            const known =
+                typeof saved === 'string' &&
+                Array.prototype.some.call(eventSelect.options, function (option) {
+                    return option.value === saved;
+                });
+            if (known && saved !== eventSelect.value) {
+                eventSelect.value = saved;
+                reloadAuditResults();
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------------------
     // Period export (PDF or JSON) — fetch -> blob -> hidden <a download>, the documented
     // bank.js download pattern (a real fetch is needed to attach the X-User-Time-Zone
     // header). The two modal buttons pick the format. No native dialogs: validation +

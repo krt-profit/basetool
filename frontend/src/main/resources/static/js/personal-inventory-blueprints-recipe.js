@@ -763,10 +763,66 @@
         }
     }
 
+    /* ------------------------------------------- toggle persistence (REQ-UI-017) */
+
+    // Per-browser persistence of the two craftability toggles: one JSON object
+    // {refinery: bool, craftable: bool} under a single localStorage key. Absence of the key
+    // keeps the server-rendered (unchecked) defaults; the live search input (#krt-bp-q) is
+    // deliberately NOT persisted. All storage access is guarded so privacy modes that deny it
+    // degrade to the defaults instead of breaking the page.
+    const TOGGLE_PREF_KEY = 'personal_blueprints_toggles';
+    let togglesRestored = false;
+
+    function readTogglePref() {
+        try {
+            const raw = localStorage.getItem(TOGGLE_PREF_KEY);
+            const parsed = raw === null ? null : JSON.parse(raw);
+            return parsed && typeof parsed === 'object' ? parsed : null;
+        } catch (_e) {
+            return null; // corrupt value / storage unavailable: fall back to the defaults
+        }
+    }
+
+    // Snapshots the current toggle states into localStorage. Called immediately on every toggle
+    // change (after the change handler mirrored the checkbox into its state variable).
+    function writeTogglePref() {
+        try {
+            localStorage.setItem(
+                TOGGLE_PREF_KEY,
+                JSON.stringify({ refinery: refineryOn, craftable: craftableOnly }),
+            );
+        } catch (_e) {
+            /* storage unavailable */
+        }
+    }
+
+    // Applies the saved toggle states to the checkboxes. Runs once, from init() AFTER the
+    // toggle elements are grabbed but BEFORE their checked states are mirrored into
+    // refineryOn/craftableOnly — so the first recompute/filter pass (loadCraftability's
+    // callback) already honours the restored state. Re-inits after a krt:swapped keep the live
+    // checkbox state (the toggles survive the swap and storage already mirrors them).
+    function restoreToggles() {
+        if (togglesRestored) {
+            return;
+        }
+        togglesRestored = true;
+        const saved = readTogglePref();
+        if (!saved) {
+            return;
+        }
+        if (refineryToggle && typeof saved.refinery === 'boolean') {
+            refineryToggle.checked = saved.refinery;
+        }
+        if (craftableToggle && typeof saved.craftable === 'boolean') {
+            craftableToggle.checked = saved.craftable;
+        }
+    }
+
     // Refinery toggle: recompute badges + active detail + recipe sliders client-side (both figure
     // sets are already cached, so no refetch is needed).
     function onRefineryToggle() {
         refineryOn = !!(refineryToggle && refineryToggle.checked);
+        writeTogglePref();
         decorateRows();
         // The craftable set widens/narrows with the refinery toggle, so re-run the view filter too.
         applyClientFilter();
@@ -782,6 +838,7 @@
     // "Show only craftable" toggle: no badge/detail recompute needed — just re-run the view filter.
     function onCraftableToggle() {
         craftableOnly = !!(craftableToggle && craftableToggle.checked);
+        writeTogglePref();
         applyClientFilter();
     }
 
@@ -866,8 +923,13 @@
         detailCraftEl = document.getElementById('krt-bp-detail-craft');
 
         // The refinery toggle lives outside the swapped collection card, so it survives a re-render
-        // and is wired exactly once (init re-runs on krt:swapped).
+        // and is wired exactly once (init re-runs on krt:swapped). The "show only craftable"
+        // toggle likewise. Both are grabbed first so the one-time persisted-state restore
+        // (REQ-UI-017) can set their checked states BEFORE they are mirrored into
+        // refineryOn/craftableOnly below and before the first recompute (loadCraftability).
         refineryToggle = document.getElementById('krt-bp-refinery-toggle');
+        craftableToggle = document.getElementById('krt-bp-craftable-toggle');
+        restoreToggles();
         if (refineryToggle) {
             refineryOn = refineryToggle.checked;
             if (!refineryToggle.dataset.wired) {
@@ -875,10 +937,6 @@
                 refineryToggle.dataset.wired = '1';
             }
         }
-
-        // The "show only craftable" toggle likewise lives outside the swapped collection card, so its
-        // checkbox state survives a re-render; mirror it here and wire the change handler exactly once.
-        craftableToggle = document.getElementById('krt-bp-craftable-toggle');
         if (craftableToggle) {
             craftableOnly = craftableToggle.checked;
             if (!craftableToggle.dataset.wired) {

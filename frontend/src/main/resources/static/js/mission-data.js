@@ -488,6 +488,40 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     });
 }
 
+// Per-browser persistence of the three include-inactive toggles (REQ-UI-017): one JSON object
+// under a single key; absence = the server default (all unchecked). Guarded so privacy modes
+// that deny storage degrade to the defaults instead of breaking the page.
+const MISSION_FILTER_PREF_KEY = 'admin_mission_data_filters';
+
+function readMissionFilterPref() {
+    try {
+        const raw = localStorage.getItem(MISSION_FILTER_PREF_KEY);
+        const parsed = raw === null ? null : JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (_e) {
+        return null;
+    }
+}
+
+function persistMissionFilters() {
+    function checked(id) {
+        const el = document.getElementById(id);
+        return el ? el.checked : false;
+    }
+    try {
+        localStorage.setItem(
+            MISSION_FILTER_PREF_KEY,
+            JSON.stringify({
+                squadrons: checked('includeInactiveSquadrons'),
+                jobTypes: checked('includeInactiveJobTypes'),
+                frequencyTypes: checked('includeInactiveFrequencyTypes'),
+            }),
+        );
+    } catch (_e) {
+        /* storage unavailable */
+    }
+}
+
 // Include-inactive filters -> in-place swap of just the affected section (REQ-FE-002),
 // replacing the former data-trigger="submit-form-by-id" full reload. Each swap URL carries
 // all three include-inactive values so the address bar / no-JS refresh reproduce full state.
@@ -496,6 +530,7 @@ if (window.krtFetch) {
         const cb = document.getElementById(checkboxId);
         if (!cb) return;
         cb.addEventListener('change', function () {
+            persistMissionFilters();
             window.krtFetch.swap({
                 url: '/admin/mission-data?' + missionFilterParams(),
                 container: '#' + sectionId,
@@ -507,4 +542,43 @@ if (window.krtFetch) {
     wireFilter('includeInactiveSquadrons', 'squadrons-results');
     wireFilter('includeInactiveJobTypes', 'jobtypes-results');
     wireFilter('includeInactiveFrequencyTypes', 'freqtypes-results');
+
+    // On load, reconcile the saved toggles with the server-rendered checkboxes (REQ-UI-017).
+    // Explicit includeInactive* query params (deep link / the no-JS GET forms) win and are
+    // re-persisted from the server-checked boxes. Otherwise every checkbox is set FIRST — so each
+    // replayed handler sends the full three-param state — and then the EXISTING change handler
+    // above fires once per section that actually differs (there is no combined all-sections
+    // swap, so a differing section costs exactly one fragment swap).
+    (function () {
+        const toggles = [
+            { id: 'includeInactiveSquadrons', pref: 'squadrons' },
+            { id: 'includeInactiveJobTypes', pref: 'jobTypes' },
+            { id: 'includeInactiveFrequencyTypes', pref: 'frequencyTypes' },
+        ];
+        if (!document.getElementById(toggles[0].id)) {
+            return;
+        }
+        if (
+            /[?&]includeInactive(Squadrons|JobTypes|FrequencyTypes)=/.test(window.location.search)
+        ) {
+            persistMissionFilters();
+            return;
+        }
+        const saved = readMissionFilterPref();
+        if (saved === null) {
+            return;
+        }
+        const changed = [];
+        toggles.forEach(function (toggle) {
+            const el = document.getElementById(toggle.id);
+            const want = saved[toggle.pref] === true;
+            if (el && el.checked !== want) {
+                el.checked = want;
+                changed.push(el);
+            }
+        });
+        changed.forEach(function (el) {
+            el.dispatchEvent(new Event('change'));
+        });
+    })();
 }

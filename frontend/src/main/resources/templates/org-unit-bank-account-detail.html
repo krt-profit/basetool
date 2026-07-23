@@ -583,7 +583,28 @@
     // pager's ?page= history); document-delegated so the handlers survive the swap. No inline on*
     // (CSP).
     (function () {
-        var active = 'history';
+        // Per-user tab persistence (REQ-UI-017): with no URL deeplink (by design, see above) the
+        // active tab is kept in localStorage — keyed per user via main[data-user-id], mirroring
+        // the bank.js storage-key helper — and restored on load through the existing apply()
+        // switch, which clamps an unknown/stale saved key back to the first tab.
+        const tabStorageKey = (function () {
+            const mainEl = document.querySelector('main[data-user-id]');
+            return (
+                'org_unit_bank_account_tab_' +
+                (mainEl ? mainEl.getAttribute('data-user-id') : 'unknown')
+            );
+        })();
+        function readSavedTab() {
+            try { return localStorage.getItem(tabStorageKey); } catch (_e) { return null; }
+        }
+        function writeSavedTab(tab) {
+            try {
+                localStorage.setItem(tabStorageKey, tab);
+            } catch (_e) {
+                /* localStorage unavailable (private mode): the tab simply will not persist. */
+            }
+        }
+        var active = readSavedTab() || 'history';
         function panels() { return document.querySelectorAll('[data-tabpanel]'); }
         function tabs() { return document.querySelectorAll('.tab-nav .tab[data-tab]'); }
         function apply(focus) {
@@ -601,7 +622,7 @@
         }
         document.addEventListener('click', function (e) {
             var t = e.target.closest ? e.target.closest('.tab-nav .tab[data-tab]') : null;
-            if (t) { active = t.getAttribute('data-tab'); apply(); }
+            if (t) { active = t.getAttribute('data-tab'); writeSavedTab(active); apply(); }
         });
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') { return; }
@@ -612,6 +633,7 @@
             var i = ts.indexOf(t);
             var n = (i + (e.key === 'ArrowRight' ? 1 : ts.length - 1)) % ts.length;
             active = ts[n].getAttribute('data-tab');
+            writeSavedTab(active);
             apply(true);
         });
         apply();

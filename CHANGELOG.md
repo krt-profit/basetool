@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Filter bleiben jetzt app-weit pro Browser erhalten.** Alle Auswahl-Filter (Checkboxen, Mehrfachauswahlen, Dropdowns, Umschalter) werden im localStorage gespeichert und beim nächsten Öffnen wiederhergestellt — u. a. Materialbörse, Mein/Globales Lager, Raffinerie-Aufträge, Profitberechnung, Missionen/Operationen („Vergangene anzeigen"), Beförderung, Bank-Freigaben, Bank-Chart-Zeitraum sowie die Admin-Filterseiten. Text-Suchfelder und Datumsbereiche starten bewusst weiterhin frisch (REQ-UI-017, ADR-0120).
+
 ### Fixed
 
 - **Preis-Übersicht: Die gesetzten Filter (Material, System, Loading Dock, Auto Load) bleiben jetzt erhalten.** Bisher setzte jeder Reload — oder das Öffnen am nächsten Tag — alle Filter zurück; die Auswahl wird nun pro Browser im localStorage gespeichert und beim Laden der Seite vor dem ersten Datenabruf wiederhergestellt (REQ-UI-016).

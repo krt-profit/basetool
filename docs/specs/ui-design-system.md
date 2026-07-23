@@ -347,6 +347,61 @@ it to bind.
 on `UserDto` / `UserReferenceDto` and downstream DTOs, the per-feature Thymeleaf templates ·
 **Related:** REQ-FE-011, ADR-0053.
 
+### REQ-UI-017 — Filter selections persist per browser (app-wide convention)
+
+Every **selection-type filter** on a listing/overview surface — checkbox sets, multi-selects,
+dropdown selections, boolean toggles, view-mode/tab choices that act as filters, and preset range
+selectors — is **persisted per browser** in `localStorage` and restored on the next page load, so a
+reload or a visit days later reopens the surface with the last-used selection already applied
+(ADR-0120). Two widget families are **deliberately excluded**: free-text search fields and
+date-range (`from`/`to`) inputs — a silently restored stale search term or week-old date window
+hides data in a way users read as loss; they start fresh on every load.
+
+The mechanics follow the established idiom (REQ-ORDERS-027, REQ-UI-016):
+
+- One JSON object per page under a single storage key; bank surfaces key per user
+  (`<name>_<uid>`), other surfaces per browser. Absence of the key means "no saved preference" —
+  the server-rendered defaults apply.
+- A multi-select dimension whose server default is "no filter" stores all-or-zero checked as
+  `null` = "no filter", so options added later stay included; on restore, stale values are dropped
+  and an entirely stale subset falls back to the page's rendered no-filter default (all checked on
+  the matrix/profit pages, all unchecked on the Lager views — semantically identical). Status
+  queues whose server default is a **subset** (orders, refinery: OPEN+IN_PROGRESS) store the
+  checked list verbatim and collapse only zero-checked to `null`, so an explicit "show everything"
+  choice survives (REQ-ORDERS-027 precedent).
+- The selection is persisted immediately on every change (never debounced with the re-fetch).
+- On load the restored state is applied through the page's **existing** update path exactly once
+  (fragment swap / fetch / guarded `location.replace`), and only when it differs from the rendered
+  default — no hand-rolled parallel fetch paths.
+- Where filters are mirrored to the URL, an **explicit filter query parameter wins** over the
+  stored state and is re-persisted (deeplinks and history navigation stay authoritative).
+- Storage access is guarded so a storage-denying privacy mode degrades to the defaults without
+  breaking the page.
+
+Covered surfaces (beyond the pre-existing REQ-ORDERS-027 orders queue, REQ-UI-016 price matrix,
+bank request-queue/dashboard/org-layout modules and the grouping toggles): Materialbörse (both
+boards: mode/tab, min quality, min amount, sort), Mein Lager + Globales Lager (all multi-selects,
+min quality, personal-only flags, per view), Raffinerie-Aufträge (status + only-mine),
+Profitberechnung (ship + systems), Missionen/Operationen (`showPast`), Meine Bewertungen
+(only-open), Persönliche Blueprints (refinery + craftable toggles), Beförderung verwalten
+(filters/sort/collapse, migrated sessionStorage → localStorage), Bank-Freigaben (view + account /
+employee selection), Bank-Kontodetail chart range (both detail pages) and the Org-Kontodetail tab,
+Admin: Audit-Log event-type (per domain), Missionsdaten + SK include-inactive toggles, and the
+member selection of the personal-inventory/blueprints admin pages.
+
+**Acceptance**
+
+- [ ] Changing any covered selection filter, reloading, and revisiting later restores the widgets
+  and applies the selection to the first data load.
+- [ ] Search fields and date ranges are NOT restored.
+- [ ] An explicit filter query parameter beats the stored state and is re-persisted.
+- [ ] With `localStorage` unavailable every covered page renders with its defaults.
+
+**Enforced by:** `MaterialsOverviewFilterPersistenceE2eTest` (matrix precedent) ·
+`FilterPersistenceE2eTest` (representative sweep surfaces) · code review against ADR-0120 ·
+**Code:** the per-page JS modules listed in ADR-0120 · **Related:** REQ-UI-016, REQ-ORDERS-027,
+ADR-0120.
+
 ## Out of scope
 
 Brand assets/logos themselves (managed in the design skill `assets/`), and the desktop SC

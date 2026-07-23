@@ -23,7 +23,9 @@
     </nav>
 </header>
 
-<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available}">
+<!-- data-user-id keys the per-user localStorage persistence (REQ-UI-017), mirroring the other
+     bank templates (bank-dashboard.html / bank-requests.html). -->
+<main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available},data-user-id=${#authentication.name}">
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="#{bank.grants.title}">Berechtigungen</h1>

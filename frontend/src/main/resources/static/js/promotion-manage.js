@@ -25,14 +25,16 @@
  *   drops the pending queue and re-renders the matrix in place via window.krtFetch.swap
  *   (fragment matrixBody) instead of a full-page reload.
  * - Per-member eligibility-cell swaps once the queue drains, topic collapse/expand with
- *   sessionStorage persistence, search/checkbox filters, a five-mode sort cycle, row selection
+ *   localStorage persistence (REQ-UI-017: collapse state, checkbox filters and the sort mode
+ *   survive the browser session; the member-search text stays unpersisted by design),
+ *   search/checkbox filters, a five-mode sort cycle, row selection
  *   with bulk apply through window.showKrtConfirm, client-side CSV export (UTF-8 BOM so Excel
  *   detects umlauts) and local formatting of the last-evaluated timestamps.
  * - Wiring runs on DOMContentLoaded through window.krtEvents delegation; the krt:swapped
  *   listener restores collapse/sort/filter/selection view state after a matrixBody container
  *   swap and deliberately ignores the id-less per-cell eligibility swaps.
  *
- * The localized MSG_* strings, SORT_LABELS and the sessionStorage key names are defined by the
+ * The localized MSG_* strings, SORT_LABELS and the localStorage key names are defined by the
  * inline Thymeleaf bootstrap block of promotion-manage.html, which executes immediately before
  * this classic script; both tags share th:unless="${isAllSquadronsMode}", so neither runs in
  * all-squadrons mode.
@@ -276,7 +278,7 @@ function pmProcessNextSave() {
 // ----------------------------------------------------------------------
 function pmLoadCollapsedTopics() {
     try {
-        const raw = sessionStorage.getItem(STORAGE_KEY_COLLAPSED);
+        const raw = localStorage.getItem(STORAGE_KEY_COLLAPSED);
         if (!raw) return [];
         const parsed = JSON.parse(raw);
         return Array.isArray(parsed) ? parsed : [];
@@ -286,7 +288,7 @@ function pmLoadCollapsedTopics() {
 }
 function pmSaveCollapsedTopics(ids) {
     try {
-        sessionStorage.setItem(STORAGE_KEY_COLLAPSED, JSON.stringify(ids));
+        localStorage.setItem(STORAGE_KEY_COLLAPSED, JSON.stringify(ids));
     } catch {
         /* ignore */
     }
@@ -370,10 +372,12 @@ function pmGetFilterState() {
         noEvalOnly: !!(noEval && noEval.checked),
     };
 }
+// Persist ONLY the two checkbox filters (REQ-UI-017); the #pm-member-search text filter is
+// deliberately excluded (free text is never persisted).
 function pmSaveFilters() {
     try {
         const f = pmGetFilterState();
-        sessionStorage.setItem(
+        localStorage.setItem(
             STORAGE_KEY_FILTERS,
             JSON.stringify({
                 eligibleOnly: f.eligibleOnly,
@@ -386,7 +390,7 @@ function pmSaveFilters() {
 }
 function pmRestoreFilters() {
     try {
-        const raw = sessionStorage.getItem(STORAGE_KEY_FILTERS);
+        const raw = localStorage.getItem(STORAGE_KEY_FILTERS);
         if (!raw) return;
         const f = JSON.parse(raw);
         const elig = document.getElementById('pm-filter-eligible');
@@ -434,14 +438,14 @@ function pmSetSortMode(mode) {
     const indicator = btn ? btn.querySelector('.pm-sort-indicator') : null;
     if (indicator) indicator.textContent = SORT_LABELS[mode] || SORT_LABELS[0];
     try {
-        sessionStorage.setItem(STORAGE_KEY_SORT, String(mode));
+        localStorage.setItem(STORAGE_KEY_SORT, String(mode));
     } catch {
         /* ignore */
     }
 }
 function pmRestoreSortMode() {
     try {
-        const raw = sessionStorage.getItem(STORAGE_KEY_SORT);
+        const raw = localStorage.getItem(STORAGE_KEY_SORT);
         if (!raw) return 0;
         const m = parseInt(raw, 10);
         return m >= 0 && m <= 4 ? m : 0;

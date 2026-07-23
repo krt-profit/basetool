@@ -23,7 +23,8 @@
  *
  * Fills each eligibility card's progress bar client-side by scraping the already-rendered per-check
  * fraction texts (the aggregate achieved/required pair is not on the DTO), and drives the "only open
- * requirements" checkbox filter through the delegated window.krtEvents bus.
+ * requirements" checkbox filter through the delegated window.krtEvents bus. The toggle persists per
+ * browser in localStorage (REQ-UI-017) and is restored on load.
  *
  * The block carried no Thymeleaf interpolation, so there is no inline bootstrap: the whole script
  * moved here unchanged (its `th:unless="${isAllSquadronsMode}"` gate now rides on the th:src tag).
@@ -85,9 +86,58 @@ function meApplyOpenFilter() {
     });
 }
 
+/*
+ * Per-browser persistence of the "nur offene Voraussetzungen" toggle (REQ-UI-017): one JSON
+ * object {onlyOpen: bool} under a single localStorage key. The filter is pure client-side row
+ * hiding, so the restore just re-checks the box and re-applies the filter — no re-fetch and no
+ * URL involvement. Absent key = no saved preference = the default (unchecked, all rows shown).
+ * Guarded so privacy modes that deny storage degrade to the default instead of breaking.
+ */
+const ME_FILTER_PREF_KEY = 'promotion_my_evaluations_filter';
+
+function meReadFilterPref() {
+    try {
+        const raw = localStorage.getItem(ME_FILTER_PREF_KEY);
+        return raw === null ? null : JSON.parse(raw);
+    } catch (_e) {
+        return null;
+    }
+}
+
+function meWriteFilterPref(value) {
+    try {
+        localStorage.setItem(ME_FILTER_PREF_KEY, JSON.stringify(value));
+    } catch (_e) {
+        /* storage unavailable */
+    }
+}
+
+function mePersistOpenFilter() {
+    const input = document.getElementById('me-filter-open');
+    if (input) {
+        meWriteFilterPref({ onlyOpen: input.checked });
+    }
+}
+
+function meRestoreOpenFilter() {
+    const input = document.getElementById('me-filter-open');
+    const saved = meReadFilterPref();
+    if (input && saved && typeof saved.onlyOpen === 'boolean') {
+        input.checked = saved.onlyOpen;
+    }
+}
+
+/* Change handler for the toggle: persist the new state, then re-apply the row filter. */
+function meOnOpenFilterChange() {
+    mePersistOpenFilter();
+    meApplyOpenFilter();
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     meFillProgressBars();
+    meRestoreOpenFilter();
+    meApplyOpenFilter();
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
-        window.krtEvents.on('change', 'me-filter-open', meApplyOpenFilter);
+        window.krtEvents.on('change', 'me-filter-open', meOnOpenFilterChange);
     }
 });

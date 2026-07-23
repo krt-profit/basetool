@@ -103,6 +103,65 @@
         });
         renderStaging();
         wireAdminSwap();
+        wireAdminMemberPersistence();
+    }
+
+    /* ------------------------------------------------ admin member persistence */
+
+    // Admin page only (REQ-UI-017): the selected member is kept per browser so reopening
+    // /admin/personal-blueprints returns to the last-inspected member. The picker is a deliberate
+    // full-GET reload (data-trigger="submit-form", see wireAdminSwap above), so the URL always
+    // carries ?userSub= once a member is selected: an explicit param wins and is re-persisted,
+    // and a BARE load with a saved member does a one-time location.replace to ?userSub=<saved> —
+    // loop-safe because the target URL carries the param — so the SERVER seeds the remote-users
+    // combobox with the member's display label (which a client-side restore could not
+    // reconstruct). Guarded on the member picker form, which only the admin page renders, so the
+    // user blueprints page is untouched. NOTE: this requires the module to load on the BARE admin
+    // page too — admin/personal-blueprints.html loads it outside the selected-user block.
+    const ADMIN_USER_PREF_KEY = 'admin_personal_blueprints_user';
+
+    function wireAdminMemberPersistence() {
+        if (!document.querySelector('form.krt-pi-userform [name="userSub"]')) {
+            return;
+        }
+        function persistMember(value) {
+            try {
+                if (value) {
+                    localStorage.setItem(ADMIN_USER_PREF_KEY, JSON.stringify({ userSub: value }));
+                } else {
+                    // Cleared selection = back to the server default (the bare picker).
+                    localStorage.removeItem(ADMIN_USER_PREF_KEY);
+                }
+            } catch (_e) {
+                /* storage unavailable */
+            }
+        }
+        // Persist the pick right away; the data-trigger="submit-form" navigation runs in the same
+        // synchronous change dispatch and the storage write lands before the page unloads.
+        document.addEventListener('change', function (e) {
+            const sel = e.target;
+            if (sel.matches && sel.matches('form.krt-pi-userform [name="userSub"]')) {
+                persistMember(sel.value);
+            }
+        });
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('userSub')) {
+            persistMember(params.get('userSub'));
+            return;
+        }
+        let saved;
+        try {
+            const raw = localStorage.getItem(ADMIN_USER_PREF_KEY);
+            const parsed = raw === null ? null : JSON.parse(raw);
+            saved = parsed && typeof parsed.userSub === 'string' ? parsed.userSub : null;
+        } catch (_e) {
+            saved = null;
+        }
+        if (saved) {
+            window.location.replace(
+                window.location.pathname + '?userSub=' + encodeURIComponent(saved),
+            );
+        }
     }
 
     /**
