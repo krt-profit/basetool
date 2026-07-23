@@ -58,6 +58,36 @@ presentation and trigger no re-fetch.
 `MaterialController.getMaterialMatrixItems`, `MaterialsPageController.getMatrixData`,
 `static/js/materials-matrix.js` · **Issues:** —
 
+### REQ-UI-016 — The matrix filter selection persists per browser
+
+The four filter dimensions of REQ-UI-014 (material names, star-system names, has-loading-dock,
+is-auto-load) are **persisted per browser** in `localStorage` (single key
+`materials_matrix_filters`, one JSON object) and restored into the filter widgets **before the
+initial fetch**, so a reload — or a visit days later — reopens the matrix with the last-used
+selection already applied; the first data request carries it. The persistence follows the
+established orders-queue filter idiom (REQ-ORDERS-027): a multi-select dimension with all (or
+zero) options checked is stored as `null` = "no filter", so options added to the catalogue later
+are included automatically; absence of the key means "no saved preference" (server-rendered
+defaults: everything checked, booleans off). On restore, saved values whose option no longer
+exists are dropped; a saved subset none of whose values still exist falls back to the "all"
+default. The preference is a pure client-side concern — nothing is stored server-side, and a
+storage-denying privacy mode degrades to the defaults without breaking the page (same guard as
+REQ-UI-010). The select-all checkbox and the dropdown header text ("Alle …" / "N ausgewählt")
+are synchronised with the restored state.
+
+**Acceptance**
+
+- [ ] Changing any filter persists the whole selection immediately (not debounced with the
+  re-fetch); a reload restores the widgets and the restored selection is applied to the first
+  `GET /materials/overview/data` request.
+- [ ] A dimension left at "all" is stored as `null` and keeps newly added options included.
+- [ ] Stale saved values are dropped; an entirely stale subset falls back to "all"; with
+  `localStorage` unavailable the page renders with the defaults.
+
+**Enforced by:** `MaterialsOverviewFilterPersistenceE2eTest` (boolean filters + grouping survive a
+reload; multi-select subset restored where catalogue data exists) · **Code:**
+`static/js/materials-matrix.js` · **Issues:** —
+
 ### REQ-UI-015 — The detail price list is the complete list across all pages
 
 `GET /materials/{id}` renders the material's price-per-terminal table as the **complete** list of

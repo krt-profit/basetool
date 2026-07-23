@@ -14,6 +14,8 @@
  * parameters and re-renders. This replaced an in-memory filter over a single clamped fetch, which
  * silently dropped material×terminal cells once the universe exceeded the backend page-size clamp.
  * A stale-response guard (fetchToken) discards out-of-order responses from rapid filter changes.
+ * The filter selection is persisted per browser in localStorage (REQ-UI-016) and restored before
+ * the initial fetch, so a reload or a later visit reopens the page with the last-used filters.
  * The category-grouping toggle and the collapse/expand of a category are pure presentation and stay
  * client-side (no re-fetch). Columns are NOT virtualized (terminals are bounded by the game
  * universe and rendered in full per visible row); the unbounded dimension is the material rows,
@@ -69,6 +71,7 @@
     const BUFFER = 8; // extra rows rendered above and below the viewport
     const collapsed = {}; // kind -> true when its rows are hidden
     const GROUP_PREF_KEY = 'materials_matrix_group_by_category';
+    const FILTER_PREF_KEY = 'materials_matrix_filters';
     let grouped = true; // false -> one flat, alphabetically sorted row list with no category headers
 
     let rowHeight = 0; // measured from the first rendered row (uniform via CSS)
@@ -88,8 +91,11 @@
 
     function init() {
         // Bind first so the grouping preference is restored before the initial render and the
-        // filters are live immediately; then load the (unfiltered) grid.
+        // filters are live immediately; restore the saved filter selection into the widgets
+        // (REQ-UI-016) before the initial fetch so the first request already carries it; then
+        // load the grid for that selection.
         bindFilters();
+        restoreFilters();
         fetchGrid();
     }
 
@@ -192,6 +198,92 @@
     function isChecked(id) {
         const el = document.getElementById(id);
         return !!(el && el.checked);
+    }
+
+    // Per-browser persistence of the filter selection (REQ-UI-016), mirroring the orders-queue
+    // filter idiom (REQ-ORDERS-027): one JSON object under a single key, `null` for a multi-select
+    // dimension meaning "no filter" (all options), absence of the key meaning "no saved
+    // preference" (server-rendered defaults). Storing `null` — not the full option list — for an
+    // unfiltered dimension keeps options added to the catalogue later included automatically.
+    // Guarded so privacy modes that deny storage degrade to the defaults instead of breaking.
+    function readFilterPref() {
+        try {
+            const raw = localStorage.getItem(FILTER_PREF_KEY);
+            return raw === null ? null : JSON.parse(raw);
+        } catch (_e) {
+            return null; // corrupt value / storage unavailable: fall back to the defaults
+        }
+    }
+
+    function writeFilterPref(value) {
+        try {
+            localStorage.setItem(FILTER_PREF_KEY, JSON.stringify(value));
+        } catch (_e) {
+            /* storage unavailable */
+        }
+    }
+
+    // Snapshots the current widget state into localStorage. Called on every filter change (via
+    // scheduleRefetch), immediately — persistence is not debounced with the fetch, so even a
+    // change the user navigates away from before the debounce fires is kept.
+    function persistFilters() {
+        writeFilterPref({
+            materials: selectedValues('matCheck'),
+            systems: selectedValues('sysCheck'),
+            loadingDock: isChecked('filterLoadingDock'),
+            autoLoad: isChecked('filterAutoLoad'),
+        });
+    }
+
+    // Applies the saved selection to the filter widgets before the initial fetch. Saved values
+    // whose option no longer exists are dropped silently; a saved subset none of whose values
+    // still exist falls back to the "all" default (an all-unchecked widget would confusingly
+    // show a "0 selected" header while the query builder treats it as "no filter" anyway).
+    function restoreFilters() {
+        const saved = readFilterPref();
+        if (!saved || typeof saved !== 'object') {
+            return;
+        }
+        applySavedSelection('matCheck', 'matAll', 'materialHeader', saved.materials);
+        applySavedSelection('sysCheck', 'sysAll', 'systemHeader', saved.systems);
+        setCheckedById('filterLoadingDock', saved.loadingDock);
+        setCheckedById('filterAutoLoad', saved.autoLoad);
+    }
+
+    function applySavedSelection(className, allId, headerId, saved) {
+        if (!Array.isArray(saved) || saved.length === 0) {
+            return; // null / absent = no filter — keep the server-rendered "all checked" default
+        }
+        const checks = document.getElementsByClassName(className);
+        let anyChecked = false;
+        let allChecked = true;
+        for (let i = 0; i < checks.length; i++) {
+            const on = saved.indexOf(checks[i].value) >= 0;
+            checks[i].checked = on;
+            if (on) {
+                anyChecked = true;
+            } else {
+                allChecked = false;
+            }
+        }
+        if (!anyChecked) {
+            for (let i = 0; i < checks.length; i++) {
+                checks[i].checked = true;
+            }
+            allChecked = true;
+        }
+        const allBox = document.getElementById(allId);
+        if (allBox) {
+            allBox.checked = allChecked;
+        }
+        updateSelectedText(className, headerId);
+    }
+
+    function setCheckedById(id, value) {
+        const el = document.getElementById(id);
+        if (el && typeof value === 'boolean') {
+            el.checked = value;
+        }
     }
 
     // Per-browser persistence of the category-grouping preference (guarded so privacy modes that
@@ -506,8 +598,10 @@
 
     // Debounces a server re-fetch so dragging through many checkboxes issues one request, not one
     // per click. Each fired fetch carries a fresh token, so an earlier in-flight response that
-    // arrives late is discarded rather than clobbering the newer selection.
+    // arrives late is discarded rather than clobbering the newer selection. The selection is
+    // persisted (REQ-UI-016) on every call, outside the debounce.
     function scheduleRefetch() {
+        persistFilters();
         if (filterTimer) {
             clearTimeout(filterTimer);
         }

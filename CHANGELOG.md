@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Preis-Übersicht: Die gesetzten Filter (Material, System, Loading Dock, Auto Load) bleiben jetzt erhalten.** Bisher setzte jeder Reload — oder das Öffnen am nächsten Tag — alle Filter zurück; die Auswahl wird nun pro Browser im localStorage gespeichert und beim Laden der Seite vor dem ersten Datenabruf wiederhergestellt (REQ-UI-016).
+
 ## [v1.5.14](https://github.com/krt-profit/basetool/releases/tag/v1.5.14) - 2026-07-23
 
 ### Fixed

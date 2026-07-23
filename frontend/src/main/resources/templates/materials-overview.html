@@ -41,7 +41,9 @@
           and returns only the matching slice. This replaced an in-memory filter over a single
           clamped fetch, which silently dropped cells once the universe exceeded the page-size clamp.
           The option lists themselves span the whole universe (derived server-side in the shell), so
-          narrowing a filter never removes options.
+          narrowing a filter never removes options. The selection is persisted per browser in
+          localStorage and restored before the initial fetch (REQ-UI-016), so it survives reloads
+          and later visits.
         -->
         <div class="filters-container">
             <div class="form-group">
