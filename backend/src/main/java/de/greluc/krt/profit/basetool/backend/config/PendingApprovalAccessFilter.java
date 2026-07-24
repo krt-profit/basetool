@@ -131,7 +131,11 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
         messageSource.getMessage(
             "problem.pending_approval.detail", null, "Account is pending admin approval.", locale);
 
-    log.warn(
+    // Logged at DEBUG, not WARN: a pending user's shell polls several endpoints on every page load,
+    // so an approved-status-pending session emits a steady stream of these 403s — an expected,
+    // self-inflicted condition, not an operational warning. The metric below (not this line) is the
+    // monitoring signal, so dropping to DEBUG does not blind the mass-403 detector.
+    log.debug(
         "Pending-approval user blocked on {} {} [correlationId={}]",
         request.getMethod(),
         request.getRequestURI(),
@@ -141,8 +145,8 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
     // GlobalExceptionHandler, so it never reaches basetool_http_error_total via the advice. Count
     // it
     // here (mirroring IdentityProviderUnavailableFilter) so a converter / approval-sync regression
-    // that mass-403s legitimate users surfaces on PendingApprovalBlockSpike, not only in the WARN
-    // log.
+    // that mass-403s legitimate users surfaces on PendingApprovalBlockSpike, not in the log (which
+    // is now DEBUG for this expected condition).
     meterRegistry
         .counter(MetricNames.HTTP_ERROR, MetricNames.TAG_CODE, CODE_PENDING_APPROVAL)
         .increment();

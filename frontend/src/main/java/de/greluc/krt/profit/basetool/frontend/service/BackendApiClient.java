@@ -509,6 +509,17 @@ public class BackendApiClient {
           parsed.getCorrelationId(),
           parsed.getProblemDetail(),
           parsed.getFieldErrors());
+    } else if (BackendServiceException.CODE_PENDING_APPROVAL.equals(parsed.getProblemCode())) {
+      // Expected, high-frequency 403: a pending-approval session polls several endpoints on every
+      // page load. Log at DEBUG so it does not flood the client-error log (mirrors the backend
+      // PendingApprovalAccessFilter). The backend-4xx metric below is unaffected.
+      log.debug(
+          "Backend client error on {} {}: status={}, code={}, correlationId={}",
+          method,
+          uri,
+          parsed.getStatusCode(),
+          parsed.getProblemCode(),
+          parsed.getCorrelationId());
     } else {
       log.warn(
           "Backend client error on {} {}: status={}, code={}, correlationId={}, detail={},"

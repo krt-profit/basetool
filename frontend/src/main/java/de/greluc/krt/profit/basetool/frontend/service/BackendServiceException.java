@@ -54,6 +54,14 @@ public class BackendServiceException extends RuntimeException {
   /** The backend did not respond within the configured timeout. */
   public static final String CODE_BACKEND_TIMEOUT = "BACKEND_TIMEOUT";
 
+  /**
+   * The caller is authenticated but their registration is still pending admin approval. An
+   * expected, self-inflicted 403 the pending user's shell polls on every page load — logged at
+   * DEBUG rather than WARN so it does not flood the client-error log (mirrors the backend {@code
+   * PendingApprovalAccessFilter}).
+   */
+  public static final String CODE_PENDING_APPROVAL = "PENDING_APPROVAL";
+
   private final int statusCode;
   private final @NotNull String problemCode;
   private final @Nullable String correlationId;
