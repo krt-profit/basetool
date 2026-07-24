@@ -97,7 +97,9 @@
                     <th th:text="#{bank.request.col.requester}">Antragsteller</th>
                     <th th:text="#{bank.request.col.status}">Status</th>
                     <th th:text="#{bank.request.col.created}">Erstellt</th>
-                    <th th:text="#{bank.request.col.actions}">Aktionen</th>
+                    <!-- "Entscheidung", not "Aktionen": the cell only carries confirm/reject while the
+                         request is PENDING; on a decided request it shows who decided it. -->
+                    <th th:text="#{bank.request.col.decision}">Entscheidung</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -131,13 +133,18 @@
                               th:classappend="${r.status() == 'REJECTED' or r.status() == 'CANCELLED'} ? ' chip--muted' : ''"
                               th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
                         <!-- Over-limit marker (REQ-BANK-041): flags a request that needs the
-                             responsible holder's approval; a chip once it has been granted. -->
+                             responsible holder's approval; a chip once it has been granted. The
+                             ungranted marker is deliberately status-neutral ("&Uuml;ber Limit") and only
+                             warning-toned while the request is still PENDING: on a decided request the
+                             approval either happened out-of-band (employee checkbox) or is moot, so a
+                             "Freigabe n&ouml;tig" call to action would be plain wrong there. -->
                         <span th:if="${r.requiresOwnerApproval() and r.ownerApprovalGranted()}"
                               class="chip chip--success" data-testid="bank-request-approval-granted"
                               th:text="#{bank.approvalLimit.granted}">Freigegeben</span>
                         <span th:if="${r.requiresOwnerApproval() and !r.ownerApprovalGranted()}"
-                              class="chip chip--warning" data-testid="bank-request-approval-pending"
-                              th:text="#{bank.approvalLimit.needsApproval}">Freigabe n&ouml;tig</span>
+                              class="chip" data-testid="bank-request-approval-pending"
+                              th:classappend="${r.status() == 'PENDING'} ? ' chip--warning' : ' chip--muted'"
+                              th:text="#{bank.approvalLimit.overLimit}">&Uuml;ber Limit</span>
                     </td>
                     <td><span class="utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span></td>
                     <td>
