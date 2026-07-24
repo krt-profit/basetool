@@ -181,6 +181,12 @@ x-keycloak: &keycloak-template
     KC_HOSTNAME: keycloak.profit-base.online
     KC_HOSTNAME_STRICT: "true"
     KC_HEALTH_ENABLED: "true"
+    # Keep the root log level at INFO but mute io.vertx.core.net.impl.ConnectionBase, which logs an
+    # empty-message ERROR (<missing-log-message>) on every abrupt client TCP reset (browser closed
+    # mid-request, scanner, keep-alive drop). These carry no diagnostic value yet surface at ERROR
+    # in Loki (app=keycloak-stdout) and can trip the ERROR-spike alerting. Format is
+    # `<root>,<category>:<level>`; applies to both the console and file handlers.
+    KC_LOG_LEVEL: "info,io.vertx.core.net.impl.ConnectionBase:off"
     KC_HTTP_ENABLED: "true"
     KC_HTTP_PORT: 18080
     # Keystore password for the prod HTTPS connector. The `keycloak` (prod) service's command

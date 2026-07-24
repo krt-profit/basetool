@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Monitoring: Der `JobOrderStale`-Alert schlägt jetzt erst nach 180 Tagen an (vorher 30).** Lang laufende Aufträge sind bei der aktuellen Org-Kadenz normal; `RefineryOrderStale`/`OperationStale` bleiben bei 30 Tagen (REQ-OBS-005).
+
+### Fixed
+
+- **Log-Hygiene: Anmeldungen mit noch nicht freigeschaltetem Konto fluten das Log nicht mehr.** Die erwarteten `PENDING_APPROVAL`-403 (die Shell eines wartenden Nutzers pollt mehrere Endpunkte pro Seitenaufruf) werden in Backend und Frontend jetzt auf DEBUG statt WARN geloggt; die Metrik/der `PendingApprovalBlockSpike`-Alert bleiben unverändert (REQ-OBS-001).
+- **Log-Hygiene: Keycloak protokolliert Verbindungsabbrüche von Clients nicht mehr als ERROR.** `io.vertx.core.net.impl.ConnectionBase` (leere `<missing-log-message>`-ERROR-Zeilen bei abruptem TCP-Reset des Browsers/Scanners) ist per `KC_LOG_LEVEL` stummgeschaltet, damit diese wertlosen Zeilen keine ERROR-Spike-Alerts auslösen.
+
 ## [v1.5.15](https://github.com/krt-profit/basetool/releases/tag/v1.5.15) - 2026-07-23
 
 ### Changed
