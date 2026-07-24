@@ -1603,6 +1603,15 @@ sees an explicit warning in the confirmation dialog and must tick a mandatory
 request can be confirmed; ticking it is audited (`BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED`). A
 flagged request cannot be confirmed without the checkbox (`BANK_OWNER_APPROVAL_REQUIRED`, 409).
 
+**Queue markers (`/bank/requests`).** A flagged request carries a second chip next to its status: a
+success chip **"Freigegeben"** once the holder granted approval in-app, otherwise the status-neutral
+**"Über Limit"** marker — warning-toned while the request is `PENDING`, muted once it is decided. The
+marker is deliberately *not* a "Freigabe nötig" call to action: a confirmed request whose approval
+came from the employee checkbox alone (step (2) without step (1)) keeps `owner_approval_granted =
+false` forever, so an action-worded chip would still demand an approval that is long settled. The
+queue's last column is headed **"Entscheidung"** rather than "Aktionen" for the same reason — it holds
+the confirm/reject buttons only while the request is `PENDING` and otherwise names the decider.
+
 The two approval acts (holder in-app grant, employee checkbox) are on **different surfaces seen by
 different users**, so they are outside the same-surface peer-sync scope (REQ-FE-010 live multi-user
 is Mission-only). An out-of-band grant/revoke bumps the request's `@Version`; an already-open

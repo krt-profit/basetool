@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Bank-Anträge: Die letzte Spalte heißt jetzt „Entscheidung" statt „Aktionen", und der Über-Limit-Marker heißt „Über Limit" statt „Freigabe nötig".** Die Spalte zeigt nur bei offenen Anträgen Buttons, sonst die Person, die entschieden hat; der Marker wirkte auf bereits bestätigten Anträgen wie eine noch offene Aufgabe und ist dort jetzt zusätzlich grau statt gelb (REQ-BANK-041).
+
 - **Monitoring: Der `JobOrderStale`-Alert schlägt jetzt erst nach 180 Tagen an (vorher 30).** Lang laufende Aufträge sind bei der aktuellen Org-Kadenz normal; `RefineryOrderStale`/`OperationStale` bleiben bei 30 Tagen (REQ-OBS-005).
 
 ### Fixed
