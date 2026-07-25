@@ -268,19 +268,23 @@ services:
     # set right on the 90% line and ContainerWorkingSetHigh fired chronically (2026-07-15).
     #
     # 2026-07-25: 384M/300MiB ALSO paged, and the reason is an arithmetic error worth spelling out —
-    # the "~78% of the limit" rule above sizes GOMEMLIMIT as a pure RATIO, but the off-heap overhead it
-    # has to leave room for is an ABSOLUTE ~35 MB (file-tailer page cache + not-yet-reclaimed MADV_FREE
-    # pages), not a proportional slice. At a 384M limit that is another ~9%, so 78% + 9% = ~87% sat only
-    # 3 points under the alert and any transient tipped it over (observed >90% sustained). Size it as a
-    # BUDGET instead: working_set ~= GOMEMLIMIT + ~35 MB must land <= ~85% of the limit. 512M with
-    # GOMEMLIMIT 400MiB gives 78% + 6.8% = ~85% — better than 384M but still thin, so this deliberately
-    # undershoots the 400MiB the 2026-07-15 note suggested: 384MiB is 75.0% of 512M, and 75.0% + 6.8%
-    # = ~82%, an 8-point margin under the 90% line. Note GOMEMLIMIT is a SOFT ceiling the Go GC only
-    # reaches if the live heap demands it (GOGC targets 2x live first), so raising it does not force
-    # Alloy to consume it. When changing the limit, re-derive from the budget above — do NOT just
-    # re-apply a percentage.
+    # the "~78% of the limit" rule above sizes GOMEMLIMIT as a pure RATIO, but the non-Go overhead it
+    # has to leave room for is an ABSOLUTE constant, not a proportional slice. Measured on prod:
+    # working set 347 MiB while GOMEMLIMIT was 300 MiB, so that overhead is ~47 MiB — another ~12% at a
+    # 384M limit, which is why 78% + 12% = 90% parked Alloy exactly ON the alert line (observed >90%
+    # sustained, and 90.4% at the 2026-07-25T02:00Z snapshot).
+    #
+    # Size it as a BUDGET, the same way the three app JVMs are sized (see the JVM CONTAINER SIZING
+    # block in docker-compose.yml): working_set ~= GOMEMLIMIT + 47 MiB must land <= ~80% of the limit.
+    # At 512M that gives GOMEMLIMIT <= 363 MiB, hence 360MiB -> 407 MiB = ~80%. This deliberately
+    # undershoots the "512M / 400MiB" the 2026-07-15 note suggested, which lands at ~87% and would have
+    # left only 3 points of margin — the very mistake being fixed here. 360MiB still relieves the Go
+    # runtime by ~20% over the 300MiB it is currently GC-pinned at. GOMEMLIMIT is a SOFT ceiling the GC
+    # only reaches if the live heap demands it (GOGC targets 2x live first), so raising it does not
+    # force Alloy to consume it. When changing the limit, re-derive from the budget — never re-apply a
+    # percentage.
     environment:
-      GOMEMLIMIT: "384MiB"
+      GOMEMLIMIT: "360MiB"
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
@@ -305,11 +309,12 @@ services:
           # so it kept riding >90% of 256M and tripped ContainerWorkingSetHigh (2026-07-15). The 384M
           # follow-up did NOT hold: it paged again 2026-07-24/25 with no new Alloy workload since (the
           # only config change was a `stage.drop`), i.e. Alloy was GC-pinned AT its 300MiB GOMEMLIMIT and
-          # the constant off-heap overhead pushed the total over the 90% line. See the GOMEMLIMIT comment
-          # above for the budget arithmetic that replaces the old percentage rule; 512M/384MiB targets a
-          # ~82% working set. If this recurs a THIRD time with no added workload, stop bumping and treat
-          # it as an Alloy-side leak (check for loki.source.docker tailer-reconnect churn:
-          # "could not transfer logs: unexpected EOF") rather than a sizing shortfall.
+          # the constant ~47 MiB non-Go overhead pushed the total onto the 90% line. See the GOMEMLIMIT
+          # comment above for the measured budget arithmetic that replaces the old percentage rule;
+          # 512M/360MiB targets a ~80% working set. If this recurs a THIRD time with no added workload,
+          # stop bumping and treat it as an Alloy-side leak (check for loki.source.docker
+          # tailer-reconnect churn: "could not transfer logs: unexpected EOF") rather than a sizing
+          # shortfall.
           memory: 512M
           pids: 512
     networks:
