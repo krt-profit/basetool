@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Lager einbuchen: Bei genau einem zugeordneten Einsatz bzw. Auftrag muss die Menge nicht mehr eingetippt werden.** Bleibt das Mengenfeld der einzigen Zuordnung leer, wird die gesamte Menge des Eintrags dieser Zuordnung zugewiesen — pro Dimension unabhängig. Erst ab zwei Zuordnungen sind die Mengen wieder explizit anzugeben; eine eingetragene Menge hat immer Vorrang (REQ-INV-027).
+
 - **Raffinerie: Im Einlager-Dialog lässt sich jede Ausgabezeile direkt als persönlicher Eintrag einlagern.** Bisher landete Raffinerie-Ausbeute immer im geteilten Staffelbestand und musste anschließend über „Mein Lager" umgebucht werden. Persönliche Zeilen tragen keine Zuordnung: Die Kombination mit einem Auftrag wird abgelehnt (der Auftrags-Selektor wird bei gesetztem Haken gesperrt), und die Mission des Raffinerieauftrags wird für diese Zeile nicht vermerkt (REQ-INV-035).
 
 ## [v1.5.16](https://github.com/krt-profit/basetool/releases/tag/v1.5.16) - 2026-07-25

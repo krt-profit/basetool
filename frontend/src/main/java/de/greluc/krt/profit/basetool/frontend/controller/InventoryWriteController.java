@@ -238,8 +238,8 @@ public class InventoryWriteController {
         form.getJobOrderId(),
         form.getOwningOrgUnitId(),
         itemMode ? Boolean.FALSE : form.getMergeStock(),
-        toAllocationInputs(form.getJobOrderAllocations()),
-        itemMode ? List.of() : toAllocationInputs(form.getMissionAllocations()));
+        toAllocationInputs(form.getJobOrderAllocations(), form.getAmount()),
+        itemMode ? List.of() : toAllocationInputs(form.getMissionAllocations(), form.getAmount()));
   }
 
   /**
@@ -256,24 +256,43 @@ public class InventoryWriteController {
     }
     return form.getJobOrderId() != null
         || form.getMissionId() != null
-        || !toAllocationInputs(form.getJobOrderAllocations()).isEmpty()
-        || !toAllocationInputs(form.getMissionAllocations()).isEmpty();
+        || !toAllocationInputs(form.getJobOrderAllocations(), form.getAmount()).isEmpty()
+        || !toAllocationInputs(form.getMissionAllocations(), form.getAmount()).isEmpty();
   }
 
   /**
    * Maps the create form's split-at-check-in rows to the backend allocation-input list
-   * (REQ-INV-027, R4), dropping incomplete rows (a target or amount the user left blank).
+   * (REQ-INV-027, R4), dropping rows without a target and rows whose amount the user left blank.
+   *
+   * <p>Single-target shorthand: when a dimension names <strong>exactly one</strong> target and its
+   * amount is blank, the whole entry amount is earmarked to it — assigning a book-in to one order /
+   * mission is the common case and needs no amount typed twice. The shorthand deliberately does
+   * <em>not</em> extend to several targets: with two or more rows there is no unambiguous split, so
+   * each amount must be entered and a blank row is dropped as before. A blank amount with no usable
+   * entry amount (missing / non-positive — the {@code @NotNull} {@code @Min(0)} bind error already
+   * rejects the submit) yields no allocation, and an explicitly entered non-positive amount is
+   * forwarded unchanged so the backend's {@code @Positive} keeps rejecting it.
    *
    * @param rows the bound allocation rows; may be {@code null}.
-   * @return the non-blank allocation inputs; never {@code null}.
+   * @param entryAmount the amount of the entry being booked in, used by the single-target
+   *     shorthand; may be {@code null}.
+   * @return the resolved allocation inputs; never {@code null}.
    */
   private static List<InventoryAllocationInput> toAllocationInputs(
-      List<InventoryForm.AllocationRow> rows) {
+      List<InventoryForm.AllocationRow> rows, Double entryAmount) {
     if (rows == null) {
       return List.of();
     }
-    return rows.stream()
-        .filter(row -> row != null && row.getTargetId() != null && row.getAmount() != null)
+    List<InventoryForm.AllocationRow> targeted =
+        rows.stream().filter(row -> row != null && row.getTargetId() != null).toList();
+    if (targeted.size() == 1 && targeted.getFirst().getAmount() == null) {
+      if (entryAmount == null || entryAmount <= 0d) {
+        return List.of();
+      }
+      return List.of(new InventoryAllocationInput(targeted.getFirst().getTargetId(), entryAmount));
+    }
+    return targeted.stream()
+        .filter(row -> row.getAmount() != null)
         .map(row -> new InventoryAllocationInput(row.getTargetId(), row.getAmount()))
         .toList();
   }

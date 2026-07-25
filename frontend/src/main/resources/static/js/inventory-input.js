@@ -25,7 +25,9 @@
  * step + hint) and drives the Variante-C split-at-check-in rows (REQ-INV-027, R4) — repeatable
  * job-order / mission allocation rows cloned from hidden templates and bound as indexed form params
  * (jobOrderAllocations[i].targetId / .amount), each order row filtered to the chosen material, with
- * an over-allocation hint and a personal-toggle that clears/hides the sections.
+ * an over-allocation hint and a personal-toggle that clears/hides the sections. A dimension naming
+ * exactly one target may leave its amount blank — the write controller then earmarks the whole entry
+ * amount to it; the per-dimension shorthand hint is hidden as soon as a second target is named.
  * Second (an IIFE): the #577 in-place book-into-inventory submit through krtFetch.submitForm —
  * navigate-after-AJAX on success, a code-specific inline error toast on failure; the classic
  * POST->redirect stays the no-JS fallback. Both former blocks always render, so they are combined
@@ -243,13 +245,36 @@ function allocConfig(dimension) {
               template: 'jobOrderRowTemplate',
               prefix: 'jobOrderAllocations',
               group: 'jobOrderAllocGroup',
+              singleHint: 'jobOrderAllocSingleHint',
           }
         : {
               rows: 'missionAllocRows',
               template: 'missionRowTemplate',
               prefix: 'missionAllocations',
               group: 'missionAllocGroup',
+              singleHint: 'missionAllocSingleHint',
           };
+}
+
+// Counts a dimension's target-carrying rows — the same "how many targets did the user name?" the
+// write controller's single-target shorthand keys on, so the client hint and the server default
+// agree. A freshly added, not-yet-picked row carries no target and does not count.
+function allocTargetedRows(dimension) {
+    return Array.prototype.filter.call(
+        document.querySelectorAll('#' + allocConfig(dimension).rows + ' [data-alloc-target]'),
+        function (select) {
+            return !!select.value;
+        },
+    );
+}
+
+// The single-target shorthand only applies while a dimension names at most one target (the write
+// controller then earmarks the whole entry amount to it); with two or more targets every amount has
+// to be typed, so the hint would be wrong and is hidden.
+function updateAllocSingleHint(dimension) {
+    const hint = document.getElementById(allocConfig(dimension).singleHint);
+    if (!hint) return;
+    hint.classList.toggle('krtm-hidden', allocTargetedRows(dimension).length > 1);
 }
 
 // Renumbers a dimension's rows so the indexed form params stay contiguous (Spring binding needs no
@@ -311,6 +336,10 @@ function filterOrderSelects(catalogId) {
         }
         if (select.selectedIndex > 0 && !hasSelectedValid) select.value = '';
     });
+    // Clearing an incompatible selection above fires no `change`, so the Σ / over-warning and the
+    // single-target hint have to be recomputed here — otherwise switching the material silently
+    // leaves both reading the dropped order row.
+    updateAllocOver();
 }
 
 // Sums a dimension's entered allocation amounts.
@@ -326,8 +355,15 @@ function allocDimensionSum(dimension) {
 }
 
 // Shows the over-allocation warning when either dimension's Σ exceeds the entry amount (the backend
-// enforces the same R5 rule with a 422).
+// enforces the same R5 rule with a 422), and refreshes both single-target shorthand hints — this is
+// the one place every add / remove / target-change / amount-change already routes through.
+//
+// A blank amount under the shorthand needs no special casing here: it resolves to the entry amount
+// server-side, which by definition never exceeds itself, so counting it as 0 reaches the same
+// verdict.
 function updateAllocOver() {
+    updateAllocSingleHint('jobOrder');
+    updateAllocSingleHint('mission');
     const overEl = document.getElementById('inputAllocOver');
     if (!overEl) return;
     const amountEl = document.getElementById('amount');

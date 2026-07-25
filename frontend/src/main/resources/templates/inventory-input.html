@@ -186,10 +186,13 @@
                 <!-- Variante C (REQ-INV-027, R4): split at check-in — assign the new stock to several
                      job orders / missions with their own amounts. inventory-input.js clones a row
                      from the hidden template and binds it as indexed params the FormData submit
-                     carries; an empty section falls back to no assignment. -->
+                     carries; an empty section falls back to no assignment. With exactly ONE target
+                     row the amount may stay blank — the write controller then earmarks the entry's
+                     whole amount to it (single-target shorthand); the hint states that. -->
                 <div class="form-group" id="jobOrderAllocGroup">
                     <label th:text="#{inventory.input.orders.label}">Aufträge zuordnen (optional)</label>
                     <div id="jobOrderAllocRows" data-alloc-rows="jobOrder"></div>
+                    <p class="form-hint" id="jobOrderAllocSingleHint" th:text="#{inventory.input.alloc.single}">Bei genau einer Zuordnung kann die Menge leer bleiben - dann wird die gesamte Menge zugeordnet.</p>
                     <button type="button" class="btn btn-ghost" data-trigger="inv-input-add-order" th:text="#{inventory.assoc.add.order}">+ Auftrag</button>
                     <template id="jobOrderRowTemplate">
                         <div class="flex-gap-sm mb-1" data-alloc-row>
@@ -212,6 +215,7 @@
                 <div class="form-group" id="missionAllocGroup">
                     <label th:text="#{inventory.input.missions.label}">Einsätze zuordnen (optional)</label>
                     <div id="missionAllocRows" data-alloc-rows="mission"></div>
+                    <p class="form-hint" id="missionAllocSingleHint" th:text="#{inventory.input.alloc.single}">Bei genau einer Zuordnung kann die Menge leer bleiben - dann wird die gesamte Menge zugeordnet.</p>
                     <button type="button" class="btn btn-ghost" data-trigger="inv-input-add-mission" th:text="#{inventory.assoc.add.mission}">+ Einsatz</button>
                     <template id="missionRowTemplate">
                         <div class="flex-gap-sm mb-1" data-alloc-row>
