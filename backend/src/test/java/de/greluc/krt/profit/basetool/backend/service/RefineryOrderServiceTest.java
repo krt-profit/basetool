@@ -361,7 +361,7 @@ class RefineryOrderServiceTest {
 
       RefineryOrderStoreItemDto dto =
           new RefineryOrderStoreItemDto(
-              MATERIAL_ID, LOCATION_ID, 500, 10.0, null, null, null, OWNING_OU_ID);
+              MATERIAL_ID, LOCATION_ID, 500, 10.0, null, null, null, OWNING_OU_ID, null);
       refineryOrderService.storeRefineryOrder(
           OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(dto)), false);
 
@@ -609,8 +609,108 @@ class RefineryOrderServiceTest {
   }
 
   // ------------------------------------------------------------------
+  // Personal marker (REQ-INV-035)
+  // ------------------------------------------------------------------
+
+  /**
+   * The store dialog may book an output row into the receiver's private pool instead of the shared
+   * squadron stock. A personal row never carries an allocation: the contradictory per-item job
+   * order is rejected, and the refinery order's automatic mission earmark is not applied.
+   */
+  @Nested
+  class PersonalMarkerTests {
+
+    @Test
+    void storesRowAsPersonal_whenItemSetsTheFlag() {
+      stubLookupsForSingleItem();
+
+      refineryOrderService.storeRefineryOrder(
+          OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(personalItem(true, null))), false);
+
+      ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository, times(1)).save(captor.capture());
+      assertEquals(Boolean.TRUE, captor.getValue().getPersonal());
+    }
+
+    @Test
+    void storesRowAsShared_whenFlagIsNullOrFalse() {
+      // Backward compatibility: an older client omitting the field must keep producing shared
+      // stock.
+      stubLookupsForSingleItem();
+
+      refineryOrderService.storeRefineryOrder(
+          OWNER_ID,
+          ORDER_ID,
+          new RefineryOrderStoreDto(List.of(personalItem(null, null), personalItem(false, null))),
+          false);
+
+      ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository, times(2)).save(captor.capture());
+      assertTrue(
+          captor.getAllValues().stream().noneMatch(i -> Boolean.TRUE.equals(i.getPersonal())));
+    }
+
+    @Test
+    void rejectsPersonalCombinedWithAJobOrder_andWritesNothing() {
+      lenient().when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      lenient().when(materialRepository.findById(MATERIAL_ID)).thenReturn(Optional.of(material));
+      lenient().when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(location));
+
+      RefineryOrderStoreDto dto =
+          new RefineryOrderStoreDto(List.of(personalItem(true, JOB_ORDER_ID)));
+
+      de.greluc.krt.profit.basetool.backend.exception.BadRequestException ex =
+          assertThrows(
+              de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+              () -> refineryOrderService.storeRefineryOrder(OWNER_ID, ORDER_ID, dto, false));
+
+      assertEquals("Personal items cannot be assigned to a mission or job order", ex.getMessage());
+      verify(inventoryItemRepository, never()).save(any());
+      verify(refineryOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void dropsTheOrdersMissionEarmark_onAPersonalRow_butKeepsItOnASharedOne() {
+      // The mission earmark is derived from the order, not picked per item — marking the batch
+      // personal is precisely the act of taking it out of the mission pool, so the personal row
+      // carries no mission slice while a shared row in the same call still does.
+      de.greluc.krt.profit.basetool.backend.model.Mission mission =
+          new de.greluc.krt.profit.basetool.backend.model.Mission();
+      mission.setId(UUID.randomUUID());
+      order.setMission(mission);
+      stubLookupsForSingleItem();
+
+      refineryOrderService.storeRefineryOrder(
+          OWNER_ID,
+          ORDER_ID,
+          new RefineryOrderStoreDto(List.of(personalItem(true, null), personalItem(false, null))),
+          false);
+
+      ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository, times(2)).save(captor.capture());
+      InventoryItem personalRow = captor.getAllValues().get(0);
+      InventoryItem sharedRow = captor.getAllValues().get(1);
+      assertTrue(personalRow.getMissionAllocations().isEmpty());
+      assertEquals(1, sharedRow.getMissionAllocations().size());
+    }
+  }
+
+  // ------------------------------------------------------------------
   // Helpers
   // ------------------------------------------------------------------
+
+  /**
+   * Builds a store item for the default material/location carrying the given personal marker and
+   * optional job-order pick.
+   *
+   * @param personal the personal marker to send ({@code null} exercises the omitted-field default)
+   * @param jobOrderId the job order to earmark, or {@code null} for none
+   * @return the store item DTO
+   */
+  private static RefineryOrderStoreItemDto personalItem(Boolean personal, UUID jobOrderId) {
+    return new RefineryOrderStoreItemDto(
+        MATERIAL_ID, LOCATION_ID, 500, 10.0, null, jobOrderId, null, null, personal);
+  }
 
   /**
    * Stubs the repositories required by a single-item store call where the item references the
@@ -631,7 +731,7 @@ class RefineryOrderServiceTest {
 
     RefineryOrderStoreItemDto dto =
         new RefineryOrderStoreItemDto(
-            material.getId(), LOCATION_ID, 500, amount, null, null, null, null);
+            material.getId(), LOCATION_ID, 500, amount, null, null, null, null, null);
     refineryOrderService.storeRefineryOrder(
         OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(dto)), false);
   }
@@ -647,7 +747,7 @@ class RefineryOrderServiceTest {
   private static RefineryOrderStoreItemDto itemWithAmount(
       double amount, String note, UUID userId, UUID jobOrderId) {
     return new RefineryOrderStoreItemDto(
-        MATERIAL_ID, LOCATION_ID, 500, amount, userId, jobOrderId, note, null);
+        MATERIAL_ID, LOCATION_ID, 500, amount, userId, jobOrderId, note, null, null);
   }
 
   private static Material newMaterial(QuantityType type) {

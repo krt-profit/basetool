@@ -612,11 +612,18 @@ public class RefineryOrderService {
    * configured recipient (typically the order's owner, optionally redirected to a different user /
    * job order from the store form).
    *
+   * <p>A row the store form marks {@code personal} (REQ-INV-035) lands as the receiver's private
+   * stock and, per the standing "personal stock carries no allocation" invariant ({@code
+   * InventoryItemService#assertNotPersonal}), receives <strong>no</strong> earmark: the per-item
+   * job order is a contradictory user choice and is rejected with a {@code BadRequestException},
+   * while the refinery order's automatic mission earmark is simply not applied (marking the batch
+   * personal is exactly the act of taking it out of the mission pool).
+   *
    * @throws AccessDeniedException when the caller is neither owner nor logistician
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the order or any
    *     referenced id is unknown
    * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the order is
-   *     already stored or has no output goods
+   *     already stored, has no output goods, or an item combines {@code personal} with a job order
    */
   @Transactional
   public void storeRefineryOrder(
@@ -670,6 +677,17 @@ public class RefineryOrderService {
         assignee = order.getOwner();
       }
 
+      // REQ-INV-035: the store dialog may mark an output row as the receiver's private stock. A
+      // personal row never carries an allocation (the standing assertNotPersonal invariant), so the
+      // contradictory per-item job-order pick is rejected rather than silently dropped — mirroring
+      // the Einbuchen (InventoryItemService#createInventoryItem) and item-production book-in
+      // guards.
+      final boolean personal = Boolean.TRUE.equals(itemDto.personal());
+      if (personal && itemDto.jobOrderId() != null) {
+        throw new de.greluc.krt.profit.basetool.backend.exception.BadRequestException(
+            "Personal items cannot be assigned to a mission or job order");
+      }
+
       de.greluc.krt.profit.basetool.backend.model.JobOrder jobOrder = null;
       if (itemDto.jobOrderId() != null) {
         jobOrder =
@@ -715,14 +733,17 @@ public class RefineryOrderService {
       item.setQuality(itemDto.quality());
       item.setAmount(InventoryItem.roundToScuScale(itemDto.amount()));
       item.setNote(incomingNote);
+      item.setPersonal(personal);
       // Variante C (REQ-INV-027): the deposited row earmarks its full amount to the order it was
       // refined for and to the refinery order's mission (each as one allocation); an unset
       // dimension
-      // stays empty.
+      // stays empty. A personal row (REQ-INV-035) takes neither: the job-order pick was already
+      // rejected above, and the order's mission earmark is dropped because marking the batch
+      // personal is precisely the act of taking it out of the mission pool.
       if (jobOrder != null) {
         InventoryAllocations.addJobOrder(item, jobOrder, item.getAmount(), false);
       }
-      if (order.getMission() != null) {
+      if (!personal && order.getMission() != null) {
         InventoryAllocations.addMission(item, order.getMission(), item.getAmount());
       }
 
@@ -740,6 +761,7 @@ public class RefineryOrderService {
               .with("material", mat.getName())
               .with("amount", item.getAmount())
               .with("q", itemDto.quality())
+              .with("personal", personal)
               .with("jobOrder", jobOrder != null ? "#" + jobOrder.getDisplayId() : "-"));
 
       // Write the adjusted amount back into the refinery order so that the

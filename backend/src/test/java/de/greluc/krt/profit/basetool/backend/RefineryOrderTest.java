@@ -512,6 +512,7 @@ class RefineryOrderTest {
             user1.getId(),
             null,
             null,
+            null,
             null);
     RefineryOrderStoreDto storeDto = new RefineryOrderStoreDto(java.util.List.of(itemDto));
 
@@ -572,6 +573,7 @@ class RefineryOrderTest {
             user1.getId(),
             null,
             "Charge A - Tagesproduktion",
+            null,
             null);
     RefineryOrderStoreDto storeDto = new RefineryOrderStoreDto(java.util.List.of(itemDto));
 
@@ -627,7 +629,7 @@ class RefineryOrderTest {
 
     RefineryOrderStoreItemDto itemDto =
         new RefineryOrderStoreItemDto(
-            quantanium.getId(), station.getId(), 100, -1.0, user1.getId(), null, null, null);
+            quantanium.getId(), station.getId(), 100, -1.0, user1.getId(), null, null, null, null);
     RefineryOrderStoreDto storeDto = new RefineryOrderStoreDto(java.util.List.of(itemDto));
 
     mockMvc
