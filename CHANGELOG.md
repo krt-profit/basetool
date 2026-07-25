@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.17](https://github.com/krt-profit/basetool/releases/tag/v1.5.17) - 2026-07-25
+
 ### Added
 
 - **Lager einbuchen: Bei genau einem zugeordneten Einsatz bzw. Auftrag muss die Menge nicht mehr eingetippt werden.** Bleibt das Mengenfeld der einzigen Zuordnung leer, wird die gesamte Menge des Eintrags dieser Zuordnung zugewiesen — pro Dimension unabhängig. Erst ab zwei Zuordnungen sind die Mengen wieder explizit anzugeben; eine eingetragene Menge hat immer Vorrang (REQ-INV-027).
