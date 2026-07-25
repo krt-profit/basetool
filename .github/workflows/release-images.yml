@@ -146,8 +146,14 @@ jobs:
 
       # No QEMU here — the matrix already runs each platform on its own
       # native runner. setup-qemu-action would only add overhead.
+      #
+      # Local wrapper rather than docker/setup-buildx-action directly: it
+      # pre-pulls the BuildKit image with retry/backoff so a transient Docker Hub
+      # failure cannot kill the builder boot (see .github/actions/setup-buildx).
+      # The `docker-container` driver is required here for the `type=gha` cache
+      # exporter below, so the BuildKit container pull is unavoidable.
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        uses: ./.github/actions/setup-buildx
 
       - name: Log in to GHCR
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
@@ -306,9 +312,14 @@ jobs:
           pattern: digest-${{ matrix.module }}-*
           merge-multiple: true
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
-
+      # No `Set up Docker Buildx` here on purpose. This job only runs
+      # `docker buildx imagetools create` / `inspect`, which are pure
+      # registry-side manifest operations performed by the buildx CLI plugin
+      # that ships with the runner's Docker — they never dispatch a build and
+      # therefore need no builder instance. Booting a `docker-container`
+      # builder anyway would pull `moby/buildkit` from Docker Hub for nothing,
+      # which is exactly the anonymous-pull flake that killed the keycloak-spi
+      # job of run 30160708503. Three fewer Docker Hub pulls per release.
       - name: Log in to GHCR
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
@@ -441,8 +452,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
+      # Local wrapper — retries the BuildKit image pull, see the build job above.
+      # The `docker-container` driver is required here because this image is
+      # built for two platforms in one job.
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        uses: ./.github/actions/setup-buildx
 
       - name: Log in to GHCR
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
@@ -619,8 +633,11 @@ jobs:
           cp "${jars[0]}" keycloak-spi.jar
           ls -l keycloak-spi.jar
 
+      # Local wrapper — retries the BuildKit image pull, see the build job above.
+      # This is the job that lost run 30160708503 to a Docker Hub timeout here,
+      # after its Gradle build had already succeeded.
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        uses: ./.github/actions/setup-buildx
 
       - name: Log in to GHCR
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
