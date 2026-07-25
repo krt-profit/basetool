@@ -465,6 +465,18 @@ unchanged on the job-order dimension.
 so a book-in can be earmarked to several orders / missions with their own amounts in one shot,
 under the same guards + R5. An empty list falls back to no assignment.
 
+**Single-target shorthand at check-in.** Assigning a book-in to *one* order or *one* mission is the
+common case, so the Einbuchen form does not make the user type the amount twice: when a dimension
+names **exactly one** target and leaves its amount **blank**, the entry's **whole `amount`** is
+earmarked to that target. The shorthand is resolved by the frontend write controller while mapping
+the form to the create payload (the backend allocation input keeps its `@NotNull @Positive` amount —
+the API contract is unchanged), applies to both dimensions independently, and counts as an
+assignment for the "a personal entry carries no earmark" rule. It deliberately does **not** extend to
+several targets: with two or more target rows there is no unambiguous split, so every amount must be
+entered and a blank row is dropped as before. An explicitly entered amount always wins over the
+shorthand, and a not-yet-picked row (no target) is neither counted as a target nor sent. The create
+form states the rule as a per-dimension hint and hides that hint as soon as a second target is named.
+
 **Delivered is per-(entry, job-order) slice (Variante A).** The "Geliefert" marker moved onto the
 job-order allocation: an entry serving several orders can be delivered for one and open for another.
 The order material-collection reads the slice's flag and shows the amount **allocated to that order**
@@ -547,18 +559,23 @@ there is no separate income-attribution input.
   (`sellAmount × scu/sold`), leaves the rest (unassigned + non-participated) personal, and books no
   entry when nothing is deducted from a mission earmark.
 - [ ] Each allocation add / change / remove records the matching `INVENTORY_ALLOCATION_*` audit event.
+- [ ] A book-in naming exactly one order / mission with a blank amount earmarks the entry's full
+  amount to it (per dimension); with two or more targets a blank row is dropped, an explicit amount
+  always wins, and a blank-amount row still trips the personal-entry rejection.
 
 **Enforced by:** `InventoryItemServiceTest`, `InventoryItemServiceBookOutTest`,
 `InventoryCheckoutServiceAuditTest`, `InventoryStockMergeTest`, `JobOrderHandoverServiceTest`,
 `InventoryAllocationSoakDataTest`, `InventoryItemControllerTest`, `InventoryPageControllerMvcTest`,
-`DatabaseIndexMigrationTest`, e2e `InventoryOperationsE2eTest` (Herkunft picker gate + deduct-from) ·
+`DatabaseIndexMigrationTest`, `InventoryInputAjaxControllerTest` (single-target shorthand),
+e2e `InventoryOperationsE2eTest` (Herkunft picker gate + deduct-from) ·
 **Code:** `InventoryJobOrderAllocation`, `InventoryMissionAllocation`,
 `support/InventoryAllocations`, `InventoryItemController` (allocation endpoints),
 `InventoryItemService#createInventoryItem`, `InventoryCheckoutService` (book-out / merge / SELL),
 `InventoryAggregationService#getMaterialCollection`, `InventoryItemMapper`,
 `V217__add_inventory_allocation_tables.sql`, `V218__drop_inventory_scalar_associations.sql`,
 `fragments/inventory-stack-entries.html`, `inventory-my.js` / `inventory-admin.js`,
-`inventory-herkunft.js` (deduct-from picker), `inventory-input.html` / `inventory-input.js` ·
+`inventory-herkunft.js` (deduct-from picker), `inventory-input.html` / `inventory-input.js`,
+`InventoryWriteController#toAllocationInputs` (single-target shorthand) ·
 **Issues:** #1182 · **ADR:** ADR-0098
 
 ### REQ-INV-028 — Aggregated per-material overview shows average and maximum quality

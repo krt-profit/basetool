@@ -32,6 +32,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryAllocationInput;
+import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
@@ -113,17 +115,163 @@ class InventoryInputAjaxControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.targetUrl").value("/inventory/my"));
 
-    org.mockito.ArgumentCaptor<Object> captor = org.mockito.ArgumentCaptor.captor();
-    verify(backendApiClient)
-        .post(eq("/api/v1/inventory"), captor.capture(), eq(InventoryItemDto.class));
-    de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemCreateDto request =
-        (de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemCreateDto) captor.getValue();
+    InventoryItemCreateDto request = captureCreateRequest();
     org.assertj.core.api.Assertions.assertThat(request.gameItemId()).isEqualTo(gameItemId);
     org.assertj.core.api.Assertions.assertThat(request.materialId()).isNull();
     org.assertj.core.api.Assertions.assertThat(request.quality()).isNull();
     org.assertj.core.api.Assertions.assertThat(request.missionId()).isNull();
     org.assertj.core.api.Assertions.assertThat(request.mergeStock()).isFalse();
     org.assertj.core.api.Assertions.assertThat(request.missionAllocations()).isEmpty();
+  }
+
+  // covers REQ-INV-027 R4 (single-target shorthand): one mission row with a blank amount earmarks
+  // the entry's whole amount, and the same shorthand applies independently on the job-order
+  // dimension.
+  @Test
+  @WithMockUser
+  void addInventoryItemAjax_singleAllocationWithoutAmount_earmarksFullEntryAmount()
+      throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    mockMvc
+        .perform(
+            post("/inventory/input")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("materialId", MATERIAL_ID.toString())
+                .param("locationId", LOCATION_ID.toString())
+                .param("quality", "100")
+                .param("amount", "23")
+                .param("missionAllocations[0].targetId", missionId.toString())
+                .param("missionAllocations[0].amount", "")
+                .param("jobOrderAllocations[0].targetId", jobOrderId.toString())
+                .param("jobOrderAllocations[0].amount", "")
+                .param("source", "my"))
+        .andExpect(status().isOk());
+
+    InventoryItemCreateDto request = captureCreateRequest();
+    org.assertj.core.api.Assertions.assertThat(request.missionAllocations())
+        .containsExactly(new InventoryAllocationInput(missionId, 23d));
+    org.assertj.core.api.Assertions.assertThat(request.jobOrderAllocations())
+        .containsExactly(new InventoryAllocationInput(jobOrderId, 23d));
+  }
+
+  // covers REQ-INV-027 R4 (shorthand does not extend to several targets): with two mission rows the
+  // amounts must be explicit, so the blank one is dropped instead of swallowing the entry amount.
+  @Test
+  @WithMockUser
+  void addInventoryItemAjax_multipleAllocations_dropsBlankAmountRow() throws Exception {
+    UUID firstMission = UUID.randomUUID();
+    UUID secondMission = UUID.randomUUID();
+    mockMvc
+        .perform(
+            post("/inventory/input")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("materialId", MATERIAL_ID.toString())
+                .param("locationId", LOCATION_ID.toString())
+                .param("quality", "100")
+                .param("amount", "23")
+                .param("missionAllocations[0].targetId", firstMission.toString())
+                .param("missionAllocations[0].amount", "5")
+                .param("missionAllocations[1].targetId", secondMission.toString())
+                .param("missionAllocations[1].amount", "")
+                .param("source", "my"))
+        .andExpect(status().isOk());
+
+    org.assertj.core.api.Assertions.assertThat(captureCreateRequest().missionAllocations())
+        .containsExactly(new InventoryAllocationInput(firstMission, 5d));
+  }
+
+  // covers REQ-INV-027 R4: an explicit amount on a single row still wins over the shorthand, and a
+  // trailing not-yet-picked row (no target) neither counts as a second target nor is sent.
+  @Test
+  @WithMockUser
+  void addInventoryItemAjax_singleAllocationWithAmount_keepsExplicitAmount() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    mockMvc
+        .perform(
+            post("/inventory/input")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("materialId", MATERIAL_ID.toString())
+                .param("locationId", LOCATION_ID.toString())
+                .param("quality", "100")
+                .param("amount", "23")
+                .param("missionAllocations[0].targetId", missionId.toString())
+                .param("missionAllocations[0].amount", "7.5")
+                .param("missionAllocations[1].targetId", "")
+                .param("missionAllocations[1].amount", "")
+                .param("source", "my"))
+        .andExpect(status().isOk());
+
+    org.assertj.core.api.Assertions.assertThat(captureCreateRequest().missionAllocations())
+        .containsExactly(new InventoryAllocationInput(missionId, 7.5d));
+  }
+
+  // covers REQ-INV-027 R4 + the standing personal invariant: the shorthand row counts as an
+  // assignment even with no amount typed, so a personal book-in carrying it is refused pre-backend.
+  @Test
+  @WithMockUser
+  void addInventoryItemAjax_personalWithBlankAmountAllocation_returns422() throws Exception {
+    mockMvc
+        .perform(
+            post("/inventory/input")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("materialId", MATERIAL_ID.toString())
+                .param("locationId", LOCATION_ID.toString())
+                .param("quality", "100")
+                .param("amount", "23")
+                .param("personal", "true")
+                .param("missionAllocations[0].targetId", UUID.randomUUID().toString())
+                .param("missionAllocations[0].amount", "")
+                .param("source", "my"))
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("INVENTORY_PERSONAL_ASSIGNMENT"));
+
+    verify(backendApiClient, never()).post(anyString(), any(), eq(InventoryItemDto.class));
+  }
+
+  // covers REQ-INV-031 (item mode has no mission dimension): the shorthand fills the job-order
+  // dimension of an item book-in, while the mission list stays empty even if rows were crafted in.
+  @Test
+  @WithMockUser
+  void addInventoryItemAjax_itemModeSingleOrderWithoutAmount_earmarksFullAmountAndNoMission()
+      throws Exception {
+    UUID gameItemId = UUID.randomUUID();
+    UUID jobOrderId = UUID.randomUUID();
+    mockMvc
+        .perform(
+            post("/inventory/input")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("gameItemId", gameItemId.toString())
+                .param("locationId", LOCATION_ID.toString())
+                .param("amount", "4")
+                .param("jobOrderAllocations[0].targetId", jobOrderId.toString())
+                .param("jobOrderAllocations[0].amount", "")
+                .param("missionAllocations[0].targetId", UUID.randomUUID().toString())
+                .param("missionAllocations[0].amount", "")
+                .param("source", "my"))
+        .andExpect(status().isOk());
+
+    InventoryItemCreateDto request = captureCreateRequest();
+    org.assertj.core.api.Assertions.assertThat(request.jobOrderAllocations())
+        .containsExactly(new InventoryAllocationInput(jobOrderId, 4d));
+    org.assertj.core.api.Assertions.assertThat(request.missionAllocations()).isEmpty();
+  }
+
+  /**
+   * Captures the single create payload the controller posted to the backend.
+   *
+   * @return the captured {@code /api/v1/inventory} create request.
+   */
+  private InventoryItemCreateDto captureCreateRequest() {
+    org.mockito.ArgumentCaptor<Object> captor = org.mockito.ArgumentCaptor.captor();
+    verify(backendApiClient)
+        .post(eq("/api/v1/inventory"), captor.capture(), eq(InventoryItemDto.class));
+    return (InventoryItemCreateDto) captor.getValue();
   }
 
   // covers REQ-INV-031 (catalog XOR: both references set -> 422 VALIDATION, no backend call)
