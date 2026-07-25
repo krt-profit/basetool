@@ -56751,6 +56751,9 @@
           "owningOrgUnitId" : {
             "type" : "string",
             "format" : "uuid"
+          },
+          "personal" : {
+            "type" : "boolean"
           }
         },
         "required" : [ "amount", "locationId", "materialId", "quality" ]

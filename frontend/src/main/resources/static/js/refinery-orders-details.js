@@ -181,6 +181,11 @@ function duplicateStoreItem(btn) {
 
     blockToCopy.after(newBlock);
     reindexStoreItems();
+    // Re-derive the split row's earmark lock from its own checkbox (REQ-INV-035): cloneNode copies
+    // the server-rendered `checked` ATTRIBUTE, not the user's live toggle, while `disabled` (a
+    // reflected property) does come across — so without this the clone can end up with a locked
+    // job-order picker and an unticked personal box.
+    syncStorePersonalJobOrder(newBlock);
     // Upgrade the freshly inserted receiver <select> into a searchable combobox (idempotent;
     // skips controls already enhanced). reindexStoreItems() has stamped its final id/name.
     if (window.krtEnhanceComboboxes) {
@@ -207,6 +212,23 @@ function reindexStoreItems() {
             }
         });
     });
+}
+
+// REQ-INV-035: personal stock never carries an earmark, so while a store row's personal-entry box
+// is ticked its job-order picker is disabled AND cleared (a disabled select submits nothing, so the
+// row reaches the backend without a job order); unticking restores the choice. Mirrors
+// syncPersonalAllocations on the Einbuchen page and _prodSyncPersonalAllocate in the
+// item-production modal.
+function syncStorePersonalJobOrder(block) {
+    if (!block) return;
+    const personalCb = block.querySelector('[id^="storePersonal_"]');
+    const jobOrderSelect = block.querySelector('[id^="storeJobOrder_"]');
+    if (!jobOrderSelect) return;
+    const personal = !!(personalCb && personalCb.checked);
+    jobOrderSelect.disabled = personal;
+    if (personal) {
+        jobOrderSelect.value = '';
+    }
 }
 
 // #596: rebuild a store row's owning-org-unit <select> from the picked receiver's OrgUnit
@@ -237,14 +259,22 @@ function rebuildOrgUnitOptions(selectEl, options) {
 }
 
 // When the receiving member of a store row changes, refresh that row's owning-org-unit picker
-// from the new member's memberships (proxied via the frontend AJAX endpoint). Delegated on the
-// items container so split (duplicated) rows are covered too.
+// from the new member's memberships (proxied via the frontend AJAX endpoint); when its personal
+// marker is toggled, re-sync that row's job-order picker (REQ-INV-035). Delegated on the items
+// container so split (duplicated) rows are covered too. The initial pass covers a flashed-back
+// form that re-renders with the box already ticked.
 (function () {
     const storeItemsContainer = document.getElementById('storeItemsContainer');
     if (!storeItemsContainer) return;
+    storeItemsContainer.querySelectorAll('.store-item-block').forEach(syncStorePersonalJobOrder);
     storeItemsContainer.addEventListener('change', (e) => {
         const sel = e.target;
-        if (!sel || !sel.id || !sel.id.startsWith('storeUser_')) return;
+        if (!sel || !sel.id) return;
+        if (sel.id.startsWith('storePersonal_')) {
+            syncStorePersonalJobOrder(sel.closest('.store-item-block'));
+            return;
+        }
+        if (!sel.id.startsWith('storeUser_')) return;
         const index = sel.id.substring('storeUser_'.length);
         const orgSelect = document.getElementById('storeOrgUnit_' + index);
         if (!orgSelect || !sel.value) return;

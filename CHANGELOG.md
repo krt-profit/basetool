@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Raffinerie: Im Einlager-Dialog lässt sich jede Ausgabezeile direkt als persönlicher Eintrag einlagern.** Bisher landete Raffinerie-Ausbeute immer im geteilten Staffelbestand und musste anschließend über „Mein Lager" umgebucht werden. Persönliche Zeilen tragen keine Zuordnung: Die Kombination mit einem Auftrag wird abgelehnt (der Auftrags-Selektor wird bei gesetztem Haken gesperrt), und die Mission des Raffinerieauftrags wird für diese Zeile nicht vermerkt (REQ-INV-035).
+
 ## [v1.5.16](https://github.com/krt-profit/basetool/releases/tag/v1.5.16) - 2026-07-25
 
 ### Changed

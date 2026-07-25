@@ -229,7 +229,9 @@ public class RefineryOrderWriteController {
    *
    * <p>The store form picks the target location and (optionally) the receiving user/job-order; the
    * backend computes the inventory rows from the order's goods and the chosen target. A validation
-   * failure flashes the form back and re-opens the store modal on the detail page.
+   * failure flashes the form back and re-opens the store modal on the detail page. An item that
+   * combines the personal marker with a job order (REQ-INV-035) is rejected here with its own toast
+   * so the user sees the concrete reason instead of the generic backend-failure message.
    *
    * @param id refinery order id
    * @param form store form
@@ -246,6 +248,13 @@ public class RefineryOrderWriteController {
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
       redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.store.invalid");
+      redirectAttributes.addFlashAttribute("storeForm", form);
+      redirectAttributes.addFlashAttribute("showStoreModal", true);
+      return "redirect:/refinery-orders/" + id;
+    }
+    if (storePersonalWithJobOrder(form)) {
+      redirectAttributes.addFlashAttribute(
+          "errorToast", "error.refineryorder.store.personal.assignment");
       redirectAttributes.addFlashAttribute("storeForm", form);
       redirectAttributes.addFlashAttribute("showStoreModal", true);
       return "redirect:/refinery-orders/" + id;
@@ -390,9 +399,28 @@ public class RefineryOrderWriteController {
               f.getUserId(),
               f.getJobOrderId(),
               f.getNote(),
-              f.getOwningOrgUnitId()));
+              f.getOwningOrgUnitId(),
+              Boolean.TRUE.equals(f.getPersonal())));
     }
     return new RefineryOrderStoreDto(dtoList);
+  }
+
+  /**
+   * Whether any store row marks its output personal while also picking a job order — the
+   * contradictory combination the backend rejects with HTTP 400, since personal stock never carries
+   * an allocation (REQ-INV-035). The store dialog's JS already disables and clears the job-order
+   * picker while the personal box is ticked, so this only catches the no-JS fallback and a tampered
+   * payload; it exists to turn that case into a precise message instead of a generic store failure.
+   *
+   * @param form the bound store form
+   * @return {@code true} when at least one row is personal and carries a job order
+   */
+  private static boolean storePersonalWithJobOrder(RefineryOrderStoreForm form) {
+    if (form.getItems() == null) {
+      return false;
+    }
+    return form.getItems().stream()
+        .anyMatch(f -> Boolean.TRUE.equals(f.getPersonal()) && f.getJobOrderId() != null);
   }
 
   /**
@@ -439,7 +467,8 @@ public class RefineryOrderWriteController {
   /**
    * AJAX twin of {@link #storeOrder} (#575): completes a refinery order (stores the refined output)
    * and returns the navigation target as JSON. Routed by the {@code X-Requested-With} header; the
-   * classic handler stays the no-JS fallback. Binding errors → 400.
+   * classic handler stays the no-JS fallback. Binding errors — and an item combining the personal
+   * marker with a job order (REQ-INV-035) — → 400.
    *
    * @param id the refinery order id
    * @param form the bound store form
@@ -453,7 +482,7 @@ public class RefineryOrderWriteController {
       @PathVariable UUID id,
       @Valid @ModelAttribute("storeForm") RefineryOrderStoreForm form,
       BindingResult bindingResult) {
-    if (bindingResult.hasErrors()) {
+    if (bindingResult.hasErrors() || storePersonalWithJobOrder(form)) {
       return org.springframework.http.ResponseEntity.badRequest().build();
     }
     try {

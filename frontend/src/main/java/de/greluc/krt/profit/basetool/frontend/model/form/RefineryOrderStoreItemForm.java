@@ -72,4 +72,13 @@ public class RefineryOrderStoreItemForm {
    * receiver. Mirrors {@code RefineryOrderStoreItemDto#owningOrgUnitId}.
    */
   private UUID owningOrgUnitId;
+
+  /**
+   * Marks the resulting inventory row as the receiver's private stock instead of shared squadron
+   * stock (REQ-INV-035), mirroring {@code RefineryOrderStoreItemDto#personal}. Bound from the store
+   * dialog's personal-entry checkbox, so an unticked box arrives as {@code false} via Spring's
+   * hidden checkbox marker. A personal row carries no earmark: the backend rejects the combination
+   * with {@link #jobOrderId} (HTTP 400) and applies no mission earmark.
+   */
+  private Boolean personal = false;
 }

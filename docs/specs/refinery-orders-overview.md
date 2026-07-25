@@ -49,7 +49,9 @@ AJAX-swap fragment so an in-place status-filter change re-renders them.
 
 - The order **detail**, **create**, **store**, **cancel** and screenshot-**import** flows — covered
   by [`refinery-screenshot-import.md`](refinery-screenshot-import.md) and the controller's other
-  handlers; this spec only governs the list view's pagination.
+  handlers; this spec only governs the list view's pagination. The store dialog's personal marker
+  (booking refinery output straight into the receiver's private pool) is specified in
+  [`inventory-lager.md`](inventory-lager.md) `REQ-INV-035`.
 - New sortable columns. The backend sort whitelist for these endpoints is
   `{startedAt, durationMinutes, expenses, id}`; the UI keeps the fixed `startedAt,desc` order. The
   end-time column the list displays is a derived value (`startedAt + durationMinutes`) and is not

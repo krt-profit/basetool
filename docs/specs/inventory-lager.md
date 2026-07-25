@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-17.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-25.
 > **Owner area:** INV · **Related ADRs:** ADR-0003, ADR-0097, ADR-0098, ADR-0104
 
 # Inventory Lager — append-only entries & group-on-read
@@ -701,6 +701,59 @@ no-silent-cap principle).
 `InventoryItemRepository#findUserEntryIds` / `#findUserItemEntryIds`,
 `InventoryPageController#myEntryIds`, `templates/inventory-my.html`, `static/js/inventory-my.js` ·
 **Issues:** — · **ADR:** ADR-0104
+
+### REQ-INV-035 — Refinery output can be stored straight into the personal pool
+
+The refinery-order **store dialog** (`/refinery-orders/{id}`, "Einlagern") offers a per-output-row
+**personal marker** — the same `inventory_item.personal` flag the Einbuchen dialog
+(`InventoryItemService#createInventoryItem`) and the item-production book-in
+([`orders-item-production.md`](orders-item-production.md) REQ-INV-032) already carry. Before this,
+refinery output was **always** shared squadron stock: a member who refined their own ore had to
+store it shared and then run the personal-rebooking split of
+[REQ-INV-007](#req-inv-007--personal-marker-rebooking-umbuchung-is-an-append-only-split) on
+`/inventory/my` to get it into their private pool — a second, easily-forgotten step whose intent was
+already known at storage time.
+
+- **Per row, not per order.** The marker is a field of `RefineryOrderStoreItemDto` (optional; `null`
+  means `false`), so a split store (the dialog's "+" duplicate) can send one part of an output good
+  to the shared pool and another to the receiver's private pool in the same call. Everything else
+  about the row is unchanged: it is still append-only (REQ-INV-001), still stamped with the
+  receiver's resolved owning org unit, and `personal` is part of its stack identity
+  (REQ-INV-002/026), so a personal and a shared row never group or merge together.
+- **A personal row carries no earmark.** This is the standing `assertNotPersonal` invariant
+  (REQ-INV-027), and the store flow honours it per allocation dimension according to where the
+  earmark comes from:
+  - the **job order** is a per-item pick in the same dialog, so combining it with the marker is a
+    contradictory *user choice* and is **refused (HTTP 400)** rather than silently dropped —
+    mirroring the Einbuchen and production-book-in guards. The dialog additionally disables and
+    clears a row's job-order picker while its box is ticked, so the rejection is only reachable
+    without JS or with a tampered payload.
+  - the **mission** is derived from the refinery order, never picked per item, so it is simply
+    **not applied** to a personal row: marking the batch personal *is* the act of taking it out of
+    the mission pool. A shared row of the same store call keeps the order's mission earmark
+    unchanged.
+- **Audit.** The existing `INVENTORY_RECEIVED_FROM_REFINERY` event gains a `personal` detail (no new
+  event type, no new viewer filter entry); REQ-AUDIT-001's coverage of the Raffinerie area is
+  unchanged.
+
+**Acceptance**
+
+- [ ] The store dialog renders a personal checkbox per output row, bound to `items[i].personal`, and
+  a split (duplicated) row carries its own independent marker.
+- [ ] Storing with the marker set creates the row with `personal = true`; omitting the field (older
+  client) or leaving it unticked still creates shared squadron stock.
+- [ ] An item combining the marker with a job order is rejected with 400 and writes **no** inventory
+  row and **no** order status change; ticking the box in the dialog disables and clears that row's
+  job-order picker.
+- [ ] On a mission-linked refinery order, a personal row carries no mission allocation while a
+  shared row of the same call still does.
+
+**Enforced by:** `RefineryOrderServiceTest` (`PersonalMarkerTests`), `RefineryOrderTest`,
+`RefineryStorePersonalMarkerTest` · **Code:** `RefineryOrderService#storeRefineryOrder`,
+`RefineryOrderStoreItemDto`, `RefineryOrderWriteController#storeOrder` / `#storeOrderAjax` /
+`#storePersonalWithJobOrder`, `RefineryOrderStoreItemForm`,
+`templates/refinery-orders-details.html`, `static/js/refinery-orders-details.js` · **Issues:** — ·
+**ADR:** —
 
 ## Out of scope
 
