@@ -47,6 +47,14 @@ import java.util.UUID;
  * {@code null} and the resolver auto-stamps (or leaves the row ownerless). The store dialog
  * pre-fills it with the order's own owning OrgUnit, so a same-OrgUnit self-store needs no manual
  * choice.
+ *
+ * <p>The optional {@code personal} flag marks the resulting {@code InventoryItem} as the receiver's
+ * private stock ({@code inventory_item.personal = true}) instead of shared squadron stock — the
+ * same marker the Einbuchen dialog and the item-production book-in offer, so refinery output no
+ * longer has to be stored shared and rebooked afterwards (REQ-INV-035). {@code null} means {@code
+ * false}. A personal row never carries an allocation: combining it with {@code jobOrderId} is
+ * rejected with HTTP 400, and the refinery order's automatic mission earmark is not applied (see
+ * {@code RefineryOrderService#storeRefineryOrder}).
  */
 @ValidQuantityAmount
 public record RefineryOrderStoreItemDto(
@@ -57,5 +65,6 @@ public record RefineryOrderStoreItemDto(
     UUID userId,
     UUID jobOrderId,
     @Size(max = 1000) String note,
-    UUID owningOrgUnitId)
+    UUID owningOrgUnitId,
+    Boolean personal)
     implements QuantityAware {}

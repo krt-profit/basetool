@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Raffinerie: Im Einlager-Dialog lässt sich jede Ausgabezeile direkt als persönlicher Eintrag einlagern.** Bisher landete Raffinerie-Ausbeute immer im geteilten Staffelbestand und musste anschließend über „Mein Lager" umgebucht werden. Persönliche Zeilen tragen keine Zuordnung: Die Kombination mit einem Auftrag wird abgelehnt (der Auftrags-Selektor wird bei gesetztem Haken gesperrt), und die Mission des Raffinerieauftrags wird für diese Zeile nicht vermerkt (REQ-INV-035).
+
 ### Changed
 
 - **Bank-Anträge: Die letzte Spalte heißt jetzt „Entscheidung" statt „Aktionen", und der Über-Limit-Marker heißt „Über Limit" statt „Freigabe nötig".** Die Spalte zeigt nur bei offenen Anträgen Buttons, sonst die Person, die entschieden hat; der Marker wirkte auf bereits bestätigten Anträgen wie eine noch offene Aufgabe und ist dort jetzt zusätzlich grau statt gelb (REQ-BANK-041).

@@ -455,6 +455,18 @@
                                 <option th:each="jo : ${jobOrders}" th:if="${(item.jobOrderId != null and item.jobOrderId == jo.id) or (jo.requiredMaterialIds != null and #lists.contains(jo.requiredMaterialIds, item.materialId))}" th:value="${jo.id}" th:text="${jo.displayId + ' - ' + (jo.requestingOrgUnit != null ? jo.requestingOrgUnit.name() : '—')}"></option>
                             </select>
                         </div>
+                        <!-- REQ-INV-035: book this output row into the receiver's private pool
+                             instead of the shared squadron stock, mirroring the Einbuchen dialog's
+                             marker. Personal stock never carries an earmark, so refinery-orders-
+                             details.js disables + clears this row's job-order picker while the box
+                             is ticked and the backend applies no mission earmark to the row. -->
+                        <div class="form-group check-row krtm-margin-bottom-0-margin-top-1rem-7579">
+                            <input type="checkbox" th:id="'storePersonal_' + ${stat.index}" th:field="*{items[__${stat.index}__].personal}">
+                            <div>
+                                <label th:for="'storePersonal_' + ${stat.index}" th:text="#{refineryorder.store.personal}">Als persönlichen Eintrag einlagern</label>
+                                <p class="form-hint" th:text="#{refineryorder.store.personal.help}">Persönliche Einträge sind nur für dich sichtbar und können keinem Auftrag und keinem Einsatz zugeordnet werden.</p>
+                            </div>
+                        </div>
                         <div class="form-group krtm-margin-bottom-0-margin-top-1rem-7579">
                             <label th:for="'storeNote_' + ${stat.index}" th:text="#{refineryorder.store.note}">Notiz (Optional)</label>
                             <textarea th:id="'storeNote_' + ${stat.index}" th:field="*{items[__${stat.index}__].note}" maxlength="1000" rows="2" th:placeholder="#{refineryorder.store.note.placeholder}"></textarea>

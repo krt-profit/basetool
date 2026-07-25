@@ -27,6 +27,11 @@ import java.util.UUID;
  * <p>{@code owningOrgUnitId} is the per-item owning-OrgUnit picker output forwarded to the backend
  * store endpoint; {@code null} when the receiving member belongs to a single OrgUnit (the backend
  * auto-stamps) and otherwise the OrgUnit the user picked in the store dialog.
+ *
+ * <p>{@code personal} forwards the store dialog's personal-entry checkbox (REQ-INV-035): {@code
+ * true} books the output as the receiver's private stock instead of shared squadron stock. The
+ * backend rejects it in combination with {@code jobOrderId} (HTTP 400) and applies no mission
+ * earmark to a personal row.
  */
 public record RefineryOrderStoreItemDto(
     UUID materialId,
@@ -36,4 +41,5 @@ public record RefineryOrderStoreItemDto(
     UUID userId,
     UUID jobOrderId,
     String note,
-    UUID owningOrgUnitId) {}
+    UUID owningOrgUnitId,
+    Boolean personal) {}
