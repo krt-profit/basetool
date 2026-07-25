@@ -508,10 +508,29 @@ x-frontend: &frontend-template
       soft: 65536
       hard: 65536
   # Thymeleaf SSR + WebClient proxy to the backend; no JPA, no business logic,
-  # so the working set is well below the backend's. 1024 MB → ~768 MB heap with
-  # MaxRAMPercentage=75 covers Tomcat, the Spring Session client cache and the
-  # Caffeine-backed reference-data cache, with precautionary headroom over the
-  # previous 768M.
+  # so the working set is well below the backend's. 1024 MB → ~614 MB heap with
+  # MaxRAMPercentage=60 covers Tomcat, the Spring Session client cache and the
+  # Caffeine-backed reference-data cache.
+  #
+  # MaxRAMPercentage is 60, NOT 75 (lowered 2026-07-25). ContainerWorkingSetHigh fired continuously
+  # for this container on 2026-07-24/25, and raising the LIMIT is the one fix that provably cannot
+  # work here: the 8d7ec8f5 bump (768M → 1024M) assumed "the alert keys off the working_set/limit
+  # RATIO, so it auto-adjusts to the new limit" — but MaxRAMPercentage is a ratio too, so the heap
+  # ceiling scaled in lockstep (576M → 768M) and the ratio the alert watches never improved. The heap
+  # simply took ~27 h after the v1.5.15 deploy to grow into its new ceiling (G1 grows on allocation
+  # pressure and does not return committed heap), and then the same 90% line tripped one size up.
+  # Fixing it means DECOUPLING the heap ceiling from the limit: at 75% the JVM's own steady-state
+  # target (768M heap + ~150-200M non-heap for metaspace, code cache, thread stacks and Netty direct
+  # buffers) is 90-95% of the limit — i.e. the alert was reporting the configuration faithfully. 60%
+  # budgets 614M heap + ~200M non-heap ≈ 815M ≈ 80% of the limit, a real margin under the alert. The
+  # heap still ENLARGES on the last known-good config (the pre-8d7ec8f5 768M/75% = 576M ceiling this
+  # app ran on for months), so this is not a capacity reduction. Size any future change as a BUDGET
+  # (heap + non-heap <= ~80% of the limit), never by re-applying a percentage.
+  #
+  # NOTE the same ratio error is latent for the other two JVMs, which have NOT paged yet and are
+  # deliberately left alone here for lack of prod working-set data: backend 2048M at 75% budgets
+  # 1536M heap + ~512M non-heap = exactly 100% of its limit by 8d7ec8f5's own arithmetic, and ingest
+  # is 512M at 75%. Re-derive both from jvm_memory_committed_bytes before touching them.
   deploy:
     resources:
       limits:
@@ -535,7 +554,10 @@ x-frontend: &frontend-template
     MONITORING_TRACING_SAMPLING_PROBABILITY: ${MONITORING_TRACING_SAMPLING_PROBABILITY:-1.0}
     SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
     SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
-    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0
+    # MaxRAMPercentage=60 (not the 75 the other two JVMs use) — see the heap-budget rationale in the
+    # deploy.resources comment above: at 75 the heap ceiling alone plus non-heap exceeded the
+    # ContainerWorkingSetHigh 90% line, so raising the limit could never clear the alert.
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=60.0 -XX:InitialRAMPercentage=50.0
   volumes:
     - /var/iri/frontend/log:/app/logs
     - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro

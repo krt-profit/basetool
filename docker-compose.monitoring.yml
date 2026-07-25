@@ -265,11 +265,22 @@ services:
     # ALSO counts non-runtime RSS (page cache from the ~8 file tailers + docker log source, MADV_FREE
     # pages the kernel has not yet reclaimed). The prior 230MiB was ~90% of the old 256M hard limit —
     # the SAME ratio as the alert — so the managed target plus that off-heap overhead parked the working
-    # set right on the 90% line and ContainerWorkingSetHigh fired chronically (2026-07-15). 300MiB is
-    # ~78% of the 384M limit below, leaving real headroom for the non-runtime overhead under the alert
-    # threshold. Keep GOMEMLIMIT at ~75-80% of deploy.resources.limits.memory whenever that changes.
+    # set right on the 90% line and ContainerWorkingSetHigh fired chronically (2026-07-15).
+    #
+    # 2026-07-25: 384M/300MiB ALSO paged, and the reason is an arithmetic error worth spelling out —
+    # the "~78% of the limit" rule above sizes GOMEMLIMIT as a pure RATIO, but the off-heap overhead it
+    # has to leave room for is an ABSOLUTE ~35 MB (file-tailer page cache + not-yet-reclaimed MADV_FREE
+    # pages), not a proportional slice. At a 384M limit that is another ~9%, so 78% + 9% = ~87% sat only
+    # 3 points under the alert and any transient tipped it over (observed >90% sustained). Size it as a
+    # BUDGET instead: working_set ~= GOMEMLIMIT + ~35 MB must land <= ~85% of the limit. 512M with
+    # GOMEMLIMIT 400MiB gives 78% + 6.8% = ~85% — better than 384M but still thin, so this deliberately
+    # undershoots the 400MiB the 2026-07-15 note suggested: 384MiB is 75.0% of 512M, and 75.0% + 6.8%
+    # = ~82%, an 8-point margin under the 90% line. Note GOMEMLIMIT is a SOFT ceiling the Go GC only
+    # reaches if the live heap demands it (GOGC targets 2x live first), so raising it does not force
+    # Alloy to consume it. When changing the limit, re-derive from the budget above — do NOT just
+    # re-apply a percentage.
     environment:
-      GOMEMLIMIT: "300MiB"
+      GOMEMLIMIT: "384MiB"
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
@@ -288,14 +299,18 @@ services:
     deploy:
       resources:
         limits:
-          # 384M (was 256M, orig 192M): ADR-0095 (2026-07-12) added the three busiest apps' full
+          # 512M (was 384M, 256M, orig 192M): ADR-0095 (2026-07-12) added the three busiest apps' full
           # stdout/stderr via loki.source.docker + RE2 masking on top of the OTLP receiver+exporter and
           # ~8 file tailers, raising Alloy's steady-state working set without a compensating limit bump —
-          # so it kept riding >90% of 256M and tripped ContainerWorkingSetHigh (2026-07-15). 384M gives
-          # real headroom above that workload; GOMEMLIMIT above (300MiB, ~78%) sits below the 90% alert
-          # line so a healthy GC-at-target no longer reads as an imminent OOM. Bump to 512M / GOMEMLIMIT
-          # 400MiB if prod working-set data shows Alloy sustaining above ~330M.
-          memory: 384M
+          # so it kept riding >90% of 256M and tripped ContainerWorkingSetHigh (2026-07-15). The 384M
+          # follow-up did NOT hold: it paged again 2026-07-24/25 with no new Alloy workload since (the
+          # only config change was a `stage.drop`), i.e. Alloy was GC-pinned AT its 300MiB GOMEMLIMIT and
+          # the constant off-heap overhead pushed the total over the 90% line. See the GOMEMLIMIT comment
+          # above for the budget arithmetic that replaces the old percentage rule; 512M/384MiB targets a
+          # ~82% working set. If this recurs a THIRD time with no added workload, stop bumping and treat
+          # it as an Alloy-side leak (check for loki.source.docker tailer-reconnect churn:
+          # "could not transfer logs: unexpected EOF") rather than a sizing shortfall.
+          memory: 512M
           pids: 512
     networks:
       - net-monitoring-core

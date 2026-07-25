@@ -8,7 +8,13 @@
 
 - **Monitoring: Der `JobOrderStale`-Alert schlägt jetzt erst nach 180 Tagen an (vorher 30).** Lang laufende Aufträge sind bei der aktuellen Org-Kadenz normal; `RefineryOrderStale`/`OperationStale` bleiben bei 30 Tagen (REQ-OBS-005).
 
+- **Monitoring: `MailDroppedConfigDrift` alarmiert nicht mehr für den absichtlich abgeschalteten Mailversand.** Der Alert wertete den bewussten prod-Kill-Switch (`APP_MAIL_ENABLED=false`) als Konfigurationsfehler und mailte deshalb alle 4 Stunden; er greift jetzt nur noch bei aktiviertem, aber falsch konfiguriertem Versand (leerer SMTP-Host oder fehlende Sender-Bean) und bleibt bis zur Aktivierung des Mailversands still (REQ-OBS-011).
+
 ### Fixed
+
+- **Stabilität: Das Frontend läuft nicht mehr dauerhaft am Rand seines Speicherlimits.** Der JVM-Heap durfte 75 % des Container-Limits belegen, sodass Heap-Obergrenze plus Nicht-Heap-Speicher zusammen über der 90-%-Warnschwelle lagen — die vorherige Limit-Erhöhung half nicht, weil die Heap-Grenze prozentual mitwuchs. Der Heap ist jetzt auf 60 % (~614 MB) begrenzt und damit weiter über der lange bewährten Obergrenze, mit echtem Puffer bis zum Limit. Greift beim nächsten Deploy.
+
+- **Monitoring: Alloy-Speicherlimit auf 512 MB angehoben (`GOMEMLIMIT` 384 MiB).** Der Log-/Trace-Versender lief erneut über 90 % seines 384-MB-Limits und löste den `ContainerWorkingSetHigh`-Alarm aus, obwohl keine neue Last hinzukam; die Größen sind jetzt als Budget (Go-Speicher + konstanter Off-Heap-Anteil) statt als reiner Prozentwert bemessen. Greift beim nächsten Deploy.
 
 - **Log-Hygiene: Anmeldungen mit noch nicht freigeschaltetem Konto fluten das Log nicht mehr.** Die erwarteten `PENDING_APPROVAL`-403 (die Shell eines wartenden Nutzers pollt mehrere Endpunkte pro Seitenaufruf) werden in Backend und Frontend jetzt auf DEBUG statt WARN geloggt; die Metrik/der `PendingApprovalBlockSpike`-Alert bleiben unverändert (REQ-OBS-001).
 - **Log-Hygiene: Keycloak protokolliert Verbindungsabbrüche von Clients nicht mehr als ERROR.** `io.vertx.core.net.impl.ConnectionBase` (leere `<missing-log-message>`-ERROR-Zeilen bei abruptem TCP-Reset des Browsers/Scanners) ist per `KC_LOG_LEVEL` stummgeschaltet, damit diese wertlosen Zeilen keine ERROR-Spike-Alerts auslösen.
