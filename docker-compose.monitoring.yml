@@ -265,11 +265,26 @@ services:
     # ALSO counts non-runtime RSS (page cache from the ~8 file tailers + docker log source, MADV_FREE
     # pages the kernel has not yet reclaimed). The prior 230MiB was ~90% of the old 256M hard limit —
     # the SAME ratio as the alert — so the managed target plus that off-heap overhead parked the working
-    # set right on the 90% line and ContainerWorkingSetHigh fired chronically (2026-07-15). 300MiB is
-    # ~78% of the 384M limit below, leaving real headroom for the non-runtime overhead under the alert
-    # threshold. Keep GOMEMLIMIT at ~75-80% of deploy.resources.limits.memory whenever that changes.
+    # set right on the 90% line and ContainerWorkingSetHigh fired chronically (2026-07-15).
+    #
+    # 2026-07-25: 384M/300MiB ALSO paged, and the reason is an arithmetic error worth spelling out —
+    # the "~78% of the limit" rule above sizes GOMEMLIMIT as a pure RATIO, but the non-Go overhead it
+    # has to leave room for is an ABSOLUTE constant, not a proportional slice. Measured on prod:
+    # working set 347 MiB while GOMEMLIMIT was 300 MiB, so that overhead is ~47 MiB — another ~12% at a
+    # 384M limit, which is why 78% + 12% = 90% parked Alloy exactly ON the alert line (observed >90%
+    # sustained, and 90.4% at the 2026-07-25T02:00Z snapshot).
+    #
+    # Size it as a BUDGET, the same way the three app JVMs are sized (see the JVM CONTAINER SIZING
+    # block in docker-compose.yml): working_set ~= GOMEMLIMIT + 47 MiB must land <= ~80% of the limit.
+    # At 512M that gives GOMEMLIMIT <= 363 MiB, hence 360MiB -> 407 MiB = ~80%. This deliberately
+    # undershoots the "512M / 400MiB" the 2026-07-15 note suggested, which lands at ~87% and would have
+    # left only 3 points of margin — the very mistake being fixed here. 360MiB still relieves the Go
+    # runtime by ~20% over the 300MiB it is currently GC-pinned at. GOMEMLIMIT is a SOFT ceiling the GC
+    # only reaches if the live heap demands it (GOGC targets 2x live first), so raising it does not
+    # force Alloy to consume it. When changing the limit, re-derive from the budget — never re-apply a
+    # percentage.
     environment:
-      GOMEMLIMIT: "300MiB"
+      GOMEMLIMIT: "360MiB"
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
@@ -288,14 +303,19 @@ services:
     deploy:
       resources:
         limits:
-          # 384M (was 256M, orig 192M): ADR-0095 (2026-07-12) added the three busiest apps' full
+          # 512M (was 384M, 256M, orig 192M): ADR-0095 (2026-07-12) added the three busiest apps' full
           # stdout/stderr via loki.source.docker + RE2 masking on top of the OTLP receiver+exporter and
           # ~8 file tailers, raising Alloy's steady-state working set without a compensating limit bump —
-          # so it kept riding >90% of 256M and tripped ContainerWorkingSetHigh (2026-07-15). 384M gives
-          # real headroom above that workload; GOMEMLIMIT above (300MiB, ~78%) sits below the 90% alert
-          # line so a healthy GC-at-target no longer reads as an imminent OOM. Bump to 512M / GOMEMLIMIT
-          # 400MiB if prod working-set data shows Alloy sustaining above ~330M.
-          memory: 384M
+          # so it kept riding >90% of 256M and tripped ContainerWorkingSetHigh (2026-07-15). The 384M
+          # follow-up did NOT hold: it paged again 2026-07-24/25 with no new Alloy workload since (the
+          # only config change was a `stage.drop`), i.e. Alloy was GC-pinned AT its 300MiB GOMEMLIMIT and
+          # the constant ~47 MiB non-Go overhead pushed the total onto the 90% line. See the GOMEMLIMIT
+          # comment above for the measured budget arithmetic that replaces the old percentage rule;
+          # 512M/360MiB targets a ~80% working set. If this recurs a THIRD time with no added workload,
+          # stop bumping and treat it as an Alloy-side leak (check for loki.source.docker
+          # tailer-reconnect churn: "could not transfer logs: unexpected EOF") rather than a sizing
+          # shortfall.
+          memory: 512M
           pids: 512
     networks:
       - net-monitoring-core

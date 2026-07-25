@@ -88,6 +88,23 @@ the sync.
 Post-pass the `prod` app services total ~9.5 GB; with the ~2–3 GB monitoring stack that leaves ~4 GB
 headroom on the 16 GB host. Keep the sum of limits under ~14 GB.
 
+> **Measured update 2026-07-25 (PR #1419) — the ~14 GB guidance is now effectively reached.** The app
+> side held to its prediction (**9.75 GB**, after the frontend limit went 1024M → 1280M to fix
+> `ContainerWorkingSetHigh`), but the **monitoring stack has grown to 4.23 GB**, well past the "~2–3 GB"
+> this ADR assumed. Current sum: **13.98 GB — about 16 MB under the cap.** The `~14 GB` rule itself is
+> unchanged and still honoured; what is stale is the monitoring estimate it was derived from.
+>
+> The next capacity increase therefore needs an explicit owner decision, not an incremental bump. The
+> identified lever, with measurements to back it, is the **`backend` app container: 2048M against a
+> measured 1108 MB working-set peak (54%)**, whose heap is capped at 1167 MB (57%) for a 1605 MB
+> worst case. Reducing it to 1792M with `MaxRAMPercentage=55` (986 MB heap — still 1.5× the 670 MB it
+> actually commits) keeps its worst case at 79% and returns **256 MB**. That was deliberately NOT done
+> in PR #1419: shrinking the busiest JVM's ceiling is a capacity trade for @greluc to make. The same
+> applies to trimming the monitoring stack, which is where the actual drift is.
+>
+> Measure before deciding — the per-service snapshot queries (working set, `jvm_memory_committed_bytes`
+> by area, and the unreported native-memory term) are in `monitoring/README.md`.
+
 ### 5. Preserve the 30-day rolling login (Redis sized instead of TTL cut)
 
 The 30-day Spring-Session idle window is a **deliberate** design premise (it carries the OAuth2
