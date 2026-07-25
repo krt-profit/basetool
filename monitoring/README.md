@@ -142,7 +142,7 @@ Keep triage fast: confirm the signal in the matching Grafana dashboard, then act
 | **P4kImportFailed**                                                                                                      | A P4K catalog import reached FAILED in the last 24h. A repeatedly-failing import leaves a healthy-looking empty pending queue; open the job list and the backend logs for the error.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | **JobOrderStale / RefineryOrderStale / OperationStale**                                                                  | A work-queue item has been open/planned past its baseline (job order > 180d, refinery order / operation > 30d) — likely abandoned. Close, reassign or cancel it. The floors are baselines; tune them to the org's cadence.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | **MailDeliveryFailing**                                                                                                  | Outgoing SMTP mail is failing (>2/h). Check the relay host/credentials and the backend logs; registration and approval notifications may be silently lost.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| **MailDroppedConfigDrift**                                                                                               | Mail is being dropped before delivery on a deployment where it is configured — a config-drift regression. Check `app.mail.enabled`, `spring.mail.host` and the `JavaMailSender` bean; the firing label names the gate.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| **MailDroppedConfigDrift**                                                                                               | Mail is enabled but silently going nowhere: check `spring.mail.host` (blank env var?) and the `JavaMailSender` bean; the firing `outcome` label names the gate. Scoped to `dropped_no_host` / `dropped_no_sender` only — the deliberate `APP_MAIL_ENABLED=false` prod kill-switch (`dropped_disabled`) is excluded and never mails, so this alert is expected to stay silent until mail is switched on.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | **SsePushChannelDead**                                                                                                   | The backend has zero live SSE connections while users are online (frontend active sessions > 3) — the notification push channel is down and clients fell back to polling. Check reverse-proxy SSE buffering (no response buffering on `/notifications/stream`) and the relay.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | **FrontendLoginBroken**                                                                                                  | The frontend logged repeated OAuth2 provider errors (failed code-to-token exchange, JWKS or bad IdP response — `reason="provider_error"`, >=3 in 15m) with zero successes — login is likely broken for everyone at the token-exchange step. Check frontend logs and Keycloak reachability from the frontend (issuer-uri/JWKS) and the OIDC client config. Scoped to `provider_error` on purpose: a lone `invalid_state` failure (bot at the OAuth callback, abandoned/expired login) is benign and no longer trips this; a real state/session-loss break shows as `invalid_state` and via the `redis` readiness indicator.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | **CsrfRejectionSpike**                                                                                                   | CSRF-token rejections are elevated (>0.1/s for 15m) — likely a systematic CSRF-wiring regression, not stale tokens (which `krtFetch` self-heals). Check recent security/template changes and the `/csrf` endpoint.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -199,6 +199,58 @@ the internet and that the `/actuator` denies answer 404 (REQ-OBS-012). It cannot
 traffic from the internal blackbox exporter is SNAT'd to the Docker bridge gateways, which are
 exactly the `/admin` allow-list, so from inside the console always looks reachable. A failing run
 notifies via GitHub's workflow-failure e-mail, not Alertmanager.
+
+## Container memory sizing — how to measure before you tune
+
+Prometheus is **not published on the host** (it lives on `net-monitoring-core` behind basic auth), so
+query it via its container IP. `grafana` is the basic-auth user; the password is on the host in
+`/var/iri/monitoring/secrets/prometheus_web_password`, so it never has to be typed:
+
+```bash
+IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' prometheus | awk '{print $1}')
+PW="$(cat /var/iri/monitoring/secrets/prometheus_web_password)"
+q() { curl -sG -u "grafana:$PW" "http://$IP:9090/api/v1/query" --data-urlencode "query=$1" --data-urlencode "time=${2:-}"; }
+```
+
+**Never size a container from a percentage — size it from a measured budget.** Take one *time-aligned*
+snapshot (pass a `time=` while the alert was firing; an instant query resolves each series within a 5 min
+lookback) of these three, then solve `heapCeiling + overhead <= ~80% of limit`:
+
+```promql
+container_memory_working_set_bytes{name=~"backend|frontend|ingest|alloy"}
+sum by (application,area) (jvm_memory_committed_bytes)
+sum by (application) (jvm_memory_used_bytes{area="heap"})
+```
+
+Three traps, all of which have produced a wrong fix here (see the **JVM CONTAINER SIZING** block in
+`docker-compose.yml`):
+
+- **`working_set != heap + nonheap`.** A third term — JVM-internal native memory that no JVM metric
+  reports (G1 auxiliary structures sized off *max* heap, JIT scratch, glibc malloc arenas) — was
+  **226 MB on the frontend**, more than its entire nonheap. Derive it as
+  `working_set - (heap_committed + nonheap_committed)` and budget it explicitly. Rule out the innocent
+  explanations first: page cache via `cgroup memory.stat` (`file=`), direct buffers via
+  `jvm_buffer_memory_used_bytes`, thread stacks via `jvm_threads_live_threads` — on this stack all
+  three were negligible and `anon` was ~97% of the working set.
+- **Do not `sum by (name)` over a multi-day window.** Each deploy creates a new container id under the
+  same `name`, and overlapping lives get added together — that is how you get a "peak" of 2183 MB in a
+  2048 MB container. Use `max by (name) (max_over_time(...))`, or snapshot a single instant.
+- **A percentage cannot fix a container whose floor already exceeds the target.** Check
+  `heap_used + overhead` against the limit *before* tuning: if that floor is already near the alert
+  line, the container is undersized and only more RAM helps. Conversely, raising the limit alone never
+  helps a JVM, because `MaxRAMPercentage` scales the heap ceiling with it.
+
+Cheap host-side cross-check without Prometheus (working set ≈ `anon` + active file pages):
+
+```bash
+id=$(docker inspect --format '{{.Id}}' frontend)
+grep -E '^(anon|file|kernel_stack|slab) ' /sys/fs/cgroup/system.slice/docker-$id.scope/memory.stat
+docker inspect --format '{{.Name}} limit={{.HostConfig.Memory}}' alloy frontend backend ingest
+```
+
+The last command is also how you confirm a compose-definition change actually **reached** the running
+container — a stale limit was the real root cause of a recurring `ContainerWorkingSetHigh` in July 2026,
+before `deploy.sh` learned to apply compose-definition drift.
 
 ## Grafana sandbox-export workflow
 

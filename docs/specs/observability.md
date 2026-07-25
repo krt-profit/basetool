@@ -575,9 +575,18 @@ transaction per pass) rather than per-scrape.
 - `basetool_mail_total{outcome}` counter (`SmtpMailService`, #1041 item 16), one bounded `outcome`
   per delivery path — `sent`, `failed` (swallowed `MailException`), and the three config-gate drops
   `dropped_disabled` / `dropped_no_host` / `dropped_no_sender`; never the recipient or subject
-  (PII). `MailDeliveryFailing` fires on `failed` > 2/h; `MailDroppedConfigDrift` fires on any
-  `dropped_*` (on the configured prod deployment a drop is a config-drift regression that silently
-  swallows registration / approval mail, previously visible only via `LogbackErrorSpike`).
+  (PII). `MailDeliveryFailing` fires on `failed` > 2/h; `MailDroppedConfigDrift` fires on
+  `dropped_no_host` / `dropped_no_sender` — mail was enabled but is silently going nowhere (blank
+  `spring.mail.host`, or no `JavaMailSender` bean), previously visible only via `LogbackErrorSpike`.
+  **`dropped_disabled` is deliberately out of scope** (amended 2026-07-25): the rule originally fired
+  on any `dropped_*` on the premise that "mail is configured on the monitored deployment", but on prod
+  `APP_MAIL_ENABLED=false` is the *intended* state until the privacy policy gains an e-mail section, so
+  every send took the kill-switch branch and the alert paged every 4 h about a policy decision rather
+  than a regression. Because `SmtpMailService` checks its gates in the order enabled → host → sender,
+  the two in-scope outcomes are unreachable while the kill-switch is off — the rule is correctly silent
+  today and starts protecting the moment mail is switched on. An *unintended* kill-switch flip is still
+  caught downstream by `RegistrationApprovalOverdue` (nobody acting on pending registrations). Locked
+  by `monitoring/prometheus/tests/maildropped_disabled_scope_test.yml`.
 - `basetool_sse_connections` gauge + `basetool_sse_send_failures_total{event}` counter
   (`NotificationStreamService`, #1041 item 17). The gauge sums the live SSE subscriber count across
   all recipients (unlabelled — `sub` is PII); the counter is bumped at each drop-on-send-failure

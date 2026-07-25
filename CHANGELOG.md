@@ -6,15 +6,26 @@
 
 - **Raffinerie: Im Einlager-Dialog lässt sich jede Ausgabezeile direkt als persönlicher Eintrag einlagern.** Bisher landete Raffinerie-Ausbeute immer im geteilten Staffelbestand und musste anschließend über „Mein Lager" umgebucht werden. Persönliche Zeilen tragen keine Zuordnung: Die Kombination mit einem Auftrag wird abgelehnt (der Auftrags-Selektor wird bei gesetztem Haken gesperrt), und die Mission des Raffinerieauftrags wird für diese Zeile nicht vermerkt (REQ-INV-035).
 
+## [v1.5.16](https://github.com/krt-profit/basetool/releases/tag/v1.5.16) - 2026-07-25
+
 ### Changed
 
 - **Bank-Anträge: Die letzte Spalte heißt jetzt „Entscheidung" statt „Aktionen", und der Über-Limit-Marker heißt „Über Limit" statt „Freigabe nötig".** Die Spalte zeigt nur bei offenen Anträgen Buttons, sonst die Person, die entschieden hat; der Marker wirkte auf bereits bestätigten Anträgen wie eine noch offene Aufgabe und ist dort jetzt zusätzlich grau statt gelb (REQ-BANK-041).
 
 - **Monitoring: Der `JobOrderStale`-Alert schlägt jetzt erst nach 180 Tagen an (vorher 30).** Lang laufende Aufträge sind bei der aktuellen Org-Kadenz normal; `RefineryOrderStale`/`OperationStale` bleiben bei 30 Tagen (REQ-OBS-005).
 
+- **Monitoring: `MailDroppedConfigDrift` alarmiert nicht mehr für den absichtlich abgeschalteten Mailversand.** Der Alert wertete den bewussten prod-Kill-Switch (`APP_MAIL_ENABLED=false`) als Konfigurationsfehler und mailte deshalb alle 4 Stunden; er greift jetzt nur noch bei aktiviertem, aber falsch konfiguriertem Versand (leerer SMTP-Host oder fehlende Sender-Bean) und bleibt bis zur Aktivierung des Mailversands still (REQ-OBS-011).
+
 ### Fixed
 
+- **Stabilität: Das Frontend läuft nicht mehr am Rand seines Speicherlimits.** Der Container war mit 1024 MB tatsächlich zu klein — gemessen auf prod belegte er 935 MB (91 %) und selbst der nicht reduzierbare Anteil lag bei 87 %, sodass keine Heap-Einstellung das Limit hätte retten können. Das Limit steigt auf 1280 MB und der Heap ist auf 50 % (640 MB) begrenzt, weiterhin klar über den gemessenen 529 MB. Greift beim nächsten Deploy.
+
+- **Stabilität: Backend und Ingest-Gateway können ihr Speicherlimit nicht mehr überschreiten.** Beide durften bis zu 75 % des Limits als Heap belegen, was zusammen mit dem übrigen Speicherbedarf 96 % (Backend) bzw. 90 % (Ingest) ergeben hätte — bisher unbemerkt, weil der Heap nie so weit wuchs. Die Obergrenzen liegen jetzt bei 57 % bzw. 60 % und damit immer noch beim 1,2- bis 1,7-Fachen des gemessenen Bedarfs; die Container-Limits bleiben unverändert. Greift beim nächsten Deploy.
+
+- **Monitoring: Alloy-Speicherlimit auf 512 MB angehoben (`GOMEMLIMIT` 360 MiB).** Der Log-/Trace-Versender lief erneut auf über 90 % seines 384-MB-Limits und löste den `ContainerWorkingSetHigh`-Alarm aus, obwohl keine neue Last hinzukam; die Größen sind jetzt anhand des gemessenen konstanten Zusatzbedarfs (~47 MiB) als Budget statt als reiner Prozentwert bemessen. Greift beim nächsten Deploy.
+
 - **Log-Hygiene: Anmeldungen mit noch nicht freigeschaltetem Konto fluten das Log nicht mehr.** Die erwarteten `PENDING_APPROVAL`-403 (die Shell eines wartenden Nutzers pollt mehrere Endpunkte pro Seitenaufruf) werden in Backend und Frontend jetzt auf DEBUG statt WARN geloggt; die Metrik/der `PendingApprovalBlockSpike`-Alert bleiben unverändert (REQ-OBS-001).
+
 - **Log-Hygiene: Keycloak protokolliert Verbindungsabbrüche von Clients nicht mehr als ERROR.** `io.vertx.core.net.impl.ConnectionBase` (leere `<missing-log-message>`-ERROR-Zeilen bei abruptem TCP-Reset des Browsers/Scanners) ist per `KC_LOG_LEVEL` stummgeschaltet, damit diese wertlosen Zeilen keine ERROR-Spike-Alerts auslösen.
 
 ## [v1.5.15](https://github.com/krt-profit/basetool/releases/tag/v1.5.15) - 2026-07-23

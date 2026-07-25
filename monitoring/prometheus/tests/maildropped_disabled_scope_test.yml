@@ -1,0 +1,79 @@
+# promtool unit test for the narrowed MailDroppedConfigDrift scope (REQ-OBS-011, 2026-07-25).
+#
+# Locks the `outcome=~"dropped_no_host|dropped_no_sender"` selector that replaced the original
+# `dropped_.*` catch-all. The old selector treated the DELIBERATE prod kill-switch
+# (`APP_MAIL_ENABLED=false`, kept off until the privacy policy gains an e-mail section) as a
+# config-drift regression, so it paged every 4h about a policy decision — the 2026-07-24/25 mail
+# storm. The two genuine drift outcomes must keep firing:
+#   - SILENT for dropped_disabled, however large the count (the intended steady state);
+#   - FIRES for dropped_no_host (mail enabled but `spring.mail.host` blank);
+#   - FIRES for dropped_no_sender (host set but no JavaMailSender bean);
+#   - SILENT for a healthy deployment that is actually sending.
+#
+# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
+#   docker run --rm -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.13.1 promtool test rules tests/maildropped_disabled_scope_test.yml
+
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  # The prod steady state: every send takes the kill-switch branch, so dropped_disabled climbs
+  # steadily. The selector must NOT match it -> no alert, no mail. This is the false positive.
+  - name: silent - deliberate kill-switch drops (dropped_disabled climbing)
+    interval: 1m
+    input_series:
+      - series: 'basetool_mail_total{outcome="dropped_disabled"}'
+        values: "0+5x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: MailDroppedConfigDrift
+        exp_alerts: []
+
+  # Mail was ENABLED but `spring.mail.host` is blank (e.g. an empty env var passed through by Compose):
+  # real drift, silently swallowing registration/approval mail -> MUST fire past the 10m `for`.
+  - name: fires - mail enabled but spring.mail.host blank (dropped_no_host)
+    interval: 1m
+    input_series:
+      - series: 'basetool_mail_total{outcome="dropped_no_host"}'
+        values: "0+1x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: MailDroppedConfigDrift
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              outcome: dropped_no_host
+            exp_annotations:
+              summary: "Mail dropped by a config gate (dropped_no_host)"
+              description: "Outgoing mail was dropped before delivery (dropped_no_host) — mail is enabled on this deployment but misconfigured (blank spring.mail.host, or no JavaMailSender bean), so registration / approval notifications are being lost. The deliberate app.mail.enabled=false kill-switch (dropped_disabled) is out of scope for this alert."
+
+  # Host set but the autoconfigured JavaMailSender bean is missing: the third gate, also real drift.
+  - name: fires - host set but no JavaMailSender bean (dropped_no_sender)
+    interval: 1m
+    input_series:
+      - series: 'basetool_mail_total{outcome="dropped_no_sender"}'
+        values: "0+1x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: MailDroppedConfigDrift
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              outcome: dropped_no_sender
+            exp_annotations:
+              summary: "Mail dropped by a config gate (dropped_no_sender)"
+              description: "Outgoing mail was dropped before delivery (dropped_no_sender) — mail is enabled on this deployment but misconfigured (blank spring.mail.host, or no JavaMailSender bean), so registration / approval notifications are being lost. The deliberate app.mail.enabled=false kill-switch (dropped_disabled) is out of scope for this alert."
+
+  # A healthy deployment actually delivering mail: only `sent` climbs, no dropped_* series at all.
+  - name: silent - healthy deployment sending mail
+    interval: 1m
+    input_series:
+      - series: 'basetool_mail_total{outcome="sent"}'
+        values: "0+3x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: MailDroppedConfigDrift
+        exp_alerts: []

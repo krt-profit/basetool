@@ -315,11 +315,26 @@ x-backend: &backend-template
       hard: 65536
   # Biggest workload on the host: every API call goes through this JVM, Flyway
   # runs at startup, and Hibernate caches L1/L2 + Caffeine caches live here.
-  # MaxRAMPercentage=75 (set further down in JAVA_TOOL_OPTIONS) maps to roughly
-  # 1.5 GB heap inside the 2048M limit, the remaining ~512 MB cover Metaspace,
-  # the JIT code cache, native libs (openpdf, postgres jdbc) and a working
-  # buffer for the Tomcat thread pool. Raised from 1536M for precautionary
-  # headroom against restart / peak-load spikes; the 16 GB host has room.
+  # MaxRAMPercentage=57 (set further down in JAVA_TOOL_OPTIONS) maps to roughly
+  # 1167 MB heap inside the 2048M limit, leaving ~880 MB for Metaspace, the JIT
+  # code cache, native libs (openpdf, postgres jdbc), G1 auxiliary structures and
+  # a working buffer for the Tomcat thread pool.
+  #
+  # MaxRAMPercentage is 57, NOT 75 (lowered 2026-07-25, same sweep as the frontend). At 75 the heap
+  # ceiling was 1536 MB and this container's measured overhead (nonheap 230 + other native 208 = 438
+  # MB; see the JVM CONTAINER SIZING block in x-frontend) puts a fully-grown heap at 1974 MB = 96% of
+  # the limit — i.e. the heap ceiling could not physically fit under the ContainerWorkingSetHigh 90%
+  # line. Unlike the frontend this had NOT paged, and would not have soon: prod measures heapCommitted
+  # at only 670 MB (heapUsed 416) and a 1108 MB working set = 54% of the limit, so the ceiling was a
+  # latent trap, not an active one. 57% caps the heap at 1167 MB, satisfying `H + 438 <= 80% of 2048`
+  # (the cap is 1200 MB) for a 1605 MB worst case = 78%.
+  #
+  # This takes away no heap the service uses: 1167 MB is 1.7x the 670 MB it commits and 2.8x the
+  # 416 MB it uses, and still above the 1152 MB ceiling it ran on for months before 8d7ec8f5 (that
+  # bump was explicitly "precautionary", never a response to heap pressure). Note the limit is
+  # deliberately NOT reduced even though 2048 MB is generous against a measured 1108 MB peak —
+  # shrinking the busiest JVM's ceiling is a capacity decision for the repo owner, and ADR-0085's
+  # "sum of limits under ~14 GB" still holds without it.
   deploy:
     resources:
       limits:
@@ -394,7 +409,12 @@ x-backend: &backend-template
     # volume entry per service.
     SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
     SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
-    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0
+    # MaxRAMPercentage=57 (was 75) — see the heap-budget rationale in the deploy.resources comment
+    # above: at 75 a fully-grown heap plus the measured 438M overhead reached 96% of the limit.
+    # InitialRAMPercentage drops 50 -> 35 (717M): it must stay below the 57% max (1167M), and 717M sits
+    # just above the 670M this JVM actually commits, so startup no longer pre-commits ~350M of heap the
+    # service never touches. Keep Initial < Max on any change — an inverted pair fails the JVM start.
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=57.0 -XX:InitialRAMPercentage=35.0
   volumes:
     - /var/iri/backend/log:/app/logs
     # Production cert is on the host, never in the image. Default points at the
@@ -507,15 +527,60 @@ x-frontend: &frontend-template
     nofile:
       soft: 65536
       hard: 65536
-  # Thymeleaf SSR + WebClient proxy to the backend; no JPA, no business logic,
-  # so the working set is well below the backend's. 1024 MB → ~768 MB heap with
-  # MaxRAMPercentage=75 covers Tomcat, the Spring Session client cache and the
-  # Caffeine-backed reference-data cache, with precautionary headroom over the
-  # previous 768M.
+  # Thymeleaf SSR + WebClient proxy to the backend; no JPA, no business logic.
+  # 1280 MB → ~640 MB heap with MaxRAMPercentage=50 covers Tomcat, the Spring
+  # Session client cache and the Caffeine-backed reference-data cache.
+  #
+  # ============================ JVM CONTAINER SIZING (reference) ============================
+  # This block is the reference derivation for all three Spring Boot JVMs. All three were
+  # re-budgeted 2026-07-25 after `ContainerWorkingSetHigh` fired on this container; the numbers
+  # below are MEASURED on prod (Prometheus, snapshot 2026-07-25T02:00Z while the alert was firing),
+  # not estimated — an earlier revision of this comment guessed them and guessed wrong.
+  #
+  #   svc       limit  heapCommit  heapUsed  nonheap  otherNative  workingSet  %limit
+  #   backend    2048         670       416      230          208        1108     54%
+  #   frontend   1024         529       482      180          226         935     91%   <- paged
+  #   ingest      512         248        61       76           13         337     66%
+  #
+  # Two things that comment used to get wrong, both worth remembering:
+  #
+  # 1. `working_set != heap + nonheap`. There is a THIRD term — `otherNative` above — that no JVM
+  #    metric reports: 226 MB on the frontend, i.e. more than its whole nonheap. It is NOT page cache
+  #    (cgroup memory.stat: file=13M) and NOT direct buffers (jvm_buffer_memory_used: 0.4M) and NOT
+  #    thread stacks (67 live threads); cgroup `anon` accounts for ~97% of the working set, so it is
+  #    JVM-internal native memory (G1 auxiliary structures sized off MAX heap, JIT scratch, glibc
+  #    malloc arenas). Budget it explicitly per service: `workingSet ~= heapCommitted + overhead`,
+  #    where overhead = nonheap + otherNative = 438 (backend) / 406 (frontend) / 89 (ingest) MB.
+  #
+  # 2. The frontend did NOT page because its heap grew into its ceiling. At the alert its heap had
+  #    committed 529 MB of a 742 MB ceiling and was never going to reach it. So lowering
+  #    MaxRAMPercentage alone could not have helped: the IRREDUCIBLE floor (heapUsed 482 + overhead
+  #    406) is 888 MB = 87% of a 1024 MB limit, already above the 90%-line's practical margin. No
+  #    heap percentage whatsoever fits this app under 90% in a 1024 MB box — solving for
+  #    `H + 406 <= 0.80 * 1024` gives H <= 413 MB, which is BELOW the 482 MB it demonstrably uses.
+  #    The frontend was simply undersized, and 8d7ec8f5's 768M -> 1024M bump was directionally right
+  #    but too small AND paired with a 75% ratio that let the ceiling outrun the box.
+  #
+  # Sizing rule: pick the limit L and ceiling H = MaxRAMPercentage x L so that H + overhead <= ~80% L,
+  # with H comfortably above the MEASURED heapCommitted. Never re-derive by re-applying a percentage:
+  # raising L alone is a no-op for the alert because H scales with it (that is the 8d7ec8f5 trap), and
+  # lowering the percentage alone cannot help when the floor already exceeds the target.
+  #
+  #   - backend  2048M unchanged, 75 -> 57  (H=1167 <= the 1200 cap; 1167+438 = 1605 = 78%)
+  #   - frontend 1024M -> 1280M,  75 -> 50  (this block; H=640 > 529 measured; 640+406 = 1046 = 82%)
+  #   - ingest    512M unchanged, 75 -> 60  (H=307 <= the 321 cap; 307+89 = 396 = 77%)
+  # Only the frontend needed more RAM (+256 MB); the other two are pure ratio corrections that cost
+  # nothing and, per the table above, take away no heap either service was actually using.
+  # Also keep InitialRAMPercentage BELOW MaxRAMPercentage — an inverted pair makes the JVM refuse to
+  # start — and near the measured heapCommitted so the container does not pre-commit dead memory.
+  # Keycloak is the same class but already lands ~80%: its image auto-sizes the heap to ~70% of the
+  # 2560M limit and Quarkus native memory is far smaller than a Spring Boot JVM's, so it needs no
+  # change. Re-measure with the snapshot queries in monitoring/README.md before any future change.
+  # ==========================================================================================
   deploy:
     resources:
       limits:
-        memory: 1024M
+        memory: 1280M
         cpus: '1.0'
         # JVM thread ceiling — generous headroom (see the backend template).
         pids: 2048
@@ -535,7 +600,12 @@ x-frontend: &frontend-template
     MONITORING_TRACING_SAMPLING_PROBABILITY: ${MONITORING_TRACING_SAMPLING_PROBABILITY:-1.0}
     SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
     SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
-    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0
+    # MaxRAMPercentage=50 at the 1280M limit → a 640M ceiling, comfortably above the 529M this JVM
+    # measurably commits on prod. InitialRAMPercentage drops 50 -> 35 (448M): it must stay BELOW the
+    # max (at the old 50 it would be 640M == the max, an inverted/equal pair that makes the JVM refuse
+    # to start or clamp), and sitting just under the measured commit avoids pre-committing dead
+    # memory. See the JVM CONTAINER SIZING block above for the measured derivation.
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0 -XX:InitialRAMPercentage=35.0
   volumes:
     - /var/iri/frontend/log:/app/logs
     - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
@@ -565,7 +635,18 @@ x-ingest: &ingest-template
   cap_drop: [ALL]
   stop_grace_period: 30s
   # Lightweight: a JWT-validating relay + Redis staging, no JPA, no business logic. 512 MB →
-  # ~384 MB heap with MaxRAMPercentage=75 covers Tomcat, the reactive WebClient and Lettuce.
+  # ~307 MB heap with MaxRAMPercentage=60 covers Tomcat, the reactive WebClient and Lettuce.
+  #
+  # MaxRAMPercentage=60 (was 75, lowered 2026-07-25); the 512M limit is UNCHANGED. Measured on prod
+  # (see the JVM CONTAINER SIZING block in x-frontend): heapCommitted 248M, heapUsed only 61M, nonheap
+  # 76M, other native 13M, working set 337M = 66% of the limit. The old 75% ceiling (371M) was never
+  # REACHABLE — 371 + 89 overhead = 460M = 90% of the limit, exactly the alert line — so this service
+  # sat one traffic burst away from paging, and would have been OOM-killed before it could use the top
+  # of its own heap. It never fired only because a near-idle relay's G1 heap stays near
+  # InitialRAMPercentage rather than its ceiling. 60% (307M) satisfies `H + 89 <= 80% of 512` (the cap
+  # is 321M) and still sits far above the 248M actually committed, so it removes no usable capacity:
+  # worst case becomes 396M = 77%. This is the cheapest of the three fixes — a pure ratio correction,
+  # no extra RAM, and it is what keeps the stack inside ADR-0085's "sum of limits under ~14 GB".
   deploy:
     resources:
       limits:
@@ -609,7 +690,11 @@ x-ingest: &ingest-template
     # self-signed cert).
     SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
     SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
-    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0
+    # MaxRAMPercentage=60 (was 75) — see the heap-budget rationale in the deploy.resources comment
+    # above. InitialRAMPercentage stays 50 (256M): still below the 60% max (307M) — keep Initial < Max,
+    # an inverted pair makes the JVM refuse to start — and it happens to match the 248M this service
+    # actually commits, so the container pre-commits almost exactly what it needs.
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=60.0 -XX:InitialRAMPercentage=50.0
   volumes:
     - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
     # Log dir mounted like backend/frontend (host dir pre-chowned to uid 10001) so the gateway can

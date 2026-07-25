@@ -357,17 +357,30 @@ groups:
           summary: "SMTP mail delivery failing (>2/h)"
           description: "More than 2 outgoing mails failed to send in the last hour. Check the SMTP relay and the backend logs; registration / approval notifications may be silently lost."
 
-      # On the monitored (prod) deployment mail is configured, so ANY dropped_* outcome means a
-      # config-drift regression (kill-switch flipped, blank host env var, or a missing sender bean)
-      # that silently swallows mail. by(outcome) so the firing alert names the specific gate.
+      # A dropped_* outcome means mail was swallowed by one of SmtpMailService's three config gates.
+      # by(outcome) so the firing alert names the specific gate.
+      #
+      # dropped_disabled is DELIBERATELY EXCLUDED (2026-07-25). This rule originally assumed "mail is
+      # configured on the monitored deployment, so ANY drop is drift" — that premise is false for prod:
+      # `APP_MAIL_ENABLED=false` is the INTENDED steady state there, because re-enabling transactional
+      # mail requires a matching e-mail section in the privacy policy first (the mail/privacy
+      # coupling). So every prod send took the kill-switch branch and the rule paged every 4h about a
+      # policy decision, not a regression — a pure false positive that trained the on-call to ignore the
+      # mail alerts entirely. The two REMAINING outcomes are still genuine drift and stay in scope: a
+      # blank `spring.mail.host` (dropped_no_host) or a missing JavaMailSender bean (dropped_no_sender)
+      # both mean mail was TURNED ON but is silently going nowhere. Because SmtpMailService checks the
+      # gates in the order enabled -> host -> sender, those two are unreachable while the kill-switch is
+      # off, so this rule is correctly silent today and starts protecting the moment mail is enabled.
+      # If the kill-switch is ever flipped off UNINTENTIONALLY, RegistrationApprovalOverdue still
+      # catches the user-visible consequence (nobody acts on pending registrations).
       - alert: MailDroppedConfigDrift
-        expr: sum by (outcome) (increase(basetool_mail_total{outcome=~"dropped_.*"}[1h])) > 0
+        expr: sum by (outcome) (increase(basetool_mail_total{outcome=~"dropped_no_host|dropped_no_sender"}[1h])) > 0
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "Mail dropped by a config gate ({{ $labels.outcome }})"
-          description: "Outgoing mail was dropped before delivery ({{ $labels.outcome }}) — mail is configured on this deployment, so this is a config-drift regression (app.mail.enabled, spring.mail.host, or the JavaMailSender bean). Registration / approval notifications are being lost."
+          description: "Outgoing mail was dropped before delivery ({{ $labels.outcome }}) — mail is enabled on this deployment but misconfigured (blank spring.mail.host, or no JavaMailSender bean), so registration / approval notifications are being lost. The deliberate app.mail.enabled=false kill-switch (dropped_disabled) is out of scope for this alert."
 
       # (#1041 item 17) Dead notification push channel. The backend SSE gauge reads zero while the
       # frontend still reports active sessions — users are online but no SSE stream reaches the
