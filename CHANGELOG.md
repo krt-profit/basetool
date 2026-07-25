@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Release-Pipeline: Ein Aussetzer von Docker Hub bricht den Image-Bau nicht mehr ab.** Das BuildKit-Image wird vor dem Start des Builders mit Wiederholversuchen geladen, und die rein manifestbezogenen Jobs (Zusammenführen, Promotion) starten gar keinen Builder mehr — sie brauchten nie einen. Zuvor scheiterte der `keycloak-spi`-Job von v1.5.17 an einer Zeitüberschreitung beim anonymen Docker-Hub-Abruf, nachdem sein Build bereits erfolgreich war.
+
 ## [v1.5.17](https://github.com/krt-profit/basetool/releases/tag/v1.5.17) - 2026-07-25
 
 ### Added

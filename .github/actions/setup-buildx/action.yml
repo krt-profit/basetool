@@ -1,0 +1,78 @@
+name: Set up Docker Buildx (Docker Hub flake resilient)
+
+description: >
+  Boots a `docker-container` BuildKit builder like `docker/setup-buildx-action`
+  does, but pre-pulls the BuildKit image with retry + backoff first so a
+  transient Docker Hub failure cannot fail the job.
+
+# Why this wrapper exists:
+#
+# The `docker-container` driver runs BuildKit as a container, so booting a
+# builder pulls `moby/buildkit:buildx-stable-1` from Docker Hub — an anonymous,
+# unauthenticated pull that is subject to Docker Hub's per-IP rate limit and to
+# the shared-runner egress being intermittently slow. buildx wraps that pull in
+# a short context deadline; when it expires the boot dies with
+#   `ERROR: Error response from daemon: Get "https://registry-1.docker.io/v2/":
+#    context deadline exceeded`
+# and takes the whole job with it. That is exactly what failed the v1.5.17
+# `Build & sign keycloak-spi bundle` job (run 30160708503) after its Gradle
+# build had already succeeded — a pure infrastructure flake with no code cause,
+# on a release whose other seven image jobs all passed.
+#
+# The fix leans on a documented buildx behaviour: when the driver's own image
+# pull fails, buildx falls back to the **local image store** and only aborts if
+# the image is absent there too. Pre-pulling with `docker pull` (which has no
+# short internal deadline) and retrying with backoff therefore turns a
+# hard failure into, at worst, a logged warning followed by a successful boot
+# from the local cache.
+#
+# This is the same reasoning as the `cosign sign` retry wrappers in
+# release-images.yml / promote.yml: signing and builder-boot are both network
+# round-trips to a shared public service, and a single flake there must not fail
+# an otherwise-complete release.
+#
+# The step is deliberately **non-fatal**: if every pre-pull attempt fails we
+# still hand over to `setup-buildx-action`, which may well succeed on its own.
+# The wrapper can only improve the odds, never fail a job that would have passed.
+
+inputs:
+  buildkit-image:
+    description: >
+      BuildKit image the `docker-container` driver boots. Pinned through to the
+      driver via `driver-opts` so the tag that gets pre-pulled and the tag that
+      gets booted can never diverge. Kept on the floating `buildx-stable-1` tag
+      that setup-buildx-action defaults to, so this wrapper does not silently
+      freeze BuildKit at a version the action no longer tests against.
+    required: false
+    default: moby/buildkit:buildx-stable-1
+
+runs:
+  using: composite
+  steps:
+    - name: Pre-pull BuildKit image (retry on transient registry failure)
+      shell: bash
+      env:
+        BUILDKIT_IMAGE: ${{ inputs.buildkit-image }}
+      run: |
+        set -eu
+        attempts=4
+        delay=5
+        for i in $(seq 1 "$attempts"); do
+          if docker pull --quiet "$BUILDKIT_IMAGE"; then
+            echo "BuildKit image present locally: ${BUILDKIT_IMAGE}"
+            exit 0
+          fi
+          if [ "$i" -lt "$attempts" ]; then
+            echo "::warning::pulling ${BUILDKIT_IMAGE} failed (attempt ${i}/${attempts}); retrying in ${delay}s" >&2
+            sleep "$delay"
+            delay=$((delay * 2))
+          fi
+        done
+        # Non-fatal on purpose — see the header comment. setup-buildx-action
+        # still gets its own attempt at pulling the image.
+        echo "::warning::could not pre-pull ${BUILDKIT_IMAGE} after ${attempts} attempts; letting buildx try its own pull" >&2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      with:
+        driver-opts: image=${{ inputs.buildkit-image }}
