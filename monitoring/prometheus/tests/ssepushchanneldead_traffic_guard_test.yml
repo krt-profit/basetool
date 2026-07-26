@@ -1,0 +1,96 @@
+# promtool unit test for the SsePushChannelDead "users are online" guard (REQ-OBS-011, 2026-07-26).
+#
+# Locks the live-request-rate guard that replaced `basetool_active_sessions > 3`. The old guard
+# counted Spring Session entries in Redis, which carry a 720h authenticated TTL (REQ-SEC-025): on
+# prod the gauge sits at ~365 against ~30 real principals and never dips, so `> 3` held 24/7 and the
+# rule collapsed into a bare `basetool_sse_connections == 0 for 30m` — firing every night the
+# squadron was simply asleep (two mail pairs on 2026-07-26 alone).
+#
+#   - SILENT for an idle night: SSE at zero, no human traffic, session backlog still huge;
+#   - SILENT when only the infrastructure floor (blackbox `/`, NOT_FOUND scanners) is left;
+#   - FIRES when SSE is zero while real page traffic continues — the genuine dead-push-channel case;
+#   - SILENT for a healthy site with both SSE connections and traffic.
+#
+# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
+#   docker run --rm -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.13.1 promtool test rules tests/ssepushchanneldead_traffic_guard_test.yml
+
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  # THE false positive. Overnight: SSE flat at zero, nobody browsing, but the Redis session backlog
+  # still reads 365 because those sessions have a 30-day idle window. The old guard fired here.
+  - name: silent - idle night with a large stale session backlog
+    interval: 1m
+    input_series:
+      - series: 'basetool_sse_connections{job="basetool-backend"}'
+        values: "0x180"
+      - series: 'basetool_active_sessions{job="basetool-frontend"}'
+        values: "365x180"
+    alert_rule_test:
+      - eval_time: 150m
+        alertname: SsePushChannelDead
+        exp_alerts: []
+
+  # Same idle night, but the never-sleeping infrastructure floor is present: blackbox probes on `/`
+  # plus scanner 404s. All of it is excluded by the `uri` selector, so the guard must stay below the
+  # 0.01 req/s floor and the alert must stay silent.
+  - name: silent - only infrastructure traffic (blackbox probes and scanner 404s)
+    interval: 1m
+    input_series:
+      - series: 'basetool_sse_connections{job="basetool-backend"}'
+        values: "0x180"
+      # ~0.133 req/s of blackbox/NPM probing on the landing page.
+      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/"}'
+        values: "0+8x180"
+      # Background scanner noise.
+      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="NOT_FOUND"}'
+        values: "0+1x180"
+      # The probes' 302 to the login page.
+      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="REDIRECTION"}'
+        values: "0+2x180"
+    alert_rule_test:
+      - eval_time: 150m
+        alertname: SsePushChannelDead
+        exp_alerts: []
+
+  # The real defect: people are demonstrably on the site (steady traffic across genuine page URIs)
+  # yet not one SSE stream reaches the backend. Must fire past the 30m `for`.
+  - name: fires - zero SSE while real users browse
+    interval: 1m
+    input_series:
+      - series: 'basetool_sse_connections{job="basetool-backend"}'
+        values: "0x180"
+      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/missions"}'
+        values: "0+3x180"
+      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/notifications/unread-count"}'
+        values: "0+2x180"
+      # The infrastructure floor is present too and must not mask the genuine signal.
+      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/"}'
+        values: "0+8x180"
+    alert_rule_test:
+      - eval_time: 150m
+        alertname: SsePushChannelDead
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: basetool-backend
+            exp_annotations:
+              summary: "Notification SSE push channel dead while users are online"
+              description: "The backend has zero live SSE connections for 30 minutes while the frontend is still serving real user page traffic — the notification push channel is down and clients fell back to polling. Check reverse-proxy SSE buffering and the /notifications/stream relay."
+
+  # Healthy steady state: users browsing AND their SSE streams established.
+  - name: silent - healthy site with live SSE connections
+    interval: 1m
+    input_series:
+      - series: 'basetool_sse_connections{job="basetool-backend"}'
+        values: "10x180"
+      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/missions"}'
+        values: "0+3x180"
+    alert_rule_test:
+      - eval_time: 150m
+        alertname: SsePushChannelDead
+        exp_alerts: []

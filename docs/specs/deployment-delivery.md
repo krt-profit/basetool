@@ -472,7 +472,18 @@ maxmemory was unset), and `RedisEvictions` is a misconfiguration tripwire (any e
 **Enforced by:** `docker-compose.yml` (`x-redis` template + `redis` prod override) ·
 `monitoring/prometheus/alerts/infrastructure.yml` (Redis memory/persistence alerts) · **Decision:** ADR-0079
 
-### REQ-OPS-019 — JVM app containers reap orphaned subprocesses (PID-1 zombie reaping)
+### REQ-OPS-019 — Containers with a wget-HTTPS healthcheck reap orphaned subprocesses (PID-1 zombie reaping)
+
+**Scope rule (amended 2026-07-26): this applies to *every* container — in either compose file —
+whose PID 1 is not an init and whose healthcheck fetches an `https://` URL with BusyBox `wget`.** It
+is not a JVM property. The requirement was originally written for the three JVM app services and
+therefore silently exempted `grafana`, which carries the identical probe against its own TLS port
+with a Go binary as PID 1 (Go does not reap orphans either). It leaked one `ssl_client` zombie per
+30 s probe into a `pids: 512` cap — roughly four hours to exhaustion — and on 2026-07-26 was found
+at 512/512 with 493 zombies and `pids.events max=7445`, refusing every `fork()`: the healthcheck
+itself could no longer run (`/bin/sh: can't fork: Resource temporarily unavailable`), so the
+container reported `unhealthy` for two days while the Go server, which needs no fork, kept serving.
+When adding any service, check the probe, not the runtime.
 
 Every JVM app service (`backend`, `frontend`, `ingest`) runs with a zombie-reaping init as PID 1
 (`init: true`, Docker's bundled tini). The image entrypoint `exec java …` makes the JVM PID 1, and a
@@ -493,14 +504,36 @@ were `712 × (ssl_client) Z`.
 
 **Acceptance**
 
-- [ ] `backend`, `frontend` and `ingest` (via their `x-*` compose templates) set `init: true`; a
-  prod app container whose PID 1 is the bare JVM is a regression.
+- [ ] `backend`, `frontend` and `ingest` (via their `x-*` compose templates) **and `grafana`** set
+  `init: true`; a prod container that runs a wget-HTTPS healthcheck with a bare runtime as PID 1 is
+  a regression.
 - [ ] A long-lived (>17 h) app container's `pids` count stays flat instead of climbing ≈1 per 30 s
   healthcheck — no `<defunct>` `ssl_client` accumulation (spot-check: `docker exec <svc> sh -c 'cut
   -d" " -f3 /proc/[0-9]*/stat | sort | uniq -c'` shows no growing `Z` count).
+- [ ] Host-side cross-check that needs no working `fork()` in the container (the spot-check above
+  cannot run once the cap is hit, which is exactly when it matters): for each container,
+  `pids.current` in `/sys/fs/cgroup/system.slice/docker-<id>.scope/` stays well under `pids.max`,
+  and `ps -eo stat,ppid | awk '$1 ~ /^Z/ && $2 == <container host PID>'` counts zero zombies.
+- [ ] `ContainerPidsHigh` (REQ-OBS-014) covers the service — it is cap-relative
+  (`container_threads / container_threads_max > 0.8`) and unscoped by name, so a new service is
+  monitored automatically.
+- [ ] `.github/scripts/check_pid1_reaping.py` passes. It resolves each service's *effective* probe
+  the way Docker does (explicit compose `healthcheck` first, else the image's `HEALTHCHECK` — which
+  for our own images it reads out of the Dockerfiles, since the dev-profile services declare no
+  compose healthcheck at all) and fails the build on any forking probe without a reaping PID 1.
+
+**Defence in depth.** Three independent layers, because both incidents were silent until the cap was
+already exhausted: (1) `init: true` on the **shared** templates — `x-backend` / `x-frontend` /
+`x-ingest` in `docker-compose.yml` and `x-mon-base` in `docker-compose.monitoring.yml`, the latter
+covering **all 13** monitoring services rather than only grafana, so switching any of them to an
+HTTPS probe cannot re-arm the leak; (2) the CI gate above, which blocks the regression at review
+time; (3) `ContainerPidsHigh` as the runtime backstop for a task leak from any *other* source.
 
 **Enforced by:** `docker-compose.yml` (`x-backend` / `x-frontend` / `x-ingest` templates, `init:
-true`) · verification recipe in the `x-backend` service comment
+true`) · `docker-compose.monitoring.yml` (`x-mon-base` anchor, `init: true`) ·
+`.github/scripts/check_pid1_reaping.py` (wired into the `pid1-reaping` job of
+[`repo-lint.yml`](../../.github/workflows/repo-lint.yml), with a self-test that keeps it from
+passing vacuously) · verification recipe in the `x-backend` service comment
 
 ## Out of scope
 

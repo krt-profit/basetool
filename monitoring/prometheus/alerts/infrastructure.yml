@@ -300,20 +300,33 @@ groups:
       # pids/task leak (another zombie source, a thread runaway) before the cap is hit. cAdvisor's
       # container_threads is the cgroup pids.current task count (companion container_threads_max =
       # pids.max); the `process` metric group that emits it is enabled in docker-compose.monitoring.yml.
-      # Scoped to the four containers that carry the 2048 pids cap — keycloak is included as
-      # defense-in-depth: it carries the same cap but exports no basetool-* Micrometer series, so
-      # JvmThreadsHigh cannot see a pids/thread runaway in it at all. The 2048 cap is hardcoded here to
-      # stay in lockstep with JvmThreadsHigh and the compose pids limit (container_threads_max would
-      # export it, but the hardcode keeps both alerts trivially comparable); >80% (=1638) is the early
-      # warning and a steady climb is a task/thread leak. Verified against cadvisor v0.60.5.
+      # Compared against each container's OWN cap via container_threads_max (the cgroup pids.max),
+      # NOT a hardcoded number, and scoped to EVERY named container (amended 2026-07-26). It
+      # previously read `container_threads{name=~"backend|frontend|ingest|keycloak"} > 1638`, which
+      # was blind twice over: the name list omitted every non-JVM container, and the 1638 literal
+      # (80% of 2048) is unreachable for the ones capped at `pids: 512` — so for those the rule could
+      # not have fired even at 100% of their cap. Grafana hit exactly that hole: its wget-HTTPS
+      # healthcheck forks an `ssl_client` per probe that reparents to the Go server (no init, no
+      # wait()), and on 2026-07-26 it sat at 512/512 pids with 493 unreaped zombies and
+      # pids.events max=7445 — refusing every fork, `unhealthy` for two days, with no alert mail at
+      # all. `init: true` on the grafana service (docker-compose.monitoring.yml) removes that
+      # specific zombie source; this rule is what makes any future pids leak visible ANYWHERE.
+      # The `> 0` guard on the denominator drops the unnamed cgroup roots that export
+      # container_threads_max=0 and would otherwise divide to +Inf and fire permanently.
+      # Headroom is ample: measured on prod, grafana read 100% while the next-highest container
+      # (tempo) sat at 12.5%, so 0.8 is nowhere near normal operation. Verified on cadvisor v0.60.5;
+      # the `process` metric group that emits both series is enabled in docker-compose.monitoring.yml.
       - alert: ContainerPidsHigh
-        expr: container_threads{name=~"backend|frontend|ingest|keycloak"} > 1638
+        expr: >-
+          container_threads{name=~".+"}
+          / (container_threads_max{name=~".+"} > 0)
+          > 0.8
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "Container pids >80% of the cgroup cap: {{ $labels.name }}"
-          description: "Container {{ $labels.name }} holds more than 1638 tasks (>80% of its 2048 pids cgroup cap — container_threads is the cgroup pids.current count). At the cap the kernel refuses new tasks: the JVM throws 'unable to create native thread' and child-process spawns (healthcheck wget, ssl_client) fail — the 2026-07-12 ingest native-thread OOM, where unreaped zombies exhausted the cap while jvm_threads_live_threads (JVM-only) stayed flat and JvmThreadsHigh never fired. A steady climb is a task/zombie leak — investigate before it reaches 2048; do not raise the cap to silence it."
+          description: "Container {{ $labels.name }} holds more than 80% of its pids cgroup cap (container_threads is the cgroup pids.current count, container_threads_max its pids.max). At the cap the kernel refuses new tasks: a JVM throws 'unable to create native thread' and child-process spawns (healthcheck wget, ssl_client) fail — the 2026-07-12 ingest native-thread OOM and the 2026-07-26 grafana zombie exhaustion. A steady climb is a task/zombie leak — investigate before it reaches the cap; do not raise the cap to silence it."
 
       - alert: RedisEvictions
         expr: increase(redis_evicted_keys_total[15m]) > 0

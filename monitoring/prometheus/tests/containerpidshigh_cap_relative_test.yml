@@ -1,0 +1,92 @@
+# promtool unit test for the cap-relative ContainerPidsHigh scope (REQ-OBS-014, 2026-07-26).
+#
+# Locks the `container_threads / container_threads_max > 0.8` form that replaced
+# `container_threads{name=~"backend|frontend|ingest|keycloak"} > 1638`. The old rule was blind twice:
+# the name list omitted every non-JVM container, and the 1638 literal (80% of 2048) is unreachable
+# for containers capped at `pids: 512`. Grafana fell through both holes — 512/512 pids, 493 unreaped
+# `ssl_client` zombies from its wget-HTTPS healthcheck, `unhealthy` for two days, zero alert mails.
+#
+#   - FIRES for a 512-capped container at its cap (the grafana case the old rule could never see);
+#   - FIRES for a 2048-capped JVM container above 80% (the 2026-07-12 ingest regression case);
+#   - SILENT at normal load on both cap sizes;
+#   - SILENT for unnamed cgroup roots exporting container_threads_max=0 (no +Inf permafire).
+#
+# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
+#   docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.13.1 test rules tests/containerpidshigh_cap_relative_test.yml
+
+rule_files:
+  - ../alerts/infrastructure.yml
+
+evaluation_interval: 1m
+
+tests:
+  # THE blind spot. A 512-capped container pinned at its cap: 100% of pids.max, but only 512 tasks —
+  # far below the old 1638 literal, and not in the old name list either. Must fire.
+  - name: fires - 512-capped container at its cap (grafana zombie exhaustion)
+    interval: 1m
+    input_series:
+      - series: 'container_threads{name="grafana"}'
+        values: "512x30"
+      - series: 'container_threads_max{name="grafana"}'
+        values: "512x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerPidsHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              name: grafana
+            exp_annotations:
+              summary: "Container pids >80% of the cgroup cap: grafana"
+              description: "Container grafana holds more than 80% of its pids cgroup cap (container_threads is the cgroup pids.current count, container_threads_max its pids.max). At the cap the kernel refuses new tasks: a JVM throws 'unable to create native thread' and child-process spawns (healthcheck wget, ssl_client) fail — the 2026-07-12 ingest native-thread OOM and the 2026-07-26 grafana zombie exhaustion. A steady climb is a task/zombie leak — investigate before it reaches the cap; do not raise the cap to silence it."
+
+  # The original 2026-07-12 case must keep firing: a 2048-capped JVM container past 80% (1700/2048).
+  - name: fires - 2048-capped JVM container above 80 percent
+    interval: 1m
+    input_series:
+      - series: 'container_threads{name="ingest"}'
+        values: "1700x30"
+      - series: 'container_threads_max{name="ingest"}'
+        values: "2048x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerPidsHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              name: ingest
+            exp_annotations:
+              summary: "Container pids >80% of the cgroup cap: ingest"
+              description: "Container ingest holds more than 80% of its pids cgroup cap (container_threads is the cgroup pids.current count, container_threads_max its pids.max). At the cap the kernel refuses new tasks: a JVM throws 'unable to create native thread' and child-process spawns (healthcheck wget, ssl_client) fail — the 2026-07-12 ingest native-thread OOM and the 2026-07-26 grafana zombie exhaustion. A steady climb is a task/zombie leak — investigate before it reaches the cap; do not raise the cap to silence it."
+
+  # Normal operation on both cap sizes — prod measured grafana's healthy peers at <=12.5%.
+  - name: silent - normal load on 512-capped and 2048-capped containers
+    interval: 1m
+    input_series:
+      - series: 'container_threads{name="tempo"}'
+        values: "64x30"
+      - series: 'container_threads_max{name="tempo"}'
+        values: "512x30"
+      - series: 'container_threads{name="backend"}'
+        values: "56x30"
+      - series: 'container_threads_max{name="backend"}'
+        values: "2048x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerPidsHigh
+        exp_alerts: []
+
+  # cAdvisor exports unnamed cgroup roots whose pids.max is 0. Without the `> 0` denominator guard
+  # these divide to +Inf and would fire forever.
+  - name: silent - zero pids.max must not divide to +Inf
+    interval: 1m
+    input_series:
+      - series: 'container_threads{name="edgecase"}'
+        values: "10x30"
+      - series: 'container_threads_max{name="edgecase"}'
+        values: "0x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerPidsHigh
+        exp_alerts: []
