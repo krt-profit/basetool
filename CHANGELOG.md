@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.19](https://github.com/krt-profit/basetool/releases/tag/v1.5.19) - 2026-07-26
+
 ### Fixed
 
 - **Monitoring: Grafana läuft nicht mehr nach wenigen Stunden in einen Zustand, in dem es keine Prozesse mehr starten kann.** Der HTTPS-Healthcheck erzeugte pro Prüfung einen unaufgeräumten `ssl_client`-Zombieprozess; nach rund vier Stunden war das Prozesslimit des Containers erschöpft (zuletzt 493 Zombies), der Container galt zwei Tage als „unhealthy". Alle Monitoring-Container starten jetzt wie die App-Container mit einem aufräumenden Init-Prozess, sodass auch eine künftige Umstellung auf HTTPS den Fehler nicht erneut auslösen kann (REQ-OPS-019).
