@@ -382,19 +382,42 @@ groups:
           summary: "Mail dropped by a config gate ({{ $labels.outcome }})"
           description: "Outgoing mail was dropped before delivery ({{ $labels.outcome }}) — mail is enabled on this deployment but misconfigured (blank spring.mail.host, or no JavaMailSender bean), so registration / approval notifications are being lost. The deliberate app.mail.enabled=false kill-switch (dropped_disabled) is out of scope for this alert."
 
-      # (#1041 item 17) Dead notification push channel. The backend SSE gauge reads zero while the
-      # frontend still reports active sessions — users are online but no SSE stream reaches the
-      # backend (e.g. reverse-proxy buffering drift), so everyone silently fell back to the poll.
-      # `and on()` broadcasts the cross-target correlation (backend gauge vs frontend gauge, which
-      # live on different scrape jobs); >3 sessions avoids firing on a near-empty site.
+      # (#1041 item 17) Dead notification push channel. The backend SSE gauge reads zero while real
+      # users are demonstrably browsing — nobody's stream reaches the backend, so everyone silently
+      # fell back to the poll. `and on()` broadcasts the cross-target correlation (backend gauge vs
+      # frontend request rate, which live on different scrape jobs).
+      #
+      # The "users are online" guard MUST be live request traffic, NOT `basetool_active_sessions`
+      # (amended 2026-07-26). That gauge counts Spring Session entries in Redis, whose authenticated
+      # TTL is 720h (`app.session.authenticated-timeout`, REQ-SEC-025) — on prod it sits at ~365
+      # against ~30 real principals and NEVER dips, so `> 3` was true 24/7 and the rule degenerated
+      # to a bare `basetool_sse_connections == 0 for 30m`. That fires every single night: measured
+      # 2026-07-26, SSE fell 25 -> 0 at 00:45Z when the squadron went to bed and returned at 06:30Z,
+      # while active_sessions held flat at 362-370 throughout — two firing/resolved mail pairs for a
+      # site that was simply idle. A session that has not been touched for three weeks is not a user
+      # who is online.
+      #
+      # The `uri` exclusions strip the infrastructure floor that never sleeps: `/` carries a constant
+      # ~0.133 req/s of blackbox probes (https://profit-base.online, 30s interval) plus NPM health,
+      # `REDIRECTION` is dominated by those probes' 302 to the login, `NOT_FOUND` is background
+      # scanner noise, and `/actuator*` is the scrape/healthcheck surface. What remains is human page
+      # traffic: measured 0.04-0.18 req/s while people are on the site and exactly 0.0 across the
+      # 02:00-06:00Z dead window, with only ~0.002 req/s of stragglers at the shoulders — so the
+      # 0.01 req/s floor (~9 requests per 15m window) separates the two states cleanly. Note the
+      # failure direction is safe: if the frontend job disappears entirely the guard goes absent and
+      # this alert stays silent, leaving a full outage to TargetDown / blackbox, which own it.
       - alert: SsePushChannelDead
-        expr: (basetool_sse_connections == 0) and on() (basetool_active_sessions > 3)
+        expr: >-
+          (basetool_sse_connections == 0)
+          and on()
+          (sum(rate(http_server_requests_seconds_count{job="basetool-frontend",
+          uri!~"/|/actuator.*|NOT_FOUND|UNKNOWN|REDIRECTION"}[15m])) > 0.01)
         for: 30m
         labels:
           severity: warning
         annotations:
           summary: "Notification SSE push channel dead while users are online"
-          description: "The backend has zero live SSE connections for 30 minutes while the frontend reports more than 3 active sessions — the notification push channel is down and clients fell back to polling. Check reverse-proxy SSE buffering and the /notifications/stream relay."
+          description: "The backend has zero live SSE connections for 30 minutes while the frontend is still serving real user page traffic — the notification push channel is down and clients fell back to polling. Check reverse-proxy SSE buffering and the /notifications/stream relay."
 
       # (#1127) SSE relay pool near saturation — early warning for the silently-dropped-viewer
       # failure. The frontend->backend notification relay runs on a dedicated 1000-connection pool

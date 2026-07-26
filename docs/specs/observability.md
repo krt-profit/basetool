@@ -591,8 +591,22 @@ transaction per pass) rather than per-scrape.
   (`NotificationStreamService`, #1041 item 17). The gauge sums the live SSE subscriber count across
   all recipients (unlabelled — `sub` is PII); the counter is bumped at each drop-on-send-failure
   branch with a fixed `event` (`connected` / `notification` / `heartbeat`). Zero connections while
-  the frontend still reports active sessions drives `SsePushChannelDead` (a dead push channel, e.g.
-  reverse-proxy buffering drift). The cross-replica SSE fan-out (#1102, REQ-FE-015 / ADR-0094) adds
+  the frontend is still serving **real user page traffic** drives `SsePushChannelDead` (a dead push
+  channel, e.g. reverse-proxy buffering drift). The "users are online" guard **must be live request
+  rate, never `basetool_active_sessions`** (amended 2026-07-26): that gauge counts Spring Session
+  entries in Redis, whose authenticated TTL is 720h (REQ-SEC-025), so on prod it sits at ~365
+  against ~30 real principals and never dips. The original `basetool_active_sessions > 3` guard was
+  therefore true 24/7 and reduced the rule to a bare `basetool_sse_connections == 0 for 30m`, which
+  fires every night the org is simply asleep — measured 2026-07-26, SSE fell 25 → 0 at 00:45Z and
+  returned at 06:30Z while the session gauge held flat at 362–370, producing two firing/resolved
+  mail pairs for an idle site. The guard sums `http_server_requests_seconds_count{job="basetool-frontend"}`
+  excluding the infrastructure floor that never sleeps (`/` — a constant ~0.133 req/s of blackbox
+  probes and NPM health; `REDIRECTION` — those probes' 302 to the login; `NOT_FOUND` — scanner
+  noise; `/actuator*`), leaving human traffic that measures 0.04–0.18 req/s on the site and exactly
+  0.0 overnight, well separated by the 0.01 req/s floor. If the frontend job vanishes the guard goes
+  absent and the alert stays silent by design — a full outage belongs to `TargetDown` / blackbox.
+  Locked by `monitoring/prometheus/tests/ssepushchanneldead_traffic_guard_test.yml`.
+  The cross-replica SSE fan-out (#1102, REQ-FE-015 / ADR-0094) adds
   `basetool_sse_redis_published_total` / `basetool_sse_redis_consumed_total` (real-time notification
   signals this replica published to / consumed from the `basetool:notify:published` Redis channel;
   own-origin messages are excluded) and `basetool_sse_redis_errors_total{op}` (`publish` / `consume`
@@ -605,7 +619,9 @@ edit-awareness, unlabelled), `basetool_active_sessions` gauge (active Spring Ses
 `@Profile("!test")`, maintained by `ActiveSessionsTracker` from Spring Session create/delete/expire
 events and seeded once at startup from the Redis session namespace — it MUST NOT sample the
 Redis-backed `SpringSessionBackedSessionRegistry`, whose `getAllPrincipals()` throws and left the
-gauge permanently `NaN`, silently disarming `SsePushChannelDead`, #1158), and
+gauge permanently `NaN`, silently disarming the alert that then consumed it, #1158; its remaining
+consumer is `ActiveSessionsRunaway`, and it is **not** a presence signal — see the
+`SsePushChannelDead` guard note above), and
 `basetool_backend_client_errors_total{reason,method}` counter at the
 `BackendApiClient` failure funnels. `reason` is a fixed **local** enumeration
 (`backend_4xx`/`backend_5xx`/`circuit_open`/`bulkhead_full`/`timeout`/`unknown`) derived from the
@@ -934,11 +950,24 @@ therefore alerts on:
   fixed at the root by **REQ-OPS-019** (`init: true` PID-1 reaping on backend/frontend/ingest);
   `ContainerPidsHigh` (warning) is the observability complement that closes the *monitoring* blind
   spot and catches **any future** pids/task leak (a different zombie source, a thread runaway) before
-  the cap is hit. It fires when cAdvisor's `container_threads` (the cgroup `pids.current` task count;
-  companion `container_threads_max` = `pids.max`) exceeds 80% (1638) of the 2048 cap for 10m. It is
-  the cgroup-level companion to `JvmThreadsHigh` and additionally covers keycloak as defense-in-depth
-  — keycloak carries the same 2048 cap but exports no `basetool-*` Micrometer series, so
-  `JvmThreadsHigh` cannot see a pids/thread runaway in it at all. The signal exists **only because**
+  the cap is hit. It fires when cAdvisor's `container_threads` (the cgroup `pids.current` task count)
+  exceeds **80% of that container's own `container_threads_max`** (= `pids.max`) for 10m. The
+  comparison **must be cap-relative and must cover every named container** (amended 2026-07-26): the
+  rule originally read `container_threads{name=~"backend|frontend|ingest|keycloak"} > 1638` and was
+  blind twice over — the name list omitted every non-JVM container, and the `1638` literal (80% of
+  2048) is *unreachable* for the services capped at `pids: 512`, so for those it could not fire even
+  at 100% of their cap. Grafana fell through both holes: its wget-HTTPS healthcheck forks an
+  `ssl_client` per probe that reparents to the Go server (no init, never `wait()`s), and on
+  2026-07-26 it sat at 512/512 pids with 493 unreaped zombies and `pids.events max=7445`, refusing
+  every fork and reporting `unhealthy` for two days **with no alert mail at all**. The root cause is
+  fixed the same way as #1274 — `init: true` on the grafana service in
+  `docker-compose.monitoring.yml` — and the denominator carries a `> 0` guard so the unnamed cgroup
+  roots that export `container_threads_max=0` cannot divide to `+Inf` and permafire. Headroom is
+  ample: measured on prod, grafana read 100% while the next-highest container (tempo) sat at 12.5%.
+  It is the cgroup-level companion to `JvmThreadsHigh` and covers keycloak as defense-in-depth —
+  keycloak carries the same 2048 cap but exports no `basetool-*` Micrometer series, so
+  `JvmThreadsHigh` cannot see a pids/thread runaway in it at all. Locked by
+  `monitoring/prometheus/tests/containerpidshigh_cap_relative_test.yml`. The signal exists **only because**
   the cadvisor `process` metric group is enabled in `docker-compose.monitoring.yml`
   (`--disable_metrics` set to cadvisor's default minus `process`, plus `disk`; `--enable_metrics=process`
   is wrong — it *replaces* the whole set and would blind the memory/cpu container alerts). The `disk`

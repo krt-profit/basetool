@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Monitoring: Grafana läuft nicht mehr nach wenigen Stunden in einen Zustand, in dem es keine Prozesse mehr starten kann.** Der HTTPS-Healthcheck erzeugte pro Prüfung einen unaufgeräumten `ssl_client`-Zombieprozess; nach rund vier Stunden war das Prozesslimit des Containers erschöpft (zuletzt 493 Zombies), der Container galt zwei Tage als „unhealthy". Alle Monitoring-Container starten jetzt wie die App-Container mit einem aufräumenden Init-Prozess, sodass auch eine künftige Umstellung auf HTTPS den Fehler nicht erneut auslösen kann (REQ-OPS-019).
+
+- **CI: Ein neuer Prüfschritt blockiert genau diesen Fehler künftig vor dem Merge.** Er prüft für jeden Container-Dienst, ob ein Healthcheck Prozesse abspaltet, ohne dass ein aufräumender Init-Prozess läuft — inklusive der Healthchecks, die aus den Images stammen. Ein Selbsttest stellt sicher, dass die Prüfung nicht unbemerkt wirkungslos wird (REQ-OPS-019).
+
+- **Monitoring: `ContainerPidsHigh` überwacht jetzt alle Container gegen ihr jeweils eigenes Prozesslimit.** Die Regel prüfte nur die vier JVM-Container gegen einen fest verdrahteten Schwellwert, der für Container mit kleinerem Limit unerreichbar war — die Grafana-Erschöpfung blieb deshalb vollständig unbemerkt und ohne Alarmmail (REQ-OBS-014).
+
+- **Monitoring: `SsePushChannelDead` alarmiert nicht mehr jede Nacht, in der niemand das Tool nutzt.** Die Bedingung „Nutzer sind online" stützte sich auf die Zahl der Sitzungen in Redis, die 30 Tage gültig bleiben und deshalb dauerhaft bei ~365 liegt — der Alert prüfte faktisch nur noch „keine SSE-Verbindung seit 30 Minuten" und meldete deshalb jede Nacht einen toten Benachrichtigungskanal. Er wertet jetzt echten Seitenverkehr aus (ohne Health-Probes, 404-Scanner und `/actuator*`) und schlägt nur noch an, wenn tatsächlich jemand die Anwendung benutzt (REQ-OBS-011).
+
 ## [v1.5.18](https://github.com/krt-profit/basetool/releases/tag/v1.5.18) - 2026-07-25
 
 ### Fixed

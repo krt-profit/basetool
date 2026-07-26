@@ -33,6 +33,24 @@ x-mon-base: &mon-base
   security_opt:
     - no-new-privileges:true
   oom_score_adj: 500
+  # Zombie-reaping init (tini) as PID 1 for EVERY monitoring service — class-level protection,
+  # deliberately not per-service (REQ-OPS-019). Rationale: none of these images ships an init, so
+  # whichever process the image starts becomes PID 1, and Go/C binaries do not `wait()` on orphans.
+  # Any child that outlives its parent then lingers as a `<defunct>` and permanently occupies one of
+  # the `pids: 512` slots each service carries below. The known trigger is a healthcheck that fetches
+  # an `https://` URL: BusyBox `wget` forks an `ssl_client` TLS helper per probe, which is exactly how
+  # grafana reached 512/512 pids with 493 unreaped zombies on 2026-07-26 — refusing every fork,
+  # `unhealthy` for two days (the same defect as the 2026-07-12 ingest OOM that put `init: true` on
+  # the JVM app services in docker-compose.yml).
+  #
+  # Applied to the shared anchor rather than to grafana alone so the trap cannot be re-armed: today
+  # only grafana probes over TLS and alertmanager uses plain `http://` (no fork), but switching any
+  # service to HTTPS, or adding a new one with a forking probe, would otherwise silently reintroduce
+  # a ~4h-to-exhaustion leak. tini needs no capability, is compatible with `no-new-privileges` +
+  # `cap_drop: [ALL]`, and forwards signals, so graceful shutdown and `stop_grace_period` are
+  # unchanged. The runtime backstop for any *other* task leak is ContainerPidsHigh, which is
+  # cap-relative and unscoped by name (infrastructure.yml, REQ-OBS-014).
+  init: true
 
 services:
   # ------------------------------------------------------------------------------------------
@@ -141,6 +159,12 @@ services:
       - /var/iri/monitoring/certs/grafana.crt:/etc/grafana/certs/grafana.crt:ro
       - /var/iri/monitoring/certs/grafana.key:/etc/grafana/certs/grafana.key:ro
       - /var/iri/monitoring/data/grafana:/var/lib/grafana
+    # This is the ONE monitoring service whose probe forks: BusyBox `wget` spawns an `ssl_client` TLS
+    # helper for the https:// fetch below, one per 30s, which reparents to the Grafana Go server (PID
+    # 1, never `wait()`s). Unreaped it filled the `pids: 512` cap on 2026-07-26 — 493 zombies,
+    # pids.current 512/512, pids.events max=7445, every fork refused, `unhealthy` for two days.
+    # The reaper comes from `init: true` on the shared *mon-base anchor above; that is a deliberate
+    # class-level guarantee, not an incidental inheritance — dropping it re-arms this leak in ~4h.
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null --no-check-certificate https://localhost:3000/api/health || exit 1"]
       interval: 30s

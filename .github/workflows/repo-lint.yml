@@ -96,3 +96,36 @@ jobs:
       # Threshold lives in .hadolint.yaml (warning) so local + CI agree.
       - name: Run hadolint
         run: hadolint backend/Dockerfile frontend/Dockerfile
+
+  pid1-reaping:
+    name: pid1-reaping
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      # Uses the runner's preinstalled python3, like every other script in .github/scripts — no
+      # setup-python action, so there is no extra pinned SHA to maintain. PyYAML ships with the
+      # ubuntu-latest image; the fallback keeps the job working if that ever stops being true.
+      - name: Ensure PyYAML
+        run: |
+          set -eu
+          if ! python3 -c "import yaml" >/dev/null 2>&1; then
+            pip3 install --disable-pip-version-check pyyaml
+          fi
+          python3 -c "import yaml; print('PyYAML', yaml.__version__)"
+
+      # REQ-OPS-019. A wget-HTTPS healthcheck forks an `ssl_client` per probe; with no init as PID 1
+      # it is never reaped and fills the service's `pids` cgroup cap until every fork is refused.
+      # This shipped twice (ingest 2026-07-12 native-thread OOM, grafana 2026-07-26 unhealthy for two
+      # days) — both times silently, because nothing failed until the cap was already gone. The
+      # self-test runs first so the check can never pass vacuously: it asserts the detector still
+      # distinguishes forking from non-forking probes AND still resolves the image-level HEALTHCHECK
+      # out of the Dockerfiles (the dev-profile services have no compose healthcheck at all, so a
+      # broken resolver would silently exempt them).
+      - name: Self-test the detector
+        run: python3 .github/scripts/check_pid1_reaping.py --selftest
+
+      - name: Check PID-1 reaping invariant
+        run: python3 .github/scripts/check_pid1_reaping.py
