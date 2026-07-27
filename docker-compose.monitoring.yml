@@ -565,7 +565,7 @@ services:
   redis-exporter:
     <<: *mon-base
     container_name: redis-exporter
-    image: oliver006/redis_exporter:v1.87.0
+    image: oliver006/redis_exporter:v1.88.0
     cap_drop: [ALL]
     environment:
       REDIS_ADDR: redis://redis:6379
