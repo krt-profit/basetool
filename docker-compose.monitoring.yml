@@ -192,7 +192,7 @@ services:
   loki:
     <<: *mon-base
     container_name: loki
-    image: grafana/loki:3.7.3
+    image: grafana/loki:3.7.4
     cap_drop: [ALL]
     command: -config.file=/etc/loki/loki-config.yml
     # Docker's default 10s stop-grace SIGKILLs Loki ~20s into its dskit graceful shutdown
