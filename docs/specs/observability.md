@@ -358,7 +358,13 @@ abuse detection:
   login on a key-only host.
 - **Host auditd log** — `/var/log/audit/audit.log`: file-integrity watch events on `sshd_config`(.d)
   and root `authorized_keys` (the acting `auid` + path; catches a smuggled key or a security
-  downgrade). Ingested unmasked so the acting user stays attributable.
+  downgrade). Ingested unmasked so the acting user stays attributable. `AuditdSshTamper` must match
+  **`type=SYSCALL` only**: auditd stamps each rule's `key=` onto its own `add_rule` / `remove_rule`
+  `CONFIG_CHANGE` records as well, so an unscoped `key=` match turns every auditd restart — the
+  nightly unattended `libc6` upgrade restarts it — into a tamper page with no file actually touched
+  (2026-07-28 fix). Both watches are directory-wide (`-w /root/.ssh/`, `-w /etc/ssh/sshd_config.d/`),
+  so a benign `known_hosts` append by an outbound `ssh` is a genuine, attributable hit and stays in
+  scope on purpose.
 - **Host fail2ban log** — `/var/log/fail2ban.log`: SSH-jail ban/unban events carrying the offending
   client IP — the active-blocking complement to the `SshFailedAuthSpike` detection.
 
@@ -687,10 +693,17 @@ at Keycloak; the failure side is scoped to `provider_error` and floored so the b
 noise cannot trip it when fresh successes are naturally sparse under the 30-day login window.
 Unauthenticated bots hitting the bare OAuth callback raise `invalid_request` — a bare/partial callback
 is not a valid authorization response, so `OAuth2LoginAuthenticationFilter` rejects it before any token
-exchange — and abandoned / expired-state logins raise the state codes; `LoginFailureMetricsHandler`
-folds **both** into the `invalid_state` bucket (2026-07-15 fix — before it, `invalid_request` leaked
-into `provider_error` and off-peak scanner traffic false-tripped the alert), keeping `provider_error` a
-genuine post-authorization token/IdP-break signal. A state/session-loss break also surfaces as
+exchange — abandoned / expired-state logins raise the state codes, and the `prompt=none` silent-SSO
+probe `SsoReAuthenticationEntryPoint` fires on every unauthenticated top-level navigation comes back as
+the OIDC Core 3.1.2.6 error set (`login_required`, `interaction_required`, `consent_required`,
+`account_selection_required`) whenever the browser carries no live Keycloak SSO cookie;
+`LoginFailureMetricsHandler` folds **all three groups** into the `invalid_state` bucket (2026-07-15 fix
+for `invalid_request`, 2026-07-28 fix for the `prompt=none` set — each time the code leaked into
+`provider_error` and off-peak scanner traffic false-tripped the alert with login perfectly healthy),
+keeping `provider_error` a genuine post-authorization token/IdP-break signal. `login_required` is the
+highest-volume failure code the app records about itself — one per unauthenticated navigation — so it
+must never be alertable. `access_denied` deliberately stays in `provider_error`: it is an explicit
+refusal, not routine "no session yet" noise. A state/session-loss break also surfaces as
 `invalid_state` and via the `redis` readiness indicator instead) and
 `CsrfRejectionSpike` (a systematic CSRF-wiring regression that `krtFetch`'s silent single-retry
 otherwise masks as intermittent failed writes). The pre-auth `BotProtectionFilter` adds
