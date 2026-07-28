@@ -1,6 +1,7 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Module-scoped guidance lives in [`backend/CLAUDE.md`](backend/CLAUDE.md) and
+[`frontend/CLAUDE.md`](frontend/CLAUDE.md) and loads when you work under those directories.
 
 ## Project
 
@@ -59,54 +60,23 @@ in its [`INDEX.md`](docs/specs/INDEX.md)), and architecture/design decisions in
 
 ## Frontend / UI & design system
 
-The UI is a **binding requirement**: follow the DAS KARTELL design system. The rules —
-brand colours, Lato-only typography (headlines = Lato Bold + uppercase), the authoritative department colours, the
-square-first sci-fi HUD style, "no native browser dialogs", and the four responsive device
-classes — live in [`docs/specs/ui-design-system.md`](docs/specs/ui-design-system.md). The
-visual source of truth is the design skill at
-[`.claude/skills/das-kartell-design/README.md`](.claude/skills/das-kartell-design/README.md)
-(README.md = Quelle der Wahrheit für Farben, Typografie, Komponenten).
+Two binding requirements govern every frontend change, and their full rules live in
+[`frontend/CLAUDE.md`](frontend/CLAUDE.md) (loads automatically when you work under `frontend/`):
 
-**The design system is a git submodule (`github.com/krt-profit/design-system`) and MUST be
-present before any UI work.** `git worktree add` does not populate submodules, so in a fresh
-worktree `.claude/skills/das-kartell-design/` is empty and the source of truth above is
-unreadable. A `SessionStart` hook (`.claude/settings.json`) materialises it automatically at
-session start (offline-first from the module store, with a copy from the main worktree as
-fallback). The hook is cross-platform via two self-guarding entries that dispatch on `command -v
-pwsh`: Windows runs [`.claude/hooks/ensure-design-system.ps1`](.claude/hooks/ensure-design-system.ps1),
-Linux/macOS/CI run the portable
-[`.claude/hooks/ensure-design-system.sh`](.claude/hooks/ensure-design-system.sh) — exactly one
-runs per host, with no error noise on the other. **If that directory is still empty when you start
-UI work** — hooks disabled, or a worktree outside the harness — populate it yourself before
-touching any frontend surface: `git submodule update --init .claude/skills/das-kartell-design`,
-or, offline, copy it from the main worktree (find it via `git worktree list`). Never do UI work
-against an empty design system and never treat its absence as "no design system applies".
+- **The DAS KARTELL design system is binding**, and its git submodule at
+  `.claude/skills/das-kartell-design/` **must be populated before any UI work** — a `SessionStart`
+  hook materialises it, but if that directory is still empty, populate it yourself
+  (`git submodule update --init .claude/skills/das-kartell-design`) before touching any frontend
+  surface. Never do UI work against an empty design system, and never treat its absence as "no
+  design system applies".
+- **Live update is binding**: every create / update / delete / toggle / reorder / filter /
+  paginate interaction updates the DOM **in place** via `krtFetch` — no full-page reload on
+  success — and on shared surfaces a peer's change propagates without a manual reload. Live-update
+  and multi-user-sync wiring moves with every feature added, changed *or* removed.
 
-**Live update is a binding requirement: every part of the frontend must support live update to
-the current standard.** Every create / update / delete / toggle / reorder / filter / paginate
-interaction updates the DOM **in place** through the shared `krtFetch` / `krtCsrf` / fragment-swap
-foundation — **no full-page reload on success** (the only two sanctioned reloads are the
-optimistic-lock conflict confirm and the bfcache history-restore of `REQ-FE-008`) — derived UI
-outside the swapped fragment is refreshed too, and on any surface where several users can see the
-same state a peer's change propagates to the others without a manual reload. The current standard,
-its full `krtFetch`/fragment-swap contract and the live multi-user sync live in
+Specs: [`docs/specs/ui-design-system.md`](docs/specs/ui-design-system.md),
 [`docs/specs/frontend-ajax-mutations.md`](docs/specs/frontend-ajax-mutations.md)
-(`REQ-FE-001…010`, ADR-0012/0013/0031). A new or changed frontend surface that reloads the page on
-success, leaves a sibling/peer view stale, or hand-rolls a `fetch`/CSRF write outside `krtFetch` is
-incomplete — extend the standard to cover it, don't fall back to a reload.
-
-**Live update and multi-user sync move with every feature — added, changed *or* removed.** Whenever
-you add, change or remove a frontend surface that participates in live update or live multi-user
-sync (a new editable section, a renamed/retired one, a new mutation on an existing section), you
-**must** update its live-update and peer-sync wiring in the **same change** — never defer it to a
-follow-up. For the multi-user sync in particular, a section key must stay consistent across **all**
-its mirror points at once: the acting client's broadcast (the page's section/seam map), the server
-relay's accept-list (`BROADCASTABLE_SECTIONS`), and the receiving client's apply map. A key present
-in one but missing from another **silently** leaves other viewers stale with no error — the
-REQ-FE-010 defect that shipped when `objectives`/`frequencies` were added to the write seam but not
-the receiver/relay. Prefer deriving these maps from a single source of truth so they cannot diverge;
-where they can't share one, changing one **requires** changing the others in the same PR, and the
-change is incomplete otherwise.
+(`REQ-FE-001…010`, ADR-0012/0013/0031).
 
 ## Build, run, test
 
@@ -135,30 +105,19 @@ Tests force `spring.profiles.active=test`; `bootRun` forces `dev`. Both `Test` a
 - **Every new or modified piece of code must be linted before the task is considered done.** Run at least `./gradlew :<module>:checkstyleMain :<module>:spotbugsMain` (or `./gradlew check` for the full sweep) and read the reports.
 - **All Checkstyle and SpotBugs errors *and* warnings introduced or touched by your change must be fixed.** Do not silence findings with `@SuppressWarnings`, `@SuppressFBWarnings`, or Checkstyle suppression files unless the rule is genuinely wrong for that specific call site — and in that case leave a one-line comment explaining why.
 - Pre-existing findings in code you did not touch are out of scope; do not opportunistically clean them up in an unrelated change. But never *add* a new finding on top of them.
-- **Run `./gradlew spotlessApply` (whole repo) locally before *every* push — no exceptions, even for a one-line test or comment edit.** It formats **all** source sets (incl. `e2e`) and the `.properties` / Markdown / Gradle files; running a narrower task (`:<module>:checkstyleMain`, `compileE2eJava`, `checkstyleE2e`, …) is **not** a substitute and will let a formatting violation slip through to CI (e.g. an over-long Javadoc line in an `e2e` test that `checkstyleE2e` does not catch). Spotless is wired into `check` via `isEnforceCheck = true`, and Checkstyle runs with `isIgnoreFailures = false` + `maxWarnings = 0` — any unformatted file or new Checkstyle warning fails CI immediately.
-- **ALL lint tasks must be green locally before *every* push — no exceptions.** Formatting (`spotlessApply` + `:frontend:prettierApply`) is necessary but **not sufficient**: the frontend also runs three *strict* asset linters that fail CI independently and are **not** covered by Spotless/Prettier/Checkstyle — **`:frontend:lintCss`** (Stylelint: e.g. media-query *range* notation `(width <= Npx)` not `(max-width: Npx)`, and modern `rgb(r g b / a%)` not `rgba(...)`), **`:frontend:lintJs`** (ESLint: `no-var` → use `let`/`const`, unused caught errors must be `_`-prefixed, etc.), and **`:frontend:lintHtml`** (HTMLHint). Before pushing any change that touches `src/main/resources/static/**` (CSS/JS) or `templates/**`, run — and get to **zero findings** — the full local gate for both modules: `./gradlew :backend:check :frontend:lintCss :frontend:lintJs :frontend:lintHtml :frontend:prettierCheck` (or the whole `./gradlew check`, which wires them all in). Stylelint/ESLint auto-fix most findings — the Gradle Node plugin's private Node lives under `frontend/.gradle/nodejs/…/node.exe`; put it on `PATH` and run `node_modules/.bin/stylelint --fix <file.css>` / `node_modules/.bin/eslint --fix <file.js>`, then re-run the Gradle lint task to confirm. Never push relying only on the tests + Spotless being green.
+- **Run `./gradlew spotlessApply` (whole repo) locally before *every* push — no exceptions, even for a one-line test or comment edit**, and **ALL** lint tasks must be green before *every* push. Formatting alone is **not sufficient**: the frontend runs three strict asset linters (`:frontend:lintCss`, `:frontend:lintJs`, `:frontend:lintHtml`) that fail CI independently and are not covered by Spotless/Prettier/Checkstyle. Never push relying only on the tests + Spotless being green. Exact tasks, the Stylelint/ESLint rules that bite, and the auto-fix recipe: the [`lint-gate`](.claude/skills/lint-gate/SKILL.md) skill.
 
 ## Local stack
 
-Use Docker Compose profiles:
-
-```bash
-docker compose --profile dev up -d db-backend-dev db-keycloak-dev keycloak-dev redis-dev   # deps only, run apps locally
-docker compose --profile dev up -d                                                          # full dev stack with host port exposure
-docker compose --profile prod up -d                                                         # prod-equivalent stack behind nginx-proxy-manager
-docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml \
-    --profile dev up -d                                                                     # isolated test stack with throwaway credentials
-```
-
-Host ports (dev profile only): backend `11261`, frontend `18081`, Keycloak `18080`, backend DB `15432`, Keycloak DB `15433`, Redis `6379`, NPM admin `10081`. A `.env` at repo root is required for the regular dev/prod profiles (see README for keys). The isolated test stack instead reads `.env.test` plus a locally generated `keystore.p12` and a stripped `realm-export.json` — see the README's `Running the Local Test Stack` section for setup, and never substitute production artifacts for those.
-
-The backend serves HTTPS with a self-signed cert (`keystore.p12`, password `changeit`); the frontend talks to `https://backend:11261` in prod and `http://localhost:11261` (overridable via `BACKEND_URL`) in dev. There is no Swagger UI — the OpenAPI document is served at `https://localhost:11261/v3/api-docs` in the `dev`/`test` profiles only (disabled in `prod`); the committed `backend/src/main/resources/api/openapi.json` is the single API-documentation artifact.
+Docker Compose profiles (`dev`, `prod`, and the isolated test stack), host ports, and the
+HTTPS / OpenAPI setup: the [`local-stack`](.claude/skills/local-stack/SKILL.md) skill. Never
+substitute production artifacts for the test stack's — see the Testing section's credential rule.
 
 ## Architecture
 
 ### Module split
 
-- **`backend`** — REST API only. Layered: `controller` → `service` → `repository` → `model` (JPA entities), with `dto` records, MapStruct `mapper`s, `config` (security, caching, OpenAPI, rate limiting, WebClient), `integration` (UEX external API), `task` (scheduled jobs), `filter`/`interceptor` (correlation ID, deprecation headers), `annotation` (`@ApiDeprecation`).
+- **`backend`** — REST API only. Layered: `controller` → `service` → `repository` → `model` (JPA entities), with `dto` records and MapStruct `mapper`s.
 - **`frontend`** — Thymeleaf server-rendered UI that calls the backend via WebClient. No business logic of its own; `service.BackendApiClient` is the single seam. Persistent state across frontend restarts goes in Redis (Spring Session).
 
 The frontend never talks to PostgreSQL or Keycloak Admin API directly. The backend never serves HTML.
@@ -177,19 +136,18 @@ Moved to [`docs/specs/data-persistence.md`](docs/specs/data-persistence.md) (`RE
 
 ### Concurrency — read this before touching multi-step transactions
 
-The codebase has been bitten by optimistic-locking traps several times. The rules below exist because of real bugs that shipped.
+The codebase has been bitten by optimistic-locking traps several times. Two rules are
+cross-cutting and stay here:
 
-- **Optimistic locking via `@Version`** — every write DTO carries the `version` field; the frontend echoes it back; concurrent modifications surface as `ObjectOptimisticLockingFailureException` → HTTP 409. Don't strip the version from DTOs to "make it simpler." The version-mismatch **check** goes through the `support.OptimisticLock` helper family (S2, #908) — `check` (skip when the persisted version is null, else 409 unless equal), `checkOptionalClient` (also skip when the client omits the version — admin force-save), `checkRequired` (an absent persisted version is itself a 409) — rather than a hand-rolled `if (…) throw new ObjectOptimisticLockingFailureException(…)`. Pick the method by the site's null-semantics; never re-derive the guard inline. **Exception:** `Mission`'s manual `coreVersion`/`scheduleVersion`/`flagsVersion`/`partyLeadVersion`/`stepsVersion`/`objectivesVersion`/`owningOrgUnitVersion` counters are plain business `Long`s (not JPA `@Version`); since #1112/#1114/#1147 each section's check-and-bump is a **single DB-enforced atomic conditional** `UPDATE Mission … SET xVersion = xVersion + 1 WHERE id = ? AND xVersion = ?` (`MissionRepository.bump*VersionIfMatches`, dispatched by the private `MissionSection` enum) driven through `MissionSectionVersions.enforceSectionVersion(...)` — 0 rows affected → 409 — which row-locks the mission so two racing same-section writers actually serialise (the earlier in-memory `assertSectionVersion` check-then-bump had a TOCTOU window that let both commit). This is only safe because **every mutable `Mission` scalar/association is `@OptimisticLock(excluded = true)` and the entity is `@DynamicUpdate`**: a section edit dirties only its own columns, so it never bumps the row `@Version` (no cross-section 409) and the column-narrowed flush never clobbers a concurrent other-section change. The in-memory `bumpSectionVersion` survives only for the two unconditional cross-section pokes with no client echo — the legacy full-replace `updateMission` (which force-increments the row `@Version` via `OPTIMISTIC_FORCE_INCREMENT`, its remaining guard once the scalars are excluded) and the activation auto-stamp of `actualStartTime`. Steps/objectives additionally carry a deferrable unique `(mission_id, order_index)` DB backstop (V208). Keep the deliberate `null → 0L` semantics; do **not** route these through the `support.OptimisticLock` family, and do **not** re-expand `enforceSectionVersion` into per-section helpers.
-- **Lock as fine-grained as the data allows.** Every part of the frontend must be locked as narrowly as possible: an edit to one part of a screen must **not** 409 a concurrent edit to an unrelated part. Prefer the smallest optimistic-lock scope an aggregate's parts can carry — split a large aggregate's single coarse lock into **independent per-section version counters**, each bumped and echoed on its own, so editing one section never collides with a concurrent edit of another. The canonical precedent is `Mission`'s manual `coreVersion` / `scheduleVersion` / `flagsVersion` / `partyLeadVersion` / … counters — plain business `Long`s independent of the row's Hibernate `@Version`, **DB-enforced** via an atomic conditional bump (see the Exception above) and decoupled at the row level by `@DynamicUpdate` plus per-scalar `@OptimisticLock(excluded = true)`, so an edit to one section never bumps `@Version` and never 409s a concurrent edit of another (note: these manual counters are NOT `@Version`, so the `saveAndFlush` writeback caveat of `REQ-FE-003` does **not** apply to them). Each form / fragment should write the smallest entity that owns the data it touches rather than re-saving the whole aggregate. A coarse, screen-wide lock that forces unrelated concurrent edits to collide is a defect, not a simplification.
-- **Frontend DOM version sync** — when an entity is updated via AJAX (dropdown change, row reorder, etc.), the new `version` must propagate to **every** related DOM element in the same context (edit/action buttons, modals inside the same `<tr>` or container). A missed `data-version` attribute → 409 on the user's next click. If targeted updates are too tangled, just `window.location.reload()` on success.
-- **Pessimistic locking for bulk reorders** — use `@Lock(LockModeType.PESSIMISTIC_WRITE)` (or atomic SQL) for priority shifts and reorder operations to avoid races.
-- **Intra-transaction service calls — `…WithinTransaction` pattern.** When a `@Transactional` service method modifies an entity (directly or via cascaded `repository.save()`) and then calls another service that operates on the **same entity**, the inner method's own `findById()` + `save()` + `flush()` will collide with the already-incremented `@Version` field, causing 409. Fix: expose a dedicated `completeSomethingWithinTransaction(Entity entity)` method annotated `@Transactional(propagation = MANDATORY)` that operates on the already-managed entity and relies on dirty-checking — no `save()`/`flush()` of its own. Canonical example: `JobOrderService.completeJobOrderWithinTransaction()`. Apply this consistently to handover, booking, transfer, and any similar flow.
-- **Bulk updates inside loops.** A `@Modifying` repository query with `clearAutomatically = true` (e.g. `unlinkJobOrderMaterial`) detaches the **entire** persistence context — including all sibling entities of the aggregate currently being processed. NEVER execute such a bulk update inside a loop that mutates more than one item of the same aggregate (e.g. multiple `JobOrderMaterial`s of the same `JobOrder`): subsequent iterations will operate on detached entities, and any `repository.save(entity)` call on a detached entity silently does `EntityManager.merge()`, producing a second `@Version` bump on rows already updated in the same transaction → 409. The fix (extension of the `*WithinTransaction` pattern, see `JobOrderHandoverService.createHandover()`):
-  1. Inside the loop, mutate only managed entities and rely on Hibernate dirty-checking — do NOT call `repository.save(child)` explicitly.
-  2. Collect the IDs of items that need a clearing bulk update in a `Set<UUID>` and run those bulk updates exactly once **after** the loop AND **after** persisting any new aggregate root.
-  3. If the completion check needs the freshly persisted state, re-fetch the aggregate root once via `findById(id)` to get a managed instance with up-to-date `@Version`, then hand it to the dedicated `…WithinTransaction(...)` method.
-     Apply this rule to every bulk-update + multi-item flow (handover, booking, refinery, transfer).
-- **Find-or-create races on a "last-writer-wins" toggle — retry in a *fresh* transaction, never in place.** A find-or-create-then-save on a row carrying a unique constraint AND a `@Version` (e.g. `OperationPayoutStatus` on `(operation_id, participant_key)`) is not idempotent under concurrency: two callers both INSERT (second violates the constraint → `DataIntegrityViolationException`) or both load `version=N` and the second flush matches 0 rows (`ObjectOptimisticLockingFailureException`). Catching either **inside the same `@Transactional` method and continuing is impossible** — Postgres marks the transaction aborted, so every subsequent statement fails. The fix (canonical example: `OperationService.setPayoutStatus` / `setPayoutStatusWithinTransaction`, #1111): make the public method a **non-transactional orchestrator** that retries a `@Transactional(propagation = REQUIRES_NEW)` inner method through a self-proxy (`ObjectProvider<Self>`), catching both exceptions, up to a small bounded attempt count — by the retry the winner has committed the row, so the loser reloads and UPDATEs in place and last-writer-wins actually holds. Do NOT add a client `version` to a boolean toggle; the retry, not a version echo, is what makes it idempotent. Let a persistent race propagate after the bound so the proxy still maps it to a truthful 409, never a 500 (the frontend proxy MUST have an explicit 409 branch). The same pattern also guards `MaterialClaimService.upsertClaim` / `upsertClaimWithinTransaction` (the squadron material-claim sign-up on the `@Version`ed, uniquely-indexed `material_claim` bucket row — `uq_material_claim_bucket_org_unit`, V131). One contrast to the boolean toggle: because a claim carries a meaningful payload (`amount`), its `@Version` is **kept** and echoed via `ClaimDto`, so a genuine concurrent same-squadron *edit* that outlasts the retry bound still 409s; the claim's frontend proxy satisfies the explicit-409 rule by relaying the backend status verbatim through `propagateBackendError`, which additionally preserves the RFC 7807 `code` so `krt-fetch.js` keeps its reload-vs-toast distinction.
+- **Optimistic locking via `@Version`** — every write DTO carries the `version` field; the frontend echoes it back; concurrent modifications surface as `ObjectOptimisticLockingFailureException` → HTTP 409. Don't strip the version from DTOs to "make it simpler."
+- **Lock as fine-grained as the data allows.** Every part of the frontend must be locked as narrowly as possible: an edit to one part of a screen must **not** 409 a concurrent edit to an unrelated part. Prefer the smallest optimistic-lock scope an aggregate's parts can carry — split a large aggregate's single coarse lock into **independent per-section version counters**, each bumped and echoed on its own, so editing one section never collides with a concurrent edit of another. Each form / fragment should write the smallest entity that owns the data it touches rather than re-saving the whole aggregate. A coarse, screen-wide lock that forces unrelated concurrent edits to collide is a defect, not a simplification.
+
+The full landmine list — the `support.OptimisticLock` helper family, `Mission`'s manual
+section counters and their DB-enforced atomic bump, pessimistic locking for bulk reorders, the
+`…WithinTransaction` pattern, bulk-updates-inside-loops, and the find-or-create retry — lives in
+[`backend/CLAUDE.md`](backend/CLAUDE.md) and loads when you work under `backend/`. **Read it
+before touching any multi-step transaction.** The frontend half (propagating the new `version` to
+every related DOM element after an AJAX update) is in [`frontend/CLAUDE.md`](frontend/CLAUDE.md).
 
 ### API conventions
 
@@ -215,39 +173,13 @@ Moved to [`docs/specs/observability.md`](docs/specs/observability.md) (`REQ-OBS-
 
 ## Testing
 
-- Tests live in the same package structure under `src/test/java/` mirroring `src/main/java/`.
-- Naming: `*Test` suffix (e.g., `UserServiceTest`).
-- Structure: Given/When/Then (or Arrange/Act/Assert).
-- Mock external/complex dependencies with Mockito (`@Mock`, `@InjectMocks`).
 - **Every new feature ships with tests.** No exceptions.
 - **Never use production / real credentials in tests or local test stacks.** This is a hard rule. It applies to every kind of test (Mockito unit tests, MockMvc, `@SpringBootTest`, TestContainers integration tests) and to every manually-started local stack used to verify a change. Forbidden inputs include — non-exhaustively — the production `.env` at the repo root, the shared `keystore.p12` at `backend/src/main/resources/keystore.p12`, the shared `realm-export.json` Keycloak dump, real OIDC client secrets, real database passwords, real SMTP credentials, real Keycloak admin passwords, real JWT signing keys. Use dedicated test artifacts instead: `.env.test` (gitignored via `.env.*`), a `keystore.p12` generated locally with a throwaway password, a stripped `realm-export.json` with rotated client secrets and a synthetic test user, the `docker-compose.test.yml` override. The README has a `Running the Local Test Stack` section with the exact `keytool` / Python-rewrite commands. Reason: anything that enters a worktree, a CI log, a container volume, a screenshot artifact, an MCP-preview snapshot or an editor backup has to be assumed leaked and rotated — and the recovery is cheaper if it never had to happen in the first place. When you spin a local stack up to verify a UI change, always source `.env.test` (never `.env`), point Docker Compose at `--env-file .env.test`, and tear the stack down with `down --volumes` after the verification.
-
-Minimal example:
-
-```java
-package de.greluc.krt.profit.basetool.backend;
-
-import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-class GuidelinesExampleTest {
-    @Test
-    void shouldPassExampleTest() {
-        // Given
-        boolean condition = true;
-        // When
-        // Execute the method under test
-        // Then
-        assertTrue(condition, "demonstration test");
-    }
-}
-```
 
 ## Java conventions
 
 - **Constructor injection only** (favor Lombok `@RequiredArgsConstructor`). No field `@Autowired`.
 - **Records** for DTOs and immutable config wrappers.
-- **Modern Java**: switch expressions, pattern matching (`instanceof`, `switch`), sealed classes where they help with exhaustiveness.
 - **Lombok** — maximize it (`@Slf4j`, `@Getter`, `@Setter`, `@Builder`, `@RequiredArgsConstructor`, `@NoArgsConstructor`, `@AllArgsConstructor`, `@Data`) to avoid boilerplate.
 - **JetBrains annotations** (`@NotNull`, `@Nullable`, `@Contract`) wherever they communicate a real contract.
 - **Logging**: `@Slf4j` — never instantiate loggers manually.
@@ -258,7 +190,7 @@ class GuidelinesExampleTest {
 - **CHANGELOG entries must be short, terse and to the point — only the essentials.** One to three sentences per bullet covering *what* changed and *why it matters to the user*. No multi-paragraph design rationales, no exhaustive file lists, no copy-pasted commit messages, no architectural reasoning that belongs in the PR description or Javadoc. Mention the area affected (controller / migration / config) and the user-visible effect — anything beyond that is noise. If a bullet grows past ~3 sentences, cut it.
 - Keep `README.md`, the [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md) role matrix and the German `basetool.wiki` handbook current whenever a change affects them — this is the binding *"README, the role matrix and the user wiki move with the change"* rule from the Requirements section above, restated here so it is not forgotten at documentation time.
 - **Javadoc is mandatory** on every class, interface, enum, record, and public/protected method — no exceptions, including trivial getters/setters and Lombok-generated members documented at the field level. Javadoc must describe the *actual* behavior, parameters, return values, side effects, thrown exceptions, and non-obvious invariants of the specific code it annotates. **Generic boilerplate is forbidden** — phrases like "Gets the value", "Returns the result", "Does something", "Helper method", or restating the method name in prose are not acceptable. If you cannot write a concrete, code-specific sentence, read the implementation again until you can.
-- **Javadoc is gate-enforced.** Missing Javadoc on a new `public`/`protected` member fails the build via Checkstyle's `MissingJavadocType` / `MissingJavadocMethod` checks — there is no warn-only grace period. Same gate covers summary period (`SummaryJavadoc`), placement between annotations and the declaration (`InvalidJavadocPosition`), `<p>` after blank lines (`JavadocParagraph`), and `@param`/`@return`/`@throws` order (`AtclauseOrder`).
+- **Javadoc is gate-enforced.** Checkstyle fails the build on missing or malformed Javadoc (presence, summary period, placement, paragraphs, at-clause order) — there is no warn-only grace period. Note it only checks *form*: the quality bar above is on you.
 
 ## Git
 
