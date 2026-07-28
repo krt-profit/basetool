@@ -1,4 +1,4 @@
-// Grafana Alloy config for the Basetool monitoring plane. Alloy 1.17.x (verified 2026-07).
+// Grafana Alloy config for the Basetool monitoring plane. Alloy 1.18.x (verified 2026-07).
 // Epic #936, REQ-OBS-007 (per-stream log-privacy) / REQ-OBS-009 (OTLP trace collector), ADR-0072.
 //
 // Two responsibilities:
@@ -29,6 +29,13 @@ otelcol.receiver.otlp "default" {
 		endpoint = "0.0.0.0:4317"
 	}
 
+	// This block's timeouts are INHERITED, and their defaults CHANGED in Alloy 1.18.0: idle_timeout,
+	// read_header_timeout and write_timeout moved from "0s" (unlimited) to "1m" / "1m" / "30s" to match
+	// the upstream OTel Collector. Deliberately NOT pinned back to "0s" — backend/frontend/ingest push
+	// short batched POSTs to /v1/traces (MONITORING_OTLP_ENDPOINT), so a 30s write budget is ample, and
+	// an unbounded read_header_timeout is a slowloris foothold even on this unpublished scrape-net port.
+	// Keycloak uses the gRPC listener above and is unaffected. If trace gaps ever correlate with
+	// exporter-side connection resets, suspect the 1m idle close racing a pooled client connection.
 	http {
 		endpoint = "0.0.0.0:4318"
 	}
