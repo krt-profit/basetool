@@ -138,7 +138,7 @@ class RefineryOrderServiceLifecycleTest {
     refineryLocation.setId(LOCATION_ID);
     refineryLocation.setName("ARC-L1");
     SpaceStation station = new SpaceStation();
-    station.setHasRefinery(true);
+    station.setHasRefineryTerminal(true);
     refineryLocation.setSpaceStation(station);
 
     rawInput = new Material();
@@ -413,7 +413,7 @@ class RefineryOrderServiceLifecycleTest {
       Location cityLoc = new Location();
       cityLoc.setId(LOCATION_ID);
       City city = new City();
-      city.setHasRefinery(true);
+      city.setHasRefineryTerminal(true);
       cityLoc.setCity(city);
 
       when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
@@ -441,7 +441,7 @@ class RefineryOrderServiceLifecycleTest {
       Location cityLoc = new Location();
       cityLoc.setId(LOCATION_ID);
       City city = new City();
-      city.setHasRefinery(false);
+      city.setHasRefineryTerminal(false);
       cityLoc.setCity(city);
 
       when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.Terminal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -31,4 +32,15 @@ public interface TerminalRepository extends JpaRepository<Terminal, UUID> {
 
   /** Derived Spring-Data query - returns entities matching {@code Name}. */
   Optional<Terminal> findByName(String name);
+
+  /**
+   * Returns every currently reachable terminal of the given UEX kind. Called once per sweep with
+   * {@link Terminal#TYPE_REFINERY} to recompute the derived {@code has_refinery_terminal} flags on
+   * cities and space stations (REQ-REFINERY-020); the {@code is_available_live} filter is what
+   * drops a decommissioned refinery out of the picker on the next sweep.
+   *
+   * @param type UEX terminal kind, e.g. {@link Terminal#TYPE_REFINERY}
+   * @return matching live terminals, never {@code null}
+   */
+  List<Terminal> findByTypeAndIsAvailableLiveTrue(String type);
 }

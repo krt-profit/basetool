@@ -119,7 +119,7 @@ class RefineryOrderTest {
 
     SpaceStation spaceStation = new SpaceStation();
     spaceStation.setName("ARC-L1 Station");
-    spaceStation.setHasRefinery(true);
+    spaceStation.setHasRefineryTerminal(true);
     spaceStationRepository.save(spaceStation);
 
     station = new Location();

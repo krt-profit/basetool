@@ -914,13 +914,34 @@ public class RefineryOrderService {
         .orElseGet(Map::of);
   }
 
+  /**
+   * Rejects a chosen location that hosts no refinery, keyed on the derived {@code
+   * hasRefineryTerminal} flag — exactly the signal {@link
+   * LocationRepository#findLocationsWithRefinery()} builds the picker from, so the gate accepts
+   * precisely what the form offered (REQ-REFINERY-020).
+   *
+   * <p>Deliberately NOT keyed on UEX's parent-level {@code hasRefinery} claim, which this check
+   * used to read: that claim both misses real refineries (MIC-L5, ARC-L4, Patch City) and invents
+   * ones that do not exist (four People's Service Stations). The flag is recomputed from the live
+   * {@code type = 'refinery'} terminals by {@code
+   * UexUniverseSyncService.reconcileRefineryTerminalFlags()}.
+   *
+   * <p>Reads the already-loaded parent in memory rather than issuing a query, and that is load
+   * bearing: a query here would auto-flush a transaction that is midway through rewriting the order
+   * and its goods, so the goods {@code clear()} + re-add would race its own freshly written rows
+   * and fail with {@code ObjectOptimisticLockingFailureException}.
+   *
+   * @param location the order's chosen location
+   * @throws IllegalArgumentException when the location hosts no live refinery terminal
+   */
   private void validateLocationHasRefinery(
       de.greluc.krt.profit.basetool.backend.model.Location location) {
     boolean hasRefinery = false;
-    if (location.getCity() != null && Boolean.TRUE.equals(location.getCity().getHasRefinery())) {
+    if (location.getCity() != null
+        && Boolean.TRUE.equals(location.getCity().getHasRefineryTerminal())) {
       hasRefinery = true;
     } else if (location.getSpaceStation() != null
-        && Boolean.TRUE.equals(location.getSpaceStation().getHasRefinery())) {
+        && Boolean.TRUE.equals(location.getSpaceStation().getHasRefineryTerminal())) {
       hasRefinery = true;
     }
     if (!hasRefinery) {

@@ -54,7 +54,9 @@ import de.greluc.krt.profit.basetool.backend.repository.SpaceStationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.support.UexValues;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -720,6 +722,9 @@ public class UexUniverseSyncService {
                               }));
       entity.setName(dto.name());
       entity.setCode(dto.code());
+      // The terminal kind is what actually proves a refinery exists at the parent location; the
+      // parent's own has_refinery flag is unreliable upstream (REQ-REFINERY-020).
+      entity.setType(dto.type());
       entity.setIsAvailableLive(dto.checkIsAvailableLive());
       entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
       entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
@@ -751,6 +756,66 @@ public class UexUniverseSyncService {
       entity.setCompanyName(dto.companyName());
       terminalRepository.save(entity);
     }
+    reconcileRefineryTerminalFlags();
     log.info("Finished sync for Terminals.");
+  }
+
+  /**
+   * Recomputes {@code city.has_refinery_terminal} / {@code space_station.has_refinery_terminal}
+   * from the terminals just synced: a parent is flagged iff it hosts at least one live {@code type
+   * = 'refinery'} terminal (REQ-REFINERY-020).
+   *
+   * <p>This is the correction step for an upstream inconsistency. UEX's parent-level {@code
+   * has_refinery} claim disagrees with its own terminal list in both directions — it misses MIC-L5,
+   * ARC-L4 and Patch City, and claims four People's Service Stations that host no refinery. The raw
+   * claim stays in {@code has_refinery} for diagnostics; the derived flag is what the
+   * refinery-order picker and its create/update gate read.
+   *
+   * <p>Runs at the end of {@link #syncTerminals()} and nowhere else: cities and space stations are
+   * synced <em>before</em> terminals in the sweep, so anything earlier would recompute against a
+   * stale terminal table. Deriving the flag here (rather than resolving it per read) is what keeps
+   * the order write path free of an extra query — see the V226 migration note.
+   *
+   * <p>Matching is by the terminal's denormalised parent-name columns, mirroring {@code
+   * RefineryYieldRepository.findAllForLocation}: the city branch additionally requires {@code
+   * spaceStationName IS NULL} so a refinery at a station <em>within</em> a city does not promote
+   * the city itself.
+   */
+  private void reconcileRefineryTerminalFlags() {
+    Set<String> refineryCities = new HashSet<>();
+    Set<String> refineryStations = new HashSet<>();
+    for (Terminal terminal :
+        terminalRepository.findByTypeAndIsAvailableLiveTrue(Terminal.TYPE_REFINERY)) {
+      if (terminal.getSpaceStationName() != null) {
+        refineryStations.add(terminal.getSpaceStationName());
+      } else if (terminal.getCityName() != null) {
+        refineryCities.add(terminal.getCityName());
+      }
+    }
+
+    int changed = 0;
+    for (City city : cityRepository.findAll()) {
+      boolean expected = city.getName() != null && refineryCities.contains(city.getName());
+      if (expected != Boolean.TRUE.equals(city.getHasRefineryTerminal())) {
+        city.setHasRefineryTerminal(expected);
+        cityRepository.save(city);
+        changed++;
+      }
+    }
+    for (SpaceStation station : spacestationRepository.findAll()) {
+      boolean expected = station.getName() != null && refineryStations.contains(station.getName());
+      if (expected != Boolean.TRUE.equals(station.getHasRefineryTerminal())) {
+        station.setHasRefineryTerminal(expected);
+        spacestationRepository.save(station);
+        changed++;
+      }
+    }
+    log.info(
+        "Reconciled refinery-terminal flags: {} refinery terminals ({} stations, {} cities),"
+            + " {} parent rows updated",
+        refineryStations.size() + refineryCities.size(),
+        refineryStations.size(),
+        refineryCities.size(),
+        changed);
   }
 }

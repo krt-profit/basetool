@@ -40,6 +40,14 @@ import lombok.ToString;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Terminal extends AbstractEntity<UUID> {
+
+  /**
+   * Value of {@link #type} that marks a terminal as a refinery kiosk. This is the terminal-level
+   * ground truth for "a refinery exists here" — UEX's parent-level {@code has_refinery} flag on
+   * city / space-station / outpost disagrees with it in both directions (REQ-REFINERY-020).
+   */
+  public static final String TYPE_REFINERY = "refinery";
+
   @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
@@ -50,6 +58,15 @@ public class Terminal extends AbstractEntity<UUID> {
 
   private String name;
   private String code;
+
+  /**
+   * UEX terminal kind — one of {@code item}, {@code commodity}, {@code commodity_raw}, {@code
+   * fuel}, {@code refinery}, {@code vehicle_buy}, {@code vehicle_rent}. Mirrored verbatim from the
+   * upstream {@code /terminals} feed; {@code null} for rows synced before V226 until the next UEX
+   * sweep refreshes them. Compare against {@link #TYPE_REFINERY} rather than a string literal.
+   */
+  @Column(name = "type")
+  private String type;
 
   @Column(name = "is_available_live")
   private Boolean isAvailableLive;
