@@ -19,8 +19,13 @@ springBoot = "4.1.0"
 springDependencyManagement = "1.1.7"
 cyclonedx = "3.3.0"
 testcontainers = "2.0.5"
-flyway = "12.11.0"
-##  ⬆ = "13.0.0"
+# 13.0.0 (2026-07-28): the three upstream breaking changes are all no-ops here — min Java moved
+# 17 -> 21 (toolchain is 25), the `createSchema.sql` -> `beforeCreateSchema.sql` callback rename
+# hits nothing (db/ holds only migration/, no callbacks), and the `initSQL` -> `afterConnect.sql`
+# replacement hits nothing (no profile sets it; all three set only enabled + locations). Note the
+# Redgate release-notes page lists NO breaking changes for 13.0.0 — they are documented only in the
+# "Looking forward to Flyway V13" blog post, so do not clear a future major from that page alone.
+flyway = "13.0.0"
 mapstruct = "1.6.3"
 ##     ⬆ = "1.7.0.Beta1"
 ##     ⬆ = "1.7.0.Beta2"
