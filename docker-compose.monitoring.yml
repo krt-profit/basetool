@@ -275,7 +275,7 @@ services:
   alloy:
     <<: *mon-base
     container_name: alloy
-    image: grafana/alloy:v1.17.1
+    image: grafana/alloy:v1.18.0
     # Runs as root to reach its own storage dir and read privileged host logs, but with ALL caps
     # dropped. Instead of restoring CAP_DAC_OVERRIDE we grant two supplementary groups (least
     # privilege, no capability bypass): GID 473 = the image's `alloy` group that owns /var/lib/alloy
