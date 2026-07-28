@@ -46,12 +46,23 @@ import tools.jackson.databind.ObjectMapper;
  * redirects the browser to the OAuth2 authorization endpoint with {@code prompt=none}. Keycloak
  * will then transparently re-authenticate the user using its own SSO session cookie (which lives in
  * the browser independently of the Spring session). If the Keycloak SSO session is still active,
- * the user is re-authenticated without any visible login prompt. If the Keycloak SSO session has
- * also expired, Keycloak returns an {@code interaction_required} error and the user is redirected
- * to the normal login page.
+ * the user is re-authenticated without any visible login prompt. If the browser carries no live SSO
+ * cookie, Keycloak bounces back to the callback with {@code error=login_required} (OIDC Core
+ * 3.1.2.6) and the user is redirected to the normal login page.
  *
- * <p>Bot and scanner requests are handled upstream by {@link BotProtectionFilter} before reaching
- * this entry point, so this class only deals with genuine unauthenticated user requests.
+ * <p><b>That {@code login_required} bounce is the expected steady-state outcome, not an error.</b>
+ * Every unauthenticated top-level navigation — a first-time visitor, an expired SSO session, a
+ * scanner walking paths — produces exactly one of them, so it is by far the most common OAuth2
+ * failure the app records about itself. {@link LoginFailureMetricsHandler} therefore counts it in
+ * the benign {@code invalid_state} bucket; letting it reach {@code provider_error} false-tripped
+ * the {@code FrontendLoginBroken} alert (2026-07-28).
+ *
+ * <p><b>Scanner traffic does reach this entry point.</b> {@link BotProtectionFilter} blocks only
+ * known-bad path prefixes ({@code /wp-}, …) and file extensions, so unauthenticated probes for
+ * plausible-looking paths it does not list ({@code /blog/}, {@code /wp/}, {@code /old/}, {@code
+ * /new/}) arrive here as ordinary navigations and each costs one full silent-SSO round trip to
+ * Keycloak. That is noisy but not harmful — the metric classification above keeps it out of the
+ * alerting path.
  *
  * <p>A short-lived cookie ({@code SSO_ATTEMPTED}) is used to prevent infinite redirect loops: if a
  * silent re-auth attempt has already been made for this request cycle, the entry point falls back

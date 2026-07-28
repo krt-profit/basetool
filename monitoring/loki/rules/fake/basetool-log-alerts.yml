@@ -187,13 +187,25 @@ groups:
       # sshd_config / authorized_keys tamper: auditd emits a watch event (with the acting auid) on any
       # write to the sshd config or a root authorized_keys. Fires on the operator's OWN edits too (rare)
       # — each event carries the auid, so it stays attributable; raise to critical once the config is
-      # stable. Needs the host-auditd stream (auditd installed + log_group=adm). Verify the raw-log key=
-      # format once on the test stack (auditd hex-encodes keys with special chars; these two do not).
+      # stable. Needs the host-auditd stream (auditd installed + log_group=adm). The raw-log key= format
+      # is verified in prod: neither key is hex-encoded, so the plain `key="…"` match is correct.
+      #
+      # type=SYSCALL is REQUIRED, not cosmetic (2026-07-28 fix). A watch hit carries its key= on the
+      # type=SYSCALL record, but auditd ALSO stamps each rule's key= onto the type=CONFIG_CHANGE records
+      # it emits for its own `op=remove_rule` / `op=add_rule` bookkeeping when the daemon restarts and
+      # reloads /etc/audit/rules.d. Without the type filter those reload records look exactly like a
+      # tamper event: the nightly unattended-upgrade of libc6 restarts auditd, so this alert fired at
+      # 04:11:43Z with auid=unset and every watched file's mtime untouched — a monthly false page.
+      #
+      # Note the watches are `-w /root/.ssh/ -p wa` and `-w /etc/ssh/sshd_config.d/ -p wa`, i.e.
+      # DIRECTORY watches: a benign known_hosts append by the operator's own outbound ssh also trips
+      # sshd-authkeys. That stays in scope on purpose — the record carries auid/comm so it is
+      # attributable in one look, and narrowing by comm= would blind the alert to a real backdoor write.
       - alert: AuditdSshTamper
-        expr: 'sum(count_over_time({app="host-auditd"} |~ `key="(sshd-config|sshd-authkeys)"` [5m])) > 0'
+        expr: 'sum(count_over_time({app="host-auditd"} |= `type=SYSCALL` |~ `key="(sshd-config|sshd-authkeys)"` [5m])) > 0'
         for: 0m
         labels:
           severity: warning
         annotations:
           summary: "SSH config / authorized_keys modified (auditd)"
-          description: "auditd recorded a write to sshd_config(.d) or a root authorized_keys file. Confirm the acting user (auid) was you; an unexpected change may be a backdoor key or a security downgrade."
+          description: "auditd recorded a write inside /etc/ssh/sshd_config(.d) or /root/.ssh. Confirm the acting user (auid) and process (comm) in the matching type=SYSCALL record were you; an unexpected change may be a backdoor key or a security downgrade. Both watches are directory-wide, so a known_hosts append by an outbound ssh also lands here — check the type=PATH record for the actual file, and cross-check the file's mtime before treating it as a change."

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Monitoring: `AuditdSshTamper` meldet keinen SSH-Manipulationsverdacht mehr, wenn nur die nächtliche Systemaktualisierung läuft.** Die Regel erkannte auch die Einträge, mit denen auditd beim Neustart seine eigenen Regeln neu lädt — das nächtliche `libc6`-Update startet auditd neu und löste damit einen Fehlalarm aus, obwohl keine SSH-Datei angefasst wurde. Sie wertet jetzt nur noch echte Dateizugriffe (`type=SYSCALL`) aus (REQ-OBS-010).
+
+- **Monitoring: `FrontendLoginBroken` schlägt nicht mehr wegen Scanner-Verkehr in der Nacht an.** Besteht keine Keycloak-SSO-Sitzung, antwortet Keycloak auf die stille SSO-Erneuerung (`prompt=none`) mit `login_required` — der Normalfall bei jedem nicht angemeldeten Seitenaufruf, bisher aber als echter Anbieterfehler gezählt. Diese Antworten zählen jetzt als harmlos, sodass nur noch tatsächliche Fehler beim Token-Tausch alarmieren (REQ-OBS-011).
+
 ## [v1.5.19](https://github.com/krt-profit/basetool/releases/tag/v1.5.19) - 2026-07-26
 
 ### Fixed

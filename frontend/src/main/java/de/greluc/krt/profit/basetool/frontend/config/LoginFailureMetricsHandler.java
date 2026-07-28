@@ -25,6 +25,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Set;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.core.AuthenticationException;
@@ -40,16 +41,39 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationFa
  * OAuth2AuthenticationException}, its bounded OAuth2 error <b>code</b> — never the raw, provider-
  * supplied error description (which could be arbitrary and would blow up the metric cardinality).
  * It collapses to three buckets: {@code invalid_state} (a benign authorization-response / {@code
- * state}-validation failure raised BEFORE any token exchange — the state check failed OR the
- * callback was not a valid authorization response, i.e. a scanner/probe or stale bookmark hitting
- * the {@code /login/oauth2/code/*} callback), {@code provider_error} (a genuine post-authorization
- * failure — a bad IdP response or a failed code-to-token exchange, the failure class {@code
+ * state}-validation failure raised BEFORE any token exchange — the state check failed, the callback
+ * was not a valid authorization response at all, or the {@code prompt=none} silent-SSO probe found
+ * no live Keycloak SSO session), {@code provider_error} (a genuine post-authorization failure — a
+ * bad IdP response or a failed code-to-token exchange, the failure class {@code
  * KeycloakLoginErrorSpike}'s event regex misses) and {@code other} (a non-OAuth2 authentication
- * exception). Keeping malformed-callback traffic OUT of {@code provider_error} is what stops it
+ * exception). Keeping pre-token-exchange traffic OUT of {@code provider_error} is what stops it
  * false-tripping {@code FrontendLoginBroken}; see {@link #isStateError(String)}. See {@link
  * LoginSuccessMetricsHandler} for the paired success signal (#1041 item 18, REQ-OBS-011).
  */
 public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHandler {
+
+  /**
+   * The bounded set of OAuth2 / OIDC error codes that denote a benign authorization-response
+   * outcome. Every code in here is raised at the authorization-response stage — BEFORE any
+   * code-to-token exchange — so none of them can ever be the token-exchange break {@code
+   * provider_error} exists to signal. See {@link #isStateError(String)} for what each group means
+   * and why leaving a code out of this set false-trips {@code FrontendLoginBroken}.
+   */
+  private static final Set<String> BENIGN_AUTHORIZATION_RESPONSE_ERRORS =
+      Set.of(
+          // The callback could not be correlated to a saved authorization request (state failure).
+          "authorization_request_not_found",
+          "invalid_state_parameter",
+          "invalid_state",
+          // The callback was not a valid authorization response at all (scanner / stale bookmark).
+          "invalid_request",
+          // The prompt=none silent-SSO probe found no usable Keycloak SSO session (OIDC Core
+          // 3.1.2.6). SsoReAuthenticationEntryPoint issues that probe by design, so these are
+          // self-inflicted and expected — not a provider fault.
+          "login_required",
+          "interaction_required",
+          "consent_required",
+          "account_selection_required");
 
   private final MeterRegistry meterRegistry;
 
@@ -127,20 +151,35 @@ public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHa
    *       before the authorization-request lookup and before the {@code AuthenticationManager}
    *       runs, so it can NEVER be a token-exchange failure. Leaving it out of this set let those
    *       malformed-callback hits fall through to {@code provider_error} and, off-peak with no
-   *       fresh successes, trip {@code FrontendLoginBroken} with nothing actually broken.
+   *       fresh successes, trip {@code FrontendLoginBroken} with nothing actually broken;
+   *   <li>the {@code prompt=none} silent-SSO probe found no usable Keycloak SSO session: {@code
+   *       login_required}, {@code interaction_required}, {@code consent_required}, {@code
+   *       account_selection_required} (the OIDC Core 3.1.2.6 {@code prompt=none} error set). {@link
+   *       SsoReAuthenticationEntryPoint} sends every unauthenticated top-level navigation through
+   *       that probe by design, and Keycloak answers {@code login_required} whenever the browser
+   *       carries no live SSO cookie — so this is the single most frequent login failure the app
+   *       generates about itself. Keycloak returns it as an <em>authorization-response</em> error
+   *       (the callback arrives with {@code error=…&state=…} and no {@code code}), which {@code
+   *       OAuth2LoginAuthenticationProvider} rethrows as an {@link OAuth2AuthenticationException}
+   *       before any token request is made — so, like {@code invalid_request}, it can never be a
+   *       token-exchange failure. This is the 2026-07-28 fix: {@code login_required} used to fall
+   *       through to {@code provider_error}, so a scanner walking unauthenticated paths ({@code
+   *       /blog/}, {@code /wp/}, {@code /old/}, …) minted one {@code provider_error} per probe and
+   *       tripped {@code FrontendLoginBroken} overnight with login perfectly healthy.
    * </ul>
    *
    * <p>Anything else — {@code invalid_grant}, {@code server_error}, {@code invalid_token_response},
    * … — is a genuine post-authorization token/IdP failure and correctly maps to {@code
-   * provider_error}, the class the {@code FrontendLoginBroken} alert exists to catch.
+   * provider_error}, the class the {@code FrontendLoginBroken} alert exists to catch. {@code
+   * access_denied} is deliberately NOT folded in: it is also an authorization-response error, but
+   * it means an explicit refusal (a user declining consent, or a client/IdP policy rejecting the
+   * request) rather than routine "no session yet" noise, and it is rare enough that surfacing it is
+   * worth more than the alert quiet.
    *
    * @param code the OAuth2 error code, or {@code null}
    * @return {@code true} when the code denotes a benign authorization-response / state failure
    */
   private static boolean isStateError(@Nullable String code) {
-    return "authorization_request_not_found".equals(code)
-        || "invalid_state_parameter".equals(code)
-        || "invalid_state".equals(code)
-        || "invalid_request".equals(code);
+    return code != null && BENIGN_AUTHORIZATION_RESPONSE_ERRORS.contains(code);
   }
 }

@@ -79,11 +79,54 @@ class LoginMetricsHandlersTest {
         .isEqualTo(MetricNames.LOGIN_REASON_INVALID_STATE);
   }
 
+  /**
+   * The OIDC {@code prompt=none} error set must land in the benign bucket.
+   * SsoReAuthenticationEntryPoint probes Keycloak with {@code prompt=none} on every unauthenticated
+   * top-level navigation, and Keycloak answers {@code login_required} whenever the browser carries
+   * no live SSO cookie — an authorization-response error raised before any token exchange. Counting
+   * those as provider_error made a path-scanning bot trip FrontendLoginBroken overnight with login
+   * perfectly healthy (2026-07-28).
+   */
+  @Test
+  void reasonFor_mapsPromptNoneSilentSsoErrorsToInvalidState() {
+    assertThat(LoginFailureMetricsHandler.reasonFor(oauth2("login_required")))
+        .isEqualTo(MetricNames.LOGIN_REASON_INVALID_STATE);
+    assertThat(LoginFailureMetricsHandler.reasonFor(oauth2("interaction_required")))
+        .isEqualTo(MetricNames.LOGIN_REASON_INVALID_STATE);
+    assertThat(LoginFailureMetricsHandler.reasonFor(oauth2("consent_required")))
+        .isEqualTo(MetricNames.LOGIN_REASON_INVALID_STATE);
+    assertThat(LoginFailureMetricsHandler.reasonFor(oauth2("account_selection_required")))
+        .isEqualTo(MetricNames.LOGIN_REASON_INVALID_STATE);
+  }
+
   @Test
   void reasonFor_mapsOtherOAuth2ErrorsToProviderError() {
     assertThat(LoginFailureMetricsHandler.reasonFor(oauth2("invalid_grant")))
         .isEqualTo(MetricNames.LOGIN_REASON_PROVIDER_ERROR);
     assertThat(LoginFailureMetricsHandler.reasonFor(oauth2("server_error")))
+        .isEqualTo(MetricNames.LOGIN_REASON_PROVIDER_ERROR);
+    assertThat(LoginFailureMetricsHandler.reasonFor(oauth2("invalid_token_response")))
+        .isEqualTo(MetricNames.LOGIN_REASON_PROVIDER_ERROR);
+    // access_denied is an authorization-response error too, but it means an explicit refusal rather
+    // than routine "no session yet" noise, so it deliberately stays a provider_error.
+    assertThat(LoginFailureMetricsHandler.reasonFor(oauth2("access_denied")))
+        .isEqualTo(MetricNames.LOGIN_REASON_PROVIDER_ERROR);
+  }
+
+  /**
+   * An {@link OAuth2AuthenticationException} carrying no {@link OAuth2Error} must map to
+   * provider_error without throwing. This pins a real hazard of the set-based lookup: {@code
+   * Set.of(…).contains(null)} throws {@link NullPointerException}, so the null guard in {@code
+   * isStateError} is load-bearing (the superseded chain of {@code "literal".equals(code)} calls was
+   * null-safe by construction). {@code new OAuth2Error(null)} is rejected by Spring, so the null
+   * error can only be reached through a stub.
+   */
+  @Test
+  void reasonFor_mapsMissingErrorToProviderErrorWithoutThrowing() {
+    OAuth2AuthenticationException noError = mock(OAuth2AuthenticationException.class);
+    when(noError.getError()).thenReturn(null);
+
+    assertThat(LoginFailureMetricsHandler.reasonFor(noError))
         .isEqualTo(MetricNames.LOGIN_REASON_PROVIDER_ERROR);
   }
 
