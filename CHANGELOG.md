@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.20](https://github.com/krt-profit/basetool/releases/tag/v1.5.20) - 2026-07-28
+
 ### Fixed
 
 - **Raffinerie: MIC-L5, ARC-L4 und Patch City stehen jetzt als Raffinerie zur Auswahl.** Die Auswahlliste richtete sich nach dem Stations-/Stadt-Kennzeichen von UEX, das diesen drei Standorten keine Raffinerie zuschreibt, obwohl UEX dort jeweils ein Raffinerie-Terminal führt. Maßgeblich ist jetzt das Terminal selbst. Umgekehrt entfallen die vier „People's Service Station"-Stationen (Alpha, Delta, Lambda, Theta), die als Raffinerie angeboten wurden, ohne eine zu besitzen. Die Liste wird beim nächsten UEX-Abgleich aktualisiert (REQ-REFINERY-020). Die Regel erkannte auch die Einträge, mit denen auditd beim Neustart seine eigenen Regeln neu lädt — das nächtliche `libc6`-Update startet auditd neu und löste damit einen Fehlalarm aus, obwohl keine SSH-Datei angefasst wurde. Sie wertet jetzt nur noch echte Dateizugriffe (`type=SYSCALL`) aus (REQ-OBS-010).
