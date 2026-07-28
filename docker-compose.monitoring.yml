@@ -276,6 +276,10 @@ services:
     <<: *mon-base
     container_name: alloy
     image: grafana/alloy:v1.18.0
+    # 1.18.0 (taken 2026-07-28) also pulled in Prometheus 3.12 and otel-collector 0.153 upstream. If the
+    # working set drifts up after this bump with NO config change of ours, that dependency jump is the
+    # first suspect before the "Alloy-side leak" verdict at the end of the sizing note below — and the
+    # fix is still to re-derive GOMEMLIMIT from the budget, never to re-apply a percentage.
     # Runs as root to reach its own storage dir and read privileged host logs, but with ALL caps
     # dropped. Instead of restoring CAP_DAC_OVERRIDE we grant two supplementary groups (least
     # privilege, no capability bypass): GID 473 = the image's `alloy` group that owns /var/lib/alloy
