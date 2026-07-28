@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-28.
 > **Owner area:** REFINERY · **Related ADRs:** none
 
 # Refinery-order overview list
@@ -44,6 +44,62 @@ AJAX-swap fragment so an in-place status-filter change re-renders them.
 (`testViewOrders_*`) · **Code:** `RefineryOrderPageController.viewOrders` / `buildPaginationBaseUrl`,
 `templates/refinery-orders-index.html`, `templates/fragments/pagination.html` · **Issues:** #2
 (performance audit)
+
+### REQ-REFINERY-020 — A location counts as a refinery iff it hosts a refinery terminal
+
+The set of locations offered as refineries — the create/edit form's location picker, and the
+candidate set the screenshot import resolves its location read against — MUST be derived from the
+presence of a **live UEX terminal with `type = 'refinery'`** at the location's city or space
+station. It MUST NOT be derived from UEX's parent-level `has_refinery` boolean on
+`city` / `space_station` / `outpost`.
+
+**Why:** UEX publishes both statements and they disagree. Measured against the live UEX API on
+2026-07-28, 21 terminals carry `type = 'refinery'`, while the parent flag is wrong in *both*
+directions:
+
+|                Disagreement                |                              Locations                              |              Effect before this requirement               |
+|--------------------------------------------|---------------------------------------------------------------------|-----------------------------------------------------------|
+| Parent flag `0`, refinery terminal present | MIC-L5 Modern Icarus Station, ARC-L4 Faint Glen Station, Patch City | Missing from the picker although members can refine there |
+| Parent flag `1`, no refinery terminal      | People's Service Station Alpha / Delta / Lambda / Theta             | Offered as refineries that do not exist in-game           |
+
+The `type = 'refinery'` terminal is the same record UEX's own site renders its refinery list from,
+so it is the signal to trust.
+
+**How:** `terminal.type` mirrors the upstream discriminator verbatim. The derived truth lives in
+`city.has_refinery_terminal` / `space_station.has_refinery_terminal`, recomputed from the live
+refinery terminals at the end of every terminal sweep
+(`UexUniverseSyncService.reconcileRefineryTerminalFlags()`, which must run *after* `syncTerminals`
+since cities and stations are synced earlier in the sweep). UEX's raw `has_refinery` claim is kept
+untouched alongside it for diagnostics — the same "raw upstream value next to the effective value"
+split `terminal.uex_has_loading_dock` already uses.
+
+Storing the derived value rather than resolving it per read is **binding, not an optimisation**: the
+create/update gate reads the flag off the already-loaded `Location` parent in memory. Issuing a query
+there would auto-flush a transaction that is midway through rewriting the order and its goods, so the
+goods `clear()` + re-add would race its own freshly written rows and fail with
+`ObjectOptimisticLockingFailureException` (409).
+
+The picker and the write-path gate MUST read the **same** flag, so the create/update gate accepts
+exactly the locations the form offered — a stricter gate would reject a location the picker just
+handed the user.
+
+**Acceptance**
+
+- [ ] A location whose parent carries `has_refinery = false` but hosts a live refinery terminal
+  (MIC-L5, ARC-L4, Patch City) is offered by the picker and accepted by create/update.
+- [ ] A location whose parent carries `has_refinery = true` but hosts no refinery terminal
+  (People's Service Station Alpha/Delta/Lambda/Theta) is *not* offered and is rejected on create.
+- [ ] A terminal that is not `type = 'refinery'` never flags its parent.
+- [ ] A `type = 'refinery'` terminal with `is_available_live = false` never flags its parent, so a
+  decommissioned refinery drops out on the next sweep.
+- [ ] The sweep corrects a stale derived flag in both directions, and leaves the raw `has_refinery`
+  claim unmodified.
+- [ ] Editing a refinery order's location does not produce a 409.
+
+**Enforced by:** `UexUniverseSyncRefineryFlagTest`, `LocationRepositoryRefineryTest`,
+`RefineryOrderServiceLifecycleTest` (`CreateRefineryOrderTests`) · **Code:**
+`UexUniverseSyncService.reconcileRefineryTerminalFlags`, `LocationRepository.findLocationsWithRefinery`,
+`RefineryOrderService.validateLocationHasRefinery`, `Terminal.type`, migration `V226`
 
 ## Out of scope
 

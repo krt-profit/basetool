@@ -968,7 +968,7 @@ class RefineryOrderServiceTest {
       Location loc = new Location();
       loc.setId(UUID.randomUUID());
       SpaceStation station = new SpaceStation();
-      station.setHasRefinery(true);
+      station.setHasRefineryTerminal(true);
       loc.setSpaceStation(station);
       RefineryOrder transientOrder = new RefineryOrder();
       transientOrder.setLocation(loc);
@@ -996,7 +996,7 @@ class RefineryOrderServiceTest {
       Location loc = new Location();
       loc.setId(UUID.randomUUID());
       SpaceStation station = new SpaceStation();
-      station.setHasRefinery(true);
+      station.setHasRefineryTerminal(true);
       loc.setSpaceStation(station);
       when(locationRepository.findById(loc.getId())).thenReturn(Optional.of(loc));
       when(refineryOrderRepository.save(any(RefineryOrder.class)))

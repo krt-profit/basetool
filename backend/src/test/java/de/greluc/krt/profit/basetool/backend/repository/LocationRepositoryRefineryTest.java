@@ -32,6 +32,16 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Pins the refinery-location picker source (REQ-REFINERY-020): eligibility follows the derived
+ * {@code hasRefineryTerminal} flag, never UEX's parent-level {@code hasRefinery} claim.
+ *
+ * <p>The two disagreement cases are the reported bug. UEX reports {@code has_refinery = 0} for
+ * MIC-L5 Modern Icarus Station, ARC-L4 Faint Glen Station and Patch City while listing a live
+ * refinery terminal at each, and reports {@code has_refinery = 1} for four People's Service
+ * Stations that host no refinery terminal at all. How the flag itself is recomputed from the
+ * terminal table is pinned by {@code UexUniverseSyncRefineryFlagTest}.
+ */
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
@@ -43,44 +53,78 @@ public class LocationRepositoryRefineryTest {
 
   @Autowired private SpaceStationRepository spaceStationRepository;
 
+  /**
+   * Persists a station-backed location.
+   *
+   * @param name station name; the location is named after it
+   * @param uexClaim UEX's raw (untrusted) {@code has_refinery} flag
+   * @param derived the reconciled {@code has_refinery_terminal} flag the picker reads
+   * @return the persisted location
+   */
+  private Location saveStationLocation(String name, boolean uexClaim, boolean derived) {
+    SpaceStation station = new SpaceStation();
+    station.setName(name);
+    station.setHasRefinery(uexClaim);
+    station.setHasRefineryTerminal(derived);
+    spaceStationRepository.save(station);
+
+    Location location = new Location();
+    location.setName(name + " Loc");
+    location.setSpaceStation(station);
+    return locationRepository.save(location);
+  }
+
+  // covers REQ-REFINERY-020 — a flagged city or station is offered, an unflagged one is not.
   @Test
   public void testFindLocationsWithRefinery() {
     City city = new City();
     city.setName("Refinery City");
-    city.setHasRefinery(true);
+    city.setHasRefineryTerminal(true);
     cityRepository.save(city);
 
-    Location loc1 = new Location();
-    loc1.setName("Refinery City Loc");
-    loc1.setCity(city);
-    locationRepository.save(loc1);
+    Location cityLocation = new Location();
+    cityLocation.setName("Refinery City Loc");
+    cityLocation.setCity(city);
+    locationRepository.save(cityLocation);
 
-    SpaceStation ss = new SpaceStation();
-    ss.setName("Refinery Station");
-    ss.setHasRefinery(true);
-    spaceStationRepository.save(ss);
+    Location stationLocation = saveStationLocation("Refinery Station", false, true);
 
-    Location loc2 = new Location();
-    loc2.setName("Refinery Station Loc");
-    loc2.setSpaceStation(ss);
-    locationRepository.save(loc2);
+    City plainCity = new City();
+    plainCity.setName("Normal City");
+    plainCity.setHasRefineryTerminal(false);
+    cityRepository.save(plainCity);
 
-    City city2 = new City();
-    city2.setName("Normal City");
-    city2.setHasRefinery(false);
-    cityRepository.save(city2);
-
-    Location loc3 = new Location();
-    loc3.setName("Normal City Loc");
-    loc3.setCity(city2);
-    locationRepository.save(loc3);
+    Location plainLocation = new Location();
+    plainLocation.setName("Normal City Loc");
+    plainLocation.setCity(plainCity);
+    locationRepository.save(plainLocation);
 
     locationRepository.flush();
 
     List<Location> refineries = locationRepository.findLocationsWithRefinery();
 
-    assertTrue(refineries.contains(loc1));
-    assertTrue(refineries.contains(loc2));
-    assertFalse(refineries.contains(loc3));
+    assertTrue(refineries.contains(cityLocation));
+    assertTrue(refineries.contains(stationLocation));
+    assertFalse(refineries.contains(plainLocation));
+  }
+
+  // covers REQ-REFINERY-020 — the reported bug: UEX claims has_refinery = 0 for MIC-L5 / ARC-L4 /
+  // Patch City, but a live refinery terminal sits there, so the derived flag wins.
+  @Test
+  public void testUexClaimFalseButRefineryTerminalPresentIsIncluded() {
+    Location micL5 = saveStationLocation("MIC-L5 Modern Icarus Station", false, true);
+    locationRepository.flush();
+
+    assertTrue(locationRepository.findLocationsWithRefinery().contains(micL5));
+  }
+
+  // covers REQ-REFINERY-020 — the mirror image: UEX claims has_refinery = 1 for the People's
+  // Service Stations, but no refinery terminal exists, so they must NOT be offered.
+  @Test
+  public void testUexClaimTrueWithoutRefineryTerminalIsExcluded() {
+    Location bogus = saveStationLocation("People's Service Station Alpha", true, false);
+    locationRepository.flush();
+
+    assertFalse(locationRepository.findLocationsWithRefinery().contains(bogus));
   }
 }

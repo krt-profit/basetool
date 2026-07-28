@@ -95,13 +95,23 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
   List<Location> findByHomeLocationTrueAndHiddenFalseOrderByNameDesc();
 
   /**
-   * Returns every location attached to a city or space-station that has a refinery; used as the
-   * picker source when the user creates a refinery order.
+   * Returns every location whose city or space station hosts a live refinery terminal; the picker
+   * source when the user creates a refinery order, and the candidate set the screenshot import
+   * matches its location read against.
+   *
+   * <p>Keyed on the derived {@code hasRefineryTerminal} flag, NOT on UEX's parent-level {@code
+   * hasRefinery} claim this query used to read (REQ-REFINERY-020). The upstream claim disagrees
+   * with UEX's own terminal list in both directions — it misses MIC-L5, ARC-L4 and Patch City, and
+   * invents four People's Service Stations. {@code
+   * UexUniverseSyncService.reconcileRefineryTerminalFlags()} recomputes the derived flag from the
+   * live {@code type = 'refinery'} terminals at the end of every sweep.
+   *
+   * @return locations hosting a live refinery terminal, never {@code null}
    */
   @Query(
       """
-      SELECT l FROM Location l LEFT JOIN l.city c LEFT JOIN l.spaceStation s WHERE c.hasRefinery =
-      true OR s.hasRefinery = true
+      SELECT l FROM Location l LEFT JOIN l.city c LEFT JOIN l.spaceStation s
+      WHERE c.hasRefineryTerminal = true OR s.hasRefineryTerminal = true
       """)
   List<Location> findLocationsWithRefinery();
 }

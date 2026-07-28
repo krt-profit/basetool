@@ -39,6 +39,7 @@ public record UexTerminalDto(
     @JsonProperty("id") Integer id,
     @JsonProperty("name") String name,
     @JsonProperty("code") String code,
+    @JsonProperty("type") String type,
     @JsonProperty("is_available_live") Integer isAvailableLive,
     @JsonProperty("nickname") String nickname,
     @JsonProperty("star_system_name") String starSystemName,
