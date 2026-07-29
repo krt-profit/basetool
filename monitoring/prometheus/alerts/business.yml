@@ -14,6 +14,20 @@ groups:
           summary: "Bank ledger integrity violation: {{ $labels.category }}"
           description: "The hourly integrity sweep found {{ $value }} rows in category '{{ $labels.category }}'. A bank ledger invariant is broken — investigate before any further bank mutation."
 
+      # REQ-ORDERS-033: an ordered-item line's blueprint no longer produces the ordered item, so the
+      # order is showing a FOREIGN recipe's materials as its demand. People collect and book against
+      # those numbers, so this is wrong-data-in-production, not a cosmetic drift. Warning rather than
+      # critical: nothing is corrupted (the write path stays consistent), but every affected order
+      # misleads until it is re-saved.
+      - alert: JobOrderItemBlueprintDrift
+        expr: basetool_job_order_integrity_violations > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Item-order line blueprint drift: {{ $value }} line(s)"
+          description: "The integrity sweep found {{ $value }} ordered-item line(s) whose blueprint no longer produces the ordered item — an SC-Wiki re-sync re-pointed the blueprint after the order was placed. Those orders display a foreign recipe's materials. The backend log names each order; re-saving an affected order re-derives its lines."
+
   - name: business-warning
     rules:
       # NOTE (#1041 item 23): the backend tags basetool_scheduled_job_* with a `task` label
@@ -164,6 +178,18 @@ groups:
         annotations:
           summary: "Bank ledger-integrity sweep stale >6h"
           description: "The hourly bank ledger-integrity sweep last succeeded more than 6 hours ago. While it is stale the violations gauge is frozen and BankLedgerIntegrityViolation cannot fire — the data-corruption detector is blind. Restore the sweep before trusting a 'no violations' reading."
+
+      # Same false-silence trap as the bank sweep (REQ-ORDERS-033): a stale job-order integrity sweep
+      # freezes basetool_job_order_integrity_violations, so JobOrderItemBlueprintDrift can never fire
+      # and a "0 drifted lines" reading means nothing. Warning, matching the alert it guards.
+      - alert: JobOrderIntegritySweepStale
+        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"}) > 21600
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job-order integrity sweep stale >6h"
+          description: "The hourly job-order integrity sweep last succeeded more than 6 hours ago. While it is stale the violations gauge is frozen and JobOrderItemBlueprintDrift cannot fire — a blueprint re-point would go undetected. Restore the sweep before trusting a 'no drift' reading."
 
       # (#1041 item 3) BusinessMetricsCollector.refresh() (every 60s) feeds every approval/work-queue
       # depth gauge. If it wedges, the gauges FREEZE and the *ApprovalOverdue alerts silently consume

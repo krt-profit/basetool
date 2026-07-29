@@ -34,6 +34,8 @@ import java.util.UUID;
  * @param deliveredAmount whole units already handed over
  * @param parentItemId the parent line this was adopted from, or {@code null}
  * @param materials the snapshotted material requirements
+ * @param blueprintStale {@code true} when the chosen blueprint no longer produces {@code gameItem}
+ *     after an SC-Wiki re-sync, making the snapshotted materials a foreign recipe (REQ-ORDERS-033)
  * @param version optimistic-lock version
  */
 public record JobOrderItemDto(
@@ -45,4 +47,5 @@ public record JobOrderItemDto(
     Integer deliveredAmount,
     UUID parentItemId,
     List<JobOrderItemMaterialDto> materials,
+    boolean blueprintStale,
     Long version) {}

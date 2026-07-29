@@ -54797,6 +54797,9 @@
               "$ref" : "#/components/schemas/JobOrderItemMaterialDto"
             }
           },
+          "blueprintStale" : {
+            "type" : "boolean"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -54938,6 +54941,10 @@
       "CreateJobOrderItemLineDto" : {
         "type" : "object",
         "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "gameItemId" : {
             "type" : "string",
             "format" : "uuid"
@@ -58360,13 +58367,13 @@
               "$ref" : "#/components/schemas/InventoryAllocationInput"
             }
           },
-          "qualityConsistentWithCatalog" : {
+          "catalogReferenceValid" : {
             "type" : "boolean"
           },
           "missionFreeForGameItem" : {
             "type" : "boolean"
           },
-          "catalogReferenceValid" : {
+          "qualityConsistentWithCatalog" : {
             "type" : "boolean"
           }
         },

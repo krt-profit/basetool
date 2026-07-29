@@ -168,6 +168,7 @@ class JobOrderItemServiceTest {
     // When ordering 3 units, overriding screws to GOOD and leaving steel at its default.
     CreateJobOrderItemLineDto line =
         new CreateJobOrderItemLineDto(
+            null,
             weapon.getId(),
             blueprint.getId(),
             3,
@@ -203,7 +204,7 @@ class JobOrderItemServiceTest {
     JobOrderItem built =
         service.buildItemLine(
             new CreateJobOrderItemLineDto(
-                item.getId(), blueprint.getId(), 3, List.of(), null, null));
+                null, item.getId(), blueprint.getId(), 3, List.of(), null, null));
 
     assertThat(requirementFor(built, bolts).getRequiredQuantity()).isEqualTo(8.0);
   }
@@ -222,7 +223,7 @@ class JobOrderItemServiceTest {
     JobOrderItem built =
         service.buildItemLine(
             new CreateJobOrderItemLineDto(
-                weapon.getId(), blueprint.getId(), 5, List.of(), null, null));
+                null, weapon.getId(), blueprint.getId(), 5, List.of(), null, null));
 
     assertThat(requirementFor(built, iron).getRequiredQuantity()).isEqualTo(1.8);
   }
@@ -237,7 +238,8 @@ class JobOrderItemServiceTest {
     when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
 
     CreateJobOrderItemLineDto line =
-        new CreateJobOrderItemLineDto(ordered.getId(), blueprint.getId(), 1, List.of(), null, null);
+        new CreateJobOrderItemLineDto(
+            null, ordered.getId(), blueprint.getId(), 1, List.of(), null, null);
 
     assertThatThrownBy(() -> service.buildItemLine(line))
         .isInstanceOf(BadRequestException.class)
@@ -443,7 +445,7 @@ class JobOrderItemServiceTest {
     JobOrderItem built =
         service.buildItemLine(
             new CreateJobOrderItemLineDto(
-                weapon.getId(), blueprint.getId(), 2, List.of(), null, null));
+                null, weapon.getId(), blueprint.getId(), 2, List.of(), null, null));
 
     assertThat(built.getMaterials()).hasSize(2);
     JobOrderItemMaterial ricciteReq = requirementFor(built, riccite);
@@ -451,6 +453,76 @@ class JobOrderItemServiceTest {
     JobOrderItemMaterial beradomReq = requirementFor(built, beradomMaterial);
     assertThat(beradomReq.getRequiredQuantity()).isEqualTo(40.0); // 20 pieces * 2, whole
     assertThat(beradomReq.getQualityRequirement()).isEqualTo(QualityRequirement.NONE);
+  }
+
+  // covers REQ-ORDERS-032 (an edit re-derives a line in place; booked production is not discarded)
+  @Test
+  void applyItemLineReDerivesMaterialsInPlaceAndKeepsBookedProduction() {
+    // Given an existing line that already has 6 of 10 units manufactured and 2 delivered, carrying
+    // a stale snapshot (Screws) from the recipe it was created with.
+    GameItem weapon = gameItem("Ballista", GameItemKind.WEAPON);
+    Material screws = material("Screws", QuantityType.PIECE);
+    Material steel = material("Steel", QuantityType.SCU);
+    Blueprint corrected = blueprint(weapon);
+    corrected.addIngredient(resource(steel, 1.5, null));
+
+    JobOrderItem existing = JobOrderItem.builder().amount(10).build();
+    existing.setId(UUID.randomUUID());
+    existing.setGameItem(weapon);
+    existing.setManufacturedAmount(6);
+    existing.setDeliveredAmount(2);
+    existing.addMaterial(
+        JobOrderItemMaterial.builder()
+            .material(screws)
+            .requiredQuantity(40.0)
+            .qualityRequirement(QualityRequirement.NONE)
+            .build());
+
+    when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
+    when(blueprintRepository.findById(corrected.getId())).thenReturn(Optional.of(corrected));
+
+    // When re-deriving that same line against the corrected blueprint at an unchanged amount
+    service.applyItemLine(
+        existing,
+        new CreateJobOrderItemLineDto(
+            existing.getId(), weapon.getId(), corrected.getId(), 10, List.of(), null, null));
+
+    // Then the snapshot follows the new recipe...
+    assertThat(existing.getMaterials()).hasSize(1);
+    assertThat(requirementFor(existing, steel).getRequiredQuantity()).isEqualTo(15.0);
+    assertThat(existing.getBlueprint()).isSameAs(corrected);
+    // ...while the production counters — the whole point of editing in place — survive untouched.
+    assertThat(existing.getManufacturedAmount()).isEqualTo(6);
+    assertThat(existing.getDeliveredAmount()).isEqualTo(2);
+  }
+
+  // covers REQ-ORDERS-033 (a line whose blueprint drifted away from the ordered item is flagged)
+  @Test
+  void toItemDtosFlagsLinesWhoseBlueprintNoLongerProducesTheOrderedItem() {
+    // Given two lines: one consistent, one whose blueprint now outputs a different item — exactly
+    // what an SC-Wiki re-point leaves behind, since the pairing is only validated at write time.
+    GameItem cooler = gameItem("Cryo-Star SL", GameItemKind.VEHICLE_ITEM);
+    GameItem heatSink = gameItem("HeatSink", GameItemKind.VEHICLE_ITEM);
+
+    JobOrderItem consistent = JobOrderItem.builder().amount(1).build();
+    consistent.setId(UUID.randomUUID());
+    consistent.setGameItem(cooler);
+    consistent.setBlueprint(blueprint(cooler));
+
+    JobOrderItem drifted = JobOrderItem.builder().amount(3).build();
+    drifted.setId(UUID.randomUUID());
+    drifted.setGameItem(cooler);
+    drifted.setBlueprint(blueprint(heatSink));
+
+    JobOrder order = new JobOrder();
+    order.setType(JobOrderType.ITEM);
+    order.addItem(consistent);
+    order.addItem(drifted);
+
+    // When / Then — only the drifted line carries the warning flag.
+    assertThat(service.toItemDtos(order))
+        .extracting(dto -> dto.id() + ":" + dto.blueprintStale())
+        .containsExactlyInAnyOrder(consistent.getId() + ":false", drifted.getId() + ":true");
   }
 
   // ── helpers ──────────────────────────────────────────────────────────

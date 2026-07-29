@@ -63,6 +63,14 @@ public class JobOrderItemForm {
   @Data
   public static class JobOrderItemLineForm {
 
+    /**
+     * The persistent id of the existing line this row edits, or {@code null} for a newly added row.
+     * Rendered as a hidden input by the item editor in edit mode and passed straight through to the
+     * backend, which uses it to update the line in place so its booked production survives
+     * (REQ-ORDERS-032).
+     */
+    private UUID id;
+
     /** The finished item to order. */
     private UUID gameItemId;
 

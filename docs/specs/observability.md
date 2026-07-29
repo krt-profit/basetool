@@ -413,9 +413,9 @@ transaction per pass) rather than per-scrape.
 - `basetool_scheduled_job_executions_total{task,outcome}` counter,
   `basetool_scheduled_job_duration_seconds{task}` timer,
   `basetool_scheduled_job_last_success_timestamp_seconds{task}` gauge and — for the jobs that
-  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the seven
+  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the eight
   wrapped jobs (`user_sync`, `notification_retention`, `default_blueprint_provisioning`,
-  `bank_ledger_integrity`, `uex_sync`, `scwiki_sync`, `business_metrics`) via `TaskMetrics` (`record`
+  `bank_ledger_integrity`, `job_order_integrity`, `uex_sync`, `scwiki_sync`, `business_metrics`) via `TaskMetrics` (`record`
   / `recordCounting`). The `business_metrics` job wraps `BusinessMetricsCollector.refresh()` (the 60s
   queue-depth sampler) so a wedged sampler surfaces via its frozen last-success (`BusinessMetricsStale`)
   instead of silently freezing every queue gauge under the `*ApprovalOverdue` alerts (#1041 item 3).
@@ -429,7 +429,9 @@ transaction per pass) rather than per-scrape.
 
   > 48 h), `ScheduledJobStale` (`notification_retention` / `default_blueprint_provisioning`, > 26 h),
   > `BankLedgerIntegritySweepStale` (`bank_ledger_integrity`, > 6 h, **critical** — while stale the
-  > violations gauge freezes and `BankLedgerIntegrityViolation` cannot fire) and `BusinessMetricsStale`
+  > violations gauge freezes and `BankLedgerIntegrityViolation` cannot fire),
+  > `JobOrderIntegritySweepStale` (`job_order_integrity`, > 6 h — same frozen-gauge trap for
+  > `JobOrderItemBlueprintDrift`) and `BusinessMetricsStale`
   > (`business_metrics`, > 10 min); it is registered lazily so a config-gated-off job never reports a
   > falsely-stale `0`. The items counter is present only for jobs that report a count: user sync,
   > notification retention, default-blueprint provisioning, and — since #1041 item 2 — `uex_sync` (the
@@ -564,6 +566,13 @@ transaction per pass) rather than per-scrape.
   (`DiscordPrecheckDisabledOnProd`); no PII, only the coarse outcome.
 - `basetool_bank_ledger_integrity_violations{category}` gauge fed by the hourly integrity sweep
   (six `category` values; **any value > 0 is CRITICAL** — the ledger broke an invariant).
+- `basetool_job_order_integrity_violations{category}` gauge fed by the hourly `JobOrderIntegrityTask`
+  (REQ-ORDERS-033; one `category` today, `item_line_blueprint_drift`). `> 0` means an ordered-item
+  line's blueprint no longer produces the ordered item after an SC-Wiki re-point, so that order
+  displays a **foreign recipe** as its material demand (`JobOrderItemBlueprintDrift`, warning — the
+  data is wrong, not corrupt). The sweep logs one `ERROR` per drifted line carrying the order's
+  display id, the ordered item and the blueprint's current output — catalogue names only, never the
+  order's user-entered handle.
 - Queue-depth gauges (`BusinessMetricsCollector`): `basetool_registration_pending_count` +
   `_oldest_age_seconds`, `basetool_bank_booking_request_pending_count` + `_oldest_age_seconds`,
   and `{status}`-labelled `basetool_job_order_open_count` / `basetool_operation_open_count` /

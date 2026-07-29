@@ -44,6 +44,12 @@ public enum ScheduledJob {
   /** The hourly bank ledger-integrity sweep ({@code BankLedgerIntegrityTask}). */
   BANK_LEDGER_INTEGRITY("bank_ledger_integrity"),
 
+  /**
+   * The job-order integrity sweep ({@code JobOrderIntegrityTask}) — detects ordered-item lines
+   * whose blueprint drifted away from the ordered item after an SC-Wiki re-sync (REQ-ORDERS-033).
+   */
+  JOB_ORDER_INTEGRITY("job_order_integrity"),
+
   /** The ~daily UEX commodity/universe sync ({@code UexScheduler}). */
   UEX_SYNC("uex_sync"),
 

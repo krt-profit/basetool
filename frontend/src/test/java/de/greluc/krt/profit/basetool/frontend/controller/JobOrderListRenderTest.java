@@ -121,6 +121,7 @@ class JobOrderListRenderTest {
             0,
             null,
             List.of(),
+            false,
             1L);
 
     JobOrderDto order =

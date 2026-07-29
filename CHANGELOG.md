@@ -4,7 +4,15 @@
 
 ### Fixed
 
+- **Aufträge: Beim Bearbeiten eines Item-Auftrags gehen die bereits erfassten Herstellungen nicht mehr verloren.** Jedes Speichern löschte bisher alle Item-Zeilen und legte sie neu an, wodurch die Spalte „Hergestellt" jeder Zeile still auf 0 zurückfiel. Zeilen werden jetzt anhand ihrer ID an Ort und Stelle aktualisiert. Ist auf einer Zeile schon etwas hergestellt, lässt sie sich nicht mehr entfernen, das Item nicht mehr wechseln und die Anzahl nicht unter die hergestellte Menge senken; der Bauplan bleibt änderbar (REQ-ORDERS-032, ADR-0121).
+
+- **Aufträge: Item-Zeilen mit veraltetem Bauplan werden jetzt erkannt und markiert.** Ändert der SC-Wiki-Abgleich, welches Item ein Bauplan herstellt, blieb die Auftragszeile am alten Bauplan hängen und zeigte still die Materialien eines fremden Rezepts an — betroffen waren zwei Zeilen (u. a. „Cryo-Star SL" mit dem HeatSink-Rezept). Solche Zeilen tragen in der Auftragsdetailansicht jetzt den Hinweis „Rezept veraltet"; ein stündlicher Prüflauf meldet sie zusätzlich ans Monitoring. Einmal Bearbeiten und Speichern leitet die Zeile korrekt neu ab (REQ-ORDERS-033, ADR-0121).
+
 - **Raffinerie: Die Standortauswahl kann nicht mehr für einen ganzen Tag leer bleiben.** Seit der Umstellung auf die Terminal-basierte Ableitung wird die Liste aus Daten gebildet, die erst der UEX-Abgleich füllt. Schlug einer der Abgleichschritte davor fehl, wurden die Terminals gar nicht erst geholt — die Auswahl blieb leer und es ließ sich kein Raffinerieauftrag anlegen, bis der nächste Lauf 24 Stunden später griff. Die Terminals werden jetzt zuerst abgeglichen, und die Ableitung läuft auch dann, wenn ein späterer Schritt abbricht (REQ-REFINERY-020).
+
+## [v1.5.20](https://github.com/krt-profit/basetool/releases/tag/v1.5.20) - 2026-07-28
+
+### Fixed
 
 - **Raffinerie: MIC-L5, ARC-L4 und Patch City stehen jetzt als Raffinerie zur Auswahl.** Die Auswahlliste richtete sich nach dem Stations-/Stadt-Kennzeichen von UEX, das diesen drei Standorten keine Raffinerie zuschreibt, obwohl UEX dort jeweils ein Raffinerie-Terminal führt. Maßgeblich ist jetzt das Terminal selbst. Umgekehrt entfallen die vier „People's Service Station"-Stationen (Alpha, Delta, Lambda, Theta), die als Raffinerie angeboten wurden, ohne eine zu besitzen. Die Liste wird beim nächsten UEX-Abgleich aktualisiert (REQ-REFINERY-020). Die Regel erkannte auch die Einträge, mit denen auditd beim Neustart seine eigenen Regeln neu lädt — das nächtliche `libc6`-Update startet auditd neu und löste damit einen Fehlalarm aus, obwohl keine SSH-Datei angefasst wurde. Sie wertet jetzt nur noch echte Dateizugriffe (`type=SYSCALL`) aus (REQ-OBS-010).
 

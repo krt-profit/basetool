@@ -77,6 +77,10 @@ app:
       # The scheduled sweep is disabled under test; BankLedgerIntegrityServiceTest drives verify()
       # directly so the schedule never races the synthetic-corruption assertions.
       enabled: false
+  joborder:
+    integrity:
+      # Same rationale as the bank sweep: JobOrderIntegrityServiceTest drives verify() directly.
+      enabled: false
   notifications:
     retention:
       # The scheduled retention sweep is disabled under @SpringBootTest; the repository delete is
