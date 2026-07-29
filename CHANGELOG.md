@@ -8,6 +8,8 @@
 
 - **Aufträge: Item-Zeilen mit veraltetem Bauplan werden jetzt erkannt und markiert.** Ändert der SC-Wiki-Abgleich, welches Item ein Bauplan herstellt, blieb die Auftragszeile am alten Bauplan hängen und zeigte still die Materialien eines fremden Rezepts an — betroffen waren zwei Zeilen (u. a. „Cryo-Star SL" mit dem HeatSink-Rezept). Solche Zeilen tragen in der Auftragsdetailansicht jetzt den Hinweis „Rezept veraltet"; ein stündlicher Prüflauf meldet sie zusätzlich ans Monitoring. Einmal Bearbeiten und Speichern leitet die Zeile korrekt neu ab (REQ-ORDERS-033, ADR-0121).
 
+- **Raffinerie: Die Standortauswahl kann nicht mehr für einen ganzen Tag leer bleiben.** Seit der Umstellung auf die Terminal-basierte Ableitung wird die Liste aus Daten gebildet, die erst der UEX-Abgleich füllt. Schlug einer der Abgleichschritte davor fehl, wurden die Terminals gar nicht erst geholt — die Auswahl blieb leer und es ließ sich kein Raffinerieauftrag anlegen, bis der nächste Lauf 24 Stunden später griff. Die Terminals werden jetzt zuerst abgeglichen, und die Ableitung läuft auch dann, wenn ein späterer Schritt abbricht (REQ-REFINERY-020).
+
 ## [v1.5.20](https://github.com/krt-profit/basetool/releases/tag/v1.5.20) - 2026-07-28
 
 ### Fixed

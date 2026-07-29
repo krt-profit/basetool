@@ -105,6 +105,10 @@ class UexSchedulerTest {
     verify(uexRefinerySyncService).syncRefiningMethods();
     verify(uexRefinerySyncService).syncRefineryYields();
 
+    // Derived refinery flags, recomputed once per sweep from the sweep's finally
+    // (REQ-REFINERY-020).
+    verify(uexUniverseSyncService).reconcileRefineryTerminalFlags();
+
     verifyNoMoreInteractions(
         uexUniverseSyncService,
         uexStarSystemService,
@@ -137,6 +141,11 @@ class UexSchedulerTest {
             uexItemPriceSyncService,
             uexRefinerySyncService);
 
+    // Phase 0: terminals lead the sweep (REQ-REFINERY-020) — they carry no FK into the rest of the
+    // topology, and hoisting them ahead of every step that can abort the tick is what keeps
+    // terminal.type (the refinery picker's only source) from going a full 24h unpopulated.
+    order.verify(uexUniverseSyncService).syncTerminals();
+
     // Phase 1: universe basics in declared order
     order.verify(uexUniverseSyncService).syncFactions();
     order.verify(uexUniverseSyncService).syncJurisdictions();
@@ -147,7 +156,6 @@ class UexSchedulerTest {
     order.verify(uexUniverseSyncService).syncOutposts();
     order.verify(uexUniverseSyncService).syncPois();
     order.verify(uexUniverseSyncService).syncSpaceStations();
-    order.verify(uexUniverseSyncService).syncTerminals();
 
     // Phase 2: catalogue
     order.verify(uexStarSystemService).fetchAndProcessStarSystems();
@@ -256,6 +264,52 @@ class UexSchedulerTest {
 
     // Then the finally still evicts, so any step that DID commit is reconciled rather than stranded
     // until the TTL.
+    verify(masterDataCacheEvictionService).evictUexSyncedMasterData();
+  }
+
+  // covers REQ-REFINERY-020 — terminals must be fetched before anything that can abort the tick,
+  // because terminal.type is the sole source the refinery picker derives from and the sweep only
+  // repeats every 24h.
+  @Test
+  void scheduleTask_syncsTerminalsEvenWhenTheRestOfTheTopologyFails() {
+    // Given the first of the topology steps that used to precede terminals blows up
+    doThrow(new RuntimeException("UEX 500")).when(uexUniverseSyncService).syncFactions();
+
+    // When
+    scheduler.scheduleCommodityPriceUpdate();
+
+    // Then terminals were already fetched — previously this abort left terminal.type NULL, every
+    // has_refinery_terminal false and the refinery-order picker empty until the next daily tick.
+    verify(uexUniverseSyncService).syncTerminals();
+  }
+
+  // covers REQ-REFINERY-020 — the derived flags survive an aborted sweep.
+  @Test
+  void scheduleTask_reconcilesRefineryFlagsEvenWhenALaterStepFails() {
+    // Given a step downstream of the committed terminals aborts the sweep
+    doThrow(new RuntimeException("UEX 500")).when(uexVehicleService).syncVehicles();
+
+    // When
+    scheduler.scheduleCommodityPriceUpdate();
+
+    // Then the finally still derives has_refinery_terminal from the terminals that DID commit,
+    // rather than stranding the refinery feature until the next daily tick.
+    verify(uexUniverseSyncService).reconcileRefineryTerminalFlags();
+  }
+
+  // A failing reconciliation must not replace the sweep's own exception nor skip the eviction that
+  // shares its finally block.
+  @Test
+  void scheduleTask_stillEvictsMasterData_whenReconciliationItselfFails() {
+    // Given the reconciliation in the finally throws
+    doThrow(new RuntimeException("reconcile boom"))
+        .when(uexUniverseSyncService)
+        .reconcileRefineryTerminalFlags();
+
+    // When
+    scheduler.scheduleCommodityPriceUpdate();
+
+    // Then the eviction after it still runs
     verify(masterDataCacheEvictionService).evictUexSyncedMasterData();
   }
 

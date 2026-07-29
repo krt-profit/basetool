@@ -106,8 +106,10 @@ class UexUniverseSyncRefineryFlagTest {
 
   // covers REQ-REFINERY-020 — the sweep derives the flag from refinery terminals, correcting both
   // the false negatives (MIC-L5, ARC-L4, Patch City) and the false positives (People's Service).
+  // The two calls mirror the sweep: syncTerminals() leads it, reconcileRefineryTerminalFlags() runs
+  // from UexScheduler's finally once every step has had its turn.
   @Test
-  void syncTerminalsDerivesRefineryFlagFromTerminalsNotFromTheUexClaim() {
+  void sweepDerivesRefineryFlagFromTerminalsNotFromTheUexClaim() {
     saveStation("MIC-L5 Modern Icarus Station", false, false);
     saveStation("People's Service Station Alpha", true, true);
     saveStation("MIC-L3 Endless Odyssey Station", false, false);
@@ -134,6 +136,7 @@ class UexUniverseSyncRefineryFlagTest {
                     999, "Shop - MIC-L3", "item", "MIC-L3 Endless Odyssey Station", null, 1)));
 
     service.syncTerminals();
+    service.reconcileRefineryTerminalFlags();
 
     // False negative corrected: UEX said no, the terminal says yes.
     assertTrue(
@@ -186,6 +189,7 @@ class UexUniverseSyncRefineryFlagTest {
                     0)));
 
     service.syncTerminals();
+    service.reconcileRefineryTerminalFlags();
 
     assertFalse(
         spaceStationRepository
