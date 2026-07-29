@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.21](https://github.com/krt-profit/basetool/releases/tag/v1.5.21) - 2026-07-29
+
 ### Fixed
 
 - **Aufträge: Beim Bearbeiten eines Item-Auftrags gehen die bereits erfassten Herstellungen nicht mehr verloren.** Jedes Speichern löschte bisher alle Item-Zeilen und legte sie neu an, wodurch die Spalte „Hergestellt" jeder Zeile still auf 0 zurückfiel. Zeilen werden jetzt anhand ihrer ID an Ort und Stelle aktualisiert. Ist auf einer Zeile schon etwas hergestellt, lässt sie sich nicht mehr entfernen, das Item nicht mehr wechseln und die Anzahl nicht unter die hergestellte Menge senken; der Bauplan bleibt änderbar (REQ-ORDERS-032, ADR-0121).
