@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.23](https://github.com/krt-profit/basetool/releases/tag/v1.5.23) - 2026-07-29
+
 ### Fixed
 
 - **CI: Der Build schlägt nicht mehr sporadisch mit einem abgeschnittenen OpenAPI-Dokument fehl.** Der Backend-Test, der `openapi.json` erzeugt, schrieb die 1,8-MB-Datei direkt an Ort und Stelle, während parallel laufende Frontend-Tests sie lesen — wer ins Schreibfenster geriet, scheiterte an unvollständigem JSON. Die Datei wird jetzt fertig geschrieben und erst dann an ihren Platz verschoben (REQ-API-007).
