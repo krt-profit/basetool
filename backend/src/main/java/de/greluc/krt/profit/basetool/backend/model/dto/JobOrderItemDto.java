@@ -29,6 +29,12 @@ import java.util.UUID;
  * line was adopted from another line's blueprint sub-assembly suggestion (provenance). The counts
  * hold the invariant {@code 0 <= deliveredAmount <= manufacturedAmount <= amount}.
  *
+ * <p>{@code blueprintStale} flags the REQ-ORDERS-033 drift case: the chosen blueprint no longer
+ * produces {@code gameItem}, because a later SC-Wiki sync re-pointed it at a different item. The
+ * line's snapshotted {@code materials} then faithfully mirror a <em>foreign</em> recipe and must
+ * not be trusted — re-saving the order repairs the line by re-picking a blueprint that still
+ * produces the item.
+ *
  * @param id the item-line primary key
  * @param gameItem the requested finished item
  * @param blueprint the recipe chosen for this line
@@ -37,6 +43,8 @@ import java.util.UUID;
  * @param deliveredAmount whole units already handed over
  * @param parentItemId the parent line this was adopted from, or {@code null} for a top-level line
  * @param materials the snapshotted material requirements for this line
+ * @param blueprintStale {@code true} when the chosen blueprint no longer outputs {@code gameItem},
+ *     making the snapshotted materials untrustworthy (REQ-ORDERS-033)
  * @param version optimistic-lock version
  */
 public record JobOrderItemDto(
@@ -48,4 +56,5 @@ public record JobOrderItemDto(
     Integer deliveredAmount,
     UUID parentItemId,
     List<JobOrderItemMaterialDto> materials,
+    boolean blueprintStale,
     Long version) {}

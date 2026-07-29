@@ -159,7 +159,8 @@ class JobOrderItemProductionServiceTest {
         .thenReturn(Optional.of(inventoryItem));
     lenient()
         .when(jobOrderItemService.toItemDtos(any()))
-        .thenReturn(List.of(new JobOrderItemDto(lineId, null, null, 4, 1, 0, null, List.of(), 4L)));
+        .thenReturn(
+            List.of(new JobOrderItemDto(lineId, null, null, 4, 1, 0, null, List.of(), false, 4L)));
 
     // REQ-INV-032: bookIn is required on every payload, so the fixture line carries a produced
     // game item and the book-in collaborators resolve the defaultBookIn() target (acting user,

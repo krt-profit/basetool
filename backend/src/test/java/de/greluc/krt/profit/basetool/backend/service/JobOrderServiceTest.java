@@ -1086,7 +1086,7 @@ class JobOrderServiceTest {
             null,
             List.of(
                 new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
-                    UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null)),
+                    null, UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null)),
             1L);
 
     jobOrderService.updateItemJobOrderAsRequester(orderId, dto);
@@ -1157,7 +1157,7 @@ class JobOrderServiceTest {
             null,
             List.of(
                 new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
-                    UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null)),
+                    null, UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null)),
             1L);
 
     jobOrderService.updateItemJobOrderAsRequester(orderId, dto);
@@ -1876,7 +1876,7 @@ class JobOrderServiceTest {
           null,
           List.of(
               new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
-                  UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null)),
+                  null, UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null)),
           version);
     }
 
@@ -1949,9 +1949,9 @@ class JobOrderServiceTest {
               null,
               List.of(
                   new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
-                      UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null),
+                      null, UUID.randomUUID(), UUID.randomUUID(), 1, List.of(), 1, null),
                   new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
-                      UUID.randomUUID(), UUID.randomUUID(), 2, List.of(), 2, 1)),
+                      null, UUID.randomUUID(), UUID.randomUUID(), 2, List.of(), 2, 1)),
               1L);
 
       jobOrderService.updateItemJobOrder(orderId, dto);
@@ -1966,6 +1966,130 @@ class JobOrderServiceTest {
           "the adopted line keeps its sub-assembly parent");
       verify(materialClaimService).withdrawOrphanedClaimsWithinTransaction(order);
       assertEquals("edited", order.getHandle());
+    }
+
+    // covers REQ-ORDERS-032 (an edit re-derives a matched line in place; production is not lost)
+    @Test
+    void matchedLine_isReDerivedInPlace_soBookedProductionSurvives() {
+      // Given an order whose single line already has 6 of 10 units manufactured...
+      JobOrder order = itemOrder();
+      de.greluc.krt.profit.basetool.backend.model.JobOrderItem existing =
+          new de.greluc.krt.profit.basetool.backend.model.JobOrderItem();
+      java.util.UUID lineId = UUID.randomUUID();
+      existing.setId(lineId);
+      existing.setAmount(10);
+      existing.setManufacturedAmount(6);
+      order.addItem(existing);
+
+      when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
+      when(jobOrderRepository.save(any(JobOrder.class))).thenAnswer(inv -> inv.getArgument(0));
+      when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+      when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
+      when(jobOrderItemService.aggregateMaterials(any())).thenReturn(List.of());
+
+      // ...and an edit that echoes the line's id (what the editor posts back).
+      de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto dto =
+          new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto(
+              null,
+              null,
+              "edited",
+              null,
+              List.of(
+                  new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+                      lineId, UUID.randomUUID(), UUID.randomUUID(), 12, List.of(), 1, null)),
+              1L);
+
+      jobOrderService.updateItemJobOrder(orderId, dto);
+
+      // The very same row is re-derived — not deleted and rebuilt — so the counter is intact.
+      verify(jobOrderItemService, never()).buildItemLine(any());
+      verify(jobOrderItemService).applyItemLine(eq(existing), any());
+      assertEquals(1, order.getItems().size());
+      assertSame(existing, order.getItems().iterator().next(), "the persisted line is reused");
+      assertEquals(6, existing.getManufacturedAmount(), "booked production survives the edit");
+    }
+
+    // covers REQ-ORDERS-032 (a line with booked production may not be dropped by an edit)
+    @Test
+    void droppingALineWithBookedProduction_throwsBadRequest() {
+      // Given an order whose line already has production booked...
+      JobOrder order = itemOrder();
+      de.greluc.krt.profit.basetool.backend.model.JobOrderItem produced =
+          new de.greluc.krt.profit.basetool.backend.model.JobOrderItem();
+      produced.setId(UUID.randomUUID());
+      produced.setAmount(4);
+      produced.setManufacturedAmount(4);
+      order.addItem(produced);
+      when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
+      when(jobOrderItemService.buildItemLine(any()))
+          .thenAnswer(inv -> new de.greluc.krt.profit.basetool.backend.model.JobOrderItem());
+
+      // ...when the payload no longer mentions it (a different, brand-new line instead)
+      assertThrows(
+          de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+          () -> jobOrderService.updateItemJobOrder(orderId, oneLine(1L)));
+      verify(jobOrderRepository, never()).save(any(JobOrder.class));
+    }
+
+    // covers REQ-ORDERS-032 (a payload claiming one line twice is rejected, not silently collapsed)
+    @Test
+    void twoPayloadLinesClaimingTheSameExistingLine_throwsBadRequest() {
+      JobOrder order = itemOrder();
+      de.greluc.krt.profit.basetool.backend.model.JobOrderItem existing =
+          new de.greluc.krt.profit.basetool.backend.model.JobOrderItem();
+      java.util.UUID lineId = UUID.randomUUID();
+      existing.setId(lineId);
+      existing.setAmount(5);
+      order.addItem(existing);
+      when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
+
+      de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto dto =
+          new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto(
+              null,
+              null,
+              "edited",
+              null,
+              List.of(
+                  new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+                      lineId, UUID.randomUUID(), UUID.randomUUID(), 5, List.of(), 1, null),
+                  new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+                      lineId, UUID.randomUUID(), UUID.randomUUID(), 7, List.of(), 2, null)),
+              1L);
+
+      assertThrows(
+          de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+          () -> jobOrderService.updateItemJobOrder(orderId, dto));
+      verify(jobOrderRepository, never()).save(any(JobOrder.class));
+    }
+
+    // covers REQ-ORDERS-032 (the amount may not fall below what was already produced)
+    @Test
+    void loweringAmountBelowManufactured_throwsBadRequest() {
+      JobOrder order = itemOrder();
+      de.greluc.krt.profit.basetool.backend.model.JobOrderItem existing =
+          new de.greluc.krt.profit.basetool.backend.model.JobOrderItem();
+      java.util.UUID lineId = UUID.randomUUID();
+      existing.setId(lineId);
+      existing.setAmount(10);
+      existing.setManufacturedAmount(6);
+      order.addItem(existing);
+      when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
+
+      de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto dto =
+          new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto(
+              null,
+              null,
+              "edited",
+              null,
+              List.of(
+                  new de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemLineDto(
+                      lineId, UUID.randomUUID(), UUID.randomUUID(), 3, List.of(), 1, null)),
+              1L);
+
+      assertThrows(
+          de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+          () -> jobOrderService.updateItemJobOrder(orderId, dto));
+      verify(jobOrderRepository, never()).save(any(JobOrder.class));
     }
 
     @Test

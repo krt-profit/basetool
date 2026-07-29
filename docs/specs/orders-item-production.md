@@ -25,7 +25,11 @@ item stock earmarked to the order (`REQ-ORDERS-028`, the item sibling of the mat
 the **Itemsammelübersicht** page where the earmarked units are collected (`REQ-ORDERS-031`, the item
 sibling of the Materialsammlung) and
 the **owner/location redaction** that hides the fulfilling side's inventory owner and Standort from a
-requesting-side viewer of an SK-public order (`REQ-ORDERS-029`, ADR-0107). The decision behind the
+requesting-side viewer of an SK-public order (`REQ-ORDERS-029`, ADR-0107). It further governs the two
+invariants that keep a booked `manufacturedAmount` trustworthy over time: an **edit must re-derive the
+ordered-item lines in place** rather than recreate them (`REQ-ORDERS-032`, ADR-0121), and an
+ordered-item line whose **blueprint drifted away from the ordered item** must be detected and surfaced
+(`REQ-ORDERS-033`, ADR-0121). The decision behind the
 booking flow is [ADR-0099](../adr/0099-job-order-item-production-booking.md).
 
 ## Requirements
@@ -586,10 +590,96 @@ persists) · **Code:** `ItemCollectionPageController`, `item-collection.html`, `
 `InventoryCheckoutService.bookOutTransfer` / `applyTransferInherit` · **Issues:** — · **Design:**
 [`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md)
 
+### REQ-ORDERS-032 — An item-order edit re-derives its lines in place and never discards booked production
+
+Editing an `ITEM` order MUST preserve every line's booked `manufacturedAmount` and `deliveredAmount`.
+
+Each ordered-item line in an item-order write payload (`CreateJobOrderItemLineDto`) carries the
+**persistent `id`** of the line it updates; `null` means "new line". Both edit paths — the
+logistician `updateItemJobOrder` and the requester `updateItemJobOrderAsRequester` — MUST reconcile
+the payload against the order's existing lines instead of replacing the collection:
+
+- a payload line whose `id` matches an existing line of **this** order is re-derived **in place** —
+  game item, blueprint, amount and the snapshotted `JobOrderItemMaterial` children are overwritten,
+  the row's identity and its production counters are not;
+- a payload line with no (or a foreign) `id` is added as a new line;
+- an existing line the payload no longer carries is removed;
+- the same `id` appearing on two payload lines is rejected with HTTP 400 — silently collapsing them
+  into one (last derivation wins) is exactly the class of quiet data loss this requirement closes.
+
+The counters are guarded by three rules, because a line whose production is already booked describes
+physical units that exist in the world:
+
+| Attempted edit on a line with `manufacturedAmount > 0` |                                                                 Result                                                                 |
+|--------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| Change the ordered **game item**                       | HTTP 400 — the produced units *are* that item                                                                                          |
+| Lower the **amount** below `manufacturedAmount`        | HTTP 400 — would break `manufactured ≤ amount`                                                                                         |
+| **Remove** the line                                    | HTTP 400 — the units were booked into stock; deleting the line loses that record                                                       |
+| Change the **blueprint**                               | **Allowed** — re-pointing at a corrected recipe is the repair path for `REQ-ORDERS-033`, and it does not invalidate units already made |
+
+The item editor mirrors these server-side rules so the user is not surprised by a rejected save: a
+line with booked production renders its `id` as a hidden input, pins the amount input's `min` to
+`manufacturedAmount`, drops its remove button, and shows how many units are already produced
+(`orders.create.item.producedLocked`).
+
+Before this requirement the edit paths ran `jobOrder.getItems().clear()` followed by a full rebuild.
+`orphanRemoval` deleted every line and its materials, and the rebuilt rows started at
+`manufacturedAmount = 0` — so **every** save of an item order silently reset all recorded production,
+with no error and no audit trace. The handover freeze did not cover it: it blocks editing only once a
+*delivery* exists, while production is booked long before that.
+
+**Enforced by:** `JobOrderServiceTest.UpdateItemJobOrderTests`
+(`matchedLine_isReDerivedInPlace_soBookedProductionSurvives`,
+`droppingALineWithBookedProduction_throwsBadRequest`,
+`loweringAmountBelowManufactured_throwsBadRequest`),
+`JobOrderItemServiceTest.applyItemLineReDerivesMaterialsInPlaceAndKeepsBookedProduction` ·
+**Code:** `JobOrderService#reconcileItemLines` / `#assertLineEditable` / `#assertLineRemovable`,
+`JobOrderItemService#applyItemLine`, `CreateJobOrderItemLineDto#id`,
+`JobOrderPageController#buildEditItems`, `orders-create.js` (`addItemLine`) ·
+**Decision:** [ADR-0121](../adr/0121-item-order-edit-reconciles-lines-in-place.md)
+
+### REQ-ORDERS-033 — Ordered-item lines whose blueprint drifted are detected and surfaced
+
+A line's `gameItem` ↔ `blueprint` pairing is validated **only when the line is written**, but
+`ScWikiBlueprintSyncService` re-resolves every blueprint's `outputItem` from the Wiki feed on **every**
+run. An upstream re-point therefore leaves an existing line pointing at a blueprint that now produces
+a *different* item, and the line's snapshotted materials become a foreign recipe — silently, with no
+error, no audit event and nothing in the read model to distinguish it from correct data.
+
+The system MUST make that drift visible on three surfaces:
+
+1. **Read model** — `JobOrderItemDto.blueprintStale` is `true` when the line's blueprint no longer
+   outputs the line's game item (or resolves to no item at all).
+2. **UI** — the order detail's ordered-item row renders a warning chip
+   (`orders.detail.item.blueprintStale`) whose tooltip states that the shown materials belong to a
+   foreign recipe and that re-saving the order repairs the line.
+3. **Monitoring** — a scheduled sweep (`JobOrderIntegrityTask`, default hourly,
+   `app.joborder.integrity.*`) feeds
+   `basetool_job_order_integrity_violations{category="item_line_blueprint_drift"}` and logs one
+   `ERROR` per drifted line naming the order's display id, the ordered item and what its blueprint
+   produces now — never the order's user-entered handle. `JobOrderItemBlueprintDrift` (warning) fires
+   on `> 0`; `JobOrderIntegritySweepStale` guards the false silence of a frozen gauge.
+
+Detection is deliberately **non-mutating**. Auto-re-pointing a drifted line at another recipe would
+change what people must supply mid-order, so the repair stays a human action: re-saving the order
+re-derives the line, and because the stale blueprint is no longer offered for that item the editor's
+blueprint picker falls back to one that still produces it (`REQ-ORDERS-032` explicitly permits the
+blueprint change on a line with booked production so this repair works).
+
+**Enforced by:** `JobOrderIntegrityServiceTest` (drift reported + clean run),
+`JobOrderItemServiceTest.toItemDtosFlagsLinesWhoseBlueprintNoLongerProducesTheOrderedItem` ·
+**Code:** `JobOrderIntegrityService`, `JobOrderIntegrityTask`,
+`JobOrderItemRepository#findBlueprintOutputDrift`, `JobOrderItemBlueprintDrift`,
+`JobOrderItemService#isBlueprintStale`, `orders-detail.html`,
+`monitoring/prometheus/alerts/business.yml`, `monitoring/grafana/dashboards/07-basetool-operations.json` ·
+**Decision:** [ADR-0121](../adr/0121-item-order-edit-reconciles-lines-in-place.md)
+
 ## Out of scope
 
 - Editing the ordered recipe / blueprint from the production modal — the recipe is the line's
   snapshot; production consumes against it and never rewrites it.
+- **Auto-healing** a drifted blueprint link (`REQ-ORDERS-033`): the sweep detects and reports, it never
+  re-points a line, because that would silently change an in-flight order's material demand.
 - Moving inventory between orders — production only draws down **this** order's earmark on an entry
   (never a sibling order's slice or the free rest); reassigning earmarks is the Variante-C allocation
   flow (`REQ-INV-027`).

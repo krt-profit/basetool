@@ -104,9 +104,11 @@ public class JobOrderItemService {
   private final MaterialMapper materialMapper;
 
   /**
-   * Builds one ordered-item line with its derived, snapshotted material requirements. The returned
-   * {@link JobOrderItem} is detached (not yet attached to an order) — the caller wires it onto the
-   * {@link JobOrder} and resolves any sub-assembly parent link.
+   * Builds one <b>new</b> ordered-item line with its derived, snapshotted material requirements.
+   * The returned {@link JobOrderItem} is detached (not yet attached to an order) — the caller wires
+   * it onto the {@link JobOrder} and resolves any sub-assembly parent link. Its production counters
+   * start at zero; to re-derive an <em>existing</em> line without losing them use {@link
+   * #applyItemLine(JobOrderItem, CreateJobOrderItemLineDto)}.
    *
    * @param line the create payload for this line (game item, chosen blueprint, amount, quality
    *     choices)
@@ -116,6 +118,33 @@ public class JobOrderItemService {
    */
   @NotNull
   public JobOrderItem buildItemLine(@NotNull CreateJobOrderItemLineDto line) {
+    JobOrderItem item = JobOrderItem.builder().build();
+    applyItemLine(item, line);
+    return item;
+  }
+
+  /**
+   * Re-derives {@code item} from the payload <b>in place</b>: re-resolves the game item and
+   * blueprint, re-validates that the blueprint produces the item, overwrites the amount, and
+   * replaces the snapshotted {@link JobOrderItemMaterial} children with a fresh derivation. The
+   * line's identity and its booked {@link JobOrderItem#getManufacturedAmount() manufacturedAmount}
+   * / {@link JobOrderItem#getDeliveredAmount() deliveredAmount} are deliberately left untouched —
+   * this is what lets an edit re-snapshot the recipe without discarding recorded production
+   * (REQ-ORDERS-032). The caller is responsible for the guards that keep {@code deliveredAmount <=
+   * manufacturedAmount <= amount} intact ({@code JobOrderService#assertLineEditable}).
+   *
+   * <p>Clearing the {@code materials} set relies on the association's {@code orphanRemoval}: the
+   * old child rows are deleted and the freshly derived ones inserted in the same flush. On a
+   * brand-new (builder-created) line the set is simply empty, so {@link #buildItemLine} delegates
+   * here.
+   *
+   * @param item the line to re-derive — either a managed existing row or a fresh builder instance
+   * @param line the payload carrying the (possibly changed) game item, blueprint, amount and
+   *     quality choices
+   * @throws NotFoundException when the game item or blueprint id is unknown
+   * @throws BadRequestException when the chosen blueprint does not produce the ordered game item
+   */
+  public void applyItemLine(@NotNull JobOrderItem item, @NotNull CreateJobOrderItemLineDto line) {
     GameItem gameItem =
         Entities.require(
             gameItemRepository.findById(line.gameItemId()),
@@ -131,12 +160,10 @@ public class JobOrderItemService {
           "Blueprint " + line.blueprintId() + " does not produce game item " + line.gameItemId());
     }
 
-    JobOrderItem item =
-        JobOrderItem.builder()
-            .gameItem(gameItem)
-            .blueprint(blueprint)
-            .amount(line.amount())
-            .build();
+    item.setGameItem(gameItem);
+    item.setBlueprint(blueprint);
+    item.setAmount(line.amount());
+    item.getMaterials().clear();
 
     Map<UUID, QualityRequirement> qualityChoices = qualityChoicesByMaterial(line.materials());
 
@@ -175,7 +202,6 @@ public class JobOrderItemService {
               .qualityRequirement(quality)
               .build());
     }
-    return item;
   }
 
   /**
@@ -367,7 +393,31 @@ public class JobOrderItemService {
         item.getDeliveredAmount(),
         item.getParentItem() == null ? null : item.getParentItem().getId(),
         materials,
+        isBlueprintStale(item),
         item.getVersion());
+  }
+
+  /**
+   * Whether this line's chosen blueprint no longer produces the ordered game item (REQ-ORDERS-033).
+   * The item↔blueprint pairing is validated when the line is written, but {@code
+   * ScWikiBlueprintSyncService} re-resolves {@code Blueprint#outputItem} from the Wiki feed on
+   * every run, so an upstream correction can silently re-point a blueprint at a different item and
+   * leave the line snapshotting a foreign recipe. Surfacing the drift on the read model lets the
+   * order page warn instead of presenting the wrong materials as fact.
+   *
+   * @param item the ordered-item line to check
+   * @return {@code true} when the blueprint's output item is absent or differs from {@code
+   *     item.gameItem}; {@code false} for a consistent line (and when either side is unset, which
+   *     the {@code nullable = false} columns already preclude)
+   */
+  private static boolean isBlueprintStale(JobOrderItem item) {
+    Blueprint blueprint = item.getBlueprint();
+    GameItem gameItem = item.getGameItem();
+    if (blueprint == null || gameItem == null) {
+      return false;
+    }
+    GameItem output = blueprint.getOutputItem();
+    return output == null || !gameItem.getId().equals(output.getId());
   }
 
   private static Map<UUID, QualityRequirement> qualityChoicesByMaterial(

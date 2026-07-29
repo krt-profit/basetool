@@ -212,6 +212,12 @@ app:
       # Scheduled ledger-integrity sweep (REQ-BANK-020). Disable or retune per environment.
       enabled: ${APP_BANK_INTEGRITY_ENABLED:true}
       interval: ${APP_BANK_INTEGRITY_INTERVAL:PT1H}
+  joborder:
+    integrity:
+      # Scheduled ordered-item-line integrity sweep (REQ-ORDERS-033): detects lines whose blueprint
+      # drifted away from the ordered item after an SC-Wiki re-sync. Disable or retune per env.
+      enabled: ${APP_JOBORDER_INTEGRITY_ENABLED:true}
+      interval: ${APP_JOBORDER_INTEGRITY_INTERVAL:PT1H}
   notifications:
     retention:
       # Scheduled cleanup of READ notifications older than max-age (REQ-NOTIF-009). User-initiated

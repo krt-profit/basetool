@@ -760,7 +760,7 @@ class JobOrderControllerTest {
             new JobOrderItemProductionCreateDto.BookInDto(
                 UUID.randomUUID(), null, null, false, true));
     JobOrderItemDto persisted =
-        new JobOrderItemDto(itemId, null, null, 5, 3, 0, null, List.of(), 8L);
+        new JobOrderItemDto(itemId, null, null, 5, 3, 0, null, List.of(), false, 8L);
     when(jobOrderItemProductionService.bookProduction(jobOrderId, itemId, dto))
         .thenReturn(persisted);
 

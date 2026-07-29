@@ -159,6 +159,7 @@ class JobOrderItemDetailRenderTest {
             List.of(
                 new JobOrderItemMaterialDto(UUID.randomUUID(), acryliPlex, 7.5, "GOOD", 1L),
                 new JobOrderItemMaterialDto(UUID.randomUUID(), agricium, 12.0, "NONE", 1L)),
+            false,
             1L);
     JobOrderItemDto subItem =
         new JobOrderItemDto(
@@ -170,6 +171,7 @@ class JobOrderItemDetailRenderTest {
             0,
             parentId,
             List.of(),
+            false,
             1L);
 
     JobOrderDto order =
@@ -291,6 +293,7 @@ class JobOrderItemDetailRenderTest {
             0,
             null,
             List.of(new JobOrderItemMaterialDto(UUID.randomUUID(), agricium, 12.0, "NONE", 1L)),
+            false,
             1L);
     JobOrderDto order =
         new JobOrderDto(
@@ -364,6 +367,7 @@ class JobOrderItemDetailRenderTest {
             List.of(
                 new JobOrderItemMaterialDto(
                     UUID.randomUUID(), material("Agricium", "SCU"), 12.0, "NONE", 1L)),
+            false,
             1L);
     JobOrderDto order =
         new JobOrderDto(
@@ -446,6 +450,7 @@ class JobOrderItemDetailRenderTest {
             List.of(
                 new JobOrderItemMaterialDto(
                     UUID.randomUUID(), material("Agricium", "SCU"), 12.0, "NONE", 1L)),
+            false,
             1L);
     JobOrderDto order =
         new JobOrderDto(
@@ -526,6 +531,7 @@ class JobOrderItemDetailRenderTest {
             List.of(
                 new JobOrderItemMaterialDto(
                     UUID.randomUUID(), material("Agricium", "SCU"), 12.0, "NONE", 1L)),
+            false,
             1L);
     JobOrderItemHandoverDto handover =
         new JobOrderItemHandoverDto(
@@ -806,6 +812,7 @@ class JobOrderItemDetailRenderTest {
             List.of(
                 new JobOrderItemMaterialDto(
                     UUID.randomUUID(), material("Agricium", "SCU"), 12.0, "NONE", 1L)),
+            false,
             1L);
     return new JobOrderDto(
         orderId,

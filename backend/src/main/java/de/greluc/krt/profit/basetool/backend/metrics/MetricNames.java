@@ -142,6 +142,12 @@ public final class MetricNames {
   public static final String BANK_LEDGER_INTEGRITY_VIOLATIONS =
       "basetool.bank.ledger.integrity.violations";
 
+  // --- Job-order integrity (JobOrderIntegrityTask) ---------------------------------------
+
+  /** Gauge {@code basetool_job_order_integrity_violations} — tag {@code category}. */
+  public static final String JOB_ORDER_INTEGRITY_VIOLATIONS =
+      "basetool.job.order.integrity.violations";
+
   // --- Approval / work-queue depth (BusinessMetricsCollector) ----------------------------
 
   /** Gauge {@code basetool_registration_pending_count} — pending user registrations. */
@@ -391,6 +397,12 @@ public final class MetricNames {
 
   /** Integrity category: an audited transaction missing its mandatory audit row. */
   public static final String CATEGORY_TRANSACTION_WITHOUT_AUDIT = "transaction_without_audit";
+
+  /**
+   * Integrity category: an ordered-item line whose blueprint no longer produces the ordered game
+   * item, so its snapshotted materials mirror a foreign recipe (REQ-ORDERS-033).
+   */
+  public static final String CATEGORY_ITEM_LINE_BLUEPRINT_DRIFT = "item_line_blueprint_drift";
 
   private MetricNames() {
     // Constants holder — not instantiable.
