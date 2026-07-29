@@ -68,11 +68,16 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>The order in which {@link de.greluc.krt.profit.basetool.backend.service.UexScheduler} calls
  * the sync methods matters: factions/jurisdictions first (no parent), then planets, then
- * moons/orbits/POI (parented by planet), then cities (parented by planet/moon), then outposts /
- * space stations / terminals (parented by city/station). Calling them out of order means a child
- * row references a parent that does not yet exist in the local mirror, and the child is silently
- * dropped (the scheduler retries the full sweep on the next tick so missed children eventually
- * land).
+ * moons/orbits/POI (parented by planet), then cities (parented by planet/moon), then outposts and
+ * space stations (parented by city). Calling them out of order means a child row references a
+ * parent that does not yet exist in the local mirror, and the child is silently dropped (the
+ * scheduler retries the full sweep on the next tick so missed children eventually land).
+ *
+ * <p>{@link #syncTerminals()} is the exception and deliberately runs <em>first</em>
+ * (REQ-REFINERY-020). Terminals resolve no parent entity at all — UEX ships the parent as a
+ * denormalised name string that is stored verbatim — so they have no ordering constraint, and
+ * running them ahead of every step that can abort the tick is what keeps {@code terminal.type}, the
+ * refinery picker's only source, from staying unpopulated for a full 24-hour sweep interval.
  *
  * <p>Every sync method follows the same pattern: pull the full UEX catalog for that entity, upsert
  * by UEX id (with name-based fallback for legacy rows missing the id), per-field dirty checking to
@@ -756,7 +761,6 @@ public class UexUniverseSyncService {
       entity.setCompanyName(dto.companyName());
       terminalRepository.save(entity);
     }
-    reconcileRefineryTerminalFlags();
     log.info("Finished sync for Terminals.");
   }
 
@@ -771,17 +775,41 @@ public class UexUniverseSyncService {
    * claim stays in {@code has_refinery} for diagnostics; the derived flag is what the
    * refinery-order picker and its create/update gate read.
    *
-   * <p>Runs at the end of {@link #syncTerminals()} and nowhere else: cities and space stations are
-   * synced <em>before</em> terminals in the sweep, so anything earlier would recompute against a
-   * stale terminal table. Deriving the flag here (rather than resolving it per read) is what keeps
-   * the order write path free of an extra query — see the V226 migration note.
+   * <p>Called once per sweep from {@code UexScheduler}'s {@code finally}, after every sync step has
+   * had its turn — deliberately NOT at the end of {@link #syncTerminals()}, where it used to sit.
+   * Two reasons, both load-bearing:
+   *
+   * <ul>
+   *   <li>It must see BOTH tables current. It matches terminals against {@code city} / {@code
+   *       space_station} rows by name, so running it inside {@code syncTerminals()} — which now
+   *       leads the sweep — would reconcile against parents that this tick has not synced yet.
+   *   <li>Running it in the {@code finally} means a later step aborting the sweep no longer costs
+   *       the refinery feature its flags: terminals are already committed by then, so the derived
+   *       truth still lands. This mirrors the master-data cache eviction that shares that block.
+   * </ul>
+   *
+   * <p>It issues no network call — a pure local derivation over already-committed rows — so it is
+   * safe in a {@code finally} even when the sweep aborted because UEX was unreachable.
+   *
+   * <p>Deriving the flag here (rather than resolving it per read) is what keeps the order write
+   * path free of an extra query — see the V226 migration note.
    *
    * <p>Matching is by the terminal's denormalised parent-name columns, mirroring {@code
    * RefineryYieldRepository.findAllForLocation}: the city branch additionally requires {@code
    * spaceStationName IS NULL} so a refinery at a station <em>within</em> a city does not promote
    * the city itself.
+   *
+   * <p><strong>{@code @Transactional} here is load-bearing — do not drop it.</strong> The class
+   * default is {@code @Transactional(readOnly = true)}. While this method was private and called
+   * from inside {@link #syncTerminals()} it simply ran in that method's read-write transaction; now
+   * that the scheduler calls it from outside, the Spring proxy applies the class default and starts
+   * a genuinely read-only transaction, in which Hibernate switches to {@code FlushMode.MANUAL} and
+   * <em>silently discards</em> the {@code save} calls below. No test would catch that: {@code
+   * UexUniverseSyncRefineryFlagTest} is {@code @Transactional} itself, so this method would merely
+   * join the test's read-write transaction and pass while production wrote nothing.
    */
-  private void reconcileRefineryTerminalFlags() {
+  @Transactional
+  public void reconcileRefineryTerminalFlags() {
     Set<String> refineryCities = new HashSet<>();
     Set<String> refineryStations = new HashSet<>();
     for (Terminal terminal :
