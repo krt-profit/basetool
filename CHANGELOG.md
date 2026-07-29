@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **CI: Der Build schlägt nicht mehr sporadisch mit einem abgeschnittenen OpenAPI-Dokument fehl.** Der Backend-Test, der `openapi.json` erzeugt, schrieb die 1,8-MB-Datei direkt an Ort und Stelle, während parallel laufende Frontend-Tests sie lesen — wer ins Schreibfenster geriet, scheiterte an unvollständigem JSON. Die Datei wird jetzt fertig geschrieben und erst dann an ihren Platz verschoben (REQ-API-007).
+
 - **Discord-Registrierung: Nach der Freigabe geht es sofort weiter — ohne zweimaliges Ab- und Anmelden.** Die laufende Sitzung merkte sich das „noch nicht freigegeben" für ihre gesamte Laufzeit von 30 Tagen, sodass ein freigeschalteter Zugang weiter auf der Warteseite landete; die anschließend vergebenen Rollen und Einheiten waren aus demselben Grund erst nach einer weiteren Anmeldung sichtbar. Beides wird jetzt laufend aufgefrischt, und die Warteseite leitet nach der Freigabe von selbst ins Tool weiter (REQ-SEC-013, REQ-SEC-017, ADR-0122).
 
 - **Entzogene Rollen und Rechte verschwinden jetzt auch aus einer laufenden Sitzung.** Der Abgleich mit dem Backend hat Rechte bisher nur hinzugefügt, nie entfernt — wer eine Rolle verlor, sah die zugehörigen Schaltflächen bis zum nächsten Anmelden weiter, bekam beim Klick aber eine Fehlermeldung. Entzogene Rollen und Rechte fallen jetzt innerhalb von ein bis wenigen Minuten aus der Oberfläche (REQ-SEC-013, ADR-0122).
