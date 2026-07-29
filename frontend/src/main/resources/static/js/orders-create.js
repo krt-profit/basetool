@@ -307,7 +307,13 @@ function addItemLine(prefill) {
     row.dataset.lineIndex = idx;
     row.style.cssText = 'border:1px solid var(--color-gray-3); padding:1rem; margin-bottom:1rem;';
     const options = document.getElementById('item-options-template').innerHTML;
+    // Units already produced on this line (edit mode only). A line with booked production may not
+    // be removed and may not drop below what was made — the backend rejects both — so the editor
+    // pins the minimum and hides the remove button instead of letting the save fail.
+    const manufactured = Number(prefill.manufactured) || 0;
+    const minAmount = manufactured > 0 ? manufactured : 1;
     row.innerHTML = `
+        ${prefill.id ? `<input type="hidden" name="items[${idx}].id" value="${prefill.id}">` : ''}
         <input type="hidden" name="items[${idx}].clientLineId" value="${idx}">
         <input type="hidden" name="items[${idx}].parentClientLineId" value="${prefill.parentId != null ? prefill.parentId : ''}">
         <div class="oc-line-fields">
@@ -321,10 +327,19 @@ function addItemLine(prefill) {
             </div>
             <div class="form-group flex-1 mb-0">
                 <label>${ITEM_I18N.amount}</label>
-                <input type="number" step="1" name="items[${idx}].amount" data-role="amount" min="1" value="${prefill.amount || 1}" required>
+                <input type="number" step="1" name="items[${idx}].amount" data-role="amount" min="${minAmount}" value="${prefill.amount || 1}" required>
             </div>
-            <button type="button" class="btn btn-quiet-danger mb-0 nowrap" data-trigger="orders-remove-item">${ITEM_I18N.remove}</button>
+            ${
+                manufactured > 0
+                    ? ''
+                    : `<button type="button" class="btn btn-quiet-danger mb-0 nowrap" data-trigger="orders-remove-item">${ITEM_I18N.remove}</button>`
+            }
         </div>
+        ${
+            manufactured > 0
+                ? `<p class="oc-note-block text-muted mb-0" data-role="produced-note">${ITEM_I18N.producedLocked.replace('{0}', String(manufactured))}</p>`
+                : ''
+        }
         <div data-role="derived" class="oc-derived-block"></div>
         <div data-role="unresolved" class="hud-box hud-box-error oc-note-block krtm-hidden"></div>
         <div data-role="subassemblies" class="oc-note-block"></div>

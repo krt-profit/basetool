@@ -639,6 +639,12 @@
                 <td>
                     <span th:text="${item.gameItem != null ? item.gameItem.name() : '-'}"></span>
                     <span th:if="${item.parentItemId != null}" class="subassembly-tag" th:text="#{orders.detail.item.subassembly}" th:title="#{orders.detail.item.subassembly}">Unterbaugruppe</span>
+                    <!-- REQ-ORDERS-033: the stored blueprint no longer produces this item (an
+                         SC-Wiki re-sync re-pointed it), so the snapshotted materials below are a
+                         foreign recipe. Warn rather than present the wrong demand as fact. -->
+                    <span th:if="${item.blueprintStale}" class="chip chip--warning"
+                          th:text="#{orders.detail.item.blueprintStale}"
+                          th:title="#{orders.detail.item.blueprintStale.hint}">Rezept veraltet</span>
                     <!-- Machine-readable per-material demand for the production modal (read by
                          orders-detail.js openProductionModal via the button's closest <tr>). Kept on
                          the main row so the modal finds it independently of the collapsible demand

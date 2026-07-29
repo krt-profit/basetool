@@ -195,7 +195,7 @@ public class JobOrderService {
             .requestingOrgUnit(requesting)
             .build();
 
-    populateItemLines(jobOrder, createDto.items());
+    reconcileItemLines(jobOrder, createDto.items());
 
     jobOrder = jobOrderRepository.save(jobOrder);
     jobOrderRepository.flush();
@@ -556,13 +556,15 @@ public class JobOrderService {
       JobOrder order, int removedCount, int orphanedClaimsWithdrawn) {}
 
   /**
-   * Full edit of an {@code ITEM} order's ordered-item lines plus its metadata. Rebuilds the item
-   * lines from scratch (mirroring {@link #createItemJobOrder}): each line's required materials are
-   * re-derived and re-snapshotted from its chosen blueprint, and sub-assembly provenance is
-   * reconstructed from the transient {@code clientLineId}/{@code parentClientLineId} hints. Editing
-   * is only permitted while the order has <strong>no item-handover</strong> yet — once any partial
-   * delivery has been recorded the lines are frozen, because reconciling delivered quantities
-   * against a changed line set is out of scope (decision from the item-edit follow-up).
+   * Full edit of an {@code ITEM} order's ordered-item lines plus its metadata. Reconciles the item
+   * lines against the payload ({@link #reconcileItemLines}): a line the payload identifies by
+   * {@code id} is re-derived and re-snapshotted from its chosen blueprint <b>in place</b>, so its
+   * booked {@code manufacturedAmount} survives the edit (REQ-ORDERS-032); lines the payload no
+   * longer carries are removed, and lines without a matching id are added. Sub-assembly provenance
+   * is reconstructed from the transient {@code clientLineId}/{@code parentClientLineId} hints.
+   * Editing is only permitted while the order has <strong>no item-handover</strong> yet — once any
+   * partial delivery has been recorded the lines are frozen, because reconciling delivered
+   * quantities against a changed line set is out of scope (decision from the item-edit follow-up).
    *
    * <p>Because the derived buckets can change, the orphaned-claim reconciliation hook runs
    * afterwards: a claim on a material+quality bucket that the new lines no longer require is
@@ -607,11 +609,10 @@ public class JobOrderService {
     jobOrder.setHandle(updateDto.handle());
     jobOrder.setComment(normalizeComment(updateDto.comment()));
 
-    // Rebuild the ordered-item lines: orphanRemoval cascades the delete of the old lines and their
-    // derived JobOrderItemMaterial rows; buildItemLine re-derives + re-snapshots from the
-    // blueprint.
-    jobOrder.getItems().clear();
-    populateItemLines(jobOrder, updateDto.items());
+    // Reconcile the ordered-item lines: matched lines are re-derived + re-snapshotted in place so
+    // their booked manufacturedAmount survives (REQ-ORDERS-032); only lines the payload dropped are
+    // orphan-removed, and only when nothing has been produced on them.
+    reconcileItemLines(jobOrder, updateDto.items());
 
     jobOrder = jobOrderRepository.save(jobOrder);
     jobOrderRepository.flush();
@@ -631,37 +632,141 @@ public class JobOrderService {
   }
 
   /**
-   * Builds the ordered-item lines from the given create-line DTOs onto {@code jobOrder} and wires
-   * up each line's sub-assembly provenance from the transient {@code clientLineId}/{@code
-   * parentClientLineId} hints. Each line's required materials are derived + snapshotted from its
-   * chosen blueprint by {@link JobOrderItemService#buildItemLine}. Shared by {@link
-   * #createItemJobOrder}, {@link #updateItemJobOrder} and {@link #updateItemJobOrderAsRequester} so
-   * the three build the lines identically; the edit paths clear the existing lines first.
+   * Reconciles the order's ordered-item lines against the given create-line DTOs and wires up each
+   * line's sub-assembly provenance from the transient {@code clientLineId}/{@code
+   * parentClientLineId} hints. Each line's required materials are (re-)derived + re-snapshotted
+   * from its chosen blueprint. Shared by {@link #createItemJobOrder}, {@link #updateItemJobOrder}
+   * and {@link #updateItemJobOrderAsRequester} so the three treat the lines identically; on create
+   * the order simply has no existing lines and every payload line is new.
    *
-   * @param jobOrder the order to attach the built lines to (mutated in place).
-   * @param lines the ordered-item line create DTOs.
+   * <p><b>Matched lines are mutated in place, never recreated</b> (REQ-ORDERS-032). A payload line
+   * carrying an {@code id} that belongs to this order updates that very row, so its booked {@code
+   * manufacturedAmount} / {@code deliveredAmount} survive the edit. This replaced an earlier {@code
+   * getItems().clear()} + rebuild, which orphan-removed every line and silently reset all recorded
+   * production to zero on every save. An {@code id} that is {@code null} or foreign means "new
+   * line"; an existing line the payload no longer mentions is removed — but only when nothing has
+   * been produced on it yet, see {@link #assertLineRemovable}.
+   *
+   * @param jobOrder the order whose lines to reconcile (mutated in place).
+   * @param lines the ordered-item line DTOs describing the desired end state.
+   * @throws BadRequestException when the payload would discard or under-run booked production.
    */
-  private void populateItemLines(JobOrder jobOrder, List<CreateJobOrderItemLineDto> lines) {
-    Map<Integer, JobOrderItem> byClientId = new HashMap<>();
-    List<JobOrderItem> built = new ArrayList<>();
-    for (CreateJobOrderItemLineDto line : lines) {
-      JobOrderItem item = jobOrderItemService.buildItemLine(line);
-      jobOrder.addItem(item);
-      built.add(item);
-      if (line.clientLineId() != null) {
-        byClientId.put(line.clientLineId(), item);
+  private void reconcileItemLines(JobOrder jobOrder, List<CreateJobOrderItemLineDto> lines) {
+    Map<UUID, JobOrderItem> existingById = new HashMap<>();
+    for (JobOrderItem existing : jobOrder.getItems()) {
+      if (existing.getId() != null) {
+        existingById.put(existing.getId(), existing);
       }
     }
-    // Resolve sub-assembly provenance once every line exists, ignoring dangling or self references.
+
+    Map<Integer, JobOrderItem> byClientId = new HashMap<>();
+    List<JobOrderItem> resolved = new ArrayList<>();
+    Set<UUID> keptIds = new LinkedHashSet<>();
+    for (CreateJobOrderItemLineDto line : lines) {
+      JobOrderItem match = line.id() == null ? null : existingById.get(line.id());
+      if (match != null) {
+        // Two payload lines claiming the same persisted line would silently collapse into one (the
+        // last derivation winning) — reject instead, the payload is malformed.
+        if (!keptIds.add(match.getId())) {
+          throw new BadRequestException(
+              "Item line " + match.getId() + " appears more than once in the update payload.");
+        }
+        assertLineEditable(match, line);
+        jobOrderItemService.applyItemLine(match, line);
+      } else {
+        match = jobOrderItemService.buildItemLine(line);
+        jobOrder.addItem(match);
+      }
+      resolved.add(match);
+      if (line.clientLineId() != null) {
+        byClientId.put(line.clientLineId(), match);
+      }
+    }
+
+    // Drop the persisted lines the payload no longer carries — orphanRemoval deletes them and their
+    // snapshotted materials. A line with booked production is never silently dropped.
+    List<JobOrderItem> removed =
+        jobOrder.getItems().stream()
+            .filter(item -> item.getId() != null && !keptIds.contains(item.getId()))
+            .toList();
+    for (JobOrderItem gone : removed) {
+      assertLineRemovable(gone, jobOrder.getId());
+    }
+
+    // Reset provenance before rewiring so a link into a removed line cannot survive, then resolve
+    // it once every line exists, ignoring dangling or self references.
+    resolved.forEach(item -> item.setParentItem(null));
     for (int i = 0; i < lines.size(); i++) {
       Integer parentClientId = lines.get(i).parentClientLineId();
       if (parentClientId == null) {
         continue;
       }
       JobOrderItem parent = byClientId.get(parentClientId);
-      if (parent != null && parent != built.get(i)) {
-        built.get(i).setParentItem(parent);
+      if (parent != null && parent != resolved.get(i)) {
+        resolved.get(i).setParentItem(parent);
       }
+    }
+    removed.forEach(jobOrder.getItems()::remove);
+  }
+
+  /**
+   * Guards an in-place line update against invalidating production that was already booked on it
+   * (REQ-ORDERS-032). Once {@code manufacturedAmount > 0} the line's ordered item is frozen — the
+   * produced units are physically that item — and the amount may not fall below what has been
+   * produced, which would break the {@code deliveredAmount <= manufacturedAmount <= amount}
+   * invariant. The <b>blueprint may still change</b>: re-pointing a line at a corrected recipe is
+   * exactly how a line whose blueprint went stale is repaired, and it does not invalidate units
+   * already made.
+   *
+   * @param existing the managed line being updated.
+   * @param line the payload describing its new state.
+   * @throws BadRequestException when the update would orphan or under-run booked production.
+   */
+  private static void assertLineEditable(JobOrderItem existing, CreateJobOrderItemLineDto line) {
+    int manufactured =
+        existing.getManufacturedAmount() == null ? 0 : existing.getManufacturedAmount();
+    if (manufactured <= 0) {
+      return;
+    }
+    if (existing.getGameItem() != null
+        && !existing.getGameItem().getId().equals(line.gameItemId())) {
+      throw new BadRequestException(
+          "Item line "
+              + existing.getId()
+              + " already has "
+              + manufactured
+              + " manufactured unit(s); its ordered item can no longer be changed.");
+    }
+    if (line.amount() != null && line.amount() < manufactured) {
+      throw new BadRequestException(
+          "Item line "
+              + existing.getId()
+              + " already has "
+              + manufactured
+              + " manufactured unit(s); the amount cannot be lowered below that.");
+    }
+  }
+
+  /**
+   * Guards the removal of a line the edit payload no longer carries: a line with booked production
+   * (or, defensively, a recorded delivery) may not be deleted, because the produced units were
+   * already booked into stock and deleting the line would lose that record with no way to reconcile
+   * it (REQ-ORDERS-032). Lines with nothing produced are removed as before.
+   *
+   * @param gone the line the payload dropped.
+   * @param orderId the owning order id, for the error message.
+   * @throws BadRequestException when the line carries production or delivery.
+   */
+  private static void assertLineRemovable(JobOrderItem gone, UUID orderId) {
+    int manufactured = gone.getManufacturedAmount() == null ? 0 : gone.getManufacturedAmount();
+    int delivered = gone.getDeliveredAmount() == null ? 0 : gone.getDeliveredAmount();
+    if (manufactured > 0 || delivered > 0) {
+      throw new BadRequestException(
+          "Item line "
+              + gone.getId()
+              + " of order "
+              + orderId
+              + " already has booked production and cannot be removed.");
     }
   }
 
@@ -727,14 +832,15 @@ public class JobOrderService {
    * Requester-side full edit of an {@code ITEM} order (REQ-ORDERS-023): a member of the order's
    * requesting org unit replaces the ordered-item lines (change quantity, add/remove lines) and
    * edits the comment, permitted only while the order is still fully undelivered (the whole-order
-   * freeze). Each line's required materials are re-derived from its blueprint. Unlike the
-   * logistician {@link #updateItemJobOrder} — which leaves now-unrequired links as REQ-ORDERS-019
-   * orphan warnings — the requester path unlinks the inventory of every material no longer required
-   * by any surviving line <em>and</em> drops the game-item allocation slices of every game item the
-   * rebuilt line set no longer requests (REQ-INV-031), honouring the issue's "removing an item
-   * unlinks the linked inventory" rule, via the same safe post-persist unlink ordering. On commit
-   * the processing org unit's officers/leads are notified. Audited as {@code
-   * JOB_ORDER_ITEM_UPDATED} with {@code byRequester=true}.
+   * freeze). Each line's required materials are re-derived from its blueprint, in place for lines
+   * the payload identifies by {@code id} so booked production survives (REQ-ORDERS-032, {@link
+   * #reconcileItemLines}). Unlike the logistician {@link #updateItemJobOrder} — which leaves
+   * now-unrequired links as REQ-ORDERS-019 orphan warnings — the requester path unlinks the
+   * inventory of every material no longer required by any surviving line <em>and</em> drops the
+   * game-item allocation slices of every game item the rebuilt line set no longer requests
+   * (REQ-INV-031), honouring the issue's "removing an item unlinks the linked inventory" rule, via
+   * the same safe post-persist unlink ordering. On commit the processing org unit's officers/leads
+   * are notified. Audited as {@code JOB_ORDER_ITEM_UPDATED} with {@code byRequester=true}.
    *
    * @param id the order id.
    * @param updateDto the new item lines + comment (carries the expected version); org-unit / status
@@ -769,8 +875,7 @@ public class JobOrderService {
     final Set<UUID> requiredGameItemsBefore =
         new LinkedHashSet<>(jobOrderItemService.requiredGameItemIds(jobOrder));
 
-    jobOrder.getItems().clear();
-    populateItemLines(jobOrder, updateDto.items());
+    reconcileItemLines(jobOrder, updateDto.items());
 
     // Persist the rebuilt aggregate FIRST (still managed), then run the clearAutomatically unlinks
     // —

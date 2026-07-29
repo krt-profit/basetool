@@ -723,9 +723,9 @@ public class JobOrderPageController {
 
   /**
    * Builds the prefill payload for {@code window.EDIT_ITEMS}: one entry per ordered-item line with
-   * its game item, blueprint, amount, the index of its sub-assembly parent line (or {@code null}),
-   * and a material-id → quality map. The list index doubles as the client line id, so a child's
-   * {@code parentId} is the list index of its parent.
+   * its persistent id, booked production count, game item, blueprint, amount, the index of its
+   * sub-assembly parent line (or {@code null}), and a material-id → quality map. The list index
+   * doubles as the client line id, so a child's {@code parentId} is the list index of its parent.
    *
    * @param order the item order being edited
    * @return the JS-serializable prefill list (Thymeleaf inlines it as a JSON array)
@@ -749,6 +749,13 @@ public class JobOrderPageController {
         }
       }
       java.util.Map<String, Object> entry = new java.util.LinkedHashMap<>();
+      // The line's persistent id must travel with the prefill and be posted back: it is what lets
+      // the backend re-derive this very row instead of recreating it, so its booked production
+      // survives the edit (REQ-ORDERS-032). Dropping it here silently resets manufactured counts.
+      entry.put("id", line.id() != null ? line.id().toString() : null);
+      // Booked production, so the editor can stop the user from removing or shrinking a line the
+      // backend would reject anyway, and explain why up front.
+      entry.put("manufactured", line.manufacturedAmount() != null ? line.manufacturedAmount() : 0);
       entry.put("gameItemId", line.gameItem() != null ? line.gameItem().id().toString() : null);
       // The item picker now loads its options on demand, so the saved item's name must travel with
       // the prefill to seed the combobox's displayed label (the id alone would render blank).

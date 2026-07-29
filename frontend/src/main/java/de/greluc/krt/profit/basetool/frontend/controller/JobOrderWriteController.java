@@ -156,30 +156,7 @@ public class JobOrderWriteController {
       RedirectAttributes redirectAttributes,
       @AuthenticationPrincipal OidcUser principal) {
     try {
-      List<CreateJobOrderItemLineDto> lines =
-          form.getItems().stream()
-              .filter(
-                  l ->
-                      l.getGameItemId() != null
-                          && l.getBlueprintId() != null
-                          && l.getAmount() != null
-                          && l.getAmount() > 0)
-              .map(
-                  l ->
-                      new CreateJobOrderItemLineDto(
-                          l.getGameItemId(),
-                          l.getBlueprintId(),
-                          l.getAmount(),
-                          l.getMaterials().stream()
-                              .filter(m -> m.getMaterialId() != null && m.getQuality() != null)
-                              .map(
-                                  m ->
-                                      new CreateJobOrderItemMaterialDto(
-                                          m.getMaterialId(), m.getQuality()))
-                              .toList(),
-                          l.getClientLineId(),
-                          l.getParentClientLineId()))
-              .toList();
+      List<CreateJobOrderItemLineDto> lines = buildItemLineDtos(form);
 
       if (lines.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.invalid");
@@ -221,10 +198,16 @@ public class JobOrderWriteController {
   /**
    * Builds the validated {@link CreateJobOrderItemLineDto} list from an item-order form, dropping
    * lines without a game item, blueprint or positive amount, and per-line materials without a
-   * material id or quality. Shared by the item create + edit AJAX twins.
+   * material id or quality. Shared by all four item create + edit handlers (classic + AJAX twins)
+   * so they map the form identically.
+   *
+   * <p>The line's persistent {@code id} is passed straight through when the editor rendered one:
+   * that is what lets the backend update an existing line in place rather than recreating it, so
+   * its booked production survives the edit (REQ-ORDERS-032). It is {@code null} on create and for
+   * newly-added rows.
    *
    * @param form the bound item-order form
-   * @return the filtered item-line DTOs (preserving the client line + parent ids)
+   * @return the filtered item-line DTOs (preserving the persistent, client line + parent ids)
    */
   private static List<CreateJobOrderItemLineDto> buildItemLineDtos(JobOrderItemForm form) {
     return form.getItems().stream()
@@ -237,6 +220,7 @@ public class JobOrderWriteController {
         .map(
             l ->
                 new CreateJobOrderItemLineDto(
+                    l.getId(),
                     l.getGameItemId(),
                     l.getBlueprintId(),
                     l.getAmount(),
@@ -309,30 +293,7 @@ public class JobOrderWriteController {
       @ModelAttribute("jobOrderItemForm") JobOrderItemForm form,
       RedirectAttributes redirectAttributes) {
     try {
-      List<CreateJobOrderItemLineDto> lines =
-          form.getItems().stream()
-              .filter(
-                  l ->
-                      l.getGameItemId() != null
-                          && l.getBlueprintId() != null
-                          && l.getAmount() != null
-                          && l.getAmount() > 0)
-              .map(
-                  l ->
-                      new CreateJobOrderItemLineDto(
-                          l.getGameItemId(),
-                          l.getBlueprintId(),
-                          l.getAmount(),
-                          l.getMaterials().stream()
-                              .filter(m -> m.getMaterialId() != null && m.getQuality() != null)
-                              .map(
-                                  m ->
-                                      new CreateJobOrderItemMaterialDto(
-                                          m.getMaterialId(), m.getQuality()))
-                              .toList(),
-                          l.getClientLineId(),
-                          l.getParentClientLineId()))
-              .toList();
+      List<CreateJobOrderItemLineDto> lines = buildItemLineDtos(form);
 
       if (lines.isEmpty()) {
         redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.invalid");

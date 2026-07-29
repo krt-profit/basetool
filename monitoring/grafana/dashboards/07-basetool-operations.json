@@ -808,6 +808,63 @@
       ]
     },
     {
+      "id": 41,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
+      "type": "stat",
+      "title": "Item-order line blueprint drift",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "basetool_job_order_integrity_violations",
+          "refId": "A",
+          "legendFormat": "{{category}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "description": "REQ-ORDERS-033: ordered-item lines whose blueprint no longer produces the ordered item after an SC-Wiki re-point. > 0 means those orders display a foreign recipe as their material demand; the backend log names each affected order, and re-saving an order re-derives its lines."
+    },
+    {
       "id": 16,
       "gridPos": {
         "h": 8,
