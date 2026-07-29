@@ -206,7 +206,19 @@ rule — no blanket "everything is masked" claim:
   but nginx-proxy-manager does not log admin logins to stdout and the admin UI is
   loopback-only — descoped as an accepted gap (REQ-OBS-010).
 - **PostgreSQL container logs** — ingested with `log_error_verbosity=terse` so `DETAIL`
-  lines cannot leak row data.
+  lines cannot leak row data. Both instances additionally run
+  `log_line_prefix='%m [%p] %q%u@%d/%a '` (2026-07-29) so **every** line is self-attributing:
+  terse strips the `HINT`, and Postgres' default `%m [%p] ` prefix identifies no sender, which
+  left a bare `ERROR: column "…" does not exist at character N` indistinguishable between the
+  application, `postgres_exporter` and an interactive `docker exec psql` forensics session —
+  they all authenticate as the same `POSTGRES_USER` role. `%a` (`application_name`) is the
+  discriminator: `psql` for an ad-hoc session, `PostgreSQL JDBC Driver` for the backend's Hikari
+  pool, `postgres_exporter` for the scraper. `%q` suppresses the session fields for
+  non-session processes so startup/checkpointer lines stay clean. The prefix adds **no row
+  data and no end-user identity** — `%u`/`%d` are service-account and database names — so the
+  terse PII guarantee and REQ-OBS-004 are untouched. `PostgresFatalOrPanic` matches with plain
+  LogQL line filters, not a prefix-anchored regex, so it is unaffected; a future prefix change
+  must re-check that.
 - **Monitoring-plane container stdout** (`app="mon-<service>"` for the monitoring services —
   Prometheus, Grafana, Loki, Tempo, Alloy, Alertmanager, the exporters, the socket proxy; #1041
   item 24) — shipped so a misbehaving monitoring component (Grafana and Tempo have OOM-looped in

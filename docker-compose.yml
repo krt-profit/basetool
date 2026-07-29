@@ -46,6 +46,18 @@ x-db-backend: &db-backend-template
   # mission-scale hardening) plus postgres_exporter + Flyway + admin sessions all fit
   # with headroom, and 200 concurrent tool users never exceed the 100-slot pool
   # (request handling runs on virtual threads, not per-user JDBC connections).
+  #
+  # `log_error_verbosity=terse` keeps DETAIL lines — which quote row values — out of the log
+  # (REQ-OBS-004/-007); do NOT relax it. Its cost is that a rejected statement logs a bare
+  # `ERROR: ... at character N` with no `HINT`, and Postgres' default `%m [%p] ` prefix names
+  # no sender — so the app pool, postgres_exporter and an interactive `docker exec psql`
+  # forensics session all look identical and an operator cannot tell an application defect
+  # from a typo in an ad-hoc query. `%u@%d/%a` adds the session's
+  # user@database plus its `application_name` — the discriminator that actually matters, since
+  # every client sends a distinct one (`psql` ad-hoc, `PostgreSQL JDBC Driver` for the backend
+  # pool, `postgres_exporter` for the scraper) while they all share the POSTGRES_USER role.
+  # `%q` suppresses those fields for non-session processes, keeping startup/checkpointer lines
+  # clean. The prefix carries no row data, so the terse PII guarantee is untouched.
   command: >
     postgres
     -c shared_buffers=512MB
@@ -54,6 +66,7 @@ x-db-backend: &db-backend-template
     -c maintenance_work_mem=64MB
     -c max_connections=150
     -c log_error_verbosity=terse
+    -c log_line_prefix='%m [%p] %q%u@%d/%a '
   environment:
     POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set in .env}
     POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
@@ -113,6 +126,8 @@ x-db-keycloak: &db-keycloak-template
   # 5000-account scale. max_connections 100 -> 120: Keycloak's own DB pool defaults
   # to ~100 connections, so the raise leaves headroom for postgres_exporter + admin
   # sessions instead of starving the exporter at the ceiling.
+  # Same terse-verbosity + `log_line_prefix` rationale as db-backend (see the comment there):
+  # `%q%u@%d/%a` makes every error line self-attributing without logging any row data.
   command: >
     postgres
     -c shared_buffers=192MB
@@ -121,6 +136,7 @@ x-db-keycloak: &db-keycloak-template
     -c maintenance_work_mem=32MB
     -c max_connections=120
     -c log_error_verbosity=terse
+    -c log_line_prefix='%m [%p] %q%u@%d/%a '
   environment:
     POSTGRES_DB: ${KC_POSTGRES_DB:?KC_POSTGRES_DB must be set in .env}
     POSTGRES_USER: ${KC_POSTGRES_USER:?KC_POSTGRES_USER must be set in .env}
