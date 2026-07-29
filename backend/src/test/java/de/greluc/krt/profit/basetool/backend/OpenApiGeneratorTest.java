@@ -23,9 +23,12 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -72,8 +75,50 @@ class OpenApiGeneratorTest {
     if (path.getParent() != null) {
       Files.createDirectories(path.getParent());
     }
-    objectMapper.writerWithDefaultPrettyPrinter().writeValue(path.toFile(), jsonObject);
+    writeAtomically(path, jsonObject);
 
     log.info("OpenAPI documentation generated at: {}", path.toAbsolutePath());
+  }
+
+  /**
+   * Serializes {@code document} into {@code target} via a temporary sibling file that is then moved
+   * into place, so the committed spec is never observable half-written.
+   *
+   * <p>This matters because {@code org.gradle.parallel=true} lets {@code :backend:test} and {@code
+   * :frontend:test} run at the same time, and four frontend contract tests ({@code
+   * DtoOpenApiContractTest}, {@code FrontendDtoContractTest}, …) read this very file with {@code
+   * Files.readString}. Writing in place truncated the 1.8&nbsp;MB document and streamed it back
+   * over several hundred milliseconds; a reader that hit that window parsed a cut-off document and
+   * failed with {@code UnexpectedEndOfInputException} — a flake that only surfaced when the two
+   * test tasks happened to overlap on the wrong side (release/v1.5.23, while the identical tree
+   * passed on {@code main} minutes earlier). Moving a fully-written file into place means a
+   * concurrent reader always sees one complete version, old or new; since the generated document
+   * must equal the committed one anyway, either is a valid read.
+   *
+   * <p>The temporary file is created <em>in the target's own directory</em> so the move stays
+   * within one filesystem and can be atomic. A filesystem that cannot do atomic moves falls back to
+   * a plain replace, which still writes the bytes elsewhere first and so keeps the truncation
+   * window far smaller than an in-place write.
+   *
+   * @param target the committed spec path to replace
+   * @param document the parsed OpenAPI document to serialize
+   * @throws IOException if the document cannot be written or moved into place
+   */
+  private void writeAtomically(Path target, Object document) throws IOException {
+    Path directory = target.getParent() == null ? Paths.get(".") : target.getParent();
+    Path temporary = Files.createTempFile(directory, "openapi-", ".json.tmp");
+    try {
+      objectMapper.writerWithDefaultPrettyPrinter().writeValue(temporary.toFile(), document);
+      try {
+        Files.move(
+            temporary, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+      } catch (AtomicMoveNotSupportedException e) {
+        log.debug("Atomic move unsupported for {}; falling back to a plain replace.", target, e);
+        Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+      }
+    } finally {
+      // A successful move already consumed the temporary file; this only cleans up after a failure.
+      Files.deleteIfExists(temporary);
+    }
   }
 }

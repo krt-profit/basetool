@@ -2,7 +2,11 @@
 
 ## [Unreleased]
 
+## [v1.5.23](https://github.com/krt-profit/basetool/releases/tag/v1.5.23) - 2026-07-29
+
 ### Fixed
+
+- **CI: Der Build schlägt nicht mehr sporadisch mit einem abgeschnittenen OpenAPI-Dokument fehl.** Der Backend-Test, der `openapi.json` erzeugt, schrieb die 1,8-MB-Datei direkt an Ort und Stelle, während parallel laufende Frontend-Tests sie lesen — wer ins Schreibfenster geriet, scheiterte an unvollständigem JSON. Die Datei wird jetzt fertig geschrieben und erst dann an ihren Platz verschoben (REQ-API-007).
 
 - **Discord-Registrierung: Nach der Freigabe geht es sofort weiter — ohne zweimaliges Ab- und Anmelden.** Die laufende Sitzung merkte sich das „noch nicht freigegeben" für ihre gesamte Laufzeit von 30 Tagen, sodass ein freigeschalteter Zugang weiter auf der Warteseite landete; die anschließend vergebenen Rollen und Einheiten waren aus demselben Grund erst nach einer weiteren Anmeldung sichtbar. Beides wird jetzt laufend aufgefrischt, und die Warteseite leitet nach der Freigabe von selbst ins Tool weiter (REQ-SEC-013, REQ-SEC-017, ADR-0122).
 
