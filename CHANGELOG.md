@@ -8,6 +8,8 @@
 
 - **Entzogene Rollen und Rechte verschwinden jetzt auch aus einer laufenden Sitzung.** Der Abgleich mit dem Backend hat Rechte bisher nur hinzugefügt, nie entfernt — wer eine Rolle verlor, sah die zugehörigen Schaltflächen bis zum nächsten Anmelden weiter, bekam beim Klick aber eine Fehlermeldung. Entzogene Rollen und Rechte fallen jetzt innerhalb von ein bis wenigen Minuten aus der Oberfläche (REQ-SEC-013, ADR-0122).
 
+- **Monitoring: Postgres-Fehlerzeilen lassen jetzt erkennen, welcher Client sie ausgelöst hat.** Mit dem Standardpräfix war eine abgewiesene Abfrage nicht zuordenbar — Anwendung, Exporter und eine manuelle `psql`-Sitzung sahen identisch aus, weil alle dieselbe Datenbankrolle verwenden. Beide Datenbanken schreiben jetzt Benutzer, Datenbank und `application_name` in jede Logzeile; Zeileninhalte werden weiterhin nicht geloggt (REQ-OBS-007).
+
 ## [v1.5.22](https://github.com/krt-profit/basetool/releases/tag/v1.5.22) - 2026-07-29
 
 ## [v1.5.21](https://github.com/krt-profit/basetool/releases/tag/v1.5.21) - 2026-07-29
