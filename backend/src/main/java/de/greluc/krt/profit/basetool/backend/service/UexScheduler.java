@@ -53,6 +53,14 @@ import org.springframework.stereotype.Component;
  * its own {@code krt.uex.item-price-sync-enabled} flag (default off) so it stays a no-op until an
  * operator opts in.
  *
+ * <p>Terminals lead the chain (REQ-REFINERY-020). They are the one topology step with no FK into
+ * any other — the upsert touches only {@code terminal} and stores UEX's denormalised parent names —
+ * so nothing is lost by hoisting them, and {@code terminal.type} is the sole source the whole
+ * refinery feature derives from. Behind the rest of the topology (their former position) any single
+ * failing endpoint aborted the tick before terminals were fetched; against a 24h {@code fixedDelay}
+ * that left the refinery-order picker empty for a full day. The derived flags are then reconciled
+ * in the sweep's {@code finally}, so a later abort cannot cost them either.
+ *
  * <p>Cross-scheduler exclusion: the sweep runs through a shared {@link SyncCoordinator} so it never
  * overlaps the SC Wiki sync. UEX starts at boot ({@code initialDelay = 0}) and SC Wiki is staggered
  * an hour later; should their daily cadences ever align, whichever fires second waits for the first
@@ -109,7 +117,10 @@ public class UexScheduler {
    * <p>The sweep evicts the master-data caches it can make stale in a {@code finally} ({@link
    * MasterDataCacheEvictionService#evictUexSyncedMasterData()}), so a freshly-synced catalogue is
    * visible on the next read instead of lagging the 12-hour TTL (CACHE-SYNC-EVICT-001) — and
-   * committed steps are still reconciled when a later step aborts the sweep.
+   * committed steps are still reconciled when a later step aborts the sweep. {@code
+   * UexUniverseSyncService#reconcileRefineryTerminalFlags()} shares that block for the same reason,
+   * guarded by its own catch so a failure there cannot replace the sweep's exception or skip the
+   * eviction.
    *
    * <p>Returns the item-catalogue upsert count from {@link UexItemSyncService#syncItems()} — the
    * representative "rows processed" tally for the whole sweep — which {@link
@@ -126,6 +137,17 @@ public class UexScheduler {
     log.info("Running scheduled task to update UEX data...");
     int itemsProcessed = 0;
     try {
+      // Terminals lead the sweep (REQ-REFINERY-020). They carry no FK to any other topology table —
+      // the upsert touches only terminalRepository and writes UEX's denormalised parent NAMES — so
+      // nothing here depends on the steps below, while `terminal.type` is what the whole refinery
+      // feature is derived from. Behind the topology block (its former position) a single failing
+      // endpoint anywhere in factions..spaceStations aborted the tick before terminals were ever
+      // fetched, and with a 24h fixedDelay that left `type` NULL, every has_refinery_terminal false
+      // and the refinery-order picker EMPTY for a full day, silently. Leading the sweep removes
+      // that
+      // starvation path entirely.
+      uexUniverseSyncService.syncTerminals();
+
       uexUniverseSyncService.syncFactions();
       uexUniverseSyncService.syncJurisdictions();
       uexUniverseSyncService.syncPlanets();
@@ -135,7 +157,6 @@ public class UexScheduler {
       uexUniverseSyncService.syncOutposts();
       uexUniverseSyncService.syncPois();
       uexUniverseSyncService.syncSpaceStations();
-      uexUniverseSyncService.syncTerminals();
 
       uexStarSystemService.fetchAndProcessStarSystems();
       uexCommodityService.fetchAndProcessCommoditiesPrices();
@@ -156,6 +177,22 @@ public class UexScheduler {
       uexRefinerySyncService.syncRefiningMethods();
       uexRefinerySyncService.syncRefineryYields();
     } finally {
+      // Derive city/space_station.has_refinery_terminal from the terminals committed above
+      // (REQ-REFINERY-020). In the finally, not at the end of syncTerminals(), so that (a) it sees
+      // the cities and space stations this tick synced, and (b) a later step aborting the sweep no
+      // longer costs the refinery feature its flags — terminals lead the sweep and are already
+      // committed by the time anything downstream can throw. Pure local derivation, no network, so
+      // it is safe here even when the sweep aborted because UEX was unreachable.
+      //
+      // Caught, not propagated: an exception thrown from a finally REPLACES the in-flight sweep
+      // exception (TaskMetrics would then record the wrong failure cause) and would skip the cache
+      // eviction below. A failed reconciliation must not cost us either.
+      try {
+        uexUniverseSyncService.reconcileRefineryTerminalFlags();
+      } catch (RuntimeException e) {
+        log.error(
+            "Refinery-terminal flag reconciliation failed; flags keep their previous values", e);
+      }
       masterDataCacheEvictionService.evictUexSyncedMasterData();
     }
     return itemsProcessed;

@@ -67,11 +67,30 @@ so it is the signal to trust.
 
 **How:** `terminal.type` mirrors the upstream discriminator verbatim. The derived truth lives in
 `city.has_refinery_terminal` / `space_station.has_refinery_terminal`, recomputed from the live
-refinery terminals at the end of every terminal sweep
-(`UexUniverseSyncService.reconcileRefineryTerminalFlags()`, which must run *after* `syncTerminals`
-since cities and stations are synced earlier in the sweep). UEX's raw `has_refinery` claim is kept
-untouched alongside it for diagnostics — the same "raw upstream value next to the effective value"
-split `terminal.uex_has_loading_dock` already uses.
+refinery terminals by `UexUniverseSyncService.reconcileRefineryTerminalFlags()`. UEX's raw
+`has_refinery` claim is kept untouched alongside it for diagnostics — the same "raw upstream value
+next to the effective value" split `terminal.uex_has_loading_dock` already uses.
+
+**Bootstrap and starvation — binding placement in the sweep.** The derived flags have no local
+bootstrap: `terminal.type` is not derivable from anything already in the database, so until a sweep
+has populated it every `has_refinery_terminal` is `FALSE` (the V226 default) and the picker resolves
+to an **empty** list — not merely a shorter one, and the create/update gate then rejects every
+location. The sweep repeats only every 24 h (`krt.uex.scheduler-delay`, default 86400000 ms; it does
+start at boot via `initialDelay = 0`), so a tick that never reaches the terminal step costs the
+refinery feature a full day. Two placement rules therefore bind:
+
+1. **`syncTerminals()` MUST lead the sweep**, ahead of every step that can abort the tick. It is the
+   one topology step with no FK into another — it writes only `terminal`, storing UEX's denormalised
+   parent names — so nothing is lost by hoisting it. Behind the rest of the topology (its position
+   as originally shipped) any single failing endpoint aborted the tick before terminals were ever
+   fetched.
+2. **`reconcileRefineryTerminalFlags()` MUST run from the sweep's `finally`**, not at the end of
+   `syncTerminals()`. It matches terminals against `city` / `space_station` rows by name, so it has
+   to run after those are synced; and in the `finally` a later step aborting the sweep no longer
+   costs the flags, since the terminals it derives from are already committed. It performs no
+   network call — a pure local derivation — so it is safe there even when the sweep aborted because
+   UEX was unreachable. Its own failure is caught and logged rather than propagated, so it can
+   neither replace the sweep's exception nor skip the master-data cache eviction sharing that block.
 
 Storing the derived value rather than resolving it per read is **binding, not an optimisation**: the
 create/update gate reads the flag off the already-loaded `Location` parent in memory. Issuing a query
@@ -95,8 +114,16 @@ handed the user.
 - [ ] The sweep corrects a stale derived flag in both directions, and leaves the raw `has_refinery`
   claim unmodified.
 - [ ] Editing a refinery order's location does not produce a 409.
+- [ ] `syncTerminals()` still runs when an unrelated topology step throws, so one failing UEX
+  endpoint cannot leave the picker empty until the next daily tick.
+- [ ] The derived flags are still reconciled when a step downstream of the terminals aborts the
+  sweep, and a failing reconciliation neither replaces the sweep's exception nor skips the
+  master-data cache eviction.
+- [ ] An environment with no UEX sweep (the E2E stack, which runs with
+  `KRT_UEX_SCHEDULER_ENABLED=false`) seeds `has_refinery_terminal` itself — see
+  `frontend/src/e2e/resources/uex-catalog-seed.sql`.
 
-**Enforced by:** `UexUniverseSyncRefineryFlagTest`, `LocationRepositoryRefineryTest`,
+**Enforced by:** `UexUniverseSyncRefineryFlagTest`, `UexSchedulerTest`, `LocationRepositoryRefineryTest`,
 `RefineryOrderServiceLifecycleTest` (`CreateRefineryOrderTests`) · **Code:**
 `UexUniverseSyncService.reconcileRefineryTerminalFlags`, `LocationRepository.findLocationsWithRefinery`,
 `RefineryOrderService.validateLocationHasRefinery`, `Terminal.type`, migration `V226`
