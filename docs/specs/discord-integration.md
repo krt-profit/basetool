@@ -310,8 +310,15 @@ new PENDING registration (REQ-NOTIF-012), keyed off the PENDING transition itsel
   cannot be used until an admin approves the account, and sets the expectation that approval is
   manual and may take 1–2 days (`pendingApproval.message` / `pendingApproval.patience` in the
   default/de/en bundles).
+- [x] **An approval reaches the waiting member without any re-login.** The waiting page polls
+  `GET /pending-approval/status` (exempt from the waiting-page redirect) every 20 s and forwards to
+  the tool as soon as the status turns `ACTIVE`; the poll pauses while the tab is hidden and stops
+  on the terminal `REJECTED`. Independently of the page being open, `BackendRoleSyncFilter` expires
+  a non-terminal verdict after 15 s (REQ-SEC-013, ADR-0122), so a member who simply returns later is
+  let straight in. The page therefore promises automatic forwarding (`pendingApproval.help`) instead
+  of instructing a re-login, and confirms it (`pendingApproval.approved`) before redirecting.
 
-**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (gate) + `UserServiceApprovalTest` (approve/reject + 409) + `UserServiceDiscordSyncTest` (new credential ⇒ PENDING, new admin ⇒ ACTIVE) + `UserServiceSyncTest` (scheduled-sync fail-safe) + `UserServiceDeleteTest` (approval-audit cleanup precedes the user delete) · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `UserService.deleteUser`, `UserApprovalEventRepository` / `UserRepository.clearApprovedBy` (delete-time FK cleanup), `DiscordRegistrationAdminController`, `BackendRoleSyncFilter` (waiting-page route), `pending-approval.html`, `messages*.properties` (`pendingApproval.*`) · **Issues:** #724
+**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (gate) + `UserServiceApprovalTest` (approve/reject + 409) + `UserServiceDiscordSyncTest` (new credential ⇒ PENDING, new admin ⇒ ACTIVE) + `UserServiceSyncTest` (scheduled-sync fail-safe) + `UserServiceDeleteTest` (approval-audit cleanup precedes the user delete) + `BackendRoleSyncFilterTest` (verdict expiry + poll-path exemption) + `PendingApprovalPageControllerTest` (status poll) · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `UserService.deleteUser`, `UserApprovalEventRepository` / `UserRepository.clearApprovedBy` (delete-time FK cleanup), `DiscordRegistrationAdminController`, `BackendRoleSyncFilter` (waiting-page route), `PendingApprovalPageController`, `pending-approval.html`, `pending-approval.js`, `messages*.properties` (`pendingApproval.*`) · **Issues:** #724, post-approval double re-login · **ADR:** ADR-0122
 
 ### REQ-NOTIF-012 — Admins notified on new PENDING registration
 

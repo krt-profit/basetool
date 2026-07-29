@@ -539,11 +539,51 @@ regressed exactly this way: it read the principal, so the "Finanzen" panel silen
 skipped, while the panel chrome still rendered because the template's `sec:authorize` correctly read
 the token.
 
-`BackendRoleSyncFilter` (which enriches the principal with backend-DB roles/permissions) MUST mark a
-session synced (`BACKEND_ROLES_SYNCED`) only when the `/api/v1/users/me` read genuinely succeeded. A
-Resilience4j fallback (`null`, no exception) or a thrown error MUST leave the flag unset so the next
-request retries, rather than poisoning the whole session with an under-privileged principal until the
-user re-logs in.
+`BackendRoleSyncFilter` (which enriches the principal with backend-DB roles/permissions) MUST stamp a
+session as synced (`BACKEND_ROLES_SYNCED_AT`) only when the `/api/v1/users/me` read genuinely
+succeeded. A Resilience4j fallback (`null`, no exception) or a thrown error MUST leave the stamp
+unset so the next request retries, rather than poisoning the session with an under-privileged
+principal.
+
+**Session-cached authorization state MUST be TTL-refreshed, never pinned for the session's
+lifetime** (ADR-0122). Both values the filter caches are decided by an admin *mid-session*, and an
+authenticated session lives 720 h (REQ-SEC-025), so a one-shot resolve can never observe the
+decision:
+
+- The **approval verdict** (`BACKEND_APPROVAL_STATE`) is cached with its read time
+  (`BACKEND_APPROVAL_CHECKED_AT`). `ACTIVE` is terminal — the backend only ever decides a still-
+  `PENDING` registration — and stays cached; a non-terminal `PENDING`/`REJECTED` verdict expires
+  after 15 s, so an approval reaches a live session without a re-login (REQ-SEC-017).
+- The **role sync** repeats every 60 s, and immediately when the filter observes the
+  `PENDING → ACTIVE` transition, so a role, permission or org-unit membership granted after login
+  reaches the principal without a new session. It reads `/api/v1/users/me`, i.e. the backend's local
+  mirror: an org-unit membership (written locally) therefore lands within the interval, while a
+  **Keycloak realm role** first has to reach that mirror through the next access-token refresh
+  (`accessTokenLifespan` 300 s), so it takes up to ~5 min longer.
+- **Static assets skip the filter body**, so the two refreshes cost roughly one backend read per
+  interval per session rather than one per page asset.
+- A backend read that fails MUST leave the cached verdict and its stamp untouched (retry on the next
+  request), never downgrade a known verdict.
+
+The sync **reconciles in both directions** — it grants what the backend reports and revokes what it
+no longer reports — so the frontend principal converges on the backend's authority set instead of
+drifting from it. The removal rule is asymmetric by ownership (ADR-0122):
+
+- **`ROLE_*`** — the backend response is authoritative for the whole vocabulary; a role it no longer
+  reports is dropped. Its local `role` catalog is where realm roles are mirrored and is what its own
+  `@PreAuthorize` gates read, so keeping such a role only renders UI that 403s. Technical realm roles
+  with no catalog entry (`offline_access`, `default-roles-*`) are dropped with it.
+- **Every other authority** — revocable only when a *previous* sync asserted it, tracked in
+  `BACKEND_SYNCED_AUTHORITIES`. Permission strings carry no prefix and are indistinguishable from the
+  login-owned `OIDC_USER` / `SCOPE_*` authorities, so this rule makes stripping one of those
+  structurally impossible.
+- A response carrying no role (or no permission) list asserts nothing and MUST revoke nothing —
+  silence is never "everything withdrawn". Likewise a failed read changes no authority at all.
+
+Revocation is **not** immediate and is not the access boundary: an org-unit membership leaves within
+the re-sync interval, a Keycloak realm role only after it has left the backend's mirror via the next
+access-token refresh. The boundary remains the backend, which re-derives authorities per token under
+its own 30 s memoisation; anything that must revoke instantly needs the session terminated.
 
 **Acceptance**
 
@@ -551,12 +591,21 @@ user re-logs in.
   Authentication token and false for anonymous, missing-context and role-less GUEST callers.
 - [ ] A member's `GET /missions/{id}` triggers the member-only finance-entries fetch; an anonymous
   visitor's does not.
-- [ ] `BackendRoleSyncFilter` does not set `BACKEND_ROLES_SYNCED` when `/api/v1/users/me` returns
-  `null` or throws; it does set it when the read succeeds.
+- [x] `BackendRoleSyncFilter` does not stamp `BACKEND_ROLES_SYNCED_AT` when `/api/v1/users/me`
+  returns `null` or throws; it does stamp it when the read succeeds.
+- [x] A cached `ACTIVE` verdict is never re-read; a cached `PENDING` verdict is re-read once its
+  15 s interval has elapsed and not before, and observing `→ ACTIVE` drops the role-sync stamp so
+  the unlocked authorities are pulled on that same request.
+- [x] The role sync re-runs once its 60 s interval has elapsed and is skipped inside it.
+- [x] A static-asset request performs no backend read at all.
+- [x] A `ROLE_*` the backend no longer reports is removed from the principal; a permission is
+  removed only when a previous sync asserted it; `OIDC_USER` / `SCOPE_*` survive every sync; and a
+  response with a `null` role/permission list revokes nothing.
 
 **Enforced by:** `FrontendAuthHelperServiceTest`, `BackendRoleSyncFilterTest`,
 `MissionPageControllerMvcTest` · **Code:** `FrontendAuthHelperService`, `MissionPageController`,
-`BackendRoleSyncFilter` · **Issues:** mission-finance-panel regression
+`BackendRoleSyncFilter` · **Issues:** mission-finance-panel regression, post-approval double
+re-login · **ADR:** ADR-0122
 
 ### REQ-SEC-014 — Encrypted transport to Keycloak (no cleartext edge)
 
