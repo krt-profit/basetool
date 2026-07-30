@@ -104,7 +104,8 @@ class OrgUnitBankPageControllerMvcTest {
             List.of(new BigDecimal("1430000"), new BigDecimal("1850000")),
             new BigDecimal("2000000"),
             true,
-            null);
+            null,
+            false);
     BankBookingRequestDto request =
         new BankBookingRequestDto(
             UUID.randomUUID(),
@@ -358,7 +359,8 @@ class OrgUnitBankPageControllerMvcTest {
             List.of(),
             null,
             false,
-            null);
+            null,
+            false);
     BankAccountRefDto target =
         new BankAccountRefDto(specialId, "KB-0042", "Event Sonderkonto", "SPECIAL");
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
@@ -439,7 +441,7 @@ class OrgUnitBankPageControllerMvcTest {
                 null,
                 java.util.List.of()));
     OrgUnitBankAccountDetailDto detail =
-        new OrgUnitBankAccountDetailDto(inner, true, true, true, true, true, null);
+        new OrgUnitBankAccountDetailDto(inner, true, true, true, true, true, null, false);
     OrgUnitBankAccountSettingsDto settings =
         new OrgUnitBankAccountSettingsDto(
             accountId,
@@ -573,7 +575,7 @@ class OrgUnitBankPageControllerMvcTest {
                 null,
                 java.util.List.of()));
     OrgUnitBankAccountDetailDto detail =
-        new OrgUnitBankAccountDetailDto(inner, true, false, false, true, false, null);
+        new OrgUnitBankAccountDetailDto(inner, true, false, false, true, false, null, false);
     String detailUri = "/api/v1/org-units/bank/accounts/" + accountId;
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))
@@ -637,7 +639,7 @@ class OrgUnitBankPageControllerMvcTest {
                 java.util.List.of()));
     OrgUnitBankAccountDetailDto detail =
         new OrgUnitBankAccountDetailDto(
-            inner, true, false, false, true, false, new BigDecimal("1000000"));
+            inner, true, false, false, true, false, new BigDecimal("1000000"), false);
     String detailUri = "/api/v1/org-units/bank/accounts/" + accountId;
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(detailUri), eq(OrgUnitBankAccountDetailDto.class)))

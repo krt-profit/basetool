@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -1243,6 +1244,143 @@ class OrgUnitBankAccessServiceTest {
             eq(true),
             eq(new BigDecimal("1000")),
             eq(BankRequestApprover.ORGANISATIONSLEITUNG),
+            eq(false),
+            eq(null));
+  }
+
+  @Test
+  void createBookingRequest_byResponsibleHolder_needsNoApproval() {
+    // REQ-BANK-041 (owner decision): the responsible holder disposes freely over their own account.
+    // No limit is configured, which for anyone else would mean approval-required — the
+    // Staffelleiter
+    // is exempt regardless: requiresOwnerApproval=false, applicableLimit=null, no approver.
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0020", squadron(orgUnitId, "Nemesis", "NEM"));
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("2000000"), null);
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(orgUnitId)));
+    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(orgUnitId, MembershipRole.STAFFELLEITER))
+        .thenReturn(true);
+    when(bankBookingRequestService.create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("2000000")),
+            eq(null),
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(null)))
+        .thenReturn(requestDto(accountId, orgUnitId));
+
+    service.createBookingRequest(request);
+
+    verify(bankBookingRequestService)
+        .create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("2000000")),
+            eq(null),
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(null));
+    // The holder's exemption short-circuits before any limit lookup.
+    verify(approvalLimitRepository, never()).findByAccountId(accountId);
+  }
+
+  @Test
+  void createBookingRequest_byResponsibleHolderAboveConfiguredLimit_stillNeedsNoApproval() {
+    // REQ-BANK-041 (owner decision): limits bind everyone EXCEPT the holder — a ceiling configured
+    // on the account (here an all-members limit far below the amount) does not apply to them.
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0020", squadron(orgUnitId, "Nemesis", "NEM"));
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("2000000"), null);
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(ownerScopeService.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(orgUnitId)));
+    when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(orgUnitId, MembershipRole.STAFFELLEITER))
+        .thenReturn(true);
+    when(bankBookingRequestService.create(
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            anyBoolean(),
+            any(),
+            any(),
+            anyBoolean(),
+            any()))
+        .thenReturn(requestDto(accountId, orgUnitId));
+
+    service.createBookingRequest(request);
+
+    verify(bankBookingRequestService)
+        .create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("2000000")),
+            eq(null),
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(null));
+  }
+
+  @Test
+  void createBookingRequest_krtByOlMember_bypassesAmountLadder() {
+    // REQ-BANK-041/-047 (owner decision): an OL member is the KRT account's responsible holder, so
+    // the amount ladder does not bind them — an amount above T2 still needs no approver.
+    UUID accountId = UUID.randomUUID();
+    krtAccountWithTiers(accountId, "1000", "5000");
+    when(ownerScopeService.currentUserIsOlMember()).thenReturn(true);
+    CreateBankBookingRequest request =
+        new CreateBankBookingRequest(
+            accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("9000"), "reason");
+    when(bankBookingRequestService.create(
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            anyBoolean(),
+            any(),
+            any(),
+            anyBoolean(),
+            any()))
+        .thenReturn(requestDto(accountId, UUID.randomUUID()));
+
+    service.createBookingRequest(request);
+
+    verify(bankBookingRequestService)
+        .create(
+            eq(accountId),
+            eq(BankBookingRequestType.WITHDRAWAL),
+            eq(new BigDecimal("9000")),
+            eq("reason"),
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(null),
+            eq(null),
             eq(false),
             eq(null));
   }

@@ -134,7 +134,7 @@ class OrgUnitBankLimitsDisplayMvcTest {
             readOnlyNonEmptyLimits());
     // canManage drives settings != null; expose it via canSetTarget (canConfigureVisibility /
     // canConfigureApprovalLimits stay false so the manager case needs no /users/lookup stub).
-    return new OrgUnitBankAccountDetailDto(inner, true, canManage, false, true, false, null);
+    return new OrgUnitBankAccountDetailDto(inner, true, canManage, false, true, false, null, false);
   }
 
   /**

@@ -40,7 +40,13 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
  * @param canConfigureApprovalLimits whether the caller may set/clear this account's approval limits
  *     (REQ-BANK-041 — responsible holder / bank management / admin)
  * @param applicableLimit the caller's resolved approval limit for this account (REQ-BANK-041), or
- *     {@code null} = unlimited; the request form warns above it
+ *     {@code null} when no limit applies to them — which means the request needs the responsible
+ *     holder's approval, <em>unless</em> {@code approvalExempt} is set; the request form warns
+ *     whenever approval would be required
+ * @param approvalExempt {@code true} iff the caller is this account's responsible holder and is
+ *     therefore bound by no approval ceiling at all (REQ-BANK-041, owner decision): a holder
+ *     disposes freely over their own account, so the form never warns. The request still has to be
+ *     confirmed by a bank employee — only the holder's extra sign-off falls away.
  */
 public record OrgUnitBankAccountDetailDto(
     BankAccountDetailDto detail,
@@ -49,4 +55,5 @@ public record OrgUnitBankAccountDetailDto(
     boolean canConfigureVisibility,
     boolean canRequest,
     boolean canConfigureApprovalLimits,
-    @org.jetbrains.annotations.Nullable java.math.BigDecimal applicableLimit) {}
+    @org.jetbrains.annotations.Nullable java.math.BigDecimal applicableLimit,
+    boolean approvalExempt) {}

@@ -1551,6 +1551,25 @@ confirmable even when the employee cannot see the destination; capability gate o
 > applicable_limit`. (`CARTEL_BANK` and `SPECIAL` stay non-request-capable, so this never reaches
 > them.)
 >
+> **Amended (owner-approved, ADR-0123) — the responsible holder is exempt.** Approval limits bind
+> every requester **except the account's responsible holder** (REQ-BANK-034): the Staffelleiter /
+> SK-Leiter of an `ORG_UNIT` account, the Bereichsleiter of an `AREA` account and any OL member on the
+> KRT (`CARTEL`) account dispose **freely** over the account they are responsible for. For them
+> `requires_owner_approval` is always `false`, `applicable_limit` always `null` and
+> `required_approver` always `null` — for **any** amount, whatever limits are configured, and
+> **bypassing the KRT amount ladder** (REQ-BANK-047) as well. The exemption is evaluated **before**
+> any limit or ladder resolution, so a holder's request never triggers a limit lookup. Rationale: a
+> limit is an instrument the holder wields **against third parties**, not against themselves; making
+> them counter-sign their own request was a no-op click that only produced noise. The snapshot
+> computation therefore reads `requires_owner_approval = !isResponsibleHolder && ((applicable_limit ==
+> null) || amount > applicable_limit)`.
+>
+> **This removes only the *second* signature, not the booking.** The request is still filed `PENDING`
+> and still has to be confirmed and booked by a bank employee / the Bankleitung (REQ-BANK-023) — that
+> is the step that moves the money and mirrors the in-game booking. What falls away is exclusively the
+> two-step owner approval below: the holder's in-app "Freigabe erteilen" and the bank employee's
+> mandatory *"Freigabe durch Kontoverantwortlichen erfolgt"* checkbox.
+>
 > **Amended by REQ-BANK-047/-048 (owner-approved, ADR-0066):** two refinements. (1) **"Alle Mitglieder"
 > = the owning org unit, for limits too.** The `ALL_MEMBERS` limit tier now applies **only to an actual
 > member of the account's owning org unit** (`currentUserIsMemberOfOrgUnit(owner)`) — the former
@@ -1569,7 +1588,9 @@ explicit approval. The tiers mirror the configurable visibility buckets of REQ-B
 Bereich sub-ranks, all-members, individual users). A **missing** limit for a requester's tier means
 the request **always needs the responsible holder's approval** (amended above — approval is the safe
 default; the pre-amendment "missing = unlimited" behaviour is retired). The limit a requester is
-subject to is resolved **at request creation** in the seam: an individual-user limit wins; otherwise
+subject to is resolved **at request creation** in the seam: **the account's responsible holder is
+exempt outright** (amended above — no limit binds them, no ladder, no approver); otherwise an
+individual-user limit wins; otherwise
 the maximum of the limits for the role tiers they hold; otherwise the all-members limit; otherwise
 **none applies and approval is required**. The
 **all-members tier is the catch-all ceiling for every eligible requester** who matches no more
@@ -1594,7 +1615,9 @@ Setting/clearing a limit is audited (`APPROVAL_LIMIT_SET` / `APPROVAL_LIMIT_CLEA
 
 **Two-step approval.** When a request exceeds the requester's limit — **or when no limit applies to
 the requester at all** (amended) — it is flagged `requires_owner_approval`; the requester sees a live
-warning that it must be approved first. (1) The
+warning that it must be approved first. **A request by the account's responsible holder is never
+flagged** (amended, ADR-0123), so neither step below runs for them and the request modal shows no
+warning. (1) The
 responsible holder may **grant approval in-app** from the new "Fremde Anträge" tab — the requests
 raised against the accounts they are responsible for — recorded as `owner_approval_granted` (with
 who/when) and audited (`BOOKING_REQUEST_OWNER_APPROVAL_GRANTED` / `…_REVOKED`). (2) The bank employee
@@ -1623,7 +1646,10 @@ project concurrency rules, not a defect.
 applying to a non-member per-user view-grant holder; `canConfigureApprovalLimits` matrix —
 holder/management/admin yes, employee/member no; set/clear audit; grant/revoke owner approval, incl.
 a non-responsible-holder being rejected; **the no-limit case always flags approval**,
-`createBookingRequest_withdrawalNoLimit_alwaysFlagsRequiresOwnerApproval`),
+`createBookingRequest_withdrawalNoLimit_alwaysFlagsRequiresOwnerApproval`; **the responsible holder
+is exempt** — `createBookingRequest_byResponsibleHolder_needsNoApproval` (no limit lookup happens at
+all), `createBookingRequest_byResponsibleHolderAboveConfiguredLimit_stillNeedsNoApproval` and
+`createBookingRequest_krtByOlMember_bypassesAmountLadder`),
 `BankBookingRequestServiceTest` (snapshot at create;
 confirm gate 409 + audit; pre-fill is UI-only), `OrgUnitBankControllerTest`,
 `BankAccountServiceTest` (the bank-staff detail surface assembles limits read-only — `canEdit`
@@ -1632,8 +1658,10 @@ forced `false` even for management,
 `model/BankAccountApprovalLimit`,
 `repository/BankAccountApprovalLimitRepository`, `service/BankApprovalLimitService`,
 `service/OrgUnitBankAccessService`, `service/BankBookingRequestService`, `db/migration/V193`, frontend
-`templates/fragments/bank-approval-limits.html` + `org-unit-bank.html` + `bank-requests.html` ·
-**ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) · **Issues:** —
+`templates/fragments/bank-approval-limits.html` + `org-unit-bank.html` + `bank-requests.html` +
+`static/js/bank.js` (the `data-exempt` short-circuit in the live warning) ·
+**ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md),
+[ADR-0123](../adr/0123-responsible-holder-exempt-from-approval-limits.md) · **Issues:** —
 
 ### REQ-BANK-042 — Unrestricted deposit requests (any user, any active account, no limit)
 
@@ -1992,6 +2020,18 @@ renders the filter box + `data-filter-name` + filter-empty note) · **Code:** fr
 > endpoint answers **`202`** with a `BankBookingOutcomeDto.pendingRequest`, so the employee is told to
 > notify the Bankleitung rather than hitting a dead end. The band-routing text below is stated in its
 > amended form.
+>
+> **Amended by ADR-0123 (owner decision) — the OL is exempt from the ladder.** The KRT account's
+> responsible holder is *any OL member* (REQ-BANK-034), and per the REQ-BANK-041 holder exemption a
+> responsible holder is bound by no approval gate on their own account. An **OL member's** request
+> against the KRT account therefore **bypasses the ladder entirely** (`requires_owner_approval =
+> false`, `applicable_limit = null`, `required_approver = null`), whatever the amount. The ladder is
+> unchanged for **every other requester** — any KRT member may raise a request against the KRT account
+> (`canView(CARTEL) = isMemberOrAbove()`), and for them the three bands below still route as stated.
+> The `exceedsCartelDirectBookingCeiling` gate on a bank employee's **direct** booking is a separate
+> ledger-side control and is **not** affected — it still routes an over-`T1` direct booking into a
+> request; only the resulting request's approver is dropped when that employee is themselves an OL
+> member.
 
 The **KRT account** (`CARTEL`, **not** the bank's own `CARTEL_BANK`) uses an **amount-tiered approval
 ladder** for money *leaving* it (a withdrawal or account↔account transfer request, and the direct

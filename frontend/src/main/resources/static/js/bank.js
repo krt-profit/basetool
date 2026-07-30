@@ -998,7 +998,9 @@
      * per-account limit rides on each source-account <option> as `data-limit`. Semantics: a configured
      * limit warns only when the entered amount exceeds it; a MISSING limit (`data-limit` absent/empty,
      * i.e. no per-user/role/all-members limit applies) means approval is ALWAYS required, so it warns
-     * for any positive amount. Advisory only — it never blocks submission; the request is still filed
+     * for any positive amount. An account the caller is the responsible holder of carries
+     * `data-exempt="true"` and never warns at all — a holder is bound by no ceiling on their own
+     * account (owner decision). Advisory only — it never blocks submission; the request is still filed
      * and then flagged for the responsible holder.
      *
      * @param {HTMLFormElement} form the org-unit request form carrying a `[data-limit-warning]` block
@@ -1022,6 +1024,11 @@
             return;
         }
         const option = accountEl.options[accountEl.selectedIndex];
+        // REQ-BANK-041 (owner decision): the responsible holder is exempt on their own account.
+        if (option && option.getAttribute('data-exempt') === 'true') {
+            warning.hidden = true;
+            return;
+        }
         const rawLimit = option ? option.getAttribute('data-limit') : null;
         const limit = rawLimit === null || rawLimit === '' ? null : Number(rawLimit);
         // No configured limit => approval is always required; a configured limit => only above it.

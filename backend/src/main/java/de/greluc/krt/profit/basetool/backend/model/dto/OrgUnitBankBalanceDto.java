@@ -74,7 +74,13 @@ import org.jetbrains.annotations.Nullable;
  *     balance target and/or configure who else may view it) — the responsible holder of an org-unit
  *     account, or an OL member for a Sonderkonto. Drives the per-card settings affordance.
  * @param approvalLimit the caller's resolved approval limit for this account (REQ-BANK-041), or
- *     {@code null} = unlimited; the request modal warns when the entered amount exceeds it
+ *     {@code null} when no limit applies to them — which means the request needs the responsible
+ *     holder's approval, <em>unless</em> {@code approvalExempt} is set. The request modal warns
+ *     whenever approval would be required.
+ * @param approvalExempt {@code true} iff the caller is this account's responsible holder and is
+ *     therefore bound by no approval ceiling at all (REQ-BANK-041, owner decision): a holder
+ *     disposes freely over their own account, so the modal never warns. The request still has to be
+ *     confirmed by a bank employee — only the holder's extra sign-off falls away.
  */
 public record OrgUnitBankBalanceDto(
     UUID accountId,
@@ -92,4 +98,5 @@ public record OrgUnitBankBalanceDto(
     List<BigDecimal> sparkline,
     @Nullable BigDecimal balanceTarget,
     boolean canManageSettings,
-    @Nullable BigDecimal approvalLimit) {}
+    @Nullable BigDecimal approvalLimit,
+    boolean approvalExempt) {}

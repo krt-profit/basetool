@@ -35,7 +35,10 @@ import org.jetbrains.annotations.Nullable;
  * @param canConfigureApprovalLimits whether the caller may set/clear this account's approval limits
  *     (REQ-BANK-041)
  * @param applicableLimit the caller's resolved approval limit for this account (REQ-BANK-041), or
- *     {@code null} = unlimited
+ *     {@code null} when no limit applies — which means approval is required, unless {@code
+ *     approvalExempt} is set
+ * @param approvalExempt {@code true} iff the caller is this account's responsible holder and is
+ *     bound by no approval ceiling (REQ-BANK-041, owner decision)
  */
 public record OrgUnitBankAccountDetailDto(
     BankAccountDetailDto detail,
@@ -44,4 +47,5 @@ public record OrgUnitBankAccountDetailDto(
     boolean canConfigureVisibility,
     boolean canRequest,
     boolean canConfigureApprovalLimits,
-    @Nullable BigDecimal applicableLimit) {}
+    @Nullable BigDecimal applicableLimit,
+    boolean approvalExempt) {}

@@ -208,6 +208,15 @@ public class OrgUnitBankPageController {
       }
     }
     model.addAttribute("requestLimits", requestLimits);
+    // REQ-BANK-041 (owner decision): the accounts the caller is the responsible holder of. They are
+    // bound by no ceiling there, so the modal must not warn — a missing limit alone would otherwise
+    // read as "approval required".
+    Set<UUID> approvalExemptAccountIds =
+        safeBalances.stream()
+            .filter(b -> b.canRequest() && b.approvalExempt())
+            .map(OrgUnitBankBalanceDto::accountId)
+            .collect(Collectors.toSet());
+    model.addAttribute("approvalExemptAccountIds", approvalExemptAccountIds);
     if ("orgUnitBank".equals(fragment)) {
       return "org-unit-bank :: orgUnitBank";
     }
