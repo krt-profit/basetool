@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.25](https://github.com/krt-profit/basetool/releases/tag/v1.5.25) - 2026-07-30
+
 ### Changed
 
 - **Kartellbank: Der Kontoverantwortliche unterliegt auf seinem eigenen Konto keinem Freigabe-Limit mehr.** Staffelleiter, SK-Leiter und Bereichsleiter mussten ihre eigenen Auszahlungs- und Überweisungsanträge selbst freigeben, weil die Limit-Prüfung nicht danach fragte, wer den Antrag stellt — bei Konten ohne hinterlegtes Limit traf das jeden Antrag. Solche Anträge tragen jetzt kein „Über Limit" mehr und brauchen keine zusätzliche Freigabe. Am KRT-Konto gilt das ebenso für die Organisationsleitung; für alle anderen Antragsteller bleibt die Betragsstaffel unverändert. Bestätigt und gebucht wird ein Antrag weiterhin durch die Bank (REQ-BANK-041, REQ-BANK-047, ADR-0123).
