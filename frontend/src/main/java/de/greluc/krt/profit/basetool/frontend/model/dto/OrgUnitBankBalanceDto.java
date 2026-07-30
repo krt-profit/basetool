@@ -61,7 +61,11 @@ import org.jetbrains.annotations.Nullable;
  * @param canManageSettings {@code true} iff the caller may open the account's settings (set the
  *     target and/or configure who else may view it); drives the per-card settings affordance
  * @param approvalLimit the caller's resolved approval limit for this account (REQ-BANK-041), or
- *     {@code null} = unlimited; the request modal warns when the entered amount exceeds it
+ *     {@code null} when no limit applies — which means approval is required, unless {@code
+ *     approvalExempt} is set; the request modal warns whenever approval would be required
+ * @param approvalExempt {@code true} iff the caller is this account's responsible holder and is
+ *     bound by no approval ceiling (REQ-BANK-041, owner decision); rides onto the source-account
+ *     option as {@code data-exempt} so the modal suppresses the warning
  */
 public record OrgUnitBankBalanceDto(
     UUID accountId,
@@ -79,4 +83,5 @@ public record OrgUnitBankBalanceDto(
     List<BigDecimal> sparkline,
     @Nullable BigDecimal balanceTarget,
     boolean canManageSettings,
-    @Nullable BigDecimal approvalLimit) {}
+    @Nullable BigDecimal approvalLimit,
+    boolean approvalExempt) {}

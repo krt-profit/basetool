@@ -78,7 +78,8 @@ class OrgUnitBankControllerTest {
             List.of(new BigDecimal("3900"), new BigDecimal("4200")),
             new BigDecimal("10000"),
             true,
-            null);
+            null,
+            false);
     when(orgUnitBankAccessService.listOverseenOrgUnitBalances()).thenReturn(List.of(dto));
 
     List<OrgUnitBankBalanceDto> result = controller.listOverseenBalances();

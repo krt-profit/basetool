@@ -276,7 +276,7 @@
                                 data-role="org-unit-request-account" data-testid="org-unit-request-account">
                             <option th:each="t : ${requestTransferTargets}"
                                     th:value="${t.id()}"
-                                    th:attr="data-can-debit=${debitableAccountIds.contains(t.id())},data-limit=${requestLimits.get(t.id())},data-requires-justification=${t.type() == 'CARTEL' or t.type() == 'CARTEL_BANK' or t.type() == 'SPECIAL'}"
+                                    th:attr="data-can-debit=${debitableAccountIds.contains(t.id())},data-limit=${requestLimits.get(t.id())},data-exempt=${approvalExemptAccountIds.contains(t.id())},data-requires-justification=${t.type() == 'CARTEL' or t.type() == 'CARTEL_BANK' or t.type() == 'SPECIAL'}"
                                     th:text="${t.name()} + ' (' + ${t.accountNo()} + ')'">Staffel IRIDIUM (KB-0001)</option>
                         </select>
                         <span class="bank-field-hint" data-deposit-hint th:text="#{bank.orgUnit.request.deposit.accountHint}">Einzahlungen sind f&uuml;r jedes aktive Konto m&ouml;glich.</span>

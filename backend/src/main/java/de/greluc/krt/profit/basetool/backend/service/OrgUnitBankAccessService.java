@@ -255,8 +255,11 @@ public class OrgUnitBankAccessService {
               // REQ-BANK-039: eligibility = view eligibility — every viewable, request-capable
               // account the caller can already see is requestable.
               boolean canRequest = isRequestCapable(account);
+              // REQ-BANK-041 (owner decision): the responsible holder is bound by no ceiling on
+              // their own account, so no limit is resolved and the card carries the exempt flag.
+              boolean approvalExempt = canRequest && isApprovalExempt(account);
               BigDecimal approvalLimit =
-                  canRequest
+                  canRequest && !approvalExempt
                       ? resolveApplicableLimit(
                           account, limitsByAccount.getOrDefault(account.getId(), List.of()))
                       : null;
@@ -267,7 +270,8 @@ public class OrgUnitBankAccessService {
                   delta,
                   BankTrendCalculator.sparkline(balance, delta, slices),
                   canManageSettings(account),
-                  approvalLimit);
+                  approvalLimit,
+                  approvalExempt);
             })
         .toList();
   }
@@ -295,7 +299,11 @@ public class OrgUnitBankAccessService {
         bankAccountService.getAccountDetail(accountId, READ_ONLY_CAPABILITIES);
     // REQ-BANK-039: any viewer of a request-capable account may request against it.
     boolean canRequest = isRequestCapable(account);
-    BigDecimal applicableLimit = canRequest ? resolveApplicableLimit(account) : null;
+    // REQ-BANK-041 (owner decision): an exempt holder is subject to no ceiling at all, so the
+    // display limit stays null and the flag tells the form to suppress the approval warning.
+    boolean approvalExempt = canRequest && isApprovalExempt(account);
+    BigDecimal applicableLimit =
+        canRequest && !approvalExempt ? resolveApplicableLimit(account) : null;
     return new OrgUnitBankAccountDetailDto(
         detail,
         true,
@@ -303,7 +311,8 @@ public class OrgUnitBankAccessService {
         canConfigureVisibility(account),
         canRequest,
         canConfigureApprovalLimits(account),
-        applicableLimit);
+        applicableLimit,
+        approvalExempt);
   }
 
   /**
@@ -835,7 +844,12 @@ public class OrgUnitBankAccessService {
     // org-unit-blind confirm path only reads the boolean; the seam routes the "Fremde Anträge"
     // approval surface by the recorded approver class.
     ApprovalRouting routing;
-    if (account.getType() == BankAccountType.CARTEL) {
+    if (isApprovalExempt(account)) {
+      // REQ-BANK-041 (owner decision): the responsible holder disposes freely over their own
+      // account. Neither a per-audience limit nor the KRT amount ladder binds them — asking a
+      // holder to counter-sign their own request would be a no-op click.
+      routing = new ApprovalRouting(false, null, null);
+    } else if (account.getType() == BankAccountType.CARTEL) {
       routing = resolveCartelApprovalRouting(account, request.amount());
     } else {
       // Every other request-capable account: a configured per-audience limit lets the requester
@@ -942,7 +956,14 @@ public class OrgUnitBankAccessService {
         bankAccountRepository
             .findById(accountId)
             .orElseThrow(() -> new NotFoundException("Bank account not found"));
-    ApprovalRouting routing = resolveCartelApprovalRouting(account, amount);
+    // REQ-BANK-041 (owner decision): an acting bank employee who is also the account's responsible
+    // holder (an OL member on the KRT account) is exempt, so the filed request carries no approver
+    // rather than routing back to themselves. The direct-booking ceiling that sent the attempt here
+    // is a separate bank-staff ledger control (REQ-BANK-047) and still applies.
+    ApprovalRouting routing =
+        isApprovalExempt(account)
+            ? new ApprovalRouting(false, null, null)
+            : resolveCartelApprovalRouting(account, amount);
     return bankBookingRequestService.create(
         accountId,
         type,
@@ -1335,6 +1356,23 @@ public class OrgUnitBankAccessService {
       case CARTEL_BANK -> isProfitBereichsleiter();
       case SPECIAL -> false;
     };
+  }
+
+  /**
+   * {@code true} iff the current caller is exempt from every approval gate on this account
+   * (REQ-BANK-041, owner decision): the account's <b>responsible holder</b> — the Staffelleiter /
+   * SK-Leiter of an {@code ORG_UNIT} account, the Bereichsleiter of an {@code AREA} account, any OL
+   * member on the KRT ({@code CARTEL}) account — disposes freely over the account they are
+   * responsible for. Approval limits bind every requester <em>except</em> the holder, and the KRT
+   * amount ladder (REQ-BANK-047) is bypassed for them too, so a holder is never asked to
+   * counter-sign their own request. Sonderkonten ({@code SPECIAL}) have no responsible holder and
+   * are not request-capable, so this is always {@code false} there.
+   *
+   * @param account the account a request would debit
+   * @return whether the caller may debit this account without any approver's sign-off
+   */
+  private boolean isApprovalExempt(@NotNull BankAccount account) {
+    return isResponsibleHolder(account);
   }
 
   /**
@@ -1862,8 +1900,11 @@ public class OrgUnitBankAccessService {
    * @param delta30d the 30-day net change (signed)
    * @param sparkline the 30 end-of-day balances of the window, oldest first
    * @param canManageSettings whether the caller may open the account's settings
-   * @param approvalLimit the caller's resolved approval limit for this account, or {@code null} =
-   *     unlimited (REQ-BANK-041)
+   * @param approvalLimit the caller's resolved approval limit for this account (REQ-BANK-041), or
+   *     {@code null} when no limit applies — which means approval is required, unless {@code
+   *     approvalExempt} says otherwise
+   * @param approvalExempt whether the caller is the account's responsible holder and therefore
+   *     bound by no ceiling at all (REQ-BANK-041, owner decision)
    * @return the balance-card DTO
    */
   @NotNull
@@ -1874,7 +1915,8 @@ public class OrgUnitBankAccessService {
       @NotNull BigDecimal delta30d,
       @NotNull List<BigDecimal> sparkline,
       boolean canManageSettings,
-      @Nullable BigDecimal approvalLimit) {
+      @Nullable BigDecimal approvalLimit,
+      boolean approvalExempt) {
     OrgUnit orgUnit = account.getOrgUnit();
     return new OrgUnitBankBalanceDto(
         account.getId(),
@@ -1892,6 +1934,7 @@ public class OrgUnitBankAccessService {
         sparkline,
         account.getBalanceTarget(),
         canManageSettings,
-        approvalLimit);
+        approvalLimit,
+        approvalExempt);
   }
 }
