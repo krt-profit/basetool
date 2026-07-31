@@ -25,6 +25,9 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -48,4 +51,20 @@ public interface PersonalInventoryItemRepository
 
   /** Derived Spring-Data query - returns entities matching {@code IdAndOwnerSub}. */
   Optional<PersonalInventoryItem> findByIdAndOwnerSub(UUID id, String ownerSub);
+
+  /**
+   * Deletes every "Mein Inventar" row of the given owner as part of the hard account deletion
+   * (REQ-DATA-008). {@code owner_sub} carries no foreign key to {@code app_user} (V65 declares none
+   * at all), so nothing cascades and nothing else in the system would ever remove these rows:
+   * before this method existed they survived the account indefinitely, free-text {@code note}
+   * included, and were undiscoverable afterwards because every lookup is keyed by the owner sub
+   * that no roster can still offer. A returning Keycloak subject would silently re-adopt them.
+   *
+   * @param ownerSub the departing owner's Keycloak subject (equal to {@code app_user.id} rendered
+   *     as text); never {@code null}.
+   * @return the number of deleted rows, for the audit summary event.
+   */
+  @Modifying
+  @Query("DELETE FROM PersonalInventoryItem p WHERE p.ownerSub = :ownerSub")
+  int deleteByOwnerSub(@Param("ownerSub") String ownerSub);
 }

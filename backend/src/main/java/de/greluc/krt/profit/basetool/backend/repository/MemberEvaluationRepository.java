@@ -26,6 +26,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -168,4 +169,20 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
       """)
   List<MemberEvaluation> findAllByUserIdWithCategoryAndTopicScoped(
       @Param("userId") String userId, @Param("owningSquadronId") UUID owningSquadronId);
+
+  /**
+   * Deletes every promotion grade of the given member as part of the hard account deletion
+   * (REQ-DATA-008). {@code member_evaluation.user_id} is a plain {@code VARCHAR} holding the JWT
+   * sub with no foreign key to {@code app_user}, so nothing cascades and the grades — an assessment
+   * of a named person — would otherwise outlive the account indefinitely.
+   *
+   * <p>Set-based and without {@code clearAutomatically}, because it runs inside the user-deletion
+   * transaction where evicting the persistence context would detach the {@code User} being deleted.
+   *
+   * @param userId the departing member's JWT-sub identifier (equal to {@code app_user.id} as text)
+   * @return the number of grades removed, for the audit summary event
+   */
+  @Modifying
+  @Query("DELETE FROM MemberEvaluation e WHERE e.userId = :userId")
+  int deleteAllByUserId(@Param("userId") String userId);
 }

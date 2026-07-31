@@ -511,7 +511,7 @@
                             <dl class="kv-list">
                                 <th:block th:each="leadType : ${missionLeadTypes}">
                                     <dt th:text="${leadType.name}">Role</dt>
-                                    <dd><span th:each="p, iter : ${participantsByLeadType[#strings.toString(leadType.id)]}" th:text="${(p['user'] != null ? p['user']['effectiveName'] : p['guestName']) + (!iter.last ? ', ' : '')}">User</span>
+                                    <dd><span th:each="p, iter : ${participantsByLeadType[#strings.toString(leadType.id)]}" th:text="${(p['user'] != null ? p['user']['effectiveName'] : (p['guestName'] != null ? p['guestName'] : #messages.msg('mission.participant.deleted'))) + (!iter.last ? ', ' : '')}">User</span>
                                         <span th:if="${participantsByLeadType[#strings.toString(leadType.id)] == null or participantsByLeadType[#strings.toString(leadType.id)].isEmpty()}" th:text="#{general.none}">&mdash;</span></dd>
                                 </th:block>
                             </dl>
@@ -721,7 +721,7 @@
                             </thead>
                             <tbody>
                                 <tr th:each="entry : ${financeEntries}">
-                                    <td th:text="${entry.participant != null ? (entry.participant.user != null ? entry.participant.user.effectiveName : entry.participant.guestName) : '-'}">Nutzer</td>
+                                    <td th:text="${entry.participant == null ? '-' : (entry.participant.user != null ? entry.participant.user.effectiveName : (entry.participant.guestName != null ? entry.participant.guestName : #messages.msg('mission.participant.deleted')))}">Nutzer</td>
                                     <td>
                                         <span th:if="${entry.type.name() == 'INCOME'}" class="chip chip--success chip-xs" th:text="#{mission.finance.type.income}">Einnahme</span>
                                         <span th:if="${entry.type.name() == 'EXPENSE'}" class="chip chip--danger chip-xs" th:text="#{mission.finance.type.expense}">Ausgabe</span>
@@ -789,7 +789,7 @@
                             </thead>
                             <tbody>
                                 <tr th:each="p : ${participants}" th:attr="data-participant-id=${p?.id}, data-version=${p?.version}">
-                                    <td th:text="${p?.user != null ? p.user.effectiveName : p?.guestName}">Username</td>
+                                    <td th:text="${p?.user != null ? p.user.effectiveName : (p?.guestName != null ? p.guestName : #messages.msg('mission.participant.deleted'))}">Username</td>
                                     <td class="num" th:text="${#numbers.formatDecimal(participationPercentages[p.id] ?: 0.0, 1, 'NONE', 2, 'DEFAULT')} + ' %'" sec:authorize="isAuthenticated()">0.00 %</td>
                                     <td>
                                         <select class="form-control"
@@ -1426,7 +1426,7 @@
                       data-version=${p?.version},
                       data-crew-id=${crew != null ? crew.id : ''},
                       data-unit-id=${unit != null ? unit.id : ''},
-                      data-name=${p?.user != null ? p.user.effectiveName : p?.guestName},
+                      data-name=${p?.user != null ? p.user.effectiveName : (p?.guestName != null ? p.guestName : #messages.msg('mission.participant.deleted'))},
                       draggable=${mission.canEdit ? 'true' : 'false'},
                       tabindex=${mission.canEdit ? '0' : null},
                       aria-pressed=${mission.canEdit ? 'false' : null}">
@@ -1435,8 +1435,14 @@
                   th:title="${checkedIn} ? #{mission.crew.checked_in} : #{mission.crew.not_checked_in}"></span>
             <div class="row-main">
                 <div class="row-line1">
-                    <span class="person-name" th:text="${p?.user != null ? p.user.effectiveName : p?.guestName}">Name</span>
-                    <span th:if="${p?.user == null}" class="chip chip--muted chip-xs" th:text="#{mission.participant.guest}">Gast</span>
+                    <!-- A participant with neither a user nor a guest name is a deleted account: the
+                         deletion nulls user_id and a user-linked sign-up never carried a guest name,
+                         so the two cases are unambiguous. Without the third branch the row rendered
+                         blank and was additionally mislabelled "Gast". -->
+                    <span class="person-name"
+                          th:text="${p?.user != null ? p.user.effectiveName : (p?.guestName != null ? p.guestName : #messages.msg('mission.participant.deleted'))}">Name</span>
+                    <span th:if="${p?.user == null and p?.guestName != null}" class="chip chip--muted chip-xs" th:text="#{mission.participant.guest}">Gast</span>
+                    <span th:if="${p?.user == null and p?.guestName == null}" class="chip chip--muted chip-xs" th:text="#{mission.participant.deleted}">Gel&ouml;schter Nutzer</span>
                     <span th:if="${p?.orgUnits == null or p.orgUnits.isEmpty()}" class="squadron-badge squadron-badge-muted">&mdash;</span>
                     <span th:if="${p?.orgUnits != null and !p.orgUnits.isEmpty()}" class="squadron-badge-group">
                         <span th:each="ou : ${p.orgUnits}"
@@ -1473,7 +1479,10 @@
             <span th:if="${crew != null and !mission.canEdit and crew.jobTypes != null and !crew.jobTypes.isEmpty()}"
                   class="crew-jobs-static" th:text="${#strings.listJoin(crew.jobTypes.![name], ', ')}"
                   th:title="${#strings.listJoin(crew.jobTypes.![name], ', ')}">Pilot</span>
-            <div class="row-actions" th:if="${mission.canEdit or own or p?.user == null}">
+            <!-- The `user == null` arm exists so anyone may maintain a GUEST entry. A deleted
+                 account also has a null user but must not become editable-by-everyone, so the arm
+                 is narrowed to rows that actually carry a guest name. -->
+            <div class="row-actions" th:if="${mission.canEdit or own or (p?.user == null and p?.guestName != null)}">
                 <form th:action="@{/missions/{id}/participants/{pId}/check-in(id=${mission.id}, pId=${p?.id})}" method="post" th:if="${p?.startTime == null and mission.actualStartTime != null and mission.actualEndTime == null}" class="participant-action-form krtm-display-inline-2f87" data-participant-action="check-in" th:data-participant-id="${p?.id}">
                     <button type="submit" class="btn btn-success btn-icon" th:title="#{mission.participant.checkin.tooltip}" th:aria-label="#{mission.participant.checkin}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-login"/></svg></button>
                 </form>
@@ -1487,7 +1496,7 @@
                         th:data-planned-job="${p?.plannedMissionJobType != null ? p.plannedMissionJobType.id : ''}"
                         th:data-org-units="${p?.orgUnits != null ? #strings.listJoin(p.orgUnits.![id], ',') : ''}"
                         th:data-org-unit-names="${p?.orgUnits != null ? #strings.listJoin(p.orgUnits.![name], ',') : ''}"
-                        th:data-guest="${p?.user == null}"
+                        th:data-guest="${p?.user == null and p?.guestName != null}"
                         th:data-is-member="${p?.user != null and p.user.roles != null and (p.user.roles.contains('KRT_MEMBER') or p.user.roles.contains('ROLE_KRT_MEMBER') or p.user.roles.contains('ADMIN') or p.user.roles.contains('ROLE_ADMIN') or p.user.roles.contains('OFFICER') or p.user.roles.contains('ROLE_OFFICER'))}"
                         th:data-payout-preference="${p?.payoutPreference?.name()}"
                         th:data-comment="${p?.comment}"
@@ -1908,7 +1917,7 @@
                         <option th:each="p : ${participants}"
                                 th:value="${p.id}"
                                 th:attr="data-search=${p.user != null ? p.user.username : ''}"
-                                th:text="${p.user != null ? p.user.effectiveName : p.guestName}"
+                                th:text="${p.user != null ? p.user.effectiveName : (p.guestName != null ? p.guestName : #messages.msg('mission.participant.deleted'))}"
                                 th:selected="${financeForm.participantId != null and financeForm.participantId.toString() == p.id.toString()}"></option>
                     </select>
                     <div th:if="${#fields.hasErrors('participantId')}" th:errors="*{participantId}" class="field-error"></div>

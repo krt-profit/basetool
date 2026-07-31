@@ -529,6 +529,15 @@ to the global Officer role.
 | Read **audit logs** (Bank/Lager/Aufträge/Raffinerie/Mein Inventar/Missionen/Operationen/Rollen/Beförderung) + time-range PDF/JSON + retention cleanup (`/admin/audit-log`, `/api/v1/audit/**`, URL **and** method gate `hasRole('ADMIN')`) |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Write system setting (`PUT /settings/{key}`, `hasRole('ADMIN')`)                                                                                                                                                                           |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Role/permission management, member attributes/rank, flag granting (`/admin/**`, `/users/*/...`, `hasRole('ADMIN')`)                                                                                                                        |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| **Hard-delete a user account** (`DELETE /api/v1/users/{id}`, `hasRole('ADMIN')`) — irreversible, and only for an account already gone from Keycloak                                                                                        |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+
+> **Hard-deleting a user is admin-only and irreversible** (REQ-DATA-008). It is refused for an
+> account still present in Keycloak — the guard re-verifies that against Keycloak itself rather than
+> trusting the stored `in_keycloak` flag, and refuses when Keycloak cannot be reached, so a
+> swallowed sync error can never make an *active* member deletable. What the deletion does with the
+> member's data (purged vs. reassigned vs. rendered as the deleted-user placeholder) is specified in
+> [`docs/specs/data-persistence.md`](docs/specs/data-persistence.md) under REQ-DATA-008; it records
+> `USER_DELETED` plus the per-area purge events (REQ-AUDIT-001).
 
 Which master data is anonymously readable is determined solely by the `permitAll`
 list in `SecurityConfig` (see §1.1) — everything else is at least logged-in,

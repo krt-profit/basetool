@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Benutzerverwaltung: Beim Löschen eines Nutzers werden seine Daten jetzt wirklich gelöscht.** Lager, Hangar, "Mein Inventar", Baupläne, Benachrichtigungen und Bewertungen des Kontos werden entfernt statt auf einen Administrator umgebucht oder stillschweigend liegen gelassen; die Verknüpfungen der Lagereinträge zu Aufträgen und Einsätzen gehen mit. Einsätze, Operationen, Auftragshistorie und die Kartellbank bleiben erhalten — dort erscheint der Betroffene als "Gelöschter Nutzer" statt als leeres Feld. Raffinerieaufträge und von ihm angelegte Einsätze gehen weiterhin an einen Administrator über. Der Bestätigungsdialog beschreibt das jetzt zutreffend; bisher versprach er, alle Daten würden übertragen (REQ-DATA-008, REQ-AUDIT-001).
+
+- **Bereits verwaiste Daten früherer Löschungen werden einmalig entfernt.** Baupläne, "Mein Inventar", Benachrichtigungen, Benachrichtigungsregel-Ziele und Bewertungen ohne zugehöriges Konto verschwinden mit der Migration. Ein solches Regel-Ziel legte bis dahin bei jedem passenden Ereignis eine neue Benachrichtigung für ein nicht mehr existierendes Konto an.
+
+### Fixed
+
+- **Operationen: Eine bereits abgerechnete Operation ändert sich nicht mehr rückwirkend, wenn ein Mitglied gelöscht wird.** Der Gelöschte fiel aus der Aufteilung, seine Anwesenheit zählte nicht mehr zur Gesamtdauer, und von ihm verauslagte Ausgaben wurden auf die übrigen Teilnehmer umverteilt — bei Operationen, deren Auszahlung längst feststand. Er bleibt jetzt mit seinem Anteil in der Aufstellung (REQ-DATA-008).
+
+- **Benutzerverwaltung: Ein noch aktives Mitglied kann nicht mehr versehentlich gelöscht werden.** Ob ein Konto wirklich weg ist, wurde bisher nur am zuletzt gespeicherten Stand abgelesen — ein verschluckter Abgleichfehler genügte, um ein aktives Mitglied löschbar zu machen. Das wird jetzt direkt bei Keycloak nachgeprüft; ist Keycloak nicht erreichbar, wird das Löschen abgelehnt statt auf Verdacht ausgeführt (REQ-DATA-008).
+
+- **Einsätze: Ein gelöschtes Mitglied wird nicht mehr als "Gast" ausgewiesen.** Die Zeile blieb namenlos und trug fälschlich das Gast-Kennzeichen, wodurch jeder Betrachter sie bearbeiten und löschen konnte. Sie zeigt jetzt "Gelöschter Nutzer" und ist nur noch für Einsatzberechtigte änderbar.
+
+- **Benutzerverwaltung: Das Löschen eines Nutzers bricht nicht mehr mit einem Serverfehler ab.** Gehörte der Nutzer noch einer Staffel, einem Spezialkommando oder einem Bereich an — also praktisch immer —, endete das Löschen mit HTTP 500. Die Mitgliedschaftszeilen werden von der Datenbank mitgelöscht, hingen im selben Vorgang aber noch geladen im Speicher und zeigten dort auf den bereits entfernten Nutzer. Die Bank-Auswertung, die sie geladen hat, liest jetzt nur noch die IDs der betroffenen Einheiten (REQ-DATA-008, REQ-BANK-034).
+
 ## [v1.5.25](https://github.com/krt-profit/basetool/releases/tag/v1.5.25) - 2026-07-30
 
 ### Changed

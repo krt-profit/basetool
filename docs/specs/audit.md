@@ -51,7 +51,10 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   stock, REQ-ORDERS-030 → `INVENTORY_HANDED_OVER`, job-order item-production consumption →
   `INVENTORY_CONSUMED_BY_PRODUCTION`, job-order item-production book-in →
   `INVENTORY_RECEIVED_FROM_PRODUCTION`, REQ-INV-032), the org-unit re-stamp on membership change,
-  and the owner-reassignment on user deletion.
+  and the purge of a deleted member's warehouse rows and hangar
+  (`INVENTORY_PURGED_ON_USER_DELETION`, REQ-DATA-008 — a summary event carrying the affected-row
+  counts, since the set-based DELETE exposes no per-row ids). The legacy
+  `INVENTORY_OWNER_REASSIGNED` is retained for historical rows but no longer emitted.
 - **Aufträge** — create (material/item) / edit / status / priority / blueprint-coverage variant-counting
   toggle / delete / completion (a single funnel — manual and auto-completion via handover both record
   exactly one `JOB_ORDER_COMPLETED`) / reassign / assignee add/remove/note / material+inventory unlink /
@@ -62,7 +65,10 @@ Coverage is **complete**, including the cross-area writers and the system/automa
 - **Raffinerie** — order create / update / cancel / store; refining-method reference CRUD; the
   scheduled UEX method+yield sync (one summary event per run, actor `system`); owner-reassignment on
   user deletion.
-- **Mein Inventar** — create / update / delete (admin-on-behalf carries the target user).
+- **Mein Inventar** — create / update / delete (admin-on-behalf carries the target user); and the
+  purge of a deleted member's personal stores — "Mein Inventar", personal blueprints,
+  notifications, notification-rule selectors and promotion evaluations — as a single summary event
+  (`PERSONAL_DATA_PURGED_ON_USER_DELETION`, REQ-DATA-008) carrying the five row counts.
 - **Missionen** — mission create (incl. sub-mission; any goals/steps seeded on the create form each
   additionally record their own `MISSION_OBJECTIVE_ADDED` / `MISSION_STEP_ADDED`, REQ-MISSION-015) /
   edit (core, schedule, flags) / delete;
@@ -87,7 +93,9 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   reference; for Kommandogruppe events the subject is the group (its name snapshot). The details
   payload carries only the rank/kind enum names, the two flag booleans and the squadron label —
   never a user handle or free text (the group name is a non-personal structure label, like an order
-  title).
+  title). Account deletion by an admin records `USER_DELETED` here (REQ-DATA-008): the
+  deletion mutates several audited areas at once, so this marker is written unconditionally and
+  anchors the per-area purge events above; its payload holds row counts and ids only.
 - **Beförderung** (`PromotionTopic` / `PromotionCategory` / `PromotionLevelContent` /
   `RankRequirement` / `MemberEvaluation`) — every promotion-catalogue and member-grading mutation:
   topic create / edit / delete; category create / edit / delete; level-content create / edit /

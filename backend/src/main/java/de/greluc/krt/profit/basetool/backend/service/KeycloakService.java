@@ -613,6 +613,40 @@ public class KeycloakService {
   }
 
   /**
+   * Live existence probe against {@code GET /admin/realms/{realm}/users/{id}} — the authoritative
+   * answer to "does this account still exist in Keycloak?", as opposed to the locally cached {@code
+   * app_user.in_keycloak} flag that a swallowed sync error can leave stale.
+   *
+   * <p>Read-only and deliberately <b>fail-closed</b>: only a clean {@code 404} reports absence.
+   * Every other outcome — an unreachable Keycloak, an expired admin token, an unconfigured admin
+   * URL, a {@code 5xx} — propagates, so a caller that gates an irreversible action on "the account
+   * is gone" refuses instead of proceeding on a guess. {@link UserDeletionService#deleteUser(UUID)}
+   * is that caller.
+   *
+   * @param keycloakUserId the Keycloak user id (== the app user id / JWT subject) to probe
+   * @return {@code true} iff Keycloak positively confirms the user still exists
+   * @throws ExternalServiceException when the admin URL is unconfigured
+   * @throws org.springframework.web.client.RestClientException when Keycloak cannot be reached or
+   *     answers with anything other than a success or a {@code 404}
+   */
+  public boolean userExists(@NotNull UUID keycloakUserId) {
+    requireAdminUrl();
+    try {
+      adminClient()
+          .get()
+          .uri("/admin/realms/{realm}/users/{id}", properties.getRealm(), keycloakUserId)
+          .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + getAccessToken())
+          .retrieve()
+          .toBodilessEntity();
+      return true;
+    } catch (HttpClientErrorException.NotFound absent) {
+      // The only outcome that may be read as "gone". Log the id only (it is not PII).
+      log.debug("Keycloak user {} confirmed absent", keycloakUserId);
+      return false;
+    }
+  }
+
+  /**
    * Hard-deletes a Keycloak user via {@code DELETE /users/{id}}, requiring the {@code manage-users}
    * realm-management role. Idempotent: a {@code 404} (the user is already gone) is treated as
    * success. Used by the account-linking flow to dispose of the throwaway Discord-registered user

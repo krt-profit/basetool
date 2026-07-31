@@ -120,6 +120,26 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
   int deleteReadOlderThan(@Param("cutoff") Instant cutoff);
 
   /**
+   * Deletes the complete notification history of one recipient, read and unread alike, as part of
+   * the hard account deletion (REQ-DATA-008). {@code recipient_sub} is a loose reference with no
+   * foreign key to {@code app_user} (V155 says so explicitly and defers row lifetime to retention),
+   * so nothing cascades — and the retention sweep {@link #deleteReadOlderThan(Instant)} only ever
+   * reaps <em>read</em> rows, which is why a departed member's unread backlog would otherwise
+   * survive forever.
+   *
+   * <p>Deliberately without {@code clearAutomatically}: this runs inside the user-deletion
+   * transaction, where evicting the persistence context would detach the {@code User} row that is
+   * about to be deleted.
+   *
+   * @param recipientSub Keycloak {@code sub} of the departing recipient (equal to {@code
+   *     app_user.id})
+   * @return the number of rows deleted, for the audit summary event
+   */
+  @Modifying
+  @Query("delete from Notification n where n.recipientSub = :recipientSub")
+  int deleteAllForRecipient(@Param("recipientSub") UUID recipientSub);
+
+  /**
    * The recipient {@code sub}s holding an outstanding notification of one of the given types for a
    * loose entity reference — collected <em>before</em> {@link #deleteByTypeInAndEntity} so the
    * caller can push a live inbox/badge refresh to exactly those recipients once their now-stale

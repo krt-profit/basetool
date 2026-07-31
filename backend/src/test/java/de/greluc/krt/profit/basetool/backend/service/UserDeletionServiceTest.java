@@ -43,6 +43,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.web.client.ResourceAccessException;
 
 /**
  * Mockito unit tests for {@link UserDeletionService#deleteUser} — the FK-ordered hard-delete
@@ -65,6 +66,12 @@ class UserDeletionServiceTest {
   @Mock private MaterialClaimRepository materialClaimRepository;
   @Mock private UserApprovalEventRepository userApprovalEventRepository;
   @Mock private AuditService auditService;
+  @Mock private KeycloakService keycloakService;
+  @Mock private PersonalInventoryItemRepository personalInventoryItemRepository;
+  @Mock private PersonalBlueprintRepository personalBlueprintRepository;
+  @Mock private NotificationRepository notificationRepository;
+  @Mock private NotificationRuleRepository notificationRuleRepository;
+  @Mock private MemberEvaluationRepository memberEvaluationRepository;
 
   // The identity seam. deleteUser borrows getCurrentUser() for the fallback-admin path; the
   // reassign/delete tests never trigger the fallback (findAllAdmins returns a usable admin) so they
@@ -108,17 +115,22 @@ class UserDeletionServiceTest {
   }
 
   @Test
-  void shouldDeleteUserAndReassignReferences() {
+  void shouldPurgeAccountDataAndReassignSharedAggregates() {
     // Given
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
 
-    // When
+    // Then: account-owned data is purged, keyed by id / Keycloak subject...
     userDeletionService.deleteUser(userId);
 
-    // Then
-    verify(inventoryItemRepository).updateOwner(user, admin);
-    verify(shipRepository).updateOwner(user, admin);
+    verify(inventoryItemRepository).deleteByUserId(userId);
+    verify(shipRepository).deleteByOwnerId(userId);
+    verify(personalInventoryItemRepository).deleteByOwnerSub(userId.toString());
+    verify(personalBlueprintRepository).deleteAllByOwnerSub(userId.toString());
+    verify(notificationRepository).deleteAllForRecipient(userId);
+    verify(notificationRuleRepository).deleteSelectorsByUserSub(userId);
+    verify(memberEvaluationRepository).deleteAllByUserId(userId.toString());
+    // ...while the shared/historical aggregates only change owner.
     verify(refineryOrderRepository).updateOwner(user, admin);
     verify(missionRepository).updateOwner(user, admin);
     verify(missionOwnershipRepository).updateOwner(user, admin);
@@ -133,24 +145,37 @@ class UserDeletionServiceTest {
   }
 
   @Test
-  void deleteUser_recordsReassignmentEventsWithRowCounts_whenRowsMoved() {
-    // Given the deleted user owns warehouse rows and refinery orders.
+  void deleteUser_recordsPurgeAndReassignmentEventsWithRowCounts_whenRowsAffected() {
+    // Given the deleted user owns warehouse rows, ships, personal data and refinery orders.
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
-    when(inventoryItemRepository.updateOwner(user, admin)).thenReturn(3);
+    when(inventoryItemRepository.deleteByUserId(userId)).thenReturn(3);
+    when(shipRepository.deleteByOwnerId(userId)).thenReturn(7);
+    when(personalBlueprintRepository.deleteAllByOwnerSub(userId.toString())).thenReturn(8);
     when(refineryOrderRepository.updateOwner(user, admin)).thenReturn(2);
 
     // When
     userDeletionService.deleteUser(userId);
 
-    // Then both summary events fire, carrying the affected-row count.
+    // Then each summary event fires, carrying the affected-row counts.
     verify(auditService)
         .record(
-            eq(AuditEventType.INVENTORY_OWNER_REASSIGNED),
+            eq(AuditEventType.INVENTORY_PURGED_ON_USER_DELETION),
             isNull(),
             isNull(),
             eq(userId),
-            argThat(d -> d != null && d.toString().contains("rows=3")));
+            argThat(
+                d ->
+                    d != null
+                        && d.toString().contains("inventoryRows=3")
+                        && d.toString().contains("ships=7")));
+    verify(auditService)
+        .record(
+            eq(AuditEventType.PERSONAL_DATA_PURGED_ON_USER_DELETION),
+            isNull(),
+            isNull(),
+            eq(userId),
+            argThat(d -> d != null && d.toString().contains("blueprints=8")));
     verify(auditService)
         .record(
             eq(AuditEventType.REFINERY_ORDERS_REASSIGNED),
@@ -161,17 +186,55 @@ class UserDeletionServiceTest {
   }
 
   @Test
-  void deleteUser_skipsReassignmentEvents_whenNoRowsMoved() {
-    // Given the deleted user owns nothing (the updateOwner mocks default to 0 rows).
+  void deleteUser_refusesWhenKeycloakStillHasTheAccount_evenThoughTheStoredFlagSaysOtherwise() {
+    // The stored in_keycloak flag is only a cached mirror; a swallowed sync error can leave it
+    // stale at false. Since the deletion now purges rather than reassigns, acting on a stale flag
+    // would destroy an ACTIVE member's Lager, hangar and personal data. Keycloak decides.
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(keycloakService.userExists(userId)).thenReturn(true);
+
+    assertThrows(IllegalStateException.class, () -> userDeletionService.deleteUser(userId));
+
+    verify(userRepository, never()).delete(any());
+    verify(inventoryItemRepository, never()).deleteByUserId(any());
+    verify(shipRepository, never()).deleteByOwnerId(any());
+    verify(personalBlueprintRepository, never()).deleteAllByOwnerSub(any());
+  }
+
+  @Test
+  void deleteUser_refusesWhenKeycloakCannotBeReached_ratherThanAssumingTheAccountIsGone() {
+    // Fail-closed: an unreachable Keycloak is not evidence of absence. The exception propagates and
+    // nothing is purged.
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(keycloakService.userExists(userId))
+        .thenThrow(new ResourceAccessException("keycloak unreachable"));
+
+    assertThrows(ResourceAccessException.class, () -> userDeletionService.deleteUser(userId));
+
+    verify(userRepository, never()).delete(any());
+    verify(inventoryItemRepository, never()).deleteByUserId(any());
+    verify(personalInventoryItemRepository, never()).deleteByOwnerSub(any());
+  }
+
+  @Test
+  void deleteUser_alwaysRecordsTheUserDeletedMarker_evenWhenTheAccountOwnedNothing() {
+    // REQ-AUDIT-001: the deletion mutates several audited areas, so it always leaves exactly one
+    // marker event to anchor the per-area purge events — unlike those, it is unconditional.
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
 
     // When
     userDeletionService.deleteUser(userId);
 
-    // Then no inventory/refinery reassignment noise is recorded.
+    // Then the marker fires...
+    verify(auditService)
+        .record(eq(AuditEventType.USER_DELETED), isNull(), isNull(), eq(userId), any());
+    // ...but the per-area events stay silent for an account that owned nothing (all mocks yield 0).
     verify(auditService, never())
-        .record(eq(AuditEventType.INVENTORY_OWNER_REASSIGNED), any(), any(), any(), any());
+        .record(eq(AuditEventType.INVENTORY_PURGED_ON_USER_DELETION), any(), any(), any(), any());
+    verify(auditService, never())
+        .record(
+            eq(AuditEventType.PERSONAL_DATA_PURGED_ON_USER_DELETION), any(), any(), any(), any());
     verify(auditService, never())
         .record(eq(AuditEventType.REFINERY_ORDERS_REASSIGNED), any(), any(), any(), any());
   }
@@ -276,7 +339,7 @@ class UserDeletionServiceTest {
 
       userDeletionService.deleteUser(userId);
 
-      verify(inventoryItemRepository).updateOwner(toDelete, currentAdmin);
+      verify(refineryOrderRepository).updateOwner(toDelete, currentAdmin);
       verify(userRepository).delete(toDelete);
     }
 

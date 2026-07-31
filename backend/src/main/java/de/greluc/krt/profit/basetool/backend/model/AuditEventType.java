@@ -114,8 +114,25 @@ public enum AuditEventType {
   /** A user's inventory rows were re-stamped onto/off an org unit on a membership change. */
   INVENTORY_ORG_RESTAMPED(AuditDomain.INVENTORY),
 
-  /** A deleted user's inventory rows were bulk-reassigned to the fallback admin. */
+  /**
+   * A deleted user's inventory rows were bulk-reassigned to the fallback admin.
+   *
+   * @deprecated Historical only — no longer emitted since user deletion purges the departing
+   *     member's warehouse rows instead of reassigning them ({@link
+   *     #INVENTORY_PURGED_ON_USER_DELETION}, REQ-DATA-008). Retained because {@code
+   *     audit_event.event_type} stores the enum name, so existing rows would become unreadable if
+   *     the constant were removed.
+   */
+  @Deprecated
   INVENTORY_OWNER_REASSIGNED(AuditDomain.INVENTORY),
+
+  /**
+   * A deleted user's warehouse rows were purged along with their account, together with the
+   * job-order and mission allocations that hung off them (DB cascade). Summary event: a set-based
+   * DELETE exposes no per-row ids, so the payload carries the affected-row count, the deleted user
+   * is the target and the acting admin is the actor.
+   */
+  INVENTORY_PURGED_ON_USER_DELETION(AuditDomain.INVENTORY),
 
   /** The inventory audit log was exported as a PDF or JSON for a period. */
   INVENTORY_AUDIT_EXPORTED(AuditDomain.INVENTORY),
@@ -241,6 +258,14 @@ public enum AuditEventType {
 
   /** A personal inventory item was deleted. */
   PERSONAL_INVENTORY_DELETED(AuditDomain.PERSONAL_INVENTORY),
+
+  /**
+   * A deleted user's complete "Mein Inventar" and personal blueprints were purged along with their
+   * account (REQ-DATA-008). Summary event carrying the two affected-row counts; these tables key on
+   * the Keycloak subject with no foreign key to {@code app_user}, so nothing else would ever have
+   * removed them.
+   */
+  PERSONAL_DATA_PURGED_ON_USER_DELETION(AuditDomain.PERSONAL_INVENTORY),
 
   /** The personal-inventory audit log was exported as a PDF or JSON for a period. */
   PERSONAL_INVENTORY_AUDIT_EXPORTED(AuditDomain.PERSONAL_INVENTORY),
@@ -400,6 +425,14 @@ public enum AuditEventType {
 
   /** A Kommandogruppe was deleted (its squadron-rank member links are cleared first). */
   KOMMANDO_GROUP_DELETED(AuditDomain.ROLE),
+
+  /**
+   * A user account was hard-deleted by an admin (REQ-DATA-008). The marker event for an operation
+   * that mutates several audited areas at once: it names the removed account and the acting admin,
+   * and its payload summarises what went with it, so the per-area purge events can be correlated
+   * back to one deletion. Recorded in the same transaction as the delete itself.
+   */
+  USER_DELETED(AuditDomain.ROLE),
 
   /** The role &amp; membership audit log was exported as a PDF or JSON for a period. */
   ROLE_AUDIT_EXPORTED(AuditDomain.ROLE),

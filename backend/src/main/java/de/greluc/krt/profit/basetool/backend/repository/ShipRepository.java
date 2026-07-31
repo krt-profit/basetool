@@ -83,6 +83,23 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       @org.springframework.data.repository.query.Param("location") Location location);
 
   /**
+   * Deletes the whole hangar of the given owner as part of the hard account deletion
+   * (REQ-DATA-008). A ship is purely personal property — it carries no squadron-shared state — so a
+   * departing member's fleet is removed rather than reassigned to a fallback admin, which used to
+   * leave admins owning dozens of ex-members' ships.
+   *
+   * <p>Set-based on purpose: {@code Ship.owner} is a non-optional {@code @ManyToOne}, so loading
+   * the ships as managed entities before the owning {@code app_user} row is removed would abort the
+   * flush with {@code TransientPropertyValueException}. Keep this a bulk {@code DELETE}.
+   *
+   * @param ownerId the owner whose ships are removed; never {@code null}.
+   * @return the number of deleted ships, for the audit summary event.
+   */
+  @Modifying
+  @Query("DELETE FROM Ship s WHERE s.owner.id = :ownerId")
+  int deleteByOwnerId(@org.springframework.data.repository.query.Param("ownerId") UUID ownerId);
+
+  /**
    * Derived Spring-Data check - returns {@code true} iff at least one row matches {@code
    * ShipTypeId}.
    */
@@ -313,15 +330,4 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
       @org.springframework.data.repository.query.Param("memberOrgUnitIds")
           java.util.Collection<UUID> memberOrgUnitIds);
-
-  /**
-   * Bulk-reassigns every ship owned by {@code oldUser} to {@code newUser}; used by the user-merge
-   * flow so the fleet is preserved when two Keycloak accounts get consolidated.
-   */
-  @org.springframework.data.jpa.repository.Modifying
-  @org.springframework.data.jpa.repository.Query(
-      "UPDATE Ship s SET s.owner = :newUser WHERE s.owner = :oldUser")
-  void updateOwner(
-      @org.jetbrains.annotations.NotNull de.greluc.krt.profit.basetool.backend.model.User oldUser,
-      @org.jetbrains.annotations.NotNull de.greluc.krt.profit.basetool.backend.model.User newUser);
 }
