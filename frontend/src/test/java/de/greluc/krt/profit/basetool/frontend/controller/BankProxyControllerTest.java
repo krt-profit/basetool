@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -168,7 +169,10 @@ class BankProxyControllerTest {
   @Test
   void searchAccounts_passesMultiWordQueryAsUriVariable() {
     when(backendApiClient.get(
-            eq("/api/v1/bank/accounts?status=ACTIVE&size=50&sort=name,asc&query={query}"),
+            eq(
+                "/api/v1/bank/accounts?status=ACTIVE&size="
+                    + PickerSearch.PAGE_SIZE
+                    + "&sort=name,asc&query={query}"),
             anyTypeRef(),
             eq("Phoenix Reserve")))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
@@ -177,7 +181,10 @@ class BankProxyControllerTest {
 
     verify(backendApiClient)
         .get(
-            eq("/api/v1/bank/accounts?status=ACTIVE&size=50&sort=name,asc&query={query}"),
+            eq(
+                "/api/v1/bank/accounts?status=ACTIVE&size="
+                    + PickerSearch.PAGE_SIZE
+                    + "&sort=name,asc&query={query}"),
             anyTypeRef(),
             eq("Phoenix Reserve"));
   }

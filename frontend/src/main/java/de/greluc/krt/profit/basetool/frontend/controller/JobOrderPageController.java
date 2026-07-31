@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -819,13 +820,16 @@ public class JobOrderPageController {
 
   /**
    * JSON proxy for the item-order picker's live search: looks up orderable items by a free-text
-   * term and returns the matching references (capped server-side at 25). Replaces preloading the
-   * first N items and filtering client-side, which silently hid every item past the alphabetical
-   * cap once the catalog outgrew it. Public for parity with the anonymous create form; the term
-   * rides as a URI variable so spaces and quotes survive the frontend&rarr;backend hop intact.
+   * term and returns the matching references (capped server-side at {@link
+   * PickerSearch#PAGE_SIZE}). Replaces preloading the first N items and filtering client-side,
+   * which silently hid every item past the alphabetical cap once the catalog outgrew it. Public for
+   * parity with the anonymous create form; the term rides as a URI variable so spaces and quotes
+   * survive the frontend&rarr;backend hop intact.
    *
    * @param q the case-insensitive item-name search term ({@code null} / blank = first page)
-   * @return up to 25 matching orderable item references, or an empty list on failure
+   * @return up to {@link PickerSearch#PAGE_SIZE} matching orderable item references, or an empty
+   *     list on failure. The one row beyond the combobox's render cap is what makes its "keep
+   *     typing" hint appear instead of the cap being silent.
    */
   @GetMapping("/item-search")
   @ResponseBody
@@ -833,7 +837,9 @@ public class JobOrderPageController {
     try {
       PageResponse<GameItemReferenceDto> page =
           backendApiClient.getPublic(
-              "/api/v1/orders/item-catalog?search={q}&size=25&sort=name,asc",
+              "/api/v1/orders/item-catalog?search={q}&size="
+                  + PickerSearch.PAGE_SIZE
+                  + "&sort=name,asc",
               PAGE_OF_GAME_ITEM_REFERENCE,
               q == null ? "" : q);
       return page != null && page.content() != null ? page.content() : List.of();

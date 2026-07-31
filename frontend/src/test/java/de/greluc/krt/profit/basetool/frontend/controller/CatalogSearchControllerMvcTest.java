@@ -19,11 +19,13 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -34,10 +36,12 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -171,5 +175,49 @@ class CatalogSearchControllerMvcTest {
         .perform(get("/catalog/location-search").param("q", "x"))
         .andExpect(status().isOk())
         .andExpect(content().json("[]"));
+  }
+
+  /**
+   * Regression: the location relay must request MORE rows than the picker renders, or the cap is
+   * silent. It shipped at {@code size=25} against a 50-row render cap, which put 28 of the 53
+   * visible locations — MIC-L5, Patch City, New Babbage, Orison among them — permanently out of
+   * reach in the Lager Einbuchen picker, with no hint on screen that the list was cut.
+   *
+   * @throws Exception if the MockMvc request fails
+   */
+  @Test
+  void locationSearch_requestsMoreRowsThanTheLocationPickerRenders() throws Exception {
+    PageResponse<LocationReferenceDto> page = new PageResponse<>(List.of(), 0, 1, 0L, 0, List.of());
+    doReturn(page).when(backendApiClient).getPublic(anyString(), any(), any(Object[].class));
+
+    mockMvc.perform(get("/catalog/location-search").param("q", "x")).andExpect(status().isOk());
+
+    ArgumentCaptor<String> uri = ArgumentCaptor.captor();
+    verify(backendApiClient).getPublic(uri.capture(), any(), any(Object[].class));
+    assertThat(uri.getValue())
+        .as("location relay page size")
+        .contains("size=" + PickerSearch.LOCATION_PAGE_SIZE);
+    assertThat(PickerSearch.LOCATION_PAGE_SIZE).isGreaterThan(PickerSearch.LOCATION_RENDER_CAP);
+  }
+
+  /**
+   * Same rule for the material relay: one row past the combobox's generic render cap, so the "keep
+   * typing" hint becomes reachable instead of the 51st match vanishing unannounced.
+   *
+   * @throws Exception if the MockMvc request fails
+   */
+  @Test
+  void materialSearch_requestsMoreRowsThanTheComboboxRenders() throws Exception {
+    PageResponse<MaterialDto> page = new PageResponse<>(List.of(), 0, 1, 0L, 0, List.of());
+    doReturn(page).when(backendApiClient).getPublic(anyString(), any(), any(Object[].class));
+
+    mockMvc.perform(get("/catalog/material-search").param("q", "x")).andExpect(status().isOk());
+
+    ArgumentCaptor<String> uri = ArgumentCaptor.captor();
+    verify(backendApiClient).getPublic(uri.capture(), any(), any(Object[].class));
+    assertThat(uri.getValue())
+        .as("material relay page size")
+        .contains("size=" + PickerSearch.PAGE_SIZE);
+    assertThat(PickerSearch.PAGE_SIZE).isGreaterThan(PickerSearch.RENDER_CAP);
   }
 }
