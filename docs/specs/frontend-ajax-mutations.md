@@ -1136,11 +1136,33 @@ pickers search **server-side** (`remoteSource` mode): the page never preloads th
 `<option>`s; the picker fetches the matching entries per (debounced) keystroke through the public
 `/catalog/material-search` / `/catalog/location-search` relays onto the backend picker searches
 (`GET /api/v1/materials/search` with `jobOrderOnly`/`rawOnly` narrowing, `GET
-/api/v1/locations/search`), 25 name-sorted rows per query. **No silent caps, ever:** every entry
+/api/v1/locations/search`), name-sorted. **No silent caps, ever:** every entry
 stays reachable by typing a narrower term regardless of catalog size, and the complete-list
 endpoints that other surfaces consume (`/api/v1/materials/lookup`, `/api/v1/locations/lookup`)
 stay deliberately **unbounded** — a fixed bound on a complete-list surface silently hides the
-tail, the defect class that forced the item picker onto server-side search (ADR-0100). The marker
+tail, the defect class that forced the item picker onto server-side search (ADR-0100).
+
+**A picker relay MUST fetch strictly more rows than its combobox renders (binding).** The page
+sizes live in `PickerSearch` (frontend `support`); the render cap lives in the browser
+(`krt-searchable-select.js`'s `maxResults` default, plus any per-kind `krtComboboxI18n.kinds`
+override). `krt-searchable-select.js` decides whether to show the "keep typing to narrow the list"
+hint with `matches.length > maxResults` — a strict comparison against the rows it *received* — so a
+relay that fetches the render cap **or fewer** makes that condition unsatisfiable: the hint can
+never render and every match past the fetched page is invisible with nothing on screen saying so.
+"Reachable by typing" is then unknowable, and the cap is silent in exactly the sense the paragraph
+above forbids. The extra row is an overflow sentinel, never rendered. This shipped broken and was
+not theoretical: `/catalog/location-search` fetched 25 rows against a render cap of 50, so **28 of
+the 53 visible locations** — MIC-L5, Patch City, New Babbage and Orison among them — could not be
+selected at all when booking stock into the Lager; `/inventory/item-search` and the bank-account
+relay fetched *exactly* the render cap, with the same silent effect from the 51st match on.
+`PickerSearchLimitsParityTest` reads the shipped JS and `fragments/head.html` off the classpath and
+pins both halves against the constants so they cannot drift apart again.
+
+**A kind may raise its render cap when its catalog is small and bounded.** Only `remote-locations`
+does (`maxResults: 200`, mirrored by `PickerSearch.LOCATION_RENDER_CAP`): one row per live UEX city
+/ space station plus admin-curated entries is 53 visible rows today, and a user booking stock
+expects to scroll that list rather than guess a search term. The open-ended catalogs (materials,
+game items, bank accounts) keep the 50-row default and rely on the hint. The marker
 values are registered in `krt-catalog-search.js`: `remote-materials`,
 `remote-materials-joborder` (orders lines), `remote-materials-raw` (refinery inputs),
 `remote-locations`, and `remote-game-items` (the inventory item mode's bookable-item picker — the

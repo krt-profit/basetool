@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -67,8 +68,13 @@ public class BankProxyController {
   private static final ParameterizedTypeReference<PageResponse<Map<String, Object>>>
       ACCOUNT_SEARCH_PAGE = new ParameterizedTypeReference<>() {};
 
-  /** How many matches one account-picker fetch returns; matches the combobox's render cap. */
-  private static final int ACCOUNT_SEARCH_PAGE_SIZE = 50;
+  /**
+   * How many matches one account-picker fetch returns: one more than the combobox renders ({@link
+   * PickerSearch#PAGE_SIZE}). It used to <em>match</em> the render cap, which silenced the cap —
+   * the component shows its "keep typing" hint on {@code matches.length > maxResults}, so a page
+   * ending exactly at the cap can never trip it and the 51st account disappeared unannounced.
+   */
+  private static final int ACCOUNT_SEARCH_PAGE_SIZE = PickerSearch.PAGE_SIZE;
 
   private final BackendApiClient backendApiClient;
 

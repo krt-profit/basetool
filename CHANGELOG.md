@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Lager: Beim Einlagern stehen wieder alle Orte zur Auswahl.** Die Ort-Auswahl lud nur die ersten 25 Orte und zeigte keinen Hinweis, dass die Liste abgeschnitten war — 28 der 53 sichtbaren Orte waren dadurch nicht wählbar, darunter MIC-L5, Patch City, New Babbage und Orison. Der Ortskatalog wird jetzt vollständig geladen (REQ-FE-016).
+
+- **Such-Auswahlfelder melden jetzt, wenn es mehr Treffer gibt.** Material-, Item- und Kontoauswahl luden genau so viele Zeilen, wie sie anzeigen können, wodurch der Hinweis „Weiter tippen, um die Liste einzugrenzen" technisch nie erscheinen konnte. Ab dem 51. Treffer wird er wieder angezeigt (REQ-FE-016).
+
 ## [v1.5.26](https://github.com/krt-profit/basetool/releases/tag/v1.5.26) - 2026-07-31
 
 ### Changed
