@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.27](https://github.com/krt-profit/basetool/releases/tag/v1.5.27) - 2026-07-31
+
 ### Fixed
 
 - **Raffinerie: Ein ausgeblendeter Standort wird nicht mehr als Raffinerie angeboten.** Blendete ein Administrator einen Standort mit Raffinerie aus, verschwand er zwar aus dem Lagerort-Feld, blieb im selben Formular aber als Raffinerie wählbar — der Auftrag ließ sich anlegen, der Ertrag danach aber nirgends einbuchen. Bestehende Aufträge behalten ihren Standort und lassen sich weiterhin speichern (REQ-REFINERY-020).
