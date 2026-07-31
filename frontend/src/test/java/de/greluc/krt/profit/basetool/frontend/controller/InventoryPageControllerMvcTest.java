@@ -49,6 +49,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import jakarta.servlet.http.Cookie;
 import java.time.Instant;
 import java.util.Collections;
@@ -499,7 +500,10 @@ class InventoryPageControllerMvcTest {
             1,
             Collections.emptyList());
     when(backendApiClient.get(
-            eq("/api/v1/inventory/item-catalog?size=50&sort=name,asc&q={q}"),
+            eq(
+                "/api/v1/inventory/item-catalog?size="
+                    + PickerSearch.PAGE_SIZE
+                    + "&sort=name,asc&q={q}"),
             anyTypeRef(),
             eq("Quantum")))
         .thenReturn(page);
@@ -527,7 +531,10 @@ class InventoryPageControllerMvcTest {
             1,
             Collections.emptyList());
     when(backendApiClient.get(
-            eq("/api/v1/inventory/item-catalog?size=50&sort=name,asc&q={q}"),
+            eq(
+                "/api/v1/inventory/item-catalog?size="
+                    + PickerSearch.PAGE_SIZE
+                    + "&sort=name,asc&q={q}"),
             anyTypeRef(),
             eq("Quantum Drive")))
         .thenReturn(page);
@@ -539,7 +546,10 @@ class InventoryPageControllerMvcTest {
 
     verify(backendApiClient)
         .get(
-            eq("/api/v1/inventory/item-catalog?size=50&sort=name,asc&q={q}"),
+            eq(
+                "/api/v1/inventory/item-catalog?size="
+                    + PickerSearch.PAGE_SIZE
+                    + "&sort=name,asc&q={q}"),
             anyTypeRef(),
             eq("Quantum Drive"));
   }

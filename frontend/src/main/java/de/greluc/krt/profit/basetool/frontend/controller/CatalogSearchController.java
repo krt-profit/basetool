@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,11 +39,11 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * fetch their options on demand through these endpoints instead of preloading the full catalog into
  * the page. Every entry stays reachable by typing regardless of catalog size — the deliberate
  * alternative to a preloaded (or silently capped) option list, mirroring the orderable item search
- * in {@link JobOrderPageController#itemSearch(String)}. Both relays pin the response to 25
- * name-sorted rows per query and degrade to an empty list on backend failure so the picker shows
- * "no matches" instead of an error page. Public ({@code /catalog/**} is {@code permitAll}) because
- * the anonymous order form carries a material picker; the backend endpoints are public catalog data
- * themselves.
+ * in {@link JobOrderPageController#itemSearch(String)}. Both relays fetch one row more than their
+ * combobox renders ({@link PickerSearch}) so an overflow is detectable and announced, and degrade
+ * to an empty list on backend failure so the picker shows "no matches" instead of an error page.
+ * Public ({@code /catalog/**} is {@code permitAll}) because the anonymous order form carries a
+ * material picker; the backend endpoints are public catalog data themselves.
  */
 @Controller
 @RequestMapping("/catalog")
@@ -71,7 +72,9 @@ public class CatalogSearchController {
    * @param q the case-insensitive material-name fragment ({@code null}/blank = first page)
    * @param jobOrder when true, only job-order materials
    * @param raw when true, only refinery input materials
-   * @return up to 25 matching visible materials, name ascending; empty on failure
+   * @return up to {@link PickerSearch#PAGE_SIZE} matching visible materials, name ascending; empty
+   *     on failure. The combobox renders {@link PickerSearch#RENDER_CAP} of them and turns the
+   *     extra row into the "keep typing" hint rather than showing it.
    */
   @GetMapping("/material-search")
   @ResponseBody
@@ -83,7 +86,9 @@ public class CatalogSearchController {
       PageResponse<MaterialDto> page =
           backendApiClient.getPublic(
               "/api/v1/materials/search?search={q}&jobOrderOnly={jobOrder}&rawOnly={raw}"
-                  + "&size=25&sort=name,asc",
+                  + "&size="
+                  + PickerSearch.PAGE_SIZE
+                  + "&sort=name,asc",
               PAGE_OF_MATERIAL,
               q == null ? "" : q,
               jobOrder,
@@ -98,8 +103,16 @@ public class CatalogSearchController {
   /**
    * Live search over the non-hidden location catalog for the searchable location pickers.
    *
+   * <p>Fetches {@link PickerSearch#LOCATION_PAGE_SIZE} rows, not the generic {@link
+   * PickerSearch#PAGE_SIZE}: the location catalogue is small and bounded by the game universe, and
+   * a booking user expects to scroll it rather than guess a search term. At the shipped {@code
+   * size=25} against a render cap of 50 this relay was a silent cap — 28 of the 53 visible
+   * locations (MIC-L5, Patch City, New Babbage, Orison, …) never appeared in the Lager Einbuchen
+   * picker, with nothing on screen indicating the list was cut.
+   *
    * @param q the case-insensitive location-name fragment ({@code null}/blank = first page)
-   * @return up to 25 matching non-hidden location references, name ascending; empty on failure
+   * @return up to {@link PickerSearch#LOCATION_PAGE_SIZE} matching non-hidden location references,
+   *     name ascending; empty on failure
    */
   @GetMapping("/location-search")
   @ResponseBody
@@ -107,7 +120,9 @@ public class CatalogSearchController {
     try {
       PageResponse<LocationReferenceDto> page =
           backendApiClient.getPublic(
-              "/api/v1/locations/search?search={q}&size=25&sort=name,asc",
+              "/api/v1/locations/search?search={q}&size="
+                  + PickerSearch.LOCATION_PAGE_SIZE
+                  + "&sort=name,asc",
               PAGE_OF_LOCATION_REFERENCE,
               q == null ? "" : q);
       return page != null && page.content() != null ? page.content() : List.of();

@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -436,13 +437,17 @@ public class InventoryPageController {
    * BackendApiClient#get} (never {@code getPublic}): the backend {@code
    * /api/v1/inventory/item-catalog} sits under the role-gated {@code /api/v1/inventory/**}
    * umbrella, unlike the deliberately anonymous {@code /orders/item-search} sibling (design §5.3).
-   * The page size is capped at 50 — the combobox renders at most its {@code maxResults} default of
-   * 50 rows — sorted by {@code name} (the backend's sole whitelisted sort field). An empty list on
-   * backend failure keeps the picker on "no matches" instead of surfacing the error.
+   * The page size is {@link PickerSearch#PAGE_SIZE}, sorted by {@code name} (the backend's sole
+   * whitelisted sort field). It used to be exactly the combobox's {@link PickerSearch#RENDER_CAP},
+   * which made the cap silent: the component decides on the hint with {@code matches.length >
+   * maxResults}, so a page that stops <em>at</em> the render cap can never trip it and the 51st
+   * match vanished unannounced. An empty list on backend failure keeps the picker on "no matches"
+   * instead of surfacing the error.
    *
    * @param q the case-insensitive item-name search term; {@code null}/blank matches all (the
    *     combobox's browse-mode empty fetch)
-   * @return up to 50 matching bookable game-item references, never {@code null}
+   * @return up to {@link PickerSearch#PAGE_SIZE} matching bookable game-item references, never
+   *     {@code null}
    */
   @GetMapping("/item-search")
   @org.springframework.web.bind.annotation.ResponseBody
@@ -457,7 +462,7 @@ public class InventoryPageController {
     // null/blank term is normalised to the empty match-all filter.
     String uri =
         org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/inventory/item-catalog")
-            .queryParam("size", 50)
+            .queryParam("size", PickerSearch.PAGE_SIZE)
             .queryParam("sort", "name,asc")
             .toUriString();
     try {

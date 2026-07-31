@@ -157,6 +157,14 @@
       strip their wording. The map is gate-enforced against the source registries
       (krt-user-search.js / krt-catalog-search.js / krt-bank-account-search.js) by
       ComboboxKindsParityTest — registering a remote source without a kinds entry is a red build.
+
+      A kind may additionally raise its RENDER CAP via `maxResults` (keep `placeholder` the first
+      property — ComboboxKindsParityTest anchors its key regex on it). Only `remote-locations`
+      does: the location catalog is small and bounded by the game universe (53 visible rows), so a
+      user booking stock into the Lager expects to scroll the whole list instead of guessing a
+      search term. The value is mirrored by PickerSearch.LOCATION_RENDER_CAP on the Java side,
+      whose relay fetches one row MORE than this so an overflow still trips the "keep typing" hint;
+      PickerSearchLimitsParityTest pins both halves so they cannot drift apart.
     -->
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.krtComboboxI18n = {
@@ -188,7 +196,8 @@
                 },
                 'remote-locations': {
                     placeholder: /*[[#{locationSelect.search.placeholder}]]*/ 'Search or select a location…',
-                    noResults: /*[[#{locationSelect.search.noResults}]]*/ 'No matching locations'
+                    noResults: /*[[#{locationSelect.search.noResults}]]*/ 'No matching locations',
+                    maxResults: 200
                 },
                 'remote-game-items': {
                     placeholder: /*[[#{orders.create.item.search.placeholder}]]*/ 'Search or select an item…',

@@ -829,6 +829,11 @@
         return {
             placeholder: d.comboboxPlaceholder || kind.placeholder || i18n.placeholder,
             noResultsText: d.comboboxNoResults || kind.noResults || i18n.noResults,
+            // A kind may also raise its RENDER CAP. Only the location picker does: its catalog is
+            // small and bounded by the game universe, so a booking user expects to scroll it whole
+            // rather than guess a search term. Every other kind keeps the 50-row default and relies
+            // on the hint below. Precedence mirrors the wording keys: attribute > kind > default.
+            maxResults: d.comboboxMax || kind.maxResults,
             hintText: d.comboboxHint || i18n.hint,
             invalidText: d.comboboxInvalid || i18n.invalid,
             loadingText: d.comboboxLoading || i18n.loading,
