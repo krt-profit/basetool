@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- **Release-Pipeline: Ein einzelner Runner ohne Verbindung zu Docker Hub bricht den Image-Bau nicht mehr ab.** Wiederholversuche allein halfen nicht, wenn die Verbindung über das gesamte Zeitfenster gestört blieb — genau daran scheiterte der Backend-Build von v1.5.26, während ein 22 Sekunden früher gestarteter Lauf alle Jobs bestand. Das BuildKit-Image wird jetzt ersatzweise über einen Spiegel-Server auf einem anderen Netzweg geladen. Ohne den Fehlversuch fehlten der Version alle Versionskennzeichen und Signaturen, sodass sie nicht auf den Server ausgerollt werden konnte.
+
+- **Release-Pipeline: Ein fehlgeschlagener Image-Bau meldet nicht mehr zusätzlich einen irreführenden zweiten Fehler.** Der Upload des Sicherheits-Scans lief auch dann noch an, wenn der Build gar nicht erst zustande kam, und beschwerte sich über die fehlende Ergebnisdatei — was die eigentliche Ursache überdeckte.
+
 - **Lager: Beim Einlagern stehen wieder alle Orte zur Auswahl.** Die Ort-Auswahl lud nur die ersten 25 Orte und zeigte keinen Hinweis, dass die Liste abgeschnitten war — 28 der 53 sichtbaren Orte waren dadurch nicht wählbar, darunter MIC-L5, Patch City, New Babbage und Orison. Der Ortskatalog wird jetzt vollständig geladen (REQ-FE-016).
 
 - **Such-Auswahlfelder melden jetzt, wenn es mehr Treffer gibt.** Material-, Item- und Kontoauswahl luden genau so viele Zeilen, wie sie anzeigen können, wodurch der Hinweis „Weiter tippen, um die Liste einzugrenzen" technisch nie erscheinen konnte. Ab dem 51. Treffer wird er wieder angezeigt (REQ-FE-016).

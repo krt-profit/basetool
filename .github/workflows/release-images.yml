@@ -148,8 +148,10 @@ jobs:
       # native runner. setup-qemu-action would only add overhead.
       #
       # Local wrapper rather than docker/setup-buildx-action directly: it
-      # pre-pulls the BuildKit image with retry/backoff so a transient Docker Hub
-      # failure cannot kill the builder boot (see .github/actions/setup-buildx).
+      # pre-pulls the BuildKit image with retry/backoff and, if Docker Hub stays
+      # unreachable, from a mirror registry on a different network path, so
+      # neither a transient Docker Hub failure nor a single runner's broken
+      # egress to it can kill the builder boot (.github/actions/setup-buildx).
       # The `docker-container` driver is required here for the `type=gha` cache
       # exporter below, so the BuildKit container pull is unavoidable.
       - name: Set up Docker Buildx
@@ -279,8 +281,14 @@ jobs:
           ignore-unfixed: true
           exit-code: '0'
 
+      # `always()` so findings still reach the Security tab when a later step
+      # fails, but gated on the build having produced an image: when an earlier
+      # step dies (the v1.5.26 backend/amd64 builder boot, run 30615321686) the
+      # scan never runs, and an unconditional upload then adds its own
+      # `Path does not exist: trivy-*.sarif` error on top — a second, louder
+      # failure that points at the scan instead of at the actual cause.
       - name: Upload Trivy SARIF to GitHub Security
-        if: always()
+        if: always() && steps.build.outcome == 'success'
         uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
         with:
           sarif_file: trivy-${{ matrix.module }}-${{ env.PLATFORM_PAIR }}.sarif
@@ -452,9 +460,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Local wrapper — retries the BuildKit image pull, see the build job above.
-      # The `docker-container` driver is required here because this image is
-      # built for two platforms in one job.
+      # Local wrapper — retries the BuildKit image pull and falls back to a
+      # mirror registry, see the build job above. The `docker-container` driver
+      # is required here because this image is built for two platforms in one job.
       - name: Set up Docker Buildx
         uses: ./.github/actions/setup-buildx
 
@@ -633,9 +641,10 @@ jobs:
           cp "${jars[0]}" keycloak-spi.jar
           ls -l keycloak-spi.jar
 
-      # Local wrapper — retries the BuildKit image pull, see the build job above.
-      # This is the job that lost run 30160708503 to a Docker Hub timeout here,
-      # after its Gradle build had already succeeded.
+      # Local wrapper — retries the BuildKit image pull and falls back to a
+      # mirror registry, see the build job above. This is the job that lost run
+      # 30160708503 to a Docker Hub timeout here, after its Gradle build had
+      # already succeeded.
       - name: Set up Docker Buildx
         uses: ./.github/actions/setup-buildx
 

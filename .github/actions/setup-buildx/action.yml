@@ -2,8 +2,8 @@ name: Set up Docker Buildx (Docker Hub flake resilient)
 
 description: >
   Boots a `docker-container` BuildKit builder like `docker/setup-buildx-action`
-  does, but pre-pulls the BuildKit image with retry + backoff first so a
-  transient Docker Hub failure cannot fail the job.
+  does, but pre-pulls the BuildKit image first — with retry/backoff and a
+  fallback registry — so a transient Docker Hub failure cannot fail the job.
 
 # Why this wrapper exists:
 #
@@ -21,19 +21,35 @@ description: >
 #
 # The fix leans on a documented buildx behaviour: when the driver's own image
 # pull fails, buildx falls back to the **local image store** and only aborts if
-# the image is absent there too. Pre-pulling with `docker pull` (which has no
-# short internal deadline) and retrying with backoff therefore turns a
-# hard failure into, at worst, a logged warning followed by a successful boot
-# from the local cache.
+# the image is absent there too. Getting the image into the local store by any
+# means therefore guarantees the boot succeeds. This action does that in two
+# escalating stages.
+#
+# Stage 1 — retry Docker Hub. `docker pull` has no short internal deadline, so
+# retrying it with backoff already survives a brief egress hiccup.
+#
+# Stage 2 — fall back to a different registry. Retrying alone was not enough:
+# the v1.5.26 `Build (backend / linux/amd64)` job (run 30615321686) burned every
+# attempt against an egress path that stayed broken for the whole ~110s window
+# and still lost the boot, while the `main` run that started 22 seconds earlier
+# passed all eight image jobs. Docker Hub was healthy; that one runner could not
+# reach it. No amount of patience on the same host and the same route fixes
+# that — only a different route does. `mirror.gcr.io` is Google's anonymous
+# pull-through cache of Docker Hub: a wholly separate network path and operator,
+# serving (verified at the time of writing) the byte-identical index digest
+# `sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec` for
+# `buildx-stable-1`, with linux/amd64 and linux/arm64 children for both runner
+# fleets. It is consulted ONLY after Docker Hub has refused, so the canonical
+# source still wins whenever it is reachable.
 #
 # This is the same reasoning as the `cosign sign` retry wrappers in
 # release-images.yml / promote.yml: signing and builder-boot are both network
 # round-trips to a shared public service, and a single flake there must not fail
 # an otherwise-complete release.
 #
-# The step is deliberately **non-fatal**: if every pre-pull attempt fails we
-# still hand over to `setup-buildx-action`, which may well succeed on its own.
-# The wrapper can only improve the odds, never fail a job that would have passed.
+# The step is deliberately **non-fatal**: if every source fails we still hand
+# over to `setup-buildx-action`, which may well succeed on its own. The wrapper
+# can only improve the odds, never fail a job that would have passed.
 
 inputs:
   buildkit-image:
@@ -42,35 +58,82 @@ inputs:
       driver via `driver-opts` so the tag that gets pre-pulled and the tag that
       gets booted can never diverge. Kept on the floating `buildx-stable-1` tag
       that setup-buildx-action defaults to, so this wrapper does not silently
-      freeze BuildKit at a version the action no longer tests against.
+      freeze BuildKit at a version the action no longer tests against. Must stay
+      a Docker Hub reference for `fallback-registry` to resolve (see below).
     required: false
     default: moby/buildkit:buildx-stable-1
+
+  fallback-registry:
+    description: >
+      Registry host consulted only after every Docker Hub attempt has failed.
+      The fallback reference is derived as `<fallback-registry>/<buildkit-image>`
+      rather than configured separately, so the two can never drift apart — which
+      also means this must be a pull-through cache of Docker Hub that mirrors the
+      same repository path. Set to an empty string to disable the fallback and
+      keep the previous Docker-Hub-only behaviour.
+    required: false
+    default: mirror.gcr.io
 
 runs:
   using: composite
   steps:
-    - name: Pre-pull BuildKit image (retry on transient registry failure)
+    - name: Pre-pull BuildKit image (retry, then fall back to a mirror registry)
       shell: bash
       env:
         BUILDKIT_IMAGE: ${{ inputs.buildkit-image }}
+        FALLBACK_REGISTRY: ${{ inputs.fallback-registry }}
       run: |
         set -eu
-        attempts=4
-        delay=5
-        for i in $(seq 1 "$attempts"); do
-          if docker pull --quiet "$BUILDKIT_IMAGE"; then
-            echo "BuildKit image present locally: ${BUILDKIT_IMAGE}"
-            exit 0
-          fi
-          if [ "$i" -lt "$attempts" ]; then
-            echo "::warning::pulling ${BUILDKIT_IMAGE} failed (attempt ${i}/${attempts}); retrying in ${delay}s" >&2
+
+        # Pull $1 up to $2 times with exponential backoff capped at 30s. Returns
+        # 0 as soon as the image is in the local store, 1 once attempts run out.
+        pull_with_retry() {
+          local ref=$1
+          local attempts=$2
+          local delay=5
+          local i=1
+          while :; do
+            if docker pull --quiet "$ref"; then
+              return 0
+            fi
+            if [ "$i" -ge "$attempts" ]; then
+              return 1
+            fi
+            echo "::warning::pulling ${ref} failed (attempt ${i}/${attempts}); retrying in ${delay}s" >&2
             sleep "$delay"
-            delay=$((delay * 2))
-          fi
-        done
+            if [ "$delay" -lt 30 ]; then
+              delay=$((delay * 2))
+            fi
+            i=$((i + 1))
+          done
+        }
+
+        # Stage 1: the canonical source. Wins whenever Docker Hub is reachable.
+        if pull_with_retry "$BUILDKIT_IMAGE" 4; then
+          echo "BuildKit image present locally: ${BUILDKIT_IMAGE}"
+          exit 0
+        fi
+
+        if [ -z "$FALLBACK_REGISTRY" ]; then
+          echo "::warning::could not pre-pull ${BUILDKIT_IMAGE} and no fallback registry is configured; letting buildx try its own pull" >&2
+          exit 0
+        fi
+
+        # Stage 2: a different registry on a different network path.
+        mirror_ref="${FALLBACK_REGISTRY}/${BUILDKIT_IMAGE}"
+        echo "::warning::Docker Hub unreachable for ${BUILDKIT_IMAGE}; falling back to ${mirror_ref}" >&2
+        if pull_with_retry "$mirror_ref" 3; then
+          # Re-tag under the exact reference the docker-container driver asks
+          # for: buildx's local-store fallback resolves the image by name, not
+          # by digest, so the mirror-qualified name alone would not satisfy it.
+          docker tag "$mirror_ref" "$BUILDKIT_IMAGE"
+          echo "BuildKit image present locally via ${FALLBACK_REGISTRY}: ${BUILDKIT_IMAGE}"
+          exit 0
+        fi
+
         # Non-fatal on purpose — see the header comment. setup-buildx-action
         # still gets its own attempt at pulling the image.
-        echo "::warning::could not pre-pull ${BUILDKIT_IMAGE} after ${attempts} attempts; letting buildx try its own pull" >&2
+        echo "::warning::could not pre-pull ${BUILDKIT_IMAGE} from Docker Hub or ${FALLBACK_REGISTRY}; letting buildx try its own pull" >&2
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
