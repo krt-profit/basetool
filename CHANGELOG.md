@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.26](https://github.com/krt-profit/basetool/releases/tag/v1.5.26) - 2026-07-31
+
 ### Changed
 
 - **Benutzerverwaltung: Beim Löschen eines Nutzers werden seine Daten jetzt wirklich gelöscht.** Lager, Hangar, "Mein Inventar", Baupläne, Benachrichtigungen und Bewertungen des Kontos werden entfernt statt auf einen Administrator umgebucht oder stillschweigend liegen gelassen; die Verknüpfungen der Lagereinträge zu Aufträgen und Einsätzen gehen mit. Einsätze, Operationen, Auftragshistorie und die Kartellbank bleiben erhalten — dort erscheint der Betroffene als "Gelöschter Nutzer" statt als leeres Feld. Raffinerieaufträge und von ihm angelegte Einsätze gehen weiterhin an einen Administrator über. Der Bestätigungsdialog beschreibt das jetzt zutreffend; bisher versprach er, alle Daten würden übertragen (REQ-DATA-008, REQ-AUDIT-001).
