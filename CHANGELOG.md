@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Release-Pipeline: Ein einzelner Runner ohne Verbindung zu Docker Hub bricht den Image-Bau nicht mehr ab.** Wiederholversuche allein halfen nicht, wenn die Verbindung über das gesamte Zeitfenster gestört blieb — genau daran scheiterte der Backend-Build von v1.5.26, während ein 22 Sekunden früher gestarteter Lauf alle Jobs bestand. Das BuildKit-Image wird jetzt ersatzweise über einen Spiegel-Server auf einem anderen Netzweg geladen. Ohne den Fehlversuch fehlten der Version alle Versionskennzeichen und Signaturen, sodass sie nicht auf den Server ausgerollt werden konnte.
+
+- **Release-Pipeline: Ein fehlgeschlagener Image-Bau meldet nicht mehr zusätzlich einen irreführenden zweiten Fehler.** Der Upload des Sicherheits-Scans lief auch dann noch an, wenn der Build gar nicht erst zustande kam, und beschwerte sich über die fehlende Ergebnisdatei — was die eigentliche Ursache überdeckte.
+
 ## [v1.5.26](https://github.com/krt-profit/basetool/releases/tag/v1.5.26) - 2026-07-31
 
 ### Changed
