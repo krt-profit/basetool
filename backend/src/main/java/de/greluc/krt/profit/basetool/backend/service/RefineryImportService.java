@@ -398,6 +398,10 @@ public class RefineryImportService {
    * Resolves a raw location read against the refinery-equipped locations (the create-form picker
    * source) by unique canonical name — e.g. screen {@code "LEVSKI"} to master {@code "Levski"}.
    *
+   * <p>Inherits that source's exclusion of hidden locations (REQ-REFINERY-020), so a screenshot
+   * taken at a location an admin has since hidden yields {@code UNRESOLVED_LOCATION} instead of
+   * pre-filling a refinery the user could not have picked by hand.
+   *
    * @param rawName verbatim terminal-header read; null/blank yields empty (the normal case for
    *     pre-cropped panel input, which never contains the header)
    * @return the matched location, or empty when none or several candidates share the folded name

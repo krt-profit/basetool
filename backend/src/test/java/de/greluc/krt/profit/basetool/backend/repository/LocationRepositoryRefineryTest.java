@@ -41,6 +41,10 @@ import org.springframework.transaction.annotation.Transactional;
  * refinery terminal at each, and reports {@code has_refinery = 1} for four People's Service
  * Stations that host no refinery terminal at all. How the flag itself is recomputed from the
  * terminal table is pinned by {@code UexUniverseSyncRefineryFlagTest}.
+ *
+ * <p>Eligibility carries a second condition: the location must not be hidden. This query was once
+ * the only Location lookup that ignored the admin's {@code hidden} flag, which let a hidden
+ * refinery stay selectable here while disappearing from the storage pickers on the very same page.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -126,5 +130,54 @@ public class LocationRepositoryRefineryTest {
     locationRepository.flush();
 
     assertFalse(locationRepository.findLocationsWithRefinery().contains(bogus));
+  }
+
+  // covers REQ-REFINERY-020 — a hidden station-backed refinery is not offered. This also guards the
+  // query's parentheses: AND binds tighter than OR, so an unparenthesised predicate would apply the
+  // hidden filter to the city branch only and let this station leak straight back into the picker.
+  @Test
+  public void testHiddenStationBackedRefineryIsExcluded() {
+    Location hidden = saveStationLocation("Hidden Refinery Station", false, true);
+    hidden.setHidden(true);
+    locationRepository.save(hidden);
+    locationRepository.flush();
+
+    assertFalse(locationRepository.findLocationsWithRefinery().contains(hidden));
+  }
+
+  // covers REQ-REFINERY-020 — the city-backed half of the same rule: hiding a location removes it
+  // from the refinery picker exactly as it already removes it from every other location picker, so
+  // a user can no longer open an order at a location they cannot then book the yield into.
+  @Test
+  public void testHiddenCityBackedRefineryIsExcluded() {
+    City city = new City();
+    city.setName("Hidden Refinery City");
+    city.setHasRefineryTerminal(true);
+    cityRepository.save(city);
+
+    Location hidden = new Location();
+    hidden.setName("Hidden Refinery City Loc");
+    hidden.setCity(city);
+    hidden.setHidden(true);
+    locationRepository.save(hidden);
+    locationRepository.flush();
+
+    assertFalse(locationRepository.findLocationsWithRefinery().contains(hidden));
+  }
+
+  // covers REQ-REFINERY-020 — the hidden filter must not swallow the visible ones alongside it: a
+  // refinery that is merely a sibling of a hidden one stays offered.
+  @Test
+  public void testVisibleRefineryIsStillOfferedAlongsideAHiddenOne() {
+    Location visible = saveStationLocation("Visible Refinery Station", false, true);
+    Location hidden = saveStationLocation("Suppressed Refinery Station", false, true);
+    hidden.setHidden(true);
+    locationRepository.save(hidden);
+    locationRepository.flush();
+
+    List<Location> refineries = locationRepository.findLocationsWithRefinery();
+
+    assertTrue(refineries.contains(visible));
+    assertFalse(refineries.contains(hidden));
   }
 }
