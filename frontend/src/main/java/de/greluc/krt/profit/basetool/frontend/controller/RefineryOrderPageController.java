@@ -671,7 +671,15 @@ public class RefineryOrderPageController {
     model.addAttribute("orderId", id);
     model.addAttribute("materials", fetchMaterials());
     model.addAttribute("methods", fetchMethods());
-    model.addAttribute("locations", fetchLocations());
+    // Keep this order's own refinery in the dropdown even after an admin hides that location:
+    // the picker source excludes hidden entries, and the location <select> is `required`, so a
+    // dropped option would leave the field on "-- please choose --" and block every subsequent
+    // save of an order that was perfectly valid when it was created.
+    LocationDto preserveLocation =
+        model.getAttribute("order") instanceof RefineryOrderDto orderForPicker
+            ? orderForPicker.location()
+            : null;
+    model.addAttribute("locations", fetchLocations(preserveLocation));
     model.addAttribute("allLocations", fetchAllLocations());
     RefineryOrderForm formInModel = (RefineryOrderForm) model.getAttribute("refineryOrderForm");
     UUID preserveMissionId = formInModel != null ? formInModel.getMissionId() : null;
@@ -807,16 +815,58 @@ public class RefineryOrderPageController {
   }
 
   private List<LocationDto> fetchLocations() {
+    return fetchLocations(null);
+  }
+
+  /**
+   * Fetches the refinery-location catalog backing the "Raffinerie" dropdown. The backend source
+   * ({@code GET /api/v1/locations/refineries}) lists only locations that host a live refinery
+   * terminal <em>and</em> are not hidden, so an admin who hides a location removes it from this
+   * picker as well as from the storage pickers.
+   *
+   * <p>Pass {@code preserveLocation} to retain one specific location regardless of that filter —
+   * used on the detail page so an existing order's own refinery survives in the dropdown after its
+   * location was hidden. Without it the {@code required} select would render unselected and no
+   * further edit of that order could be saved.
+   *
+   * @param preserveLocation location to keep in the result even when the backend omits it, or
+   *     {@code null} to take the backend list as-is.
+   * @return mutable list of selectable refinery locations; empty on backend failure.
+   */
+  private List<LocationDto> fetchLocations(LocationDto preserveLocation) {
+    List<LocationDto> locs = new ArrayList<>();
     try {
-      List<LocationDto> locs =
+      List<LocationDto> fetched =
           backendApiClient.getCached(CachedCatalog.LOCATIONS_REFINERIES, LOCATION_LIST);
-      if (locs != null) {
-        return locs;
+      if (fetched != null) {
+        locs = new ArrayList<>(fetched);
       }
     } catch (Exception e) {
       log.error("Failed to fetch refinery locations", e);
     }
-    return new ArrayList<>();
+    return withPreservedLocation(locs, preserveLocation);
+  }
+
+  /**
+   * Appends {@code preserveLocation} to {@code locations} when it carries an id that the list does
+   * not already contain, so a filtered-out but still-referenced location stays selectable.
+   *
+   * <p>Package-private for direct unit testing — the surrounding {@link
+   * #fetchLocations(LocationDto)} would otherwise hide this behind the API client mock.
+   *
+   * @param locations the backend's picker list; mutated and returned.
+   * @param preserveLocation the location to retain, or {@code null} for no preservation.
+   * @return {@code locations}, with the preserved entry appended when it was missing.
+   */
+  static List<LocationDto> withPreservedLocation(
+      List<LocationDto> locations, LocationDto preserveLocation) {
+    if (preserveLocation == null || preserveLocation.id() == null) {
+      return locations;
+    }
+    if (locations.stream().noneMatch(l -> preserveLocation.id().equals(l.id()))) {
+      locations.add(preserveLocation);
+    }
+    return locations;
   }
 
   private List<MissionListDto> fetchMissions() {

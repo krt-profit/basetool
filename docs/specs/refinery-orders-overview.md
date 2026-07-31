@@ -53,6 +53,9 @@ presence of a **live UEX terminal with `type = 'refinery'`** at the location's c
 station. It MUST NOT be derived from UEX's parent-level `has_refinery` boolean on
 `city` / `space_station` / `outpost`.
 
+The offered set MUST additionally exclude **hidden** locations (`location.hidden = true`), on the
+same terms as every other location picker.
+
 **Why:** UEX publishes both statements and they disagree. Measured against the live UEX API on
 2026-07-28, 21 terminals carry `type = 'refinery'`, while the parent flag is wrong in *both*
 directions:
@@ -102,12 +105,38 @@ The picker and the write-path gate MUST read the **same** flag, so the create/up
 exactly the locations the form offered — a stricter gate would reject a location the picker just
 handed the user.
 
+**Hidden locations.** `LocationRepository.findLocationsWithRefinery` was for the whole life of the
+repository the only Location lookup that ignored the admin's `hidden` flag — `findAllReference`,
+`searchReference`, `findByHiddenFalse` and `findByHomeLocationTrueAndHiddenFalseOrderByNameDesc`
+all filter it, and the flag's documented meaning is that hidden entries "do not appear in trade
+lists or selection fields". Hiding a refinery-hosting location therefore produced a dead end
+*within a single page*: it stayed selectable as **Raffinerie** on the refinery-order form while
+vanishing from the **Lagerort** picker of that same page's Einlagern dialog and from the Lager
+Einbuchen picker, so a user could open an order at a location they could not then book the yield
+into. Two consequences bind:
+
+- The `AND` must be **parenthesised** against the two terminal branches
+  (`hidden = false AND (city OR station)`). `AND` binds tighter than `OR`, so an unparenthesised
+  predicate filters the city branch only and leaks every hidden station-backed refinery.
+- The write-path gate `RefineryOrderService.validateLocationHasRefinery` deliberately does **not**
+  mirror the `hidden` predicate; it stays keyed on the refinery flag alone. This makes the gate
+  *more permissive* than the picker, which the same-flag rule above permits — it forbids a
+  **stricter** gate, since only a stricter one can reject what the form just offered. The looser
+  gate is what lets an order created before its location was hidden still be edited and saved. The
+  detail page complements this by keeping the order's own location in the dropdown even when the
+  backend omits it (`RefineryOrderPageController.withPreservedLocation`); without that the
+  `required` select would render unselected and block every later save of a formerly valid order.
+
 **Acceptance**
 
 - [ ] A location whose parent carries `has_refinery = false` but hosts a live refinery terminal
   (MIC-L5, ARC-L4, Patch City) is offered by the picker and accepted by create/update.
 - [ ] A location whose parent carries `has_refinery = true` but hosts no refinery terminal
   (People's Service Station Alpha/Delta/Lambda/Theta) is *not* offered and is rejected on create.
+- [ ] A hidden location is not offered by the picker, whether its refinery terminal sits on its
+  city or on its space station, and hiding one does not remove its still-visible siblings.
+- [ ] An existing order whose location was hidden after creation still renders that location as the
+  selected option on the detail page and can still be saved.
 - [ ] A terminal that is not `type = 'refinery'` never flags its parent.
 - [ ] A `type = 'refinery'` terminal with `is_available_live = false` never flags its parent, so a
   decommissioned refinery drops out on the next sweep.
@@ -124,9 +153,10 @@ handed the user.
   `frontend/src/e2e/resources/uex-catalog-seed.sql`.
 
 **Enforced by:** `UexUniverseSyncRefineryFlagTest`, `UexSchedulerTest`, `LocationRepositoryRefineryTest`,
-`RefineryOrderServiceLifecycleTest` (`CreateRefineryOrderTests`) · **Code:**
-`UexUniverseSyncService.reconcileRefineryTerminalFlags`, `LocationRepository.findLocationsWithRefinery`,
-`RefineryOrderService.validateLocationHasRefinery`, `Terminal.type`, migration `V226`
+`RefineryOrderServiceLifecycleTest` (`CreateRefineryOrderTests`), `RefineryOrderLocationDropdownTest`
+· **Code:** `UexUniverseSyncService.reconcileRefineryTerminalFlags`,
+`LocationRepository.findLocationsWithRefinery`, `RefineryOrderService.validateLocationHasRefinery`,
+`RefineryOrderPageController.withPreservedLocation`, `Terminal.type`, migration `V226`
 
 ## Out of scope
 

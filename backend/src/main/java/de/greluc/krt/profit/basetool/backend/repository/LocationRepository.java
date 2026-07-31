@@ -95,9 +95,9 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
   List<Location> findByHomeLocationTrueAndHiddenFalseOrderByNameDesc();
 
   /**
-   * Returns every location whose city or space station hosts a live refinery terminal; the picker
-   * source when the user creates a refinery order, and the candidate set the screenshot import
-   * matches its location read against.
+   * Returns every non-hidden location whose city or space station hosts a live refinery terminal;
+   * the picker source when the user creates a refinery order, and the candidate set the screenshot
+   * import matches its location read against.
    *
    * <p>Keyed on the derived {@code hasRefineryTerminal} flag, NOT on UEX's parent-level {@code
    * hasRefinery} claim this query used to read (REQ-REFINERY-020). The upstream claim disagrees
@@ -106,12 +106,28 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
    * UexUniverseSyncService.reconcileRefineryTerminalFlags()} recomputes the derived flag from the
    * live {@code type = 'refinery'} terminals at the end of every sweep.
    *
-   * @return locations hosting a live refinery terminal, never {@code null}
+   * <p>The {@code hidden = false} predicate is as load bearing as the flag itself: an admin who
+   * hides a location expects it gone from every picker, and this query was the sole Location lookup
+   * that ignored the flag. Without it a hidden refinery stayed selectable here while vanishing from
+   * the storage pickers built on {@link #findAllReference()} / {@link #findByHiddenFalse(Pageable)}
+   * — the user could open a refinery order at a location they could then not book the yield into.
+   * The parentheses around the two terminal branches are equally load bearing: {@code AND} binds
+   * tighter than {@code OR}, so an unparenthesised predicate would filter the city branch only and
+   * leak every hidden station-backed refinery.
+   *
+   * <p>The create/update gate {@code RefineryOrderService.validateLocationHasRefinery} deliberately
+   * does <strong>not</strong> mirror this predicate. It stays keyed on the refinery flag alone, so
+   * it remains looser than the picker and an order created before its location was hidden can still
+   * be edited and saved (REQ-REFINERY-020 forbids a gate that is *stricter* than the picker, not
+   * one that is more permissive).
+   *
+   * @return non-hidden locations hosting a live refinery terminal, never {@code null}
    */
   @Query(
       """
       SELECT l FROM Location l LEFT JOIN l.city c LEFT JOIN l.spaceStation s
-      WHERE c.hasRefineryTerminal = true OR s.hasRefineryTerminal = true
+      WHERE l.hidden = false
+      AND (c.hasRefineryTerminal = true OR s.hasRefineryTerminal = true)
       """)
   List<Location> findLocationsWithRefinery();
 }

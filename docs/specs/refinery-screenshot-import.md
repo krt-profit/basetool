@@ -138,7 +138,9 @@ and the user-facing message wording were widened.
 
 `rawLocationName` resolves by unique canonical name against the refinery-equipped
 locations only (`LocationRepository.findLocationsWithRefinery()` — the create-form
-picker source); `rawMethodName` resolves against the closed nine-method `refining_method`
+picker source, which excludes hidden locations per REQ-REFINERY-020, so a hidden
+location yields `UNRESOLVED_LOCATION` rather than pre-filling a refinery the user
+could not have picked by hand); `rawMethodName` resolves against the closed nine-method `refining_method`
 enum in three deterministic-then-fuzzy stages — exact case-insensitive name, unique
 canonical-core fold, then a fuzzy nearest-match at or above
 `krt.refinery-import.method-fuzzy-accept-threshold` (default 0.6) — so the local VLM's
