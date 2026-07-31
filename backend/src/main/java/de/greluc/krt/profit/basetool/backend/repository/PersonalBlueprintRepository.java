@@ -257,6 +257,28 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
   int deleteAllRemovable();
 
   /**
+   * Bulk-removes <strong>every</strong> owned blueprint of one user, auto-granted defaults included
+   * — the hard account deletion (REQ-DATA-008), not the user-facing "clear my blueprints" action.
+   * The default-preserving exclusion of {@link #deleteRemovableByOwnerSub(String)} is deliberately
+   * absent: preserving defaults for an account that no longer exists is what left orphaned rows
+   * behind, and every user carries at least the auto-granted starter set, so the removable-only
+   * variant could never empty an owner.
+   *
+   * <p>Unlike its siblings this query does <em>not</em> set {@code clearAutomatically}. It runs
+   * inside the {@code UserDeletionService.deleteUser} transaction, where detaching the persistence
+   * context would detach the very {@code User} entity that is about to be deleted, turning the
+   * subsequent {@code delete} into a {@code merge} of a detached instance. Nothing loads {@code
+   * PersonalBlueprint} rows in that transaction, so there is nothing stale to evict.
+   *
+   * @param ownerSub Keycloak {@code sub} of the departing owner (equal to {@code app_user.id} as
+   *     text)
+   * @return the number of rows removed, for the audit summary event
+   */
+  @Modifying
+  @Query("DELETE FROM PersonalBlueprint b WHERE b.ownerSub = :ownerSub")
+  int deleteAllByOwnerSub(@Param("ownerSub") String ownerSub);
+
+  /**
    * Materialises the admin-curated default blueprints (REQ-INV-016) for a single user: inserts one
    * {@code personal_blueprint} row per {@code default_blueprint} the user does not yet own. The
    * {@code ON CONFLICT (owner_sub, product_key) DO NOTHING} makes it idempotent (a re-run, or a

@@ -976,21 +976,6 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("jobOrderId") UUID jobOrderId, @Param("gameItemId") UUID gameItemId);
 
   /**
-   * Bulk-reassigns every inventory item owned by {@code oldUser} to {@code newUser}; used by the
-   * user-deletion cascade so stock is preserved when an account is removed.
-   *
-   * @param oldUser the previous owner
-   * @param newUser the new owner (the fallback admin)
-   * @return the number of inventory rows reassigned
-   */
-  @org.springframework.data.jpa.repository.Modifying
-  @org.springframework.data.jpa.repository.Query(
-      "UPDATE InventoryItem i SET i.user = :newUser WHERE i.user = :oldUser")
-  int updateOwner(
-      @org.jetbrains.annotations.NotNull de.greluc.krt.profit.basetool.backend.model.User oldUser,
-      @org.jetbrains.annotations.NotNull de.greluc.krt.profit.basetool.backend.model.User newUser);
-
-  /**
    * Derived Spring-Data query - returns entities matching {@code IdForUpdate}. Acquires a
    * pessimistic write lock for the duration of the surrounding transaction.
    */
@@ -1117,6 +1102,34 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds);
+
+  /**
+   * Deletes every warehouse row held by the given user — personal and shared alike — as part of the
+   * hard account deletion (REQ-DATA-008). Replaces the former reassignment to a fallback admin: a
+   * departing member's stock leaves the Lager with them rather than accumulating on an admin
+   * account.
+   *
+   * <p>The three child tables that reference {@code inventory_item(id)} — {@code
+   * inventory_job_order_allocation} and {@code inventory_mission_allocation} (V217) and {@code
+   * material_exchange_offer} (V210) — all declare {@code ON DELETE CASCADE}, so the job-order and
+   * mission links and any open Materialbörse offer are removed by the database along with the row.
+   * The fourth, {@code job_order_handover_item.inventory_item_id}, is {@code ON DELETE SET NULL}
+   * (V58) so the handover history survives with its snapshot intact. No pre-cleanup loop is
+   * required.
+   *
+   * <p>Set-based by necessity, not for speed: {@code InventoryItem.user} is
+   * {@code @ManyToOne(optional = false)}, so loading the rows as managed entities before {@code
+   * userRepository.delete(user)} would abort the flush with {@code TransientPropertyValueException}
+   * — the same failure class documented on {@link
+   * OrgUnitMembershipRepository#findOrgUnitIdsByUserId(UUID)}. Never replace this with a
+   * find-then-{@code deleteAll}.
+   *
+   * @param userId the owner whose warehouse rows are removed; never {@code null}.
+   * @return the number of deleted rows, for the audit summary event.
+   */
+  @Modifying
+  @Query("DELETE FROM InventoryItem i WHERE i.user.id = :userId")
+  int deleteByUserId(@Param("userId") UUID userId);
 
   /**
    * Loads the caller's own Lager rows for the Materialbörse release picker — <b>both</b> material

@@ -318,7 +318,10 @@
                             </thead>
                             <tbody>
                                 <tr th:each="payout : ${operationPayouts}" th:attr="data-participant-id=${payout.participantId}">
-                                    <td th:text="${payout.participantName}" class="payout-user-cell">User</td>
+                                    <!-- A null name means the account was deleted: a guest always
+                                         carries a guest name and a linked user always an effective
+                                         name, so this is unambiguous. -->
+                                    <td th:text="${payout.participantName != null ? payout.participantName : #messages.msg('mission.participant.deleted')}" class="payout-user-cell">User</td>
                                     <td th:text="${#numbers.formatDecimal(payout.participationPercentage, 1, 'POINT', 2, 'COMMA')} + ' %'" sec:authorize="isAuthenticated()" class="payout-percentage-cell">0,00%</td>
                                     <td class="payout-preference-cell">
                                         <span th:if="${payout.payoutPreference.name() == 'PAYOUT'}" th:text="#{mission.payout.preference.payout}" class="payout-preference-badge payout-preference-badge--payout">Auszahlen</span>
@@ -417,7 +420,7 @@
                                         <span th:if="${entry.type.name() == 'INCOME'}" class="chip chip--success chip-xs" th:text="#{mission.finance.type.income}">Einnahme</span>
                                         <span th:if="${entry.type.name() == 'EXPENSE'}" class="chip chip--danger chip-xs" th:text="#{mission.finance.type.expense}">Ausgabe</span>
                                     </td>
-                                    <td th:text="${entry.participant != null and entry.participant.user != null ? entry.participant.user.effectiveName : (entry.participant != null ? entry.participant.guestName : '-')}">User</td>
+                                    <td th:text="${entry.participant == null ? '-' : (entry.participant.user != null ? entry.participant.user.effectiveName : (entry.participant.guestName != null ? entry.participant.guestName : #messages.msg('mission.participant.deleted')))}">User</td>
                                     <td th:text="${entry.note}">Notiz</td>
                                     <td class="num" th:text="${(entry.type.name() == 'INCOME' ? '+' : '&minus;') + #numbers.formatInteger(@moneyFormat.round(entry.amount), 1, 'POINT')} + ' aUEC'">0 aUEC</td>
                                 </tr>

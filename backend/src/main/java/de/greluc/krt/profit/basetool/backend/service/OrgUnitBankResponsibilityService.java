@@ -191,16 +191,23 @@ public class OrgUnitBankResponsibilityService {
    * (non-leadership) membership is harmless — {@link #recordResponsibleHolderChanges(Map)} records
    * nothing for an account whose set does not change.
    *
+   * <p>The member org units are resolved through the bare-id projection {@link
+   * OrgUnitMembershipRepository#findOrgUnitIdsByUserId(UUID)} rather than through {@code
+   * findAllByIdUserId}, and that choice is load-bearing: this method runs inside the {@code
+   * UserDeletionService.deleteUser} transaction right before the {@code app_user} row is removed.
+   * Attaching the user's {@code OrgUnitMembership} entities here would leave them managed and still
+   * pointing at the deleted {@code User} — the {@code org_unit_membership} rows disappear via the
+   * database {@code ON DELETE CASCADE}, which Hibernate never observes — so the following flush
+   * would abort with {@code TransientPropertyValueException}. Keep this a projection.
+   *
    * @param userId the user about to be removed from all their org units
    * @return the affected accounts mapped to their current responsible-holder user ids
    */
   @NotNull
   @Transactional
   public Map<UUID, Set<UUID>> snapshotResponsibleHoldersForUser(@NotNull UUID userId) {
-    Set<UUID> orgUnitIds = new LinkedHashSet<>();
-    for (var membership : orgUnitMembershipRepository.findAllByIdUserId(userId)) {
-      orgUnitIds.add(membership.getId().getOrgUnitId());
-    }
+    Set<UUID> orgUnitIds =
+        new LinkedHashSet<>(orgUnitMembershipRepository.findOrgUnitIdsByUserId(userId));
     Map<UUID, Set<UUID>> snapshot = new HashMap<>();
     for (UUID orgUnitId : orgUnitIds) {
       snapshot.putAll(snapshotResponsibleHolders(orgUnitId));

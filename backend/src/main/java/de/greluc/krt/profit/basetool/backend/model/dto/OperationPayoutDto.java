@@ -46,8 +46,13 @@ import java.time.Instant;
  * exists yet. {@link #paidOutByName} resolves to {@code User.effectiveName} or {@code null} when
  * the auditor has been deleted.
  *
- * @param participantId opaque participant key — user UUID stringified or {@code "guest_<name>"}
- * @param participantName the participant's display name (for the table column)
+ * @param participantId opaque participant key — user UUID stringified, {@code "guest_<name>"}, or
+ *     {@code "deleted_<participantId>"} once the account behind the row was hard-deleted
+ *     (REQ-DATA-008). The last form keeps a deleted member in the breakdown with a stable identity
+ *     so an already-settled operation's shares do not silently redistribute.
+ * @param participantName the participant's display name (for the table column), or {@code null}
+ *     exactly when the account was deleted — a guest always carries a guest name and a linked user
+ *     always an effective name, so the client renders its deleted-user placeholder off this null
  * @param participationPercentage clamped attendance-time share, 0–100, two decimals
  * @param payoutPreference {@code PAYOUT} or {@code DONATE} (sticky DONATE across the operation)
  * @param personalExpenses out-of-pocket expenses attributable to the participant (always &gt;= 0)

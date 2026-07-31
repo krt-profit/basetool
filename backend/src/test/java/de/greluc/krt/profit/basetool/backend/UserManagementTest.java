@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.model.UserApprovalEvent;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.service.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.service.UserDeletionService;
 import java.util.Set;
 import java.util.UUID;
@@ -71,6 +72,13 @@ class UserManagementTest {
   @Autowired private RoleRepository roleRepository;
 
   @MockitoBean private JwtDecoder jwtDecoder;
+
+  /**
+   * Mocked so the delete-time Keycloak existence check does not reach out over HTTP. The Mockito
+   * default for {@code userExists} is {@code false} — "the account is gone" — which is the
+   * precondition every deletion test here relies on.
+   */
+  @MockitoBean private KeycloakService keycloakService;
 
   private User testUser;
 

@@ -34,8 +34,6 @@ import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
-import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.Organisationsleitung;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
@@ -236,9 +234,10 @@ class OrgUnitBankResponsibilityServiceTest {
     UUID accountId = UUID.randomUUID();
     UUID leiter = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
-    OrgUnitMembership membership = new OrgUnitMembership();
-    membership.setId(new OrgUnitMembershipId(userId, staffelId));
-    when(orgUnitMembershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(membership));
+    // The member org units come from the bare-id projection, never from the membership entities:
+    // loading those inside the user-deletion transaction is what caused the production
+    // TransientPropertyValueException (see UserDeletionForeignKeyIntegrityTest).
+    when(orgUnitMembershipRepository.findOrgUnitIdsByUserId(userId)).thenReturn(Set.of(staffelId));
     when(bankAccountRepository.findByOrgUnitId(staffelId)).thenReturn(Optional.of(account));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
     when(bereichRepository.findByDepartment(any())).thenReturn(List.of());

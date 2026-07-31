@@ -313,8 +313,14 @@ create does not. (`AdminLocationsPageControllerTest`): the visibility / home-loc
 
 ### REQ-DATA-008 — User deletion reassigns or clears every `app_user` FK that lacks an `ON DELETE` clause
 
-`UserService.deleteUser(userId)` removes an ex-member (only users already gone from Keycloak,
-`in_keycloak = false`). Before the terminating `userRepository.delete(user)`, **every foreign key
+`UserService.deleteUser(userId)` removes an ex-member (only users already gone from Keycloak).
+**The precondition is verified twice**: against the persisted `in_keycloak` flag *and*, because that
+flag is only a cached mirror that a swallowed sync error can leave stale at `false`, against Keycloak
+itself via `KeycloakService.userExists`. That probe is **fail-closed** — only a clean `404` counts as
+"gone"; an unreachable Keycloak, an expired admin token or a `5xx` propagates and aborts the
+deletion. Without the second check a single swallowed sync error was enough for an admin to
+irreversibly hard-delete an **active** member, which matters more now that the operation purges
+rather than reassigns. Before the terminating `userRepository.delete(user)`, **every foreign key
 referencing `app_user(id)` that carries no `ON DELETE` clause (Postgres default `NO ACTION`) must be
 explicitly reassigned or nulled in code** — otherwise the delete FK-fails with `SQLSTATE 23503`.
 Foreign keys that declare their own `ON DELETE CASCADE` / `SET NULL` are handled DB-side and need no
@@ -323,20 +329,79 @@ code. The reassignment target is a surviving admin (never the user being deleted
 
 Concrete handling, in order:
 
-- **Reassigned to the admin** (mandatory ownership): `inventory_item.user_id`, `ship.owner_id`,
+- **Purged** (the account's own data): `inventory_item.user_id` and `ship.owner_id` — the departing
+  member's warehouse stock and hangar are deleted, not reassigned, so a leaving member's holdings
+  leave with them instead of accumulating on an admin account. The three child tables of
+  `inventory_item` (`inventory_job_order_allocation`, `inventory_mission_allocation`,
+  `material_exchange_offer`) declare `ON DELETE CASCADE`, so the job-order and mission links and any
+  open Materialbörse offer go with the row; `job_order_handover_item.inventory_item_id` is
+  `ON DELETE SET NULL` (V58) so the handover history survives with its snapshot, and
+  `mission_unit.ship_id` is likewise `ON DELETE SET NULL` (V51) so mission units survive without
+  their ship. **Consequence, accepted deliberately:** `inventory_item.personal = false` is the shared
+  squadron pool, in which `user_id` marks only the contributor — so this removes stock the org unit
+  may still physically hold. That is the intended semantics as of this release; a member's
+  contribution is not inherited by the squadron.
+- **Purged** (the FK-less identity columns): `personal_inventory_item.owner_sub`,
+  `personal_blueprint.owner_sub`, `notification.recipient_sub`,
+  `notification_rule_selector.user_sub` and `member_evaluation.user_id`. None of them declares a
+  foreign key to `app_user`, so nothing cascades and no retention job reaches them — the
+  notification sweep only reaps *read* rows. Left in place they survive the account indefinitely
+  (free-text notes included), become undiscoverable because every lookup is keyed by a subject no
+  roster can still offer, and are silently re-adopted if the same Keycloak subject returns. The rule
+  selectors additionally keep *manufacturing* new orphans: the engine returns the dead subject with
+  no existence check and mints a notification row for it on every subsequent matching event. All
+  five hold `app_user.id` (as text for the `VARCHAR` columns, natively for the `UUID` ones).
+  V227 purges what earlier deletions already leaked.
+- **Reassigned to the admin** (shared aggregates that must outlive the member):
   `refinery_order.owner_id`, `mission.owner_id`, and — paired with the last — the 1:1 companion
-  `mission_ownership.owner_id`. The companion (V63, FK-less `owner_id`) **must follow
-  `mission.owner`**: the mission survives the delete (its owner moved to the admin), so the
-  `ON DELETE CASCADE` on `mission_ownership.mission_id` never fires to clear the row, and a dangling
-  `owner_id` would FK-fail. It is reassigned (not nulled / row-deleted) so the companion keeps
-  mirroring `mission.owner`; the bulk update must not bump `mission_ownership.version` (the owner
-  association is excluded from the parent's optimistic lock).
+  `mission_ownership.owner_id`. These are not account data: they carry operation finances and
+  mission history that stay readable after the member leaves. The companion (V63, FK-less
+  `owner_id`) **must follow `mission.owner`**: the mission survives the delete (its owner moved to
+  the admin), so the `ON DELETE CASCADE` on `mission_ownership.mission_id` never fires to clear the
+  row, and a dangling `owner_id` would FK-fail. It is reassigned (not nulled / row-deleted) so the
+  companion keeps mirroring `mission.owner`; the bulk update must not bump
+  `mission_ownership.version` (the owner association is excluded from the parent's optimistic lock).
 - **Unlinked / cleared** (reversible or audit-only references): `mission_managers` and
   `job_order_assignees` via the join-table deletes (`removeManager` / `removeAssignee`, also
   `ON DELETE CASCADE`); `mission_participant.user_id` via `unlinkUser` (set null, the participant row
-  with its guest name + status survives); `material_claim.claimed_by_user_id` (V131, FK-less,
+  with its status survives); `material_claim.claimed_by_user_id` (V131, FK-less,
   audit-only) via `unlinkClaimedByUser` (set null — re-pointing it at the admin would falsely
   attribute the claim, and the claim is a live independent aggregate that must survive).
+
+**The deleted-user placeholder.** A participant row whose `user_id` was nulled by `unlinkUser`
+carries no name: `guest_name` is populated only on the guest branch of sign-up, never for a
+user-linked one. `user_id IS NULL AND guest_name IS NULL` is therefore an unambiguous marker for
+"this was a deleted account", and every render site resolves it to `mission.participant.deleted`
+("Gelöschter Nutzer" / "Deleted user") instead of an empty cell. Two behaviours hang off the same
+discriminator: the roster's "Gast" chip and the edit/delete actions that any viewer may use on a
+guest row are both narrowed to `guest_name != null`, so a deleted account is neither mislabelled as
+a guest nor made editable by everyone. `OperationPayoutCalculator.participantKey` returns
+`deleted_<participantId>` for such a row — without it the key was `null`, the row dropped out of the
+payout breakdown entirely, and the percentages and aUEC of an **already-settled historical**
+operation silently recomputed whenever some unrelated member was deleted, redistributing expenses
+the deleted member had advanced onto everyone else.
+
+**Audit.** The deletion records `USER_DELETED` (domain `ROLE`) unconditionally as the marker for an
+operation that mutates several audited areas at once, plus the per-area summary events
+`INVENTORY_PURGED_ON_USER_DELETION`, `PERSONAL_DATA_PURGED_ON_USER_DELETION` and
+`REFINERY_ORDERS_REASSIGNED` when their row counts are non-zero (REQ-AUDIT-001). Payloads carry ids
+and counts only. `INVENTORY_OWNER_REASSIGNED` is retained as `@Deprecated` but no longer emitted:
+`audit_event.event_type` stores the enum name, so removing the constant would make historical rows
+unreadable.
+
+**A DB-side `ON DELETE CASCADE` row must not be loaded into the persistence context before the
+delete.** The cascade is executed by PostgreSQL, and Hibernate never learns about it — so any entity
+whose row the cascade removes stays *managed* and keeps its `@ManyToOne User` reference pointing at
+the just-removed user. The flush that follows `userRepository.delete(user)` then aborts with
+`TransientPropertyValueException` before a single statement reaches the database, which surfaces as a
+plain HTTP 500 and looks nothing like the `23503` this requirement otherwise guards against. Any
+collaborator invoked between the reassignments and the delete must therefore resolve what it needs
+through a **bare-id projection**, never by loading the cascade-owned entity. The live instance is
+`OrgUnitBankResponsibilityService.snapshotResponsibleHoldersForUser`, which takes the REQ-BANK-034
+responsible-holder snapshot immediately before the delete and resolves the user's org units via
+`OrgUnitMembershipRepository.findOrgUnitIdsByUserId` (projection) rather than `findAllByIdUserId`
+(entities). Loading them was the production regression: deleting any user who still held an org-unit
+membership — nearly every user — returned 500.
 
 `mission_finance_entry` carries **no** direct `app_user` FK (the V40 `user_id`/`fk_mfe_user`
 `ON DELETE RESTRICT` pair was dropped in V41 in favour of `mission_participant_id`
@@ -349,11 +414,14 @@ work, not here.
 material-claim unlink are invoked, and that both run before `userRepository.delete`;
 `UserDeletionForeignKeyIntegrityTest` (real Postgres) deletes a user who owns a mission and stamped a
 material claim and asserts no `23503`, the mission + its companion are reassigned to the same admin,
-and the claim survives with a null stamp.
+and the claim survives with a null stamp. The same class additionally deletes a user who still holds
+an org-unit membership and asserts the flush raises no `TransientPropertyValueException` and that the
+DB cascade removed the membership row.
 
 **Enforced by:** `UserService.deleteUser` (explicit ordered reassignment),
 `MissionOwnershipRepository.updateOwner`, `MaterialClaimRepository.unlinkClaimedByUser`,
-`db/migration/V63` (companion table without auto-cascade on `owner_id`).
+`db/migration/V63` (companion table without auto-cascade on `owner_id`),
+`OrgUnitMembershipRepository.findOrgUnitIdsByUserId` (projection-only snapshot seam).
 
 ### REQ-DATA-009 — A global statement-execution timeout bounds every query (finding SEC-03)
 

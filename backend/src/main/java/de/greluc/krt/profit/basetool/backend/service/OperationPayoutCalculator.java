@@ -191,11 +191,26 @@ public final class OperationPayoutCalculator {
 
   /**
    * Returns the opaque participant key used across the payout pipeline — real user UUID
-   * stringified, or {@code "guest_<name>"} for guests. Returns {@code null} when neither a user nor
-   * a guest name is set (a malformed row that should be filtered out).
+   * stringified, {@code "guest_<name>"} for guests, or {@code "deleted_<participantId>"} for a
+   * participant whose account was hard-deleted (REQ-DATA-008).
+   *
+   * <p>The deleted branch is load-bearing, not cosmetic. A user deletion nulls {@code
+   * mission_participant.user_id} while leaving {@code guest_name} empty, which used to make this
+   * method return {@code null} — and a {@code null} key drops the row from {@link
+   * #computeParticipationBreakdown} entirely: the person vanished from the payout list, their
+   * attendance stopped counting towards {@code totalDuration}, and their {@code EXPENSE} entries
+   * stopped counting as personal reimbursement while still counting into the shared pool. The
+   * percentages and aUEC amounts of an <em>already-settled historical</em> operation therefore
+   * changed silently whenever some unrelated member was deleted, redistributing money the deleted
+   * member had advanced onto everyone else.
+   *
+   * <p>Keying on the participant row's own id keeps that row in the breakdown with a stable
+   * identity, so the split stays exactly as it was settled. Two deleted members never collapse into
+   * one bucket, and the key survives repeated recomputation. Only a row with no id at all — never
+   * persisted — is still unkeyable.
    *
    * @param participant the mission participant to key
-   * @return the opaque participant key, or {@code null} for a malformed row
+   * @return the opaque participant key, or {@code null} for an unpersisted row
    */
   @Nullable
   private static String participantKey(@NotNull MissionParticipant participant) {
@@ -205,7 +220,7 @@ public final class OperationPayoutCalculator {
     if (participant.getGuestName() != null) {
       return "guest_" + participant.getGuestName();
     }
-    return null;
+    return participant.getId() != null ? "deleted_" + participant.getId() : null;
   }
 
   /**

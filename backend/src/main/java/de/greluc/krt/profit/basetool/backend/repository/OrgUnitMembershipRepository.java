@@ -151,6 +151,28 @@ public interface OrgUnitMembershipRepository
   Set<UUID> findDistinctUserIdsByOrgUnitIdIn(@Param("orgUnitIds") Collection<UUID> orgUnitIds);
 
   /**
+   * Returns the ids of the org units the given user belongs to, as a bare id projection rather than
+   * as {@link OrgUnitMembership} entities.
+   *
+   * <p>The projection is load-bearing, not a micro-optimisation: {@code
+   * OrgUnitBankResponsibilityService.snapshotResponsibleHoldersForUser} runs <em>inside</em> the
+   * {@code UserDeletionService.deleteUser} transaction, immediately before {@code
+   * userRepository.delete(user)}. Resolving the same org units through {@link
+   * #findAllByIdUserId(UUID)} would attach the user's membership rows to the persistence context;
+   * because {@code org_unit_membership.user_id} is cleared by the database {@code ON DELETE
+   * CASCADE} and never by Hibernate, those managed entities survive the {@code delete} call still
+   * pointing at the removed {@code User}, and the following flush aborts with {@code
+   * TransientPropertyValueException} ({@code OrgUnitMembership.user -> User}) — the production
+   * user-deletion regression. Selecting only {@code id.orgUnitId} leaves the persistence context
+   * empty, so the flush sees nothing to validate.
+   *
+   * @param userId the user whose org units to collect; never {@code null}.
+   * @return the ids of the org units this user is a member of; never {@code null}, possibly empty.
+   */
+  @Query("SELECT m.id.orgUnitId FROM OrgUnitMembership m WHERE m.id.userId = :userId")
+  Set<UUID> findOrgUnitIdsByUserId(@Param("userId") UUID userId);
+
+  /**
    * Returns the ids of users who are Leads of the given org unit. Backs the notification rule
    * engine's {@code ORG_RELATIVE_ROLE = LEAD} resolution (leads of a responsible Spezialkommando).
    *
