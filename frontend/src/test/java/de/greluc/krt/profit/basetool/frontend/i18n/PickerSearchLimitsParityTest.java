@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.i18n;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import java.io.IOException;
@@ -120,6 +121,12 @@ class PickerSearchLimitsParityTest {
    * failing loudly when the anchor is gone (a refactor that renames the chain must break this gate,
    * not silently skip it).
    *
+   * <p>The patterns capture {@code \d+}, so the group can only ever be digits — but not necessarily
+   * digits that fit an {@code int}. A cap literal long enough to overflow would otherwise surface
+   * as a bare {@link NumberFormatException} stack trace naming neither the file nor the value;
+   * translating it into an assertion keeps a nonsense edit as readable as a drifted one, which is
+   * the entire point of this gate.
+   *
    * @param pattern the anchored pattern whose group 1 is the number
    * @param resource the absolute classpath resource path to scan
    * @param what human-readable name of the literal, used in the failure message
@@ -129,7 +136,12 @@ class PickerSearchLimitsParityTest {
   private static int extract(Pattern pattern, String resource, String what) throws IOException {
     Matcher matcher = pattern.matcher(readResource(resource));
     assertThat(matcher.find()).as("%s not found in %s (anchor renamed?)", what, resource).isTrue();
-    return Integer.parseInt(matcher.group(1));
+    String digits = matcher.group(1);
+    try {
+      return Integer.parseInt(digits);
+    } catch (NumberFormatException e) {
+      return fail("%s in %s is not a usable int: '%s'".formatted(what, resource, digits), e);
+    }
   }
 
   /**
