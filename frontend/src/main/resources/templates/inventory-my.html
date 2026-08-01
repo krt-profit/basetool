@@ -761,7 +761,8 @@
     // Variante C "Herkunft" (deduct-from) picker strings (REQ-INV-027): inventory-herkunft.js reads
     // these to label each dimension, the rest chip, the "assign at least" warning and the coupled
     // SELL proceeds hint. order/mission reuse the Auftrag/Einsatz captions; rest/min/personal carry
-    // a {0} placeholder the module substitutes.
+    // a {0} placeholder the module substitutes. `auto` annotates a dimension the picker fills and
+    // locks itself (single tag, no rest).
     var herkunftI18n = {
         order: /*[[#{inventory.order}]]*/ 'Auftrag',
         mission: /*[[#{inventory.tree.field.mission}]]*/ 'Einsatz',
@@ -769,7 +770,8 @@
         min: /*[[#{inventory.herkunft.min}]]*/ 'Mindestens {0} auf Marken zuweisen',
         proceedsTitle: /*[[#{inventory.herkunft.proceeds.title}]]*/ 'Gekoppelter Verkaufserl\u00f6s',
         personal: /*[[#{inventory.herkunft.proceeds.personal}]]*/ 'Pers\u00f6nlich: {0}',
-        auec: /*[[#{inventory.herkunft.auec}]]*/ 'aUEC'
+        auec: /*[[#{inventory.herkunft.auec}]]*/ 'aUEC',
+        auto: /*[[#{inventory.herkunft.auto}]]*/ 'Automatisch vorbef\u00fcllt: einzige Marke, kein Rest'
     };
 
     // "F\u00fcr B\u00f6rse freigeben" leaf-checkbox strings (inventory-materialboerse.js).

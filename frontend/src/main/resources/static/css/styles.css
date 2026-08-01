@@ -829,6 +829,18 @@ tbody tr:nth-child(even):hover {
     font-variant-numeric: tabular-nums;
 }
 
+/* A dimension with exactly one tag and no free rest has only one applyable plan, so the picker
+   fills the field from the deducted amount and locks it; .herkunft-auto states why. */
+.herkunft-input--auto {
+    cursor: not-allowed;
+    opacity: 0.75;
+}
+
+.herkunft-auto {
+    font-size: var(--fs-2xs);
+    color: var(--color-gray-2-text);
+}
+
 .herkunft-tag-max {
     flex: 0 0 auto;
     font-size: var(--fs-2xs);
