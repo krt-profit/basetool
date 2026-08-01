@@ -78,8 +78,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * assigned to logisticians, materialized via inventory handovers, and finally completed. The
  * controller covers the entire lifecycle plus the priority/status mutations, the assignee
  * management, the handover creation flow, and the unlink endpoints for materials and inventory
- * items. The status filter on the list view is persisted in a 30-day cookie so a user keeps their
- * preferred filter across sessions.
+ * items. The list view's status filter is persisted client-side in per-browser {@code localStorage}
+ * and echoed back as {@code status} query parameters — the former 30-day {@code
+ * orders_filter_status} server cookie was removed, and no cookie is set for it any more (ADR-0120).
  *
  * <p>Since the #924 L5 read/write controller split this class holds only the read side — the page
  * and fragment renders plus the read-only JSON proxies; every state-mutating {@code /orders}
@@ -228,7 +229,7 @@ public class JobOrderPageController {
     status = validStatuses.isEmpty() ? List.of("OPEN", "IN_PROGRESS") : validStatuses;
 
     // Squadron display filter (multi-select, REQ-ORDERS-027): the picker's selected squadron ids
-    // arrive as repeatable squadronId params (echoed by orders-index.js from its per-user
+    // arrive as repeatable squadronId params (echoed by orders-index.js from its per-browser
     // localStorage state). An empty/absent selection means "all squadrons" (no narrowing) — the new
     // default, replacing the former mine/all scope toggle. Only applies to the main queue, never
     // the

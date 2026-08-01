@@ -214,8 +214,13 @@ backend change is needed and the order-list endpoint gains no query; the badge r
 
 ### REQ-ORDERS-027 — Overview: collapsible material sublist + status & squadron filters
 
-Three order-overview affordances, all persisted per-user in the browser's `localStorage` (the same
-client-side persistence the Lager tree uses, REQ-INV-002 — not a server cookie):
+Three order-overview affordances, all persisted **per browser** in `localStorage` — the same
+client-side persistence the Lager tree uses (REQ-INV-002), and not a server cookie. Note the one
+difference from that tree: all three keys here (`orders_materials_expanded`,
+`orders_squadron_filter`, `orders_status_filter`) are **bare** — they carry no user id, where the
+Lager tree suffixes its keys with the tree's `data-user-id`. That is the app-wide default for
+non-bank surfaces (REQ-UI-017: only bank surfaces key per user as `<name>_<uid>`), so two accounts
+sharing one browser profile deliberately share these three preferences ([ADR-0120](../adr/0120-per-browser-filter-selection-persistence.md)):
 
 **Collapsible material sublist.** Each order row's **Materialien** cell (REQ-ORDERS-017) MUST be
 collapsible: a toggle button (caret + the `orders.index.materials` label + the material count) shows
@@ -255,7 +260,7 @@ swap.
 **Acceptance**
 
 - [ ] Each order row's material sublist starts collapsed; toggling it expands/collapses it, and the
-  state survives a filter change / fragment swap and a page reload (per-user localStorage).
+  state survives a filter change / fragment swap and a page reload (per-browser localStorage).
 - [ ] The squadron filter is a multi-select dropdown of all active squadrons, all checked by default.
 - [ ] Unchecking some squadrons narrows the list to orders whose responsible OR requesting unit is a
   checked squadron; all-checked shows every scoped order (incl. SK-only); the state persists in
