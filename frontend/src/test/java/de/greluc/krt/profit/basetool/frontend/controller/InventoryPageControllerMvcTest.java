@@ -57,6 +57,8 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -188,6 +190,25 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("data-herkunft=\"umbuchen\"")))
         .andExpect(content().string(containsString("data-herkunft-body")))
         .andExpect(content().string(containsString("/js/inventory-herkunft.js")));
+  }
+
+  // REQ-INV-027: the prefill note for a determined dimension (single tag, no rest) is rendered from
+  // the `auto` entry of the page's herkunftI18n bootstrap. The module carries an English fallback
+  // for it, so a page that forgot to declare the key would degrade silently in German -- assert the
+  // localized string reaches both Lager pages instead. Only the ASCII prefix is pinned: Thymeleaf's
+  // JavaScript inlining emits the umlaut as a \\u00FC escape inside the string literal.
+  @ParameterizedTest
+  @ValueSource(strings = {"/inventory/my", "/inventory/all"})
+  @WithMockUser(roles = "KRT_MEMBER")
+  void inventoryPages_ShouldBootstrapHerkunftAutoPrefillLabel(String path) throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get(path))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("auto: \"Automatisch vorbef")));
   }
 
   // REQ-INV-034: the "Alle markieren" (select-all) button renders in the bulk bar BEFORE the
