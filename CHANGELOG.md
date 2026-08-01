@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Lager: Beim Um- und Ausbuchen entfällt die Herkunft-Eingabe, wenn es nichts zu entscheiden gibt.** Ist ein Eintrag genau einem Einsatz bzw. genau einem Auftrag zugeordnet und bleibt kein freier Rest, kann die Menge nur von dieser einen Marke kommen — das Feld wird jetzt mit der um- bzw. ausgebuchten Menge vorbefüllt, gesperrt und als automatisch gefüllt gekennzeichnet, statt das Absenden zu blockieren, bis der Wert von Hand nachgetragen wird. Es folgt jeder späteren Änderung der Menge. Gibt es mehrere Marken oder einen Rest, bleibt die Aufteilung wie bisher freie Wahl (REQ-INV-027).
+
 ## [v1.5.27](https://github.com/krt-profit/basetool/releases/tag/v1.5.27) - 2026-07-31
 
 ### Fixed

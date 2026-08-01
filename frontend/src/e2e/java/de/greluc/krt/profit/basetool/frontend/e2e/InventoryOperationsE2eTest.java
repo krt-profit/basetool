@@ -48,13 +48,15 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * <p>One method per operation — <em>einbuchen</em> (create), <em>ausbuchen</em> (DISCARD, partial
  * and full), <em>umbuchen</em> (TRANSFER), <em>verkaufen</em> (SELL), and the two append-only-safe
  * association edits, <em>zuweisen zu einem Auftrag</em> (job order) and <em>zuweisen zu einem
- * Einsatz</em> (mission) — plus the <em>Herkunft</em> deduct-from picker (REQ-INV-027), which both
- * gates a book-out when the rest cannot cover it and directs the deduction onto a chosen earmark,
- * and three edge cases: over-booking past the held amount, a no-op transfer to the same
- * user+location, and the cross-field invariant that a personal entry may carry neither a job order
- * nor a mission. The append-only model means TRANSFER and create insert new rows while DISCARD/SELL
- * decrement (and delete at the {@code 1e-4} epsilon), so each scenario uses its <strong>own unique
- * material</strong> to stay isolated in the shared, sequentially-run stack.
+ * Einsatz</em> (mission) — plus the <em>Herkunft</em> deduct-from picker (REQ-INV-027) in both its
+ * modes: the ambiguous one, where it gates a book-out the rest cannot cover and directs the
+ * deduction onto a chosen earmark, and the determined one (a single tag, no rest), where it
+ * prefills and locks the only field that can ever be valid — and three edge cases: over-booking
+ * past the held amount, a no-op transfer to the same user+location, and the cross-field invariant
+ * that a personal entry may carry neither a job order nor a mission. The append-only model means
+ * TRANSFER and create insert new rows while DISCARD/SELL decrement (and delete at the {@code 1e-4}
+ * epsilon), so each scenario uses its <strong>own unique material</strong> to stay isolated in the
+ * shared, sequentially-run stack.
  *
  * <p><b>Drive via UI, verify via API.</b> Every mutation goes through the real Thymeleaf form /
  * book-out modal / allocation-chip combobox — i.e. the genuine frontend → backend → DB path. The
@@ -124,6 +126,8 @@ class InventoryOperationsE2eTest {
   private static String herkunftMatId;
   private static String herkunftItemId;
   private static String herkunftOrderId;
+  private static String prefillMatId;
+  private static String prefillItemId;
   private static String overbookMatId;
   private static String overbookItemId;
   private static String sameLocMatId;
@@ -198,6 +202,13 @@ class InventoryOperationsE2eTest {
     herkunftOrderId =
         seeder.createJobOrder(
             USERNAME, PASSWORD, IRIDIUM_ID, "E2E Inv Herkunft Order", herkunftMatId, 650, 100);
+
+    // Determined-dimension prefill fixture: a 60-SCU row the flow earmarks *fully* to the single
+    // seeded mission, so that dimension has one tag and no rest and the picker must fill it itself.
+    prefillMatId =
+        seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Inv Herkunft Prefill Mat");
+    prefillItemId =
+        seeder.createInventoryItem(USERNAME, PASSWORD, prefillMatId, opsHubLocId, SEED_QUALITY, 60);
 
     overbookMatId = seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Inv Overbook Mat");
     overbookItemId =
@@ -495,6 +506,74 @@ class InventoryOperationsE2eTest {
               .hasAttribute(
                   "data-amount",
                   Pattern.compile("^30(\\.0+)?$"),
+                  new LocatorAssertions.HasAttributeOptions().setTimeout(20_000));
+        });
+  }
+
+  /**
+   * <em>Herkunft-Vorbefüllung (REQ-INV-027).</em> A dimension with exactly one earmark tag and no
+   * free rest admits a single applyable plan, so the Umbuchen picker fills that field itself
+   * instead of demanding it. Earmarks the whole 60-SCU row to one mission (rest 0), opens the
+   * Umbuchen modal and asserts the mission field already carries the modal's amount, is not
+   * editable, and leaves the submit enabled with no picker interaction at all; lowering the amount
+   * to 40 re-syncs it. The transfer then moves 40 and shrinks the source's mission chip from 60 to
+   * 20 — proving the prefilled plan really was submitted, since there is no rest it could have come
+   * from instead.
+   */
+  @Test
+  void herkunftPickerPrefillsAndLocksTheOnlyTagWhenThereIsNoRest() {
+    runFlow(
+        "inventory-herkunft-prefill",
+        page -> {
+          // Earmark all 60 to the single mission -> rest 0, so the mission dimension is determined.
+          openMyInventoryToEntry(page, prefillMatId, prefillItemId);
+          assignAllocationViaChip(page, prefillItemId, "MISSION", missionId, "60");
+
+          openUmbuchenModal(page, prefillMatId, prefillItemId);
+          String dimSelector = "#umbuchenModal [data-herkunft-dim='MISSION']";
+          Locator missionInput =
+              page.locator(
+                  dimSelector + " [data-herkunft-input][data-herkunft-target='" + missionId + "']");
+
+          // The modal opens with the full row amount preselected, so the locked field carries it
+          // already and the note states why. Nothing in the picker needs touching to submit.
+          assertThat(missionInput).hasValue("60");
+          assertThat(missionInput).not().isEditable();
+          assertThat(page.locator(dimSelector + " [data-herkunft-auto-note]")).isVisible();
+          assertThat(page.locator(dimSelector + " [data-herkunft-warn]")).isHidden();
+          assertThat(page.locator("#umbuchenSubmitBtn")).isEnabled();
+
+          String destinationLocationId = selectDifferentUmbuchenLocation(page, opsHubLocId);
+          // Lowering the transferred amount re-syncs the locked field ...
+          page.locator("#umbuchenAmount").fill("40");
+          assertThat(missionInput).hasValue("40");
+          assertThat(page.locator("#umbuchenSubmitBtn")).isEnabled();
+
+          submitUmbuchenInPlace(page);
+
+          JsonArray stacks = stacksForMaterial(prefillMatId);
+          assertEquals(
+              20.0, amountAtLocation(stacks, opsHubLocId), AMOUNT_DELTA, "source keeps 60 - 40");
+          assertEquals(
+              40.0,
+              amountAtLocation(stacks, destinationLocationId),
+              AMOUNT_DELTA,
+              "destination receives the transferred 40");
+          // ... and the 40 left the mission earmark (60 - 40 = 20), which only the prefilled plan
+          // can achieve — there is no rest it could have been taken from. The transfer re-swap
+          // re-renders the chip asynchronously, so use the auto-retrying attribute matcher.
+          Locator missionChip =
+              page.locator(
+                  "div.assoc-split[data-entry-id='"
+                      + prefillItemId
+                      + "'][data-assoc-field='MISSION'] [data-assoc-chip='mission']"
+                      + "[data-target-id='"
+                      + missionId
+                      + "']");
+          assertThat(missionChip)
+              .hasAttribute(
+                  "data-amount",
+                  Pattern.compile("^20(\\.0+)?$"),
                   new LocatorAssertions.HasAttributeOptions().setTimeout(20_000));
         });
   }

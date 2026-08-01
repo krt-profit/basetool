@@ -31,6 +31,12 @@
  * omitted plan (all inputs 0) makes the backend take the deduction from the rest first -- the
  * locked default "Rest zuerst, Rest leer lassen".
  *
+ * One dimension shape has no choice to make: exactly one tag and no not-yet-assigned rest. Every
+ * unit leaving the entry then has to come out of that one tag, so `X` is the only value the field
+ * can ever hold -- typing anything else just trips the "assign at least X" gate. Such a dimension
+ * is filled from the deducted amount and locked (readOnly) instead of being demanded from the
+ * user, and it keeps following the amount field while the modal is open.
+ *
  * The picker reads the entry's tags straight from the source leaf row's Variante-C chips
  * (.assoc-split[data-assoc-field] -> .assoc-chip[data-target-id][data-amount]), so no extra
  * server round-trip is needed. State lives per modal in `registry`, keyed by a short prefix
@@ -72,6 +78,7 @@
                 proceedsTitle: 'Sale proceeds',
                 personal: 'Personal: {0}',
                 auec: 'aUEC',
+                auto: 'Filled in automatically: only tag, no rest',
             }
         );
     }
@@ -243,6 +250,22 @@
     }
 
     /**
+     * Reports whether a dimension leaves the user no choice: the entry carries exactly one earmark
+     * tag in it and no not-yet-assigned rest, so the whole deduction must come out of that single
+     * tag (minRequired == the deducted amount, and the tag is the only place it can come from).
+     * Such a dimension is prefilled and locked rather than demanded from the user.
+     *
+     * @param {object} dim the dimension descriptor from readDimension
+     * @returns {boolean} true when the single tag has to absorb the whole deduction
+     */
+    function isDetermined(dim) {
+        if (!dim || dim.tags.length !== 1) {
+            return false;
+        }
+        return Math.abs(roundAmount(dim.entryAmount - dim.sumAllocated, dim.isPiece)) <= REST_EPS;
+    }
+
+    /**
      * Finds a tag's amount input within a section or a single dimension block.
      *
      * @param {HTMLElement} scope the section or a [data-herkunft-dim] block
@@ -266,7 +289,9 @@
     /**
      * Builds the DOM for one dimension: a caption, one amount input per tag, a rest chip, an
      * "assign at least" warning and (mission dimension of a SELL-capable picker only) a coupled
-     * proceeds hint. Names are set via textContent so a mission name never injects markup.
+     * proceeds hint. Names are set via textContent so a mission name never injects markup. A
+     * determined dimension (single tag, no rest) gets its input locked plus a note saying why --
+     * the value itself is written by syncDetermined, which recompute runs right after this.
      *
      * @param {string} prefix the modal prefix
      * @param {object} dim the dimension descriptor from readDimension
@@ -274,6 +299,7 @@
      */
     function buildDimBlock(prefix, dim) {
         const strings = i18n();
+        const determined = isDetermined(dim);
         const block = document.createElement('div');
         block.className = 'herkunft-dim';
         block.setAttribute('data-herkunft-dim', dim.field);
@@ -301,6 +327,11 @@
             input.step = dim.isPiece ? '1' : '0.001';
             input.value = '0';
             input.setAttribute('inputmode', dim.isPiece ? 'numeric' : 'decimal');
+            if (determined) {
+                input.readOnly = true;
+                input.classList.add('herkunft-input--auto');
+                input.setAttribute('data-herkunft-auto', '');
+            }
 
             const max = document.createElement('span');
             max.className = 'herkunft-tag-max';
@@ -311,6 +342,14 @@
             row.appendChild(max);
             block.appendChild(row);
         });
+
+        if (determined) {
+            const auto = document.createElement('div');
+            auto.className = 'herkunft-auto';
+            auto.setAttribute('data-herkunft-auto-note', '');
+            auto.textContent = strings.auto;
+            block.appendChild(auto);
+        }
 
         const restLine = document.createElement('div');
         restLine.className = 'herkunft-restline';
@@ -334,6 +373,33 @@
             block.appendChild(proceeds);
         }
         return block;
+    }
+
+    /**
+     * Mirrors the deducted amount into a determined dimension's locked input, so the field is
+     * already filled when the modal opens and follows every later edit of the amount field. A
+     * missing / non-positive amount resets it to 0 rather than leaving a stale figure behind. The
+     * amount is written verbatim (not clamped to the slice): an over-max amount must keep tripping
+     * the picker's tagOver gate instead of being silently trimmed to a submittable plan.
+     *
+     * @param {HTMLElement} section the picker section
+     * @param {object} dim the dimension descriptor
+     * @param {number} deducted the current deducted amount
+     */
+    function syncDetermined(section, dim, deducted) {
+        if (!isDetermined(dim)) {
+            return;
+        }
+        const input = tagInput(section, dim.field, dim.tags[0].targetId);
+        if (!input) {
+            return;
+        }
+        const value =
+            isFinite(deducted) && deducted > 0 ? String(roundAmount(deducted, dim.isPiece)) : '0';
+        // Assigning .value fires no input event, so this cannot re-enter the delegated listener.
+        if (input.value !== value) {
+            input.value = value;
+        }
     }
 
     /**
@@ -491,7 +557,8 @@
     }
 
     /**
-     * Recomputes the picker: refreshes every dimension's UI and enables/disables the modal's submit
+     * Recomputes the picker: re-fills every determined dimension's locked input from the current
+     * deducted amount, refreshes every dimension's UI and enables/disables the modal's submit
      * button. An inactive or tag-less picker never gates the button.
      *
      * @param {string} prefix the modal prefix
@@ -514,6 +581,9 @@
         const sell = sellContext(prefix);
         let allValid = true;
         ctx.dims.forEach(function (dim) {
+            // Determined dimensions are filled by the picker itself, so refresh them before the
+            // state is read off the inputs -- both on the initial populate and on every amount edit.
+            syncDetermined(section, dim, deducted);
             const state = dimState(section, dim, deducted);
             if (!state.valid) {
                 allValid = false;
@@ -573,7 +643,8 @@
      * Collects the picker's per-dimension "deduct from" plan for the submit payload. A dimension
      * with only zero inputs contributes null -- the backend then takes that dimension's deduction
      * from the rest first (the legacy default). An inactive / tag-less picker contributes null for
-     * both dimensions.
+     * both dimensions. A determined dimension always contributes its prefilled single reduction,
+     * which is exactly the plan the backend's own default would have derived for it.
      *
      * @param {string} prefix the modal prefix
      * @returns {{jobOrderReductions: Array|null, missionReductions: Array|null}} the plan

@@ -508,6 +508,15 @@ assigned to tags when the deduction exceeds a dimension's rest. For a `SELL` it 
 per-mission proceeds estimate. A submit sends only the non-zero inputs as the plan; an entry with no
 earmarks hides the picker and submits the legacy `null` plan.
 
+**A determined dimension is prefilled, not demanded.** A dimension the entry splits across exactly
+one tag with **no not-yet-assigned rest** admits a single applyable plan: the deduction has to come
+out of that one tag in full, so every other value trips the "assign at least X" gate. The picker
+therefore fills that field from the deducted amount itself, keeps it in step with every later edit of
+the amount, locks it (`readOnly`) and labels it as auto-filled, so the modal is submittable the
+moment it opens. This is a client-side affordance only — the resulting explicit plan is exactly the
+one the backend's own `null`-plan default would have derived for that shape, so the write is
+unchanged. A dimension with a rest, or with two or more tags, stays a free choice defaulting to `0`.
+
 **A job-order handover draws only from its own order's slice, and clamps the mission dimension.** A
 partial handover of quantity X to an order shrinks **that order's own slice** by X and lowers the
 entry amount by X. X is capped at that order's slice on the entry — a handover fulfils only its own
@@ -548,6 +557,9 @@ there is no separate income-attribution input.
 - [ ] The Ausbuchen and Umbuchen modals render the "Herkunft" picker (one input per tag per
   dimension, defaulting to 0 = from the rest), block the submit while the plan is invalid, and send
   only the non-zero inputs; an entry with no earmarks hides the picker.
+- [ ] A dimension with exactly one tag and no rest is prefilled with the deducted amount, locked and
+  labelled as auto-filled: the modal is submittable without touching the picker, the field follows
+  every later change of the amount, and the submitted plan deducts the full amount from that tag.
 - [ ] A partial handover of a dual-tagged (order + mission) entry clamps the mission dimension by the
   handed amount instead of 422-ing (rest-first, then proportional by default); the handover modal
   shows the mission picker only when two or more missions and the handed amount exceeds the mission
