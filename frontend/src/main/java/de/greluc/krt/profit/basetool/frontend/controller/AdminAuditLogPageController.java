@@ -140,6 +140,7 @@ public class AdminAuditLogPageController {
               "INVENTORY_ITEM_PERSONALIZED",
               "INVENTORY_ITEM_DELIVERY_TOGGLED",
               "INVENTORY_BULK_CHECKED_OUT",
+              "INVENTORY_BULK_REBOOKED",
               "INVENTORY_WIPED",
               "INVENTORY_RECEIVED_FROM_REFINERY",
               "INVENTORY_RECEIVED_FROM_PRODUCTION",

@@ -46,6 +46,9 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   stock merge (`INVENTORY_ITEM_MERGED` — `PIECE` automatically, `SCU` on the per-action opt-in,
   REQ-INV-026) / per-(entry, job-order) delivery-toggle (`INVENTORY_ITEM_DELIVERY_TOGGLED` —
   `delivered` lives on the job-order allocation since Variante C, REQ-INV-027) / bulk-checkout /
+  **bulk rebooking** (Massen-Umbuchen — `INVENTORY_BULK_REBOOKED`, one summary event per action
+  carrying the mode and the moved/skipped counts, REQ-INV-036; the individual moves are not audited
+  separately, and a run that moved nothing records no event because it mutated no state) /
   global wipe; plus the cross-area writers (refinery store → `INVENTORY_RECEIVED_FROM_REFINERY`,
   job-order handover — material handover **and** item delivery consuming the order's earmarked item
   stock, REQ-ORDERS-030 → `INVENTORY_HANDED_OVER`, job-order item-production consumption →

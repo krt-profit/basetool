@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationWriteDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryCatalog;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
@@ -809,6 +811,36 @@ public class InventoryItemController {
   public void bulkCheckout(
       @AuthenticationPrincipal Jwt jwt, @RequestBody @Valid BulkCheckoutRequest request) {
     inventoryItemService.bulkCheckout(request, userService.getUserIdFromJwt(jwt));
+  }
+
+  /**
+   * Rebooks a list of the caller's own inventory rows in one transaction (Massen-Umbuchen,
+   * REQ-INV-036) — to another location/owner or across the personal marker. Every row moves in
+   * full. Owner-scoped from the JWT like {@link #bulkCheckout}: the caller can only ever move their
+   * own stock, so no logistician escalation applies.
+   *
+   * @return how many rows were moved and how many were skipped as already-at-target
+   */
+  @Operation(
+      summary = "Bulk rebook",
+      description =
+          "Moves all specified inventory rows belonging to the authenticated user in full — to a"
+              + " target location/owner, or across the personal marker. Rows already in the"
+              + " requested target state are skipped and reported; an unknown id, a foreign row or"
+              + " an earmarked row blocking a personalize aborts the whole action.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Rebooked; moved/skipped counts are returned"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Empty list, no transfer target, or an earmarked row blocking a personalize"),
+    @ApiResponse(responseCode = "403", description = "Access denied - row belongs to another user"),
+    @ApiResponse(responseCode = "404", description = "One or more rows, or a target, not found")
+  })
+  @PostMapping("/bulk-rebook")
+  @PreAuthorize("isAuthenticated()")
+  public BulkRebookResultDto bulkRebook(
+      @AuthenticationPrincipal Jwt jwt, @RequestBody @Valid BulkRebookRequest request) {
+    return inventoryItemService.bulkRebook(request, userService.getUserIdFromJwt(jwt));
   }
 
   /**

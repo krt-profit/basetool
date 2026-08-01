@@ -92,6 +92,14 @@ public enum AuditEventType {
   /** The caller bulk-checked-out several of their own inventory rows in one action. */
   INVENTORY_BULK_CHECKED_OUT(AuditDomain.INVENTORY),
 
+  /**
+   * The caller bulk-rebooked several of their own inventory rows in one action (Massen-Umbuchen,
+   * REQ-INV-036) — moved them to another location/owner or flipped their personal marker. One
+   * summarizing event per action carrying the mode and the moved/skipped counts, mirroring {@link
+   * #INVENTORY_BULK_CHECKED_OUT}; the individual moves are not audited separately.
+   */
+  INVENTORY_BULK_REBOOKED(AuditDomain.INVENTORY),
+
   /** The admin emptied the whole (scoped) global warehouse — one summarizing event. */
   INVENTORY_WIPED(AuditDomain.INVENTORY),
 
