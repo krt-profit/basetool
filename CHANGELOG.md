@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Kompakte Schaltflächen in dichten Tabellen sind jetzt tatsächlich kompakt.** Die Varianten für Zeilen-Aktionen waren seit ihrer Einführung wirkungslos: eine später deklarierte Regel überschrieb sie, sodass jede "dichte" Schaltfläche in voller Größe erschien. Aktionsspalten in Lager, Kartellbank, Materialbörse, Einsätzen und Operationen werden dadurch spürbar schmaler — alle übrigen Schaltflächen behalten unverändert ihre 44px-Zielgröße (REQ-UI-009).
+
+- **Lager: Der Mengen-Dialog einer Auftrags- oder Einsatz-Zuordnung ist wieder bedienbar.** Beim Anklicken eines Zuordnungs-Chips schrumpfte das Mengenfeld auf wenige Pixel, und "Entfernen" ragte rechts aus dem Kästchen heraus. Das Mengenfeld nimmt jetzt eine eigene Zeile über voller Breite ein, die Schaltflächen teilen sich die darunter (REQ-UI-011).
+
 ## [v1.5.27](https://github.com/krt-profit/basetool/releases/tag/v1.5.27) - 2026-07-31
 
 ### Fixed

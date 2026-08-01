@@ -749,10 +749,28 @@ tbody tr:nth-child(even):hover {
     font-weight: var(--fw-bold);
 }
 
+/* The amount editor never fits its three controls on one line inside the 260px
+   popover: "Speichern" + "Entfernen" alone claim ~225px, and the input is the only
+   shrinkable item because `.tree-field input` (above) hands every input inside the
+   Lager tree `width: 100%; min-width: 0` — the popover is a DOM descendant of
+   .tree-field even though it is position: fixed. Result before the fix: the input
+   collapsed to a 26px sliver and "Entfernen" overflowed the popover's right border.
+   So the input takes a full-width line of its own, the buttons share the next one,
+   and `flex-wrap` guarantees a longer translation drops a button to a third line
+   instead of escaping the box. */
 .assoc-pop__menge .assoc-menge-row {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
     align-items: center;
+}
+
+.assoc-pop__menge .assoc-menge-input {
+    flex: 1 0 100%;
+}
+
+.assoc-pop__menge .assoc-menge-row .btn {
+    flex: 1 1 auto;
 }
 
 /* Variante C "Herkunft" (deduct-from) picker (REQ-INV-027): inside the Ausbuchen /
@@ -936,8 +954,17 @@ tbody tr:nth-child(even):hover {
     overflow-wrap: anywhere;
 }
 
-/* Compact action button for dense tree-table rows. */
-.btn-xs {
+/* Compact action button for dense tree-table rows — the 32px dense-row exception to
+   REQ-UI-009's 44px floor, which covers these two compact classes and nothing else.
+
+   The `.btn` qualifier is load-bearing, not decoration. `.btn` is declared LATER in this
+   file and declared a second time inside the `width <= 1024px` touch block, so a bare
+   `.btn-xs` (0,1,0) loses every property it shares with `.btn` on source order and renders
+   full-size: before this qualifier a `.btn.btn-primary.btn-xs` measured 105x44 — pixel-identical
+   to a plain `.btn`, i.e. the class had been inert since it was introduced. `.btn.btn-xs`
+   (0,2,0) wins wherever `.btn` appears, in any file and inside any media query. Never drop
+   the qualifier, and never rely on moving these blocks around instead. */
+.btn.btn-xs {
     min-height: 32px;
     padding: 0.25rem 0.55rem;
     font-size: 0.68rem;
@@ -946,11 +973,19 @@ tbody tr:nth-child(even):hover {
 /* Icon-only square action button: keeps a dense action column from crowding the
    value beside it (e.g. the per-entry "Notiz" button in the Lager tree table).
    The accessible name comes from aria-label/title; the glyph is decorative
-   (aria-hidden). Pair with .btn-xs for the 32px dense-row size. */
+   (aria-hidden). Pair with .btn-xs for the 32px dense-row size.
+
+   Same specificity trap as .btn-xs above: `gap` and `padding` collide with `.btn` and need
+   the qualifier, `min-width` is unique to this rule and applies on its own. Declared after
+   `.btn.btn-xs` on purpose — equal specificity, so this padding wins when a button carries
+   both classes, which is what squares off an icon-only dense action (32x32). */
 .btn-icon {
+    min-width: 32px;
+}
+
+.btn.btn-icon {
     gap: 0;
     padding: 0.25rem;
-    min-width: 32px;
 }
 
 .btn-icon .krt-icon {
@@ -1952,6 +1987,12 @@ input[type='radio']:focus {
  * not just mobile. Touch-laptops and hybrid devices report as desktop but still
  * need the larger hit area, so we apply it unconditionally rather than only inside
  * the mobile media query.
+ *
+ * The single exception is the dense-row pair `.btn-xs` / `.btn-icon` (declared earlier,
+ * with a `.btn` qualifier so they out-specify this rule): repeated per-row actions in a
+ * dense table or tree drop to a 32px hit area on every class. That carve-out is approved
+ * and written down in REQ-UI-009 — do not widen it to further variants without amending
+ * the requirement first.
  */
 .btn {
     display: inline-flex;
