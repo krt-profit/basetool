@@ -6,6 +6,16 @@
 
 - **Lager: Markierte Einträge lassen sich jetzt auch gesammelt umbuchen.** Neben "Markierte ausbuchen" steht in "Mein Lager" ein "Markierte umbuchen" — dieselbe Auswahl wird verschoben statt ausgebucht: an einen anderen Ort bzw. Nutzer oder als persönlich bzw. ins gemeinsame Lager. Jeder markierte Eintrag wandert vollständig und nimmt seine Auftrags- und Einsatz-Marken mit. Einträge, die bereits am Ziel liegen, werden übersprungen und mitgezählt; die Meldung nennt beide Zahlen (REQ-INV-036, ADR-0124).
 
+### Changed
+
+- **Lager: Beim Um- und Ausbuchen entfällt die Herkunft-Eingabe, wenn es nichts zu entscheiden gibt.** Ist ein Eintrag genau einem Einsatz bzw. genau einem Auftrag zugeordnet und bleibt kein freier Rest, kann die Menge nur von dieser einen Marke kommen — das Feld wird jetzt mit der um- bzw. ausgebuchten Menge vorbefüllt, gesperrt und als automatisch gefüllt gekennzeichnet, statt das Absenden zu blockieren, bis der Wert von Hand nachgetragen wird. Es folgt jeder späteren Änderung der Menge. Gibt es mehrere Marken oder einen Rest, bleibt die Aufteilung wie bisher freie Wahl (REQ-INV-027).
+
+### Fixed
+
+- **Kompakte Schaltflächen in dichten Tabellen sind jetzt tatsächlich kompakt.** Die Varianten für Zeilen-Aktionen waren seit ihrer Einführung wirkungslos: eine später deklarierte Regel überschrieb sie, sodass jede "dichte" Schaltfläche in voller Größe erschien. Aktionsspalten in Lager, Kartellbank, Materialbörse, Einsätzen und Operationen werden dadurch spürbar schmaler — alle übrigen Schaltflächen behalten unverändert ihre 44px-Zielgröße (REQ-UI-009).
+
+- **Lager: Der Mengen-Dialog einer Auftrags- oder Einsatz-Zuordnung ist wieder bedienbar.** Beim Anklicken eines Zuordnungs-Chips schrumpfte das Mengenfeld auf wenige Pixel, und "Entfernen" ragte rechts aus dem Kästchen heraus. Das Mengenfeld nimmt jetzt eine eigene Zeile über voller Breite ein, die Schaltflächen teilen sich die darunter (REQ-UI-011).
+
 ## [v1.5.27](https://github.com/krt-profit/basetool/releases/tag/v1.5.27) - 2026-07-31
 
 ### Fixed

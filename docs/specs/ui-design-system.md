@@ -238,9 +238,33 @@ Every layout change and new component works on **four** classes:
 - **Desktop** (1024–1600px) and **Ultra-wide** (1600px+) — exploit space (docked sidebars,
   auto-fit card/dashboard grids) but cap long-form text at `max-width: 80ch` on `<p>`.
 
+**Dense row actions are an explicit exception at 32px.** The two compact variants `.btn-xs`
+and `.btn-icon` — the *repeated* per-row actions of a dense table / tree action cluster
+(REQ-UI-010) — carry a **32px** minimum hit area on **every** device class, touch classes
+included, rather than the 44px floor above. Density in those clusters is what keeps a wide
+Lager / bank / mission table readable, and the design system specifies exactly that: `.btn-xs`
+at 32px in `krt-components.css`, `.btn-icon` in its README as the icon-only row action that
+"saves ~50–60% of the action column in dense tables". Note the design system orders `.btn-xs`
+*after* `.btn`, so it has always worked there — the inertness below is an app-side regression
+introduced when the declarations were copied in above `.btn`. The exception is narrow: it
+covers only those two classes. Every standalone, primary, form and dialog button keeps the 44px floor on every
+class, as does `.btn` itself — including on touch-laptops, which report as desktop and are
+the reason that floor is applied unconditionally rather than inside a width media query.
+Approved by @greluc on 2026-08-01, when both classes were found to have been silently inert
+since they were introduced: `.btn` is declared after them in `styles.css` and re-declared in
+the ≤1024px touch block, so it won every shared property and each "dense" button had in fact
+been rendering full-size.
+
 **Acceptance**
 
-- [ ] Verified at all four breakpoints; interactive targets ≥ 44px on touch classes.
+- [ ] Verified at all four breakpoints; interactive targets ≥ 44px on touch classes, except
+  `.btn-xs` / `.btn-icon` dense-row actions, which are ≥ 32px on every class.
+- [ ] A compact variant actually renders compact — `.btn.btn-xs` out-specifies `.btn` rather
+  than relying on source order, since `.btn` is declared later and again inside the ≤1024px
+  touch block. A bare `.btn-xs` selector is silently inert and is a regression.
+
+**Enforced by:** code/design review · **Code:** `static/css/styles.css` (`.btn`, `.btn.btn-xs`,
+`.btn.btn-icon`, the `width <= 1024px` touch block).
 
 ### REQ-UI-010 — Standard action-button icons
 
@@ -288,6 +312,17 @@ when there is less room below it than the popover needs and more room above — 
 scrolled into view, so a trigger low in the viewport would otherwise drop its amount input +
 Speichern below the fold, unreachable.
 
+Not being clipped from the outside is only half of it: a popup must also **contain its own
+controls**. The allocation popover is a fixed 260px box, and its amount editor
+(`.assoc-pop__menge`) holds an input plus Speichern plus — in edit mode — Entfernen. Two uppercase
+buttons alone claim more than the box's content width, and the input is the only item that can give
+way, because `.tree-field input` hands every input in the Lager tree `width: 100%; min-width: 0`
+(the popover is a DOM descendant of the tree field even though it is `position: fixed`). Laid out on
+one line that collapses the input to an unusable sliver and pushes Entfernen past the popover's
+border. The amount input therefore takes a **full-width line of its own** and the buttons share the
+next one, with `flex-wrap` as the backstop so a longer translation drops a button to a third line
+instead of escaping the box.
+
 **Acceptance**
 
 - [ ] The user picker in the bank "Halter registrieren" modal (and any searchable select in a
@@ -301,10 +336,15 @@ Speichern below the fold, unreachable.
 - [ ] The "+ Zuordnen" popover on a Lager entry low in the viewport flips above its trigger so its
   amount input + Speichern stay on-screen, instead of dropping below the fold where the fixed
   popover cannot be scrolled into view.
+- [ ] Clicking an existing allocation chip opens the amount editor with a full-width, usable amount
+  input, and both Speichern and Entfernen sit inside the popover's border — no control is squeezed
+  to a sliver and none overflows the box (regression: the input collapsed to 26px and Entfernen
+  stuck out 10px to the right).
 
 **Enforced by:** code/design review · **Code:** `static/js/krt-searchable-select.js`,
 `static/js/inventory-admin.js`, `static/js/inventory-my.js`,
-`static/css/styles.css` (`.krt-combobox__listbox`, `.krt-combobox__listbox--above`, `.assoc-pop`).
+`static/css/styles.css` (`.krt-combobox__listbox`, `.krt-combobox__listbox--above`, `.assoc-pop`,
+`.assoc-pop__menge`).
 
 ### REQ-UI-012 — User-facing labels show the display name, never the raw username
 
