@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.29](https://github.com/krt-profit/basetool/releases/tag/v1.5.29) - 2026-08-02
+
 ### Added
 
 - **Ingest-Gateway: Der API-Vertrag der beiden Ingest-Endpunkte ist jetzt als OpenAPI-Dokument veröffentlicht.** `ingest/src/main/resources/api/openapi.json` beschreibt Schemata, Statuscodes und die Bearer-Authentifizierung, gegen die der Desktop-Extraktor entwickelt wird — bisher gab es dafür nur den Quelltext. Wie beim Backend wird das Dokument aus dem Test erzeugt und ist in der Produktion nicht abrufbar (REQ-INGEST-010, REQ-API-007).
