@@ -1,0 +1,113 @@
+# promtool unit test for ContainerMemoryHigh's anonymous-memory scope (REQ-OBS-014, 2026-08-02).
+#
+# Locks the `container_memory_rss / container_spec_memory_limit_bytes > 0.9` form that replaced
+# `container_memory_working_set_bytes / container_spec_memory_limit_bytes > 0.9` (alert renamed from
+# ContainerWorkingSetHigh at the same time). The old rule was not an OOM predictor: working_set counts
+# ACTIVE file pages, including each service's own memory-mapped binary — clean, file-backed, and
+# reclaimed by the kernel rather than OOM-killed. On the 32M exporters that binary is roughly HALF the
+# working set, and page cache expands to fill whatever limit it is given, so the old rule could never
+# be resolved by more RAM (alloy was bumped 192->256->384->512M chasing it).
+#
+#   - FIRES when anonymous memory alone is over the line (the real blackbox-exporter case);
+#   - SILENT when the limit is filled mostly by the mapped binary (alloy / alertmanager false alarms);
+#   - SILENT at normal load;
+#   - SILENT for cgroup roots exporting container_spec_memory_limit_bytes=0 (no +Inf permafire).
+#
+# Numbers are the measured 7-day peaks from the 2026-08-02 plane-wide sweep.
+#
+# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
+#   docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.13.1 test rules tests/containermemoryhigh_anon_scope_test.yml
+
+rule_files:
+  - ../alerts/infrastructure.yml
+
+evaluation_interval: 1m
+
+tests:
+  # The genuine case. blackbox-exporter held 30.5 MiB of ANONYMOUS memory against its 32 MiB limit
+  # (95.3%) — the only container in the stack actually near OOM. Must still fire.
+  - name: fires - anonymous memory over the line (blackbox-exporter)
+    interval: 1m
+    input_series:
+      - series: 'container_memory_rss{name="blackbox-exporter"}'
+        values: "31932416x30"
+      - series: 'container_spec_memory_limit_bytes{name="blackbox-exporter"}'
+        values: "33554432x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerMemoryHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              name: blackbox-exporter
+            exp_annotations:
+              summary: "Container anonymous memory >90% of limit: blackbox-exporter"
+              description: "Container blackbox-exporter holds unreclaimable (anonymous) memory within 10% of its limit — OOM early warning. This deliberately excludes page cache and the mapped binary, which the kernel reclaims instead of OOM-killing; cross-check container_memory_working_set_bytes only to explain a gap, never to size."
+
+  # THE false-positive class this rule exists to kill. Alloy's working set peaked at 485.6 MiB of its
+  # 512 MiB limit (94.8%) — but 183.9 MiB of that was its memory-mapped binary, re-charged to its cgroup
+  # when the v1.18.0 image pull reached prod on 2026-07-31. Anonymous memory was 207.3 MiB = 40.5%.
+  # The old rule mailed nightly about this; the new one must stay silent.
+  - name: silent - limit filled by the mapped binary, not anonymous memory (alloy)
+    interval: 1m
+    input_series:
+      - series: 'container_memory_rss{name="alloy"}'
+        values: "217399296x30"
+      - series: 'container_memory_working_set_bytes{name="alloy"}'
+        values: "509206528x30"
+      - series: 'container_memory_mapped_file{name="alloy"}'
+        values: "192868352x30"
+      - series: 'container_spec_memory_limit_bytes{name="alloy"}'
+        values: "536870912x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerMemoryHigh
+        exp_alerts: []
+
+  # Same shape on a small exporter, where the mapped binary is proportionally worst: alertmanager read
+  # 95.0% of its 48 MiB limit on a working-set basis (45.6 MiB), of which 24.5 MiB was binary and only
+  # 23.2 MiB (48.3%) anonymous.
+  - name: silent - small exporter whose binary is half its working set (alertmanager)
+    interval: 1m
+    input_series:
+      - series: 'container_memory_rss{name="alertmanager"}'
+        values: "24322048x30"
+      - series: 'container_memory_working_set_bytes{name="alertmanager"}'
+        values: "47775744x30"
+      - series: 'container_memory_mapped_file{name="alertmanager"}'
+        values: "25698304x30"
+      - series: 'container_spec_memory_limit_bytes{name="alertmanager"}'
+        values: "50331648x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerMemoryHigh
+        exp_alerts: []
+
+  # Normal load on a JVM app. The three app containers map almost nothing (frontend 0.45 MiB), so the
+  # rename does not change their behaviour and the PR #1419 budgets still hold: 888.4 MiB of 1280 MiB.
+  - name: silent - JVM app at its measured steady state (frontend)
+    interval: 1m
+    input_series:
+      - series: 'container_memory_rss{name="frontend"}'
+        values: "931581952x30"
+      - series: 'container_spec_memory_limit_bytes{name="frontend"}'
+        values: "1342177280x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerMemoryHigh
+        exp_alerts: []
+
+  # cAdvisor exports unnamed cgroup roots with a 0 limit; dividing by it yields +Inf, which is > 0.9 and
+  # would permafire. The `name=~".+"` selector keeps them out — same guard ContainerPidsHigh carries.
+  - name: silent - zero-limit cgroup root does not permafire
+    interval: 1m
+    input_series:
+      - series: 'container_memory_rss{name=""}'
+        values: "104857600x30"
+      - series: 'container_spec_memory_limit_bytes{name=""}'
+        values: "0x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerMemoryHigh
+        exp_alerts: []

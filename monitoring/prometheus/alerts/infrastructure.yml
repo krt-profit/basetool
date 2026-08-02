@@ -97,7 +97,7 @@ groups:
 
       # cAdvisor named-series blackout (#1041 item 7, REQ-OBS-014). This shipped as a real incident
       # (CHANGELOG v1.1.1): cAdvisor stayed "up" while emitting zero name-labelled series, silently
-      # blinding ContainerRestartLoop / ContainerWorkingSetHigh — TargetDown cannot catch it because
+      # blinding ContainerRestartLoop / ContainerMemoryHigh — TargetDown cannot catch it because
       # the scrape still succeeds. The host runs ~20 containers, so a drop below 10 named series means
       # cAdvisor lost its labels. `container_last_seen{name=~".+"}` metric verified against cadvisor
       # v0.60.3.
@@ -236,14 +236,35 @@ groups:
           summary: "Host NIC errors on {{ $labels.device }} ({{ $labels.instance }})"
           description: "The {{ $labels.device }} interface has had receive/transmit errors for 10 minutes — a failing NIC or saturated link corrupting packets. Check dmesg and the link/driver state."
 
-      - alert: ContainerWorkingSetHigh
-        expr: (container_memory_working_set_bytes{name=~".+"} / container_spec_memory_limit_bytes{name=~".+"}) > 0.90
+      # Renamed from ContainerWorkingSetHigh and re-based on container_memory_rss (2026-08-02). The old
+      # expression divided container_memory_working_set_bytes by the limit, and that metric is NOT an
+      # OOM predictor:
+      #
+      #   working_set = anon + ACTIVE file pages (+ kernel)
+      #
+      # The file term includes each service's own memory-mapped BINARY — clean, file-backed and
+      # trivially reclaimable, so the kernel evicts it under pressure rather than OOM-killing. It still
+      # counted fully toward the ratio. Measured 7-day peaks (anon vs what the old rule reported):
+      # alertmanager 48.3% / 95.0%, alloy 40.5% / 94.8%, node-exporter 33.4% / 83.8%, both
+      # postgres-exporters ~42% / ~78% — on the 32M exporters the mapped binary is roughly HALF the
+      # working set. blackbox-exporter (95.3% anon) was the only container in the stack genuinely near
+      # its limit, and this rule still catches it. Page cache also expands to fill whatever limit it is
+      # given, so the old rule was unfixable by more RAM — alloy's 192->256->384->512M history is that
+      # mistake four times over.
+      #
+      # container_memory_rss is cgroup `anon`: heap, thread stacks (so the 2026-07-12 ingest
+      # native-thread OOM is still covered) and JVM native memory. The JVM apps map almost nothing
+      # (frontend 0.45 MiB, ingest 0.11 MiB), so the PR #1419 JVM budgets are unaffected by the change.
+      # Kernel slab/stack is not counted here; ContainerPidsHigh covers the task-count angle
+      # independently. Method + full table: monitoring/README.md -> "Go services" (REQ-OBS-014).
+      - alert: ContainerMemoryHigh
+        expr: (container_memory_rss{name=~".+"} / container_spec_memory_limit_bytes{name=~".+"}) > 0.90
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "Container working set >90% of limit: {{ $labels.name }}"
-          description: "Container {{ $labels.name }} is within 10% of its memory limit — OOM early warning."
+          summary: "Container anonymous memory >90% of limit: {{ $labels.name }}"
+          description: "Container {{ $labels.name }} holds unreclaimable (anonymous) memory within 10% of its limit — OOM early warning. This deliberately excludes page cache and the mapped binary, which the kernel reclaims instead of OOM-killing; cross-check container_memory_working_set_bytes only to explain a gap, never to size."
 
       # A single core app container dropping out of cAdvisor (#1041 item 7, REQ-OBS-014). Complements
       # the global ContainerMetricsMissing above: fires when fewer than the 7 core containers report a

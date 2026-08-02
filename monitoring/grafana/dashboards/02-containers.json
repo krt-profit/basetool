@@ -18,7 +18,7 @@
     {
       "id": 1,
       "type": "timeseries",
-      "title": "Working Set vs Limit % per Container",
+      "title": "Anonymous Memory vs Limit % per Container",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -31,7 +31,7 @@
       },
       "targets": [
         {
-          "expr": "container_memory_working_set_bytes{name=~\".+\"}/container_spec_memory_limit_bytes{name=~\".+\"}*100",
+          "expr": "container_memory_rss{name=~\".+\"}/container_spec_memory_limit_bytes{name=~\".+\"}*100",
           "legendFormat": "{{name}}",
           "refId": "A",
           "datasource": {
@@ -46,12 +46,13 @@
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "description": "Matches the ContainerMemoryHigh alert (fires >90%). Anonymous (unreclaimable) memory only -- page cache and the memory-mapped binary are deliberately excluded, because the kernel reclaims those instead of OOM-killing. Compare against the working-set panel below to see how much of a container's footprint is its binary."
     },
     {
       "id": 2,
       "type": "timeseries",
-      "title": "Memory Working Set Bytes per Container",
+      "title": "Memory Breakdown per Container (working set / anon / mapped binary)",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -65,8 +66,26 @@
       "targets": [
         {
           "expr": "container_memory_working_set_bytes{name=~\".+\"}",
-          "legendFormat": "{{name}}",
+          "legendFormat": "{{name}} working set",
           "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "container_memory_rss{name=~\".+\"}",
+          "legendFormat": "{{name}} anon",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "container_memory_mapped_file{name=~\".+\"}",
+          "legendFormat": "{{name}} mapped binary",
+          "refId": "C",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -79,7 +98,8 @@
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "description": "working_set = anon + active file pages. The gap between working set and anon is reclaimable -- largely each service's own memory-mapped binary (alloy 183.9 MiB, grafana 173.7 MiB, ~half the working set on the 32M exporters). Never size a container from the working-set line alone; see monitoring/README.md -> Go services."
     },
     {
       "id": 3,
