@@ -58458,13 +58458,13 @@
               "$ref" : "#/components/schemas/InventoryAllocationInput"
             }
           },
-          "catalogReferenceValid" : {
+          "qualityConsistentWithCatalog" : {
             "type" : "boolean"
           },
           "missionFreeForGameItem" : {
             "type" : "boolean"
           },
-          "qualityConsistentWithCatalog" : {
+          "catalogReferenceValid" : {
             "type" : "boolean"
           }
         },

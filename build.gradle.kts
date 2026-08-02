@@ -131,13 +131,24 @@ subprojects {
     tasks.withType<Test>().configureEach {
       useJUnitPlatform()
       jvmArgs("--enable-native-access=ALL-UNNAMED")
-      // Bump test heap: every @SpringBootTest spins its own ApplicationContext, and the full
-      // backend suite (over 1000 tests, many context-loading) blows past the JVM 512 MiB default
-      // with a Java heap-space OOM at ~250 tests in. 1.5 GiB carried the suite until the
-      // monitoring-instrumentation contexts (#936) and the Mission/JobOrder service-split test
-      // classes (#948/#949) landed together, at which point the CI worker OOMed again — 2 GiB
-      // restores headroom while staying well inside the 7 GiB github-hosted runner budget.
-      maxHeapSize = "2048m"
+      // Test heap, PER MODULE. Every @SpringBootTest spins its own ApplicationContext, so the
+      // backend suite blows past the JVM 512 MiB default with a Java heap-space OOM at ~250 tests
+      // in. History: 512m -> 1.5 GiB -> 2 GiB when the monitoring-instrumentation contexts (#936)
+      // and the Mission/JobOrder service-split test classes (#948/#949) landed together -> 3 GiB
+      // when the logging-audit suite added 71 backend test methods and the contexts tipped over
+      // again (an OOM inside a bean creation, surfacing as "failed to load ApplicationContext" on
+      // whichever @SpringBootTest happened to run at the moment the heap ran out).
+      //
+      // This is a per-module map rather than one shared number BECAUSE the total is what actually
+      // binds. `org.gradle.parallel=true` plus a single `./gradlew build` in CI lets the module
+      // test JVMs run CONCURRENTLY, so a uniform bump multiplies by three: 3 x 3 GiB alongside the
+      // 2 GiB Gradle daemon would oversubscribe the 7 GiB github-hosted runner and trade a JVM heap
+      // error for an OS-level kill, which is far harder to read. Giving the backend what it needs
+      // and handing back what the small ingest suite never used keeps the concurrent peak at the
+      // 6 GiB it already was. Re-derive this when a module's suite grows, and check the SUM.
+      maxHeapSize =
+        mapOf("backend" to "3072m", "frontend" to "2048m", "ingest" to "1024m")[project.name]
+          ?: "1024m"
       systemProperty("spring.profiles.active", "test")
       // Mockito 5+ on JDK 24+ insists on running as a Java agent. Attach it via
       // -javaagent so the inline mock-maker can self-attach; -Xshare:off avoids
