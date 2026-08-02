@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Lightweight event-delegation helper.
  *
@@ -52,11 +53,14 @@
         if (typeof handler !== 'function') return;
         let selector = '[data-trigger="' + actionName + '"]';
         document.addEventListener(eventType, function (event) {
-            let target = event.target;
+            // event.target is an EventTarget: it is only an Element for events
+            // originating in the document tree, which is why the closest() probe
+            // below is a capability check rather than a formality.
+            let target = /** @type {Element | null} */ (event.target);
             if (!target || typeof target.closest !== 'function') return;
-            let matched = target.closest(selector);
+            let matched = /** @type {HTMLElement | null} */ (target.closest(selector));
             if (!matched) return;
-            if (matched.disabled) return;
+            if (/** @type {HTMLInputElement} */ (matched).disabled) return;
             handler(matched, event);
         });
     }

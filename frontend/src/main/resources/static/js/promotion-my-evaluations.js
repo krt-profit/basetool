@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -65,7 +66,7 @@ function meFillProgressBars() {
         const fill = card.querySelector('.eligibility-progress-fill');
         const text = card.querySelector('.me-progress-text');
         const bar = card.querySelector('.eligibility-progress');
-        if (fill) fill.style.width = pct + '%';
+        if (fill) /** @type {HTMLElement} */ (fill).style.width = pct + '%';
         if (text) text.textContent = achieved + ' / ' + required + ' (' + pct + '%)';
         if (bar) bar.setAttribute('aria-valuenow', String(pct));
     });
@@ -78,7 +79,7 @@ function meFillProgressBars() {
  */
 function meApplyOpenFilter() {
     const input = document.getElementById('me-filter-open');
-    const onlyOpen = !!(input && input.checked);
+    const onlyOpen = !!(input && /** @type {HTMLInputElement} */ (input).checked);
     const rows = document.querySelectorAll('.checks-table tbody tr[data-me-satisfied]');
     rows.forEach(function (row) {
         const satisfied = row.getAttribute('data-me-satisfied') === 'true';
@@ -115,7 +116,7 @@ function meWriteFilterPref(value) {
 function mePersistOpenFilter() {
     const input = document.getElementById('me-filter-open');
     if (input) {
-        meWriteFilterPref({ onlyOpen: input.checked });
+        meWriteFilterPref({ onlyOpen: /** @type {HTMLInputElement} */ (input).checked });
     }
 }
 
@@ -123,7 +124,7 @@ function meRestoreOpenFilter() {
     const input = document.getElementById('me-filter-open');
     const saved = meReadFilterPref();
     if (input && saved && typeof saved.onlyOpen === 'boolean') {
-        input.checked = saved.onlyOpen;
+        /** @type {HTMLInputElement} */ (input).checked = saved.onlyOpen;
     }
 }
 

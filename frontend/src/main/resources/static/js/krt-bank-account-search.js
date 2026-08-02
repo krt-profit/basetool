@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -46,14 +47,18 @@
 
     // Metadata the movement modal needs after the <select> (and its per-option data) is gone: maps a
     // committed account id to whether that account mandates a withdrawal/transfer justification.
-    window.krtBankAccountMeta = window.krtBankAccountMeta || {};
+    // Held in a local as well as on window: the callbacks below run long after
+    // this line, so they cannot rely on the assignment above having narrowed the
+    // optional window property.
+    const accountMeta = window.krtBankAccountMeta || {};
+    window.krtBankAccountMeta = accountMeta;
 
     // Maps a backend account row to the combobox option shape and records its justification mandate.
     // The label folds the account number and name so typing either narrows the list; the id is the
     // submitted value.
     function toOption(row) {
         const requiresJustification = JUSTIFICATION_TYPES.indexOf(row.type) !== -1;
-        window.krtBankAccountMeta[row.id] = requiresJustification;
+        accountMeta[row.id] = requiresJustification;
         const accountNo = row.accountNo || '';
         const name = row.name || '';
         const label = accountNo && name ? accountNo + ' — ' + name : accountNo || name || row.id;

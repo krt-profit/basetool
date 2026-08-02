@@ -849,11 +849,19 @@ function toggleBookOutTypeFields() {
 // ===================== Umbuchen (rebooking) modal — transfer relocated from Ausbuchen =========
 // The squadron-wide /all view rebooks only between Ort/Nutzer/OrgUnit (the former book-out
 // TRANSFER); the personal<->shared toggle is owner-scoped and lives on /inventory/my.
-let umbuchenItemId = null;
+//
+// The `admin` prefix on this file's modal state is deliberate — do not "tidy" it away.
+// inventory-my.js runs the near-identical Umbuchen/Ausbuchen modals and declared the same eight
+// top-level names (umbuchenItemId, bookOutItemId, ASSOC_EPS, the two form elements, …). These are
+// classic scripts sharing ONE global lexical environment (ADR-0069), so a page loading both
+// modules would die on `SyntaxError: Identifier 'umbuchenItemId' has already been declared` —
+// before any of it runs. No template loads both today, which is the only reason it never fired.
+// Found by the type checker (TS6200) when ADR-0125 was introduced.
+let adminUmbuchenItemId = null;
 // #1328: the row's current owning org-unit id, used to preset the target-OrgUnit picker so a
 // submit that does not touch the picker keeps the stock in its current unit (null = ownerless row).
-let umbuchenCurrentOwningOrgUnitId = null;
-let umbuchenInFlight = false;
+let adminUmbuchenCurrentOwningOrgUnitId = null;
+let adminUmbuchenInFlight = false;
 
 function updateUmbuchenAmountFromTarget() {
     const targetEl = document.getElementById('umbuchenTargetAmount');
@@ -923,12 +931,12 @@ function refreshUmbuchenTransferOrgUnitPicker() {
                 select.appendChild(o);
             });
             if (
-                umbuchenCurrentOwningOrgUnitId &&
+                adminUmbuchenCurrentOwningOrgUnitId &&
                 memberships.some(function (m) {
-                    return m.orgUnitId === umbuchenCurrentOwningOrgUnitId;
+                    return m.orgUnitId === adminUmbuchenCurrentOwningOrgUnitId;
                 })
             ) {
-                select.value = umbuchenCurrentOwningOrgUnitId;
+                select.value = adminUmbuchenCurrentOwningOrgUnitId;
             }
             wrapper.style.display = 'block';
         })
@@ -953,8 +961,8 @@ function openUmbuchenModal(
     quantityType,
     owningOrgUnitId,
 ) {
-    umbuchenItemId = id;
-    umbuchenCurrentOwningOrgUnitId = owningOrgUnitId || null;
+    adminUmbuchenItemId = id;
+    adminUmbuchenCurrentOwningOrgUnitId = owningOrgUnitId || null;
     const isScu = quantityType !== 'PIECE';
     const amountEl = document.getElementById('umbuchenAmount');
     const targetEl = document.getElementById('umbuchenTargetAmount');
@@ -1019,7 +1027,7 @@ function closeUmbuchenModal() {
 function submitUmbuchen(event) {
     if (event && event.defaultPrevented) return;
     if (event) event.preventDefault();
-    if (umbuchenInFlight || !window.krtFetch || !umbuchenItemId) return;
+    if (adminUmbuchenInFlight || !window.krtFetch || !adminUmbuchenItemId) return;
     const amountEl = document.getElementById('umbuchenAmount');
     const amount = window.krtScuInput
         ? window.krtScuInput.parse(amountEl.value)
@@ -1051,13 +1059,13 @@ function submitUmbuchen(event) {
         missionReductions: reductions.missionReductions,
     };
     // Read the earmarked orders before the write (the leaf is replaced on the post-write re-swap).
-    const affectedOrderIds = collectLeafOrderIds(umbuchenItemId);
-    umbuchenInFlight = true;
+    const affectedOrderIds = collectLeafOrderIds(adminUmbuchenItemId);
+    adminUmbuchenInFlight = true;
     if (submitBtn) submitBtn.disabled = true;
     window.krtFetch
         .write({
             method: 'POST',
-            url: '/inventory/' + umbuchenItemId + '/transfer',
+            url: '/inventory/' + adminUmbuchenItemId + '/transfer',
             payload: payload,
             successMessage: umbuchenI18n.success,
             errorMessage: umbuchenI18n.error,
@@ -1071,16 +1079,16 @@ function submitUmbuchen(event) {
             },
         })
         .then(function () {
-            umbuchenInFlight = false;
+            adminUmbuchenInFlight = false;
             if (submitBtn) submitBtn.disabled = false;
         });
 }
 
 // The item id the open book-out modal targets; set when the modal opens, read by submitBookOut.
-let bookOutItemId = null;
+let adminBookOutItemId = null;
 // Guards against a second submit (Enter / rapid click) landing while the first write is in
 // flight — a duplicate book-out on the same version would otherwise 409.
-let bookOutInFlight = false;
+let adminBookOutInFlight = false;
 
 // #577 part 2: submit the book-out in place via the shared krtFetch/krtCsrf foundation, reusing
 // the existing POST /inventory/{id}/transfer proxy (the backend book-out endpoint, equivalent
@@ -1094,7 +1102,7 @@ function submitBookOut(event) {
         return;
     }
     event.preventDefault();
-    if (bookOutInFlight || !window.krtFetch || !bookOutItemId) {
+    if (adminBookOutInFlight || !window.krtFetch || !adminBookOutItemId) {
         return;
     }
     const typeInput = document.querySelector('input[name="type"]:checked');
@@ -1131,15 +1139,15 @@ function submitBookOut(event) {
     };
     const submitBtn = document.getElementById('bookOutSubmitBtn');
     // Read the earmarked orders before the write (the leaf is replaced on the post-write re-swap).
-    const affectedOrderIds = collectLeafOrderIds(bookOutItemId);
-    bookOutInFlight = true;
+    const affectedOrderIds = collectLeafOrderIds(adminBookOutItemId);
+    adminBookOutInFlight = true;
     if (submitBtn) {
         submitBtn.disabled = true;
     }
     window.krtFetch
         .write({
             method: 'POST',
-            url: '/inventory/' + bookOutItemId + '/transfer',
+            url: '/inventory/' + adminBookOutItemId + '/transfer',
             payload: payload,
             successMessage: bookOutI18n.success,
             errorMessage: bookOutI18n.error,
@@ -1153,7 +1161,7 @@ function submitBookOut(event) {
             },
         })
         .then(function () {
-            bookOutInFlight = false;
+            adminBookOutInFlight = false;
             if (submitBtn) {
                 submitBtn.disabled = false;
             }
@@ -1161,7 +1169,7 @@ function submitBookOut(event) {
 }
 
 function openBookOutModal(id, amount, version, materialId, userId, locationId, quantityType) {
-    bookOutItemId = id;
+    adminBookOutItemId = id;
     const bookOutForm = document.getElementById('bookOutForm');
     bookOutForm.action = window.safeSameOriginUrl(
         '/inventory/' + id + '/book-out',
@@ -1349,7 +1357,7 @@ window.onclick = function (event) {
 // /inventory/all view is read-only for non-association roles (the editable chips +
 // popover are gated behind sec:authorize in stackEntriesAdmin), so this module only
 // ever binds to the interactive markup those roles receive.
-const ASSOC_EPS = 0.0005;
+const ADMIN_ASSOC_EPS = 0.0005;
 
 // Formats an amount for a chip / rest label: whole for PIECE, three decimals for SCU.
 function assocFormatAmount(amount, isPiece) {
@@ -1444,7 +1452,7 @@ function assocBuildChip(field, alloc, isPiece) {
 function assocUpdateRestChip(el, rest, isPiece) {
     if (!el) return;
     el.classList.remove('chip--success', 'chip--muted', 'chip--danger');
-    if (rest == null || Math.abs(rest) <= ASSOC_EPS) {
+    if (rest == null || Math.abs(rest) <= ADMIN_ASSOC_EPS) {
         el.classList.add('chip--success');
         el.textContent = assocI18n.restZero;
     } else if (rest < 0) {
@@ -1758,11 +1766,11 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
 
 // The book-out form is a stable top-level element (outside the swapped table container), so a
 // direct submit listener bound once survives the grouped-table re-swaps.
-const bookOutFormEl = document.getElementById('bookOutForm');
-if (bookOutFormEl) {
-    bookOutFormEl.addEventListener('submit', submitBookOut);
+const adminBookOutFormEl = document.getElementById('bookOutForm');
+if (adminBookOutFormEl) {
+    adminBookOutFormEl.addEventListener('submit', submitBookOut);
 }
-const umbuchenFormEl = document.getElementById('umbuchenForm');
-if (umbuchenFormEl) {
-    umbuchenFormEl.addEventListener('submit', submitUmbuchen);
+const adminUmbuchenFormEl = document.getElementById('umbuchenForm');
+if (adminUmbuchenFormEl) {
+    adminUmbuchenFormEl.addEventListener('submit', submitUmbuchen);
 }

@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Shared tool-wide live-sync client (REQ-FE-015, ADR-0094).
  *
@@ -338,8 +339,7 @@
         }
 
         function showPill() {
-            let pill = document.getElementById(pillId);
-            if (pill) {
+            if (document.getElementById(pillId)) {
                 return;
             }
             // Shared fallback comes from the bundle-sourced global set in head.html (F8) — no
@@ -350,7 +350,7 @@
                 typeof pillCfg.label === 'function'
                     ? pillCfg.label() || fallbackLabel
                     : fallbackLabel;
-            pill = document.createElement('button');
+            const pill = document.createElement('button');
             pill.id = pillId;
             pill.type = 'button';
             pill.className = pillClassName;

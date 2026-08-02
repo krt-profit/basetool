@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -44,6 +45,9 @@
 
     // Maps a backend MaterialDto to the combobox option shape, folding the picker metadata into
     // the option `data` map (mirrored onto the hidden input while the option is selected).
+    // The DTO type is generated from the OpenAPI spec, so a backend field rename breaks this
+    // mapping at build time instead of silently emptying the picker (ADR-0125).
+    /** @param {ApiDto<'MaterialDto'>} row */
     function toMaterialOption(row) {
         return {
             value: row.id,
@@ -57,11 +61,13 @@
     }
 
     // Maps a backend LocationReferenceDto to the combobox option shape (no metadata).
+    /** @param {ApiDto<'LocationReferenceDto'>} row */
     function toLocationOption(row) {
         return { value: row.id, label: row.name };
     }
 
     // Maps a backend game-item reference row to the combobox option shape (no metadata).
+    /** @param {ApiDto<'GameItemReferenceDto'>} row */
     function toGameItemOption(row) {
         return { value: row.id, label: row.name || row.id };
     }

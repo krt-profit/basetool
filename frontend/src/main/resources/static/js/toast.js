@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -40,7 +41,7 @@ function initToasts() {
         }, 100);
 
         // Hide after duration
-        const duration = parseInt(toast.getAttribute('data-duration')) || 5000;
+        const duration = parseInt(toast.getAttribute('data-duration') || '', 10) || 5000;
         setTimeout(() => {
             toast.classList.remove('visible');
             setTimeout(() => toast.remove(), 300);

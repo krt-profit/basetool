@@ -57,6 +57,30 @@ the receiver/relay. Prefer deriving these maps from a single source of truth so 
 where they can't share one, changing one **requires** changing the others in the same PR, and the
 change is incomplete otherwise.
 
+## Type checking (REQ-FE-018, ADR-0125)
+
+The scripts under `static/js` are statically type-checked by `:frontend:typecheckJs`
+(`tsc --noEmit`, strict, wired into `check`). **TypeScript is a checker here, not a language:**
+the sources stay JavaScript, stay classic non-module `<script>` tags sharing one global scope
+(ADR-0069), and nothing is compiled, bundled or renamed. Do **not** convert files to `.ts` — the
+full migration is an unscheduled, costed option in
+[`docs/TYPESCRIPT_MIGRATION_PLAN.md`](../docs/TYPESCRIPT_MIGRATION_PLAN.md), not a default.
+
+- **Opt in per file** with a leading `// @ts-check`. A file that opts in **must** be error-free —
+  there is no partial state. Prefer opting in any file you substantially touch.
+- **Declare shared contracts in the same change.** A new `window.krt*` API, a new custom DOM event
+  or a new Thymeleaf bootstrap constant goes into `frontend/types/globals.d.ts` or
+  `frontend/types/thymeleaf-bootstrap.d.ts` as part of the change that introduces it. A bootstrap
+  constant additionally goes into the module's `/* global */` header — ESLint's `no-undef` keeps
+  the per-page visibility check that the global declaration cannot.
+- **Never restate a backend DTO by hand.** Annotate with the generated aliases —
+  `/** @param {ApiDto<'MaterialDto'>} row */`, `ApiPage<…>`, `ApiProblem`. The types come from
+  `openapi.json` via `:frontend:generateApiTypes`; the generated file is build output and must not
+  be committed.
+- **In a checked file, JSDoc must be real JSDoc.** The Javadoc spellings used elsewhere in this
+  repo — `{@code …}`, `{@link …}`, `@param name {shape}` — are parsed as type syntax and are hard
+  errors. Convert them when you opt a file in.
+
 ## Concurrency — the frontend half
 
 - **Frontend DOM version sync** — when an entity is updated via AJAX (dropdown change, row reorder, etc.), the new `version` must propagate to **every** related DOM element in the same context (edit/action buttons, modals inside the same `<tr>` or container). A missed `data-version` attribute → 409 on the user's next click. If targeted updates are too tangled, just `window.location.reload()` on success.

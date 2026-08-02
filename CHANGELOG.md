@@ -40,6 +40,8 @@
 
 - **Ingest-Gateway: Protokollierung auf dem Stand von Backend und Frontend.** Jede Zeile trägt jetzt zusätzlich den Nutzer (Keycloak-`sub`, nie Name oder E-Mail), langsame Anfragen werden wie in den anderen Modulen als Warnung protokolliert, und jede Weiterleitung ans Backend hinterlässt eine Zeile mit Dauer. Neu einstellbar über `APP_LOGGING_*` (REQ-OBS-001/-002/-003).
 
+- **Die Browser-Skripte werden jetzt statisch typgeprüft.** Der TypeScript-Compiler läuft als reiner Prüfer (`tsc --noEmit`) über die Skripte unter `static/js` und hängt als `:frontend:typecheckJs` streng im `check`-Gate. Der Quellcode bleibt JavaScript — es wird nichts kompiliert, gebundelt oder umbenannt; Dateien nehmen einzeln per `// @ts-check` teil (derzeit 27 von 87, darunter das gesamte gemeinsame Fundament). Die Backend-DTO-Typen werden bei jedem Build aus `openapi.json` erzeugt, statt im Frontend von Hand nachgebaut zu werden, womit eine Feldumbenennung im Backend beim Bauen auffällt statt erst zur Laufzeit (REQ-FE-018, ADR-0125).
+
 ### Fixed
 
 - **Katalogabgleich: Ein unvollständiger Abruf löscht keine Einträge mehr.** Brach der Seitendurchlauf des SC-Wiki mittendrin ab oder fehlte die Seitenangabe, wertete der Abgleich den Rest des Katalogs als gelöscht und markierte ihn entsprechend. Ein unvollständiger Lauf übernimmt jetzt seine Zeilen, verzichtet aber auf das Aufräumen und meldet den Grund. Beim UEX-Abgleich bleibt zudem eine leere oder fehlerhafte Antwort nicht mehr unbemerkt, und ein unveränderter Katalog ist als solcher erkennbar statt als Nulllauf.

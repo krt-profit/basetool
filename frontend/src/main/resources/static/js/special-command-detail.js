@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -77,7 +78,9 @@
     // The flags / lead / remove forms live inside the swappable roster fragment, so they are
     // document-delegated (survive a re-swap). Remove uses the delete message, the rest "saved".
     document.addEventListener('submit', function (e) {
-        const memberForm = e.target.closest('#members-results form');
+        const memberForm = /** @type {HTMLFormElement | null} */ (
+            /** @type {Element} */ (e.target).closest('#members-results form')
+        );
         if (!memberForm) {
             return;
         }
@@ -86,7 +89,7 @@
             memberForm.submit();
             return;
         }
-        const isRemove = memberForm.getAttribute('action').indexOf('/delete') !== -1;
+        const isRemove = (memberForm.getAttribute('action') || '').indexOf('/delete') !== -1;
         memberWrite(memberForm, isRemove ? MEMBER_MSG.deleted : MEMBER_MSG.saved, null);
     });
 

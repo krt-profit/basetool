@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * krt-fetch.js — the single client-side seam for frontend write requests and
  * AJAX fragment swaps (epic #571, spec REQ-FE-001..005).
@@ -355,9 +356,9 @@
     document.addEventListener(
         'submit',
         function (e) {
-            const form = e.target;
+            const form = /** @type {HTMLFormElement | null} */ (e.target);
             pendingSubmitter =
-                e.submitter ||
+                /** @type {SubmitEvent} */ (e).submitter ||
                 (form && form.querySelector
                     ? form.querySelector('button[type="submit"], input[type="submit"]')
                     : null);

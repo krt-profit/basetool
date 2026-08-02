@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Shared yield-bonus badge manager for refinery-order forms (create + detail page).
  *
@@ -46,7 +47,7 @@
             badge = document.createElement('span');
             badge.id = 'yieldBonus_' + rowIndex;
             badge.className = 'yield-bonus-badge';
-            badge.title = state.helpText;
+            /** @type {HTMLElement} */ (badge).title = state.helpText;
             label.appendChild(badge);
         }
         badge.classList.remove('yield-positive', 'yield-negative', 'yield-zero');

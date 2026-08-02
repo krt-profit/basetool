@@ -1328,10 +1328,66 @@ account roster preloaded; the grants filter seeds only the selected account) · 
 `templates/bank-grants.html`, `fragments/head.html` (script load order) · **ADR:** ADR-0053, ADR-0089,
 ADR-0106 · **Issues:** —
 
+### REQ-FE-018 — The browser scripts are type-checked, and the DTO types are generated from the OpenAPI spec
+
+The hand-written scripts under `static/js` are **statically type-checked** by the TypeScript
+compiler running in checker-only mode (`tsc --noEmit`, `frontend/tsconfig.json`). This is a
+*checking* requirement, not a language one: the sources stay JavaScript, stay classic non-module
+`<script>` tags sharing one global scope (ADR-0069), and nothing is compiled, bundled or renamed.
+The decision and its rejected alternatives are ADR-0125.
+
+**The gate.** `:frontend:typecheckJs` runs strictly (`ignoreExitValue = false`) and is wired into
+`check` next to `lintCss` / `lintJs` / `lintHtml` / `prettierCheck`. A type error fails the build
+exactly as an ESLint finding does. `moduleDetection` must stay `legacy`: `package.json` declares
+`type: module`, and under the default `auto` every `.js` file would be classified as an ES module
+with its own scope — which would both misrepresent the runtime and blind the checker to the
+cross-file globals and redeclaration collisions it exists to catch.
+
+**Opt-in per file.** Checking is enabled per file by a leading `// @ts-check`; `checkJs` stays
+`false` globally so the ~40k pre-existing lines do not have to be fixed at once. **A file that
+opts in must be error-free** — there is no partial state, and opting a file in is what makes its
+errors a build failure. Coverage is expected to grow, and the sequencing lives in
+[`TYPESCRIPT_MIGRATION_PLAN.md`](../TYPESCRIPT_MIGRATION_PLAN.md).
+
+**Backend DTO shapes are never restated by hand.** `:frontend:generateApiTypes` derives
+`build/generated/ts/api.d.ts` from `backend/src/main/resources/api/openapi.json` on every build,
+and `typecheckJs` depends on it. The generated file is **build output and must not be committed**:
+deriving it every time is what makes drift between the frontend's idea of a DTO and the published
+contract structurally impossible. Annotations use the global aliases from `types/dto.d.ts`
+(`ApiDto<'MaterialDto'>`, `ApiPage<…>`, `ApiProblem`) — never a hand-copied field list.
+
+**The shared contracts are declared, not inferred.** Three hand-written files under
+`frontend/types/` (outside `static/`, so nothing is served): `globals.d.ts` for the cross-file
+runtime contract — the `window.krt*` APIs, the shared helpers, the custom DOM events —
+`thymeleaf-bootstrap.d.ts` for the page constants a Thymeleaf bootstrap block injects, and
+`dto.d.ts` for the generated aliases. **When you add a `window.krt*` API, a custom DOM event or a
+bootstrap constant, declare it in the matching file in the same change** — an undeclared addition
+silently degrades every consumer to `any` or breaks the gate.
+
+**ESLint keeps the visibility half.** Bootstrap constants are declared globally for the checker
+while at runtime each exists only on the page whose bootstrap declared it. ESLint's `no-undef`
+against each module's `/* global */` header remains the check that a module only references what
+its own page provides. Both checks are required; neither replaces the other, so a new bootstrap
+constant is added to **both** the declaration file and the module's `global` header.
+
+**JSDoc must be JSDoc.** In a checked file, `{@code …}` / `{@link …}` / `@param name {shape}` —
+Javadoc spellings this repo uses elsewhere — are parsed as type syntax and are hard errors.
+Convert them when opting a file in.
+
+> **Verification** — **Gate:** `./gradlew :frontend:typecheckJs` (strict, in `check`) ·
+> **Config:** `frontend/tsconfig.json` (`allowJs` + `noEmit` + `moduleDetection: legacy`),
+> `frontend/build.gradle.kts` (`generateApiTypes`, `typecheckJs`) · **Code:**
+> `frontend/types/globals.d.ts`, `frontend/types/thymeleaf-bootstrap.d.ts`,
+> `frontend/types/dto.d.ts`, the 27 files carrying `// @ts-check` · **ADR:** ADR-0125 ·
+> **Issues:** —
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract
   they each satisfy, not the work list.
+- Converting the sources to TypeScript, and the inline `<script>` blocks still in the Thymeleaf
+  templates — the checker of REQ-FE-018 reads `.js` files only. See ADR-0125 and
+  [`TYPESCRIPT_MIGRATION_PLAN.md`](../TYPESCRIPT_MIGRATION_PLAN.md).
 - Switching the CSRF token repository to cookie-based, and adopting htmx or app-wide Alpine — all
   explicitly rejected in ADR-0012.
 - Live-collaboration features beyond the section-refresh sync of REQ-FE-010/-015
