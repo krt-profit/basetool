@@ -104,6 +104,53 @@ headroom on the 16 GB host. Keep the sum of limits under ~14 GB.
 >
 > Measure before deciding — the per-service snapshot queries (working set, `jvm_memory_committed_bytes`
 > by area, and the unreported native-memory term) are in `monitoring/README.md`.
+>
+> **Owner decision 2026-08-02 — `blackbox-exporter` 32M → 64M (+32 MiB), sum now 14.02 GB.** The first
+> increase taken under the rule above; @greluc approved it against the measured alternative of leaving
+> the limit at 32M. Read-only prod measurement showed the exporter pinned at 97–100 % of its 32 MiB
+> limit while its live heap was **9.8 MiB** — an un-budgeted Go runtime holding arena pages, not a
+> workload that needs the memory. `GOMEMLIMIT=44MiB` is the actual fix; the limit bump buys the spike
+> headroom a 78–85 % steady state never had (details in the `blackbox-exporter` block of
+> `docker-compose.monitoring.yml`).
+>
+> This puts the sum of limits ~22 MiB past the `~14 GB` guidance. Two measurements justify accepting
+> that rather than treating it as a breach: the guidance bounds a **sum of ceilings**, not consumption,
+> and prod `node_memory_MemAvailable_bytes` held at **10–11 GB across the full 21-day window** with no
+> pressure event — the host is nowhere near the condition the rule protects against. The guidance is
+> therefore now understood as a *review trigger*, not a hard cap. The `backend 2048M → 1792M` lever
+> (returns 256 MB) remains un-taken and is still the first move if real headroom is ever needed.
+>
+> **Plane-wide follow-up, same PR — nine more Go services budgeted at zero capacity cost.** The bump
+> above prompted a check of every Go service in the stack; only `prometheus` and `alloy` carried a
+> `GOMEMLIMIT`. All nine others (`grafana`, `loki`, `tempo`, `cadvisor`, `alertmanager`,
+> `node-exporter`, both `postgres-exporter`s, `redis-exporter`) now carry one at 75 % of their limit.
+> **No limit was raised**, so the sum stays at the 14.02 GB above. `socket-proxy` is HAProxy, not Go.
+>
+> **Correction, same day — those nine were preventive, not remedial.** The sweep first read
+> `alertmanager` at 95.0 % of its limit, `node-exporter` at 83.8 % and both `postgres-exporter`s near
+> 78 %, and attributed that to the same runtime ratchet as `blackbox-exporter`. Decomposing the metric
+> disproved it: `container_memory_working_set_bytes` counts **active file pages**, including each
+> service's own memory-mapped binary — clean, reclaimable, and no OOM risk whatsoever. On
+> `container_memory_rss` (anonymous memory, the figure that actually predicts OOM) the same services
+> read **48.3 %, 33.4 % and ~42 %**. On the small exporters the mapped binary is roughly half the
+> working set. **`blackbox-exporter` at 95.3 % anon was the only genuine capacity case in the entire
+> stack** — which is what the +32 MiB above bought. The `GOMEMLIMIT` values remain correct and are kept
+> as defence-in-depth (all sit 1.5–4× above measured anon, so they constrain nothing today).
+>
+> **Consequence for this ADR's capacity rule: never open a capacity decision on a container-memory
+> alert alone.** Split `container_memory_rss` from `container_memory_mapped_file` first — the method
+> and the measured table are in `monitoring/README.md` → "Go services". Page cache expands to fill
+> whatever limit it is given, so a working-set alert driven by it is unfixable by more RAM; `alloy`'s
+> 192M → 256M → 384M → 512M history is that mistake four times over. The alert itself was fixed in the
+> same PR: `ContainerWorkingSetHigh` → **`ContainerMemoryHigh`**, now keyed off `container_memory_rss`,
+> so it no longer counts a service's own mapped binary against its limit.
+>
+> Two deliberate exceptions, both recorded in the compose comments rather than silently normalised:
+> `prometheus` keeps its 900MiB (88 % of its limit, looser than the rule) because its measured live
+> heap is 157.4 MiB against a 43.6 % working-set peak — tightening it would only risk GC pressure
+> during WAL replay. `alloy` was **not** given more memory: its 94.8 % is 183.9 MiB of mapped binary,
+> re-attributed to its cgroup when the v1.18.0 image pull reached prod on 2026-07-31, against a flat
+> 190–217 MB `rss`. Not a leak, not a shortfall — see its compose block.
 
 ### 5. Preserve the 30-day rolling login (Redis sized instead of TTL cut)
 
