@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.28](https://github.com/krt-profit/basetool/releases/tag/v1.5.28) - 2026-08-02
+
 ### Added
 
 - **Lager: Markierte Einträge lassen sich jetzt auch gesammelt umbuchen.** Neben "Markierte ausbuchen" steht in "Mein Lager" ein "Markierte umbuchen" — dieselbe Auswahl wird verschoben statt ausgebucht: an einen anderen Ort bzw. Nutzer oder als persönlich bzw. ins gemeinsame Lager. Jeder markierte Eintrag wandert vollständig und nimmt seine Auftrags- und Einsatz-Marken mit. Einträge, die bereits am Ziel liegen, werden übersprungen und mitgezählt; die Meldung nennt beide Zahlen (REQ-INV-036, ADR-0124).
