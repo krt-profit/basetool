@@ -226,4 +226,34 @@
     <cve>CVE-2026-15076</cve>
   </suppress>
 
+  <!--
+    Same build-time-only pattern as the Vert.x suppression above, for the July 2026 Netty CVE
+    batch fixed in 4.1.136.Final/4.2.16.Final (CVE-2026-56820 OCSP CertificateID-mismatch replay
+    bypass, CVE-2026-56819 HTTP/2 codec memory leak, CVE-2026-55833 SPDY header-decoding DoS,
+    CVE-2026-56816/-56817/-56745/-56746/-55831/-55851/-44891 from the same release). Unlike the
+    2026-42582 suppression above (which argues the 4.1.x line structurally lacks the affected
+    HTTP/3 codec), this batch genuinely affects both the 4.1.x and 4.2.x Netty lines - the real,
+    shipped 4.2.x occurrence is fixed by the `netty.version` BOM override in build.gradle.kts.
+    This suppression covers only the 4.1.135.Final jars, confirmed via
+    `./gradlew :keycloak-spi:dependencyInsight` to be compileOnly/testImplementation transitives
+    of keycloak-services 26.7.0 (via Quarkus/Vert.x) on the keycloak-spi module, absent from
+    every basetool runtime classpath (including `:keycloak-spi:runtimeClasspath` itself) - the
+    real Keycloak container supplies its own Netty at runtime. CVE-scoped and pinned to the 4.1.x
+    line so a genuinely-vulnerable 4.1.x Netty ever entering a real classpath still fails the gate.
+  -->
+  <suppress>
+    <notes>False positive: build-time-only. The July 2026 Netty CVE batch (CVE-2026-56820, CVE-2026-56819, CVE-2026-55833, CVE-2026-56816, CVE-2026-56817, CVE-2026-56745, CVE-2026-56746, CVE-2026-55831, CVE-2026-55851, CVE-2026-44891 - fixed in 4.1.136.Final/4.2.16.Final) genuinely affects the 4.1.x line too, but our 4.1.135.Final jars are compileOnly/testImplementation transitives of keycloak-services 26.7.0 (via Quarkus/Vert.x) on the keycloak-spi module only, confirmed absent from every basetool runtime classpath; Keycloak supplies its own Netty at runtime. The real, shipped 4.2.15.Final line is fixed via the netty.version BOM override in build.gradle.kts.</notes>
+    <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@4\.1\.135\.Final$</packageUrl>
+    <cve>CVE-2026-56820</cve>
+    <cve>CVE-2026-56819</cve>
+    <cve>CVE-2026-55833</cve>
+    <cve>CVE-2026-56816</cve>
+    <cve>CVE-2026-56817</cve>
+    <cve>CVE-2026-56745</cve>
+    <cve>CVE-2026-56746</cve>
+    <cve>CVE-2026-55831</cve>
+    <cve>CVE-2026-55851</cve>
+    <cve>CVE-2026-44891</cve>
+  </suppress>
+
 </suppressions>

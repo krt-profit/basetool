@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sicherheit: Netty auf 4.2.16.Final angehoben (u. a. CVE-2026-56820, CVE-2026-56819, CVE-2026-55833).** Die von Spring Boot vorgegebene Version 4.2.15.Final war über eine fehlende Zertifikatsprüfung im OCSP-Client (Umgehung der Sperrprüfung durch Replay), ein Speicherleck im HTTP/2-Codec sowie eine SPDY-Header-Dekodierung mit CPU-erschöpfendem Denial-of-Service angreifbar; die gepatchte Version wird jetzt erzwungen. Betroffen sind reale Laufzeitpfade (WebClient im Frontend, Redis-Anbindung über Lettuce). Die parallel gemeldete gleiche CVE-Reihe auf der Netty-4.1.x-Linie betrifft ausschließlich eine Nur-Kompilierzeit-Abhängigkeit des Keycloak-SPI-Moduls (vom Keycloak-Container zur Laufzeit bereitgestellt) und wurde begründet unterdrückt.
+
 ## [v1.5.28](https://github.com/krt-profit/basetool/releases/tag/v1.5.28) - 2026-08-02
 
 ### Added
