@@ -81,6 +81,14 @@ public final class MetricNames {
   /** Failure reason: the backend was unreachable or the circuit was open. */
   public static final String REASON_BACKEND_UNAVAILABLE = "backend_unavailable";
 
+  /**
+   * Failure reason: the Redis handoff staging was unreachable, so the relayed draft could not be
+   * parked for browser pickup (REQ-INGEST-003). Kept apart from {@link #REASON_INTERNAL} because it
+   * is an availability event with an obvious operator action, not an application fault — the caller
+   * is told to retry (503) rather than handed a 500.
+   */
+  public static final String REASON_STAGING_UNAVAILABLE = "staging_unavailable";
+
   /** Failure reason: any other unexpected relay failure. */
   public static final String REASON_INTERNAL = "internal";
 
@@ -96,8 +104,22 @@ public final class MetricNames {
   /** Tag key: the stable RFC-7807 error code. */
   public static final String TAG_CODE = "code";
 
-  /** Error code: the identity provider (Keycloak JWKS) was unreachable — retryable 503. */
+  /**
+   * Error code: a dependency the request needs was unreachable — retryable 503. Covers both the
+   * identity provider (Keycloak JWKS, {@code IdentityProviderUnavailableFilter}) and the Redis
+   * handoff staging ({@code GlobalExceptionHandler}); the client's reaction is the same in both
+   * cases, and {@link #INGEST_HANDOFF_ERRORS} separates them by {@code reason} for the dashboard.
+   */
   public static final String CODE_SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE";
+
+  /**
+   * Error code: the caller presented no token, or one the resource server rejected — 401. Mirrors
+   * the backend's code so a client can branch identically against both modules (REQ-API-004).
+   */
+  public static final String CODE_UNAUTHENTICATED = "UNAUTHENTICATED";
+
+  /** Error code: the caller is authenticated but not allowed to use the endpoint — 403. */
+  public static final String CODE_ACCESS_DENIED = "ACCESS_DENIED";
 
   /**
    * Counter {@code basetool_bot_blocked_total} — tag {@code rule} ({@link #BOT_RULE_METHOD} /

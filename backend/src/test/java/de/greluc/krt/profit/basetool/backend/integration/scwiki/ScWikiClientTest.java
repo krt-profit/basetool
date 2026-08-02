@@ -304,6 +304,115 @@ class ScWikiClientTest {
             + " basetool_external_fetch_errors_total{source=scwiki}");
   }
 
+  // ─── Census completeness (H5) ───────────────────────────────────────────
+  // A half-walked feed still returns real rows, so the syncs' "did we see anything?" gate waves it
+  // through and every row on the pages that were never fetched gets tombstoned as scwiki_deleted.
+  // The complete flag is the caller's only way to tell "the Wiki dropped these" from "we never
+  // asked", so these tests pin exactly when it must be false.
+
+  @Test
+  void fullFirstPageWithoutPaginationMetadata_isIncomplete_andWarns() {
+    // The upstream-rename signature: meta absent (silently decoded to null), page 1 filled to the
+    // configured page size. Assuming "one page" here would drop every later page on the floor.
+    properties.setPageSize(3);
+    server.enqueue(jsonOk(pageBodyWithoutMeta(rows(3))));
+
+    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+
+    assertFalse(
+        result.complete(),
+        "a full page 1 with no last_page must not be reported as a complete census");
+    assertEquals(3, result.data().size(), "the rows that did arrive are still returned");
+    assertEquals(
+        1.0,
+        fetchErrorCount(),
+        "a missing pagination contract must increment"
+            + " basetool_external_fetch_errors_total{source=scwiki}");
+  }
+
+  @Test
+  void shortSinglePageWithoutPaginationMetadata_staysComplete() {
+    // The healthy single-page case shares the "no last_page" shape but is NOT a contract break: the
+    // page came back short, so there is demonstrably nothing after it. It must not warn, must not
+    // count, and must stay sweepable — otherwise the guard would suppress every orphan sweep.
+    properties.setPageSize(200);
+    server.enqueue(jsonOk(pageBodyWithoutMeta(rows(2))));
+
+    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+
+    assertTrue(result.complete(), "a genuinely single-page result is a complete census");
+    assertEquals(2, result.data().size());
+    assertEquals(0.0, fetchErrorCount(), "a healthy short page is not a fetch error");
+  }
+
+  @Test
+  void metaTotalDisagreeingWithMergedRows_isIncomplete_andWarns() {
+    // The upstream states 205 rows for this filter; the walk merged 1. Whatever the cause (a
+    // dropped page, a feed that changed mid-walk), the merged list is not a census of the feed.
+    server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 205, rows(1))));
+
+    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+
+    assertFalse(result.complete(), "a merged count below meta.total is not a complete census");
+    assertEquals(1, result.data().size(), "the fetched rows are still returned");
+    assertEquals(1.0, fetchErrorCount(), "a total mismatch must count as a fetch error");
+  }
+
+  @Test
+  void metaTotalMatchingMergedRows_staysComplete() {
+    server.enqueue(jsonOk(pageBodyWithTotal(1, 2, 3, rows(2))));
+    server.enqueue(jsonOk(pageBodyWithTotal(2, 2, 3, rows(1))));
+
+    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+
+    assertTrue(result.complete(), "a walk that merged exactly meta.total rows is a full census");
+    assertEquals(3, result.data().size());
+    assertEquals(0.0, fetchErrorCount(), "a healthy full walk is not a fetch error");
+  }
+
+  @Test
+  void pageFailingMidWalk_isIncomplete() {
+    server.enqueue(jsonOk(pageBody(1, 3, rows(1))));
+    server.enqueue(new MockResponse().setResponseCode(503));
+
+    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+
+    assertFalse(result.complete(), "a walk abandoned on page 2 of 3 is not a complete census");
+    assertEquals(1, result.data().size(), "page 1's row survives the page-2 failure");
+  }
+
+  @Test
+  void failedFirstPage_isIncomplete() {
+    server.enqueue(new MockResponse().setResponseCode(500));
+
+    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+
+    assertFalse(result.complete(), "a failed page 1 enumerated nothing at all");
+    assertTrue(result.data().isEmpty());
+    assertFalse(result.notModified(), "an error is not an unchanged catalogue");
+  }
+
+  @Test
+  void unchanged304_isNotReportedAsACompleteCensus() {
+    // Belt and braces: every caller checks notModified() first, but a 304 enumerates nothing, so a
+    // caller that forgot must still be unable to sweep.
+    server.enqueue(jsonOk(pageBody(1, 1, "")).setHeader("ETag", "\"v1\""));
+    client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+    server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"v1\""));
+
+    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+
+    assertTrue(result.notModified());
+    assertFalse(result.complete(), "a conditional-GET hit enumerated no rows");
+  }
+
   @Test
   void midPagePartialFailure_returnsAccumulatedRowsSoFar() throws Exception {
     server.enqueue(
@@ -383,6 +492,18 @@ class ScWikiClientTest {
 
   // ─── helpers ────────────────────────────────────────────────────────────
 
+  // Current basetool_external_fetch_errors_total{source=scwiki}, tolerating an unregistered
+  // counter (nothing failed yet) as 0.
+  private double fetchErrorCount() {
+    return meterRegistry
+        .find(MetricNames.EXTERNAL_FETCH_ERRORS)
+        .tag(MetricNames.TAG_SOURCE, MetricNames.SOURCE_SCWIKI)
+        .counters()
+        .stream()
+        .mapToDouble(io.micrometer.core.instrument.Counter::count)
+        .sum();
+  }
+
   private MockResponse jsonOk(String body) {
     return new MockResponse()
         .setResponseCode(200)
@@ -390,16 +511,61 @@ class ScWikiClientTest {
         .setBody(body);
   }
 
+  // A page whose meta carries no "total". The client's census cross-check only fires when the
+  // upstream states a total, so these fixtures exercise the pagination itself without also having
+  // to state a row count the test does not care about.
   private String pageBody(int currentPage, int lastPage, String dataCommaSeparated) {
     String data = dataCommaSeparated == null ? "" : dataCommaSeparated.trim();
     return """
     {
       "data": [%s],
       "links": {"first":"","last":"","prev":null,"next":null},
-      "meta": {"current_page":%d,"last_page":%d,"per_page":200,"total":1}
+      "meta": {"current_page":%d,"last_page":%d,"per_page":200}
     }
     """
         .formatted(data, currentPage, lastPage);
+  }
+
+  // A page whose meta states the upstream's own row count for the whole feed — the value the
+  // client cross-checks the merged list against.
+  private String pageBodyWithTotal(
+      int currentPage, int lastPage, int total, String dataCommaSeparated) {
+    String data = dataCommaSeparated == null ? "" : dataCommaSeparated.trim();
+    return """
+    {
+      "data": [%s],
+      "links": {"first":"","last":"","prev":null,"next":null},
+      "meta": {"current_page":%d,"last_page":%d,"per_page":200,"total":%d}
+    }
+    """
+        .formatted(data, currentPage, lastPage, total);
+  }
+
+  // A 2xx page with data but NO meta object at all — the shape an upstream field rename produces,
+  // since ScWikiResponseDto/ScWikiMetaDto are @JsonIgnoreProperties(ignoreUnknown = true) and
+  // decode
+  // the renamed field to null instead of failing.
+  private String pageBodyWithoutMeta(String dataCommaSeparated) {
+    String data = dataCommaSeparated == null ? "" : dataCommaSeparated.trim();
+    return """
+    {
+      "data": [%s],
+      "links": {"first":"","last":"","prev":null,"next":null}
+    }
+    """
+        .formatted(data);
+  }
+
+  // `count` comma-separated commodity rows with distinct synthetic uuids.
+  private static String rows(int count) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 1; i <= count; i++) {
+      if (i > 1) {
+        sb.append(",\n");
+      }
+      sb.append("{\"uuid\":\"00000000-0000-0000-0000-%012d\",\"name\":\"Row%d\"}".formatted(i, i));
+    }
+    return sb.toString();
   }
 
   private static ParameterizedTypeReference<ScWikiResponseDto<ScWikiCommodityDto>>

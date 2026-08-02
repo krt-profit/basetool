@@ -1,0 +1,399 @@
+{
+  "openapi" : "3.1.0",
+  "info" : {
+    "title" : "KRT Basetool Ingest Gateway API",
+    "description" : "Forward-only ingest gateway for the KRT Basetool. It validates the caller's Keycloak JWT, relays the payload to the backend's import endpoints with that same bearer, stages the returned draft in Redis for a single-use browser pickup, and returns the handoff the desktop extractor opens. Nothing is interpreted or persisted here.",
+    "version" : "1.0"
+  },
+  "servers" : [ {
+    "url" : "http://localhost",
+    "description" : "Generated server url"
+  } ],
+  "security" : [ {
+    "bearer-jwt" : [ ]
+  } ],
+  "tags" : [ {
+    "name" : "Ingest",
+    "description" : "Forward-only ingest of extractor payloads. Both endpoints relay to the backend with the caller's own bearer and answer with a single-use browser handoff."
+  } ],
+  "paths" : {
+    "/v1/refinery-extract" : {
+      "post" : {
+        "tags" : [ "Ingest" ],
+        "summary" : "Forward a RefineryExtract to the backend import and stage the draft for one-click browser pickup.",
+        "description" : "Accepts the frozen RefineryExtract JSON contract v1 (ADR-0008). The gateway validates the envelope, forwards it to the backend refinery import with the caller's own bearer, and stages the returned draft under the caller's subject. No screenshot and no image bytes are ever transmitted or stored.",
+        "operationId" : "ingestRefineryExtract",
+        "parameters" : [ {
+          "name" : "Accept-Language",
+          "in" : "header",
+          "description" : "Caller locale, relayed so backend problems come back localized.",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "X-Correlation-Id",
+          "in" : "header",
+          "description" : "Correlation id, relayed and echoed for cross-module tracing.",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RefineryExtractDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Draft staged; handoff returned.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/IngestResponseDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Payload invalid or backend envelope reject.",
+            "content" : {
+              "application/problem+json" : { }
+            }
+          },
+          "401" : {
+            "description" : "Caller is not authenticated.",
+            "content" : {
+              "application/problem+json" : { }
+            }
+          },
+          "413" : {
+            "description" : "Payload exceeds the size cap.",
+            "content" : {
+              "application/problem+json" : { }
+            }
+          },
+          "429" : {
+            "description" : "Per-subject or per-IP rate limit exceeded.",
+            "content" : {
+              "application/problem+json" : { }
+            }
+          },
+          "502" : {
+            "description" : "Backend relay failed.",
+            "content" : {
+              "application/problem+json" : { }
+            }
+          },
+          "503" : {
+            "description" : "A dependency was temporarily unreachable (identity provider or handoff staging); retry after the advertised delay.",
+            "content" : {
+              "application/problem+json" : { }
+            }
+          }
+        }
+      }
+    },
+    "/v1/blueprint-preview" : {
+      "post" : {
+        "tags" : [ "Ingest" ],
+        "summary" : "Forward a blueprint export to the backend preview and stage it for one-click browser pickup.",
+        "description" : "The body is an opaque blueprint-export JSON object; the gateway only checks that it is a JSON object and relays it to the backend preview as a file upload. The backend parses and name-matches it, exactly as a manual file import would.",
+        "operationId" : "ingestBlueprintPreview",
+        "parameters" : [ {
+          "name" : "Accept-Language",
+          "in" : "header",
+          "description" : "Caller locale, relayed so backend problems come back localized.",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "X-Correlation-Id",
+          "in" : "header",
+          "description" : "Correlation id, relayed and echoed for cross-module tracing.",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "description" : "The blueprint export as produced by the extractor; must be a JSON object (an array or scalar is rejected with 400).",
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "additionalProperties" : true
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Preview staged; handoff returned.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/IngestResponseDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Body is not a JSON object or backend reject.",
+            "content" : {
+              "application/problem+json" : { }
+            }
+          },
+          "401" : {
+            "description" : "Caller is not authenticated.",
+            "content" : {
+              "application/problem+json" : { }
+            }
+          },
+          "413" : {
+            "description" : "Payload exceeds the size cap.",
+            "content" : {
+              "application/problem+json" : { }
+            }
+          },
+          "429" : {
+            "description" : "Per-subject or per-IP rate limit exceeded.",
+            "content" : {
+              "application/problem+json" : { }
+            }
+          },
+          "502" : {
+            "description" : "Backend relay failed.",
+            "content" : {
+              "application/problem+json" : { }
+            }
+          },
+          "503" : {
+            "description" : "A dependency was temporarily unreachable (identity provider or handoff staging); retry after the advertised delay.",
+            "content" : {
+              "application/problem+json" : { }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "RefineryExtractDto" : {
+        "type" : "object",
+        "properties" : {
+          "schemaVersion" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "tool" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
+          },
+          "toolVersion" : {
+            "type" : "string",
+            "maxLength" : 50,
+            "minLength" : 0
+          },
+          "model" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
+          },
+          "generatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "clientLanguage" : {
+            "type" : "string",
+            "maxLength" : 16,
+            "minLength" : 0
+          },
+          "orders" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RefineryExtractOrderDto"
+            },
+            "maxItems" : 5,
+            "minItems" : 0
+          }
+        },
+        "required" : [ "orders", "schemaVersion" ]
+      },
+      "RefineryExtractGoodDto" : {
+        "type" : "object",
+        "properties" : {
+          "rowIndex" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "rawMaterialName" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "inputQuantity" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "outputQuantity" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "refine" : {
+            "type" : "boolean"
+          },
+          "confidence" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0,
+            "minimum" : 0.0
+          },
+          "sourceImage" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "inputQuantity", "rawMaterialName", "refine" ]
+      },
+      "RefineryExtractImageDto" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "width" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "height" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "cropMode" : {
+            "type" : "string",
+            "maxLength" : 32,
+            "minLength" : 0
+          },
+          "capturedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        },
+        "required" : [ "name" ]
+      },
+      "RefineryExtractOrderDto" : {
+        "type" : "object",
+        "properties" : {
+          "panelType" : {
+            "type" : "string",
+            "maxLength" : 32,
+            "minLength" : 0
+          },
+          "quoted" : {
+            "type" : "boolean"
+          },
+          "layoutConfidence" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0,
+            "minimum" : 0.0
+          },
+          "rawLocationName" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "rawMethodName" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "rawInManifestTotal" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "rawToRefineTotal" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "expenses" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0E9
+          },
+          "durationMinutes" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalYieldScu" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "sourceImages" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RefineryExtractImageDto"
+            },
+            "maxItems" : 50,
+            "minItems" : 0
+          },
+          "goods" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RefineryExtractGoodDto"
+            },
+            "maxItems" : 100,
+            "minItems" : 0
+          }
+        },
+        "required" : [ "goods", "panelType" ]
+      },
+      "IngestResponseDto" : {
+        "type" : "object",
+        "description" : "The single-use handoff the extractor opens after a successful ingest.",
+        "properties" : {
+          "handoffId" : {
+            "type" : "string",
+            "description" : "Opaque, single-use id keying the staged draft. Treat it as a secret: it travels in the browser URL and is consumed on first read.",
+            "example" : "0jUZ9uJ5pQ3vD1kR7tXwYbNcMeFg"
+          },
+          "kind" : {
+            "type" : "string",
+            "description" : "Which draft was staged; selects the frontend pre-fill surface.",
+            "enum" : [ "REFINERY", "BLUEPRINT" ]
+          },
+          "frontendUrl" : {
+            "type" : "string",
+            "description" : "Absolute frontend URL to open in the browser, already carrying ?handoff=<id>.",
+            "example" : "https://app.profit-base.online/refinery-orders/create?handoff=0jUZ9uJ5"
+          }
+        }
+      }
+    },
+    "securitySchemes" : {
+      "bearer-jwt" : {
+        "type" : "http",
+        "scheme" : "bearer",
+        "bearerFormat" : "JWT"
+      }
+    }
+  }
+}

@@ -420,8 +420,9 @@ public class ScWikiItemSyncService {
    *
    * @param pass the endpoint / kind / filter tuple to run
    * @param ctx the shared backfill state (seen set, counters, manufacturer cache)
-   * @return {@code true} if the pass fetched usable data and was ingested; {@code false} if the
-   *     response was empty / 304 or the sanity cap tripped (caller suppresses the orphan sweep)
+   * @return {@code true} only if the pass fetched a complete, usable pool and ingested it; {@code
+   *     false} if the response was empty / 304, the sanity cap tripped, or the page walk came back
+   *     incomplete — in all of which cases the caller suppresses the orphan sweep
    */
   private boolean runKindPass(KindPass pass, BackfillContext ctx) {
     Map<String, String> filters =
@@ -471,6 +472,20 @@ public class ScWikiItemSyncService {
       ctx.failedPasses++;
       return false;
     }
+    // An INCOMPLETE walk (a page failed, the pagination metadata went missing on a full page, or
+    // meta.total disagreed with the merged rows) still yields real rows, so the ingest loop below
+    // runs — but the pass reports failure so the cross-kind orphan sweep stands down. The items on
+    // the pages that were never fetched must not be tombstoned for never having been fetched.
+    final boolean complete = result.complete();
+    if (!complete) {
+      log.warn(
+          "Wiki kind pass {} ({}) came back INCOMPLETE ({} row(s) merged) — ingesting what arrived"
+              + " but suppressing the cross-kind orphan sweep this run.",
+          pass.endpoint(),
+          pass.kind(),
+          fetched.size());
+      ctx.failedPasses++;
+    }
 
     for (ScWikiItemDto dto : fetched) {
       if (dto.uuid() == null || !ctx.seen.add(dto.uuid())) {
@@ -508,7 +523,7 @@ public class ScWikiItemSyncService {
         log.error("Failed to upsert SC Wiki item {} ({})", dto.uuid(), pass.kind(), e);
       }
     }
-    return true;
+    return complete;
   }
 
   /**

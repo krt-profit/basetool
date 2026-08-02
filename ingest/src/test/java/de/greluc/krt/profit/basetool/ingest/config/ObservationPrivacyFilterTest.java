@@ -72,6 +72,23 @@ class ObservationPrivacyFilterTest {
   }
 
   @Test
+  void shouldHandleAnEmptyUriTagWithoutThrowing() {
+    // The filter runs on every observation, including ones whose uri is not populated yet — a
+    // throw here would take out the whole metrics pipeline, not just one tag.
+    Observation.Context context = new Observation.Context();
+    context.addLowCardinalityKeyValue(KeyValue.of("uri", ""));
+
+    filter.map(context);
+
+    assertThat(context.getLowCardinalityKeyValue("uri").getValue()).isEmpty();
+  }
+
+  @Test
+  void shouldReturnANullValueUnchanged() {
+    assertThat(ObservationPrivacyFilter.scrub(null, true)).isNull();
+  }
+
+  @Test
   void shouldLeaveTemplatedUriAndOtherKeyValuesUntouched() {
     // Given
     Observation.Context context = new Observation.Context();

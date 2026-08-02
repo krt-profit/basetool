@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
+import de.greluc.krt.profit.basetool.ingest.logging.LogSafe;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.ratelimit.RateLimitedException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
@@ -28,6 +29,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.MDC;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -76,6 +78,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   /** Hard cap on the backend-supplied detail relayed to the extractor (security audit gap-fill). */
   private static final int MAX_RELAYED_DETAIL = 500;
 
+  /** Cap on the joined field-error string written to the log, keeping the line bounded. */
+  private static final int MAX_LOGGED_FIELD_ERRORS = 500;
+
+  /** {@code Retry-After} advertised for a transient handoff-staging (Redis) outage, in seconds. */
+  private static final String STAGING_RETRY_AFTER_SECONDS = "5";
+
   /** Generic detail used when no safe backend detail can be relayed. */
   private static final String GENERIC_BACKEND_REJECT = "The import backend rejected the request.";
 
@@ -111,6 +119,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ex.getBindingResult().getFieldErrors().stream()
             .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
             .toList();
+    // "Mein Extrakt wird abgelehnt" is the most common ingest support question, and until now the
+    // failing constraint existed only in the response body — so the operator had to ask the
+    // reporter to paste it back. Field paths and Jakarta constraint messages are schema text, not
+    // request content; the REJECTED VALUE is deliberately never touched (REQ-OBS-004), and the
+    // joined string is sanitised because a field path can carry a client-supplied map key.
+    log.warn(
+        "Ingest payload rejected by validation: {}",
+        LogSafe.text(String.join("; ", fieldErrors), MAX_LOGGED_FIELD_ERRORS));
     ProblemDetail problem =
         problem(HttpStatus.BAD_REQUEST, "Validation failed", CODE_VALIDATION, "Validation failed.");
     problem.setProperty("fieldErrors", fieldErrors);
@@ -123,6 +139,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       @NotNull HttpHeaders headers,
       @NotNull HttpStatusCode status,
       @NotNull WebRequest request) {
+    // Class name only. Jackson's message quotes the offending part of the BODY, which on this
+    // module is a user's extract — it must never reach an appender (REQ-OBS-004).
+    log.warn("Ingest body could not be parsed as JSON ({})", ex.getClass().getSimpleName());
     ProblemDetail problem =
         problem(
             HttpStatus.BAD_REQUEST,
@@ -156,6 +175,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   public @NotNull ProblemDetail handleBackendResponse(@NotNull WebClientResponseException ex) {
     HttpStatusCode status = ex.getStatusCode();
     if (status.is4xxClientError()) {
+      // DEBUG, not WARN: the backend already logged this reject at WARN with the full context, and
+      // REQ-OBS-001 allows exactly one line per failure. This is the gateway-side breadcrumb that
+      // says "the 400 the extractor saw came from the backend, not from our own validation" —
+      // without it the two are indistinguishable in the ingest log.
+      log.debug("Backend relay rejected the import with {}", status.value());
       countHandoffError(MetricNames.REASON_BACKEND_REJECT);
       return problem(status, "Backend rejected the import", CODE_BAD_REQUEST, backendDetail(ex));
     }
@@ -236,6 +260,45 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         "Backend unavailable",
         CODE_UPSTREAM,
         "The import backend could not be reached. Please try again.");
+  }
+
+  /**
+   * The Redis handoff staging was unreachable → retryable {@code 503} with {@code Retry-After}
+   * (REQ-INGEST-003), rather than the generic {@code 500} this used to fall through to.
+   *
+   * <p>Redis is the gateway's only data store, so any {@link DataAccessException} here means the
+   * relayed draft could not be parked for browser pickup. Two things were wrong with letting that
+   * land in {@link #handleUnexpected}: the caller was handed a non-retryable {@code 500} for an
+   * outage that self-heals in seconds, and the operator saw {@code ERROR "Unexpected ingest
+   * failure"} with a stack trace — indistinguishable from a genuine code defect, and it inflates
+   * {@code logback_events_total{level="error"}} enough to trip {@code LogbackErrorSpike}
+   * (REQ-OBS-013). This is the same treatment {@code IdentityProviderUnavailableFilter} gives an
+   * unreachable Keycloak: an availability event is a {@code WARN} and a {@code 503}.
+   *
+   * <p>Note the ordering guarantee this relies on: Spring picks the most specific
+   * {@code @ExceptionHandler}, so this method wins over the {@link Exception} catch-all.
+   *
+   * @param ex the data-access failure raised by the Redis staging write
+   * @return a 503 problem carrying {@code Retry-After}
+   */
+  @ExceptionHandler(DataAccessException.class)
+  public @NotNull ResponseEntity<ProblemDetail> handleStagingUnavailable(
+      @NotNull DataAccessException ex) {
+    // Class name only — a Lettuce message can carry the configured Redis endpoint.
+    log.warn("Handoff staging unavailable: {}", ex.getClass().getSimpleName());
+    countHandoffError(MetricNames.REASON_STAGING_UNAVAILABLE);
+    meterRegistry
+        .counter(MetricNames.HTTP_ERROR, MetricNames.TAG_CODE, MetricNames.CODE_SERVICE_UNAVAILABLE)
+        .increment();
+    ProblemDetail problem =
+        problem(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "Service unavailable",
+            MetricNames.CODE_SERVICE_UNAVAILABLE,
+            "The import could not be staged for pickup. Please retry shortly.");
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+        .header(HttpHeaders.RETRY_AFTER, STAGING_RETRY_AFTER_SECONDS)
+        .body(problem);
   }
 
   /**

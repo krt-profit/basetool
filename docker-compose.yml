@@ -200,8 +200,22 @@ x-keycloak: &keycloak-template
     # Keep the root log level at INFO but mute io.vertx.core.net.impl.ConnectionBase, which logs an
     # empty-message ERROR (<missing-log-message>) on every abrupt client TCP reset (browser closed
     # mid-request, scanner, keep-alive drop). These carry no diagnostic value yet surface at ERROR
-    # in Loki (app=keycloak-stdout) and can trip the ERROR-spike alerting. Format is
-    # `<root>,<category>:<level>`; applies to both the console and file handlers.
+    # in Loki and can trip the ERROR-spike alerting. Format is `<root>,<category>:<level>`; applies
+    # to both the console and file handlers.
+    #
+    # `--log=console,file` above means Keycloak is shipped to Loki as TWO distinct streams, and both
+    # are masked in the shipper (username= / ipAddress=; monitoring/alloy/config.alloy):
+    #   app="keycloak"         — the file handler, /var/log/keycloak/keycloak.log, tailed by Alloy.
+    #                            This is the stream KeycloakErrorRateHigh evaluates, so the mute
+    #                            above is what keeps that alert off the TCP-reset noise.
+    #   app="keycloak-stdout"  — the container console via loki.source.docker (2026-08-02, ADR-0095
+    #                            pattern). Same lines as the file PLUS what the JVM and the kernel
+    #                            write outside Keycloak's log handler entirely: the OOM-kill preamble
+    #                            and `pthread_create failed (EAGAIN)`. Those never reach the file, so
+    #                            before this stream a Keycloak OOM/pids death left evidence only in
+    #                            the host json-file driver (5x10MB, SSH-only). No alert reads this
+    #                            stream — it is deliberately kept out of KeycloakErrorRateHigh's
+    #                            selector so the console copy cannot double-count the file's ERRORs.
     KC_LOG_LEVEL: "info,io.vertx.core.net.impl.ConnectionBase:off"
     KC_HTTP_ENABLED: "true"
     KC_HTTP_PORT: 18080

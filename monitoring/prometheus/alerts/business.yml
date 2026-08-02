@@ -643,6 +643,21 @@ groups:
           summary: "Ingest cannot reach the backend (handoffs failing)"
           description: "The ingest gateway could not reach the backend to relay handoffs in the last 5 minutes — staged identity data is not being applied. Check backend health and the ingest→backend path."
 
+      # The Redis handoff staging (REQ-INGEST-003) is the gateway's only data store. When it is
+      # unreachable the backend relay has already SUCCEEDED and only the browser pickup cannot be
+      # parked, so the caller gets a retryable 503 — a very different operator action from
+      # IngestBackendUnavailable, which is why this reason has its own alert instead of relying on
+      # the by-reason IngestHandoffErrors threshold. Any sustained rate here means every ingest is
+      # failing at the last step: check the redis container and the gateway's REDIS_* config.
+      - alert: IngestStagingUnavailable
+        expr: rate(basetool_ingest_handoff_errors_total{reason="staging_unavailable"}[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ingest cannot stage handoffs (Redis unreachable)"
+          description: "The ingest gateway relayed the import to the backend but could not stage the draft in Redis for browser pickup — every send ends in a 503 and no pre-filled form opens. Check the redis container and the ingest Redis configuration."
+
       # (logging audit) The oversized-body DoS guard (PayloadSizeLimitFilter, INGEST-DOS-1) rejects a
       # too-large /v1 body with 413. It was previously silent — no log, no metric — unlike the sibling
       # bot / rate-limit filters, so a flood of oversized-body probes against the only internet-facing

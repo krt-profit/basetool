@@ -47,6 +47,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * the {@code finally} block to avoid thread-pool bleed-through.
  *
  * <p>Intentionally limited to {@code sub} – never emails/names/tokens – to avoid PII in logs.
+ *
+ * <p>The third correlation field REQ-OBS-001 mandates, {@code orgUnitId}, is deliberately
+ * <b>not</b> bound here: this filter is ordered {@link Ordered#LOWEST_PRECEDENCE} − 100 and runs
+ * before {@link ActiveSquadronContextFilter} ({@link Ordered#LOWEST_PRECEDENCE} − 99) has read the
+ * caller's pin out of the session, so reading it at this point would only ever yield {@code null}.
+ * That filter owns the key and clears it again on the way out.
  */
 @Slf4j
 @Component

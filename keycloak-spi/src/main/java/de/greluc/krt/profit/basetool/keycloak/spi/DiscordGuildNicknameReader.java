@@ -27,6 +27,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Optional;
+import org.jboss.logging.Logger;
 import org.keycloak.util.JsonSerialization;
 
 /**
@@ -56,6 +57,11 @@ import org.keycloak.util.JsonSerialization;
  * <p>This class never logs the token, the response body, or any captured name.
  */
 public class DiscordGuildNicknameReader {
+
+  /**
+   * A silent empty result is indistinguishable from "user has no nickname", so causes are logged.
+   */
+  private static final Logger LOG = Logger.getLogger(DiscordGuildNicknameReader.class);
 
   /**
    * Defensive upper bound on the captured nickname length. Discord caps a server nickname at 32
@@ -130,13 +136,23 @@ public class DiscordGuildNicknameReader {
       response =
           httpClient.send(buildRequest(url, accessToken), HttpResponse.BodyHandlers.ofString());
     } catch (IOException e) {
-      // Timeout / connection reset / DNS failure / truncated read — fail open (no name).
+      // Timeout / connection reset / DNS failure / truncated read — fail open (no name). At DEBUG,
+      // not WARN: a missing server nickname is cosmetic and the membership gate has already logged
+      // any real Discord outage at WARN, so this would only duplicate it.
+      LOG.debugf(
+          e,
+          "Could not fetch the Discord guild nickname (%s); continuing without it.",
+          e.getClass().getSimpleName());
       return Optional.empty();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+      LOG.debug("Interrupted while fetching the Discord guild nickname; continuing without it.");
       return Optional.empty();
     }
     if (response.statusCode() != 200) {
+      LOG.debugf(
+          "Discord guild-nickname lookup answered HTTP %d; continuing without it.",
+          response.statusCode());
       return Optional.empty();
     }
     return Optional.ofNullable(response.body());
@@ -197,6 +213,7 @@ public class DiscordGuildNicknameReader {
     try {
       return Optional.ofNullable(JsonSerialization.readValue(body, JsonNode.class));
     } catch (IOException e) {
+      LOG.debugf(e, "Discord guild-nickname payload was not readable JSON; ignoring it.");
       return Optional.empty();
     }
   }

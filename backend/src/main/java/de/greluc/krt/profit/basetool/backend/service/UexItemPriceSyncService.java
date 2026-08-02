@@ -93,7 +93,14 @@ public class UexItemPriceSyncService {
     }
 
     log.info("Starting synchronization of UEX item prices...");
-    List<UexItemPriceDto> dtos = uexClient.getItemPrices();
+    UexClient.FetchResult<UexItemPriceDto> fetched = uexClient.getItemPrices();
+    if (fetched.notModified()) {
+      // Matrix byte-identical to the last run: nothing to upsert, and no stale-row sweep either —
+      // every (item, terminal) pair it would clear is still in the (unchanged) feed.
+      log.info("UEX item-price matrix unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexItemPriceDto> dtos = fetched.data();
     if (dtos.isEmpty()) {
       log.warn("No item prices received from UEX API. Aborting synchronization (no stale sweep).");
       return;
@@ -114,7 +121,11 @@ public class UexItemPriceSyncService {
           skipped++;
         }
       } catch (Exception e) {
-        log.error("Failed to process UEX item-price dto: {}", dto, e);
+        log.error(
+            "Failed to process UEX item-price dto (idItem={}, idTerminal={})",
+            dto.idItem(),
+            dto.idTerminal(),
+            e);
       }
     }
 

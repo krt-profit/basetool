@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.service.UexFetchResults.fetched;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -76,7 +77,7 @@ class UexVehicleServiceUuidMatchTest {
     existing.setId(UUID.randomUUID());
     existing.setName("100i");
     existing.setExternalUuid(externalUuid);
-    when(uexClient.getVehicles()).thenReturn(List.of(dto));
+    when(uexClient.getVehicles()).thenReturn(fetched(List.of(dto)));
     when(shipTypeRepository.findByExternalUuid(externalUuid)).thenReturn(Optional.of(existing));
     when(manufacturerRepository.findByNameIgnoreCase("Origin Jumpworks"))
         .thenReturn(Optional.of(origin));
@@ -97,7 +98,7 @@ class UexVehicleServiceUuidMatchTest {
     existing.setId(UUID.randomUUID());
     existing.setName("Aurora Mk I CL");
     existing.setUexVehicleId(5);
-    when(uexClient.getVehicles()).thenReturn(List.of(dto));
+    when(uexClient.getVehicles()).thenReturn(fetched(List.of(dto)));
     when(shipTypeRepository.findByUexVehicleId(5)).thenReturn(Optional.of(existing));
     when(manufacturerRepository.findByNameIgnoreCase("Origin Jumpworks"))
         .thenReturn(Optional.of(origin));
@@ -117,7 +118,7 @@ class UexVehicleServiceUuidMatchTest {
     ShipType legacy = new ShipType();
     legacy.setId(UUID.randomUUID());
     legacy.setName("100i"); // no external_uuid, no uex_vehicle_id yet
-    when(uexClient.getVehicles()).thenReturn(List.of(dto));
+    when(uexClient.getVehicles()).thenReturn(fetched(List.of(dto)));
     when(shipTypeRepository.findByExternalUuid(externalUuid)).thenReturn(Optional.empty());
     when(shipTypeRepository.findByUexVehicleId(7)).thenReturn(Optional.empty());
     when(shipTypeRepository.findByNameIgnoreCase("100i")).thenReturn(Optional.of(legacy));
@@ -141,7 +142,7 @@ class UexVehicleServiceUuidMatchTest {
   @Test
   void createsNewRowAsUexOnly_whenNoMatchFound() {
     UexVehicleDto dto = vehicleDto(9, externalUuid.toString(), "Custom Ship");
-    when(uexClient.getVehicles()).thenReturn(List.of(dto));
+    when(uexClient.getVehicles()).thenReturn(fetched(List.of(dto)));
     when(shipTypeRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     when(shipTypeRepository.findByUexVehicleId(any())).thenReturn(Optional.empty());
     when(shipTypeRepository.findByNameIgnoreCase(any())).thenReturn(Optional.empty());
@@ -231,7 +232,7 @@ class UexVehicleServiceUuidMatchTest {
             0,
             0,
             0); // id_company
-    when(uexClient.getVehicles()).thenReturn(List.of(dto));
+    when(uexClient.getVehicles()).thenReturn(fetched(List.of(dto)));
     when(shipTypeRepository.findByExternalUuid(externalUuid)).thenReturn(Optional.empty());
     when(shipTypeRepository.findByUexVehicleId(12)).thenReturn(Optional.empty());
     when(shipTypeRepository.findByNameIgnoreCase("Hercules A2")).thenReturn(Optional.empty());
@@ -258,7 +259,7 @@ class UexVehicleServiceUuidMatchTest {
 
   @Test
   void orphanSweep_skipped_whenNoVehicleProcessed() {
-    when(uexClient.getVehicles()).thenReturn(List.of());
+    when(uexClient.getVehicles()).thenReturn(fetched(List.of()));
 
     service.syncVehicles();
 

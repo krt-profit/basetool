@@ -209,6 +209,17 @@ public class ScWikiCommoditySyncService {
 
     if (seenScwikiUuids.isEmpty()) {
       log.warn("Skipping orphan sweep — no SC Wiki commodity was merged this run.");
+    } else if (!fetchResult.complete()) {
+      // The page walk could not vouch for the census (a page failed, the pagination metadata went
+      // missing on a full page, or meta.total disagreed with the merged rows). The uuids we did see
+      // are real, but everything on the pages we never fetched would be tombstoned for the wrong
+      // reason. Defer orphan detection to the next complete run.
+      log.warn(
+          "Skipping the material scwiki_deleted sweep: the Wiki commodity page walk did not"
+              + " enumerate the whole feed this run, so the {} uuid(s) it saw are not a complete"
+              + " census and every row outside them would be tombstoned for never having been"
+              + " fetched.",
+          seenScwikiUuids.size());
     } else {
       int marked = materialRepository.markScwikiDeleted(seenScwikiUuids, now);
       if (marked > 0) {

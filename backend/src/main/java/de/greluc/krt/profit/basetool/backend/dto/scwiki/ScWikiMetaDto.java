@@ -45,10 +45,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * <p>Some sub-resource endpoints (e.g. {@code /api/blueprints/{uuid}}) return a single row without
  * an envelope; this DTO is not used for those.
  *
+ * <p>Because the record is {@link JsonIgnoreProperties}{@code (ignoreUnknown = true)}, an upstream
+ * rename of any of these fields decodes as {@code null} instead of failing — which is why the
+ * client treats an absent {@link #lastPage()} on a full first page as a contract break, and
+ * cross-checks {@link #total()} against the merged row count before letting the result drive a
+ * tombstone sweep.
+ *
  * @param currentPage 1-based page number this response represents
  * @param lastPage highest page number for the current filter / sort
  * @param perPage rows per page (= the {@code ?page[size]=…} we sent)
- * @param total total row count across all pages
+ * @param total total row count across all pages; the client's completeness cross-check reads it
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ScWikiMetaDto(

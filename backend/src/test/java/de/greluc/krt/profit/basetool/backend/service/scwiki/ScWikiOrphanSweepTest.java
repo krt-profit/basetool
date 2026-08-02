@@ -32,9 +32,11 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 
 /**
- * Unit tests for {@link ScWikiOrphanSweep}, pinning the load-bearing data-safety gate that keeps a
- * "fetched rows, processed none" run from tombstoning an entire SC-Wiki catalogue table: the sweep
- * must never be invoked with an empty seen-set.
+ * Unit tests for {@link ScWikiOrphanSweep}, pinning the two load-bearing data-safety gates that
+ * keep a partial run from tombstoning an entire SC-Wiki catalogue table: the sweep must never be
+ * invoked with an empty seen-set, and never after a page walk that could not enumerate the whole
+ * feed (H5 — a half-walked feed still yields hundreds of real UUIDs, so the emptiness gate alone
+ * waves it through and everything on the un-fetched pages gets soft-deleted).
  */
 class ScWikiOrphanSweepTest {
 
@@ -46,6 +48,7 @@ class ScWikiOrphanSweepTest {
 
     ScWikiOrphanSweep.sweepDeletedOrphans(
         Set.of(),
+        true,
         seen -> {
           sweepCalls.incrementAndGet();
           return 5;
@@ -64,6 +67,7 @@ class ScWikiOrphanSweepTest {
 
     ScWikiOrphanSweep.sweepDeletedOrphans(
         seen,
+        true,
         s -> {
           passedToSweep.set(s);
           return 0;
@@ -81,8 +85,38 @@ class ScWikiOrphanSweepTest {
   void nonEmptySeen_someMarked_logsCountAndEntityLabel() {
     Set<UUID> seen = Set.of(UUID.randomUUID());
 
-    ScWikiOrphanSweep.sweepDeletedOrphans(seen, s -> 3, log, "ship_type");
+    ScWikiOrphanSweep.sweepDeletedOrphans(seen, true, s -> 3, log, "ship_type");
 
     verify(log).info("Marked {} {} row(s) scwiki_deleted (no longer in Wiki feed)", 3, "ship_type");
+  }
+
+  @Test
+  void incompleteFetch_refusesToSweep_andWarnsWhy() {
+    // The regression this gate exists for: a page walk that died after page 1 still hands the sync
+    // a non-empty seen-set, so the emptiness gate passes and every row on the pages that were never
+    // fetched would be tombstoned for never having been fetched.
+    Set<UUID> seen = Set.of(UUID.randomUUID(), UUID.randomUUID());
+    AtomicInteger sweepCalls = new AtomicInteger();
+
+    ScWikiOrphanSweep.sweepDeletedOrphans(
+        seen,
+        false,
+        s -> {
+          sweepCalls.incrementAndGet();
+          return 200;
+        },
+        log,
+        "ship_type");
+
+    assertThat(sweepCalls.get())
+        .as("an incomplete page walk must not run the tombstone sweep")
+        .isZero();
+    verify(log)
+        .warn(
+            "Skipping the {} scwiki_deleted sweep: the Wiki page walk did not enumerate the whole"
+                + " feed this run, so the {} uuid(s) it saw are not a complete census and every row"
+                + " outside them would be tombstoned for never having been fetched.",
+            "ship_type",
+            2);
   }
 }

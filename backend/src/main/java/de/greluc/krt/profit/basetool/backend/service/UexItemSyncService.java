@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerUexCompanyRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
+import de.greluc.krt.profit.basetool.backend.support.LogSafe;
 import de.greluc.krt.profit.basetool.backend.support.UexValues;
 import java.time.Instant;
 import java.util.HashSet;
@@ -102,6 +103,13 @@ import org.springframework.web.util.UriUtils;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class UexItemSyncService {
+
+  /**
+   * Cap for the upstream-supplied item name in log lines. UEX is a third party we do not control,
+   * so the value is untrusted free text and goes through {@link LogSafe} first; 64 characters
+   * comfortably fit any real item name.
+   */
+  private static final int MAX_NAME_LOG_LENGTH = 64;
 
   private final UexClient uexClient;
   private final UexCategoryRefService categoryRefService;
@@ -211,7 +219,12 @@ public class UexItemSyncService {
             }
           }
         } catch (Exception e) {
-          log.error("Failed to process UEX item dto: {}", dto, e);
+          log.error(
+              "Failed to process UEX item dto (id={}, uuid={}, name='{}')",
+              dto.id(),
+              dto.uuid(),
+              LogSafe.text(dto.name(), MAX_NAME_LOG_LENGTH),
+              e);
         }
       }
     }
@@ -313,7 +326,11 @@ public class UexItemSyncService {
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public GameItem upsertItemWithinTransaction(UexItemDto dto, UexCategory category, Instant now) {
     if (dto.id() == null || !StringUtils.hasText(dto.name())) {
-      log.debug("Skipping UEX item with missing id/name: {}", dto);
+      log.debug(
+          "Skipping UEX item with missing id/name (id={}, uuid={}, name='{}')",
+          dto.id(),
+          dto.uuid(),
+          LogSafe.text(dto.name(), MAX_NAME_LOG_LENGTH));
       return null;
     }
 

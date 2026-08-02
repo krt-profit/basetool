@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemDto;
@@ -69,6 +70,13 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("isAuthenticated()")
 @Slf4j
 public class PersonalInventoryPageController {
+
+  /**
+   * Character budget for the type-ahead term when it is written to a log line. A location name that
+   * a user could plausibly be typing fits comfortably; anything longer is a paste or an attack and
+   * is truncated by {@link LogSafe#text(String, int)} rather than allowed to stretch the line.
+   */
+  private static final int MAX_LOGGED_QUERY = 80;
 
   /** Response type for the {@code /api/v1/uex/locations/search} typeahead read. */
   private static final ParameterizedTypeReference<List<UexLocationDto>> UEX_LOCATION_LIST_TYPE =
@@ -374,7 +382,16 @@ public class PersonalInventoryPageController {
       List<UexLocationDto> result = backendApiClient.get(uri, UEX_LOCATION_LIST_TYPE, query);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
-      log.warn("UEX location typeahead failed for query='{}': {}", q, e.getMessage());
+      // DEBUG, not WARN: this endpoint fires ONE REQUEST PER KEYSTROKE. With the backend down, a
+      // single member typing a location name produces one line per character — a log-flood vector
+      // triggered accidentally by ordinary use, which REQ-OBS-001 puts at DEBUG. The outage itself
+      // is already carried by basetool_backend_client_errors_total and by the WebClient/resilience
+      // logging, so nothing is lost. The query is user-typed free text and goes through LogSafe so
+      // it cannot inject a forged log line (CWE-117).
+      log.debug(
+          "UEX location typeahead failed for query='{}': {}",
+          LogSafe.text(q, MAX_LOGGED_QUERY),
+          e.getMessage());
       return Collections.emptyList();
     }
   }

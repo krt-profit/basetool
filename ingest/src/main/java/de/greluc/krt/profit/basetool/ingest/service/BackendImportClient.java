@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.ingest.service;
 
+import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractDto;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
@@ -55,18 +56,24 @@ public class BackendImportClient {
 
   private final WebClient backendWebClient;
   private final CircuitBreaker circuitBreaker;
+  private final String correlationIdHeader;
 
   /**
-   * Wires the backend {@link WebClient} and resolves the {@code backend} circuit breaker from the
-   * Resilience4j registry.
+   * Wires the backend {@link WebClient}, resolves the {@code backend} circuit breaker from the
+   * Resilience4j registry, and captures the configured correlation-id header name so the outbound
+   * relay uses the same header the gateway accepts inbound (REQ-OBS-002).
    *
    * @param backendWebClient the backend-facing client from {@code WebClientConfig}
    * @param circuitBreakerRegistry the auto-configured Resilience4j registry
+   * @param loggingProperties supplies the correlation-id header name
    */
   public BackendImportClient(
-      WebClient backendWebClient, CircuitBreakerRegistry circuitBreakerRegistry) {
+      WebClient backendWebClient,
+      CircuitBreakerRegistry circuitBreakerRegistry,
+      LoggingProperties loggingProperties) {
     this.backendWebClient = backendWebClient;
     this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("backend");
+    this.correlationIdHeader = loggingProperties.correlationIdHeader();
     // Log the one-time OPEN/CLOSED transition at WARN so a backend outage leaves a breadcrumb in
     // the
     // ingest log (the frontend has ResilienceEventLogger; ingest had only ported the breaker). This
@@ -151,7 +158,7 @@ public class BackendImportClient {
    * @param correlationId the correlation id, or {@code null} to omit the header
    * @return a header consumer applied to the outbound request
    */
-  private static @NotNull Consumer<HttpHeaders> commonHeaders(
+  private @NotNull Consumer<HttpHeaders> commonHeaders(
       @NotNull String bearer, String acceptLanguage, String correlationId) {
     return headers -> {
       headers.setBearerAuth(bearer);
@@ -159,7 +166,7 @@ public class BackendImportClient {
         headers.set(HttpHeaders.ACCEPT_LANGUAGE, acceptLanguage);
       }
       if (correlationId != null && !correlationId.isBlank()) {
-        headers.set("X-Correlation-Id", correlationId);
+        headers.set(correlationIdHeader, correlationId);
       }
     };
   }

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
+import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ClaimDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CreateClaimDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CreateJobOrderDto;
@@ -974,7 +975,10 @@ public class JobOrderWriteController {
                     .atZone(ZoneId.systemDefault())
                     .toInstant();
           } catch (Exception elocal) {
-            log.warn("Could not parse handoverTime {}, using now()", rawHandoverTime);
+            // Client-supplied free text straight off the form: sanitise before it reaches the
+            // logger so an embedded newline cannot forge a second log line (CWE-117).
+            log.warn(
+                "Could not parse handoverTime {}, using now()", LogSafe.text(rawHandoverTime, 64));
           }
         }
       }
@@ -1057,7 +1061,11 @@ public class JobOrderWriteController {
                     .atZone(ZoneId.systemDefault())
                     .toInstant();
           } catch (Exception elocal) {
-            log.warn("Could not parse item handoverTime {}, using now()", rawHandoverTime);
+            // Client-supplied free text straight off the form: sanitise before it reaches the
+            // logger so an embedded newline cannot forge a second log line (CWE-117).
+            log.warn(
+                "Could not parse item handoverTime {}, using now()",
+                LogSafe.text(rawHandoverTime, 64));
           }
         }
       }
@@ -1102,7 +1110,9 @@ public class JobOrderWriteController {
               .atZone(ZoneId.systemDefault())
               .toInstant();
         } catch (Exception elocal) {
-          log.warn("Could not parse handoverTime {}, using now()", raw);
+          // Client-supplied free text straight off the form: sanitise before it reaches the
+          // logger so an embedded newline cannot forge a second log line (CWE-117).
+          log.warn("Could not parse handoverTime {}, using now()", LogSafe.text(raw, 64));
         }
       }
     }

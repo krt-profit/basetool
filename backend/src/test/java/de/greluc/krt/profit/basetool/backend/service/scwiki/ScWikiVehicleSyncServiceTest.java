@@ -189,4 +189,26 @@ class ScWikiVehicleSyncServiceTest {
     verify(shipTypeRepository, never()).save(any());
     verify(shipTypeRepository, never()).markScwikiDeletedExcept(any(), any());
   }
+
+  @Test
+  void syncVehicles_incompletePageWalk_upsertsTheRows_butSkipsOrphanSweep() {
+    // H5: a page walk that could not enumerate the whole feed still returns real rows, so the
+    // "did we see anything?" gate passes — and every ship_type on the pages that were never
+    // fetched would be marked scwiki_deleted for exactly that reason. The rows that DID arrive are
+    // still upserted; only the tombstone sweep stands down until a complete run.
+    UUID uuid = UUID.randomUUID();
+    ScWikiVehicleDto dto =
+        new ScWikiVehicleDto(uuid, "drake-caterpillar", "Caterpillar", null, null, null, null);
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles")))
+        .thenReturn(ScWikiClient.FetchResult.partial(List.of(dto)));
+    when(shipTypeRepository.findByExternalUuid(uuid)).thenReturn(Optional.empty());
+    when(shipTypeRepository.findByNameIgnoreCase("Caterpillar")).thenReturn(Optional.empty());
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    int written = service.syncVehicles();
+
+    verify(shipTypeRepository).save(any(ShipType.class));
+    verify(shipTypeRepository, never()).markScwikiDeletedExcept(any(), any());
+    assertEquals(1, written, "the rows that arrived are still written");
+  }
 }

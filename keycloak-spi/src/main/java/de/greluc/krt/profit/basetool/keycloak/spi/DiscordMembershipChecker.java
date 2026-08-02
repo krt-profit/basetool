@@ -26,6 +26,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import org.jboss.logging.Logger;
 import org.keycloak.util.JsonSerialization;
 
 /**
@@ -43,6 +44,9 @@ import org.keycloak.util.JsonSerialization;
  * <p>This class never logs the token, the response body, or any Discord id.
  */
 public class DiscordMembershipChecker {
+
+  /** Fail-closed denials are invisible downstream, so every reason is logged here. */
+  private static final Logger LOG = Logger.getLogger(DiscordMembershipChecker.class);
 
   /** Outcome of a guild + role membership check. All non-{@code ALLOWED} values deny the login. */
   public enum Result {
@@ -93,10 +97,17 @@ public class DiscordMembershipChecker {
         response =
             httpClient.send(buildRequest(url, accessToken), HttpResponse.BodyHandlers.ofString());
       } catch (IOException e) {
-        // Timeout / connection reset / DNS failure / truncated read — fail closed.
+        // Timeout / connection reset / DNS failure / truncated read — fail closed. This is the
+        // single most likely cause of a "nobody can log in" report, so it must not be silent: the
+        // authenticator downstream only ever sees DENIED_ERROR and cannot say what went wrong.
+        LOG.warnf(
+            e,
+            "Discord membership check failed to reach the API (%s); denying.",
+            e.getClass().getSimpleName());
         return Result.DENIED_ERROR;
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
+        LOG.warn("Discord membership check was interrupted; denying.");
         return Result.DENIED_ERROR;
       }
 
@@ -105,7 +116,9 @@ public class DiscordMembershipChecker {
         try {
           return hasRole(response.body(), roleId) ? Result.ALLOWED : Result.DENIED_NOT_MEMBER;
         } catch (IOException e) {
-          // Malformed / unparseable body — fail closed.
+          // Malformed / unparseable body — fail closed. Distinct from a transport failure: this one
+          // means Discord answered 200 with something we could not read, i.e. a contract change.
+          LOG.warnf(e, "Discord returned an unreadable member payload; denying.");
           return Result.DENIED_ERROR;
         }
       }
@@ -118,7 +131,12 @@ public class DiscordMembershipChecker {
         waitForRetry(response);
         continue;
       }
-      // 5xx / 401 / 403 / 429-after-retries / anything unexpected — fail closed.
+      // 5xx / 401 / 403 / 429-after-retries / anything unexpected — fail closed. The status is the
+      // whole diagnosis: 401 means the brokered token is bad, 403 a missing scope, 429 that we are
+      // being rate-limited, 5xx a Discord outage. Never log the token or the URL (it carries the
+      // guild id).
+      LOG.warnf(
+          "Discord membership check denied on HTTP %d after %d retry attempt(s).", status, attempt);
       return Result.DENIED_ERROR;
     }
   }
@@ -155,6 +173,7 @@ public class DiscordMembershipChecker {
         Thread.sleep(waitMs);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
+        LOG.debug("Interrupted while backing off a Discord 429.");
       }
     }
   }
@@ -164,6 +183,7 @@ public class DiscordMembershipChecker {
       return (long) (Double.parseDouble(headerValue.trim()) * 1000);
     } catch (NumberFormatException e) {
       // A non-numeric Retry-After (HTTP-date form) — fall back to a small fixed wait.
+      LOG.debugf("Non-numeric Discord Retry-After header; using the default backoff.");
       return 200L;
     }
   }

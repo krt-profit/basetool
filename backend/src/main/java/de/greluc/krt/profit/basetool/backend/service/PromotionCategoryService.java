@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryResponse
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
+import de.greluc.krt.profit.basetool.backend.support.LogSafe;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import jakarta.persistence.EntityNotFoundException;
@@ -161,7 +162,14 @@ public class PromotionCategoryService {
         topic.getName() + " / " + saved.getName(),
         null,
         null);
-    log.info("Created PromotionCategory id={} name={}", saved.getId(), saved.getName());
+    // The name is admin-entered free text and reaches the log verbatim, so it goes through LogSafe:
+    // an embedded newline plus a fake level prefix would otherwise read as a second, forged log
+    // line
+    // during triage (CWE-117). 120 mirrors the DTO's @Size(MAX_SHORT_NAME).
+    log.info(
+        "Created PromotionCategory id={} name={}",
+        saved.getId(),
+        LogSafe.text(saved.getName(), 120));
     return mapper.toResponse(saved);
   }
 

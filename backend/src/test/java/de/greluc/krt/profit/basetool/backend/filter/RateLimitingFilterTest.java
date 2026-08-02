@@ -20,10 +20,15 @@
 package de.greluc.krt.profit.basetool.backend.filter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
@@ -37,6 +42,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSource;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.mock.web.MockFilterChain;
@@ -45,7 +51,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 
 /**
  * Unit tests for {@link RateLimitingFilter}. Previously had no test file at all — 36% branch
- * coverage. The most security-critical path is {@code resolveClientIp}, which decides which
+ * coverage. The most security-critical path is {@code resolveClientKey}, which decides which
  * "bucket" a request lands in:
  *
  * <ul>
@@ -270,7 +276,7 @@ class RateLimitingFilterTest {
   }
 
   // ---------------------------------------------------------------
-  // resolveClientIp + bucket bookkeeping — the spoofable-header guard
+  // resolveClientKey + bucket bookkeeping — the spoofable-header guard
   // ---------------------------------------------------------------
 
   @Nested
@@ -807,6 +813,137 @@ class RateLimitingFilterTest {
       MockHttpServletResponse resp = new MockHttpServletResponse();
       filter.doFilter(req, resp, new MockFilterChain());
       return resp.getStatus();
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // key_source — the 2026-07-06 bucket-collapse diagnosis. A 429 spike must be attributable to
+  // either "many clients tripped their own budgets" (forwarded) or "trusted-proxies drifted and
+  // everyone collapsed onto one bucket" (peer), without ever writing a client IP to the log.
+  // ---------------------------------------------------------------
+
+  @Nested
+  class KeySourceTests {
+
+    /**
+     * Drains a capacity-1 bucket and returns the rejected second response.
+     *
+     * <p>Rebuilds the filter rather than reusing the {@code @BeforeEach} instance on purpose: the
+     * trusted-proxy list is compiled into {@code IpAddressMatcher}s once in the constructor, so a
+     * {@code properties.setTrustedProxies(...)} in the test body is invisible to an already-built
+     * filter and every case would silently resolve to {@code peer}. Rebuilding also hands each case
+     * an empty bucket cache, so the two requests below are the only ones in the bucket.
+     */
+    private MockHttpServletResponse drainAndReject(String remoteAddr, String xff) throws Exception {
+      properties.setCapacity(1);
+      properties.setRefillTokens(1);
+      RateLimitingFilter freshFilter =
+          new RateLimitingFilter(properties, problemProperties, messageSource, meterRegistry);
+      freshFilter.doFilter(
+          request(remoteAddr, xff), new MockHttpServletResponse(), new MockFilterChain());
+      MockHttpServletResponse rejected = new MockHttpServletResponse();
+      freshFilter.doFilter(request(remoteAddr, xff), rejected, new MockFilterChain());
+      return rejected;
+    }
+
+    private MockHttpServletRequest request(String remoteAddr, String xff) {
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+      req.setRemoteAddr(remoteAddr);
+      if (xff != null) {
+        req.addHeader("X-Forwarded-For", xff);
+      }
+      return req;
+    }
+
+    @Test
+    void rejection_fromAnUntrustedPeer_isTaggedPeer() throws Exception {
+      properties.setTrustedProxies(List.of());
+
+      assertEquals(429, drainAndReject("198.51.100.10", "1.1.1.1").getStatus());
+
+      assertEquals(
+          1.0d,
+          meterRegistry
+              .get(MetricNames.RATELIMIT_REJECTIONS)
+              .tag(MetricNames.TAG_BUCKET, MetricNames.BUCKET_GLOBAL)
+              .tag(MetricNames.TAG_KEY_SOURCE, MetricNames.KEY_SOURCE_PEER)
+              .counter()
+              .count(),
+          "an ignored X-Forwarded-For means everyone behind that hop shares one budget");
+    }
+
+    @Test
+    void rejection_behindATrustedProxy_isTaggedForwarded() throws Exception {
+      properties.setTrustedProxies(List.of("10.0.0.1"));
+
+      assertEquals(429, drainAndReject("10.0.0.1", "203.0.113.7").getStatus());
+
+      assertEquals(
+          1.0d,
+          meterRegistry
+              .get(MetricNames.RATELIMIT_REJECTIONS)
+              .tag(MetricNames.TAG_BUCKET, MetricNames.BUCKET_GLOBAL)
+              .tag(MetricNames.TAG_KEY_SOURCE, MetricNames.KEY_SOURCE_FORWARDED)
+              .counter()
+              .count(),
+          "per-client bucketing behind the edge must report `forwarded`");
+    }
+
+    @Test
+    void rejection_withAnEmptyLeadingXffEntry_fallsBackToPeerRatherThanClaimingForwarded()
+        throws Exception {
+      // " , 1.2.3.4" would otherwise key every such request on the empty string and still report
+      // `forwarded`, hiding exactly the collapse this tag exists to expose.
+      properties.setTrustedProxies(List.of("10.0.0.1"));
+
+      assertEquals(429, drainAndReject("10.0.0.1", " , 203.0.113.7").getStatus());
+
+      assertEquals(
+          1.0d,
+          meterRegistry
+              .get(MetricNames.RATELIMIT_REJECTIONS)
+              .tag(MetricNames.TAG_KEY_SOURCE, MetricNames.KEY_SOURCE_PEER)
+              .counter()
+              .count());
+    }
+
+    /**
+     * REQ-OBS-004: the 429 short-circuits before {@code RequestLoggingFilter}, so this DEBUG line
+     * is the only log record of the rejection — and it must carry the branch, never the address.
+     * The backend stdout stream's 744h retention is predicated on "no client IPs by design". DEBUG
+     * is also the contract: the global bucket is anonymous-reachable, so a higher level would be a
+     * log-flood vector.
+     */
+    @Test
+    void rejection_logsTheKeySourceAtDebug_andNeverTheClientIp() throws Exception {
+      properties.setTrustedProxies(List.of());
+
+      Logger logger = (Logger) LoggerFactory.getLogger(RateLimitingFilter.class);
+      Level original = logger.getLevel();
+      ListAppender<ILoggingEvent> appender = new ListAppender<>();
+      appender.start();
+      logger.addAppender(appender);
+      logger.setLevel(Level.DEBUG);
+      try {
+        drainAndReject("198.51.100.10", "1.1.1.1");
+
+        ILoggingEvent event =
+            appender.list.stream()
+                .filter(e -> e.getFormattedMessage().contains("Rate limit exceeded"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("expected the rejection log line"));
+        assertEquals(Level.DEBUG, event.getLevel(), "anonymous-reachable — must stay at DEBUG");
+        String formatted = event.getFormattedMessage();
+        assertTrue(
+            formatted.contains("keySource=" + MetricNames.KEY_SOURCE_PEER),
+            "the rejection line must name the branch: " + formatted);
+        assertFalse(
+            formatted.contains("198.51.100.10") || formatted.contains("1.1.1.1"),
+            "no client IP may reach the log stream: " + formatted);
+      } finally {
+        logger.setLevel(original);
+        logger.detachAppender(appender);
+      }
     }
   }
 

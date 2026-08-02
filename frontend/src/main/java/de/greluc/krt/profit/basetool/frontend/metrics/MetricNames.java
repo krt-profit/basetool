@@ -47,9 +47,18 @@ public final class MetricNames {
 
   /**
    * Counter {@code basetool_livesync_subscribe_total} — tags {@code topic_class}, {@code outcome}
-   * ({@link #OUTCOME_ALLOWED} / {@link #OUTCOME_DENIED}); the verdict of a multiplexed {@code
-   * /ws/sync} subscribe-authorization check (REQ-FE-015, ADR-0094). A saturated-executor fail-open
-   * is instead counted as a {@link #DROPPED_AUTHORIZE_SATURATED} relay drop.
+   * ({@link #OUTCOME_ALLOWED} / {@link #OUTCOME_DENIED}) and {@code reason}; the verdict of a
+   * multiplexed {@code /ws/sync} subscribe-authorization check (REQ-FE-015, ADR-0094). A
+   * saturated-executor fail-open is instead counted as a {@link #DROPPED_AUTHORIZE_SATURATED} relay
+   * drop.
+   *
+   * <p>On a denial the {@code reason} tag separates the two very different paths that both land on
+   * {@code outcome=denied} today: an explicit backend authorization refusal ({@link
+   * #SUBSCRIBE_DENY_AUTHZ}) and a presence-enabled class failing <em>closed</em> on an
+   * indeterminate probe ({@link #SUBSCRIBE_DENY_INDETERMINATE}). Without the split, a backend or
+   * token outage reads exactly like users hitting permission boundaries. Micrometer requires a
+   * uniform tag-key set per meter name, so the {@code allowed} series carries the {@link
+   * #REASON_NONE} placeholder.
    */
   public static final String LIVESYNC_SUBSCRIBE = "basetool.livesync.subscribe";
 
@@ -95,6 +104,33 @@ public final class MetricNames {
   /** Gauge {@code basetool_active_sessions} — active Spring Session sessions (frontend). */
   public static final String ACTIVE_SESSIONS = "basetool.active.sessions";
 
+  /**
+   * Counter {@code basetool_session_evicted_total} (unlabelled) — bumped when Spring Security's
+   * concurrent-session control expires a user's oldest session because the {@code maximumSessions}
+   * cap configured in {@code SecurityConfig} is already full. The eviction reaches the victim only
+   * as an unexplained logout on their next request and leaves no other trace, so a user genuinely
+   * cycling devices and a session registry that has stopped reaping stale Redis entries (the cap
+   * then filling with dead sessions and evicting live ones) are indistinguishable without this
+   * counter. Unlabelled — neither the principal name nor the session id may become a tag value
+   * (REQ-OBS-004).
+   */
+  public static final String SESSION_EVICTED = "basetool.session.evicted";
+
+  /**
+   * Counter {@code basetool_client_error_total} — tag {@code kind} ({@link
+   * #CLIENT_ERROR_SCRIPT_ERROR} / {@link #CLIENT_ERROR_UNHANDLED_REJECTION} / {@link
+   * #CLIENT_ERROR_RESOURCE_ERROR}); browser-side failures reported by the client error beacon. A JS
+   * exception that kills a {@code krtFetch} handler produces no server-side signal whatsoever — the
+   * request that never happens cannot be counted — so a deploy that breaks the client half of a
+   * live-update surface is otherwise invisible until a user reports it.
+   *
+   * <p>The {@code kind} tag is resolved <em>server-side</em> against the three literals below and
+   * the beacon's value is discarded when it matches none of them: the endpoint is reachable without
+   * a session, so echoing a client-supplied kind would be an unbounded, attacker-controlled label
+   * (REQ-OBS-006). The message, stack, script URL and user agent never reach a tag or a log line.
+   */
+  public static final String CLIENT_ERROR = "basetool.client.error";
+
   /** Counter {@code basetool_backend_client_errors_total} — tags {@code reason}, {@code method}. */
   public static final String BACKEND_CLIENT_ERRORS = "basetool.backend.client.errors";
 
@@ -121,8 +157,11 @@ public final class MetricNames {
 
   /**
    * Counter {@code basetool_presence_relay_dropped_total} — tags {@code reason} ({@link
-   * #DROPPED_THROTTLED} / {@link #DROPPED_SEND_FAILED}) and {@code topic_class} at the throttle and
-   * send-failure branches of the relay (#1041 item 17, REQ-FE-015).
+   * #DROPPED_THROTTLED} / {@link #DROPPED_SEND_FAILED} / {@link #DROPPED_TOPIC_CAP} / {@link
+   * #DROPPED_TOPIC_THROTTLED} / {@link #DROPPED_AUTHORIZE_SATURATED} / {@link
+   * #DROPPED_SECTION_FILTERED}) and {@link #TAG_TOPIC_CLASS} at the drop branches of the relay
+   * (#1041 item 17, REQ-FE-015). Every drop branch counts here, so the reason set grows with the
+   * relay; the {@code topic_class} tag is the same bounded set the other relay counters use.
    */
   public static final String PRESENCE_RELAY_DROPPED = "basetool.presence.relay.dropped";
 
@@ -151,8 +190,21 @@ public final class MetricNames {
    */
   public static final String BOT_BLOCKED = "basetool.bot.blocked";
 
-  /** Tag key: the bounded backend-call failure reason (also the presence-drop / login reason). */
+  /**
+   * Tag key: the bounded backend-call failure reason — also the presence-drop reason, the login
+   * reason, the socket-rejected reason and the live-sync subscribe-deny reason ({@link
+   * #SUBSCRIBE_DENY_AUTHZ} / {@link #SUBSCRIBE_DENY_INDETERMINATE}). Every meter using it draws
+   * from its own fixed value set; none of those values is ever derived from client input.
+   */
   public static final String TAG_REASON = "reason";
+
+  /**
+   * Tag key: the browser-error class on {@link #CLIENT_ERROR} ({@link #CLIENT_ERROR_SCRIPT_ERROR} /
+   * {@link #CLIENT_ERROR_UNHANDLED_REJECTION} / {@link #CLIENT_ERROR_RESOURCE_ERROR}). Resolved
+   * server-side against exactly those three literals — a beacon payload that matches none of them
+   * contributes no series at all (REQ-OBS-006).
+   */
+  public static final String TAG_KIND = "kind";
 
   /** Tag key: the HTTP verb of the failed backend call ({@code GET}/{@code POST}/…). */
   public static final String TAG_METHOD = "method";
@@ -205,8 +257,20 @@ public final class MetricNames {
   /** Login failure reason: any other authentication exception. */
   public static final String LOGIN_REASON_OTHER = "other";
 
-  /** Login reason placeholder on a success (keeps the counter's label schema consistent). */
-  public static final String LOGIN_REASON_NONE = "none";
+  /**
+   * Reason placeholder for a series whose outcome has no reason — a successful {@link #LOGIN}, and
+   * an {@link #OUTCOME_ALLOWED} subscribe on {@link #LIVESYNC_SUBSCRIBE}. Micrometer rejects the
+   * same meter name registered with differing tag-key sets, so the non-failure series must still
+   * carry a {@code reason}; this is the value it carries.
+   */
+  public static final String REASON_NONE = "none";
+
+  /**
+   * Login-specific spelling of {@link #REASON_NONE}, kept because the login call sites and the
+   * {@link #LOGIN} contract are written in terms of it. Identical wire value {@code none}: the two
+   * are interchangeable and must stay so — do not give either a different literal.
+   */
+  public static final String LOGIN_REASON_NONE = REASON_NONE;
 
   /** Presence relay frame type: a peer-forwarded {@code changed} live-sync signal. */
   public static final String FRAME_CHANGED = "changed";
@@ -236,11 +300,44 @@ public final class MetricNames {
    */
   public static final String DROPPED_AUTHORIZE_SATURATED = "authorize_saturated";
 
+  /**
+   * Presence drop reason: a {@code changed} frame whose section keys were all rejected by the topic
+   * class's allowed-section whitelist, so nothing was relayed to the room. This is the exact
+   * signature of the REQ-FE-010 defect class — an acting client broadcasting a section key the
+   * relay's accept-list does not know leaves every peer stale, with no error on either side — and
+   * the drop is otherwise completely silent, which is why it is counted rather than logged. The
+   * rejected key is client-supplied and never becomes a tag value (REQ-OBS-006).
+   */
+  public static final String DROPPED_SECTION_FILTERED = "section_filtered";
+
   /** Live-sync subscribe outcome: the subscribe was authorized (or failed open on a transient). */
   public static final String OUTCOME_ALLOWED = "allowed";
 
-  /** Live-sync subscribe outcome: the subscribe was refused by an explicit backend 403/404. */
+  /**
+   * Live-sync subscribe outcome: the subscribe was refused. Covers both an explicit backend 403/404
+   * and a presence-enabled class failing closed on an indeterminate probe — the accompanying {@code
+   * reason} tag ({@link #SUBSCRIBE_DENY_AUTHZ} / {@link #SUBSCRIBE_DENY_INDETERMINATE}) is what
+   * tells the two apart.
+   */
   public static final String OUTCOME_DENIED = "denied";
+
+  /**
+   * Subscribe-deny reason on {@link #LIVESYNC_SUBSCRIBE} with {@link #OUTCOME_DENIED}: the
+   * authorization probe got an explicit backend 403/404, or a locally role-gated global room
+   * withheld its capability. A real permission verdict — the caller may not read the topic — so a
+   * steady trickle here is normal and only a step change is interesting.
+   */
+  public static final String SUBSCRIBE_DENY_AUTHZ = "authz";
+
+  /**
+   * Subscribe-deny reason on {@link #LIVESYNC_SUBSCRIBE} with {@link #OUTCOME_DENIED}: the
+   * authorization outcome was indeterminate (no captured token, a transient 401/5xx/timeout, or a
+   * probe that threw) and the topic class is presence-enabled, so it failed <b>closed</b> rather
+   * than risk disclosing who is editing a resource the caller may not read. Not a permission
+   * verdict: a rising rate here is a backend/token availability problem, and lumping it into {@link
+   * #SUBSCRIBE_DENY_AUTHZ} would make an outage look like users hitting permission boundaries.
+   */
+  public static final String SUBSCRIBE_DENY_INDETERMINATE = "indeterminate";
 
   /**
    * Socket-rejected reason ({@link #LIVESYNC_SOCKET_REJECTED}): a {@code /ws/sync} socket refused
@@ -265,6 +362,22 @@ public final class MetricNames {
 
   /** Reason: any other unexpected backend failure. */
   public static final String REASON_UNKNOWN = "unknown";
+
+  /** Browser error kind: an uncaught script exception reported via {@code window.onerror}. */
+  public static final String CLIENT_ERROR_SCRIPT_ERROR = "script_error";
+
+  /**
+   * Browser error kind: a promise rejection no handler claimed, reported via the {@code
+   * unhandledrejection} event — the shape a failed {@code krtFetch} chain takes.
+   */
+  public static final String CLIENT_ERROR_UNHANDLED_REJECTION = "unhandled_rejection";
+
+  /**
+   * Browser error kind: a subresource (script, stylesheet, image) that failed to load, caught on
+   * the capturing {@code error} event. Distinguishes a broken/stale asset deploy from application
+   * code that threw.
+   */
+  public static final String CLIENT_ERROR_RESOURCE_ERROR = "resource_error";
 
   private MetricNames() {
     // Constants holder — not instantiable.

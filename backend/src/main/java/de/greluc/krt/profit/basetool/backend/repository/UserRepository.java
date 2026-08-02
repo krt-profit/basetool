@@ -384,10 +384,20 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * Sets {@code inKeycloak = false} on every user whose id is not in the freshly-synced Keycloak id
    * list. Called by the periodic Keycloak sync so accounts removed upstream become flagged locally
    * without being deleted (preserves history and FK references).
+   *
+   * <p>The {@code inKeycloak = true} predicate restricts the UPDATE to rows that actually flip,
+   * which is what makes the returned count the number of accounts <em>newly</em> disappearing in
+   * this run rather than the running total of everyone who ever left — the difference between a
+   * usable anomaly signal (an upstream mass-deletion or a truncated roster) and a constant. Rows
+   * already flagged are unaffected either way, so the write is semantically unchanged.
+   *
+   * @param ids the ids present in the current Keycloak roster; never {@code null}, never empty (the
+   *     caller short-circuits on an empty set so an outage cannot flag the whole user base)
+   * @return the number of users flagged as missing by this call (rows whose flag flipped)
    */
   @org.springframework.data.jpa.repository.Modifying
-  @Query("UPDATE User u SET u.inKeycloak = false WHERE u.id NOT IN :ids")
-  void markMissingUsers(@NotNull java.util.Collection<java.util.UUID> ids);
+  @Query("UPDATE User u SET u.inKeycloak = false WHERE u.inKeycloak = true AND u.id NOT IN :ids")
+  int markMissingUsers(@NotNull java.util.Collection<java.util.UUID> ids);
 
   /**
    * Returns the ids of every local user that already carries a Discord account link ({@code

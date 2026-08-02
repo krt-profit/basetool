@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.dto.uex.UexStarSystemDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.model.StarSystem;
 import de.greluc.krt.profit.basetool.backend.repository.StarSystemRepository;
+import de.greluc.krt.profit.basetool.backend.support.LogSafe;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,17 +44,31 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class UexStarSystemService {
 
+  /**
+   * Cap for the upstream-supplied star-system name in log lines. UEX is a third party we do not
+   * control, so the value is untrusted free text and goes through {@link LogSafe} first; 64
+   * characters comfortably fit any real system name.
+   */
+  private static final int MAX_NAME_LOG_LENGTH = 64;
+
   private final UexClient uexClient;
   private final StarSystemRepository starSystemRepository;
 
   /**
-   * Pulls the star-system catalog and upserts each row. Empty UEX response short-circuits without
-   * wiping local data.
+   * Pulls the star-system catalog and upserts each row. An unchanged feed ({@code 304}) and an
+   * empty response are both no-ops, but only the latter is reported as a problem — the former is a
+   * healthy fully-cached run. Neither wipes local data.
    */
   @Transactional
   public void fetchAndProcessStarSystems() {
     log.info("Starting synchronization of UEX star systems...");
-    List<UexStarSystemDto> dtos = uexClient.getStarSystems();
+    UexClient.FetchResult<UexStarSystemDto> fetched = uexClient.getStarSystems();
+    if (fetched.notModified()) {
+      log.info(
+          "UEX star system catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexStarSystemDto> dtos = fetched.data();
 
     if (dtos.isEmpty()) {
       log.warn("No data received from UEX API. Aborting star system synchronization.");
@@ -66,7 +81,11 @@ public class UexStarSystemService {
         processSingleDto(dto);
         processed++;
       } catch (Exception e) {
-        log.error("Failed to process star system dto: {}", dto, e);
+        log.error(
+            "Failed to process star system dto (id={}, name='{}')",
+            dto.id(),
+            LogSafe.text(dto.name(), MAX_NAME_LOG_LENGTH),
+            e);
       }
     }
 
@@ -75,7 +94,9 @@ public class UexStarSystemService {
 
   private void processSingleDto(UexStarSystemDto dto) {
     if (dto.id() == null) {
-      log.warn("Missing ID in star system DTO: {}", dto);
+      log.warn(
+          "Missing ID in star system DTO (name='{}')",
+          LogSafe.text(dto.name(), MAX_NAME_LOG_LENGTH));
       return;
     }
 

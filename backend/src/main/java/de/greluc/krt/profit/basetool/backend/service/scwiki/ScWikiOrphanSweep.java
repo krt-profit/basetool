@@ -28,8 +28,9 @@ import org.slf4j.Logger;
 /**
  * The gated tombstone sweep every SC Wiki sync runs at the end of a successful pass: rows the Wiki
  * feed no longer lists are marked {@code scwiki_deleted} (SC_WIKI_SYNC_PLAN.md §8.7). This helper
- * exists to make the <b>data-safety gate impossible to forget</b>: the sweep runs only when the run
- * actually saw at least one Wiki row.
+ * exists to make the <b>data-safety gates impossible to forget</b>: the sweep runs only when the
+ * run actually saw at least one Wiki row AND the fetch that produced those rows enumerated the
+ * whole feed.
  *
  * <p><b>Why the gate is load-bearing:</b> {@code markScwikiDeletedExcept(seen, now)} tombstones
  * <em>every</em> catalogue row whose external UUID is not in {@code seen}. If a run reached the
@@ -38,6 +39,16 @@ import org.slf4j.Logger;
  * The empty-<em>response</em> short-circuit each sync does before its row loop guards the common
  * outage case, but not the "fetched rows, processed none" edge; this gate is the backstop for it.
  * Routing the sweep through here means a caller cannot invoke the tombstone without the gate.
+ *
+ * <p><b>The second gate: the fetch must have been a full census.</b> A non-empty {@code seen} set
+ * proves the run saw rows, not that it saw <em>all</em> rows. A page walk that died on page 2 of 6,
+ * or whose pagination metadata vanished behind an upstream field rename, still hands the sync
+ * hundreds of genuine UUIDs — enough to sail past the emptiness gate — while every row on the pages
+ * that were never requested is missing from {@code seen} for a reason that has nothing to do with
+ * the Wiki dropping it. Sweeping then soft-deletes the un-fetched remainder. So the sweep also
+ * requires {@code ScWikiClient.FetchResult.complete()}, and refuses (with a WARN naming the
+ * incompleteness) when the walk could not vouch for the census. Orphan detection is merely delayed
+ * to the next healthy run; a wrong tombstone is not.
  *
  * <p>Adopted by the two syncs whose end-of-run sweep is byte-identical bar the repository and the
  * entity label — {@link ScWikiVehicleSyncService} ({@code ship_type}) and {@link
@@ -57,15 +68,24 @@ public final class ScWikiOrphanSweep {
   private ScWikiOrphanSweep() {}
 
   /**
-   * Runs the tombstone sweep only when {@code seen} is non-empty, then logs how many rows were
-   * marked (§8.7). A run that saw no Wiki rows is a no-op — never a full-table tombstone (see the
-   * class Javadoc for why this gate is load-bearing).
+   * Runs the tombstone sweep only when the run saw at least one Wiki row <em>and</em> the fetch
+   * that produced those rows was a full census, then logs how many rows were marked (§8.7). A run
+   * that saw no Wiki rows is a silent no-op — never a full-table tombstone; a run whose page walk
+   * was incomplete logs a WARN explaining why it stood down (see the class Javadoc for why both
+   * gates are load-bearing).
    *
-   * @param seen the external UUIDs seen in this run; the sweep's exclusion set and the gate — an
-   *     empty set skips the sweep entirely
+   * <p>The WARN cannot fire on a healthy run: {@code fetchComplete} is only {@code false} when the
+   * client itself already logged a failed page, absent pagination metadata on a full page, or a
+   * {@code meta.total} mismatch.
+   *
+   * @param seen the external UUIDs seen in this run; the sweep's exclusion set and the first gate —
+   *     an empty set skips the sweep entirely
+   * @param fetchComplete {@code ScWikiClient.FetchResult.complete()} for the fetch that produced
+   *     {@code seen}; {@code false} means pages are missing from the census and the sweep is
+   *     skipped
    * @param markDeletedExcept the repository tombstone operation, invoked with {@code seen} and
    *     returning the number of rows marked (typically {@code s -> repo.markScwikiDeletedExcept(s,
-   *     now)}); called at most once, and only when {@code seen} is non-empty
+   *     now)}); called at most once, and only when both gates pass
    * @param log the calling sync's logger, so the "Marked … row(s)" line carries the sync's own
    *     logger name and level
    * @param entityLabel the table/row noun for the log line (e.g. {@code "ship_type"}, {@code
@@ -73,10 +93,20 @@ public final class ScWikiOrphanSweep {
    */
   public static void sweepDeletedOrphans(
       @NotNull Set<UUID> seen,
+      boolean fetchComplete,
       @NotNull ToIntFunction<Set<UUID>> markDeletedExcept,
       @NotNull Logger log,
       @NotNull String entityLabel) {
     if (seen.isEmpty()) {
+      return;
+    }
+    if (!fetchComplete) {
+      log.warn(
+          "Skipping the {} scwiki_deleted sweep: the Wiki page walk did not enumerate the whole"
+              + " feed this run, so the {} uuid(s) it saw are not a complete census and every row"
+              + " outside them would be tombstoned for never having been fetched.",
+          entityLabel,
+          seen.size());
       return;
     }
     int marked = markDeletedExcept.applyAsInt(seen);

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.service.UexFetchResults.fetched;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -47,7 +48,7 @@ class UexCategoryRefServiceTest {
 
   @Test
   void syncCategories_emptyResponse_returnsLocalCatalogueAndDoesNotWrite() {
-    when(uexClient.getCategories()).thenReturn(List.of());
+    when(uexClient.getCategories()).thenReturn(fetched(List.of()));
     when(repository.findAll()).thenReturn(List.of());
 
     List<UexCategory> result = service.syncCategories();
@@ -60,7 +61,7 @@ class UexCategoryRefServiceTest {
   void syncCategories_insertsNewRowsAndUpdatesExisting() {
     UexCategoryDto helmets = new UexCategoryDto(3, "item", "Armor", "Helmets", 1, 0);
     UexCategoryDto torso = new UexCategoryDto(5, "item", "Armor", "Torso", 1, 0);
-    when(uexClient.getCategories()).thenReturn(List.of(helmets, torso));
+    when(uexClient.getCategories()).thenReturn(fetched(List.of(helmets, torso)));
 
     UexCategory existing = new UexCategory();
     existing.setId(3);
@@ -93,7 +94,7 @@ class UexCategoryRefServiceTest {
     UexCategoryDto item = new UexCategoryDto(3, "item", "Armor", "Helmets", 1, 0);
     UexCategoryDto vehicle = new UexCategoryDto(7, "vehicle", "Systems", "Coolers", 1, 0);
     UexCategoryDto tradingCat = new UexCategoryDto(39, "service", "Trading", "General", 0, 0);
-    when(uexClient.getCategories()).thenReturn(List.of(item, vehicle, tradingCat));
+    when(uexClient.getCategories()).thenReturn(fetched(List.of(item, vehicle, tradingCat)));
     when(repository.findById(3)).thenReturn(Optional.empty());
     when(repository.findById(7)).thenReturn(Optional.empty());
     when(repository.save(any(UexCategory.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -114,7 +115,7 @@ class UexCategoryRefServiceTest {
   @Test
   void syncCategories_skipsRowWithMissingId() {
     UexCategoryDto missingId = new UexCategoryDto(null, "item", "Armor", "Helmets", 1, 0);
-    when(uexClient.getCategories()).thenReturn(List.of(missingId));
+    when(uexClient.getCategories()).thenReturn(fetched(List.of(missingId)));
     when(repository.findAll()).thenReturn(List.of());
 
     service.syncCategories();

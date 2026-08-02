@@ -346,6 +346,27 @@
             document.body.appendChild(pill);
         }
 
+        // Marks every section this viewer can actually SEE as held back and raises the pill, so the
+        // user gets the same "click to load the current state" affordance the busy-guard already
+        // uses. Sections whose container is absent (guest redaction, requester view, a panel this
+        // role has no access to) are skipped for the same reason apply() skips them — that
+        // asymmetry is the auth model, not a fault. Used when the live channel itself is
+        // unavailable, i.e. no `changed` frame will ever arrive to trigger the normal path.
+        function deferAllVisibleSections() {
+            let anyVisible = false;
+            allSections.forEach(function (sectionKey) {
+                const sel = sectionContainers[sectionKey];
+                if (!sel || !document.querySelector(sel)) {
+                    return;
+                }
+                deferred[sectionKey] = true;
+                anyVisible = true;
+            });
+            if (anyVisible) {
+                showPill();
+            }
+        }
+
         // The busy test is re-applied here, at flush time — not only when the signal first arrived.
         // A section that became busy DURING the coalesce window is moved to `deferred` + the pill
         // instead of being swapped out from under the edit. Sections that are safe to refresh are
@@ -433,6 +454,20 @@
                 },
                 onResync: function () {
                     apply(null);
+                },
+                // M7: a denied subscribe is TERMINAL — onOpen deliberately never re-subscribes a
+                // 'denied' topic — so from here on this tab receives no peer change for this room,
+                // ever. Until now no subscriber anywhere passed an onDenied, which made the deny
+                // branch in the socket dead code and left the user staring at a surface that looks
+                // live and silently is not (the exact REQ-FE-010 "silently stale" failure mode).
+                // Reuse the deferred-refresh pill: its label is the bundle-sourced
+                // livesync.updates_available string krt-live-sync.js already renders (F8), so no
+                // new user-visible string is introduced, and its click handler re-renders the
+                // sections in place — which is precisely the manual fallback a dead subscription
+                // leaves the user with. One-shot on purpose: once the user has taken the manual
+                // refresh, re-raising the pill on a timer would nag without adding information.
+                onDenied: function () {
+                    deferAllVisibleSections();
                 },
             });
         }

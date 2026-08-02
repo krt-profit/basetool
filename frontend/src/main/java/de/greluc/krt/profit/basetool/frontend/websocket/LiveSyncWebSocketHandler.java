@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.websocket;
 
+import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.service.LiveSyncPresenceService;
 import io.micrometer.core.instrument.Counter;
@@ -131,8 +132,20 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * Hard cap on the accepted length of a client-supplied presence {@code sectionKey}. Legitimate
    * keys are short panel identifiers; anything longer is a crafted client trying to bloat the
    * per-topic presence map's memory footprint and is dropped (#1245 presence-WS hardening).
+   *
+   * <p>Doubles as the truncation bound when a rejected {@code changed}-frame section key is put
+   * through {@link LogSafe} for the whitelist-filter DEBUG line: the same "a section key is a short
+   * panel identifier" assumption applies, so a longer value is hostile and there is nothing to gain
+   * from logging the rest of it.
    */
   private static final int MAX_SECTION_KEY_LENGTH = 64;
+
+  /**
+   * Truncation bound for a client-supplied {@code topic} string rendered into a log line via {@link
+   * LogSafe}. A canonical topic is a short class prefix plus at most a UUID (well under this), so a
+   * longer value is a crafted client and only the head of it is worth keeping.
+   */
+  private static final int MAX_LOGGED_TOPIC_LENGTH = 64;
 
   /**
    * Token-bucket capacity for inbound presence control frames ({@code focus} / {@code heartbeat} /
@@ -587,7 +600,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     String rawTopic = textValue(node, "topic");
     LiveSyncTopic topic = LiveSyncTopic.parse(rawTopic);
     if (topic == null) {
-      log.debug("Live-sync subscribe to unknown topic '{}' refused", rawTopic);
+      log.debug(
+          "Live-sync subscribe to unknown topic '{}' refused",
+          LogSafe.text(rawTopic, MAX_LOGGED_TOPIC_LENGTH));
       // #1239: an unknown/unparseable subscribe topic is the signature of a client/server
       // topic-vocabulary skew — count it so the drift is visible. No topic_class tag: the topic did
       // not parse, so it belongs to no class (a dedicated unlabelled meter, not a topic_class
@@ -625,8 +640,22 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       // non-presence class (opaque keys only; each fragment re-pull re-authorizes), closed for a
       // presence class so the editor-identity snapshot is never leaked on an unverified subscribe
       // (F1).
+      LiveSyncSubscriptionAuthorizer.Decision verdict =
+          LiveSyncSubscriptionAuthorizer.failOpen(topic);
       droppedCounter(topic, MetricNames.DROPPED_AUTHORIZE_SATURATED).increment();
-      completeSubscribe(session, topic, LiveSyncSubscriptionAuthorizer.failOpen(topic));
+      // WARN, not DEBUG: this branch was previously unlogged entirely, and saturation is
+      // infrastructure-triggered — a client cannot provoke it while the executor is healthy, so it
+      // is not a log-flood vector. It matters because it silently degrades authorization for every
+      // subscribe landing on this instance, and on a presence class it fails closed, costing that
+      // tab live updates for the topic for the session (a denied subscribe is terminal).
+      // The deny counter deliberately carries no `saturated` reason value — the
+      // authorize_saturated relay-drop series above is that signal.
+      log.warn(
+          "Live-sync subscribe authorization for topic {} was not scheduled (auth executor"
+              + " saturated); resolved as {}",
+          topic.canonical(),
+          verdict);
+      completeSubscribe(session, topic, verdict);
     }
   }
 
@@ -636,6 +665,14 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * direction ({@link LiveSyncSubscriptionAuthorizer#failOpen(LiveSyncTopic)}) — open for a
    * non-presence class, closed for a presence one (F1) — consistent with the authorizer's own
    * transient-error handling.
+   *
+   * <p>This is where a completed probe's indeterminate <em>fail-closed</em> verdict is reported at
+   * WARN (the executor-saturation branch of {@link #handleSubscribe} reports its own, and no other
+   * path logs one): a denied subscribe is terminal — the client does not retry for the rest of the
+   * session — so a 30-second backend blip permanently strips live updates from every tab that
+   * happened to subscribe during it. That outcome is backend-triggered and bounded to one line per
+   * tab per topic, so it is not a log-flood vector — unlike an explicit permission deny, which is a
+   * routine, user-triggerable verdict and stays at DEBUG in the authorizer.
    *
    * @param session the subscribing session
    * @param topic the topic being authorized
@@ -652,20 +689,42 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     LiveSyncSubscriptionAuthorizer.Decision decision;
     try {
       decision = authorizer.authorize(topic, token, pin, authorities);
+      if (decision == LiveSyncSubscriptionAuthorizer.Decision.DENY_INDETERMINATE) {
+        // The authorizer logged the underlying transient (status code / exception) at DEBUG as
+        // probe detail; this is the single line stating that it became a user-visible, terminal
+        // refusal — the level the outcome warrants (REQ-OBS-001).
+        log.warn(
+            "Live-sync subscribe to topic {} failed closed on an indeterminate authorization"
+                + " outcome; this tab gets no live updates for it until it reconnects",
+            topic.canonical());
+      }
     } catch (RuntimeException e) {
-      log.debug(
-          "Live-sync subscribe authorization threw for {} (fail direction by class)",
-          topic.canonical(),
-          e);
       decision = LiveSyncSubscriptionAuthorizer.failOpen(topic);
+      if (decision == LiveSyncSubscriptionAuthorizer.Decision.DENY_INDETERMINATE) {
+        log.warn(
+            "Live-sync subscribe to topic {} failed closed: the authorization probe threw",
+            topic.canonical(),
+            e);
+      } else {
+        log.debug(
+            "Live-sync subscribe authorization threw for {} (failing open by class)",
+            topic.canonical(),
+            e);
+      }
     }
     completeSubscribe(session, topic, decision);
   }
 
   /**
-   * Finalises a subscribe: on DENY it drops the reserved slot and refuses; on ALLOW it joins the
-   * room (skipping a socket that closed while the probe ran), acks {@code subscribed} and sends the
-   * initial presence snapshot for a presence-enabled class.
+   * Finalises a subscribe: on either deny flavour it drops the reserved slot and refuses; on ALLOW
+   * it joins the room (skipping a socket that closed while the probe ran), acks {@code subscribed}
+   * and sends the initial presence snapshot for a presence-enabled class.
+   *
+   * <p>Deliberately emits no log line of its own — every refusal is already reported by whoever
+   * produced the verdict (the authorizer at DEBUG for an explicit deny, {@link
+   * #authorizeAndRegister} at WARN for a fail-closed indeterminate one, {@link #handleSubscribe} at
+   * WARN for executor saturation), so routing the logging through here as well would double-log the
+   * same failure (REQ-OBS-001).
    *
    * @param session the subscribing session
    * @param topic the authorized topic
@@ -676,12 +735,12 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       @NotNull LiveSyncTopic topic,
       @NotNull LiveSyncSubscriptionAuthorizer.Decision decision) {
     Set<String> subs = subscriptions(session);
-    if (decision == LiveSyncSubscriptionAuthorizer.Decision.DENY) {
+    if (decision.denied()) {
       if (subs != null) {
         subs.remove(topic.canonical());
       }
       sendControlFrame(session, "denied", topic.canonical());
-      subscribeCounter(topic, MetricNames.OUTCOME_DENIED).increment();
+      subscribeCounter(topic, MetricNames.OUTCOME_DENIED, denyReason(decision)).increment();
       return;
     }
     WebSocketSession decorated = decorated(session);
@@ -703,7 +762,23 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     if (topic.topicClass().presenceEnabled()) {
       sendSnapshot(decorated, topic);
     }
-    subscribeCounter(topic, MetricNames.OUTCOME_ALLOWED).increment();
+    subscribeCounter(topic, MetricNames.OUTCOME_ALLOWED, MetricNames.REASON_NONE).increment();
+  }
+
+  /**
+   * Maps a refusal to its bounded {@code reason} tag value, so a permission verdict and a
+   * fail-closed availability symptom stop sharing one indistinguishable {@code outcome=denied}
+   * series.
+   *
+   * @param decision the refusing verdict
+   * @return {@link MetricNames#SUBSCRIBE_DENY_INDETERMINATE} for a fail-closed indeterminate
+   *     refusal, {@link MetricNames#SUBSCRIBE_DENY_AUTHZ} for an explicit authorization denial
+   */
+  @NotNull
+  private static String denyReason(@NotNull LiveSyncSubscriptionAuthorizer.Decision decision) {
+    return decision == LiveSyncSubscriptionAuthorizer.Decision.DENY_INDETERMINATE
+        ? MetricNames.SUBSCRIBE_DENY_INDETERMINATE
+        : MetricNames.SUBSCRIBE_DENY_AUTHZ;
   }
 
   /**
@@ -716,19 +791,31 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * @param node the parsed {@code changed} frame
    */
   private void handleMultiplexedChanged(@NotNull WebSocketSession session, @NotNull JsonNode node) {
-    LiveSyncTopic topic = LiveSyncTopic.parse(textValue(node, "topic"));
+    String rawTopic = textValue(node, "topic");
+    LiveSyncTopic topic = LiveSyncTopic.parse(rawTopic);
     if (topic == null) {
+      // The publish-side face of the client/server topic-vocabulary skew the subscribe path counts:
+      // the acting client believes in a topic this server does not know, so its peers never hear of
+      // the change (REQ-FE-010) and the drop is otherwise completely silent. Not counted — the
+      // relay-drop meter requires a `topic_class` an unparseable topic has none of, and the
+      // unlabelled invalid-topic meter is defined for the subscribe path, so widening it here would
+      // change what its dashboards and alerts mean. DEBUG because the frame is client-supplied and
+      // therefore an attacker-triggerable flood at INFO/WARN.
+      log.debug(
+          "Discarding live-sync changed frame for unknown topic '{}'",
+          LogSafe.text(rawTopic, MAX_LOGGED_TOPIC_LENGTH));
       return;
     }
     if (!allowChangedFrame(session)) {
       droppedCounter(topic, MetricNames.DROPPED_THROTTLED).increment();
       return;
     }
-    List<String> sections = sanitiseSections(node.get("sections"), topic.topicClass());
-    if (sections.isEmpty()) {
+    FilteredSections filtered = sanitiseSections(node.get("sections"), topic.topicClass());
+    reportFilteredSections(topic, filtered, "client");
+    if (filtered.accepted().isEmpty()) {
       return;
     }
-    relayChangedThrottled(topic, sections, decorated(session));
+    relayChangedThrottled(topic, filtered.accepted(), decorated(session));
   }
 
   /**
@@ -871,20 +958,26 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Counter {@code basetool_livesync_subscribe_total{topic_class, outcome}} for a subscribe
-   * verdict.
+   * Counter {@code basetool_livesync_subscribe_total{topic_class, outcome, reason}} for a subscribe
+   * verdict. Micrometer requires a uniform tag-key set per meter name, so the {@code allowed} row
+   * carries {@link MetricNames#REASON_NONE} rather than omitting the tag.
    *
    * @param topic the subscribed topic (its class tags the metric)
    * @param outcome {@link MetricNames#OUTCOME_ALLOWED} or {@link MetricNames#OUTCOME_DENIED}
+   * @param reason the bounded deny reason ({@link MetricNames#SUBSCRIBE_DENY_AUTHZ} / {@link
+   *     MetricNames#SUBSCRIBE_DENY_INDETERMINATE}), or {@link MetricNames#REASON_NONE} on an allow
    * @return the counter to increment
    */
-  private Counter subscribeCounter(@NotNull LiveSyncTopic topic, @NotNull String outcome) {
+  private Counter subscribeCounter(
+      @NotNull LiveSyncTopic topic, @NotNull String outcome, @NotNull String reason) {
     return meterRegistry.counter(
         MetricNames.LIVESYNC_SUBSCRIBE,
         MetricNames.TAG_TOPIC_CLASS,
         topic.topicClass().metricLabel(),
         MetricNames.TAG_OUTCOME,
-        outcome);
+        outcome,
+        MetricNames.TAG_REASON,
+        reason);
   }
 
   /**
@@ -906,11 +999,12 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     if (topic == null) {
       return;
     }
-    List<String> allowed = retainAllowed(sections, topic.topicClass());
-    if (allowed.isEmpty()) {
+    FilteredSections filtered = retainAllowed(sections, topic.topicClass());
+    reportFilteredSections(topic, filtered, "fan-out");
+    if (filtered.accepted().isEmpty()) {
       return;
     }
-    relayLocal(topic, allowed, null);
+    relayLocal(topic, filtered.accepted(), null);
   }
 
   /**
@@ -929,37 +1023,106 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     if (topic == null) {
       return;
     }
-    List<String> allowed = retainAllowed(sections, topic.topicClass());
-    if (allowed.isEmpty()) {
+    FilteredSections filtered = retainAllowed(sections, topic.topicClass());
+    reportFilteredSections(topic, filtered, "server");
+    if (filtered.accepted().isEmpty()) {
       return;
     }
-    relayLocal(topic, allowed, null);
-    fanout.publish(topic.canonical(), allowed);
+    relayLocal(topic, filtered.accepted(), null);
+    fanout.publish(topic.canonical(), filtered.accepted());
   }
 
   /**
    * Keeps only the section keys that belong to a class's whitelist, de-duplicated and capped — the
    * {@link List}-input counterpart of {@link #sanitiseSections(JsonNode, LiveSyncTopicClass)} for a
-   * server-originated publish.
+   * server-originated publish or a peer-replica delivery.
    *
    * @param sections the raw section keys
    * @param topicClass the class whose whitelist applies
-   * @return the accepted, de-duplicated, capped keys
+   * @return the accepted keys plus the rejection evidence {@link #reportFilteredSections} needs
    */
-  private static List<String> retainAllowed(
+  @NotNull
+  private static FilteredSections retainAllowed(
       @NotNull List<String> sections, @NotNull LiveSyncTopicClass topicClass) {
     Set<String> allowed = topicClass.allowedSections();
     List<String> result = new ArrayList<>();
+    int rejected = 0;
+    String firstRejected = null;
     for (String section : sections) {
       if (result.size() >= MAX_CHANGED_SECTIONS) {
         break;
       }
-      if (section != null && allowed.contains(section) && !result.contains(section)) {
+      if (section == null) {
+        continue;
+      }
+      if (!allowed.contains(section)) {
+        rejected++;
+        if (firstRejected == null) {
+          firstRejected = section;
+        }
+        continue;
+      }
+      if (!result.contains(section)) {
         result.add(section);
       }
     }
-    return result;
+    return new FilteredSections(result, rejected, firstRejected);
   }
+
+  /**
+   * Reports the section keys one {@code changed} frame lost to the topic class's whitelist — the
+   * REQ-FE-010 defect class made observable.
+   *
+   * <p>An acting client (or a server publish, or a peer replica) broadcasting a key this relay's
+   * accept-list does not know leaves every peer's matching panel stale, with no error either side:
+   * {@code relay_frames_total{type="changed"}} keeps climbing while nothing records the key was
+   * filtered. This counts exactly that, once per frame (not once per key, which would make one
+   * crafted frame worth {@link #MAX_CHANGED_SECTIONS} increments), and logs one DEBUG line carrying
+   * the count plus the first rejected key as a representative sample.
+   *
+   * <p>DEBUG is mandatory here and the level is a contract: on the client path the frame — and the
+   * key inside it — is entirely client-supplied, so INFO or WARN would be an attacker-triggerable
+   * log flood. The key is rendered through {@link LogSafe} (control characters stripped, truncated
+   * at {@link #MAX_SECTION_KEY_LENGTH}) because it is free text on its way to a logger, and it is
+   * never used as a metric tag value — that would be unbounded, client-controlled cardinality
+   * (REQ-OBS-006).
+   *
+   * @param topic the topic the frame targeted (its class tags the drop counter)
+   * @param filtered the filter outcome; a zero rejection count reports nothing at all
+   * @param source which publish path produced the frame, for the log line only (a fixed literal —
+   *     {@code client} / {@code server} / {@code fan-out})
+   */
+  private void reportFilteredSections(
+      @NotNull LiveSyncTopic topic, @NotNull FilteredSections filtered, @NotNull String source) {
+    if (filtered.rejected() == 0) {
+      return;
+    }
+    droppedCounter(topic, MetricNames.DROPPED_SECTION_FILTERED).increment();
+    log.debug(
+        "Live-sync {} changed frame for topic {} lost {} section key(s) to the {} whitelist"
+            + " (first: '{}')",
+        source,
+        topic.canonical(),
+        filtered.rejected(),
+        topic.topicClass().metricLabel(),
+        LogSafe.text(filtered.firstRejectedKey(), MAX_SECTION_KEY_LENGTH));
+  }
+
+  /**
+   * Outcome of filtering one {@code changed} frame's section keys against a topic class's
+   * whitelist: what survived, plus the evidence {@link #reportFilteredSections} needs to make the
+   * silent drop visible.
+   *
+   * <p>Only keys the whitelist refused count as rejected. A duplicate is collapsed rather than
+   * rejected (the client's vocabulary is fine, it just said the same thing twice) and a non-string
+   * array entry is malformed input rather than vocabulary skew, so neither inflates the count.
+   *
+   * @param accepted the accepted, de-duplicated, {@link #MAX_CHANGED_SECTIONS}-capped keys
+   * @param rejected how many keys the class whitelist refused
+   * @param firstRejectedKey the first refused key, kept as the single representative for the
+   *     one-line-per-frame DEBUG report, or {@code null} when nothing was refused
+   */
+  private record FilteredSections(List<String> accepted, int rejected, String firstRejectedKey) {}
 
   /**
    * Reaper tick — drops expired presence entries from every tracked topic and broadcasts the
@@ -995,29 +1158,45 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * are collapsed, and the count is capped at {@link #MAX_CHANGED_SECTIONS}. This is what stops a
    * client injecting an arbitrary fetch target or amplifying one frame into an unbounded fan-out.
    *
+   * <p>Rejected keys are not swallowed: the returned {@link FilteredSections} carries the count and
+   * a sample so {@link #reportFilteredSections} can count and log the drop, which is what turns a
+   * client/relay vocabulary skew from an invisible stale panel into an observable signal
+   * (REQ-FE-010).
+   *
    * @param sectionsNode the raw {@code sections} node (may be {@code null} or not an array)
    * @param topicClass the class whose whitelist applies
-   * @return the accepted, de-duplicated, capped keys (never {@code null})
+   * @return the accepted keys plus the rejection evidence (never {@code null})
    */
-  private List<String> sanitiseSections(
+  @NotNull
+  private static FilteredSections sanitiseSections(
       JsonNode sectionsNode, @NotNull LiveSyncTopicClass topicClass) {
     List<String> sections = new ArrayList<>();
     if (sectionsNode == null || !sectionsNode.isArray()) {
-      return sections;
+      return new FilteredSections(sections, 0, null);
     }
     Set<String> allowed = topicClass.allowedSections();
+    int rejected = 0;
+    String firstRejected = null;
     for (JsonNode element : sectionsNode) {
       if (sections.size() >= MAX_CHANGED_SECTIONS) {
         break;
       }
-      if (element != null && element.isString()) {
-        String key = element.asString();
-        if (allowed.contains(key) && !sections.contains(key)) {
-          sections.add(key);
+      if (element == null || !element.isString()) {
+        continue;
+      }
+      String key = element.asString();
+      if (!allowed.contains(key)) {
+        rejected++;
+        if (firstRejected == null) {
+          firstRejected = key;
         }
+        continue;
+      }
+      if (!sections.contains(key)) {
+        sections.add(key);
       }
     }
-    return sections;
+    return new FilteredSections(sections, rejected, firstRejected);
   }
 
   /**

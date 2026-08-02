@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.Terminal;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
+import de.greluc.krt.profit.basetool.backend.support.LogSafe;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -59,13 +60,22 @@ import org.springframework.transaction.annotation.Transactional;
  * touched-set so a sync that fails on every single row never wipes the entire table.
  *
  * <p>An empty response on either call short-circuits without wiping local data — the sync is
- * idempotent and resilient to transient UEX outages.
+ * idempotent and resilient to transient UEX outages. An <em>unchanged</em> feed ({@code 304 Not
+ * Modified}) short-circuits the same way but is reported at INFO rather than WARN: nothing to
+ * re-import is the healthy steady state, not an outage.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class UexCommodityService {
+
+  /**
+   * Cap for the upstream-supplied commodity name in log lines. UEX is a third party we do not
+   * control, so the value is untrusted free text and goes through {@link LogSafe} first; 64
+   * characters comfortably fit any real commodity name.
+   */
+  private static final int MAX_NAME_LOG_LENGTH = 64;
 
   private final UexClient uexClient;
   private final MaterialRepository materialRepository;
@@ -80,9 +90,12 @@ public class UexCommodityService {
   @Transactional
   public void fetchAndProcessCommoditiesPrices() {
     log.info("Starting synchronization of UEX commodities...");
-    List<UexCommodityDto> commodities = uexClient.getCommodities();
+    UexClient.FetchResult<UexCommodityDto> commodityFetch = uexClient.getCommodities();
+    List<UexCommodityDto> commodities = commodityFetch.data();
 
-    if (!commodities.isEmpty()) {
+    if (commodityFetch.notModified()) {
+      log.info("UEX commodity catalogue unchanged since the last sync (304) — nothing to import.");
+    } else if (!commodities.isEmpty()) {
       int commoditiesProcessed = 0;
       for (UexCommodityDto dto : commodities) {
         try {
@@ -153,7 +166,11 @@ public class UexCommodityService {
             commoditiesProcessed++;
           }
         } catch (Exception e) {
-          log.error("Failed to process commodity dto: {}", dto, e);
+          log.error(
+              "Failed to process commodity dto (id={}, name='{}')",
+              dto.id(),
+              LogSafe.text(dto.name(), MAX_NAME_LOG_LENGTH),
+              e);
         }
       }
       log.info("Finished commodities synchronization. Processed {} items.", commoditiesProcessed);
@@ -162,7 +179,15 @@ public class UexCommodityService {
     }
 
     log.info("Starting synchronization of UEX commodity prices...");
-    List<UexCommodityPriceDto> dtos = uexClient.getCommoditiesPricesAll();
+    UexClient.FetchResult<UexCommodityPriceDto> priceFetch = uexClient.getCommoditiesPricesAll();
+    if (priceFetch.notModified()) {
+      // Price matrix byte-identical to the last run: nothing to upsert, and — critically — no
+      // stale-row sweep either, since every row we would have "seen" is still current.
+      log.info(
+          "UEX commodity price matrix unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexCommodityPriceDto> dtos = priceFetch.data();
 
     if (dtos.isEmpty()) {
       log.warn("No data received from UEX API. Aborting synchronization.");
@@ -179,7 +204,12 @@ public class UexCommodityService {
         }
         processed++;
       } catch (Exception e) {
-        log.error("Failed to process commodity dto: {}", dto, e);
+        log.error(
+            "Failed to process commodity-price dto (idCommodity={}, idTerminal={}, name='{}')",
+            dto.idCommodity(),
+            dto.idTerminal(),
+            LogSafe.text(dto.commodityName(), MAX_NAME_LOG_LENGTH),
+            e);
       }
     }
 
@@ -200,7 +230,12 @@ public class UexCommodityService {
 
   private UUID processSingleDto(UexCommodityPriceDto dto) {
     if (dto.idCommodity() == null || dto.idTerminal() == null) {
-      log.warn("Missing commodity or terminal ID in DTO: {}", dto);
+      log.warn(
+          "Missing commodity or terminal ID in price DTO (idCommodity={}, idTerminal={},"
+              + " name='{}')",
+          dto.idCommodity(),
+          dto.idTerminal(),
+          LogSafe.text(dto.commodityName(), MAX_NAME_LOG_LENGTH));
       return null;
     }
 

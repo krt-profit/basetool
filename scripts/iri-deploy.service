@@ -11,7 +11,9 @@
 ;
 ; Inspect:
 ;   systemctl status iri-deploy.timer
-;   journalctl -u iri-deploy.service -f
+;   journalctl -u iri-deploy.service -f     # unit lifecycle ONLY — no script output, see below
+;   tail -f /var/log/iri-deploy.log         # what the script actually printed
+; Off-host (no SSH needed): Grafana -> Explore -> Loki, `{app="ops-deploy"}`.
 ;
 ; The unit deliberately runs as a dedicated `deploy` user (no shell, no sudo) —
 ; not as root. It is a member of the `docker` group so it can invoke
@@ -46,9 +48,18 @@ Group=docker
 
 ExecStart=/var/iri/code/scripts/deploy.sh
 
-# Send stdout/stderr to journald (visible with `journalctl -u iri-deploy.service`)
-# AND to /var/log/iri-deploy.log so logrotate can keep human-readable history
-; for post-mortems beyond the journald retention window.
+# Send stdout/stderr to /var/log/iri-deploy.log, where logrotate keeps human-readable
+# history for post-mortems beyond the journald retention window.
+#
+# `append:` REPLACES journald for these two streams — it does NOT tee to it. So
+# `journalctl -u iri-deploy.service` shows only systemd's own unit records (Starting /
+# Succeeded / Failed / the exit code) and NOT a single line deploy.sh printed. Read the
+# script output from /var/log/iri-deploy.log, or — without an SSH session — from Loki:
+# Alloy tails this file as `{app="ops-deploy"}` (monitoring/alloy/config.alloy), which is
+# where the DeployRolledBack / DeployFailed alert annotations now point. Do not "fix" this
+# by switching to `journal+file:` or dropping the redirection: logrotate's copytruncate
+# strategy here is written against the held-open append fd, and the Loki tail is now the
+# documented triage path.
 StandardOutput=append:/var/log/iri-deploy.log
 StandardError=append:/var/log/iri-deploy.log
 

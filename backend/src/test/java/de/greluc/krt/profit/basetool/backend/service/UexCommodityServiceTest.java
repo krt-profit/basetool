@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.service.UexFetchResults.fetched;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -74,7 +75,11 @@ class UexCommodityServiceTest {
             .priceSell(BigDecimal.valueOf(30.0))
             .build();
 
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of(dto));
+    // The catalogue phase is not what this test is about, but it now runs against a FetchResult
+    // rather than a bare list, so it has to be stubbed explicitly — an unstubbed mock hands back
+    // null and the phase NPEs before the price phase is ever reached.
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(dto)));
     when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.empty());
     when(materialRepository.findByName("Laranite")).thenReturn(Optional.empty());
 
@@ -111,8 +116,8 @@ class UexCommodityServiceTest {
   void commoditySync_savesRefinedMaterialWithCorrectType() {
     // Given
     UexCommodityDto refined = commodity(1, "Titanium", /*isRefined*/ 1, /*isRefinable*/ 0);
-    when(uexClient.getCommodities()).thenReturn(List.of(refined));
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of(refined)));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
     when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.empty());
     when(materialRepository.findByName("Titanium")).thenReturn(Optional.empty());
 
@@ -130,8 +135,8 @@ class UexCommodityServiceTest {
   @Test
   void commoditySync_savesRefinableMaterialAsRawType() {
     UexCommodityDto raw = commodity(2, "Quantanium", 0, 1);
-    when(uexClient.getCommodities()).thenReturn(List.of(raw));
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of(raw)));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
     when(materialRepository.findByIdCommodity(2)).thenReturn(Optional.empty());
     when(materialRepository.findByName("Quantanium")).thenReturn(Optional.empty());
 
@@ -145,8 +150,8 @@ class UexCommodityServiceTest {
   @Test
   void commoditySync_savesNonRefinableAsNoRefineType() {
     UexCommodityDto inert = commodity(3, "Stims", 0, 0);
-    when(uexClient.getCommodities()).thenReturn(List.of(inert));
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of(inert)));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
     when(materialRepository.findByIdCommodity(3)).thenReturn(Optional.empty());
     when(materialRepository.findByName("Stims")).thenReturn(Optional.empty());
 
@@ -168,8 +173,8 @@ class UexCommodityServiceTest {
     existing.setVersion(7L);
 
     UexCommodityDto updated = commodity(4, "New Name", 1, 0);
-    when(uexClient.getCommodities()).thenReturn(List.of(updated));
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of(updated)));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
     when(materialRepository.findByIdCommodity(4)).thenReturn(Optional.of(existing));
 
     uexCommodityService.fetchAndProcessCommoditiesPrices();
@@ -190,8 +195,8 @@ class UexCommodityServiceTest {
     existingByName.setIdCommodity(null);
 
     UexCommodityDto fresh = commodity(5, "Diamond", 0, 0);
-    when(uexClient.getCommodities()).thenReturn(List.of(fresh));
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of(fresh)));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
     when(materialRepository.findByIdCommodity(5)).thenReturn(Optional.empty());
     when(materialRepository.findByName("Diamond")).thenReturn(Optional.of(existingByName));
 
@@ -214,8 +219,8 @@ class UexCommodityServiceTest {
     manual.setIsManualRawMaterial(true);
 
     UexCommodityDto upstream = commodity(42, "Raw Ouratite", 0, 1);
-    when(uexClient.getCommodities()).thenReturn(List.of(upstream));
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of(upstream)));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
     when(materialRepository.findByIdCommodity(42)).thenReturn(Optional.empty());
     when(materialRepository.findByName("Raw Ouratite")).thenReturn(Optional.of(manual));
 
@@ -248,8 +253,8 @@ class UexCommodityServiceTest {
     existing.setSourceSystems(MaterialSourceSystem.UEX_ONLY);
 
     UexCommodityDto fresh = commodity(77, "Bexalite", 0, 1);
-    when(uexClient.getCommodities()).thenReturn(List.of(fresh));
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of(fresh)));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
     when(materialRepository.findByIdCommodity(77)).thenReturn(Optional.empty());
     when(materialRepository.findByName("Bexalite")).thenReturn(Optional.of(existing));
 
@@ -273,8 +278,8 @@ class UexCommodityServiceTest {
     wikiOnly.setIsVisible(false);
 
     UexCommodityDto upstream = commodity(314, "Bluemoon Fungus", 0, 1);
-    when(uexClient.getCommodities()).thenReturn(List.of(upstream));
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of(upstream)));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
     when(materialRepository.findByIdCommodity(314)).thenReturn(Optional.empty());
     when(materialRepository.findByName("Bluemoon Fungus")).thenReturn(Optional.of(wikiOnly));
 
@@ -304,8 +309,8 @@ class UexCommodityServiceTest {
     manual.setIsVisible(true);
 
     UexCommodityDto upstream = commodity(315, "Admin Special", 0, 0);
-    when(uexClient.getCommodities()).thenReturn(List.of(upstream));
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of(upstream)));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
     when(materialRepository.findByIdCommodity(315)).thenReturn(Optional.empty());
     when(materialRepository.findByName("Admin Special")).thenReturn(Optional.of(manual));
 
@@ -320,8 +325,8 @@ class UexCommodityServiceTest {
   void commoditySync_skipsDtoWithoutIdOrName() {
     UexCommodityDto noId = commodity(null, "Has Name", 0, 0);
     UexCommodityDto noName = commodity(99, null, 0, 0);
-    when(uexClient.getCommodities()).thenReturn(List.of(noId, noName));
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of(noId, noName)));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
 
     uexCommodityService.fetchAndProcessCommoditiesPrices();
 
@@ -333,8 +338,8 @@ class UexCommodityServiceTest {
     // Given — first row save throws, second must still save
     UexCommodityDto bad = commodity(10, "Bad", 0, 0);
     UexCommodityDto good = commodity(11, "Good", 0, 0);
-    when(uexClient.getCommodities()).thenReturn(List.of(bad, good));
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of(bad, good)));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
     when(materialRepository.findByIdCommodity(10)).thenReturn(Optional.empty());
     when(materialRepository.findByName("Bad")).thenReturn(Optional.empty());
     when(materialRepository.findByIdCommodity(11)).thenReturn(Optional.empty());
@@ -353,8 +358,8 @@ class UexCommodityServiceTest {
 
   @Test
   void commoditySync_emptyResponse_stillRunsPriceSync() {
-    when(uexClient.getCommodities()).thenReturn(List.of());
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of());
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
 
     uexCommodityService.fetchAndProcessCommoditiesPrices();
 
@@ -399,8 +404,8 @@ class UexCommodityServiceTest {
             1,
             1700000100L);
 
-    when(uexClient.getCommodities()).thenReturn(List.of());
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of(fresh));
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(fresh)));
     when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
     when(terminalRepository.findByIdTerminal(42)).thenReturn(Optional.of(terminal));
     when(materialPriceRepository.findByMaterialIdAndTerminalId(materialId, terminalId))
@@ -431,8 +436,8 @@ class UexCommodityServiceTest {
         new UexCommodityPriceDto(
             1, "X", 9999, "Unknown", BigDecimal.ONE, BigDecimal.ONE, 0, 0, 0, 0, 0, 1L);
 
-    when(uexClient.getCommodities()).thenReturn(List.of());
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of(orphan));
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(orphan)));
     when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
     when(terminalRepository.findByIdTerminal(9999)).thenReturn(Optional.empty());
 
@@ -449,8 +454,8 @@ class UexCommodityServiceTest {
     UexCommodityPriceDto noTerminal =
         new UexCommodityPriceDto(
             1, "X", null, "T", BigDecimal.ONE, BigDecimal.ONE, 0, 0, 0, 0, 0, 0L);
-    when(uexClient.getCommodities()).thenReturn(List.of());
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of(noCommodity, noTerminal));
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(noCommodity, noTerminal)));
 
     uexCommodityService.fetchAndProcessCommoditiesPrices();
 
@@ -469,8 +474,8 @@ class UexCommodityServiceTest {
         new UexCommodityPriceDto(
             123, "NewStuff", 7, "Terminal", BigDecimal.TEN, BigDecimal.TEN, 1, 1, 1, 1, 1, 1L);
 
-    when(uexClient.getCommodities()).thenReturn(List.of());
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of(payload));
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(payload)));
     when(materialRepository.findByIdCommodity(123)).thenReturn(Optional.empty());
     when(materialRepository.findByName("NewStuff")).thenReturn(Optional.empty());
     when(terminalRepository.findByIdTerminal(7)).thenReturn(Optional.of(terminal));
@@ -523,8 +528,8 @@ class UexCommodityServiceTest {
     t2.setId(UUID.randomUUID());
     t2.setIdTerminal(2);
 
-    when(uexClient.getCommodities()).thenReturn(List.of());
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of(bad, good));
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(bad, good)));
     when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(m1));
     when(materialRepository.findByIdCommodity(2)).thenReturn(Optional.of(m2));
     when(terminalRepository.findByIdTerminal(1)).thenReturn(Optional.of(t1));
@@ -560,8 +565,8 @@ class UexCommodityServiceTest {
         new UexCommodityPriceDto(
             1, "Gold", 1, "T1", new BigDecimal("10"), new BigDecimal("20"), 1, 1, 1, 1, 1, 1L);
 
-    when(uexClient.getCommodities()).thenReturn(List.of());
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of(dto));
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(dto)));
     when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
     when(terminalRepository.findByIdTerminal(1)).thenReturn(Optional.of(terminal));
     when(materialPriceRepository.findByMaterialIdAndTerminalId(materialId, terminalId))
@@ -599,8 +604,8 @@ class UexCommodityServiceTest {
     material.setId(UUID.randomUUID());
     material.setIdCommodity(1);
 
-    when(uexClient.getCommodities()).thenReturn(List.of());
-    when(uexClient.getCommoditiesPricesAll()).thenReturn(List.of(orphan));
+    when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(orphan)));
     when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
     when(terminalRepository.findByIdTerminal(9999)).thenReturn(Optional.empty());
 

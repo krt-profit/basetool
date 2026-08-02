@@ -271,10 +271,24 @@ groups:
           summary: "Tempo metrics-generator hit its active-series cap"
           description: "The Tempo metrics-generator dropped series against its max_active_series cap in the last hour — the service graph is incomplete and cardinality is higher than provisioned. Raise the cap or add service-graph filter_policies (tempo.yaml)."
 
-  # Log-pipeline liveness (#1041 item 5, REQ-OBS-014). All 9 Loki ruler alerts — including the
-  # critical SSH-compromise and Postgres-FATAL detectors — silently stop firing if Alloy stops
+  # Log-pipeline liveness (#1041 item 5, REQ-OBS-014). Every Loki ruler alert — including the
+  # critical SSH-compromise and Postgres-FATAL detectors — silently stops firing if Alloy stops
   # tailing: rate() over an absent stream is EMPTY, not zero, and TargetDown cannot see a
   # healthy-but-not-shipping Alloy. Metric names/labels verified against alloy v1.17.1 + loki 3.7.3.
+  #
+  # COVERAGE RULE: one LogStreamSilent per loki.source.file target in config.alloy, each with its own
+  # `path` matcher. One combined rule with a `path=~"…(backend|frontend|ingest)…"` alternation would
+  # NOT work — absent() only returns 1 when the selector matches NOTHING, so a single dead tail among
+  # three live siblings leaves the vector non-empty and the guard silent. Every `path` value below is
+  # copied from the corresponding `__path__` in config.alloy; a typo here ships a permanently-firing
+  # dead alert (a literal path that matches no series is indistinguishable from a dead tailer).
+  #
+  # The docker-shipped streams (<svc>-stdout, keycloak-stdout, mon-<service>, npm, postgres-*) get NO
+  # guard, deliberately: they come from loki.source.docker, which exposes no per-target
+  # loki_source_file_read_lines_total series to take absent() of, and REQ-OBS-014 additionally exempts
+  # the <svc>-stdout streams on their own merit — a native-error breadcrumb is rare by design, so any
+  # per-stream liveness check on such a quiet stream would be a permanent false alarm. Whole-pipeline
+  # silence still covers them via LokiIngestSilent.
   - name: meta-log-pipeline
     rules:
       # Whole-pipeline silence: the 30s blackbox probes guarantee npm-access baseline traffic, so a
@@ -326,6 +340,93 @@ groups:
         annotations:
           summary: "Log stream not being tailed: NPM access logs"
           description: "Alloy is not tailing any /logs/npm/*_access.log — the edge 5xx/rate-limit/scan detectors and the npm-access baseline for LokiIngestSilent are blind. Check the NPM log mount."
+
+      # Highest-value guard in this group. KeycloakErrorRateHigh ({app="keycloak"}) is the ONLY
+      # detector for the fail-open Discord SPI precheck: when that precheck errors persistently the
+      # account-existence security gate degrades OPEN while logins keep succeeding, so there is no
+      # user-visible symptom, no failed request and no metric anywhere else to notice it — the
+      # Keycloak ERROR-rate in this stream is the entire signal. A dead tail therefore removes a
+      # security gate's only alarm without removing anything an operator would spot by hand.
+      # Severity stays `warning` for consistency with the auth.log guard above, which backs the even
+      # more severe SshPasswordLoginOnKeyOnlyHost: these alerts report BLINDNESS, not a breach, and
+      # promoting one of them to critical while leaving the other at warning would misrank the pair.
+      - alert: LogStreamSilent
+        expr: absent(loki_source_file_read_lines_total{path="/logs/keycloak/keycloak.log"})
+        for: 1h
+        labels:
+          severity: warning
+          stream: keycloak
+        annotations:
+          summary: "Log stream not being tailed: Keycloak"
+          description: "Alloy is not tailing /logs/keycloak/keycloak.log — KeycloakErrorRateHigh is blind, and with it the fail-open Discord SPI precheck, whose failure mode is a security gate degrading open while logins keep succeeding (no other signal exists). Check the /var/iri/keycloak/log mount on the alloy container and that Keycloak still runs with `--log=console,file --log-file=/var/log/keycloak/keycloak.log`."
+
+      - alert: LogStreamSilent
+        expr: absent(loki_source_file_read_lines_total{path="/logs/backend/backend.json"})
+        for: 1h
+        labels:
+          severity: warning
+          stream: backend
+        annotations:
+          summary: "Log stream not being tailed: backend JSON"
+          description: "Alloy is not tailing /logs/backend/backend.json — the backend half of HealthContributorHanging is blind (the alert keeps evaluating on the frontend half, so it still looks healthy) and the backend's masked application log is missing from Grafana for incident review. Check the /var/iri/backend/log mount and that the app's JSON file appender is still writing."
+
+      - alert: LogStreamSilent
+        expr: absent(loki_source_file_read_lines_total{path="/logs/frontend/frontend.json"})
+        for: 1h
+        labels:
+          severity: warning
+          stream: frontend
+        annotations:
+          summary: "Log stream not being tailed: frontend JSON"
+          description: "Alloy is not tailing /logs/frontend/frontend.json — FrontendKeycloakBackchannelFailing (the 2026-07-22 lost-token-grant detector) is blind, and so is the frontend half of HealthContributorHanging. Check the /var/iri/frontend/log mount and that the app's JSON file appender is still writing."
+
+      - alert: LogStreamSilent
+        expr: absent(loki_source_file_read_lines_total{path="/logs/ingest/ingest.json"})
+        for: 1h
+        labels:
+          severity: warning
+          stream: ingest
+        annotations:
+          summary: "Log stream not being tailed: ingest JSON"
+          description: "Alloy is not tailing /logs/ingest/ingest.json — no Loki ruler alert reads this stream today, so nothing else will notice; the loss is forensic, and it lands exactly when an IngestHandoffErrors / IngestBackendUnavailable page needs the gateway's own log. Check the /var/iri/ingest/log mount and that the app's JSON file appender is still writing."
+
+      - alert: LogStreamSilent
+        expr: absent(loki_source_file_read_lines_total{path=~"/logs/npm/.+_error\\.log"})
+        for: 1h
+        labels:
+          severity: warning
+          stream: npm-error
+        annotations:
+          summary: "Log stream not being tailed: NPM error logs"
+          description: "Alloy is not tailing any /logs/npm/*_error.log — the edge's own fault record ([emerg]/[error], upstream-connect failures, cert-renewal errors) is missing, which is the first thing an EdgeServerErrorSpike triage needs after the access log. Check the NPM log mount."
+
+      - alert: LogStreamSilent
+        expr: absent(loki_source_file_read_lines_total{path="/hostlog/fail2ban.log"})
+        for: 1h
+        labels:
+          severity: warning
+          stream: host-fail2ban
+        annotations:
+          summary: "Log stream not being tailed: fail2ban"
+          description: "Alloy is not tailing /hostlog/fail2ban.log — the record of SSH-jail bans/unbans is gone, so an SshFailedAuthSpike can no longer be read against whether fail2ban actually banned the source. Check the /var/log mount and that fail2ban.log is 0640 root:adm (Alloy reads it via its supplementary adm group)."
+
+      # ops-deploy ONLY, even though Alloy tails all four ops-automation logs. The deploy timer is
+      # installed on every production host, so /var/log/iri-deploy.log always exists. The other three
+      # units are installed separately and may legitimately be absent on a given host (the
+      # docker-housekeeping timer is documented as optional outright); with no file, local.file_match
+      # yields no target and no series, so an absent()-guard on them would fire forever on a correct
+      # configuration — a dead alert, exactly what REQ-OBS-014 forbids. Their liveness is already
+      # covered from the metric side by BackupStaleOrMissing / DockerCleanupStaleOrMissing /
+      # RestoreDrillStaleOrMissing.
+      - alert: LogStreamSilent
+        expr: absent(loki_source_file_read_lines_total{path="/hostlog/iri-deploy.log"})
+        for: 1h
+        labels:
+          severity: warning
+          stream: ops-deploy
+        annotations:
+          summary: "Log stream not being tailed: deploy automation"
+          description: "Alloy is not tailing /hostlog/iri-deploy.log — the deploy narrative behind DeployRolledBack / DeployFailed / DeployHealthRestartFailing is unavailable in Grafana, and recovering it needs an approval-gated SSH session to the production host at the worst possible moment. Check the /var/log mount, that /var/log/iri-deploy.log exists and is 0640 deploy:adm, and that the iri-deploy timer is armed."
 
       - alert: LokiWriteFailing
         expr: sum by (reason) (rate(loki_write_dropped_entries_total[15m])) > 0

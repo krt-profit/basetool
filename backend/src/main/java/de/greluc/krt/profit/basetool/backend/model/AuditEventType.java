@@ -425,6 +425,17 @@ public enum AuditEventType {
   /** The Logistician / Mission-Manager capability flags on a membership were changed. */
   CAPABILITY_FLAGS_CHANGED(AuditDomain.ROLE),
 
+  /**
+   * The permission set attached to a role in the local role catalog was replaced by an admin
+   * (REQ-AUDIT-001). {@code role_permissions} holds only the current state, so without this event
+   * neither the previous grant nor the acting admin is recoverable afterwards — the change takes
+   * effect for every holder on their next authentication. The subject is the role's stable {@code
+   * code}; the details payload carries the symmetric difference over the fixed {@code Permissions}
+   * vocabulary (added / removed permission names), never the role's free-text description and never
+   * the affected users.
+   */
+  ROLE_PERMISSIONS_CHANGED(AuditDomain.ROLE),
+
   /** A Kommandogruppe was created within a squadron. */
   KOMMANDO_GROUP_CREATED(AuditDomain.ROLE),
 

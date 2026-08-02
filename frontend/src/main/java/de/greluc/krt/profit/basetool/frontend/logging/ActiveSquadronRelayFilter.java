@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.logging;
 
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.ClientRequest;
@@ -45,8 +46,15 @@ import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
  *
  * <p>Failure modes degrade silently: no thread-local bound (background task / scheduled job) and no
  * active OrgUnit set both yield "no header added" — the backend then falls through to its default
- * behaviour (admin sees all OrgUnits, members see the union of their memberships).
+ * behaviour (admin sees all OrgUnits, members see the union of their memberships). "Silently" used
+ * to be literal: the branch had no log statement at all, so a pin that was set on the servlet
+ * thread but lost before the exchange (context propagation not applied on this hop, a call issued
+ * from a pool thread) was indistinguishable from a caller who simply has no pin — and the
+ * user-visible symptom of both is the same wrong-Staffel listing. The branch now leaves a DEBUG
+ * line; DEBUG rather than anything higher because it is the normal case for every anonymous and
+ * every unpinned request, i.e. the majority of outbound calls.
  */
+@Slf4j
 @Component
 public class ActiveSquadronRelayFilter {
 
@@ -70,6 +78,13 @@ public class ActiveSquadronRelayFilter {
     return (request, next) -> {
       UUID active = ActiveSquadronContext.get();
       if (active == null) {
+        // Only the method and the path — never the query string, which carries user-typed
+        // search terms on the catalog/type-ahead proxies (REQ-OBS-004).
+        log.debug(
+            "No active OrgUnit bound on this thread; relaying {} {} without the {} header",
+            request.method(),
+            request.url().getPath(),
+            ACTIVE_ORG_UNIT_HEADER);
         return next.exchange(request);
       }
       return next.exchange(

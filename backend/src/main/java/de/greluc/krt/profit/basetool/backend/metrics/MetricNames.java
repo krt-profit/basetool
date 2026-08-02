@@ -107,7 +107,17 @@ public final class MetricNames {
 
   // --- Rate-limit rejections (RateLimitingFilter) ----------------------------------------
 
-  /** Counter {@code basetool_ratelimit_rejections_total} — tag {@code bucket}. */
+  /**
+   * Counter {@code basetool_ratelimit_rejections_total} — tags {@code bucket} and {@code
+   * key_source} ({@link #KEY_SOURCE_FORWARDED} / {@link #KEY_SOURCE_PEER}). The {@code key_source}
+   * tag records where the bucket key came from: a trusted proxy's {@code X-Forwarded-For} client
+   * address, or the immediate peer's own address when no proxy is trusted or the header is absent.
+   * That distinction decides how to read a 429 spike — forwarded keys mean many real clients behind
+   * the edge tripped their own budgets, peer keys mean everything collapsed onto one shared bucket
+   * (a trusted-proxies misconfiguration or an untrusted hop), which throttles unrelated users
+   * together. Two bounded literals only: the address itself is never exported as a label
+   * (REQ-OBS-004, REQ-OBS-006).
+   */
   public static final String RATELIMIT_REJECTIONS = "basetool.ratelimit.rejections";
 
   /**
@@ -225,12 +235,36 @@ public final class MetricNames {
   public static final String SSE_CONNECTIONS = "basetool.sse.connections";
 
   /**
-   * Counter {@code basetool_sse_send_failures_total} — tag {@code event} ({@link
-   * #SSE_EVENT_CONNECTED} / {@link #SSE_EVENT_NOTIFICATION} / {@link #SSE_EVENT_HEARTBEAT}), bumped
+   * Counter {@code basetool_sse_send_failures_total} — tags {@code event} ({@link
+   * #SSE_EVENT_CONNECTED} / {@link #SSE_EVENT_NOTIFICATION} / {@link #SSE_EVENT_HEARTBEAT}) and
+   * {@code cause} ({@link #CAUSE_IO} / {@link #CAUSE_ILLEGAL_STATE} / {@link #CAUSE_OTHER}), bumped
    * at each drop-on-send-failure branch so a broken push (e.g. proxy buffering drift) is counted
    * rather than only silently dropping the emitter.
+   *
+   * <p>The {@code cause} split exists because the three branches catch {@code IOException |
+   * RuntimeException} and discard the exception: an ordinary client hang-up ({@code io}) and a
+   * write against an already-completed emitter ({@code illegal_state} — a registry lifecycle
+   * defect, not a dead client) are otherwise the same number. Distinguishing them without flipping
+   * a logger in production is the entire point. Derived from the caught exception's <em>type</em>,
+   * never its message (REQ-OBS-006).
    */
   public static final String SSE_SEND_FAILURES = "basetool.sse.send.failures";
+
+  /**
+   * Counter {@code basetool_sse_emitters_evicted_total} (untagged) — bumped each time {@code
+   * NotificationStreamService.subscribe} retires the oldest stream of a recipient because the
+   * per-recipient emitter cap ({@code MAX_EMITTERS_PER_SUB}, currently 5) is already full. The
+   * eviction is deliberately quiet — the retired stream only receives a terminal {@code replaced}
+   * event — so a user whose tabs keep knocking each other off the push channel produces no signal
+   * at all today.
+   *
+   * <p>Doubles as the tuning signal for the cap: the frontend admits up to 20 concurrent {@code
+   * /ws/sync} sockets per user, so a user can legitimately hold far more live tabs than 5 SSE
+   * streams. A sustained eviction rate means the notification cap, not the socket cap, is the
+   * binding one and is set too low. Untagged — the recipient {@code sub} must never become a label
+   * (REQ-OBS-006).
+   */
+  public static final String SSE_EMITTERS_EVICTED = "basetool.sse.emitters.evicted";
 
   /**
    * Counter {@code basetool_sse_redis_published_total} — real-time notification signals this
@@ -277,6 +311,14 @@ public final class MetricNames {
   /** Tag key: the rate-limit bucket that rejected the request. */
   public static final String TAG_BUCKET = "bucket";
 
+  /**
+   * Tag key: where the rate-limit bucket key was derived from, on {@link #RATELIMIT_REJECTIONS} —
+   * {@link #KEY_SOURCE_FORWARDED} when a trusted proxy's {@code X-Forwarded-For} supplied the
+   * client address, {@link #KEY_SOURCE_PEER} when the immediate peer address was used. Carries only
+   * which of the two paths produced the key; the address itself is never a tag value (REQ-OBS-004).
+   */
+  public static final String TAG_KEY_SOURCE = "key_source";
+
   /** Tag key: the bank ledger-integrity violation category. */
   public static final String TAG_CATEGORY = "category";
 
@@ -308,6 +350,14 @@ public final class MetricNames {
 
   /** Tag key: the SSE event name that failed to send, on {@link #SSE_SEND_FAILURES}. */
   public static final String TAG_EVENT = "event";
+
+  /**
+   * Tag key: the failure shape of an SSE push on {@link #SSE_SEND_FAILURES} ({@link #CAUSE_IO} /
+   * {@link #CAUSE_ILLEGAL_STATE} / {@link #CAUSE_OTHER}). Mapped from the caught exception's type
+   * through that fixed three-value set — never from its message or class name, which would be
+   * unbounded (REQ-OBS-006).
+   */
+  public static final String TAG_CAUSE = "cause";
 
   /** Tag key: the notification Redis fan-out operation on {@link #SSE_REDIS_ERRORS}. */
   public static final String TAG_OP = "op";
@@ -359,11 +409,43 @@ public final class MetricNames {
   /** SSE event value: the periodic keep-alive {@code heartbeat}. */
   public static final String SSE_EVENT_HEARTBEAT = "heartbeat";
 
+  /**
+   * SSE failure cause: an {@link java.io.IOException} from the emitter write — the client hung up
+   * or the connection broke mid-push. The expected, benign shape; it dominates in healthy
+   * operation.
+   */
+  public static final String CAUSE_IO = "io";
+
+  /**
+   * SSE failure cause: an {@link IllegalStateException} — the emitter had already completed or
+   * timed out when the push was attempted. Server-side lifecycle race in the registry rather than a
+   * dead client, so it is worth separating from {@link #CAUSE_IO} even though both end in the same
+   * drop.
+   */
+  public static final String CAUSE_ILLEGAL_STATE = "illegal_state";
+
+  /** SSE failure cause: any other runtime exception thrown by the emitter write. */
+  public static final String CAUSE_OTHER = "other";
+
   /** Base unit rendered as the {@code _seconds} Prometheus suffix on epoch/age gauges. */
   public static final String UNIT_SECONDS = "seconds";
 
   /** Rate-limit bucket value for the global {@code /api/**} path budget. */
   public static final String BUCKET_GLOBAL = "global";
+
+  /**
+   * Rate-limit key source: the key came from the first entry of a trusted proxy's {@code
+   * X-Forwarded-For} header, i.e. per-client bucketing behind the edge works as designed.
+   */
+  public static final String KEY_SOURCE_FORWARDED = "forwarded";
+
+  /**
+   * Rate-limit key source: the key came from the immediate peer address ({@code
+   * request.getRemoteAddr()}) because the peer is not a trusted proxy or sent no {@code
+   * X-Forwarded-For}. Sustained rejections on this value behind a reverse proxy mean every client
+   * shares one bucket — the signature of a broken {@code app.rate-limit.trusted-proxies} list.
+   */
+  public static final String KEY_SOURCE_PEER = "peer";
 
   /** Discord precheck outcome: an existence check ran and answered {@code 200}. */
   public static final String DISCORD_PRECHECK_OK = "ok";

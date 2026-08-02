@@ -145,6 +145,74 @@ class GlobalExceptionHandlerTest {
     assertHttpErrorCounted(GlobalExceptionHandler.CODE_OPTIMISTIC_LOCK);
   }
 
+  /**
+   * The 409 WARN line must name the conflicting entity, its identifier and the compared version
+   * pair. Without the pair, "repeated 409 with nobody else editing" (a fragment that fails to
+   * re-echo the bumped version, REQ-FE-003) is indistinguishable from real contention. Stays at
+   * WARN — a 409 only fires on an actual conflict, so it is not a flood vector.
+   */
+  @Test
+  void handleOptimisticLocking_logsEntityIdentifierAndVersionPairAtWarn() {
+    when(request.getMethod()).thenReturn("PUT");
+    when(request.getRequestURI()).thenReturn("/api/v1/orders/42");
+
+    Logger logger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      handler.handleOptimisticLockingFailure(
+          new ObjectOptimisticLockingFailureException(
+              String.class, "00000000-0000-0000-0000-0000000000ab", "expected=4 persisted=9", null),
+          request);
+
+      ILoggingEvent warn =
+          appender.list.stream()
+              .filter(e -> e.getLevel() == Level.WARN)
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("expected a WARN log line for the 409"));
+      String formatted = warn.getFormattedMessage();
+      assertTrue(formatted.contains("entity=java.lang.String"), formatted);
+      assertTrue(
+          formatted.contains("entityId=00000000-0000-0000-0000-0000000000ab"),
+          "the conflicting row must be identifiable: " + formatted);
+      assertTrue(
+          formatted.contains("versions=expected=4 persisted=9"),
+          "the compared version pair is what separates contention from a stale echo: " + formatted);
+    } finally {
+      logger.detachAppender(appender);
+    }
+  }
+
+  /**
+   * A conflict that did not come from the {@code support.OptimisticLock} helpers (the JPA spec
+   * exception, raised by Hibernate on flush) carries no entity/identifier, so the context map must
+   * degrade to the exception name alone rather than blowing up on a missing accessor.
+   */
+  @Test
+  void handleOptimisticLocking_jpaVariant_logsOnlyTheExceptionName() {
+    when(request.getMethod()).thenReturn("PUT");
+
+    Logger logger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      handler.handleOptimisticLockingFailure(new OptimisticLockException("stale"), request);
+
+      ILoggingEvent warn =
+          appender.list.stream()
+              .filter(e -> e.getLevel() == Level.WARN)
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("expected a WARN log line for the 409"));
+      String formatted = warn.getFormattedMessage();
+      assertTrue(formatted.contains("exception=OptimisticLockException"), formatted);
+      assertFalse(formatted.contains("versions="), "no version pair to report here: " + formatted);
+    } finally {
+      logger.detachAppender(appender);
+    }
+  }
+
   @Test
   void handleOptimisticLocking_jpaVariant_returns409WithCode() {
     ResponseEntity<ProblemDetail> resp =

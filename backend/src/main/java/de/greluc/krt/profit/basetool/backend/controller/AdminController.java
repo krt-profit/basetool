@@ -81,7 +81,9 @@ public class AdminController {
 
   /**
    * Replaces the permission set of a role. Permissions are re-read on every JWT authentication so
-   * the change takes effect on the next user login without a server restart.
+   * the change takes effect on the next user login without a server restart. Audited as {@code
+   * ROLE_PERMISSIONS_CHANGED} in the "Rollen" area (REQ-AUDIT-001); the class-level transaction is
+   * what lets the service write that audit row in the same transaction as the change itself.
    *
    * @param name role name
    * @param permissions new permission set

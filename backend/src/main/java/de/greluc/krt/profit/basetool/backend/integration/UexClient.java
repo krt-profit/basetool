@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.dto.uex.UexStarSystemDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexTerminalDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexVehicleDto;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.support.LogSafe;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.time.Duration;
@@ -60,13 +61,23 @@ import reactor.core.publisher.Mono;
 /**
  * Read-only HTTP client for the UEX (uexcorp.space) catalog API.
  *
- * <p>Every public {@code get…()} method delegates to the shared {@link #fetchList} helper which
- * adds {@code If-None-Match} to the request when a previous ETag is known for the same endpoint
- * (M-5 from the performance audit), unwraps the {@code UexResponseDto<T>} envelope into a plain
- * {@code List<T>}, applies a 30-second per-call timeout, and on ANY error or {@code 304 Not
- * Modified} returns an empty list — the calling sync services treat an empty payload as "skip this
- * run" and explicitly never wipe local tables based on it, so a transient outage or a feed that has
- * not changed since the last sync both result in the same no-op behaviour.
+ * <p>Every public {@code get…()} method delegates to the shared {@link #fetchListWithOutcome}
+ * helper which adds {@code If-None-Match} to the request when a previous ETag is known for the same
+ * endpoint (M-5 from the performance audit), unwraps the {@code UexResponseDto<T>} envelope,
+ * applies a 30-second per-call timeout, and on ANY error or {@code 304 Not Modified} returns an
+ * empty list — the calling sync services treat an empty payload as "skip this run" and explicitly
+ * never wipe local tables based on it, so a transient outage or a feed that has not changed since
+ * the last sync both result in the same no-op behaviour.
+ *
+ * <p><b>Empty is not one thing (H6).</b> Because that empty list used to be the <em>only</em> thing
+ * a caller saw, every sync service greeted an unchanged (304) feed with the same alarming {@code
+ * WARN No X received from UEX API. Aborting…} it emits for a broken one — and a malformed envelope
+ * threw no exception, so it left no {@code basetool_external_fetch_errors_total} trail either. The
+ * getters therefore return {@link FetchResult}, not a bare {@code List}: the {@code notModified}
+ * flag lets a sync log an unchanged feed at INFO, and this client now distinguishes and reports the
+ * envelope-level anomalies (a {@code 200} carrying no {@code data} array, or a non-{@code ok}
+ * {@code status}) itself, at WARN and on the error counter. {@link #getRefineriesMethods()} and
+ * {@link #getRefineriesYields()} still return plain lists — their caller has not been migrated yet.
  *
  * <p>ETag storage is an in-memory {@link ConcurrentHashMap} keyed by endpoint URL; entries survive
  * for the lifetime of the application context and are deliberately not persisted (a restart pays
@@ -89,6 +100,21 @@ public class UexClient {
 
   /** Per-call timeout for the underlying reactive request. */
   private static final Duration CALL_TIMEOUT = Duration.ofSeconds(30);
+
+  /**
+   * The only {@code status} value a UEX envelope is documented to carry on success. Compared
+   * case-insensitively; anything else present in the field is reported as an upstream self-declared
+   * failure by {@link #unwrapEnvelope}.
+   */
+  private static final String ENVELOPE_STATUS_OK = "ok";
+
+  /**
+   * Cap for the upstream-supplied {@code status} string in log lines. UEX is a third party, so the
+   * field is untrusted free text: it goes through {@link LogSafe} before it reaches a logger, and
+   * 32 characters is generous for a token like {@code ok} or {@code error} while keeping a hostile
+   * or malformed value from bloating the line.
+   */
+  private static final int MAX_STATUS_LOG_LENGTH = 32;
 
   private final WebClient.Builder webClientBuilder;
   private final UexProperties uexProperties;
@@ -134,11 +160,11 @@ public class UexClient {
   /**
    * Fetches the full UEX commodity catalog. See class Javadoc for the shared pattern.
    *
-   * @return all commodities, or an empty list if the upstream call fails, times out, or returns
-   *     {@code 304 Not Modified}
+   * @return the commodities plus the {@code 304 Not Modified} outcome; {@code data} is empty on
+   *     error / 304 / empty-200
    */
-  public List<UexCommodityDto> getCommodities() {
-    return fetchList(
+  public FetchResult<UexCommodityDto> getCommodities() {
+    return fetchListWithOutcome(
         uexProperties.getCommoditiesEndpoint(),
         new ParameterizedTypeReference<>() {},
         "commodities");
@@ -149,10 +175,11 @@ public class UexClient {
    * largest UEX payload by far ({@literal >}1 MB) — see the {@code maxInMemorySize} in {@link
    * #initClient()}.
    *
-   * @return all commodity prices, or an empty list on error / 304
+   * @return the commodity prices plus the {@code 304 Not Modified} outcome; {@code data} is empty
+   *     on error / 304 / empty-200
    */
-  public List<UexCommodityPriceDto> getCommoditiesPricesAll() {
-    return fetchList(
+  public FetchResult<UexCommodityPriceDto> getCommoditiesPricesAll() {
+    return fetchListWithOutcome(
         uexProperties.getCommoditiesPricesEndpoint(),
         new ParameterizedTypeReference<>() {},
         "commodities prices");
@@ -163,155 +190,175 @@ public class UexClient {
    * MB — covered by the {@code maxInMemorySize} in {@link #initClient()}). Drives the R7 {@code
    * UexItemPriceSyncService}, which is feature-flagged off by default.
    *
-   * @return all item prices, or an empty list on error / 304
+   * @return the item prices plus the {@code 304 Not Modified} outcome; {@code data} is empty on
+   *     error / 304 / empty-200
    */
-  public List<UexItemPriceDto> getItemPrices() {
-    return fetchList(
+  public FetchResult<UexItemPriceDto> getItemPrices() {
+    return fetchListWithOutcome(
         uexProperties.getItemsPricesEndpoint(),
         new ParameterizedTypeReference<>() {},
         "item prices");
   }
 
   /**
-   * Returns all star systems, or an empty list on error / 304.
+   * Returns all star systems plus the {@code 304 Not Modified} outcome.
    *
-   * @return all star systems, or an empty list on error / 304
+   * @return the star systems plus the {@code 304 Not Modified} outcome; {@code data} is empty on
+   *     error / 304 / empty-200
    */
-  public List<UexStarSystemDto> getStarSystems() {
-    return fetchList(
+  public FetchResult<UexStarSystemDto> getStarSystems() {
+    return fetchListWithOutcome(
         uexProperties.getStarSystemsEndpoint(),
         new ParameterizedTypeReference<>() {},
         "star systems");
   }
 
   /**
-   * Returns all companies (in-universe manufacturers), or an empty list on error / 304.
+   * Returns all companies (in-universe manufacturers) plus the {@code 304 Not Modified} outcome.
    *
-   * @return all companies, or an empty list on error / 304
+   * @return the companies plus the {@code 304 Not Modified} outcome; {@code data} is empty on error
+   *     / 304 / empty-200
    */
-  public List<UexCompanyDto> getCompanies() {
-    return fetchList(
+  public FetchResult<UexCompanyDto> getCompanies() {
+    return fetchListWithOutcome(
         uexProperties.getCompaniesEndpoint(), new ParameterizedTypeReference<>() {}, "companies");
   }
 
   /**
-   * Returns all vehicles (ships and ground vehicles), or an empty list on error / 304.
+   * Returns all vehicles (ships and ground vehicles) plus the {@code 304 Not Modified} outcome.
    *
-   * @return all vehicles, or an empty list on error / 304
+   * @return the vehicles plus the {@code 304 Not Modified} outcome; {@code data} is empty on error
+   *     / 304 / empty-200
    */
-  public List<UexVehicleDto> getVehicles() {
-    return fetchList(
+  public FetchResult<UexVehicleDto> getVehicles() {
+    return fetchListWithOutcome(
         uexProperties.getVehiclesEndpoint(), new ParameterizedTypeReference<>() {}, "vehicles");
   }
 
   /**
-   * Returns all cities, or an empty list on error / 304.
+   * Returns all cities plus the {@code 304 Not Modified} outcome.
    *
-   * @return all cities, or an empty list on error / 304
+   * @return the cities plus the {@code 304 Not Modified} outcome; {@code data} is empty on error /
+   *     304 / empty-200
    */
-  public List<UexCityDto> getCities() {
-    return fetchList(
+  public FetchResult<UexCityDto> getCities() {
+    return fetchListWithOutcome(
         uexProperties.getCitiesEndpoint(), new ParameterizedTypeReference<>() {}, "cities");
   }
 
   /**
-   * Returns all in-universe factions, or an empty list on error / 304.
+   * Returns all in-universe factions plus the {@code 304 Not Modified} outcome.
    *
-   * @return all factions, or an empty list on error / 304
+   * @return the factions plus the {@code 304 Not Modified} outcome; {@code data} is empty on error
+   *     / 304 / empty-200
    */
-  public List<UexFactionDto> getFactions() {
-    return fetchList(
+  public FetchResult<UexFactionDto> getFactions() {
+    return fetchListWithOutcome(
         uexProperties.getFactionsEndpoint(), new ParameterizedTypeReference<>() {}, "factions");
   }
 
   /**
-   * Returns all jurisdictions (legal authorities covering a system or region), or an empty list on
-   * error / 304.
+   * Returns all jurisdictions (legal authorities covering a system or region) plus the {@code 304
+   * Not Modified} outcome.
    *
-   * @return all jurisdictions, or an empty list on error / 304
+   * @return the jurisdictions plus the {@code 304 Not Modified} outcome; {@code data} is empty on
+   *     error / 304 / empty-200
    */
-  public List<UexJurisdictionDto> getJurisdictions() {
-    return fetchList(
+  public FetchResult<UexJurisdictionDto> getJurisdictions() {
+    return fetchListWithOutcome(
         uexProperties.getJurisdictionsEndpoint(),
         new ParameterizedTypeReference<>() {},
         "jurisdictions");
   }
 
   /**
-   * Returns all moons, or an empty list on error / 304.
+   * Returns all moons plus the {@code 304 Not Modified} outcome.
    *
-   * @return all moons, or an empty list on error / 304
+   * @return the moons plus the {@code 304 Not Modified} outcome; {@code data} is empty on error /
+   *     304 / empty-200
    */
-  public List<UexMoonDto> getMoons() {
-    return fetchList(
+  public FetchResult<UexMoonDto> getMoons() {
+    return fetchListWithOutcome(
         uexProperties.getMoonsEndpoint(), new ParameterizedTypeReference<>() {}, "moons");
   }
 
   /**
-   * Returns all orbital locations, or an empty list on error / 304.
+   * Returns all orbital locations plus the {@code 304 Not Modified} outcome.
    *
-   * @return all orbits, or an empty list on error / 304
+   * @return the orbits plus the {@code 304 Not Modified} outcome; {@code data} is empty on error /
+   *     304 / empty-200
    */
-  public List<UexOrbitDto> getOrbits() {
-    return fetchList(
+  public FetchResult<UexOrbitDto> getOrbits() {
+    return fetchListWithOutcome(
         uexProperties.getOrbitsEndpoint(), new ParameterizedTypeReference<>() {}, "orbits");
   }
 
   /**
-   * Returns all outposts, or an empty list on error / 304.
+   * Returns all outposts plus the {@code 304 Not Modified} outcome.
    *
-   * @return all outposts, or an empty list on error / 304
+   * @return the outposts plus the {@code 304 Not Modified} outcome; {@code data} is empty on error
+   *     / 304 / empty-200
    */
-  public List<UexOutpostDto> getOutposts() {
-    return fetchList(
+  public FetchResult<UexOutpostDto> getOutposts() {
+    return fetchListWithOutcome(
         uexProperties.getOutpostsEndpoint(), new ParameterizedTypeReference<>() {}, "outposts");
   }
 
   /**
-   * Returns all planets, or an empty list on error / 304.
+   * Returns all planets plus the {@code 304 Not Modified} outcome.
    *
-   * @return all planets, or an empty list on error / 304
+   * @return the planets plus the {@code 304 Not Modified} outcome; {@code data} is empty on error /
+   *     304 / empty-200
    */
-  public List<UexPlanetDto> getPlanets() {
-    return fetchList(
+  public FetchResult<UexPlanetDto> getPlanets() {
+    return fetchListWithOutcome(
         uexProperties.getPlanetsEndpoint(), new ParameterizedTypeReference<>() {}, "planets");
   }
 
   /**
-   * Returns all points of interest (Lagrange points, derelicts, anomalies), or an empty list on
-   * error / 304.
+   * Returns all points of interest (Lagrange points, derelicts, anomalies) plus the {@code 304 Not
+   * Modified} outcome.
    *
-   * @return all points of interest, or an empty list on error / 304
+   * @return the points of interest plus the {@code 304 Not Modified} outcome; {@code data} is empty
+   *     on error / 304 / empty-200
    */
-  public List<UexPoiDto> getPoi() {
-    return fetchList(uexProperties.getPoiEndpoint(), new ParameterizedTypeReference<>() {}, "pois");
+  public FetchResult<UexPoiDto> getPoi() {
+    return fetchListWithOutcome(
+        uexProperties.getPoiEndpoint(), new ParameterizedTypeReference<>() {}, "pois");
   }
 
   /**
-   * Returns all space stations, or an empty list on error / 304.
+   * Returns all space stations plus the {@code 304 Not Modified} outcome.
    *
-   * @return all space stations, or an empty list on error / 304
+   * @return the space stations plus the {@code 304 Not Modified} outcome; {@code data} is empty on
+   *     error / 304 / empty-200
    */
-  public List<UexSpaceStationDto> getSpaceStations() {
-    return fetchList(
+  public FetchResult<UexSpaceStationDto> getSpaceStations() {
+    return fetchListWithOutcome(
         uexProperties.getSpaceStationsEndpoint(),
         new ParameterizedTypeReference<>() {},
         "spacestations");
   }
 
   /**
-   * Returns all terminals (trade kiosks at any location type), or an empty list on error / 304.
+   * Returns all terminals (trade kiosks at any location type) plus the {@code 304 Not Modified}
+   * outcome.
    *
-   * @return all terminals, or an empty list on error / 304
+   * @return the terminals plus the {@code 304 Not Modified} outcome; {@code data} is empty on error
+   *     / 304 / empty-200
    */
-  public List<UexTerminalDto> getTerminals() {
-    return fetchList(
+  public FetchResult<UexTerminalDto> getTerminals() {
+    return fetchListWithOutcome(
         uexProperties.getTerminalsEndpoint(), new ParameterizedTypeReference<>() {}, "terminals");
   }
 
   /**
    * Fetches all refining methods (e.g. {@code Cormack}, {@code Pyrometric}, …). Drives the local
    * refining-method catalog used by the refinery-order pricing.
+   *
+   * <p>Still returns a bare list: {@code UexRefinerySyncService} has not been migrated to the
+   * {@link FetchResult} outcome, so an unchanged (304) refinery feed still reads as "no data" at
+   * its call site. The envelope-level WARNs added in {@link #unwrapEnvelope} do fire for it.
    *
    * @return all refining methods, or an empty list on error / 304
    */
@@ -326,6 +373,8 @@ public class UexClient {
    * Fetches refinery yield ratios per (terminal, method, commodity). Used by the refinery sync to
    * compute expected output quantities for a given input.
    *
+   * <p>Bare-list caveat as for {@link #getRefineriesMethods()}.
+   *
    * @return all refinery yields, or an empty list on error / 304
    */
   public List<UexRefineryYieldDto> getRefineriesYields() {
@@ -339,10 +388,11 @@ public class UexClient {
    * Fetches the UEX category reference table (R2). The list drives {@code UexItemSyncService}'s
    * 98-iteration walk through {@code /items?id_category=<n>}.
    *
-   * @return all categories, or an empty list on error / 304
+   * @return the categories plus the {@code 304 Not Modified} outcome; {@code data} is empty on
+   *     error / 304 / empty-200
    */
-  public List<UexCategoryDto> getCategories() {
-    return fetchList(
+  public FetchResult<UexCategoryDto> getCategories() {
+    return fetchListWithOutcome(
         uexProperties.getCategoriesEndpoint(), new ParameterizedTypeReference<>() {}, "categories");
   }
 
@@ -374,9 +424,11 @@ public class UexClient {
   }
 
   /**
-   * Thin {@code List}-returning wrapper over {@link #fetchListWithOutcome} for the endpoints that
-   * do not care whether an empty result came from a {@code 304} or from an empty/errored response.
-   * See that method for the full conditional-GET and error/empty-list fallback contract.
+   * Thin {@code List}-returning wrapper over {@link #fetchListWithOutcome} for the two refinery
+   * endpoints, whose caller still consumes a bare list. See that method for the full
+   * conditional-GET and error/empty-list fallback contract. Note that discarding the outcome is
+   * exactly what made a healthy {@code 304} indistinguishable from a broken feed at the call site
+   * (H6) — do not route new endpoints through here.
    *
    * @param <T> the per-row payload type inside {@code UexResponseDto.data}
    * @param endpoint UEX endpoint path (e.g. {@code /commodities}); also serves as the cache key
@@ -398,18 +450,21 @@ public class UexClient {
    *
    * <ol>
    *   <li>If we have a previous ETag for {@code endpoint}, attach it as {@code If-None-Match}.
-   *   <li>If the response is {@code 304 Not Modified}, log at DEBUG and return an empty list
-   *       flagged {@code notModified = true} — sync services treat this as "skip this run" but must
-   *       NOT treat it as an empty catalogue (the unchanged feed is healthy, not an outage).
+   *   <li>If the response is {@code 304 Not Modified}, log the unchanged feed at INFO and return an
+   *       empty list flagged {@code notModified = true} — sync services treat this as "skip this
+   *       run" but must NOT treat it as an empty catalogue (the unchanged feed is healthy, not an
+   *       outage). INFO, not DEBUG: DEBUG is off in production, which is precisely why an all-304
+   *       night left nothing but the callers' alarming "no data" WARNs behind.
    *   <li>On {@code 2xx}, store the response's ETag (if any) keyed by endpoint URL for the next
-   *       call, then deserialise the body into {@code UexResponseDto<T>} and unwrap the data list
-   *       ({@code notModified = false}).
+   *       call, then deserialise the body into {@code UexResponseDto<T>} and hand it to {@link
+   *       #unwrapEnvelope} for the row count / status audit ({@code notModified = false}).
    *   <li>On non-2xx (and non-304) responses, propagate the {@link
    *       org.springframework.web.reactive.function.client.WebClientResponseException} through
    *       {@code .createError()} into the unified {@code onErrorResume} fallback.
-   *   <li>On any error (timeout, decoding failure, server error), log at ERROR and return an empty
-   *       list flagged {@code notModified = false} — the caller MUST treat the result as "skip this
-   *       run", not as "the table is empty".
+   *   <li>On any error (timeout, decoding failure, server error), log at WARN, count it on {@link
+   *       MetricNames#EXTERNAL_FETCH_ERRORS} and return an empty list flagged {@code notModified =
+   *       false} — the caller MUST treat the result as "skip this run", not as "the table is
+   *       empty".
    * </ol>
    *
    * @param <T> the per-row payload type inside {@code UexResponseDto.data}
@@ -433,8 +488,9 @@ public class UexClient {
         .exchangeToMono(
             response -> {
               if (response.statusCode().value() == 304) {
-                log.debug(
-                    "UEX {} unchanged since last sync (304 Not Modified) — skipping",
+                log.info(
+                    "Fetched 0 {} from UEX API: unchanged since the last sync (304 Not Modified) —"
+                        + " nothing to re-import.",
                     resourceLabel);
                 return Mono.just(new FetchResult<>(Collections.<T>emptyList(), true));
               }
@@ -445,28 +501,87 @@ public class UexClient {
               if (etag != null && !etag.isBlank()) {
                 etagByEndpoint.put(endpoint, etag);
               }
-              return response
-                  .bodyToMono(typeRef)
-                  .map(
-                      body ->
-                          new FetchResult<>(
-                              body.data() == null ? Collections.<T>emptyList() : body.data(),
-                              false));
+              return response.bodyToMono(typeRef).map(body -> unwrapEnvelope(body, resourceLabel));
             })
         .timeout(CALL_TIMEOUT)
         .onErrorResume(
             e -> {
               log.warn("Failed to fetch {} from UEX API", resourceLabel, e);
-              meterRegistry
-                  .counter(
-                      MetricNames.EXTERNAL_FETCH_ERRORS,
-                      MetricNames.TAG_SOURCE,
-                      MetricNames.SOURCE_UEX)
-                  .increment();
+              recordFetchError();
               return Mono.just(new FetchResult<>(Collections.<T>emptyList(), false));
             })
         .blockOptional()
         .orElse(new FetchResult<>(Collections.<T>emptyList(), false));
+  }
+
+  /**
+   * Audits a {@code 2xx} envelope and turns it into a {@link FetchResult}, emitting exactly one log
+   * line for the outcome (REQ-OBS-001): INFO with the row count and the reported envelope status on
+   * a healthy response, WARN on either of the two anomalies a {@code 200} can still carry.
+   *
+   * <p>Both anomalies used to be invisible. A {@code 200} whose {@code data} array is absent —
+   * upstream renamed the field, or the response is an error document dressed as a success — threw
+   * no exception, so it produced an empty list with no ERROR log and no {@link
+   * MetricNames#EXTERNAL_FETCH_ERRORS} increment; the only trace was the caller's generic "no rows"
+   * WARN, identical to the one a healthy unchanged feed produced. And {@code status} had no reader
+   * anywhere, so a self-declared upstream failure was simply parsed and discarded. Both now WARN
+   * and count.
+   *
+   * <p>A {@code null} / blank status is deliberately <em>not</em> an anomaly. No code has ever read
+   * the field, so we cannot claim to know that every one of the ~20 endpoints populates it;
+   * treating its absence as a fault would risk a WARN on every endpoint of every sweep — a log
+   * flood — to report something we have never observed. A status that is present and is not {@code
+   * ok} is a genuine upstream self-report and does warn. The rows are returned in both cases: this
+   * client is fail-soft, and the sync services never wipe local tables from a short payload.
+   *
+   * @param <T> the per-row payload type inside {@code UexResponseDto.data}
+   * @param body the decoded envelope
+   * @param resourceLabel human-readable label for log messages
+   * @return the envelope's rows (empty when {@code data} was absent), flagged {@code notModified =
+   *     false}
+   */
+  private <T> FetchResult<T> unwrapEnvelope(UexResponseDto<T> body, String resourceLabel) {
+    String status = LogSafe.text(body.status(), MAX_STATUS_LOG_LENGTH);
+    if (body.data() == null) {
+      log.warn(
+          "UEX API answered 200 for {} with no data array at all (envelope status '{}') — reporting"
+              + " zero rows; the local catalogue is left untouched.",
+          resourceLabel,
+          status);
+      recordFetchError();
+      return new FetchResult<>(Collections.emptyList(), false);
+    }
+    if (body.status() != null
+        && !body.status().isBlank()
+        && !ENVELOPE_STATUS_OK.equalsIgnoreCase(body.status().trim())) {
+      log.warn(
+          "UEX API answered 200 for {} with envelope status '{}' instead of '{}' ({} row(s)"
+              + " received) — importing them anyway, but the payload may be partial.",
+          resourceLabel,
+          status,
+          ENVELOPE_STATUS_OK,
+          body.data().size());
+      recordFetchError();
+      return new FetchResult<>(body.data(), false);
+    }
+    log.info(
+        "Fetched {} {} from UEX API (envelope status '{}').",
+        body.data().size(),
+        resourceLabel,
+        status);
+    return new FetchResult<>(body.data(), false);
+  }
+
+  /**
+   * Increments {@link MetricNames#EXTERNAL_FETCH_ERRORS} for the {@code uex} source. Called from
+   * every branch that swallows an upstream transport, decode or envelope failure into an empty /
+   * short list, so a sustained UEX problem is visible even though the sync services treat the
+   * payload as a skip and the scheduled job still records a success (REQ-OBS-011).
+   */
+  private void recordFetchError() {
+    meterRegistry
+        .counter(MetricNames.EXTERNAL_FETCH_ERRORS, MetricNames.TAG_SOURCE, MetricNames.SOURCE_UEX)
+        .increment();
   }
 
   /**

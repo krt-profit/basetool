@@ -113,7 +113,7 @@ docker compose --profile dev up -d db-backend-dev db-keycloak-dev keycloak-dev r
 ./gradlew :frontend:bootRun
 ```
 
-Host ports: backend `11261`, frontend `18081`, Keycloak `18080`, backend DB `15432`, Keycloak DB `15433`, Redis `6379`. The OpenAPI document is served at `https://localhost:11261/v3/api-docs` in the `dev`/`test` profiles only (disabled in `prod`); there is no Swagger UI.
+Host ports: backend `11261`, frontend `18081`, ingest `11262`, Keycloak `18080`, backend DB `15432`, Keycloak DB `15433`, Redis `6379`. The OpenAPI documents are served at `https://localhost:11261/v3/api-docs` (backend) and `https://localhost:11262/v3/api-docs` (ingest gateway) in the `dev`/`test` profiles only (disabled in `prod`); there is no Swagger UI.
 
 ### Full stack via Docker Compose
 
@@ -216,7 +216,7 @@ The exact `keytool` and realm-rewrite recipes (and why real artifacts must never
 - **Session store** — Redis (`spring-session-data-redis`)
 - **Security** — Spring Security with OAuth2 / OIDC (Keycloak 26.7)
 - **Frontend** — Thymeleaf + Spring Security OAuth2 Client, WebClient wrapped with Resilience4j (Timeout, Retry, CircuitBreaker, Bulkhead)
-- **API docs** — SpringDoc / OpenAPI; the committed `backend/src/main/resources/api/openapi.json` is the single documentation artifact
+- **API docs** — SpringDoc / OpenAPI; each REST-serving module ships one committed document — `backend/src/main/resources/api/openapi.json` and `ingest/src/main/resources/api/openapi.json` — as its single documentation artifact
 - **DTO mapping** — MapStruct
 - **Containerization** — Docker / Docker Compose; images published to GHCR, Cosign-signed with SLSA provenance + SBOM attestations
 
@@ -234,15 +234,16 @@ The frontend hand-mirrors the backend's DTOs as its own records (no shared modul
 
 ### Configuration (common env vars)
 
-| Variable                         | Description                                                                                | Default                                          |
-|:---------------------------------|:-------------------------------------------------------------------------------------------|:-------------------------------------------------|
-| `KEYCLOAK_ISSUER_URI`            | URL of the Keycloak realm.                                                                 | `https://keycloak.profit-base.online/realms/iri` |
-| `BACKEND_URL`                    | (Frontend) backend API URL; override to `http://localhost:11261` when running from Gradle. | `https://backend:11261`                          |
-| `IRI_BASETOOL_VERSION`           | Image tag pulled by the production compose stack.                                          | `stable`                                         |
-| `IRI_KEYSTORE_HOST_PATH`         | Host path of `keystore.p12`, bind-mounted read-only into backend + frontend.               | `./keystore.p12`                                 |
-| `REDIS_PASSWORD`                 | Password for the Redis session store.                                                      | *(required)*                                     |
-| `HOST_IP`                        | Deployment host IP the compose stack binds outbound services to.                           | *(required)*                                     |
-| `APP_LOGGING_STRUCTURED_ENABLED` | Enables the JSON (Logstash) log appender.                                                  | `false` (dev/test), `true` (prod)                |
+| Variable                                | Description                                                                                | Default                                          |
+|:----------------------------------------|:-------------------------------------------------------------------------------------------|:-------------------------------------------------|
+| `KEYCLOAK_ISSUER_URI`                   | URL of the Keycloak realm.                                                                 | `https://keycloak.profit-base.online/realms/iri` |
+| `BACKEND_URL`                           | (Frontend) backend API URL; override to `http://localhost:11261` when running from Gradle. | `https://backend:11261`                          |
+| `IRI_BASETOOL_VERSION`                  | Image tag pulled by the production compose stack.                                          | `stable`                                         |
+| `IRI_KEYSTORE_HOST_PATH`                | Host path of `keystore.p12`, bind-mounted read-only into backend + frontend.               | `./keystore.p12`                                 |
+| `REDIS_PASSWORD`                        | Password for the Redis session store.                                                      | *(required)*                                     |
+| `HOST_IP`                               | Deployment host IP the compose stack binds outbound services to.                           | *(required)*                                     |
+| `APP_LOGGING_STRUCTURED_ENABLED`        | Enables the JSON (Logstash) log appender.                                                  | `false` (dev/test), `true` (prod)                |
+| `APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS` | Requests slower than this are logged at WARN (`Slow request …`) by all three modules.      | `2000`                                           |
 
 The complete set — Keycloak JWKS, Discord login/precheck, SMTP, and the monitoring scrape/tracing gates — lives in `.env.example` and the specs under [`docs/specs/`](docs/specs/INDEX.md). Type-safe settings live in `@ConfigurationProperties` classes with `@Validated`, so misconfiguration is caught at startup.
 
@@ -255,7 +256,11 @@ The complete set — Keycloak JWKS, Discord login/precheck, SMTP, and the monito
 
 ### Request correlation & logging
 
-Both modules emit one access-log line per request and enrich every log line with MDC fields `correlationId` (echoed in the response header and propagated to outbound backend calls), `userId` (the OIDC `sub`, or `anonymous`) and `orgUnitId`. Names, emails and tokens are never logged. In `prod` all modules additionally write structured JSON logs via `LogstashEncoder`, ready for ELK/Loki/CloudWatch.
+All three modules emit one access-log line per request — escalated to WARN past `APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS` — and enrich every log line with MDC fields `correlationId` (echoed in the response header and propagated to outbound backend calls) and `userId` (the OIDC/JWT `sub`, or `anonymous`); backend and frontend additionally carry `orgUnitId` (the active org-unit pin, or `none`), which the ingest gateway has no use for. Names, emails and tokens are never logged, and a PII-masking layout scrubs JWTs, e-mail-shaped strings and token keywords as a safety net. Every client-supplied string a logger receives — search terms, filter values, relayed keys — additionally passes through the module's `LogSafe`, which strips control characters and caps the length so a pasted newline cannot forge a second log line. Scheduled jobs get a per-run correlation id so a nightly sweep reads as one unit, and each module logs a startup banner naming its effective runtime configuration (secrets sanitised). In `prod` all modules additionally write structured JSON logs via `LogstashEncoder`, ready for ELK/Loki/CloudWatch.
+
+**Levels carry meaning.** A failure is logged exactly once, at the level its status warrants: anything a client or an attacker can trigger at will sits at DEBUG (an open circuit breaker, a 401, a rate-limit rejection, a type-ahead keystroke, an SSE broken pipe), an operator-actionable fault at WARN, and a once-per-run summary at INFO. Logback's own faults are not exempt — a `statusListener` reports a self-disabled appender on `System.err`, which is shipped even when the file appender is dead ([`observability.md`](docs/specs/observability.md) REQ-OBS-017). Browser-side JavaScript errors, previously invisible server-side, are reported by a small beacon to `POST /internal/client-error` (authenticated, DEBUG-only, a bounded `{message, source, line, column, kind}` payload — never a stack trace) and counted as `basetool_client_error_total{kind}`.
+
+Log levels are changeable **at runtime** via the Actuator `loggers` endpoint — `POST {"configuredLevel":"DEBUG"}` to `/actuator/loggers/<logger>` — so a DEBUG diagnosis costs no redeploy. The endpoint is never public (see [`observability.md`](docs/specs/observability.md) REQ-OBS-016) and changes are not persisted across a restart.
 
 ### Keycloak theme
 

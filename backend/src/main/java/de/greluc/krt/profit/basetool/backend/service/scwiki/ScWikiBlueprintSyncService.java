@@ -229,7 +229,18 @@ public class ScWikiBlueprintSyncService {
       }
     }
 
-    if (!seen.isEmpty()) {
+    if (!seen.isEmpty() && !listResult.complete()) {
+      // The list page walk could not vouch for the census (a page failed, the pagination metadata
+      // went missing on a full page, or meta.total disagreed with the merged rows). The uuids we
+      // did see are real, but every blueprint on the pages that were never fetched is absent from
+      // `seen` for that reason alone and would be tombstoned for it. Defer to the next full run.
+      log.warn(
+          "Skipping the blueprint scwiki_deleted sweep: the Wiki blueprint page walk did not"
+              + " enumerate the whole feed this run, so the {} uuid(s) it saw are not a complete"
+              + " census and every row outside them would be tombstoned for never having been"
+              + " fetched.",
+          seen.size());
+    } else if (!seen.isEmpty()) {
       int marked = self.getObject().markBlueprintOrphansWithinTransaction(seen, now);
       if (marked > 0) {
         log.info("Marked {} blueprint row(s) scwiki_deleted (no longer in Wiki feed)", marked);
