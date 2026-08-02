@@ -12,6 +12,8 @@
 
 - **Änderungen an Rollenberechtigungen stehen jetzt im Aktivitätsprotokoll.** Es war die letzte Mutation im Bereich „Rollen“, die keine Spur hinterließ. Der Eintrag nennt die hinzugefügten und entfernten Berechtigungen und ist im Protokoll-Reiter filterbar; ein unbekannter Wert wird dabei nur gezählt, nie benannt (REQ-AUDIT-001).
 
+- **Lager: Die Filterleiste in „Mein Lager“ lässt sich jetzt einklappen.** Die Filterzeile lief über mehrere Zeilen und drängte die Tabelle nach unten; sie sitzt jetzt in einem einklappbaren Bereich, und die Wahl bleibt je Browser erhalten. Damit ein zugeklappter Bereich keinen aktiven Filter verbergen kann, zeigt der Schalter deren Anzahl (REQ-INV-037).
+
 ### Changed
 
 - **Protokollierung: Eine abgewiesene Anfrage ist jetzt zuordenbar, Routine-Rauschen verschwindet.** Abweisungen wegen fehlender Freigabe nannten den Betroffenen nicht, Zeilen des Frontends trugen die Organisationseinheit nicht, und jeder Tastendruck in einem Suchfeld erzeugte bei einer Störung eine Warnung. Warnungen sind jetzt wieder Warnungen, Routinefälle liegen auf DEBUG, Client-IPs verschwinden aus dem Log, und ein Speicherkonflikt nennt die betroffene Zeile samt beider Versionsstände.

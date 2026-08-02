@@ -58,6 +58,35 @@
          * modal). See audit Phase 3 / K1.
          */
 
+        /* Collapsible filter panel: the filter widgets are a full row of multi-selects and
+           checkboxes that wraps onto lines of its own, pushing the bulk bar and the table down.
+           Collapsing takes the panel out of the flow entirely, so the bar above the table stays
+           scannable. */
+        .inv-filter-toggle {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        /* Chevron points right when collapsed and rotates down when the panel is open — the same
+           idiom as the bank panels, so the affordance reads identically across the app. */
+        .inv-filter-chevron {
+            transition: transform 0.15s ease;
+        }
+        [aria-expanded='true'] .inv-filter-chevron {
+            transform: rotate(90deg);
+        }
+        /* The active-filter count is what keeps a collapsed panel honest: it says how many
+           dimensions are narrowing the table, so a short table is never left unexplained. The
+           explicit [hidden] rule is required — .chip sets display:inline-flex, which would
+           otherwise beat the user-agent [hidden] { display: none }. */
+        .inv-filter-count[hidden] {
+            display: none;
+        }
+        .inv-filter-panel {
+            margin-top: 0.75rem;
+        }
+
         @media (max-width: 768px) {
             .my-inventory-filter {
                 flex-direction: column;
@@ -65,6 +94,14 @@
             }
             .my-inventory-filter > div { width: 100%; }
             .multi-select-container { width: 100%; }
+            /* Stacked, the auto-margin would strand the toggle on a line of its own; match the
+               full-width treatment the bulk-bar buttons already get at this width. */
+            .inv-filter-toggle {
+                margin-left: 0;
+                width: 100%;
+                justify-content: center;
+                min-height: 44px;
+            }
         }
         /* Notiz-Vorschau im Lagereintrag (KRT HUD-Stil). Bessere Lesbarkeit: deutlich
            groesserer Text, Border-Left in Primary Orange, dunkler HUD-Hintergrund. */
@@ -162,7 +199,29 @@
             <a th:href="@{/inventory}" class="btn btn-ghost">&laquo; Zurück zur Staffelübersicht</a>
             <a th:href="@{/inventory/input(source='my')}" class="btn btn--cta" th:text="#{inventory.input.new}">Neuen Eintrag erfassen</a>
 
-            <div class="krtm-margin-left-auto-display-flex-gap-1rem-align-2424">
+            <!-- Filter toggle (REQ-INV-037): the panel below holds the whole filter row, which
+                 wraps onto lines of its own and pushes the bulk bar and the table down. The
+                 button collapses it, and carries the number of active filters so a collapsed
+                 panel can never hide WHY the table is narrowed — that count is the only thing
+                 standing between "tidy" and "silently filtered".
+
+                 Rendered EXPANDED and collapsed by script on load: `hidden` is the collapse
+                 mechanism, so without JavaScript the filters stay reachable and usable. -->
+            <button type="button" class="btn btn-ghost inv-filter-toggle" id="myFilterToggle"
+                    data-trigger="inv-my-toggle-filters" data-testid="lager-filter-toggle"
+                    aria-expanded="true" aria-controls="myFilterPanel">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-filter"/></svg>
+                <span th:text="#{inventory.filter.toggle}">Filter</span>
+                <span class="chip chip--primary inv-filter-count" id="myFilterCount" hidden
+                      th:data-label="#{inventory.filter.activeCount}" data-testid="lager-filter-count">
+                    <span id="myFilterCountValue" aria-hidden="true">0</span>
+                    <span id="myFilterCountLabel" class="visually-hidden"></span>
+                </span>
+                <svg class="krt-icon inv-filter-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+            </button>
+        </div>
+
+        <div class="inv-filter-panel" id="myFilterPanel">
                 <form th:if="${view != 'items'}" th:action="@{/inventory/my}" method="get" id="myFilterForm" class="my-inventory-filter no-track krtm-margin-0-display-flex-gap-1rem-align-items-c-5700">
                     <div class="flex-gap-sm">
                         <label class="form-label-xs" th:text="#{inventory.filter.material}">Material:</label>
@@ -293,7 +352,6 @@
                     </label>
                     <button type="button" class="btn btn-ghost" data-trigger="inv-my-reset-filter" th:text="#{inventory.filter.reset}">Filter zur\u00fccksetzen</button>
                 </form>
-            </div>
         </div>
 
         <div class="bulk-checkout-bar" id="bulkCheckoutBar">

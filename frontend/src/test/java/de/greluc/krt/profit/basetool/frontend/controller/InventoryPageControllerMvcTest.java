@@ -211,6 +211,56 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("auto: \"Automatisch vorbef")));
   }
 
+  /**
+   * REQ-INV-037: the filter row sits in a collapsible panel, in both the Material and the Items
+   * view. Four separate guarantees are pinned here because each fails silently on its own:
+   *
+   * <ul>
+   *   <li>the toggle carries its delegated {@code data-trigger} and the {@code
+   *       aria-expanded}/{@code aria-controls} pair — without them the collapse is a dead button
+   *       and mute to a screen reader;
+   *   <li>the panel is rendered EXPANDED. {@code hidden} is the collapse mechanism and the script
+   *       applies it on load, so a server-rendered collapsed panel would leave a client without
+   *       JavaScript no way to reach the filters at all;
+   *   <li>the filter form is INSIDE the panel, between the toggle and the bulk bar — a form left
+   *       outside stays permanently visible and the collapse silently does nothing;
+   *   <li>the count chip ships the raw {@code {0}} placeholder. The script substitutes the number
+   *       client-side, so a message source that resolved the argument here would hand it a string
+   *       with nothing left to replace and the count would never be announced.
+   * </ul>
+   *
+   * @param path the Lager view under test — the two views render two different filter forms
+   * @throws Exception if the request fails
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"/inventory/my", "/inventory/my?view=items"})
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewMyInventory_rendersTheFilterRowInsideACollapsiblePanel(String path) throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get(path))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-trigger=\"inv-my-toggle-filters\"")))
+        .andExpect(content().string(containsString("aria-controls=\"myFilterPanel\"")))
+        .andExpect(content().string(containsString("aria-expanded=\"true\"")))
+        .andExpect(
+            content()
+                .string(containsString("<div class=\"inv-filter-panel\" id=\"myFilterPanel\">")))
+        .andExpect(content().string(containsString("data-label=\"Aktive Filter: {0}\"")))
+        .andExpect(
+            content()
+                .string(
+                    stringContainsInOrder(
+                        List.of(
+                            "id=\"myFilterToggle\"",
+                            "id=\"myFilterPanel\"",
+                            "my-inventory-filter",
+                            "id=\"bulkCheckoutBar\""))));
+  }
+
   // REQ-INV-034: the "Alle markieren" (select-all) button renders in the bulk bar BEFORE the
   // "Markierte ausbuchen" button, carries the select-all trigger + both toggle labels, and the
   // entry-ids proxy is wired for the JS to fetch the full filtered id set.
