@@ -25,7 +25,7 @@ testcontainers = "2.0.5"
 # replacement hits nothing (no profile sets it; all three set only enabled + locations). Note the
 # Redgate release-notes page lists NO breaking changes for 13.0.0 — they are documented only in the
 # "Looking forward to Flyway V13" blog post, so do not clear a future major from that page alone.
-flyway = "13.0.0"
+flyway = "13.1.0"
 mapstruct = "1.6.3"
 ##     ⬆ = "1.7.0.Beta1"
 ##     ⬆ = "1.7.0.Beta2"
@@ -36,7 +36,7 @@ bucket4j = "8.19.0"
 semver4j = "6.0.0"
 logstashLogback = "9.0"
 archunit = "1.4.2"
-springdocOpenapi = "3.0.3"
+springdocOpenapi = "3.1.0"
 okhttp3 = "5.4.0"
 playwright = "1.61.0"
 axeCorePlaywright = "4.12.0"
@@ -53,12 +53,12 @@ spotbugs = "6.5.9"
 pitest = "1.19.0"
 pitestJunit5 = "1.2.3"
 nodeGradle = "7.1.0"
-spotless = "8.8.0"
+spotless = "8.9.0"
 owaspDependencycheck = "12.2.2"
 findsecbugs = "1.14.0"
 checkstyle = "13.8.0"
 googleJavaFormat = "1.35.0"
-node = "24.18.0"
+node = "24.18.1"
 # Keycloak server SPI artifacts for the keycloak-spi provider module (Discord
 # federation + first-login gate, epic #720). Pin to the highest 26.7.x patch — the
 # floating `quay.io/keycloak/keycloak:26.7` runtime tag resolves to it; SPI APIs are
