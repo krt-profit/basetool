@@ -81,10 +81,17 @@ if [ ${#expected_tag[@]} -eq 0 ]; then
   exit 2
 fi
 
-mapfile -t doc_files < <(git ls-files '*.md' | grep -Ev "$EXCLUDED_DOCS_REGEX" || true)
+if ! tracked_docs="$(git ls-files '*.md')"; then
+  printf 'error: git ls-files failed — cannot enumerate the docs to check.\n' >&2
+  exit 2
+fi
+mapfile -t doc_files < <(printf '%s\n' "$tracked_docs" | grep -Ev "$EXCLUDED_DOCS_REGEX" || true)
 if [ ${#doc_files[@]} -eq 0 ]; then
-  printf 'No Markdown files tracked; nothing to check.\n'
-  exit 0
+  # Not "nothing to drift, pass" — this repository always tracks Markdown, so an empty list means
+  # the enumeration broke (no git on PATH, run outside a work tree, a mangled exclude regex). A gate
+  # that goes green when it could not look is worse than no gate: it reports "checked, clean".
+  printf 'error: no Markdown files to check — the enumeration is broken, not the repository.\n' >&2
+  exit 2
 fi
 
 printf 'Checking %d monitoring image pin(s) across %d Markdown file(s).\n' \

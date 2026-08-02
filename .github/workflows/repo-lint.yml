@@ -148,4 +148,10 @@ jobs:
       # against a binary that is not deployed, so the wrong answer is silent. This gate keeps them
       # honest. `--fix` rewrites every drifted pin in one go.
       - name: Check documented monitoring image pins
-        run: scripts/check-monitoring-image-pins.sh
+        # chmod first, mirroring the migration-numbering gate: this repo is developed on Windows
+        # where `core.filemode=false`, so a local `chmod +x` is not recorded and the executable bit
+        # is easy to lose on a re-add. Without this the job dies with exit 126 before running a
+        # single check -- which is how it failed the first time.
+        run: |
+          chmod +x scripts/check-monitoring-image-pins.sh
+          scripts/check-monitoring-image-pins.sh
