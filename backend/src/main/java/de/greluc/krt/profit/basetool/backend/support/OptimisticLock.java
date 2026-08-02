@@ -36,8 +36,12 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  * the dependency-leaf {@code support} package because it depends only on the entity {@link Class}
  * and identifier passed in, never on {@code model} / {@code service} (ADR-0047).
  *
- * <p>The {@code identifier} is used only to build the 409 exception (its message names the entity +
- * id) and may be {@code null}, a plain id, or a composite-key object — it is never dereferenced.
+ * <p>The {@code identifier} is used only to build the 409 exception (it is carried on the exception
+ * as {@code getIdentifier()}) and may be {@code null}, a plain id, or a composite-key object — it
+ * is never dereferenced. The exception <em>message</em> carries the compared version pair ({@code
+ * expected=<client> persisted=<persisted>}), which {@code GlobalExceptionHandler} surfaces in its
+ * 409 WARN line so real contention can be told apart from a fragment that failed to re-echo the
+ * bumped version (REQ-FE-003).
  *
  * <p><b>Not for the manual {@code Mission} counters.</b> {@code Mission}'s {@code coreVersion} /
  * {@code scheduleVersion} / {@code flagsVersion} / {@code partyLeadVersion} / {@code stepsVersion}
@@ -70,7 +74,7 @@ public final class OptimisticLock {
       @NotNull Class<?> entityType,
       @Nullable Object identifier) {
     if (persistedVersion != null && !persistedVersion.equals(clientVersion)) {
-      throw conflict(entityType, identifier);
+      throw conflict(entityType, identifier, persistedVersion, clientVersion);
     }
   }
 
@@ -96,7 +100,7 @@ public final class OptimisticLock {
     if (clientVersion != null
         && persistedVersion != null
         && !persistedVersion.equals(clientVersion)) {
-      throw conflict(entityType, identifier);
+      throw conflict(entityType, identifier, persistedVersion, clientVersion);
     }
   }
 
@@ -120,21 +124,44 @@ public final class OptimisticLock {
       @NotNull Class<?> entityType,
       @Nullable Object identifier) {
     if (persistedVersion == null || persistedVersion != clientVersion) {
-      throw conflict(entityType, identifier);
+      throw conflict(entityType, identifier, persistedVersion, clientVersion);
     }
   }
 
   /**
-   * Builds the 409 exception carrying the entity type and identifier, mirroring the hand-written
-   * {@code new ObjectOptimisticLockingFailureException(Entity.class, id)} the call sites used.
+   * Builds the 409 exception carrying the entity type, the identifier and — as the exception
+   * message — the two version numbers that were just compared, in the fixed shape {@code
+   * expected=<client> persisted=<persisted>} (a {@code null} on either side renders as the literal
+   * {@code null}).
+   *
+   * <p>The version pair is the whole point of this method. Without it the 409 that {@code
+   * GlobalExceptionHandler} logs is indistinguishable between real contention (two members editing
+   * the same row) and the REQ-FE-003 failure mode where a fragment forgets to re-echo the freshly
+   * bumped {@code version}, so the same client retries forever against a version it never
+   * refreshed. The pair separates the two on sight: a stationary {@code expected} against a
+   * climbing {@code persisted} is contention, an unchanging pair repeated by one caller is a stale
+   * echo.
+   *
+   * <p>Both values are plain numbers and the identifier is a UUID (or {@code null}, or the bounded
+   * {@code SystemSetting} key) at every call site, so nothing user-supplied and nothing
+   * REQ-OBS-004-relevant enters the message.
    *
    * @param entityType the entity class
    * @param identifier the entity id (or composite-key object); may be {@code null}
+   * @param persistedVersion the entity's current {@code @Version} as loaded from the database
+   * @param clientVersion the version the caller echoed back
    * @return the conflict exception to throw
    */
   @NotNull
   private static ObjectOptimisticLockingFailureException conflict(
-      @NotNull Class<?> entityType, @Nullable Object identifier) {
-    return new ObjectOptimisticLockingFailureException(entityType, identifier);
+      @NotNull Class<?> entityType,
+      @Nullable Object identifier,
+      @Nullable Long persistedVersion,
+      @Nullable Long clientVersion) {
+    return new ObjectOptimisticLockingFailureException(
+        entityType,
+        identifier,
+        "expected=" + clientVersion + " persisted=" + persistedVersion,
+        null);
   }
 }

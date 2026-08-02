@@ -28,9 +28,12 @@ import java.time.Instant;
  * referenced by its normalized {@code productKey}; the server resolves the display name and output
  * item, so neither is accepted from the client.
  *
- * @param productKey normalized product key of the blueprint to add
+ * @param productKey normalized product key of the blueprint to add (max 255 chars, matching the
+ *     {@code personal_blueprint.product_key} column)
  * @param acquiredAt optional in-game acquisition time
  * @param note optional free-form note (max 2000 chars)
  */
 public record PersonalBlueprintCreateRequest(
-    @NotBlank String productKey, Instant acquiredAt, @Size(max = 2000) String note) {}
+    @NotBlank @Size(max = 255) String productKey,
+    Instant acquiredAt,
+    @Size(max = 2000) String note) {}

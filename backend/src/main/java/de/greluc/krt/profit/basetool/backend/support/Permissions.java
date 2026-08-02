@@ -31,6 +31,13 @@ package de.greluc.krt.profit.basetool.backend.support;
  * strings in the {@code Role.permissions} {@code ElementCollection} and are read back as plain
  * Spring {@code GrantedAuthority} names (no {@code ROLE_} prefix).
  *
+ * <p><b>This holder is read reflectively.</b> {@code RoleService} derives the vocabulary its {@code
+ * ROLE_PERMISSIONS_CHANGED} audit row and log line may name from the {@code public static final
+ * String} fields declared here, so a permission added below is audited by name from the moment it
+ * exists — no second list to update. The price is that this class must keep holding <b>only</b>
+ * permission values: a {@code String} constant of any other meaning added here would silently
+ * become an auditable permission name.
+ *
  * <p>Lives in the dependency-leaf {@code support} package (ADR-0047) — plain {@code String}
  * constants with no dependency on the security API, {@code model} or {@code service}.
  */

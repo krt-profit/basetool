@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anySet;
@@ -29,6 +30,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
 import java.util.Collections;
 import java.util.List;
@@ -38,6 +43,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 
 /**
  * Unit tests for {@link UserSyncService} — the Keycloak-&gt;local reconciliation shared by the
@@ -119,6 +125,92 @@ class UserSyncServiceTest {
     verify(userReconciliationService).syncUser(user1);
     verify(userReconciliationService).markMissingUsers(anySet());
     verify(bankHolderReconciliationService).reconcileAll();
+  }
+
+  @Test
+  void syncFromKeycloak_logsTheRoleSummaryAndFlaggedCount_atInfoForAnOrdinaryRun() {
+    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(user("user1")));
+    when(userReconciliationService.markMissingUsers(anySet())).thenReturn(2);
+
+    withAppender(
+        appender -> {
+          userSyncService.syncFromKeycloak();
+
+          ILoggingEvent flagged = eventContaining(appender, "no longer present in Keycloak");
+          // Two leavers is the ordinary trickle: reported, but not an anomaly.
+          assertEquals(Level.INFO, flagged.getLevel());
+          assertTrue(flagged.getFormattedMessage().contains("2 local users"));
+        });
+    // The per-run role-mapping aggregate is emitted by the reconciliation service itself.
+    verify(userReconciliationService).logRoleSyncSummary();
+  }
+
+  @Test
+  void syncFromKeycloak_massSoftDeleteInOneRun_escalatesToWarn() {
+    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(user("user1")));
+    when(userReconciliationService.markMissingUsers(anySet())).thenReturn(42);
+
+    withAppender(
+        appender -> {
+          userSyncService.syncFromKeycloak();
+
+          ILoggingEvent flagged = eventContaining(appender, "no longer present in Keycloak");
+          // 42 accounts vanishing in a single run is what an upstream mass-deletion or a
+          // half-degraded roster looks like — the run still "succeeds", so this line is the
+          // only signal.
+          assertEquals(Level.WARN, flagged.getLevel());
+          assertTrue(flagged.getFormattedMessage().contains("42 local users"));
+        });
+  }
+
+  @Test
+  void syncFromKeycloak_withNoDepartures_saysNothingAboutSoftDeletes() {
+    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(user("user1")));
+    when(userReconciliationService.markMissingUsers(anySet())).thenReturn(0);
+
+    withAppender(
+        appender -> {
+          userSyncService.syncFromKeycloak();
+
+          // Nobody left: the run must not emit a "0 users flagged" line every night.
+          assertTrue(
+              appender.list.stream()
+                  .noneMatch(
+                      e -> e.getFormattedMessage().contains("no longer present in Keycloak")));
+        });
+  }
+
+  /**
+   * Runs {@code body} with a {@link ListAppender} attached to the {@link UserSyncService} logger
+   * and detaches it afterwards, so a failing assertion cannot leak the appender into other tests.
+   *
+   * @param body the assertions to run against the captured log events
+   */
+  private static void withAppender(java.util.function.Consumer<ListAppender<ILoggingEvent>> body) {
+    Logger logger = (Logger) LoggerFactory.getLogger(UserSyncService.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      body.accept(appender);
+    } finally {
+      logger.detachAppender(appender);
+    }
+  }
+
+  /**
+   * The first captured log event whose formatted message contains {@code needle}.
+   *
+   * @param appender the appender holding the captured events
+   * @param needle the substring identifying the wanted line
+   * @return that event
+   */
+  private static ILoggingEvent eventContaining(
+      ListAppender<ILoggingEvent> appender, String needle) {
+    return appender.list.stream()
+        .filter(e -> e.getFormattedMessage().contains(needle))
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("no log line containing: " + needle));
   }
 
   private static KeycloakUserDto user(String name) {

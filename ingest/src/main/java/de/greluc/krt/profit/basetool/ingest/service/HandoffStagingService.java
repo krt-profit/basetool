@@ -81,11 +81,15 @@ public class HandoffStagingService {
     // from
     // an expired / already-consumed handoff (matching sub hash, key absent) — the exact ambiguity
     // behind the "Import-Link abgelaufen oder ungültig" reports.
+    // draftLen is the cheapest possible answer to "the pre-filled form came up empty": a two-byte
+    // draft is an empty backend response, a plausible size is a real draft and moves the search to
+    // the frontend's consume side. The draft itself is never logged.
     log.info(
-        "Staged {} handoff (sub=u-{}, hid=h-{}, ttl={})",
+        "Staged {} handoff (sub=u-{}, hid=h-{}, draftLen={}, ttl={})",
         kind,
         mask(sub),
         mask(handoffId),
+        draftJson.length(),
         ingestProperties.getHandoffTtl());
     return handoffId;
   }

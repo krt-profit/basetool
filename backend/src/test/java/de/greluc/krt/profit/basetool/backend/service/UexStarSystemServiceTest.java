@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.service.UexFetchResults.fetched;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -60,7 +61,7 @@ class UexStarSystemServiceTest {
             .factionName("UEE")
             .build();
 
-    when(uexClient.getStarSystems()).thenReturn(List.of(dto));
+    when(uexClient.getStarSystems()).thenReturn(fetched(List.of(dto)));
     when(starSystemRepository.findByIdSystem(1)).thenReturn(Optional.empty());
     when(starSystemRepository.findByName("Stanton")).thenReturn(Optional.empty());
 

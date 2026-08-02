@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-10
 - **Deciders:** @greluc
-- **Related:** `frontend`/`ingest` `application-prod.yml` (`management.server.*`) · `docker-compose.yml` (prod `frontend`/`ingest` healthcheck override) · `monitoring/prometheus/prometheus.yml` (scrape targets) · `ManagementPortSecurityConfig` · `ManagementPortIsolationTest` · `MonitoringScrapeSecurityConfig` · `BotProtectionFilter` · REQ-OBS-005 · REQ-OBS-008 · REQ-OBS-012 · REQ-SEC-014 · REQ-INGEST-001 · ADR-0072 · ADR-0018
+- **Related:** `frontend`/`ingest` `application-prod.yml` (`management.server.*`) · `docker-compose.yml` (prod `frontend`/`ingest` healthcheck override) · `monitoring/prometheus/prometheus.yml` (scrape targets) · `ManagementPortSecurityConfig` · `ManagementPortIsolationTest` · `MonitoringScrapeSecurityConfig` · `BotProtectionFilter` · `SecurityConfig` (backend, the `ROLE_ADMIN` matcher on `POST /actuator/loggers/**`) · `ActuatorLoggersAuthorizationTest` · REQ-OBS-005 · REQ-OBS-008 · REQ-OBS-012 · REQ-OBS-016 · REQ-SEC-014 · REQ-INGEST-001 · ADR-0072 · ADR-0018
 
 ## Context
 
@@ -106,4 +106,43 @@ belt-and-braces drift detection.
   `basetool-ingest` targets are `up` on the new ports, and (c) `https://profit-base.online/actuator/health`
   and the ingest equivalent still answer 404 from outside (the REQ-OBS-012 probes assert this
   continuously).
+
+### Amendment 2026-08 (PR #1472) — the exposure list gained a *mutator*
+
+The unauthenticated permit-all chain above was decided when **everything** reachable on the
+management port was read-only (`health`, `prometheus`, `info`): there was nothing an unauthenticated
+caller inside `net-monitoring-scrape` could *change*. REQ-OBS-016 then added the Actuator **`loggers`**
+endpoint, whose `POST {"configuredLevel":…}` is a write. The `@Order(0)` chain matches `/actuator/**`
+by **path** and cannot tell a read operation from a write one, so on `frontend` and `ingest` the level
+mutator became reachable unauthenticated from `net-monitoring-scrape` and `localhost`. Setting `ROOT`
+to `TRACE` there makes Spring Security, WebClient and Netty write bearer tokens and request bodies
+into a Loki stream retained 744 h — a read-only exposure trade quietly turned into a
+credential-disclosure lever. The decision above stands; the two modules resolve it in opposite ways
+because their connector posture differs:
+
+- **`frontend` + `ingest`, prod only — the write is removed, not gated.**
+  `management.endpoint.loggers.access: read-only` under the existing `management:` block of each
+  `application-prod.yml` (next to `server.port: 18091` / `11272`). The write operation is not
+  registered at all, so there is nothing for the permit-all chain to guard and that chain stays
+  exactly as decided. `GET /actuator/loggers` still answers on the management port. Dev, test and e2e
+  set no management port and never load these files, so full runtime level control is unchanged there
+  (REQ-OBS-016).
+- **`backend` — the write is kept and gated on `ROLE_ADMIN`.** The backend is out of scope of the
+  decision above and deliberately sets **no** `management.server.port`: Actuator rides the ordinary
+  `11261` app connector, which is not host-published and sits only on internal Docker networks. That
+  connector is **not** an "internal-only management port" and must not be described as one — the
+  distinction is exactly what makes the two shapes differ, because the app connector is covered by the
+  module's *main* security chain. `SecurityConfig` therefore adds
+  `.requestMatchers(HttpMethod.POST, "/actuator/loggers/**").hasRole(Roles.ADMIN)` immediately after
+  the `/actuator/health` `permitAll()` and well before `anyRequest().authenticated()`; `GET` keeps
+  falling through to the authenticated catch-all. Pinned by `ActuatorLoggersAuthorizationTest`
+  (anonymous → 401, `KRT_MEMBER` → 403, `OFFICER` → 403, `ADMIN` → 204, member `GET` → 200).
+- **Standing rule this ADR now carries.** Every endpoint added to the `frontend` / `ingest`
+  `management.endpoints.web.exposure.include` list must be checked for write operations, and any it
+  has set `access: read-only` in `application-prod.yml` **in the same change**. On an unauthenticated
+  port, "expose" and "expose for writing" are the same act unless `access` says otherwise.
+- **Cost, accepted:** a prod DEBUG dive is now a backend-only, admin-only operation. Raising a
+  frontend or ingest logger in prod is back to a config edit plus a force-recreate, which is what
+  REQ-OBS-016 set out to avoid — the trade is taken because the alternative is an unauthenticated
+  write on a port whose whole security model is "nobody can reach it".
 

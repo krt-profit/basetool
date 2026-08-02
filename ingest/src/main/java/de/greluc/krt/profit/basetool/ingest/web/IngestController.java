@@ -23,8 +23,12 @@ import de.greluc.krt.profit.basetool.ingest.model.dto.IngestResponseDto;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractDto;
 import de.greluc.krt.profit.basetool.ingest.service.IngestService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -53,7 +57,15 @@ import tools.jackson.databind.ObjectMapper;
 @RequestMapping("/v1")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
+@Tag(
+    name = "Ingest",
+    description =
+        "Forward-only ingest of extractor payloads. Both endpoints relay to the backend with the"
+            + " caller's own bearer and answer with a single-use browser handoff.")
 public class IngestController {
+
+  /** Media type every error response carries (RFC 7807); referenced from the response docs. */
+  private static final String PROBLEM_JSON = MediaType.APPLICATION_PROBLEM_JSON_VALUE;
 
   private final IngestService ingestService;
   private final ObjectMapper objectMapper;
@@ -74,19 +86,55 @@ public class IngestController {
   @Operation(
       summary =
           "Forward a RefineryExtract to the backend import and stage the draft for one-click"
-              + " browser pickup.")
+              + " browser pickup.",
+      description =
+          "Accepts the frozen RefineryExtract JSON contract v1 (ADR-0008). The gateway validates"
+              + " the envelope, forwards it to the backend refinery import with the caller's own"
+              + " bearer, and stages the returned draft under the caller's subject. No screenshot"
+              + " and no image bytes are ever transmitted or stored.")
   @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "Draft staged; handoff returned."),
-    @ApiResponse(responseCode = "400", description = "Payload invalid or backend envelope reject."),
-    @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),
-    @ApiResponse(responseCode = "413", description = "Payload exceeds the size cap."),
-    @ApiResponse(responseCode = "429", description = "Per-subject or per-IP rate limit exceeded."),
-    @ApiResponse(responseCode = "502", description = "Backend relay failed.")
+    @ApiResponse(
+        responseCode = "200",
+        description = "Draft staged; handoff returned.",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = IngestResponseDto.class))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Payload invalid or backend envelope reject.",
+        content = @Content(mediaType = PROBLEM_JSON)),
+    @ApiResponse(
+        responseCode = "401",
+        description = "Caller is not authenticated.",
+        content = @Content(mediaType = PROBLEM_JSON)),
+    @ApiResponse(
+        responseCode = "413",
+        description = "Payload exceeds the size cap.",
+        content = @Content(mediaType = PROBLEM_JSON)),
+    @ApiResponse(
+        responseCode = "429",
+        description = "Per-subject or per-IP rate limit exceeded.",
+        content = @Content(mediaType = PROBLEM_JSON)),
+    @ApiResponse(
+        responseCode = "502",
+        description = "Backend relay failed.",
+        content = @Content(mediaType = PROBLEM_JSON)),
+    @ApiResponse(
+        responseCode = "503",
+        description =
+            "A dependency was temporarily unreachable (identity provider or handoff staging);"
+                + " retry after the advertised delay.",
+        content = @Content(mediaType = PROBLEM_JSON))
   })
   public @NotNull IngestResponseDto ingestRefineryExtract(
       @AuthenticationPrincipal Jwt jwt,
-      @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage,
-      @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId,
+      @Parameter(description = "Caller locale, relayed so backend problems come back localized.")
+          @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
+          String acceptLanguage,
+      @Parameter(description = "Correlation id, relayed and echoed for cross-module tracing.")
+          @RequestHeader(value = "X-Correlation-Id", required = false)
+          String correlationId,
       @Valid @RequestBody @NotNull RefineryExtractDto extract) {
     return ingestService.ingestRefinery(
         jwt.getSubject(), jwt.getTokenValue(), acceptLanguage, correlationId, extract);
@@ -110,21 +158,67 @@ public class IngestController {
   @Operation(
       summary =
           "Forward a blueprint export to the backend preview and stage it for one-click browser"
-              + " pickup.")
+              + " pickup.",
+      description =
+          "The body is an opaque blueprint-export JSON object; the gateway only checks that it is a"
+              + " JSON object and relays it to the backend preview as a file upload. The backend"
+              + " parses and name-matches it, exactly as a manual file import would.",
+      requestBody =
+          @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              required = true,
+              description =
+                  "The blueprint export as produced by the extractor; must be a JSON"
+                      + " object (an array or scalar is rejected with 400).",
+              content =
+                  @Content(
+                      mediaType = MediaType.APPLICATION_JSON_VALUE,
+                      schema =
+                          @Schema(
+                              type = "object",
+                              additionalProperties = Schema.AdditionalPropertiesValue.TRUE))))
   @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "Preview staged; handoff returned."),
+    @ApiResponse(
+        responseCode = "200",
+        description = "Preview staged; handoff returned.",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = IngestResponseDto.class))),
     @ApiResponse(
         responseCode = "400",
-        description = "Body is not a JSON object or backend reject."),
-    @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),
-    @ApiResponse(responseCode = "413", description = "Payload exceeds the size cap."),
-    @ApiResponse(responseCode = "429", description = "Per-subject or per-IP rate limit exceeded."),
-    @ApiResponse(responseCode = "502", description = "Backend relay failed.")
+        description = "Body is not a JSON object or backend reject.",
+        content = @Content(mediaType = PROBLEM_JSON)),
+    @ApiResponse(
+        responseCode = "401",
+        description = "Caller is not authenticated.",
+        content = @Content(mediaType = PROBLEM_JSON)),
+    @ApiResponse(
+        responseCode = "413",
+        description = "Payload exceeds the size cap.",
+        content = @Content(mediaType = PROBLEM_JSON)),
+    @ApiResponse(
+        responseCode = "429",
+        description = "Per-subject or per-IP rate limit exceeded.",
+        content = @Content(mediaType = PROBLEM_JSON)),
+    @ApiResponse(
+        responseCode = "502",
+        description = "Backend relay failed.",
+        content = @Content(mediaType = PROBLEM_JSON)),
+    @ApiResponse(
+        responseCode = "503",
+        description =
+            "A dependency was temporarily unreachable (identity provider or handoff staging);"
+                + " retry after the advertised delay.",
+        content = @Content(mediaType = PROBLEM_JSON))
   })
   public @NotNull IngestResponseDto ingestBlueprintPreview(
       @AuthenticationPrincipal Jwt jwt,
-      @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage,
-      @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId,
+      @Parameter(description = "Caller locale, relayed so backend problems come back localized.")
+          @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
+          String acceptLanguage,
+      @Parameter(description = "Correlation id, relayed and echoed for cross-module tracing.")
+          @RequestHeader(value = "X-Correlation-Id", required = false)
+          String correlationId,
       @RequestBody @NotNull JsonNode export) {
     if (!export.isObject()) {
       throw new BadRequestException("The blueprint export must be a JSON object.");

@@ -324,6 +324,26 @@
         }
     }
 
+    /**
+     * Developer-facing console diagnostic — never localized, never shown to the user. Several
+     * krtFetch paths fail without touching the DOM at all (see swap()'s bail branches), so for the
+     * 43 of 49 `.swap({…})` call sites that pass no errorMessage this is the ONLY trace a "the
+     * button did nothing / the list did not update" report leaves behind. Guarded on `console`
+     * because embedded webviews may not provide one, and a diagnostic must never become the
+     * failure it is reporting. `detail` is optional: it is omitted from the call rather than
+     * passed as undefined, so the console line stays readable.
+     */
+    function devWarn(message, detail) {
+        if (typeof console === 'undefined' || typeof console.warn !== 'function') {
+            return;
+        }
+        if (detail === undefined) {
+            console.warn(message);
+        } else {
+            console.warn(message, detail);
+        }
+    }
+
     // Double-submit guard (app-wide): record the button that triggered the most recent form submit
     // — capture phase, so it runs before the form's own preventDefault handler — so write() /
     // submitForm() can disable it for the in-flight request without every call site threading it
@@ -553,9 +573,7 @@
                 // re-enable a store button) that the response-side onError never sees on this path;
                 // returning truthy signals it already surfaced its own error UI and suppresses the
                 // default network-error toast.
-                if (typeof console !== 'undefined' && typeof console.warn === 'function') {
-                    console.warn('krtFetch network error', networkError);
-                }
+                devWarn('krtFetch network error', networkError);
                 let handled = false;
                 if (typeof opts.onNetworkError === 'function') {
                     try {
@@ -864,6 +882,16 @@
                 // injecting it would dump a login form or a nested page into the results
                 // container. Bail without touching the DOM (#574 review must-fix).
                 if (res.redirected || !res.ok) {
+                    // M11: bailing here is correct, but it used to be completely invisible — no
+                    // toast (unless the caller passed errorMessage), no DOM change, no console
+                    // line. The section simply stopped updating. Record WHY, so a support session
+                    // can tell an expired-session login bounce (redirected) from a 5xx fragment
+                    // render (status) without reproducing the failure.
+                    devWarn('krtFetch.swap bailed: response is not a fragment', {
+                        url: url,
+                        status: res.status,
+                        redirected: res.redirected,
+                    });
                     return null;
                 }
                 return res.text();
@@ -883,6 +911,16 @@
                     if (opts.errorMessage) {
                         errorToast(opts.errorMessage);
                     }
+                    // M11: this is the branch the USER experiences — the swap finished and the
+                    // container still shows the pre-swap render. Only 6 of the 49 `.swap({…})`
+                    // call sites pass an errorMessage, so for the other 43 nothing at all is said.
+                    // `toasted` records which of the two it was, so the console line distinguishes
+                    // "the user was told and ignored it" from "the UI lied by omission".
+                    devWarn('krtFetch.swap did not update the container', {
+                        url: url,
+                        container: opts.container,
+                        toasted: !!opts.errorMessage,
+                    });
                     return false;
                 }
                 container.innerHTML = html;
@@ -905,12 +943,22 @@
                 }
                 return true;
             })
-            .catch(function () {
+            .catch(function (error) {
                 // Aborted-by-supersession (a newer swap called abort()) or a genuine transport
                 // error: never paint anything, and only clear the indicator if a newer swap has not
                 // already taken ownership of it.
                 hideIndicatorIfCurrent();
                 releaseAborter();
+                // M11: the comment above already named the two cases; the code then treated them
+                // identically and said nothing about either. A supersession is INTENTIONAL and
+                // happens on every debounced keystroke (#1151 aborts the older read), so warning
+                // on it would make the console useless. A genuine transport failure — offline,
+                // DNS/TLS, the frontend gone — is the opposite: the section silently froze on a
+                // stale render and there is no other signal anywhere that it did.
+                const superseded = (error && error.name === 'AbortError') || !isCurrent();
+                if (!superseded) {
+                    devWarn('krtFetch.swap transport failure', { url: url, error: error });
+                }
                 return false;
             });
     }

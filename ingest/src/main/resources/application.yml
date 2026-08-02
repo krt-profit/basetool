@@ -57,6 +57,16 @@ spring:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:https://keycloak.profit-base.online/realms/iri}
 
 app:
+  logging:
+    # Same keys the backend/frontend bind (REQ-OBS-001/-002), so all three modules are tuned through
+    # one APP_LOGGING_* surface. The gateway has no `org-unit-id-mdc-key`: it relays drafts and owns
+    # no squadron-scoped data, so that field would always be empty.
+    correlation-id-header: X-Correlation-Id
+    correlation-id-mdc-key: correlationId
+    user-id-mdc-key: userId
+    slow-request-threshold-ms: 2000
+    slow-backend-call-threshold-ms: 1500
+    structured-enabled: false
   ingest:
     backend-base-url: ${BACKEND_URL:https://backend:11261}
     frontend-base-url: ${FRONTEND_URL:https://app.profit-base.online}
@@ -117,8 +127,25 @@ logging:
 management:
   endpoints:
     web:
+      # `loggers` is exposed so a log level can be raised at RUNTIME instead of requiring a config
+      # change plus a redeploy plus a force-recreate. That matters because the most diagnostic lines
+      # in this codebase sit at DEBUG on purpose (bot blocks, the per-IP rate limit, the open circuit
+      # breaker, a relayed backend 4xx) — without this endpoint they exist but are unreachable during
+      # an incident. It adds no PUBLIC surface: `/actuator/health*` is the only permitted actuator
+      # path there, everything else falls through to `anyRequest().authenticated()` on the public
+      # connector.
+      #
+      # The management port is the other half of the story, and it is not "no surface". In prod the
+      # endpoints move to it, and ADR-0090 leaves that port UNAUTHENTICATED — a trade made when
+      # everything exposed was read-only. `loggers` is not: a ROOT logger at TRACE writes bearer
+      # tokens and request bodies into a Loki stream retained for 744h. There is no identity on
+      # that port to gate on, so application-prod.yml removes the mutator instead
+      # (`management.endpoint.loggers.access: read-only`).
+      # Read: GET /actuator/loggers/<logger> — everywhere, including prod.
+      # Write: POST {"configuredLevel":"DEBUG"} — dev and test only; not persisted, so a restart
+      # returns to the configured levels (REQ-OBS-016).
       exposure:
-        include: health, prometheus
+        include: health, prometheus, loggers
   endpoint:
     health:
       show-details: never

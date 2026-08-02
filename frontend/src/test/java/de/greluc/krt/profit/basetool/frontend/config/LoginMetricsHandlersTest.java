@@ -25,14 +25,23 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import java.net.ConnectException;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -45,6 +54,44 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
  * decides the bucket.
  */
 class LoginMetricsHandlersTest {
+
+  private ListAppender<ILoggingEvent> appender;
+  private Logger failureLogger;
+
+  @BeforeEach
+  void attachAppender() {
+    failureLogger = (Logger) LoggerFactory.getLogger(LoginFailureMetricsHandler.class);
+    appender = new ListAppender<>();
+    appender.start();
+    failureLogger.addAppender(appender);
+    failureLogger.setLevel(Level.DEBUG);
+  }
+
+  @AfterEach
+  void detachAppender() {
+    failureLogger.detachAppender(appender);
+  }
+
+  /**
+   * Drives one failure through the handler with a stubbed request/response so the superclass
+   * redirect does not blow up, and returns the registry it counted into.
+   *
+   * @param exception the failure to report
+   * @return the registry the counter was bumped against
+   * @throws Exception if the handler's redirect fails
+   */
+  private static SimpleMeterRegistry handleFailure(AuthenticationException exception)
+      throws Exception {
+    SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    LoginFailureMetricsHandler handler = new LoginFailureMetricsHandler(registry, "/?error");
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    when(request.getContextPath()).thenReturn("");
+    when(request.getSession()).thenReturn(mock(HttpSession.class));
+    when(response.encodeRedirectURL(anyString())).thenAnswer(inv -> inv.getArgument(0));
+    handler.onAuthenticationFailure(request, response, exception);
+    return registry;
+  }
 
   /**
    * Reads the {@code basetool_login_total} value for one {@code (outcome, reason)} pair.
@@ -169,6 +216,77 @@ class LoginMetricsHandlersTest {
     assertThat(loginCount(registry, MetricNames.OUTCOME_SUCCESS, MetricNames.LOGIN_REASON_NONE))
         .isEqualTo(1.0);
     verify(delegate).onAuthenticationSuccess(request, response, authentication);
+  }
+
+  /**
+   * The bucket {@code FrontendLoginBroken} fires on must reach the log at WARN and must carry the
+   * two fields that make it triageable: the bounded OAuth2 error code and the root cause's type.
+   * Before audit finding H3 the handler had no logger at all, so the alert's own "check the
+   * frontend logs" instruction pointed at nothing.
+   */
+  @Test
+  void onAuthenticationFailure_logsProviderErrorAtWarnWithCodeAndRootCause() throws Exception {
+    handleFailure(
+        new OAuth2AuthenticationException(
+            new OAuth2Error("invalid_token_response"),
+            new IllegalStateException("wrapper", new ConnectException("connection refused"))));
+
+    assertThat(appender.list)
+        .singleElement()
+        .satisfies(
+            event -> {
+              assertThat(event.getLevel()).isEqualTo(Level.WARN);
+              assertThat(event.getFormattedMessage())
+                  .contains(MetricNames.LOGIN_REASON_PROVIDER_ERROR)
+                  .contains("invalid_token_response")
+                  .contains("ConnectException");
+            });
+  }
+
+  /**
+   * The benign buckets are scanner- and probe-driven — every bare hit on {@code
+   * /login/oauth2/code/*} and every {@code prompt=none} SSO probe without a Keycloak cookie lands
+   * there — so they must stay at DEBUG. At WARN a single path-scanning bot would flood the log
+   * (REQ-OBS-001).
+   */
+  @Test
+  void onAuthenticationFailure_logsBenignBucketsAtDebug() throws Exception {
+    handleFailure(oauth2("login_required"));
+    handleFailure(new BadCredentialsException("nope"));
+
+    assertThat(appender.list)
+        .hasSize(2)
+        .allSatisfy(event -> assertThat(event.getLevel()).isEqualTo(Level.DEBUG));
+    assertThat(appender.list.get(0).getFormattedMessage())
+        .contains(MetricNames.LOGIN_REASON_INVALID_STATE);
+    assertThat(appender.list.get(1).getFormattedMessage()).contains(MetricNames.LOGIN_REASON_OTHER);
+  }
+
+  /**
+   * The OAuth2 error <em>description</em> is provider-supplied free text and therefore a
+   * log-injection surface (CWE-117): it must never reach the log line, sanitised or not. The
+   * bounded error code may.
+   */
+  @Test
+  void onAuthenticationFailure_neverLogsTheProviderSuppliedDescription() throws Exception {
+    handleFailure(
+        new OAuth2AuthenticationException(
+            new OAuth2Error(
+                "invalid_grant",
+                "forged\nERROR --- [main] a.b.C : login succeeded",
+                "https://example.invalid/err")));
+
+    assertThat(appender.list)
+        .singleElement()
+        .satisfies(
+            event -> {
+              assertThat(event.getFormattedMessage()).contains("invalid_grant");
+              assertThat(event.getFormattedMessage())
+                  .doesNotContain("forged")
+                  .doesNotContain("login succeeded")
+                  .doesNotContain("example.invalid");
+              assertThat(event.getFormattedMessage()).doesNotContain("\n");
+            });
   }
 
   private static OAuth2AuthenticationException oauth2(String errorCode) {

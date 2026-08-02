@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.service.UexFetchResults.fetched;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -96,7 +97,7 @@ class UexItemPriceSyncServiceTest {
 
   @Test
   void syncItemPrices_abortsWithoutSweep_whenFeedEmpty() {
-    when(uexClient.getItemPrices()).thenReturn(List.of());
+    when(uexClient.getItemPrices()).thenReturn(fetched(List.of()));
 
     service.syncItemPrices();
 
@@ -108,7 +109,8 @@ class UexItemPriceSyncServiceTest {
   void upsertsNewPrice_forKnownItemAndTerminal_thenRunsSweep() {
     GameItem item = gameItem();
     Terminal terminal = terminal();
-    when(uexClient.getItemPrices()).thenReturn(List.of(dto(1, 107, 15461.0, 0.0, 1778763945L)));
+    when(uexClient.getItemPrices())
+        .thenReturn(fetched(List.of(dto(1, 107, 15461.0, 0.0, 1778763945L))));
     when(gameItemRepository.findByUexItemId(1)).thenReturn(Optional.of(item));
     when(terminalRepository.findByIdTerminal(107)).thenReturn(Optional.of(terminal));
     when(gameItemPriceRepository.findByGameItemIdAndTerminalId(item.getId(), terminal.getId()))
@@ -142,7 +144,7 @@ class UexItemPriceSyncServiceTest {
     existing.setGameItem(item);
     existing.setTerminal(terminal);
     existing.setPriceBuy(99.0);
-    when(uexClient.getItemPrices()).thenReturn(List.of(dto(1, 107, 250.0, 300.0, 10L)));
+    when(uexClient.getItemPrices()).thenReturn(fetched(List.of(dto(1, 107, 250.0, 300.0, 10L))));
     when(gameItemRepository.findByUexItemId(1)).thenReturn(Optional.of(item));
     when(terminalRepository.findByIdTerminal(107)).thenReturn(Optional.of(terminal));
     when(gameItemPriceRepository.findByGameItemIdAndTerminalId(item.getId(), terminal.getId()))
@@ -160,7 +162,7 @@ class UexItemPriceSyncServiceTest {
 
   @Test
   void skipsUnknownItem_andDoesNotSweep_whenNothingProcessed() {
-    when(uexClient.getItemPrices()).thenReturn(List.of(dto(999, 107, 1.0, 2.0, 1L)));
+    when(uexClient.getItemPrices()).thenReturn(fetched(List.of(dto(999, 107, 1.0, 2.0, 1L))));
     when(gameItemRepository.findByUexItemId(999)).thenReturn(Optional.empty());
 
     service.syncItemPrices();
@@ -172,7 +174,7 @@ class UexItemPriceSyncServiceTest {
   @Test
   void skipsUnknownTerminal() {
     GameItem item = gameItem();
-    when(uexClient.getItemPrices()).thenReturn(List.of(dto(1, 555, 1.0, 2.0, 1L)));
+    when(uexClient.getItemPrices()).thenReturn(fetched(List.of(dto(1, 555, 1.0, 2.0, 1L))));
     when(gameItemRepository.findByUexItemId(1)).thenReturn(Optional.of(item));
     when(terminalRepository.findByIdTerminal(555)).thenReturn(Optional.empty());
 
@@ -211,10 +213,11 @@ class UexItemPriceSyncServiceTest {
     UUID id3 = UUID.randomUUID();
     when(uexClient.getItemPrices())
         .thenReturn(
-            List.of(
-                dto(1, 107, 10.0, 0.0, 1L),
-                dto(2, 108, 20.0, 0.0, 2L),
-                dto(3, 109, 30.0, 0.0, 3L)));
+            fetched(
+                List.of(
+                    dto(1, 107, 10.0, 0.0, 1L),
+                    dto(2, 108, 20.0, 0.0, 2L),
+                    dto(3, 109, 30.0, 0.0, 3L))));
     when(gameItemRepository.findByUexItemId(1)).thenReturn(Optional.of(item1));
     when(gameItemRepository.findByUexItemId(2)).thenReturn(Optional.of(item2));
     when(gameItemRepository.findByUexItemId(3)).thenReturn(Optional.of(item3));

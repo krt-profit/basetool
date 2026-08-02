@@ -4,19 +4,36 @@
   a PII-masked console + rolling text file + dedicated ERROR file in every profile, plus a structured
   JSON file in prod (logs/ingest.json) that Alloy ships to Loki via the same loki.source.file ->
   loki.process.app_json path as backend/frontend (epic #936, REQ-OBS-007). NEVER log tokens, names or
-  emails (REQ-OBS-004): the application code only ever logs the draft kind and the correlation id, and
-  the PiiMaskingPatternLayout / PiiMaskingLogstashEncoder scrub JWTs / e-mails / token keywords as a
-  safety net. The ingest gateway carries only the correlationId MDC field (no userId / orgUnitId — it
-  owns no per-user data).
+  emails (REQ-OBS-004): the application code only ever logs the draft kind, the correlation id and the
+  caller's Keycloak `sub` (a UUID, not PII), and the PiiMaskingPatternLayout /
+  PiiMaskingLogstashEncoder scrub JWTs / e-mails / token keywords as a safety net. The gateway carries
+  the correlationId and userId MDC fields but no orgUnitId — it relays drafts and owns no
+  squadron-scoped data (REQ-OBS-001). Logback's own faults are surfaced by the status listener
+  below, and the two async wrappers gate + drain as described at their definitions.
 -->
 <configuration>
+  <!--
+    Logback's own failures (a rollover that cannot rename, a full disk, an IO error that makes an
+    appender self-disable) are reported ONLY through the internal status system — never through the
+    appenders, which in that scenario are exactly what is broken. Without a status listener those
+    statuses are collected in memory and surface nowhere, so a dead FILE / ERROR_FILE appender
+    leaves no trace at all, while `logback_events_total` keeps counting: that metric is a
+    TurboFilter on the LOGGER, so it increments for events that were never written. The result is
+    LogbackErrorSpike firing while pointing at errors nobody can read.
+    OnErrorConsoleStatusListener reports WARN/ERROR statuses only (no startup INFO noise) and writes
+    them to System.err — the one sink that still works when the file appenders are dead, and one the
+    `<svc>-stdout` Loki stream already ships (ADR-0095). Keep it as the FIRST child of
+    <configuration> so faults raised while the remaining appenders are being built are reported too.
+  -->
+  <statusListener class="ch.qos.logback.core.status.OnErrorConsoleStatusListener"/>
+
   <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
   <property name="LOG_FILE" value="logs/ingest.log"/>
   <property name="LOG_ERROR_FILE" value="logs/ingest-error.log"/>
 
-  <property name="LOG_PATTERN_CONSOLE" value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr([%X{correlationId:-}]){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
-  <property name="LOG_PATTERN_FILE" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [%X{correlationId:-}] --- [%t] %-40.40logger{39} : %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
+  <property name="LOG_PATTERN_CONSOLE" value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr([%X{correlationId:-}]){magenta} %clr([%X{userId:-anonymous}]){blue} %clr([%X{traceId:-},%X{spanId:-}]){faint} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
+  <property name="LOG_PATTERN_FILE" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [%X{correlationId:-}] [%X{userId:-anonymous}] [%X{traceId:-},%X{spanId:-}] --- [%t] %-40.40logger{39} : %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
 
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
     <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
@@ -41,12 +58,13 @@
     </encoder>
   </appender>
 
-  <!-- Dedicated ERROR-only appender so support can scan incidents without the full INFO stream. -->
+  <!--
+    Dedicated ERROR-only appender so support can scan incidents without the full INFO stream. The
+    ERROR threshold filter lives on the ASYNC_ERROR_FILE wrapper below, not here — see the
+    rationale there.
+  -->
   <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
     <file>${LOG_ERROR_FILE}</file>
-    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-      <level>ERROR</level>
-    </filter>
     <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
       <fileNamePattern>logs/ingest-error.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
       <maxFileSize>20MB</maxFileSize>
@@ -65,16 +83,39 @@
     thread hands the formatted event to a bounded queue instead of blocking on file I/O / masking, a
     single worker drains it, and discardingThreshold=0 keeps every event (audit-trail integrity over
     throughput). CONSOLE stays synchronous so the last lines before a JVM crash flush deterministically.
+
+    maxFlushTime=5000 raises logback's 1s default drain budget on stop(): once it elapses the worker
+    exits and everything still queued is thrown away, so a shutdown triggered by the very failure we
+    want to read about could truncate up to a full queue of already-accepted events. 5s is enough to
+    drain a 512-slot queue to disk and stays far below the container's stop grace period (ADR-0072),
+    so it cannot turn a graceful stop into a SIGKILL.
   -->
   <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
     <queueSize>512</queueSize>
     <discardingThreshold>0</discardingThreshold>
+    <maxFlushTime>5000</maxFlushTime>
     <appender-ref ref="FILE"/>
   </appender>
 
   <appender name="ASYNC_ERROR_FILE" class="ch.qos.logback.classic.AsyncAppender">
+    <!--
+      The ERROR threshold gate sits on the async wrapper rather than on the inner
+      RollingFileAppender. Be precise about what this does and does not buy: with
+      discardingThreshold=0 nothing was ever DROPPED, so no event was lost under either arrangement
+      and the file content is identical. The win is where the gate runs. Logback evaluates an
+      appender's filter chain on the CALLING thread before handing the event to the appender, so a
+      non-ERROR event is now rejected before it is enqueued, instead of being copied into the queue
+      (with its MDC snapshot) only for the worker to discard it at write time. That also stops the
+      128-slot queue — deliberately sized for ERROR-only volume — from carrying the full INFO
+      stream, where a burst could fill it and backpressure request threads on events that were all
+      going to be thrown away anyway.
+    -->
+    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+      <level>ERROR</level>
+    </filter>
     <queueSize>128</queueSize>
     <discardingThreshold>0</discardingThreshold>
+    <maxFlushTime>5000</maxFlushTime>
     <appender-ref ref="ERROR_FILE"/>
   </appender>
 
@@ -82,7 +123,8 @@
     Structured JSON appender, prod only. Writes logs/ingest.json which Alloy tails via
     loki.source.file -> loki.process.app_json (the same path as backend/frontend), so the `level`
     field becomes a Loki label and ingest shows up on the "App errors & warnings" dashboard panel.
-    PiiMaskingLogstashEncoder preserves the MDC (correlationId + trace fields) as first-class JSON.
+    PiiMaskingLogstashEncoder preserves the MDC (correlationId, userId + trace fields) as first-class
+    JSON.
   -->
   <springProfile name="prod">
     <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
@@ -95,6 +137,7 @@
       </rollingPolicy>
       <encoder class="de.greluc.krt.profit.basetool.ingest.logging.PiiMaskingLogstashEncoder">
         <includeMdcKeyName>correlationId</includeMdcKeyName>
+        <includeMdcKeyName>userId</includeMdcKeyName>
         <!-- REQ-OBS-009 (epic #936 Phase 1b): trace correlation fields for the Grafana
              logs<->traces links. Meaningful only while tracing is
              enabled (MONITORING_TRACING_ENABLED=true); while disabled, at most dangling
@@ -109,6 +152,7 @@
     <appender name="ASYNC_JSON_FILE" class="ch.qos.logback.classic.AsyncAppender">
       <queueSize>512</queueSize>
       <discardingThreshold>0</discardingThreshold>
+      <maxFlushTime>5000</maxFlushTime>
       <appender-ref ref="JSON_FILE"/>
     </appender>
   </springProfile>

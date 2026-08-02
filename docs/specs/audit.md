@@ -1,6 +1,6 @@
 # Activity audit logs — Lager, Aufträge, Raffinerie, Mein Inventar
 
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-23.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-08-02.
 
 Area: `AUDIT` · Related: [`bank.md`](bank.md) (the bank's own audit trail, REQ-BANK-012),
 [`observability.md`](observability.md) (the log-stream PII rule), [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md).
@@ -91,10 +91,28 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   leadership-rank grant / change / revoke (Bereichsleitung, OL, SK-Lead and the squadron ranks
   Staffelleiter / Kommandoleiter / stellv. / Ensign); Grand Admiral designation / vacation
   (`ROLE_CHANGED` carrying a `grandAdmiral` boolean, REQ-ORG-021); Logistician / Mission-Manager
-  capability-flag changes; and Kommandogruppe create / rename+reorder / delete. For membership/rank events the
+  capability-flag changes; **role permission-set changes** (`ROLE_PERMISSIONS_CHANGED` — the admin
+  role editor's permission grid, previously the one mutation in this area that left no trace); and
+  Kommandogruppe create / rename+reorder / delete. For membership/rank events the
   subject is the org unit (its shorthand/name snapshot) and the affected user is the target
-  reference; for Kommandogruppe events the subject is the group (its name snapshot). The details
-  payload carries only the rank/kind enum names, the two flag booleans and the squadron label —
+  reference; for Kommandogruppe events the subject is the group (its name snapshot). For a
+  permission change the subject is the **role's stable `code`** carried as the subject *label* with a
+  `null` `subjectId`: `Role.id` is a `Long` while `AuditEvent.subjectId` is a `UUID`, so the code is
+  the only usable subject key. Its details payload renders
+  `added=… removed=… unknownAdded=N unknownRemoved=N`: the two named sides are filtered through the
+  closed `Permissions` vocabulary and rendered `-` when empty, and the two counts tally the changed
+  members that vocabulary cannot name. The write endpoint accepts a raw string set, so an
+  out-of-vocabulary value is still applied but **never named** — only counted — which keeps client
+  free text out of both the trail and the log line while making the case observable at all (before
+  2026-08 such a change produced an audit row reading `added=- removed=-`, indistinguishable from no
+  change). The counts are always emitted so the shape is stable and `unknownAdded>0` is greppable; a
+  value present on **both** sides of the edit is not counted, so leaving an out-of-vocabulary
+  permission in place does not report a phantom change. The vocabulary itself is **derived
+  reflectively** from the `Permissions` constants rather than hand-listed, so a new permission is
+  audited by name the moment it is declared — pinned by the `RoleServiceTest` parity test, which also
+  asserts every public constant in `Permissions` is a `String` whose value equals its field name.
+  The details payload carries only the rank/kind enum names, the two flag booleans and the squadron
+  label —
   never a user handle or free text (the group name is a non-personal structure label, like an order
   title). Account deletion by an admin records `USER_DELETED` here (REQ-DATA-008): the
   deletion mutates several audited areas at once, so this marker is written unconditionally and
@@ -169,7 +187,14 @@ Reference columns are plain UUIDs (no FKs) so audit rows **outlive** every refer
   locking landmine paths (book-out, handover, store, delete, completion, claim) record without a 409.
 - [ ] Non-admin access to `/api/v1/audit/**` and `/admin/audit-log`: 403; the sidebar link is hidden.
 
+A new event type is only half-wired until the viewer can filter for it: the per-area event-type list
+in `AdminAuditLogPageController.EVENT_TYPES_BY_DOMAIN` and the `admin.audit.event.<TYPE>` label in
+all three message bundles are the two mirror points, and `AdminAuditLogPageControllerTest` pins them
+by reading the `AuditEventDto.eventType` enum out of the committed `openapi.json` and asserting that
+**every** produced type is offered by one of the ten tabs *and* carries a label.
+
 **Enforced by:** `AuditServiceTest`, `AuditQueryIntegrationTest`, `AuditAdminControllerSecurityTest`,
+`RoleServiceTest`, `AdminAuditLogPageControllerTest`,
 per-domain emission assertions in the service tests · **Code:** `service/AuditService`,
 `model/AuditEvent`, `model/AuditDomain`, `model/AuditEventType`, `controller/AuditAdminController`,
 `db/migration/V179` · **Decision:** [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md)

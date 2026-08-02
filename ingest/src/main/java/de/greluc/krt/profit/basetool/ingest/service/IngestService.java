@@ -20,12 +20,15 @@
 package de.greluc.krt.profit.basetool.ingest.service;
 
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
+import de.greluc.krt.profit.basetool.ingest.logging.LogSafe;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.model.dto.HandoffKind;
 import de.greluc.krt.profit.basetool.ingest.model.dto.IngestResponseDto;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractDto;
+import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractOrderDto;
 import de.greluc.krt.profit.basetool.ingest.ratelimit.SubjectRateLimiter;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -41,6 +44,9 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class IngestService {
+
+  /** Cap on a logged provenance string, so a padded {@code tool} field cannot bloat a log line. */
+  private static final int MAX_LOGGED_PROVENANCE = 60;
 
   private final BackendImportClient backendImportClient;
   private final HandoffStagingService handoffStagingService;
@@ -68,11 +74,46 @@ public class IngestService {
     // backend import endpoints. Checked before the backend relay so an over-budget caller is
     // rejected without forwarding.
     subjectRateLimiter.requireWithinLimit(sub);
+    logAcceptedExtract(extract);
     String draftJson =
         backendImportClient.forwardRefineryExtract(bearer, acceptLanguage, correlationId, extract);
     String handoffId = handoffStagingService.stage(sub, HandoffKind.REFINERY, draftJson);
     countHandoff(HandoffKind.REFINERY);
     return response(handoffId, HandoffKind.REFINERY, ingestProperties.getRefineryPath());
+  }
+
+  /**
+   * Records the <em>shape</em> of an accepted extract before it is relayed: the contract version,
+   * the producing tool, and how many orders / goods rows / source images it carries. Without this
+   * line an extractor that sends a structurally odd payload (a v2 envelope, zero goods, fifty
+   * stitched images) is indistinguishable in the log from a normal send — the gateway itself
+   * interprets nothing, so the counts are the only handle on "what did the client actually push?".
+   *
+   * <p>No screen read and no material name is logged: only counts, the numeric schema version and
+   * the provenance strings, and those go through {@link LogSafe} because they are client-supplied
+   * free text that could otherwise forge a second log line.
+   *
+   * @param extract the validated extract about to be forwarded
+   */
+  private void logAcceptedExtract(@NotNull RefineryExtractDto extract) {
+    if (!log.isInfoEnabled()) {
+      return;
+    }
+    List<RefineryExtractOrderDto> orders = extract.orders() == null ? List.of() : extract.orders();
+    int goods = 0;
+    int images = 0;
+    for (RefineryExtractOrderDto order : orders) {
+      goods += order.goods() == null ? 0 : order.goods().size();
+      images += order.sourceImages() == null ? 0 : order.sourceImages().size();
+    }
+    log.info(
+        "Relaying refinery extract (schemaVersion={}, tool={}/{}, orders={}, goods={}, images={})",
+        extract.schemaVersion(),
+        LogSafe.text(extract.tool(), MAX_LOGGED_PROVENANCE),
+        LogSafe.text(extract.toolVersion(), MAX_LOGGED_PROVENANCE),
+        orders.size(),
+        goods,
+        images);
   }
 
   /**
@@ -94,6 +135,9 @@ public class IngestService {
       byte @NotNull [] blueprintJson) {
     // Per-subject throttle (REQ-INGEST-005); see ingestRefinery for the rationale.
     subjectRateLimiter.requireWithinLimit(sub);
+    // The export is opaque to the gateway, so its size is the only shape there is to record — and
+    // it is what separates "the extractor sent an empty file" from a genuine backend reject.
+    log.info("Relaying blueprint export ({} bytes)", blueprintJson.length);
     String draftJson =
         backendImportClient.forwardBlueprintPreview(
             bearer, acceptLanguage, correlationId, blueprintJson);

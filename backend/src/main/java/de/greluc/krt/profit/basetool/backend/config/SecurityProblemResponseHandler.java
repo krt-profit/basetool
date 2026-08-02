@@ -28,7 +28,10 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
@@ -55,6 +58,17 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  * <p>Because the security chain runs before {@code CorrelationIdFilter}, no request-scoped
  * correlation id exists yet; {@code GlobalExceptionHandler} mints a fresh one for the body and the
  * log line, so a client-reported 401/403 is still traceable to a single server log entry.
+ *
+ * <p>The same ordering also leaves the {@code userId} MDC key unset, and {@code
+ * CorrelationIdFilter} is its only writer in the backend. A filter-level 403 (URL-matrix denial)
+ * would therefore render as the logback pattern's {@code anonymous} default even though the {@link
+ * SecurityContextHolder} already holds the caller's {@link JwtAuthenticationToken} — while a
+ * controller-thrown {@code AccessDeniedException} renders the real {@code sub} in a byte-identical
+ * line. That makes the value actively misleading, so {@link #delegate} stamps the {@code sub} for
+ * the duration of the rejection write using the same own-then-remove discipline as the correlation
+ * id. It stays unset when there is no {@link JwtAuthenticationToken}, so a genuine anonymous 401
+ * still reads {@code anonymous} truthfully. Only the {@code sub} is stamped, never the callsign or
+ * e-mail (REQ-OBS-004).
  */
 @Slf4j
 @Component
@@ -63,6 +77,14 @@ public class SecurityProblemResponseHandler
 
   /** SLF4J MDC key the correlation-id filter uses; also read by {@code GlobalExceptionHandler}. */
   private static final String MDC_CORRELATION_ID = "correlationId";
+
+  /**
+   * SLF4J MDC key the logback pattern renders as {@code [<userId>]}, mirroring {@code
+   * LoggingProperties}' default. Hardcoded rather than injected for the same reason {@link
+   * #MDC_CORRELATION_ID} is: it is a wire constant shared with the logback pattern, not a
+   * per-deployment override.
+   */
+  private static final String MDC_USER_ID = "userId";
 
   /** App-wide correlation-id response header, mirroring {@code LoggingProperties} default. */
   private static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
@@ -127,6 +149,11 @@ public class SecurityProblemResponseHandler
    * (never expected: {@code GlobalExceptionHandler} covers both {@link AuthenticationException} and
    * {@link AccessDeniedException}) or the response is already committed.
    *
+   * <p>Owns the {@code correlationId} and {@code userId} MDC keys for the duration of the write —
+   * minting the former and stamping the JWT {@code sub} into the latter when nothing populated them
+   * yet — and removes exactly the keys it added, so nothing bleeds into the next request on a
+   * pooled or virtual thread.
+   *
    * @param request the rejected request
    * @param response the response to write into
    * @param ex the security exception to map to a problem response
@@ -149,6 +176,10 @@ public class SecurityProblemResponseHandler
       MDC.put(MDC_CORRELATION_ID, correlationId);
       mdcOwned = true;
     }
+    // Same reasoning, same discipline for userId: CorrelationIdFilter is its only other writer and
+    // it never runs on a rejected request, so without this the rejection line claims 'anonymous'
+    // for a caller whose sub the SecurityContextHolder is holding right now.
+    boolean userIdOwned = stampAuthenticatedSub();
     try {
       response.setHeader(CORRELATION_ID_HEADER, correlationId);
       if (resolver.resolveException(request, response, null, ex) == null) {
@@ -164,6 +195,40 @@ public class SecurityProblemResponseHandler
       if (mdcOwned) {
         MDC.remove(MDC_CORRELATION_ID);
       }
+      if (userIdOwned) {
+        MDC.remove(MDC_USER_ID);
+      }
     }
+  }
+
+  /**
+   * Puts the current {@link JwtAuthenticationToken}'s {@code sub} claim into the {@code userId} MDC
+   * key, unless something already populated that key (then the existing value wins, exactly as the
+   * correlation id above) or the caller is not JWT-authenticated (then the key stays unset so the
+   * logback pattern's {@code anonymous} default is the truth rather than a cover-up).
+   *
+   * <p>Deliberately duplicated in {@code PendingApprovalAccessFilter} instead of extracted into the
+   * {@code logging} package: {@code logging.CorrelationIdFilter} already depends on {@code
+   * config.LoggingProperties}, so a {@code config -> logging} helper call would close a package
+   * cycle (ADR-0047).
+   *
+   * @return {@code true} when this call stamped the key and must therefore remove it again, {@code
+   *     false} when nothing was stamped
+   */
+  private static boolean stampAuthenticatedSub() {
+    String existing = MDC.get(MDC_USER_ID);
+    if (existing != null && !existing.isBlank()) {
+      return false;
+    }
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (!(auth instanceof JwtAuthenticationToken jwtAuth)) {
+      return false;
+    }
+    String sub = jwtAuth.getToken().getSubject();
+    if (sub == null || sub.isBlank()) {
+      return false;
+    }
+    MDC.put(MDC_USER_ID, sub);
+    return true;
   }
 }

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -29,21 +30,31 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.AppenderBase;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.context.MessageSource;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import tools.jackson.databind.json.JsonMapper;
 
 /** Unit tests for {@link PendingApprovalAccessFilter} (PR review #1: REQ-SEC-017 backend gate). */
@@ -71,6 +82,7 @@ class PendingApprovalAccessFilterTest {
   @AfterEach
   void clear() {
     SecurityContextHolder.clearContext();
+    MDC.clear();
   }
 
   private void authenticateWith(String... authorities) {
@@ -188,5 +200,125 @@ class PendingApprovalAccessFilterTest {
                 MetricNames.TAG_CODE,
                 PendingApprovalAccessFilter.CODE_PENDING_APPROVAL)
             .count());
+  }
+
+  /** Authenticates with a pending-approval bearer token carrying {@code sub}. */
+  private void authenticateWithPendingJwt(String sub) {
+    Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject(sub).build();
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new JwtAuthenticationToken(
+                jwt,
+                List.of(
+                    new SimpleGrantedAuthority(PendingApprovalAccessFilter.PENDING_AUTHORITY))));
+  }
+
+  /**
+   * One captured log event: its level, its formatted message and the {@code userId} MDC value as it
+   * stood at the moment the appender ran.
+   *
+   * @param level the event's level
+   * @param message the fully formatted message
+   * @param userId the MDC {@code userId} at append time; {@code null} when the key was unset
+   */
+  private record CapturedEvent(Level level, String message, String userId) {}
+
+  /**
+   * Records the {@code userId} MDC value as it stands <em>at append time</em>, which is the only
+   * point where the logback pattern would read it. {@code ILoggingEvent.getMDCPropertyMap()}
+   * resolves lazily, so inspecting it after the filter's {@code finally} has removed the key would
+   * observe the post-removal state and silently pass whatever the filter did.
+   */
+  private static final class UserIdCapturingAppender extends AppenderBase<ILoggingEvent> {
+
+    /** Every accepted event, in arrival order. */
+    private final List<CapturedEvent> events = new ArrayList<>();
+
+    @Override
+    protected void append(ILoggingEvent event) {
+      events.add(
+          new CapturedEvent(
+              event.getLevel(),
+              event.getFormattedMessage(),
+              MDC.get(PendingApprovalAccessFilter.MDC_USER_ID)));
+    }
+
+    /**
+     * Returns the MDC {@code userId} recorded for the first DEBUG event whose message contains
+     * {@code needle}.
+     *
+     * @param needle substring identifying the wanted log line
+     * @return the recorded value, possibly {@code null} when the key was unset
+     * @throws AssertionError when no matching DEBUG event was captured
+     */
+    private String userIdOf(String needle) {
+      return events.stream()
+          .filter(e -> Level.DEBUG.equals(e.level()) && e.message().contains(needle))
+          .findFirst()
+          .orElseThrow(() -> new AssertionError("no DEBUG event containing: " + needle))
+          .userId();
+    }
+  }
+
+  /**
+   * Runs the filter against a blocked API write with a DEBUG-level capturing appender attached.
+   *
+   * @return the appender holding the captured events
+   */
+  private UserIdCapturingAppender runBlockedWithCapture() throws Exception {
+    Logger logger = (Logger) LoggerFactory.getLogger(PendingApprovalAccessFilter.class);
+    Level original = logger.getLevel();
+    UserIdCapturingAppender appender = new UserIdCapturingAppender();
+    appender.start();
+    logger.addAppender(appender);
+    logger.setLevel(Level.DEBUG);
+    try {
+      run("POST", "/api/v1/inventory", mock(FilterChain.class));
+    } finally {
+      logger.setLevel(original);
+      logger.detachAppender(appender);
+    }
+    return appender;
+  }
+
+  /**
+   * The block line must name the blocked caller. {@code CorrelationIdFilter} is the backend's only
+   * other {@code userId} writer and it never runs on a request this filter rejects, so without the
+   * stamping the line would print the pattern's {@code anonymous} default for a caller who is
+   * demonstrably authenticated.
+   */
+  @Test
+  void pendingUser_isForbidden_stampsSubIntoUserIdMdcWhileLogging() throws Exception {
+    String sub = "6a1f2c9e-0000-4000-8000-00000000abcd";
+    authenticateWithPendingJwt(sub);
+
+    UserIdCapturingAppender appender = runBlockedWithCapture();
+
+    assertEquals(
+        sub,
+        appender.userIdOf("Pending-approval user blocked"),
+        "the block line must carry the caller's sub, not 'anonymous'");
+  }
+
+  @Test
+  void pendingUser_isForbidden_removesTheStampedUserIdAfterwards() throws Exception {
+    authenticateWithPendingJwt("6a1f2c9e-0000-4000-8000-00000000abcd");
+
+    run("POST", "/api/v1/inventory", mock(FilterChain.class));
+
+    assertNull(
+        MDC.get(PendingApprovalAccessFilter.MDC_USER_ID),
+        "own-then-remove: nothing may bleed into the next request on a pooled thread");
+  }
+
+  @Test
+  void pendingUser_withoutABearerToken_leavesUserIdUnset() throws Exception {
+    // REQ-OBS-004: there is no sub to stamp here, and the principal name is the callsign — so the
+    // key stays unset and the pattern's 'anonymous' default remains the truthful rendering.
+    authenticateWith(PendingApprovalAccessFilter.PENDING_AUTHORITY);
+
+    UserIdCapturingAppender appender = runBlockedWithCapture();
+
+    assertNull(appender.userIdOf("Pending-approval user blocked"));
   }
 }

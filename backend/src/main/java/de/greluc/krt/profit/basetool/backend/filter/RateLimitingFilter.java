@@ -82,12 +82,22 @@ import tools.jackson.core.io.JsonStringEncoder;
  *
  * <p>{@code X-Forwarded-For} is only honored when the immediate peer is listed in {@code
  * app.rate-limit.trusted-proxies}; blanket trust (the literal {@code "*"}) is explicitly rejected
- * because it would let any client spoof the header and get a fresh bucket per request. Rejected
- * requests get a 429 with an RFC&nbsp;7807 body and rate-limit headers ({@code X-Rate-Limit-Limit},
- * {@code X-Rate-Limit-Remaining}, {@code X-Rate-Limit-Retry-After-Seconds}). The body mirrors
- * GlobalExceptionHandler's contract: a stable {@code code} of {@code RATE_LIMIT_EXCEEDED}, a
- * per-response {@code correlationId} (also logged) for traceability, and a {@code title}/{@code
- * detail} localized from the request's {@code Accept-Language} rather than hardcoded English.
+ * because it would let any client spoof the header and get a fresh bucket per request. Which of the
+ * two branches produced the bucket key is carried as {@link KeySource} on the {@link ClientKey} and
+ * exported both as the {@code key_source} tag of the rejection counter and as {@code keySource=} in
+ * the DEBUG line — never the address itself. That is what makes a 429 spike readable: {@code peer}
+ * keys behind the edge mean the trusted-proxy list drifted and every user collapsed onto one shared
+ * budget (the 2026-07-06 recurrence), {@code forwarded} keys mean individual callers tripped their
+ * own. The 429 short-circuits before {@code RequestLoggingFilter}, so there is no access-log line
+ * to fall back on. Logging the raw client IP instead is not an option: it is PII the backend stdout
+ * stream's 744h retention is explicitly predicated on never carrying (REQ-OBS-004).
+ *
+ * <p>Rejected requests get a 429 with an RFC&nbsp;7807 body and rate-limit headers ({@code
+ * X-Rate-Limit-Limit}, {@code X-Rate-Limit-Remaining}, {@code X-Rate-Limit-Retry-After-Seconds}).
+ * The body mirrors GlobalExceptionHandler's contract: a stable {@code code} of {@code
+ * RATE_LIMIT_EXCEEDED}, a per-response {@code correlationId} (also logged) for traceability, and a
+ * {@code title}/{@code detail} localized from the request's {@code Accept-Language} rather than
+ * hardcoded English.
  */
 @Slf4j
 public class RateLimitingFilter extends OncePerRequestFilter {
@@ -123,7 +133,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    * idle-expiry, 100 000 entries max). Both properties classes carry the validated
    * {@code @ConfigurationProperties} values pulled from {@code application.yml}. The trusted-proxy
    * list is compiled into {@link IpAddressMatcher} instances once during construction so that the
-   * per-request {@link #resolveClientIp} hot path no longer allocates a fresh matcher (and
+   * per-request {@link #resolveClientKey} hot path no longer allocates a fresh matcher (and
    * re-parses the CIDR / IP literal) on every call. Malformed entries are logged once here and
    * dropped from the cached list, exactly as the previous per-request path did. Every configured
    * rate-limit pattern is likewise compiled and validated here via {@link
@@ -280,7 +290,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
 
-    String clientIp = resolveClientIp(request);
+    ClientKey clientKey = resolveClientKey(request);
     List<BucketSlot> slots = resolveSlots(request);
     if (slots.isEmpty()) {
       // The umbrella {@code paths} match was confirmed by {@link #shouldNotFilter}; if no slots
@@ -298,7 +308,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     int tightestLimit = Integer.MAX_VALUE;
     long tightestRemaining = Long.MAX_VALUE;
     for (BucketSlot slot : slots) {
-      Bucket bucket = bucketCache.get(clientIp + "|" + slot.key(), k -> createNewBucket(slot));
+      Bucket bucket =
+          bucketCache.get(clientKey.key() + "|" + slot.key(), k -> createNewBucket(slot));
       ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
       // Per-bucket evaluation counter (#1041 item 19) — every attempt, consumed or not, so
       // rejections/requests yields a rejection ratio rather than 429-only detection.
@@ -306,12 +317,18 @@ public class RateLimitingFilter extends OncePerRequestFilter {
           .counter(MetricNames.RATELIMIT_REQUESTS, MetricNames.TAG_BUCKET, bucketLabel(slot.key()))
           .increment();
       if (!probe.isConsumed()) {
-        // Per-bucket 429 rejection counter (REQ-OBS-011). The label is the bounded rule name
-        // (or `global` for the umbrella path budget) derived from the slot key — never the client
-        // IP or the request URI, both unbounded/PII.
+        // Per-bucket 429 rejection counter (REQ-OBS-011). Both labels are bounded: the rule name
+        // (or `global` for the umbrella path budget) derived from the slot key, and the two-valued
+        // key source. Never the client IP or the request URI, both unbounded/PII. Without
+        // key_source a 429 spike cannot be told apart — one abusive caller looks exactly like a
+        // trusted-proxies drift that collapsed every user onto a single shared budget.
         meterRegistry
             .counter(
-                MetricNames.RATELIMIT_REJECTIONS, MetricNames.TAG_BUCKET, bucketLabel(slot.key()))
+                MetricNames.RATELIMIT_REJECTIONS,
+                MetricNames.TAG_BUCKET,
+                bucketLabel(slot.key()),
+                MetricNames.TAG_KEY_SOURCE,
+                clientKey.source().label())
             .increment();
         long nanosToWait = probe.getNanosToWaitForRefill();
         long secondsToWait = (long) Math.ceil(nanosToWait / 1_000_000_000.0);
@@ -319,9 +336,14 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         // exists yet. Mint one here and thread it through both the log line and the response body
         // so a user reporting a 429 can be traced to this exact log entry.
         String correlationId = UUID.randomUUID().toString();
+        // keySource, never the address: the raw client IP is PII this log stream must not carry
+        // (REQ-OBS-004), and the branch that produced the key is the part that is actually
+        // diagnostic. Stays at DEBUG — the global bucket is anonymous-reachable, so an attacker
+        // could otherwise flood the log at will.
         log.debug(
-            "Rate limit exceeded: ip={}, slot={}, path={}, retryAfterSeconds={}, correlationId={}",
-            clientIp,
+            "Rate limit exceeded: keySource={}, slot={}, path={}, retryAfterSeconds={},"
+                + " correlationId={}",
+            clientKey.source().label(),
             slot.key(),
             request.getRequestURI(),
             secondsToWait,
@@ -460,18 +482,26 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Resolves the rate-limit key for the incoming request. {@code X-Forwarded-For} is only honored
-   * when the immediate peer ({@code request.getRemoteAddr()}) matches one of the trusted-proxy
-   * matchers compiled at filter construction; the literal {@code "*"} is intentionally NOT a valid
-   * trust value, since blanket trust lets any client spoof the header and obtain a fresh bucket per
-   * request.
+   * Resolves the rate-limit key for the incoming request <em>together with the branch that produced
+   * it</em>. {@code X-Forwarded-For} is only honored when the immediate peer ({@code
+   * request.getRemoteAddr()}) matches one of the trusted-proxy matchers compiled at filter
+   * construction; the literal {@code "*"} is intentionally NOT a valid trust value, since blanket
+   * trust lets any client spoof the header and obtain a fresh bucket per request.
+   *
+   * <p>The branch is returned rather than discarded because it is the only thing that makes a 429
+   * spike interpretable without logging the address: {@link KeySource#PEER} behind a reverse proxy
+   * means every client shares one bucket, {@link KeySource#FORWARDED} means per-client bucketing
+   * works as designed.
    *
    * <p>Audit finding H-8: each trusted-proxies entry may be either an exact IP ({@code 172.17.0.1})
    * or a CIDR range ({@code 172.17.0.0/16}). Matching delegates to Spring Security's {@link
    * IpAddressMatcher} so docker-network ranges (typically {@code 172.17.0.0/16}, {@code
    * 10.0.0.0/8}, etc.) can be configured without enumerating every proxy IP individually.
+   *
+   * @param request the request whose bucket key is being derived
+   * @return the bucket key plus the branch it came from; never {@code null}
    */
-  private String resolveClientIp(HttpServletRequest request) {
+  private ClientKey resolveClientKey(HttpServletRequest request) {
     String remoteAddr = request.getRemoteAddr();
     boolean isTrusted = false;
     for (IpAddressMatcher matcher : trustedProxyMatchers) {
@@ -486,11 +516,17 @@ public class RateLimitingFilter extends OncePerRequestFilter {
       if (xff != null && !xff.isBlank()) {
         // First IP in the list is the original client
         int idx = xff.indexOf(',');
-        return idx > 0 ? xff.substring(0, idx).trim() : xff.trim();
+        String forwarded = idx > 0 ? xff.substring(0, idx).trim() : xff.trim();
+        // A header whose first element is empty (e.g. " , 1.2.3.4") would otherwise key every such
+        // request on the empty string AND report `forwarded`, i.e. hide the very collapse this tag
+        // exists to expose. Fall through to the peer address, which is always present.
+        if (!forwarded.isEmpty()) {
+          return new ClientKey(forwarded, KeySource.FORWARDED);
+        }
       }
     }
 
-    return remoteAddr;
+    return new ClientKey(remoteAddr, KeySource.PEER);
   }
 
   private String firstMatchingPattern(PathContainer parsedPath, List<String> patterns) {
@@ -613,6 +649,58 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    * @param refillPeriod time window for the {@link #refillTokens()} refill
    */
   private record BucketSlot(String key, int capacity, int refillTokens, Duration refillPeriod) {}
+
+  /**
+   * The resolved rate-limit identity of one request: the bucket-key prefix and the branch of {@link
+   * #resolveClientKey} that produced it.
+   *
+   * <p>Keeping the two together is the point — {@link #key()} is a client IP and therefore must
+   * never leave this filter (REQ-OBS-004), while {@link #source()} is a two-valued, bounded label
+   * that is safe to log and to export as a metric tag. Splitting them at the resolution site makes
+   * it hard to accidentally log the address while reaching for the diagnosis.
+   *
+   * @param key the bucket-key prefix (the client address); never logged or exported
+   * @param source which branch produced {@code key}
+   */
+  private record ClientKey(String key, KeySource source) {}
+
+  /**
+   * Where a {@link ClientKey#key()} came from. Exactly two values, so it is safe as a metric tag
+   * (REQ-OBS-006) and readable in a log line without exposing an address.
+   */
+  private enum KeySource {
+
+    /** The key is the first entry of a trusted proxy's {@code X-Forwarded-For} header. */
+    FORWARDED(MetricNames.KEY_SOURCE_FORWARDED),
+
+    /**
+     * The key is the immediate peer address, because the peer is not a trusted proxy or sent no
+     * usable {@code X-Forwarded-For}. Sustained rejections on this value behind a reverse proxy
+     * mean every client shares one bucket.
+     */
+    PEER(MetricNames.KEY_SOURCE_PEER);
+
+    private final String label;
+
+    /**
+     * Binds the constant to the wire label shared by the metric tag and the log line.
+     *
+     * @param label the {@code MetricNames} literal exported for this branch
+     */
+    KeySource(String label) {
+      this.label = label;
+    }
+
+    /**
+     * Returns the wire label ({@code forwarded} / {@code peer}) used both as the {@code key_source}
+     * metric tag value and in the 429 DEBUG line, so dashboards and logs agree on the spelling.
+     *
+     * @return the bounded label literal
+     */
+    String label() {
+      return label;
+    }
+  }
 
   /**
    * Reduces a {@link BucketSlot#key()} to the bounded {@code bucket} metric label. A {@code

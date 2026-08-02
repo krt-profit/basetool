@@ -39,6 +39,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.AuthenticationServiceException;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -155,6 +156,89 @@ class IdentityProviderUnavailableFilterTest {
 
     assertEquals(200, response.getStatus());
     verify(chain).doFilter(any(), any());
+    assertEquals(0.0, serviceUnavailableCount());
+  }
+
+  @Test
+  void keycloak4xx_isNotTreatedAsAnOutage() throws Exception {
+    // Only an upstream 5xx means "Keycloak is unwell". A 4xx from the JWKS endpoint is a
+    // configuration problem, and silently turning it into a retryable 503 would tell every client
+    // to keep retrying a request that can never succeed.
+    FilterChain chain =
+        (req, res) -> {
+          throw new AuthenticationServiceException(
+              "decode failed", new HttpClientErrorException(HttpStatus.NOT_FOUND));
+        };
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", URI);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    assertThrows(
+        AuthenticationServiceException.class, () -> filter.doFilter(request, response, chain));
+    assertEquals(0.0, serviceUnavailableCount());
+  }
+
+  @Test
+  void selfReferentialCauseChain_doesNotSpin() {
+    // A cause that points at itself would loop forever without the guard; the bounded walk must
+    // simply give up and rethrow.
+    RuntimeException looping =
+        new RuntimeException("looping") {
+          private static final long serialVersionUID = 1L;
+
+          @Override
+          public synchronized Throwable getCause() {
+            return this;
+          }
+        };
+    FilterChain chain =
+        (req, res) -> {
+          throw new AuthenticationServiceException("decode failed", looping);
+        };
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", URI);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    assertThrows(
+        AuthenticationServiceException.class, () -> filter.doFilter(request, response, chain));
+    assertEquals(0.0, serviceUnavailableCount());
+  }
+
+  @Test
+  void deeplyNestedTransportCauseBeyondTheWalkBound_isRethrownRatherThanMisclassified() {
+    // The walk is bounded at 12 links; a transport cause buried deeper is not found, and rethrowing
+    // (rather than guessing) keeps the classification honest.
+    Throwable cause = new SocketTimeoutException("Read timed out");
+    for (int i = 0; i < 20; i++) {
+      cause = new IllegalStateException("layer " + i, cause);
+    }
+    Throwable deep = cause;
+    FilterChain chain =
+        (req, res) -> {
+          throw new AuthenticationServiceException("decode failed", deep);
+        };
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", URI);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    assertThrows(
+        AuthenticationServiceException.class, () -> filter.doFilter(request, response, chain));
+    assertEquals(0.0, serviceUnavailableCount());
+  }
+
+  @Test
+  void alreadyCommittedResponse_isRethrownInsteadOfRewritten() throws Exception {
+    // Once bytes are on the wire the 503 body cannot be written any more; rethrowing lets the
+    // container abort the response rather than appending a second, corrupt document.
+    FilterChain chain =
+        (req, res) -> {
+          ((MockHttpServletResponse) res).setCommitted(true);
+          throw new AuthenticationServiceException(
+              "decode failed", new SocketTimeoutException("Read timed out"));
+        };
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", URI);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    assertThrows(
+        AuthenticationServiceException.class, () -> filter.doFilter(request, response, chain));
+    assertEquals("", response.getContentAsString());
     assertEquals(0.0, serviceUnavailableCount());
   }
 }

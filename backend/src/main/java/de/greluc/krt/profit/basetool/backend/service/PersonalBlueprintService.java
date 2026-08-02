@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintUpdateRe
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
+import de.greluc.krt.profit.basetool.backend.support.LogSafe;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.HashSet;
@@ -280,7 +281,13 @@ public class PersonalBlueprintService {
   public PersonalBlueprintResponse addForUser(
       @NotNull String targetSub, @NotNull PersonalBlueprintCreateRequest request) {
     PersonalBlueprintResponse response = add(targetSub, request);
-    log.info("Admin added blueprint productKey='{}' ownerSub={}", request.productKey(), targetSub);
+    // The raw, client-supplied key — not the resolved product's — so it goes through LogSafe: a
+    // member could otherwise paste a newline plus a fake log prefix and forge a second line
+    // (CWE-117). 255 mirrors the column and the DTO's @Size.
+    log.info(
+        "Admin added blueprint productKey='{}' ownerSub={}",
+        LogSafe.text(request.productKey(), 255),
+        targetSub);
     return response;
   }
 

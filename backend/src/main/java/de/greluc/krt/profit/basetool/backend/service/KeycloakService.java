@@ -338,10 +338,13 @@ public class KeycloakService {
    * matches are queried, using Keycloak's own casing. This mirrors the interactive JWT path (which
    * maps via {@code findByNameIgnoreCase}) and removes the scheduled-vs-interactive casing
    * asymmetry: Keycloak's {@code /roles/{name}/users} lookup is case-sensitive, so passing a
-   * differently-cased local name straight through would silently miss the role. Local-only roles
-   * such as the {@code Guest} fallback, and ubiquitous default/technical realm roles ({@code
-   * default-roles-*}, {@code offline_access}, {@code uma_authorization}), are not in the app's
-   * mappable set and are therefore never queried (no wasteful full-membership page walk).
+   * differently-cased local name straight through would silently miss the role. Ubiquitous
+   * default/technical realm roles ({@code default-roles-*}, {@code offline_access}, {@code
+   * uma_authorization}) are not in the app's mappable set and are therefore never queried (no
+   * wasteful full-membership page walk). The mappable set <em>does</em> contain the app's
+   * local-only roles — the seeded {@code Guest} fallback in particular — because it is simply the
+   * local catalog's names; they find no realm counterpart, which is expected and must not be
+   * reported as an anomaly (see the intersection logging below).
    *
    * @param appRoleNames the realm role names to index; never {@code null}.
    * @param token a valid admin access token.
@@ -362,11 +365,36 @@ public class KeycloakService {
     if (canonicalByLower.isEmpty()) {
       return byUser;
     }
-    for (String keycloakRoleName : fetchRealmRoleNames(token)) {
+    List<String> realmRoleNames = fetchRealmRoleNames(token);
+    int matched = 0;
+    for (String keycloakRoleName : realmRoleNames) {
       String canonical = canonicalByLower.get(keycloakRoleName.toLowerCase(Locale.ROOT));
       if (canonical != null) {
+        matched++;
         accumulateRoleMembers(keycloakRoleName, canonical, token, byUser);
       }
+    }
+    // Which of the app's roles the realm actually still knows is the input every downstream role
+    // decision rests on, and it used to be invisible: a renamed realm role simply stops matching
+    // here, the run still "succeeds", and every holder quietly falls through to the Guest fallback.
+    // Counts only (role names are structural, but the numbers are what a dashboard needs).
+    log.info(
+        "Keycloak role index: {} of {} mappable app roles matched a realm role ({} realm roles"
+            + " listed), {} users carry at least one.",
+        matched,
+        canonicalByLower.size(),
+        realmRoleNames.size(),
+        byUser.size());
+    // Not a per-role "missing from the realm" warning: the local catalog deliberately contains
+    // local-only roles (the seeded `Guest` fallback), so an unmatched app role is NOT by itself an
+    // anomaly and warning per role would fire on every single run. Only the degenerate case — the
+    // realm matching NONE of the app's roles, which re-maps the entire user base onto Guest — is
+    // unambiguous enough to warn about.
+    if (matched == 0) {
+      log.warn(
+          "Keycloak role index: none of the {} mappable app roles matched a realm role; every"
+              + " account would be re-mapped onto the local Guest fallback.",
+          canonicalByLower.size());
     }
     return byUser;
   }

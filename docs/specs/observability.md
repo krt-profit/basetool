@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-06.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-08-02.
 > **Owner area:** OBS · **Related:** [`security-and-access.md`](security-and-access.md), [`org-unit-tenancy.md`](org-unit-tenancy.md), [ADR-0072](../adr/0072-monitoring-stack-prometheus-grafana.md), [ADR-0095](../adr/0095-ship-app-container-stdout-to-loki.md), monitoring epic [#936](https://github.com/krt-profit/basetool/issues/936)
 
 # Observability & logging
@@ -19,8 +19,19 @@ The backend and frontend emit one access-log line per request and enrich every l
 fields `correlationId`, `userId`, and `orgUnitId` (the last per
 [`org-unit-tenancy.md`](org-unit-tenancy.md) REQ-ORG-007). Logback patterns must include
 `%X{orgUnitId}` to keep audit trails intact. The ingest gateway emits the same
-one-line-per-request access log (`RequestLoggingFilter`, scoped to `/v1`) but carries only the
-`correlationId` MDC field — it owns no per-user data (REQ-OBS-003).
+one-line-per-request access log (`RequestLoggingFilter`, scoped to `/v1`) and carries
+`correlationId` **and `userId`**, but no `orgUnitId` — it relays drafts and owns no
+squadron-scoped data, so that field would be permanently empty.
+
+The gateway's `userId` is populated in two steps, because its `CorrelationIdFilter` deliberately
+runs **before** Spring Security so the bot-protection, size-cap and rate-limit filters are already
+correlation-tagged. That filter seeds `userId=anonymous` and owns the MDC lifecycle (it is the only
+place both keys are removed, which is what prevents bleed-through on a pooled or virtual thread);
+`UserIdMdcFilter`, installed inside the security chain right after `BearerTokenAuthenticationFilter`,
+then overwrites the seed with the caller's JWT `sub` and deliberately does **not** clear it, so the
+subject survives into the access-log line emitted after the security chain has unwound. Pre-auth
+rejections (413 / 429 / bot 404) therefore log `anonymous`, which is accurate — at that point no
+caller has been authenticated.
 
 A relayed backend failure is logged **exactly once, at the level its status warrants.** The
 frontend's `BackendApiClient` boundary logs every backend error once — a 5xx server fault at
@@ -62,8 +73,71 @@ a genuinely malformed id on a real navigation (e.g. a truncated pasted link, no 
 `400` + `WARN` signal, as does every non-UUID type mismatch. The rejected parameter value itself is
 never logged at any level (REQ-OBS-004: it may carry PII).
 
+**A scheduled job run is one correlated unit.** A scheduler thread carries no request, so
+`CorrelationIdFilter` never runs for it and every line the eight `@Scheduled` jobs emitted had an
+empty `correlationId` — with overlapping schedules, a nightly window interleaved several jobs with
+nothing to say which run a line belonged to. `TaskMetrics` (the wrapper every job already runs
+through) now stamps `<job-label>-<8 hex>` into the MDC for the duration of the run and removes it
+afterwards, so the label greps to all runs of a job and the full id narrows to one. An id that is
+already present is left alone: the admin-triggered manual run (`recordCountingRethrow`) executes
+inside a request that owns a real correlation id, and overwriting it would sever the trigger from
+its HTTP call.
+
+**A fail-closed login rejection names its cause.** The Keycloak SPI's `DiscordMembershipChecker`,
+`BackendAccountChecker` and `DiscordGuildNicknameReader` collapsed every failure — timeout, DNS,
+Discord 429, upstream 5xx, unreadable body — into an opaque `DENIED_ERROR` / `UNKNOWN` with no log
+line at all, leaving `Discord membership gate denied login (reason=DENIED_ERROR)` as the only trace
+of a user who cannot get in. Each of those paths now logs its cause (exception class or HTTP status)
+via JBoss Logging, the SPI's runtime logger. The `BackendAccountChecker` matters for the opposite
+reason: it fails **open**, so a silent failure means the duplicate-account check simply did not run
+and nothing recorded that. Never logged: the brokered token, the request URL (it carries the guild
+id) or any user identifier.
+
+**Every ingest rejection leaves a line naming its cause.** The gateway is the surface a separately
+released desktop client codes against, so "why did my send fail?" has to be answerable from the
+gateway log alone:
+
+- **Validation reject** — `WARN` with the failing field paths and constraint messages (schema text).
+  The **rejected value** is never logged, and the joined string is sanitised (see below).
+- **Unreadable body** — `WARN` with the exception class only; Jackson's message quotes the offending
+  part of the body, which here is a user's extract.
+- **413** — `DEBUG` with both the declared body size and the configured cap, so a cap set below what
+  a legitimate extract needs is distinguishable from a hostile body (a chunked reject reports
+  `declared=-1`, which is itself the diagnostic).
+- **429** — the *per-subject* limiter (the enforceable one) logs `WARN` with the budget and the
+  advertised `Retry-After`; the *per-IP* pre-auth limiter logs the same at `DEBUG`, because an
+  attacker decides how often it fires and a higher level would be a log-flood vector. Absence of the
+  `WARN` on a 429 therefore identifies the per-IP limiter, and the `bucket`-tagged counter
+  distinguishes them in the metrics either way. Neither line repeats the subject (it is the `userId`
+  MDC field) or the client IP (app logs stay PII-free — REQ-OBS-004).
+- **401 / 403** — `DEBUG` and `WARN` respectively, per the same expected-noise reasoning the backend
+  applies; see REQ-API-004 for the response shape.
+- **Backend 4xx** — `DEBUG`, so the gateway log distinguishes "the backend rejected it" from "our own
+  validation rejected it" without duplicating the `WARN` the backend already emitted.
+
+**The accepted payload's shape is logged, its content never is.** Before relaying, the gateway
+records `schemaVersion`, the producing tool/version and the order / goods-row / source-image counts
+(or, for the opaque blueprint export, its byte count). The gateway interprets nothing, so these
+counts are the only handle on what a client actually pushed. No screen read, material name or
+quantity is logged. The client-supplied provenance strings pass through `LogSafe`, which replaces
+ISO control characters and caps the length — a `\n` inside a JSON string would otherwise let an
+internet-facing caller forge a second, fabricated log line, and neither the logback pattern nor
+`PiiMasker` strips it. `LogSafe` complements `PiiMasker` rather than replacing it: the masker removes
+secrets from what reached the appender, `LogSafe` removes structure-breaking characters before the
+value is handed to the logger.
+
+The gateway carries the same log-once discipline on its **outbound** relay. `WebClientLoggingFilter`
+emits one line per backend call with method, host, path, status and elapsed time — `INFO` normally,
+`INFO` with the `Slow backend call` marker past `app.logging.slow-backend-call-threshold-ms`
+(1500 ms, issue #1204 — relay latency is alerted on through the `http.client.requests` p95
+histogram, not by escalating this line), and `DEBUG` for a backend 5xx or any error signal, because
+`GlobalExceptionHandler` already owns the single operator-facing `WARN` for those. The exception
+message is never logged (it can carry the target URL) and the forwarded bearer never appears at any
+level.
+
 `RequestLoggingFilter` escalates the access-log line to `WARN` (`Slow request …`) when a request
-exceeds `app.logging.slow-request-threshold-ms` (2000 ms), **except the notification SSE relay**
+exceeds `app.logging.slow-request-threshold-ms` (2000 ms) — in **all three** modules — **except the
+notification SSE relay**
 (`/api/v1/notifications/stream` on the backend, `/notifications/stream` on the frontend), which stays
 at `INFO`. Spring MVC books an async request's whole lifetime as its elapsed duration, so a relay
 held open for up to 30 minutes would cross the threshold on **every** close and flood the access log
@@ -72,6 +146,164 @@ skew that `NotificationStreamObservationPredicate` already suppresses (REQ-OBS-0
 emits its single `INFO` access-log line, so the one-line-per-request guarantee holds; relay health
 stays visible through the dedicated SSE meters, not the access log.
 
+**The frontend binds `orgUnitId` too.** The MDC contract above names the field for backend *and*
+frontend, but until 2026-08 only the backend ever bound it: the frontend's Logback patterns rendered
+no third bracket and its prod JSON encoder exported no such key, so a frontend line could not be
+attributed to an org-unit context at all — the spec and the code disagreed.
+`ActiveSquadronContextFilter` now binds the active-pin UUID, or the literal `none` when the user has
+no pin, and removes the key in a `finally` so a pooled or virtual thread cannot carry it into the
+next request. **Filter order is load-bearing:** `CorrelationIdFilter` runs at
+`LOWEST_PRECEDENCE-100` and `ActiveSquadronContextFilter` at `-99`, because the pin is not resolvable
+yet inside the correlation filter — binding it there would have written `null` on every request.
+Both Logback text patterns (console + file, `[%X{orgUnitId:-}]` after `userId`, so an unpinned
+request keeps the column as an empty bracket pair) and the prod `PiiMaskingLogstashEncoder` carry the
+field. The ingest carve-out above is unchanged: the gateway relays drafts and owns no
+squadron-scoped data.
+
+**A filter-level rejection names its subject.** The two backend rejections that short-circuit before
+the servlet is reached — `SecurityProblemResponseHandler` (the Spring Security 401/403) and
+`PendingApprovalAccessFilter` (the REQ-SEC-017 403) — already minted their own `correlationId`
+(REQ-OBS-002) but left `userId` unset, so the security-relevant 403 "authenticated but not allowed"
+line could not be attributed to anyone. Both now stamp the JWT `sub` into the `userId` MDC for the
+duration of the rejection write and remove it in the **same** `finally` that removes the minted
+correlation id. The stamp is skipped when the authentication is not a JWT (there is nothing to name —
+an anonymous 401 stays unattributed, which is accurate) and when the key is already owned further up
+the chain (the pre-existing value wins and is never overwritten). Levels are unchanged: the 403 stays
+`WARN`, the 401 stays `DEBUG`. The `sub` UUID is the only identifier permitted here (REQ-OBS-004).
+
+**Client free text is sanitised in all three modules, not only at the gateway.** The `LogSafe` guard
+described above for the ingest gateway now exists as a module-local twin in the backend
+(`backend…logging.LogSafe`) and the frontend (`frontend…logging.LogSafe`) with a byte-identical
+contract: `text(value, maxLength)` truncates to the cap first, replaces every
+`Character.isISOControl` character with `?`, appends the truncation marker only when the *original*
+exceeded the cap, and renders null/blank as the stable token `none`. There is no shared module
+between the three, so this is a deliberate triplicate rather than a missed extraction. The realistic
+actor here is not an internet caller but an authenticated squadron member — or a guest holding an
+edit link — typing into a search box, a filter or a form field: a pasted newline plus a fabricated
+`ERROR ---` prefix reads as a genuine line during incident triage (CWE-117), and neither the Logback
+pattern nor `PiiMasker` strips it. Every call site that hands a client-supplied string to a logger
+routes through it — the type-ahead query parameters, a rejected live-sync section key and topic, a
+relayed personal-blueprint `productKey`, a promotion-category name, the client-error beacon's message
+and source. `LogSafe` complements the two existing utilities rather than replacing either:
+`PiiMasker` strips secrets from a line that already reached the appender, `LogMasker` redacts a
+known-sensitive value at the call site, `LogSafe` removes structure-breaking characters before the
+logger sees the value; a value that is both sensitive and user-supplied needs a masker **and**
+`LogSafe`. Sanitising is not a licence — a value forbidden by REQ-OBS-004 (callsign, name, e-mail,
+token, client IP) stays forbidden after passing through it.
+
+**The levels of the lines added in the 2026-08 logging audit**, with the reasoning that fixed each
+one. The governing rule is the one stated above: anything a client or an attacker can trigger at will
+is `DEBUG`, because at any higher level it is a log-flood vector; an operator-actionable fault is
+`WARN`; a once-per-run summary is `INFO`.
+
+*Backend.*
+
+- **SC-Wiki census completeness** (`ScWikiClient`) — `WARN` when a **full** page 1 carries no
+  `meta.last_page`, when a page fails mid-walk, or when `meta.total` disagrees with the accumulated
+  row count; each also bumps the fetch-error counter and marks the walk **incomplete**. A genuinely
+  short single page stays `complete` and silent, which is what keeps the WARN off healthy runs. The
+  closing census line is one `INFO` per walk reporting pages fetched vs. announced plus the
+  `complete` flag. The flag is not cosmetic: `ScWikiOrphanSweep` (and the inline sweeps in the
+  commodity/blueprint/item sync services) now **refuse to tombstone** on an incomplete walk and WARN
+  why — a truncated census previously read as "the rest of the catalogue was deleted".
+- **UEX envelope outcome** (`UexClient`) — exactly **one** line per 2xx: `INFO` with the row count
+  and the envelope status on a healthy response; `WARN` plus a fetch-error counter when `data` is
+  `null` or when `status` is present and not `ok` (the rows are still returned). A blank/absent
+  `status` is deliberately **not** an anomaly — no code ever read the field, so it cannot be asserted
+  that all ~20 endpoints populate it.
+- **UEX `304 Not Modified`** — raised from `DEBUG` to `INFO`, both in `UexClient` and at each sync
+  service, which now logs `unchanged (304) — nothing to import.` and returns **before** any upsert or
+  sweep. An unchanged catalogue is the normal healthy outcome of a nightly run and must be readable
+  without raising a level mid-incident; the volume is bounded by the schedule, not by callers.
+- **Role-sync summary** (`UserReconciliationService.logRoleSyncSummary`, `UserSyncService`) — one
+  aggregate `INFO` per run (roles mapped, Guest fallbacks, dropped role names, accounts newly flagged
+  as departed), escalating to `WARN` past a threshold (more than 3 Guest demotions, more than 10
+  newly-missing accounts). Per-account detail stays `DEBUG` and carries the `sub` UUID only: a full
+  roster at `INFO` would be a per-run flood and would name accounts.
+- **Keycloak role-mapping summary** (`KeycloakService`) — `INFO` with matched / mappable / realm-role
+  / holder counts; `WARN` **only** in the degenerate `matched == 0` case. A naive per-role "missing
+  from the realm" WARN would fire on every single run, because the mappable set is the entire local
+  catalogue including the seeded local-only `Guest` role.
+- **SSE send failure and cap eviction** (`NotificationStreamService`) — `DEBUG`, deliberately not
+  raised. A broken pipe arrives on every browser tab close, and a user opening a sixth tab evicts
+  their oldest emitter by design; both are client-paced. The throwable is now passed to the logger
+  (it was discarded), and the signal lives in the `cause`-tagged counter and the new eviction counter
+  (REQ-OBS-011).
+- **Optimistic-lock 409** (`GlobalExceptionHandler`) — level unchanged (`WARN`); the line now carries
+  `entity`, `entityId` and `versions` (`expected=<client> persisted=<persisted>`), degrading to the
+  exception text alone for the bare JPA variant that names no entity. Numbers and ids only. All
+  `support.OptimisticLock` call sites pass a `UUID`, an `entity.getId()` or `null`; the single
+  exception (`SystemSettingService`) passes a setting key that must already have matched a persisted
+  row, so it is a bounded seeded key and not free text.
+- **Rate-limit rejection** (`RateLimitingFilter`) — level unchanged (`DEBUG`, attacker-paced); the
+  line now reports `keySource=peer|forwarded` **instead of the client IP** (REQ-OBS-004), and the
+  same bounded value tags the rejection counter. An empty leading `X-Forwarded-For` element falls
+  through to `peer` rather than keying on the empty string while claiming `forwarded`.
+- **Role permission change** (`RoleService.updatePermissions`) — `INFO`, a rare admin mutation. It
+  names the added/removed permission keys filtered through the fixed `Permissions` vocabulary and the
+  actor's `sub`; an out-of-vocabulary value submitted by the client is applied but never named, which
+  also keeps client free text out of the logger. The matching audit event is REQ-AUDIT-001.
+
+*Frontend.*
+
+- **Login failure** (`LoginFailureMetricsHandler`) — `WARN` for the `provider_error` bucket (a
+  genuine post-authorization token/IdP break), carrying the bucket, the length-capped and
+  control-stripped OAuth2 error **code** and the hop-bounded root cause's class simple name; `DEBUG`
+  for `invalid_state` and `other`, which are driven by unauthenticated bots hitting the bare callback
+  and by the `prompt=none` silent-SSO probe that fires on every unauthenticated navigation. The error
+  **description**, the authorization `code`, the `state`, tokens and the principal never reach the
+  logger at any level.
+- **Session eviction** (`SessionEvictionLoggingStrategy`) — `WARN`. A user reached the
+  10-concurrent-session cap and an older session was destroyed: rare, user-visible and worth a line.
+  It carries the cap and the `userId` MDC (falling back to `unknown`), never the principal name and
+  never a session id. The victim-facing response body is byte-identical to Spring Security's default.
+- **Unrelayed active-org-unit pin** (`ActiveSquadronRelayFilter`) — `DEBUG` on the previously silent
+  null branch, logging the method and the **path only**. The query string is deliberately excluded:
+  it carries type-ahead terms.
+- **Type-ahead catalogue-fetch failures** (the personal-inventory, personal-blueprint and
+  admin-default-blueprint page controllers) — demoted from `WARN` to `DEBUG`. These fire once per
+  keystroke on a search field, which is the textbook flood vector. The admin catch-all
+  `catch (Exception)` branch stays `ERROR`; the query is wrapped in `LogSafe`.
+- **Live-sync section filtering** (`LiveSyncWebSocketHandler`) — `DEBUG`, **one line per frame**,
+  carrying the reject count and the first rejected key through `LogSafe`; an unknown changed-topic
+  likewise gets one sanitised `DEBUG` line where it previously returned silently. Both are keyed on
+  client-supplied values arriving at socket rate.
+- **Live-sync subscribe verdicts** — an explicit backend 403/404 deny and a withheld capability stay
+  `DEBUG` in `LiveSyncSubscriptionAuthorizer` (routine authorization outcomes). The **fail-closed
+  indeterminate** deny (a 401/5xx/null-token probe on a presence-enabled class) and the previously
+  **unlogged** `RejectedExecutionException` executor-saturation branch are `WARN`, one line each,
+  emitted by whichever component produced the verdict — `completeSubscribe` deliberately logs nothing
+  so the same denial cannot be reported twice.
+- **Access log** (`RequestLoggingFilter`) — level unchanged; the single line gains a
+  `[fragment=… ajax=true]` suffix so a fragment refresh is distinguishable from a full page load.
+  `fragment` is read by scanning the raw query string for the literal `fragment=` prefix — never
+  `getParameter`, which would consume a POST body in the `finally` block after the response is
+  committed — left percent-encoded and passed through `LogSafe`; `ajax` comes from
+  `X-Requested-With`. No second line and never the whole query string. `http.server.requests` cannot
+  answer this: it is keyed by URI template and collapses `?fragment=` into the page-load bucket.
+
+**Browser-side faults reach the server, at `DEBUG`.** A JavaScript exception after a fragment swap
+left no trace anywhere — the user saw a dead panel and the operator saw a clean log. A small beacon
+(`static/js/krt-client-error.js`, loaded as the first, non-`defer` script so it is installed before
+anything it watches) listens for `error` (capturing, so non-bubbling subresource failures are seen)
+and `unhandledrejection` and POSTs to **`POST /internal/client-error`**
+(`ClientErrorReportController`, authenticated). Binding constraints on that surface:
+
+- **`DEBUG` only**, on both the accept and the reject path. The endpoint is reachable by every
+  authenticated user, so any higher level hands a caller a one-request log-flood — and a malformed
+  body must not reach `GlobalExceptionHandler`'s `Exception` catch-all, which would hand the same
+  caller a one-request `ERROR`-log generator and trip `LogbackErrorSpike`; a controller-local
+  `@ExceptionHandler` answers a bare 400 at `DEBUG` instead.
+- **The record shape is the input allowlist** — exactly `{message, source, line, column, kind}`, each
+  field capped at 200 characters, both free-text fields through `LogSafe`. Never a stack trace,
+  never `document.title`, DOM content, form values or `location.search`; `source` is stripped of its
+  query and fragment on both sides.
+- **The `kind` is resolved server-side** against the three bounded literals (REQ-OBS-011); an
+  unknown value is rejected with 400 and creates **no** meter series, rather than merely a zero
+  count. `userId` comes from the MDC only.
+- Client-side a per-session token bucket (capacity 5, refill 1/60 s, persisted in `sessionStorage`
+  so an F5 storm cannot refill it) plus an in-flight guard collapse a same-round-trip error storm.
+
 ### REQ-OBS-002 — Correlation-id propagation
 
 `correlationId` comes from the inbound `X-Correlation-Id` header (configurable via
@@ -79,6 +311,16 @@ stays visible through the dedicated SSE meters, not the access log.
 header. The frontend's `WebClientLoggingFilter` propagates the same id to outbound backend
 calls so both modules share one id per user interaction. `userId` is the JWT `sub`, or
 `anonymous`.
+
+All three modules bind these settings from the same `app.logging.*` keys through a `@Validated`
+`LoggingProperties` — `correlation-id-header`, `correlation-id-mdc-key`, `user-id-mdc-key`,
+`slow-request-threshold-ms` and `structured-enabled` everywhere, plus `org-unit-id-mdc-key` on the
+backend and `slow-backend-call-threshold-ms` wherever a module calls the backend (frontend, ingest).
+A blank MDC key or a negative threshold aborts the boot rather than silently emptying the `%X{…}`
+fields. An inbound id that is not `[A-Za-z0-9._-]{1,128}` is discarded and replaced by a fresh UUID,
+so it can neither forge a log line nor a response header. The ingest gateway relays the id onward
+under the **configured** header name, so re-pointing `APP_LOGGING_CORRELATION_ID_HEADER` moves the
+inbound, echoed and relayed header together.
 
 Errors raised **before** `CorrelationIdFilter` runs — the rate-limit 429, the pending-approval 403,
 and the Spring Security filter-level 401/403 — mint their own `correlationId`, put it in the MDC (so
@@ -94,7 +336,23 @@ In `prod`, a PII-masking `LogstashEncoder` JSON appender writes `logs/{backend,f
 errors split into `*-error.log` for fast triage. Configurable via `APP_LOGGING_*` env vars.
 The ingest gateway now logs the same way as backend/frontend — a PII-masking console + rolling
 text log + dedicated `*-error.log` in every profile, plus `logs/ingest.json` in prod — so its JSON
-is tailed from the file (`loki.source.file` → `app_json`), no longer via the Docker log API.
+is tailed from the file (`loki.source.file` → `app_json`), no longer via the Docker log API. Its
+patterns and JSON encoder carry `correlationId` **and `userId`** (REQ-OBS-001).
+
+All three modules also render `[%X{traceId:-},%X{spanId:-}]` in their console and file patterns,
+following Spring Boot's own default layout. The JSON appender already carried both fields, so
+without this a text line — the console stream and `logs/<app>.log` — was the one place from which a
+trace could not be reached while tracing was enabled. The cost is a literal `[,]` on every line
+while tracing is off (the default), which is the accepted trade for the link existing when it is
+needed.
+
+**All three modules** log a **startup banner** on `ApplicationReadyEvent`
+(`StartupBannerListener`) naming the effective runtime configuration an on-call engineer reaches for
+first: active profiles, the upstream/downstream URLs, the identity-provider issuer and the effective
+logging knobs. Secrets are never printed, and any endpoint that can carry inline credentials is
+sanitised before it is logged (the backend's JDBC URL, the frontend's and gateway's Redis endpoint).
+The frontend's matters most: a wrong `BACKEND_URL` or Keycloak issuer does not fail its boot, it
+surfaces much later as a login loop or a page of 502s.
 
 ### REQ-OBS-004 — Never log PII
 
@@ -190,8 +448,36 @@ rule — no blanket "everything is masked" claim:
   rationale/cost live in ADR-0095. The `JvmNativeThreadExhaustion` Loki rule that consumes this stream
   ships **staged** (commented) until the native line is verified present on the test stack (REQ-OBS-014
   dead-alert guard).
-- **Keycloak file log** — masked **in the shipper** (Alloy stages scrub `username=` /
-  `ipAddress=` before ingestion).
+- **Keycloak file log** (`app="keycloak"`) — masked **in the shipper** (Alloy stages scrub
+  `username=` / `ipAddress=` before ingestion).
+- **Keycloak container stdout** (`app="keycloak-stdout"`) — Keycloak runs `--log=console,file`, so
+  its console carries the same lines as the masked file log plus the JVM/container-level output that
+  never enters the file at all (the ADR-0095 motive, applied to the identity provider). The
+  container keep-regex is **anchored** so `keycloak-dev`, `db-keycloak` and `postgres-exporter-keycloak`
+  do not match. It gets its own mapping rule and its own `loki.process` block with the `username=` /
+  `ipAddress=` replaces copied byte-identically from the file mask — without them the console copy
+  would re-introduce exactly the PII the file mask exists to remove. It is deliberately **not** in
+  `KeycloakErrorRateHigh`'s selector, so the console copy cannot double-count the file stream's
+  ERRORs. Extending the ADR-0095 stdout pattern to Keycloak is owner-approved; ADR-0095 (or an
+  amendment) records it.
+- **Ops-automation host logs** (`app="ops-deploy"` / `"ops-backup"` / `"ops-cleanup"` /
+  `"ops-restore-drill"`) — the four systemd units' own log files under the existing
+  `/var/log:/hostlog:ro` mount (`iri-deploy.log`, `iri-backup.log`, `iri-docker-cleanup.log`,
+  `iri-restore-drill.log`). Motive: the units write with `StandardOutput=append:`, which **replaces**
+  journald rather than teeing to it, so `journalctl -u iri-deploy.service` carries only systemd's own
+  unit records — the script output that explains *why* a deploy rolled back was reachable over SSH
+  and nowhere else, which is exactly the wrong triage path for a 03:40 alert mail. All four route
+  through `loki.process.ops_automation_mask`: the three `<svc>-stdout` replaces (JWT / e-mail /
+  bearer keyword) plus a fourth anchored on the deploy script's registry-login sentence, so an image
+  reference that happens to contain `" as "` is untouched and the registry host stays readable.
+  PII-free operational logging → global 744h retention, no REQ-OBS-010 IP-retention impact. Every
+  `ops-automation.yml` alert description now carries the LogQL query for its stream, since that
+  description is what reaches the operator's mailbox. **Precondition:** Alloy runs with
+  `cap_drop: [ALL]` and therefore no `CAP_DAC_OVERRIDE`, so each log file must exist as
+  `0640 deploy:adm` before the unit first writes it — a `0640 root:root` file ships silently empty.
+  `docs/deployment.md` pre-creates the deploy and cleanup logs; the backup and restore-drill logs are
+  a known gap in `docs/backup.md` and are also why those two streams carry no liveness guard
+  (REQ-OBS-014).
 - **NPM access logs, SSH/host-auth logs, and the host security logs
   (auditd `sshd_config`/`authorized_keys` tamper watches, fail2ban SSH-jail bans)** — ingested **including
   client IPs and usernames** at a **31-day retention**. This is a deliberate,
@@ -485,6 +771,35 @@ transaction per pass) rather than per-scrape.
   job still records a success, this is the only signal of a sustained catalogue outage; it backs the
   `ExternalFetchErrors` alert. The backend `WebClient.Builder` is wired to the `ObservationRegistry`
   (REQ-OBS-009) so these same calls also emit `http_client_requests_seconds` + client spans.
+  **Known gap, to close:** since the 2026-08 audit this one undifferentiated series carries four
+  distinct causes — a transport failure, a `null` envelope `data`, a non-`ok` envelope `status`, and
+  the SC-Wiki pagination/`total` anomalies (REQ-OBS-001) — so the counter can no longer say *what*
+  failed. The fix is a bounded `reason` tag (`transport` / `no_data` / `bad_status` / `pagination`)
+  added to `MetricNames`; it splits the existing series, so the `{source=…}` panels and the
+  `ExternalFetchErrors` rule need a `sum by (source)` review in the same change.
+  **One fetch, at most one increment (2026-08).** A single `ScWikiClient` page walk can show several
+  symptoms of the *same* break at once — a page failing mid-walk plus the resulting row shortfall
+  tripping the `meta.total` check, or a full page 1 with no `meta.last_page` plus a disagreeing
+  `meta.total`. Each symptom keeps its own WARN (they name different problems), but a per-call
+  `FetchErrorLatch` now lets only the first of them increment the counter, so the series counts failed
+  *fetches* rather than symptoms: a 20-page walk that dies on page 2 contributes `1`, not `2`. One
+  behaviour change rides along — a mid-walk page returning a bodiless `2xx` now contributes `1` where
+  it previously contributed `0`. "One fetch" means one public client call (`fetchAllPagesResult` /
+  `fetchOne`), not one HTTP request.
+  Because the count is now exactly one per incomplete walk, it is also the only usable **proxy for
+  "the SC-Wiki orphan sweep stood down"**: `ScWikiOrphanSweep` refuses to tombstone on an incomplete
+  census and says so in a WARN and nowhere else — the skip touches no meter. `ScWikiCensusIncompleteStreak`
+  (warning) therefore keys on **persistence, not volume**: an error in each of three *consecutive*
+  24 h windows means three daily runs in a row came back incomplete and orphan detection has been off
+  for three days, while `scwiki_sync` kept recording success with a healthy item tally and
+  `ExternalSyncStale` / `SyncZeroItems` / `ScWikiStepFailing` all stayed quiet. The burst-shaped
+  `ExternalFetchErrors` (> 3 in 6 h) catches the outage; this one catches the silent degradation, and
+  the two firing together read as an ordinary multi-day upstream outage. The proxy is a **superset** —
+  a failed fetch on a pass that feeds no sweep also counts, which is the safe direction for a warning —
+  and both the alert comment and the `monitoring/README.md` runbook row say so. Panel 44 on dashboard
+  `07` plots the counter per `source`; it had no panel anywhere before. **Still open:** a dedicated
+  "sweep stood down" meter would let the alert drop the proxy, and belongs with the `reason`-tag work
+  above.
 - `basetool_keycloak_sync_fetch_failures_total` counter (untagged, `KeycloakService.fetchUsers`) and
   `basetool_scheduled_job_step_failures_total{task,step}` counter (`ScWikiScheduler.runStep`; `step`
   = the bounded `commodity`/`vehicle`/`item`/`blueprint`/`manufacturer` literal) both cover a
@@ -566,18 +881,28 @@ transaction per pass) rather than per-scrape.
   never amounts, account numbers or holder identities** (REQ-OBS-006). It backs
   `BankAuditSilenceAnomaly` (the bank analogue of `AuditSilenceAnomaly`) and a bank-volume panel on
   the operations dashboard.
-- `basetool_ratelimit_rejections_total{bucket}` counter at the `RateLimitingFilter` reject branch
-  (`bucket` = the rule name, or `global` for the umbrella `/api/**` budget), paired since #1041
-  item 19 with `basetool_ratelimit_requests_total{bucket}` bumped on **every** bucket evaluation, so
-  rejections/requests is a rejection ratio (`RateLimitRejectionRatioHigh`) rather than 429-only
-  detection.
+- `basetool_ratelimit_rejections_total{bucket,key_source}` counter at the `RateLimitingFilter` reject
+  branch (`bucket` = the rule name, or `global` for the umbrella `/api/**` budget), paired since
+
+  # 1041 item 19 with `basetool_ratelimit_requests_total{bucket}` bumped on **every** bucket
+
+  evaluation, so rejections/requests is a rejection ratio (`RateLimitRejectionRatioHigh`) rather than
+  429-only detection. The `key_source` tag (2026-08) is the bounded pair `forwarded` / `peer` and
+  reports **which branch produced the bucket key** — a trusted-proxy `X-Forwarded-For` element or
+  `getRemoteAddr()`. It exists because the log line no longer carries the client IP (REQ-OBS-004),
+  and a sudden swing from `forwarded` to `peer` is the signature of an edge/proxy-trust
+  misconfiguration that would silently collapse every caller onto one bucket. The address itself
+  never becomes a label.
+
 - `basetool_discord_precheck_total{outcome}` counter (`DiscordAccountExistenceController`, #1041
   item 19; `outcome` = `ok` / `unauthorized` / `disabled`). The endpoint sits outside `/api/**`, the
   rate limiter and the `basetool_http_error` funnel, so this is the only signal for secret-guessing
   (`DiscordPrecheckUnauthorizedSpike`) or a blank-secret config drift after a rotation
   (`DiscordPrecheckDisabledOnProd`); no PII, only the coarse outcome.
+
 - `basetool_bank_ledger_integrity_violations{category}` gauge fed by the hourly integrity sweep
   (six `category` values; **any value > 0 is CRITICAL** — the ledger broke an invariant).
+
 - `basetool_job_order_integrity_violations{category}` gauge fed by the hourly `JobOrderIntegrityTask`
   (REQ-ORDERS-033; one `category` today, `item_line_blueprint_drift`). `> 0` means an ordered-item
   line's blueprint no longer produces the ordered item after an SC-Wiki re-point, so that order
@@ -585,6 +910,7 @@ transaction per pass) rather than per-scrape.
   data is wrong, not corrupt). The sweep logs one `ERROR` per drifted line carrying the order's
   display id, the ordered item and the blueprint's current output — catalogue names only, never the
   order's user-entered handle.
+
 - Queue-depth gauges (`BusinessMetricsCollector`): `basetool_registration_pending_count` +
   `_oldest_age_seconds`, `basetool_bank_booking_request_pending_count` + `_oldest_age_seconds`,
   and `{status}`-labelled `basetool_job_order_open_count` / `basetool_operation_open_count` /
@@ -594,11 +920,13 @@ transaction per pass) rather than per-scrape.
   item 15) the four work queues `P4kImportStuck` (> 6 h — imports finish in minutes), `JobOrderStale`
   / `RefineryOrderStale` / `OperationStale` (> 30 d, baseline-tune). An empty queue reports `0`, so
   there is no `absent()` ambiguity.
+
 - `basetool_p4k_import_jobs_total{outcome,kind}` counter (`P4kImportJobService`, #1041 item 15),
   bumped at each terminal transition — `outcome` = `succeeded` / `failed` (the lowercased terminal
   status, including a restart orphan-fail), `kind` = `PREVIEW` / `APPLY`. It makes a reliably-failing
   import observable (`P4kImportFailed`): the pending-queue gauge drains back to `0` after a failed
   run, so an empty queue alone cannot distinguish "nothing to do" from "every run fails".
+
 - `basetool_mail_total{outcome}` counter (`SmtpMailService`, #1041 item 16), one bounded `outcome`
   per delivery path — `sent`, `failed` (swallowed `MailException`), and the three config-gate drops
   `dropped_disabled` / `dropped_no_host` / `dropped_no_sender`; never the recipient or subject
@@ -614,10 +942,20 @@ transaction per pass) rather than per-scrape.
   today and starts protecting the moment mail is switched on. An *unintended* kill-switch flip is still
   caught downstream by `RegistrationApprovalOverdue` (nobody acting on pending registrations). Locked
   by `monitoring/prometheus/tests/maildropped_disabled_scope_test.yml`.
-- `basetool_sse_connections` gauge + `basetool_sse_send_failures_total{event}` counter
+
+- `basetool_sse_connections` gauge + `basetool_sse_send_failures_total{event,cause}` counter
   (`NotificationStreamService`, #1041 item 17). The gauge sums the live SSE subscriber count across
   all recipients (unlabelled — `sub` is PII); the counter is bumped at each drop-on-send-failure
-  branch with a fixed `event` (`connected` / `notification` / `heartbeat`). Zero connections while
+  branch with a fixed `event` (`connected` / `notification` / `heartbeat`). The `cause` tag (2026-08)
+  is the bounded triple `io` / `illegal_state` / `other`, derived from the caught exception's **type**
+  and never from its message. All three catch sites caught `IOException | RuntimeException` and
+  discarded it, so this split is the only way to tell a client hang-up (`io`, expected on every tab
+  close) from a write to an already-completed emitter (`illegal_state`, a lifecycle defect) — a
+  distinction the line itself cannot carry, because it is `DEBUG` by necessity (REQ-OBS-001).
+  `basetool_sse_emitters_evicted_total` (untagged — the recipient `sub` must never be a label) counts
+  each emitter dropped because its recipient reached the per-user cap of 5; read against the
+  frontend's 20-socket `/ws/sync` cap it is the tuning signal for whether that cap is set too low.
+  Zero connections while
   the frontend is still serving **real user page traffic** drives `SsePushChannelDead` (a dead push
   channel, e.g. reverse-proxy buffering drift). The "users are online" guard **must be live request
   rate, never `basetool_active_sessions`** (amended 2026-07-26): that gauge counts Spring Session
@@ -658,11 +996,23 @@ is the HTTP verb. The push-channel surfaces (#1041 item 17) add `basetool_notifi
 `basetool_presence_ws_sessions` (live live-sync WebSocket sessions summed across all topic rooms,
 `LiveSyncWebSocketHandler`) gauges, plus the `basetool_presence_relay_frames_total{type,topic_class}`
 (`type` = `changed` / `snapshot`) and `basetool_presence_relay_dropped_total{reason,topic_class}`
-(`reason` = `throttled` / `send_failed` / `topic_cap` / `authorize_saturated` / `topic_throttled`)
-counters at the previously-silent throttle, send-failure, topic-cap, subscribe-saturation and
-per-topic-throttle branches of the relay — the `topic_throttled` reason (F2/#1243) fires when a
-room's *aggregate* publish rate exceeds its per-topic token bucket regardless of the per-session
-limit —
+(`reason` = `throttled` / `send_failed` / `topic_cap` / `authorize_saturated` / `topic_throttled` /
+`section_filtered`)
+counters at the previously-silent throttle, send-failure, topic-cap, subscribe-saturation,
+per-topic-throttle and section-filter branches of the relay. Since 2026-08 `reason="throttled"` is
+**shared**: the per-session `subscribe`-frame token bucket (burst 24, refill 1/s — the bound that
+keeps the WARN on the subscribe path honest, because a denied subscribe releases its reserved slot and
+the topic cap therefore never limits a subscribe→deny→subscribe loop) reports its silent drops through
+the same reason within the offending topic class, rather than minting a second throttle literal. A
+`throttled` sample therefore no longer implies a presence frame; splitting them needs a new
+`MetricNames` literal. The `topic_throttled` reason (F2/#1243)
+fires when a room's *aggregate* publish rate exceeds its per-topic token bucket regardless of the
+per-session limit, and `section_filtered` (2026-08) is bumped **once per frame** on any frame that
+lost **at least one** section key to the allow-list filter, on all three publish paths (client
+`changed`, server-side publish, Redis fan-out delivery). That is the point of the meter: the visible
+symptom of a section-key skew is one panel going stale while the rest of the page keeps live-updating,
+which an all-rejected-only counter would never see. The rejected key is client-supplied and therefore
+never becomes a tag value; it appears once, sanitised, in the `DEBUG` line (REQ-OBS-001) —
 the component that shipped the REQ-FE-010 staleness defect. Since #1102 (REQ-FE-015 / ADR-0094) both
 counters carry a bounded `topic_class` label (one of the eight `LiveSyncTopicClass` labels: `mission`,
 `operation`, `order_detail`, `orders_queue`, `bank_account`, `bank_staff`, `orgunit_bank`, `materialboard`), and
@@ -671,9 +1021,23 @@ flatline (overall on panel 28, or per surface on the `topic_class` breakdown) wh
 keep flowing is the early indicator for that defect class (panels only, baselined before alerting).
 The tool-wide live-sync relay adds five more meters: `basetool_livesync_subscriptions{topic_class}`
 (open `/ws/sync` subscriptions per topic class — the live per-surface load denominator),
-`basetool_livesync_subscribe_total{topic_class,outcome}` (`outcome` = `allowed` / `denied`, the
-subscribe-authorization verdict; a saturated-executor fail-open is instead a `authorize_saturated`
-relay drop), `basetool_livesync_socket_rejected_total{reason}` (`reason` = `user_cap`; a `/ws/sync`
+`basetool_livesync_subscribe_total{topic_class,outcome,reason}` (`outcome` = `allowed` / `denied`,
+the subscribe-authorization verdict; a saturated-executor fail-open is instead a
+`authorize_saturated` relay drop). The `reason` tag (2026-08) splits the denial into `authz` — an
+explicit backend 403/404 or a withheld capability — and `indeterminate`, the fail-**closed** verdict
+for a 401/5xx/null-token probe on a presence-enabled class, which is an infrastructure fault dressed
+as a permission decision and must be readable as such. Micrometer rejects the same meter name
+registered with differing tag-key sets, so the `outcome="allowed"` series carries `reason="none"`;
+the wire value is unchanged from the existing login-reason literal, so no dashboard or alert is
+affected. Both `07` dashboard panels aggregate with `sum by (topic_class, outcome)` /
+`sum by (reason)` and therefore keep working unchanged — but neither yet **surfaces** the new deny
+split, which is the outstanding follow-up. The same two literals now also travel **on the wire** in
+the `denied` control frame, so the browser can treat `indeterminate` as retryable: it re-subscribes
+that topic **exactly once** across the whole socket lifetime (`authz` stays terminal). Reading the
+series accordingly — a single transient infrastructure fault can contribute up to **two**
+`outcome="denied", reason="indeterminate"` samples per topic, never more, and the retry is per-topic
+one-shot rather than per-reconnect.
+`basetool_livesync_socket_rejected_total{reason}` (`reason` = `user_cap`; a `/ws/sync`
 socket refused at connect because the user is already at the per-user socket cap — F2/#1243, no
 `topic_class` because a rejected socket has bound no topic; plotted alongside the relay drops on the
 `07` "Presence relay drops/hour" panel), the unlabelled `basetool_livesync_invalid_topic_total`
@@ -701,6 +1065,42 @@ anonymous traffic cannot accrete, and only a successful login promotes the sessi
 (orphan sessions accreting again, as they did to >16000 against ~30 real principals) and the Redis
 session store is heading for its `maxmemory noeviction` ceiling where login/token-refresh writes
 fail.
+
+Two frontend meters were added by the 2026-08 logging audit:
+
+- `basetool_session_evicted_total` — unlabelled counter, bumped by `SessionEvictionLoggingStrategy`
+  each time Spring Security destroys a user's oldest session because they reached the
+  `MAX_CONCURRENT_SESSIONS` cap (10). Previously the cap enforced itself in complete silence, so a
+  user reporting "I keep getting logged out in the other tab" had no server-side evidence at all.
+  Unlabelled by rule — the principal is PII. Backed since 2026-08 by `SessionEvictionSpike`
+  (> 3 evictions/h held 30 m, warning) and by panel 42 on dashboard `07`, beside "Active sessions".
+  The alert is a **sustained rate, not a burst**: eviction is rare by construction (a principal must
+  already hold ten live sessions), so the `for` clause — not the count — is what separates a member
+  cycling devices from the failure mode the meter was written for, a session registry whose cap has
+  filled with *dead* Redis entries so every fresh login evicts a live session. `ActiveSessionsRunaway`
+  cannot corroborate it: `expireNow()` only marks the session, the registry entry and the Redis key
+  both survive, so `basetool_active_sessions` does not even dip. The `> 3` floor is unbaselined
+  (`baseline-tune:`) and errs low.
+- `basetool_client_error_total{kind}` — counter minted by `ClientErrorReportController` for each
+  accepted browser-error beacon (REQ-OBS-001). `kind` is resolved **server-side** against exactly
+  three literals — `script_error`, `unhandled_rejection`, `resource_error` — and a beacon carrying
+  anything else is rejected with 400 and creates **no** series: the endpoint is reachable by every
+  authenticated user, so accepting the client's own string would hand a caller unbounded label
+  cardinality (REQ-OBS-006). No other dimension is exported; the message and source live only in the
+  `DEBUG` line — which is also why the metric has to carry the signal: a JS exception that kills a
+  `krtFetch` handler issues no request at all, so it leaves no access-log line, no
+  `http_server_requests` sample and no 5xx. The 2026-08 gap ("no panel, no rule") is **closed**: panel
+  43 on dashboard `07` plots reports/hour by `kind`, and `ClientErrorSpike` (warning) fires on
+  `> 20` reports/h of one `kind` **and** more than 3× that kind's own daily average, held 30 m. It is
+  a **step change, not a ceiling** — a handful of client errors is permanent background (old browsers,
+  extensions, a tab left open across a deploy still referencing the previous asset build), so a fixed
+  threshold either sits above that floor and misses a surface only a few members use, or below it and
+  fires forever. The baseline is the same series over `[24h]` rather than `offset 1d` on purpose: the
+  counter is registered lazily on the first report, so an offset comparison has an absent-baseline
+  hole where the right-hand side simply does not exist and the rule silently never fires, whereas the
+  trailing window is present whenever the 1 h window is. The spike hour sits inside its own
+  denominator, capping the achievable ratio at 24. Per `kind` so one class stepping up is not diluted
+  by the other two. The `> 20` floor is unbaselined (`baseline-tune:`).
 
 The auth surfaces (#1041 item 18) add `basetool_login_total{outcome,reason}` (`SecurityConfig`'s
 OAuth2 success/failure handlers: `outcome` = `success` / `failure`; on failure `reason` =
@@ -738,7 +1138,10 @@ the same `basetool_bot_blocked_total{rule}` series, distinguished by the `applic
 
 **Ingest.** `basetool_ingest_handoff_total{kind}` (accepted+staged handoffs per `HandoffKind`),
 `basetool_ingest_handoff_errors_total{reason}` (relay failures: `backend_reject` /
-`backend_unavailable` / `internal`; pre-relay rejections are not counted here), and
+`backend_unavailable` / `staging_unavailable` / `internal`; pre-relay rejections are not counted
+here — `staging_unavailable` is kept apart from `internal` because at that point the backend relay
+already **succeeded** and only Redis is at fault, a different operator action, which is why it also
+has its own `IngestStagingUnavailable` alert — REQ-INGEST-003), and
 `basetool_ratelimit_rejections_total{bucket}` (`bucket` = `ip` / `subject`; shares the metric name
 with the backend counter, the `application` common tag separating the modules) — paired since #1041
 item 19 with `basetool_ratelimit_requests_total{bucket}` on the per-IP filter and the per-subject
@@ -752,7 +1155,10 @@ refinery `import-extract`, before Jackson binds it — security review, memory-D
 `RequestBodyRejectedSpike`. The
 gateway also now emits one INFO access-log line per `/v1` request (`RequestLoggingFilter`; method /
 path / status / duration), matching the backend/frontend one-line-per-request contract
-(REQ-OBS-001).
+(REQ-OBS-001). Its `basetool_http_error_total{code}` carries `SERVICE_UNAVAILABLE` (unreachable
+identity provider *or* unreachable handoff staging), plus `UNAUTHENTICATED` / `ACCESS_DENIED` from
+the filter-level rejections — the counters that keep the 401's deliberate `DEBUG` demotion from
+costing the signal (REQ-OBS-001, REQ-API-004).
 
 **Deliberately excluded** (documented so the gap is intentional, not an oversight): notifications
 (no org-wide queue — only per-recipient unread, which is PII-adjacent), org units (no lifecycle
@@ -772,9 +1178,14 @@ so an exported metric cannot silently regress unnoticed: the ingest handoff metr
 / `AccessDeniedSpike` / `PendingApprovalBlockSpike` (and the all-codes HTTP-error panel on dashboard
 `07`); the `basetool_keycloak_sync_fetch_failures_total` and `basetool_scheduled_job_step_failures_total`
 counters feed `KeycloakSyncFetchFailing` / `ScWikiStepFailing`; and `KeycloakEventMetricsAbsent` guards
-the `keycloak_user_events_total` series that `KeycloakLoginErrorSpike` depends on. Adding, renaming or
-removing one of these metrics keeps its alert in `monitoring/prometheus/alerts/business.yml` in sync in
-the same change.
+the `keycloak_user_events_total` series that `KeycloakLoginErrorSpike` depends on. The 2026-08 logging
+audit closed the last three unwatched signals, all in `business-warning`: `basetool_client_error_total`
+→ `ClientErrorSpike`, `basetool_session_evicted_total` → `SessionEvictionSpike`, and
+`basetool_external_fetch_errors_total{source="scwiki"}` → `ScWikiCensusIncompleteStreak` (each
+described with its own metric above, and each carrying a runbook row in `monitoring/README.md` plus a
+panel on dashboard `07` — 42 session evictions, 43 client errors by `kind`, 44 external fetch errors by
+`source`). Adding, renaming or removing one of these metrics keeps its alert in
+`monitoring/prometheus/alerts/business.yml` in sync in the same change.
 
 ### REQ-OBS-012 — Edge posture assertions (deny / redirect / HSTS probes)
 
@@ -951,18 +1362,29 @@ therefore alerts on:
 - **Log-pipeline liveness.** The log-derived alerts (SSH-compromise, Postgres-FATAL, …) silently
   stop firing if Alloy stops tailing, because `rate()` over an absent stream is empty, not zero, and
   `TargetDown` cannot see a healthy-but-not-shipping Alloy. `LokiIngestSilent` (whole-pipeline
-  silence), per-critical-path `LogStreamSilent` (auth.log / audit.log / npm-access, via `absent()` of
-  the file's `loki_source_file_read_lines_total` series — a tailed file keeps its series present even
-  when quiet, so absence means the file is not being tailed at all, the permission-drift failure
+  silence), per-tail `LogStreamSilent` (via `absent()` of that file's
+  `loki_source_file_read_lines_total` series — a tailed file keeps its series present even when
+  quiet, so absence means the file is not being tailed at all, the permission-drift failure
   `config.alloy` warns about) and `LokiWriteFailing` (shipper-side entry drops) — all warning — cover
-  it. `LokiWriteFailing` fires on `rate(loki_write_dropped_entries_total[15m]) > 0`; a **persistent**
+  it. **`LogStreamSilent` guards ten tails, each its own rule with a distinct `stream` label:**
+  `host-auth`, `host-auditd`, `host-fail2ban`, `npm-access`, `npm-error`, `keycloak`, `backend`,
+  `frontend`, `ingest` and `ops-deploy`. It is deliberately **one rule per path, never an
+  alternation** — `absent()` returns 1 only when the selector matches *nothing*, so a combined
+  `path=~"…(backend|frontend|ingest)…"` rule would stay perfectly silent while two of the three tails
+  were dead. Three ops-automation tails are **not** guarded (`ops-backup`, `ops-cleanup`,
+  `ops-restore-drill`): those units are separate or optional installs, and with no file there is no
+  series, so a guard would fire forever on a correctly-configured host — their liveness is covered
+  metric-side by `BackupStaleOrMissing` / `DockerCleanupStaleOrMissing` / `RestoreDrill*` instead.
+  `LokiWriteFailing` fires on `rate(loki_write_dropped_entries_total[15m]) > 0`; a **persistent**
   firing with `reason="ingester_error"` and no other symptom is most often the idle-container stale-line
   re-delivery guarded by the `stage.drop older_than = "167h"` in `loki.process.container_mask` (see
   REQ-OBS-007) — read the exact rejected stream from Alloy's own `final error sending batch` log line
-  before touching Loki limits. The `<svc>-stdout` container streams (ADR-0095) are deliberately given **no** per-stream liveness
-  alert: a native-error breadcrumb is rare by design, so a `rate()`/`absent()` liveness check on such a
-  quiet stream would be a permanent false alarm — whole-pipeline silence is still caught by
-  `LokiIngestSilent`.
+  before touching Loki limits. The **docker-sourced** container streams — the `<svc>-stdout` set
+  (ADR-0095), `keycloak-stdout`, the `mon-*` streams, `npm` and `postgres-*` — are deliberately given
+  **no** per-stream liveness alert, for two independent reasons: `loki.source.docker` exposes no
+  per-target `loki_source_file_read_lines_total` series to take `absent()` of, and a native-error
+  breadcrumb is rare by design, so a `rate()`/`absent()` liveness check on such a quiet stream would
+  be a permanent false alarm. Whole-pipeline silence is still caught by `LokiIngestSilent`.
 - **Container-metric blackout.** cAdvisor can stay "up" while emitting zero name-labelled series (a
   real incident, CHANGELOG v1.1.1), silently blinding the container alerts. `ContainerMetricsMissing`
   (critical) and `CoreContainerMetricsMissing` (warning) guard the named-series count;
@@ -1109,3 +1531,132 @@ the backend genuinely uses Spring Data web paging and keeps the auto-config.
 (asserts the resolver is absent from the live chain) ·
 `frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/OrgUnitContextAdvice.java`
 (the single-fetch `@ModelAttribute` cross-injection the exclusion protects).
+
+### REQ-OBS-016 — Log levels are changeable at runtime
+
+All three Spring modules expose the Actuator **`loggers`** endpoint (`management.endpoints.web.exposure.include`)
+so a logger threshold can be read while the process runs, and — where the posture below allows it —
+raised:
+
+```bash
+# backend, in prod: admin bearer token required (the write is ROLE_ADMIN-gated)
+curl -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+  -d '{"configuredLevel":"DEBUG"}' \
+  https://backend:11261/actuator/loggers/de.greluc.krt.profit.basetool.backend.integration.scwiki
+
+# frontend / ingest, in prod: read only — the write operation is not registered
+curl https://localhost:11272/actuator/loggers/de.greluc.krt.profit.basetool.ingest.filter
+```
+
+Without it, every DEBUG diagnosis costs a config edit, a redeploy and — because each config is a
+single-file bind mount read from a pinned inode — a force-recreate. That is the wrong cost for a
+live incident, and it defeats a deliberate design choice: the **most diagnostic lines in this
+codebase sit at DEBUG on purpose**, because at INFO an attacker or a routine restart would flood the
+log (the bot-protection blocks of `REQ-INGEST-009`, the per-IP rate limit, the open circuit breaker
+of issue #1203, a relayed backend 4xx). Those lines existed but were unreachable when they were
+needed.
+
+The **read** is available in all three modules on every profile. The **write** is not, and "unreachable
+from a public connector" is not a sufficient statement of its posture — it says nothing about the
+connector the endpoint actually lives on. The write posture is therefore stated per module, and it
+differs because the connectors differ:
+
+- **`frontend` + `ingest`, prod — the mutator does not exist.** In prod these two move their Actuator
+  to the internal-only management port (frontend `18091`, ingest `11272`), which is served by an
+  unauthenticated permit-all chain (ADR-0090) because the port is reachable only from
+  `net-monitoring-scrape` and `localhost`. That chain matches `/actuator/**` by **path** and cannot
+  distinguish a read operation from a write one, so exposing `loggers` there exposed the level change
+  too: anything on the monitoring plane could set `ROOT` to `TRACE`, at which point Spring Security,
+  WebClient and Netty write bearer tokens and request bodies into a Loki stream retained 744 h. The
+  fix removes the operation rather than gating it — `management.endpoint.loggers.access: read-only` in
+  each `application-prod.yml`, so the write is never registered and there is nothing for the
+  permit-all chain to guard. `GET /actuator/loggers` still answers on the management port.
+- **`backend` — the mutator survives, gated on `ROLE_ADMIN`.** The backend sets **no**
+  `management.server.port`: its Actuator rides the ordinary `11261` app connector, which is not
+  host-published, sits only on internal Docker networks and — decisively — is covered by the module's
+  *main* security chain. `SecurityConfig` therefore requires `ROLE_ADMIN` on
+  `POST /actuator/loggers/**` (placed after the `/actuator/health` `permitAll()`, before
+  `anyRequest().authenticated()`), while `GET` falls through to the authenticated catch-all. The gate
+  does **not** ride the role hierarchy: `OFFICER` is refused like any other non-admin.
+- **dev / test / e2e — unchanged, full control.** No management port is configured, the
+  `application-prod.yml` files are never loaded, so all three modules keep the runtime write. The
+  backend's `ROLE_ADMIN` matcher lives in `SecurityConfig` and is profile-independent, so it applies
+  locally too.
+
+`/actuator/health*` remains the only actuator path permitted on a public connector; every other one
+falls through to `anyRequest().authenticated()`. Level changes are **not persisted** — a restart
+returns to the configured levels, so a forgotten `DEBUG` cannot silently outlive the incident that
+motivated it. The accepted cost of the split: a prod DEBUG dive is a **backend-only, admin-only**
+operation, and raising a frontend or ingest logger in prod is back to a config edit plus a
+force-recreate.
+
+**Acceptance**
+
+- [x] `GET /actuator/loggers/<name>` reports the effective level in all three modules, on whichever
+  connector that module serves Actuator on.
+- [x] Backend: `POST /actuator/loggers/**` answers 401 anonymous, 403 for an authenticated non-admin
+  (`KRT_MEMBER` **and** `OFFICER`), 204 for `ADMIN`, and the change takes effect without a restart;
+  `GET /actuator/loggers` stays reachable for any authenticated user.
+- [x] Frontend + ingest under the **prod** profile: the `loggers` write operation is not registered,
+  so no caller can change a level — including a caller already inside `net-monitoring-scrape` or on
+  `localhost`, where the management port answers without authentication.
+- [x] No actuator **write** operation is reachable unauthenticated on **any** connector of any
+  module — neither the public app connector (404 / authenticated) nor the internal management port
+  (operation removed).
+- [x] A restart discards a runtime level change.
+- [ ] Every endpoint later added to the frontend/ingest `management.endpoints.web.exposure.include`
+  list is checked for write operations, and any it has is set `access: read-only` in
+  `application-prod.yml` in the same change. **Open** — a convention, asserted by no test today; the
+  management port's permit-all chain cannot enforce it.
+
+**Enforced by:** the module `application.yml` exposure lists ·
+`{frontend,ingest}/src/main/resources/application-prod.yml`
+(`management.endpoint.loggers.access: read-only`) ·
+`backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/SecurityConfig.java` (the
+`ROLE_ADMIN` matcher on `POST /actuator/loggers/**`) ·
+`backend/src/test/java/de/greluc/krt/profit/basetool/backend/config/ActuatorLoggersAuthorizationTest.java` ·
+**Related:** ADR-0090 (management-port isolation and its 2026-08 mutator amendment), REQ-OBS-005
+(fail-closed scrape endpoint)
+
+### REQ-OBS-017 — A self-disabled log appender must be detectable
+
+The logging framework's **own** faults must leave a trace, and a shutdown must not truncate the tail
+that explains it. Logback reports its internal faults — an appender whose file path could not be
+opened, a malformed rolling policy, an encoder that failed to start — only through its internal
+status system, which is silent by default unless the failure aborts configuration outright. An
+appender can therefore disable itself at startup and every subsequent line addressed to it vanishes
+with no error anywhere. The application-side error signal does not help: `logback_events_total` is a
+TurboFilter on the **logger**, so it keeps counting events that were never written — the metric looks
+perfectly healthy while the file stays empty. All three modules therefore:
+
+- Declare `ch.qos.logback.core.status.OnErrorConsoleStatusListener` as the **first** element child of
+  `<configuration>`, so it is installed before any appender is built. It reports WARN/ERROR-level
+  status only, to `System.err` — which the `<svc>-stdout` Loki stream (ADR-0095, REQ-OBS-007) already
+  ships and which, being outside logback's appender graph, survives precisely the failure it reports.
+- Set `<maxFlushTime>5000</maxFlushTime>` on **every** `AsyncAppender` — nine in total, the
+  `ASYNC_FILE` and `ASYNC_ERROR_FILE` pair in each module plus the prod-only `ASYNC_JSON_FILE`. The
+  logback default is 1 s, after which the worker discards whatever is still queued: the tail lost on
+  shutdown is exactly the stretch under investigation after a crash or a forced recreate. 5 s stays
+  well below the container stop grace period (ADR-0072), so it cannot itself delay a stop into a
+  `SIGKILL`.
+- Place the `ERROR`-only `ThresholdFilter` on the `ASYNC_ERROR_FILE` **wrapper**, not on the inner
+  `RollingFileAppender`. With `discardingThreshold=0` nothing was ever dropped either way and the
+  file content is byte-identical; the win is that the filter chain runs on the **calling** thread, so
+  non-ERROR events are rejected before enqueue instead of being copied into the queue with their MDC
+  snapshot for the worker to discard — the 128-slot queue, sized for ERROR-only volume, stops
+  carrying the full INFO stream.
+
+**Acceptance**
+
+- [ ] An appender that cannot open its target file produces a WARN/ERROR status line on `System.err`
+  (and therefore in the `<svc>-stdout` Loki stream) instead of failing silently.
+- [ ] A container stop does not truncate the async appenders' queued tail within the stop grace
+  period.
+- [ ] The `*-error.log` content is unchanged by the filter move (ERROR-only, nothing else added or
+  dropped).
+- [ ] A parity test pins the status listener, `maxFlushTime` and the filter placement across all
+  three configs, plus the frontend's `orgUnitId` pattern slot (REQ-OBS-001). **Open** — the three
+  Logback XMLs are asserted by no test today.
+
+**Enforced by:** `{backend,frontend,ingest}/src/main/resources/logback-spring.xml` ·
+**Related:** ADR-0095 (`<svc>-stdout` shipping), ADR-0072 (`stop_grace_period`), REQ-OBS-007

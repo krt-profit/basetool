@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.model.ManufacturerUexCompany;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerUexCompanyRepository;
+import de.greluc.krt.profit.basetool.backend.support.LogSafe;
 import de.greluc.krt.profit.basetool.backend.support.UexValues;
 import java.time.Instant;
 import java.util.Comparator;
@@ -81,6 +82,13 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class UexManufacturerService {
 
+  /**
+   * Cap for the upstream-supplied company name / nickname in log lines. UEX is a third party we do
+   * not control, so both are untrusted free text and go through {@link LogSafe} first; 64
+   * characters comfortably fit any real brand name.
+   */
+  private static final int MAX_NAME_LOG_LENGTH = 64;
+
   private final UexClient uexClient;
   private final ManufacturerRepository manufacturerRepository;
   private final ManufacturerUexCompanyRepository aliasRepository;
@@ -117,7 +125,12 @@ public class UexManufacturerService {
    */
   public void syncManufacturers() {
     log.info("Starting synchronization of UEX manufacturers...");
-    List<UexCompanyDto> companies = uexClient.getCompanies();
+    UexClient.FetchResult<UexCompanyDto> fetched = uexClient.getCompanies();
+    if (fetched.notModified()) {
+      log.info("UEX company catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexCompanyDto> companies = fetched.data();
     if (companies.isEmpty()) {
       log.warn("No companies received from UEX API. Aborting synchronization.");
       return;
@@ -138,7 +151,10 @@ public class UexManufacturerService {
     int skipped = 0;
     for (UexCompanyDto dto : ordered) {
       if (!StringUtils.hasText(dto.name())) {
-        log.debug("Skipping company with missing name: {}", dto);
+        log.debug(
+            "Skipping company with missing name (id={}, nickname='{}')",
+            dto.id(),
+            LogSafe.text(dto.nickname(), MAX_NAME_LOG_LENGTH));
         skipped++;
         continue;
       }
@@ -154,7 +170,11 @@ public class UexManufacturerService {
       } catch (Exception e) {
         // The failed company's own REQUIRES_NEW transaction has rolled back; the outer sweep is
         // untouched, so we just tally it and carry on with the next company.
-        log.error("Failed to process UEX company dto: {}", dto, e);
+        log.error(
+            "Failed to process UEX company dto (id={}, name='{}')",
+            dto.id(),
+            LogSafe.text(dto.name(), MAX_NAME_LOG_LENGTH),
+            e);
         skipped++;
       }
     }

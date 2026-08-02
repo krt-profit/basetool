@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
@@ -31,6 +32,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
@@ -39,6 +44,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
@@ -303,6 +309,136 @@ class NotificationStreamServiceTest {
     // ...and the dead emitter is reaped immediately instead of leaking until the 30-min timeout,
     // which would inflate the gauge that drives the SsePushChannelDead alert.
     assertEquals(0.0, sseConnections(service));
+  }
+
+  @Test
+  void sendFailure_tagsTheCauseAndLeavesTheThrowableInADebugLine() throws Exception {
+    // The three push branches used to catch `e` and never reference it: an ordinary client
+    // hang-up and a registry lifecycle bug were the same, unattributable number.
+    CapturingStreamService service = new CapturingStreamService();
+    UUID recipientSub = UUID.randomUUID();
+    service.subscribe(recipientSub);
+    clearInvocations(service.emitter);
+    IOException brokenPipe = new IOException("broken pipe");
+    doThrow(brokenPipe).when(service.emitter).send(any(SseEmitter.SseEventBuilder.class));
+
+    List<ILoggingEvent> events =
+        withStreamLogAppender(() -> service.publish(List.of(recipientSub)));
+
+    assertEquals(
+        1.0,
+        service
+            .registry
+            .get(MetricNames.SSE_SEND_FAILURES)
+            .tag(MetricNames.TAG_EVENT, MetricNames.SSE_EVENT_NOTIFICATION)
+            .tag(MetricNames.TAG_CAUSE, MetricNames.CAUSE_IO)
+            .counter()
+            .count());
+    ILoggingEvent logged = events.getLast();
+    // DEBUG and nothing louder: a broken pipe fires on every closed tab, so any higher level is a
+    // client-triggerable log flood (REQ-OBS-001).
+    assertEquals(Level.DEBUG, logged.getLevel());
+    assertNotNull(logged.getThrowableProxy(), "the caught exception must reach the log line");
+    assertTrue(logged.getFormattedMessage().contains(recipientSub.toString()));
+  }
+
+  @Test
+  void sendFailure_onAnAlreadyCompletedEmitter_isCountedAsIllegalStateNotIo() throws Exception {
+    // A write against a completed emitter is a registry lifecycle race, not a dead client — the
+    // whole point of the bounded cause tag is telling the two apart without flipping a logger.
+    CapturingStreamService service = new CapturingStreamService();
+    UUID recipientSub = UUID.randomUUID();
+    service.subscribe(recipientSub);
+    clearInvocations(service.emitter);
+    doThrow(new IllegalStateException("already completed"))
+        .when(service.emitter)
+        .send(any(SseEmitter.SseEventBuilder.class));
+
+    service.heartbeat();
+
+    assertEquals(
+        1.0,
+        service
+            .registry
+            .get(MetricNames.SSE_SEND_FAILURES)
+            .tag(MetricNames.TAG_EVENT, MetricNames.SSE_EVENT_HEARTBEAT)
+            .tag(MetricNames.TAG_CAUSE, MetricNames.CAUSE_ILLEGAL_STATE)
+            .counter()
+            .count());
+  }
+
+  @Test
+  void sendFailure_onAnUnexpectedRuntimeException_fallsBackToTheOtherCause() throws Exception {
+    CapturingStreamService service = new CapturingStreamService();
+    UUID recipientSub = UUID.randomUUID();
+    doThrow(new IllegalArgumentException("odd"))
+        .when(service.emitter)
+        .send(any(SseEmitter.SseEventBuilder.class));
+
+    service.subscribe(recipientSub);
+
+    assertEquals(
+        1.0,
+        service
+            .registry
+            .get(MetricNames.SSE_SEND_FAILURES)
+            .tag(MetricNames.TAG_EVENT, MetricNames.SSE_EVENT_CONNECTED)
+            .tag(MetricNames.TAG_CAUSE, MetricNames.CAUSE_OTHER)
+            .counter()
+            .count());
+  }
+
+  @Test
+  void subscribe_capEviction_countsAndLogsTheRetirement() {
+    // M6: the cap holding is exactly why basetool_sse_connections stays FLAT while a user's tab
+    // silently loses its push channel — so the eviction needs its own counter and line.
+    DistinctEmitterStreamService service = new DistinctEmitterStreamService();
+    UUID sub = UUID.randomUUID();
+
+    List<ILoggingEvent> events =
+        withStreamLogAppender(
+            () -> {
+              for (int i = 0; i < NotificationStreamService.MAX_EMITTERS_PER_SUB + 2; i++) {
+                service.subscribe(sub);
+              }
+            });
+
+    assertEquals(2.0, service.registry.get(MetricNames.SSE_EMITTERS_EVICTED).counter().count());
+    ILoggingEvent evictionLine =
+        events.stream()
+            .filter(e -> e.getFormattedMessage().contains("Evicting oldest SSE emitter"))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("the cap eviction must leave a log line"));
+    assertEquals(Level.DEBUG, evictionLine.getLevel());
+    assertTrue(evictionLine.getFormattedMessage().contains(sub.toString()));
+    assertTrue(
+        evictionLine
+            .getFormattedMessage()
+            .contains(String.valueOf(NotificationStreamService.MAX_EMITTERS_PER_SUB)),
+        "the line must name the cap that was hit: " + evictionLine.getFormattedMessage());
+  }
+
+  /**
+   * Runs {@code body} with the registry's logger forced to DEBUG and a {@link ListAppender}
+   * attached, then restores the previous level and detaches the appender.
+   *
+   * @param body the action whose log output is wanted
+   * @return the captured log events, in order
+   */
+  private static List<ILoggingEvent> withStreamLogAppender(Runnable body) {
+    Logger logger = (Logger) LoggerFactory.getLogger(NotificationStreamService.class);
+    Level previous = logger.getLevel();
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    logger.setLevel(Level.DEBUG);
+    try {
+      body.run();
+      return List.copyOf(appender.list);
+    } finally {
+      logger.setLevel(previous);
+      logger.detachAppender(appender);
+    }
   }
 
   /**

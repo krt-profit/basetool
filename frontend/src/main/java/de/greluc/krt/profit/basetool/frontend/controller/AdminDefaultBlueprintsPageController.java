@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.DefaultBlueprintCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.DefaultBlueprintDto;
@@ -58,6 +59,13 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
 @Slf4j
 public class AdminDefaultBlueprintsPageController {
+
+  /**
+   * Character budget for the type-ahead term when it is written to a log line. A product name an
+   * admin could plausibly be typing fits comfortably; anything longer is a paste or an attack and
+   * is truncated by {@link LogSafe#text(String, int)} rather than allowed to stretch the line.
+   */
+  private static final int MAX_LOGGED_QUERY = 80;
 
   /**
    * Response type for the blueprint product type-ahead search results. A shared static {@link
@@ -109,7 +117,16 @@ public class AdminDefaultBlueprintsPageController {
           backendApiClient.get(uri, BLUEPRINT_PRODUCT_LIST_TYPE, query);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
-      log.warn("Default-blueprint product type-ahead failed for query='{}': {}", q, e.getMessage());
+      // DEBUG, not WARN: this endpoint fires ONE REQUEST PER KEYSTROKE. With the backend down, a
+      // single admin typing a product name produces one line per character — a log-flood vector
+      // triggered accidentally by ordinary use, which REQ-OBS-001 puts at DEBUG. The outage itself
+      // is already carried by basetool_backend_client_errors_total and by the WebClient/resilience
+      // logging, so nothing is lost. The query is user-typed free text and goes through LogSafe so
+      // it cannot inject a forged log line (CWE-117).
+      log.debug(
+          "Default-blueprint product type-ahead failed for query='{}': {}",
+          LogSafe.text(q, MAX_LOGGED_QUERY),
+          e.getMessage());
       return Collections.emptyList();
     }
   }

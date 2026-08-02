@@ -25,8 +25,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 
 /**
  * Unit tests for {@link TaskMetrics} — the shared scheduled-job instrumentation wrapper: the
@@ -310,5 +312,64 @@ class TaskMetricsTest {
                     }))
         .isInstanceOf(IllegalStateException.class)
         .hasCause(checked);
+  }
+
+  @Test
+  void record_tagsTheRunWithItsOwnCorrelationIdAndClearsItAfterwards() {
+    // A scheduler thread carries no request, so CorrelationIdFilter never runs for it and every
+    // scheduled line used to have an empty correlationId. With eight jobs on overlapping schedules
+    // that made a nightly window unreadable — the lines interleave with nothing to group them.
+    AtomicReference<String> seen = new AtomicReference<>();
+
+    taskMetrics.record(ScheduledJob.USER_SYNC, () -> seen.set(MDC.get("correlationId")));
+
+    assertThat(seen.get()).startsWith("user_sync-");
+    assertThat(MDC.get("correlationId")).isNull();
+  }
+
+  @Test
+  void record_givesTwoRunsOfTheSameJobDistinctIds() {
+    // Grepping the job label finds every run; the full id narrows it to one.
+    AtomicReference<String> first = new AtomicReference<>();
+    AtomicReference<String> second = new AtomicReference<>();
+
+    taskMetrics.record(ScheduledJob.USER_SYNC, () -> first.set(MDC.get("correlationId")));
+    taskMetrics.record(ScheduledJob.USER_SYNC, () -> second.set(MDC.get("correlationId")));
+
+    assertThat(first.get()).isNotEqualTo(second.get());
+  }
+
+  @Test
+  void record_clearsTheRunIdEvenWhenTheJobBodyThrows() {
+    // The scheduler thread is pooled, so a leaked id would mislabel the next job that runs on it.
+    taskMetrics.record(
+        ScheduledJob.USER_SYNC,
+        () -> {
+          throw new IllegalStateException("boom");
+        });
+
+    assertThat(MDC.get("correlationId")).isNull();
+  }
+
+  @Test
+  void record_keepsAnExistingRequestCorrelationIdInsteadOfOverwritingIt() {
+    // recordCountingRethrow runs inside an admin request that already owns a real correlation id;
+    // replacing it would sever the manual trigger from the HTTP call that started it.
+    MDC.put("correlationId", "request-cid-1");
+    try {
+      AtomicReference<String> seen = new AtomicReference<>();
+
+      taskMetrics.recordCountingRethrow(
+          ScheduledJob.USER_SYNC,
+          () -> {
+            seen.set(MDC.get("correlationId"));
+            return 3;
+          });
+
+      assertThat(seen.get()).isEqualTo("request-cid-1");
+      assertThat(MDC.get("correlationId")).isEqualTo("request-cid-1");
+    } finally {
+      MDC.clear();
+    }
   }
 }

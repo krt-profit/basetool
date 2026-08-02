@@ -110,7 +110,7 @@ class UexClientTest {
                 """));
 
     // When
-    List<UexCommodityDto> commodities = client.getCommodities();
+    List<UexCommodityDto> commodities = client.getCommodities().data();
 
     // Then
     assertEquals(2, commodities.size());
@@ -130,7 +130,7 @@ class UexClientTest {
     server.enqueue(new MockResponse().setResponseCode(500).setBody("upstream exploded"));
 
     // When
-    List<UexCommodityDto> commodities = client.getCommodities();
+    List<UexCommodityDto> commodities = client.getCommodities().data();
 
     // Then
     assertNotNull(commodities, "fallback must return empty list, not null");
@@ -153,7 +153,7 @@ class UexClientTest {
     server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_DURING_REQUEST_BODY));
 
     // When
-    List<UexCommodityDto> commodities = client.getCommodities();
+    List<UexCommodityDto> commodities = client.getCommodities().data();
 
     // Then
     assertNotNull(commodities);
@@ -170,7 +170,7 @@ class UexClientTest {
             .setBody("{\"status\":\"ok\",\"data\":[]}"));
 
     // When
-    List<UexCommodityDto> commodities = client.getCommodities();
+    List<UexCommodityDto> commodities = client.getCommodities().data();
 
     // Then
     assertNotNull(commodities);
@@ -188,7 +188,7 @@ class UexClientTest {
     try {
       server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":null}"));
 
-      List<UexCommodityDto> commodities = client.getCommodities();
+      List<UexCommodityDto> commodities = client.getCommodities().data();
 
       assertNotNull(commodities, "null data must surface as an empty list, not null");
       assertTrue(commodities.isEmpty());
@@ -212,7 +212,7 @@ class UexClientTest {
             ]}
             """));
 
-    List<UexCommodityPriceDto> prices = client.getCommoditiesPricesAll();
+    List<UexCommodityPriceDto> prices = client.getCommoditiesPricesAll().data();
 
     assertEquals(1, prices.size());
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
@@ -222,7 +222,7 @@ class UexClientTest {
   @Test
   void getCommoditiesPricesAll_serverError_returnsEmptyList() {
     server.enqueue(new MockResponse().setResponseCode(503));
-    assertTrue(client.getCommoditiesPricesAll().isEmpty());
+    assertTrue(client.getCommoditiesPricesAll().data().isEmpty());
   }
 
   // ─── getStarSystems ─────────────────────────────────────────────────────
@@ -238,7 +238,7 @@ class UexClientTest {
             ]}
             """));
 
-    List<UexStarSystemDto> systems = client.getStarSystems();
+    List<UexStarSystemDto> systems = client.getStarSystems().data();
 
     assertEquals(2, systems.size());
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
@@ -248,7 +248,7 @@ class UexClientTest {
   @Test
   void getStarSystems_clientError_returnsEmptyList() {
     server.enqueue(new MockResponse().setResponseCode(404));
-    assertTrue(client.getStarSystems().isEmpty());
+    assertTrue(client.getStarSystems().data().isEmpty());
   }
 
   // ─── Endpoint sanity (URIs and empty-fallback) ─────────────────────────
@@ -343,7 +343,7 @@ class UexClientTest {
     server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"abc-123\""));
 
     client.getCommodities(); // primes the ETag store
-    List<UexCommodityDto> second = client.getCommodities(); // replays the ETag
+    List<UexCommodityDto> second = client.getCommodities().data(); // replays the ETag
 
     RecordedRequest first = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(first);
@@ -369,7 +369,7 @@ class UexClientTest {
     // so the cleaner path stays intact).
     server.enqueue(new MockResponse().setResponseCode(304));
 
-    List<UexCommodityDto> result = client.getCommodities();
+    List<UexCommodityDto> result = client.getCommodities().data();
 
     assertNotNull(result);
     assertTrue(result.isEmpty(), "304 Not Modified must yield an empty list");
@@ -417,8 +417,8 @@ class UexClientTest {
     server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"keep-me\""));
 
     client.getCommodities(); // stores keep-me
-    List<UexCommodityDto> midError = client.getCommodities(); // 500 - fallback empty
-    List<UexCommodityDto> thirdCall = client.getCommodities(); // should still send keep-me
+    List<UexCommodityDto> midError = client.getCommodities().data(); // 500 - fallback empty
+    List<UexCommodityDto> thirdCall = client.getCommodities().data(); // should still send keep-me
 
     assertTrue(midError.isEmpty(), "5xx must still surface as empty list");
     assertTrue(thirdCall.isEmpty(), "subsequent 304 also yields empty list");
@@ -490,7 +490,161 @@ class UexClientTest {
     assertTrue(result.data().isEmpty());
   }
 
+  // ─── envelope audit + completion logging (H6) ───────────────────────────
+  // Before this, a 200 with no data array threw nothing and counted nothing, a non-"ok" envelope
+  // status had no reader at all, and the 304 branch logged at DEBUG — dead in production. The three
+  // outcomes were indistinguishable at the call site, which is why 19 endpoints emitted the same
+  // alarming "No X received from UEX API" WARN for a perfectly healthy unchanged feed.
+
+  @Test
+  void healthy200_logsCompletionInfoWithRowCountAndEnvelopeStatus() {
+    String body = "{\"status\":\"ok\",\"data\":[{\"id\":1,\"name\":\"Gold\"}]}";
+    List<ILoggingEvent> events =
+        captureUexLog(() -> server.enqueue(jsonOk(body)), client::getCommodities);
+
+    ILoggingEvent completion =
+        events.stream()
+            .filter(e -> e.getFormattedMessage().startsWith("Fetched 1 commodities"))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("no completion line: " + messages(events)));
+    assertEquals(Level.INFO, completion.getLevel(), "a healthy fetch completes at INFO");
+    assertTrue(
+        completion.getFormattedMessage().contains("'ok'"),
+        "the completion line must report the envelope status it read: "
+            + completion.getFormattedMessage());
+  }
+
+  @Test
+  void nullDataEnvelope_warnsAndCountsAFetchError() {
+    List<ILoggingEvent> events =
+        captureUexLog(
+            () -> server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":null}")),
+            client::getCommodities);
+
+    assertTrue(
+        events.stream()
+            .anyMatch(
+                e ->
+                    e.getLevel() == Level.WARN
+                        && e.getFormattedMessage().contains("no data array")),
+        "a 200 without a data array is a contract break and must WARN: " + messages(events));
+    assertEquals(
+        1.0,
+        fetchErrorCount(),
+        "a 200 with no data array must increment basetool_external_fetch_errors_total{source=uex}");
+  }
+
+  @Test
+  void nonOkEnvelopeStatus_warnsAndCounts_butStillReturnsTheRows() {
+    String body = "{\"status\":\"error\",\"data\":[{\"id\":1,\"name\":\"Gold\"}]}";
+    List<ILoggingEvent> events =
+        captureUexLog(() -> server.enqueue(jsonOk(body)), client::getCommodities);
+
+    assertTrue(
+        events.stream()
+            .anyMatch(
+                e ->
+                    e.getLevel() == Level.WARN
+                        && e.getFormattedMessage().contains("envelope status 'error'")),
+        "a self-declared upstream failure must WARN: " + messages(events));
+    assertEquals(1.0, fetchErrorCount(), "a non-ok envelope status must count as a fetch error");
+
+    server.enqueue(jsonOk(body));
+    assertEquals(
+        1,
+        client.getCommodities().data().size(),
+        "the client stays fail-soft: the rows are still handed to the caller");
+  }
+
+  @Test
+  void blankEnvelopeStatus_isNotTreatedAsAnAnomaly() {
+    // No code ever read `status` before, so we cannot claim every endpoint populates it. Treating
+    // its absence as a fault would WARN on every endpoint of every sweep to report something we
+    // have never observed.
+    List<ILoggingEvent> events =
+        captureUexLog(
+            () -> server.enqueue(jsonOk("{\"data\":[{\"id\":1,\"name\":\"Gold\"}]}")),
+            client::getCommodities);
+
+    assertTrue(
+        events.stream().noneMatch(e -> e.getLevel() == Level.WARN),
+        "an absent status must not warn: " + messages(events));
+    assertEquals(0.0, fetchErrorCount(), "an absent status is not a fetch error");
+  }
+
+  @Test
+  void notModified_isLoggedAtInfoNotDebug() {
+    // DEBUG is off in production, so a DEBUG-only 304 line left an all-304 night looking exactly
+    // like an outage in the log.
+    List<ILoggingEvent> events =
+        captureUexLog(
+            () -> {
+              server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}").setHeader("ETag", "\"e1\""));
+              server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"e1\""));
+              client.getCommodities();
+            },
+            client::getCommodities);
+
+    ILoggingEvent unchanged =
+        events.stream()
+            .filter(e -> e.getFormattedMessage().contains("304 Not Modified"))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("no 304 line: " + messages(events)));
+    assertEquals(Level.INFO, unchanged.getLevel(), "an unchanged feed is healthy — INFO, not WARN");
+    assertEquals(0.0, fetchErrorCount(), "a 304 is not a fetch error");
+  }
+
   // ─── helpers ────────────────────────────────────────────────────────────
+
+  /**
+   * Runs {@code arrange} then {@code call} with a {@link ListAppender} attached to the {@link
+   * UexClient} logger and returns everything it logged.
+   *
+   * @param arrange enqueues the responses (and any priming calls) the scenario needs
+   * @param call the client call under test
+   * @return the log events the client emitted during {@code arrange} and {@code call}
+   */
+  private List<ILoggingEvent> captureUexLog(Runnable arrange, Runnable call) {
+    Logger uexLog = (Logger) LoggerFactory.getLogger(UexClient.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    uexLog.addAppender(appender);
+    try {
+      arrange.run();
+      call.run();
+      return List.copyOf(appender.list);
+    } finally {
+      uexLog.detachAppender(appender);
+    }
+  }
+
+  /**
+   * Reads the current {@code basetool_external_fetch_errors_total{source=uex}} value, tolerating an
+   * unregistered counter (nothing failed yet) as {@code 0}.
+   *
+   * @return the counter value, or {@code 0} when the counter was never touched
+   */
+  private double fetchErrorCount() {
+    return meterRegistry
+        .find(MetricNames.EXTERNAL_FETCH_ERRORS)
+        .tag(MetricNames.TAG_SOURCE, MetricNames.SOURCE_UEX)
+        .counters()
+        .stream()
+        .mapToDouble(io.micrometer.core.instrument.Counter::count)
+        .sum();
+  }
+
+  /**
+   * Renders captured log events for an assertion failure message.
+   *
+   * @param events the captured events
+   * @return one {@code LEVEL message} line per event
+   */
+  private static String messages(List<ILoggingEvent> events) {
+    return events.stream()
+        .map(e -> e.getLevel() + " " + e.getFormattedMessage())
+        .reduce("", (a, b) -> a + "\n" + b);
+  }
 
   private MockResponse jsonOk(String body) {
     return new MockResponse()
