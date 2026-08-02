@@ -40,15 +40,20 @@ RUN ./gradlew :frontend:dependencies --no-daemon
 # `-x test` skips the test suite; `-x checkstyleMain -x spotbugsMain
 # -x spotlessCheck -x spotlessJavaCheck` skip the Java static-analysis and
 # formatting verification steps, and `-x lintCss -x lintHtml -x lintJs
-# -x prettierCheck` skip the Node-based web-asset linters / Prettier formatter —
-# all of which the `check` task pulls in via `build`. Those tools are meant for
-# developer / CI workflows — running them inside the production image build only
-# adds minutes and needs auxiliary files (`config/checkstyle/`, plus
-# `frontend/package.json` and the `.prettierrc.json` / `.prettierignore` / lint
-# tool configs) that are deliberately not part of the Docker context (only
-# `frontend/build.gradle.kts` and `frontend/src/` are copied). A node task whose
-# declared input files are absent fails configuration validation outright, so
-# every Node-based `check` task must be excluded here, not just the Java ones.
+# -x prettierCheck -x typecheckJs -x generateApiTypes` skip the Node-based
+# web-asset linters, the Prettier formatter and the TypeScript type check
+# (ADR-0125) — all of which the `check` task pulls in via `build`. Those tools
+# are meant for developer / CI workflows — running them inside the production
+# image build only adds minutes and needs auxiliary files (`config/checkstyle/`,
+# plus `frontend/package.json`, `frontend/tsconfig.json`, `frontend/types/` and
+# the `.prettierrc.json` / `.prettierignore` / lint tool configs) that are
+# deliberately not part of the Docker context (only `frontend/build.gradle.kts`
+# and `frontend/src/` are copied). `generateApiTypes` additionally reads the
+# BACKEND module's `openapi.json`, which is never in the frontend context at all.
+# A node task whose declared input files are absent fails configuration
+# validation outright, so every Node-based `check` task must be excluded here,
+# not just the Java ones — when you add one to `check`, add it to this list in
+# the same change or the image build breaks.
 # Spotless in particular fails the build when source files were checked out with
 # CRLF line endings (typical on a Windows-developer's workstation that pushes to
 # a Linux build host), even though the byte content is otherwise identical to the
@@ -69,6 +74,8 @@ RUN ./gradlew :frontend:build \
     -x lintHtml \
     -x lintJs \
     -x prettierCheck \
+    -x typecheckJs \
+    -x generateApiTypes \
     --no-daemon
 
 # Layered JAR extrahieren. The Spring Boot Gradle plugin produces exactly one
