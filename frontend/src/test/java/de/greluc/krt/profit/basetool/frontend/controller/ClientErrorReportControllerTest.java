@@ -65,12 +65,25 @@ class ClientErrorReportControllerTest {
   private static final String BEACON_MODULE = "/static/js/krt-client-error.js";
 
   /**
-   * Captures the beacon's request-body object literal — the argument of its object-literal {@code
-   * JSON.stringify} call. That literal has no nested braces, so the brace-excluding body class is
-   * exact here, and the module's other {@code JSON.stringify(budget)} call cannot match it because
-   * it passes a variable rather than a literal.
+   * Captures the beacon's payload object literal. It has no nested braces, so the brace-excluding
+   * body class is exact, and neither of the module's {@code JSON.stringify} calls can match it.
+   *
+   * <p>Anchored on the {@code payload} declaration rather than on the {@code JSON.stringify}
+   * argument: since the CSRF-queueing retry the payload is built once and then either delivered or
+   * parked, so it is no longer an inline argument. {@link #BEACON_BODY_IS_THE_PAYLOAD} closes the
+   * gap that opens up — on its own, this pattern would no longer prove the captured literal is what
+   * actually reaches the wire.
    */
-  private static final Pattern BEACON_BODY = Pattern.compile("JSON\\.stringify\\(\\{([^}]*)\\}\\)");
+  private static final Pattern BEACON_PAYLOAD = Pattern.compile("const payload = \\{([^}]*)\\}");
+
+  /**
+   * The beacon's request body must be the payload object <em>verbatim</em> — not a wrapper, not a
+   * spread with something merged in. Together with {@link #BEACON_PAYLOAD} this is the same
+   * guarantee the single inline-literal match used to give: exactly these five fields leave the
+   * browser.
+   */
+  private static final Pattern BEACON_BODY_IS_THE_PAYLOAD =
+      Pattern.compile("body: JSON\\.stringify\\(payload\\)");
 
   /** Matches one {@code name:} property key inside the captured object literal. */
   private static final Pattern OBJECT_KEY = Pattern.compile("(\\w+)\\s*:");
@@ -212,11 +225,14 @@ class ClientErrorReportControllerTest {
   @Test
   void beaconSendsExactlyTheFiveAllowedFieldsAndNothingElse() throws IOException {
     String beacon = readBeaconModule();
-    Matcher body = BEACON_BODY.matcher(beacon);
-    assertThat(body.find()).as("no JSON.stringify({…}) request body in %s", BEACON_MODULE).isTrue();
+    Matcher payload = BEACON_PAYLOAD.matcher(beacon);
+    assertThat(payload.find()).as("no `const payload = {…}` literal in %s", BEACON_MODULE).isTrue();
+    assertThat(BEACON_BODY_IS_THE_PAYLOAD.matcher(beacon).find())
+        .as("%s does not send the payload object verbatim as the request body", BEACON_MODULE)
+        .isTrue();
 
     List<String> keys = new ArrayList<>();
-    Matcher key = OBJECT_KEY.matcher(body.group(1));
+    Matcher key = OBJECT_KEY.matcher(payload.group(1));
     while (key.find()) {
       keys.add(key.group(1));
     }

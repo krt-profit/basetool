@@ -31,6 +31,36 @@
  *  - The `kind` values below are mirrored by ClientErrorReportController's server-side allowlist
  *    (a beacon kind outside it contributes no metric series at all); ClientErrorReportControllerTest
  *    pins the two halves against each other so they cannot drift.
+ *
+ * COVERAGE HOLES. Both are consequences of being a synchronous, CSRF-gated beacon inside the
+ * document it watches. A reader must not mistake "no client-error report" for "nothing broke":
+ *
+ *  1. IT CANNOT SEE A FAILURE OF ANYTHING THE HEAD LOADS ABOVE IT. In fragments/head.html the
+ *     favicon, the Lato-Regular preload and — the one that actually matters — the styles.css
+ *     <link> are emitted BEFORE this script. A pending stylesheet blocks execution of the next
+ *     synchronous script until its load settles, so if styles.css 404s, its non-bubbling `error`
+ *     event has already fired and been discarded by the time this file installs its capturing
+ *     listener. The same holds for any per-page `additionalLinks` further down: those parse after
+ *     this script, so they ARE covered, but the head's own three assets are not. This is a
+ *     deliberate trade, not an oversight — hoisting the script above the stylesheet would delay
+ *     CSS discovery and first paint for every page view, to gain a signal for a failure mode that
+ *     is already loud (an unstyled app is self-evident to the user, and a broken asset deploy is
+ *     what the blackbox probes and the asset pipeline exist for). The failure this beacon exists
+ *     for — a handler that parses and then throws at runtime — cannot occur that early.
+ *
+ *  2. A REPORT STILL DIES WHEN THE RENDER CARRIES NO CSRF META TAGS — but no longer blindly. The
+ *     tags are `th:if="${_csrf != null}"`, and the POST endpoint is session + CSRF gated, so
+ *     without them there is nothing to send that would be accepted. Two cases used to be
+ *     conflated by a single unconditional `return`: (a) the tags do not exist on this render at
+ *     all (an anonymous error page) — genuinely undeliverable, still dropped; and (b) the tags
+ *     exist but the parser has not reached them yet, which an early resource error can outrun if
+ *     the head is ever reordered so the beacon precedes them. Case (b) is now mitigated cheaply:
+ *     up to PENDING_CAPACITY such reports are held and retried once at DOMContentLoaded, when the
+ *     document is fully parsed and the answer is final. The queue is bounded twice over (by that
+ *     cap and by the token bucket, which a queued report has already paid), only ever fills while
+ *     `document.readyState === 'loading'`, and is never re-armed — it cannot become a memory or
+ *     flood vector. What is NOT mitigated, and cannot be from here, is case (a): a report from a
+ *     page that has no session is dropped in the browser rather than sent and rejected.
  */
 (function () {
     'use strict';
@@ -61,6 +91,14 @@
     // Set while a report is in flight, so a storm of identical errors during the round-trip
     // collapses into the one report already on its way instead of queueing N of them.
     let sending = false;
+
+    // Reports that could not be delivered because the `_csrf` meta tags were not parsed yet (see
+    // coverage hole 2 in the header). Held only while the document is still parsing and retried
+    // once at DOMContentLoaded. Bounded by PENDING_CAPACITY on top of the token bucket, which a
+    // queued report has already paid — the queue can therefore never outgrow one page load.
+    const PENDING_CAPACITY = 5;
+    let pending = [];
+    let flushArmed = false;
 
     /**
      * Reads the persisted bucket, preferring sessionStorage over the in-memory fallback so a
@@ -162,19 +200,18 @@
     }
 
     /**
-     * POSTs one report, best-effort. Every failure mode is swallowed: a beacon that surfaces its
-     * own errors would feed itself.
+     * POSTs one already-built payload, best-effort. Every failure mode is swallowed: a beacon that
+     * surfaces its own errors would feed itself.
+     *
+     * Returns false, having sent nothing and consumed nothing further, when the CSRF meta tags are
+     * not readable — the caller decides between queueing that payload and dropping it. Any other
+     * outcome (including a rejected fetch) counts as delivered: the report left the browser.
      */
-    function report(kind, message, source, line, column) {
-        if (sending || !takeToken()) {
-            return;
-        }
+    function deliver(payload) {
         const token = metaContent('_csrf');
         const header = metaContent('_csrf_header');
         if (!token || !header) {
-            // No CSRF token on this render means no usable session to report against; the endpoint
-            // would answer with the login redirect anyway.
-            return;
+            return false;
         }
         const headers = {
             'Content-Type': 'application/json',
@@ -197,18 +234,59 @@
                 // Survive an unload: the interesting errors are the ones that fire while the user
                 // is already navigating away in frustration.
                 keepalive: true,
-                body: JSON.stringify({
-                    kind: kind,
-                    message: field(message),
-                    source: scriptUrl(source),
-                    line: number(line),
-                    column: number(column),
-                }),
+                body: JSON.stringify(payload),
             };
             sending = true;
             window.fetch(ENDPOINT, init).then(settled, settled);
         } catch (_beaconFailed) {
             settled();
+        }
+        return true;
+    }
+
+    /**
+     * Retries the reports that outran the `_csrf` meta tags, once, after the document has finished
+     * parsing. The queue is cleared first so a failure here cannot leave it re-armed, and the loop
+     * stops at the first payload that is still undeliverable: the tags are absent from the whole
+     * parsed document, which means this render has no session to report against and every later
+     * payload would fail identically.
+     */
+    function flushPending() {
+        const queued = pending;
+        pending = [];
+        for (let i = 0; i < queued.length; i++) {
+            if (!deliver(queued[i])) {
+                return;
+            }
+        }
+    }
+
+    /** Rate-limits, builds the payload, and either delivers or briefly queues it. */
+    function report(kind, message, source, line, column) {
+        if (sending || !takeToken()) {
+            return;
+        }
+        const payload = {
+            kind: kind,
+            message: field(message),
+            source: scriptUrl(source),
+            line: number(line),
+            column: number(column),
+        };
+        if (deliver(payload)) {
+            return;
+        }
+        // No usable CSRF token. While the document is still parsing that may only mean the meta
+        // tags are further down, so hold a bounded number of reports for one retry at
+        // DOMContentLoaded. Once parsing is done the answer is final — this render carries no
+        // token, the endpoint would answer with the login redirect, so drop.
+        if (document.readyState !== 'loading' || pending.length >= PENDING_CAPACITY) {
+            return;
+        }
+        pending.push(payload);
+        if (!flushArmed) {
+            flushArmed = true;
+            document.addEventListener('DOMContentLoaded', flushPending, { once: true });
         }
     }
 

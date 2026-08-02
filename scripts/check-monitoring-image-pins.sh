@@ -36,9 +36,39 @@ set -euo pipefail
 
 COMPOSE_FILE="docker-compose.monitoring.yml"
 
-# Historical records: a release note naming the version that shipped at the time is CORRECT and must
-# never be rewritten to today's tag.
-EXCLUDED_DOCS_REGEX='^(CHANGELOG\.md|CHANGELOG-ARCHIVE\.md)$'
+# HISTORICAL RECORDS ARE NEVER REWRITTEN
+# --------------------------------------
+# Some documents state what was true at the moment they were written. For those, a tag that differs
+# from today's compose file is not staleness — it is the record doing its job. Rewriting it (which
+# is what --fix does, and what a red gate pressures a contributor into running) falsifies the record
+# instead of refreshing a stale doc, so they are excluded from the scan entirely:
+#
+#   CHANGELOG.md / CHANGELOG-ARCHIVE.md
+#       A release note naming the version that shipped in that release is correct forever, by
+#       construction.
+#
+#   docs/adr/
+#       An ADR records a decision taken at a point in time, and ADR-0076 already reads "pinned to
+#       grafana/tempo:3.0.2". That sentence documents what was decided, not what is deployed. On the
+#       next Tempo bump the gate would fail and its own advertised remedy would edit an ACCEPTED
+#       decision record to name a version that decision never made — a retroactive rewrite of the
+#       history the ADR process exists to preserve. An ADR that no longer matches reality is
+#       superseded by a new ADR; it is never silently edited. Same footing as the changelog, hence
+#       the same exclusion.
+#
+# Individual frozen documents outside those trees opt out through the repository's existing
+# front-matter convention instead of through a name list here: a "Doc type: ... Historical ..."
+# marker within the first few lines (see docs/BANK_PLAN.md and
+# docs/REFINERY_SCREENSHOT_IMPORT_PLAN.md, both frozen after implementation) exempts the file. That
+# is the inline escape hatch — a future incident or post-mortem write-up is covered the moment it
+# carries that header, with no edit here. The repository tracks no incident/post-mortem directory
+# today, which is why none is listed above; add its prefix here if one is ever introduced.
+EXCLUDED_DOCS_REGEX='^(CHANGELOG\.md$|CHANGELOG-ARCHIVE\.md$|docs/adr/)'
+
+# How far into a file the "Doc type:" front matter is looked for. Deliberately small: docs/specs/
+# INDEX.md quotes the very same header deep in its body as an authoring example, and that file is a
+# living index that must stay in scope.
+HISTORICAL_HEADER_LINES=10
 
 fix_mode=0
 case "${1:-}" in
@@ -59,6 +89,22 @@ fi
 # that realistically occur in a repository name ('/' and '-' are literal in ERE).
 escape_ere() {
   printf '%s' "$1" | sed -e 's/[.]/\\./g' -e 's/[+]/\\+/g'
+}
+
+# Escape an arbitrary literal for the SEARCH half of `sed 's#…#…#'`: the BRE metacharacters plus the
+# '#' delimiter. This is not theoretical — 'ghcr.io/google/cadvisor' contains dots today, and an
+# unescaped '.' matches any character, so the --fix rewrite could hit neighbouring text that differs
+# only in those positions. Backslash is escaped first so the backslashes introduced by the later
+# expressions are not escaped a second time.
+escape_sed_pattern() {
+  printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/[.[*^$]/\\&/g' -e 's/#/\\#/g'
+}
+
+# Escape an arbitrary literal for the REPLACEMENT half of `sed 's#…#…#'`, where only '\', '&' (the
+# whole match) and the '#' delimiter carry meaning. Kept adjacent to escape_sed_pattern: the two are
+# only ever correct as a pair, against the same delimiter.
+escape_sed_replacement() {
+  printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/&/\\&/g' -e 's/#/\\#/g'
 }
 
 # repository -> tag, straight from the compose file. Deriving the set means a newly added monitoring
@@ -85,12 +131,37 @@ if ! tracked_docs="$(git ls-files '*.md')"; then
   printf 'error: git ls-files failed — cannot enumerate the docs to check.\n' >&2
   exit 2
 fi
-mapfile -t doc_files < <(printf '%s\n' "$tracked_docs" | grep -Ev "$EXCLUDED_DOCS_REGEX" || true)
-if [ ${#doc_files[@]} -eq 0 ]; then
+mapfile -t candidate_docs < <(
+  printf '%s\n' "$tracked_docs" | grep -Ev "$EXCLUDED_DOCS_REGEX" || true
+)
+if [ ${#candidate_docs[@]} -eq 0 ]; then
   # Not "nothing to drift, pass" — this repository always tracks Markdown, so an empty list means
   # the enumeration broke (no git on PATH, run outside a work tree, a mangled exclude regex). A gate
   # that goes green when it could not look is worse than no gate: it reports "checked, clean".
   printf 'error: no Markdown files to check — the enumeration is broken, not the repository.\n' >&2
+  exit 2
+fi
+
+# Second exclusion pass: individually frozen documents, recognised by their
+# "Doc type: ... Historical ..." front matter (see the EXCLUDED_DOCS_REGEX comment). One awk over
+# the whole list rather than a `head | grep` per file — under `set -o pipefail` a head that exits on
+# SIGPIPE would turn a match into a spurious pipeline failure.
+declare -A frozen_doc=()
+while IFS= read -r frozen; do
+  [ -n "$frozen" ] || continue
+  frozen_doc["$frozen"]=1
+done < <(awk -v limit="$HISTORICAL_HEADER_LINES" \
+  'FNR <= limit && /Doc type:/ && /Historical/ && !seen[FILENAME]++ { print FILENAME }' \
+  "${candidate_docs[@]}" || true)
+
+doc_files=()
+for candidate in "${candidate_docs[@]}"; do
+  [ -z "${frozen_doc["$candidate"]:-}" ] || continue
+  doc_files+=("$candidate")
+done
+if [ ${#doc_files[@]} -eq 0 ]; then
+  # Same reasoning as above: every tracked document being exempt means the exemption logic broke.
+  printf 'error: every Markdown file is exempt — the gate would pass vacuously.\n' >&2
   exit 2
 fi
 
@@ -103,6 +174,11 @@ for repository in "${!expected_tag[@]}"; do
   repository_ere="$(escape_ere "$repository")"
   # A tag may carry dots, dashes and underscores; stop at anything else so a trailing backslash or
   # quote in the surrounding command is not swallowed into the tag.
+  #
+  # `grep -H` forces the `file:line:match` prefix the split below parses. Without it grep omits the
+  # filename whenever the list happens to hold exactly one file, and the split would silently read
+  # the line number as the filename — "the list has more than one entry" is not an invariant this
+  # loop gets to assume, least of all once exclusions can shrink it.
   while IFS= read -r hit; do
     [ -n "$hit" ] || continue
     file="${hit%%:*}"
@@ -114,9 +190,13 @@ for repository in "${!expected_tag[@]}"; do
     drift_count=$((drift_count + 1))
     printf '  %s:%s  %s:%s  ->  %s\n' "$file" "$line" "$repository" "$found_tag" "$want"
     if [ "$fix_mode" -eq 1 ]; then
-      sed -i "s|${repository}:${found_tag}|${repository}:${want}|g" "$file"
+      # Both halves are literals that must survive `sed` unchanged, so both are escaped for their
+      # own side of the s command (see the two helpers).
+      search="$(escape_sed_pattern "${repository}:${found_tag}")"
+      replacement="$(escape_sed_replacement "${repository}:${want}")"
+      sed -i "s#${search}#${replacement}#g" "$file"
     fi
-  done < <(grep -nEo "${repository_ere}:[A-Za-z0-9][A-Za-z0-9._-]*" "${doc_files[@]}" || true)
+  done < <(grep -HnEo "${repository_ere}:[A-Za-z0-9][A-Za-z0-9._-]*" "${doc_files[@]}" || true)
 done
 
 if [ "$drift_count" -eq 0 ]; then

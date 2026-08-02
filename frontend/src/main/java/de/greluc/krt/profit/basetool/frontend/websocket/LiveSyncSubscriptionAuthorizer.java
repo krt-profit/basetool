@@ -74,9 +74,11 @@ public class LiveSyncSubscriptionAuthorizer {
    *
    * <p>The two refusals are kept apart because they mean opposite things operationally: {@link
    * #DENY} is a real permission verdict a user hit, {@link #DENY_INDETERMINATE} is the tool failing
-   * closed while it could not tell. They behave identically on the wire (both refuse the subscribe,
-   * and a refused subscribe is terminal for that tab), so callers gate on {@link #denied()} rather
-   * than comparing constants; only the deny metric's {@code reason} tag and the log level differ.
+   * closed while it could not tell. Both refuse the subscribe, so callers gate on {@link #denied()}
+   * rather than comparing constants; what differs is the deny metric's {@code reason} tag, the log
+   * level, and — since the flavour also rides the {@code denied} control frame — what the client
+   * does next: an indeterminate refusal earns one retry on the next reconnect, an authorization
+   * refusal is terminal for that tab.
    */
   public enum Decision {
     /** The subscribe is authorized (or failed open on an indeterminate outcome). */
@@ -91,7 +93,9 @@ public class LiveSyncSubscriptionAuthorizer {
      * captured token, a transient 401/5xx/timeout/transport failure, auth-executor saturation, or a
      * probe that threw) and the topic class is presence-enabled, so it fails <b>closed</b> (F1).
      * Not a permission verdict: a rising rate here is a backend/token availability problem, and one
-     * such deny costs the tab live updates for that topic for the rest of the session.
+     * such deny costs the tab live updates for that topic until it reconnects — the client retries
+     * this flavour once (and only once) on its next reconnect, so a blip that outlasts the retry
+     * still leaves that tab on the manual-refresh pill for the session.
      */
     DENY_INDETERMINATE;
 

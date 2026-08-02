@@ -53738,22 +53738,26 @@
           },
           "durationMinutes" : {
             "type" : "integer",
-            "format" : "int64"
+            "format" : "int64",
+            "minimum" : 0
           },
           "expenses" : {
             "type" : "number",
             "format" : "double",
-            "maximum" : 1.0E9
+            "maximum" : 1.0E9,
+            "minimum" : 0
           },
           "otherExpenses" : {
             "type" : "number",
             "format" : "double",
-            "maximum" : 1.0E9
+            "maximum" : 1.0E9,
+            "minimum" : 0
           },
           "oreSales" : {
             "type" : "number",
             "format" : "double",
-            "maximum" : 1.0E9
+            "maximum" : 1.0E9,
+            "minimum" : 0
           },
           "profit" : {
             "type" : "number",
@@ -56122,7 +56126,8 @@
         "properties" : {
           "desiredAmount" : {
             "type" : "number",
-            "format" : "double"
+            "format" : "double",
+            "minimum" : 0
           },
           "minQuality" : {
             "type" : "integer",
@@ -56326,7 +56331,8 @@
         "properties" : {
           "offeredAmount" : {
             "type" : "number",
-            "format" : "double"
+            "format" : "double",
+            "minimum" : 0
           },
           "remark" : {
             "type" : "string",
@@ -56426,7 +56432,8 @@
           },
           "sortIndex" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int32",
+            "minimum" : 0
           },
           "version" : {
             "type" : "integer",
@@ -56902,7 +56909,8 @@
         "properties" : {
           "rowIndex" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int32",
+            "minimum" : 0
           },
           "rawMaterialName" : {
             "type" : "string",
@@ -56915,11 +56923,13 @@
           },
           "inputQuantity" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int32",
+            "minimum" : 0
           },
           "outputQuantity" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int32",
+            "minimum" : 0
           },
           "refine" : {
             "type" : "boolean"
@@ -56948,11 +56958,13 @@
           },
           "width" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int32",
+            "minimum" : 0
           },
           "height" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int32",
+            "minimum" : 0
           },
           "cropMode" : {
             "type" : "string",
@@ -56995,24 +57007,29 @@
           },
           "rawInManifestTotal" : {
             "type" : "integer",
-            "format" : "int64"
+            "format" : "int64",
+            "minimum" : 0
           },
           "rawToRefineTotal" : {
             "type" : "integer",
-            "format" : "int64"
+            "format" : "int64",
+            "minimum" : 0
           },
           "expenses" : {
             "type" : "number",
             "format" : "double",
-            "maximum" : 1.0E9
+            "maximum" : 1.0E9,
+            "minimum" : 0
           },
           "durationMinutes" : {
             "type" : "integer",
-            "format" : "int64"
+            "format" : "int64",
+            "minimum" : 0
           },
           "totalYieldScu" : {
             "type" : "number",
-            "format" : "double"
+            "format" : "double",
+            "minimum" : 0
           },
           "sourceImages" : {
             "type" : "array",
@@ -57728,7 +57745,8 @@
           },
           "amount" : {
             "type" : "number",
-            "format" : "double"
+            "format" : "double",
+            "minimum" : 0
           }
         },
         "required" : [ "amount", "claimingOrgUnitId", "materialId", "qualityRequirement" ]
@@ -57770,7 +57788,8 @@
           },
           "amount" : {
             "type" : "number",
-            "format" : "double"
+            "format" : "double",
+            "minimum" : 0
           },
           "version" : {
             "type" : "integer",
@@ -57856,7 +57875,8 @@
           },
           "amount" : {
             "type" : "number",
-            "format" : "double"
+            "format" : "double",
+            "minimum" : 0
           }
         },
         "required" : [ "amount", "targetId" ]
@@ -57894,7 +57914,8 @@
           },
           "amount" : {
             "type" : "number",
-            "format" : "double"
+            "format" : "double",
+            "minimum" : 0
           },
           "missionReductions" : {
             "type" : "array",
@@ -58306,7 +58327,8 @@
           },
           "requestedAmount" : {
             "type" : "number",
-            "format" : "double"
+            "format" : "double",
+            "minimum" : 0
           },
           "remark" : {
             "type" : "string",
@@ -58353,7 +58375,8 @@
           },
           "offeredAmount" : {
             "type" : "number",
-            "format" : "double"
+            "format" : "double",
+            "minimum" : 0
           },
           "remark" : {
             "type" : "string",
@@ -58394,7 +58417,8 @@
           },
           "amount" : {
             "type" : "number",
-            "format" : "double"
+            "format" : "double",
+            "minimum" : 0
           }
         },
         "required" : [ "amount", "targetId" ]

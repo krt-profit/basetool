@@ -2194,6 +2194,153 @@
           }
         }
       ]
+    },
+    {
+      "id": 42,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 120
+      },
+      "type": "timeseries",
+      "title": "Session evictions/hour",
+      "description": "Concurrent-session evictions (basetool_session_evicted_total): Spring Security expired a principal's oldest session because the per-user cap of 10 was full. The panel sits beside 'Active sessions' on purpose - the gauge cannot show this, because expireNow() only marks the session and leaves the registry entry and the Redis key in place. Rare by construction; a floor that never returns to zero means the registry is holding dead sessions against the cap and evicting live ones (watched by SessionEvictionSpike).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(basetool_session_evicted_total[1h])) * 3600",
+          "refId": "A",
+          "legendFormat": "session evictions/h",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 144
+      },
+      "type": "timeseries",
+      "title": "Browser client errors/hour by kind",
+      "description": "Browser-side failures posted by the client error beacon (basetool_client_error_total, kind = script_error / unhandled_rejection / resource_error). A JS exception that kills a krtFetch handler issues no request at all, so it appears in no other panel on this dashboard. Read the shape, not the level: a low permanent background is normal (old browsers, extensions, tabs open across a deploy), a step in one kind that starts at a deploy and stays up is the broken live-update surface (watched by ClientErrorSpike).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (kind) (rate(basetool_client_error_total[1h])) * 3600",
+          "refId": "A",
+          "legendFormat": "{{kind}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 144
+      },
+      "type": "timeseries",
+      "title": "External catalogue fetch errors/hour by source",
+      "description": "Swallowed UEX / SC-Wiki fetch, parse and pagination-contract failures (basetool_external_fetch_errors_total). Each is mapped to an empty or incomplete result, so the sync job still records success and the staleness alerts stay quiet. For scwiki this doubles as the only proxy for 'the scwiki_deleted orphan sweep stood down this run': an incomplete page walk always contributes one increment here. A burst trips ExternalFetchErrors; a line that is non-zero on every daily run trips ScWikiCensusIncompleteStreak, which means orphan detection has been off for days.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (source) (rate(basetool_external_fetch_errors_total[1h])) * 3600",
+          "refId": "A",
+          "legendFormat": "{{source}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
     }
   ]
 }

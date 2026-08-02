@@ -235,7 +235,8 @@
         "properties" : {
           "rowIndex" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int32",
+            "minimum" : 0
           },
           "rawMaterialName" : {
             "type" : "string",
@@ -248,11 +249,13 @@
           },
           "inputQuantity" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int32",
+            "minimum" : 0
           },
           "outputQuantity" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int32",
+            "minimum" : 0
           },
           "refine" : {
             "type" : "boolean"
@@ -281,11 +284,13 @@
           },
           "width" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int32",
+            "minimum" : 0
           },
           "height" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int32",
+            "minimum" : 0
           },
           "cropMode" : {
             "type" : "string",
@@ -328,24 +333,29 @@
           },
           "rawInManifestTotal" : {
             "type" : "integer",
-            "format" : "int64"
+            "format" : "int64",
+            "minimum" : 0
           },
           "rawToRefineTotal" : {
             "type" : "integer",
-            "format" : "int64"
+            "format" : "int64",
+            "minimum" : 0
           },
           "expenses" : {
             "type" : "number",
             "format" : "double",
-            "maximum" : 1.0E9
+            "maximum" : 1.0E9,
+            "minimum" : 0
           },
           "durationMinutes" : {
             "type" : "integer",
-            "format" : "int64"
+            "format" : "int64",
+            "minimum" : 0
           },
           "totalYieldScu" : {
             "type" : "number",
-            "format" : "double"
+            "format" : "double",
+            "minimum" : 0
           },
           "sourceImages" : {
             "type" : "array",

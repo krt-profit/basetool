@@ -21,6 +21,10 @@ package de.greluc.krt.profit.basetool.backend.integration.scwiki;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintDto;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiCommodityDto;
@@ -36,6 +40,7 @@ import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -375,6 +380,82 @@ class ScWikiClientTest {
   }
 
   @Test
+  void twoCensusProblemsInOneWalk_warnSeparatelyButCountAsOneFetchError() {
+    // A renamed meta block loses last_page and total together, so "no pagination metadata on a full
+    // page 1" and "meta.total disagrees with the merged rows" are the same single upstream failure
+    // seen twice. Both WARNs must survive — they name different problems and an operator wants both
+    // — but the counter tracks failed FETCHES, not symptoms: counting each would inflate
+    // basetool_external_fetch_errors_total by the number of things that happened to be wrong.
+    properties.setPageSize(3);
+    server.enqueue(jsonOk(pageBodyWithTotalWithoutLastPage(205, rows(3))));
+
+    List<ILoggingEvent> events =
+        captureClientLog(
+            () ->
+                assertFalse(
+                    client
+                        .fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities")
+                        .complete(),
+                    "a walk with two census problems is not a complete census"));
+
+    assertTrue(
+        events.stream()
+            .anyMatch(
+                e ->
+                    e.getLevel() == Level.WARN
+                        && e.getFormattedMessage().contains("no pagination metadata")),
+        "the missing-last_page problem must still WARN: " + messages(events));
+    assertTrue(
+        events.stream()
+            .anyMatch(
+                e ->
+                    e.getLevel() == Level.WARN
+                        && e.getFormattedMessage().contains("meta.total reports")),
+        "the total-mismatch problem must still WARN: " + messages(events));
+    assertEquals(
+        1.0,
+        fetchErrorCount(),
+        "one fetch exhibiting two problems is ONE failed fetch —"
+            + " basetool_external_fetch_errors_total{source=scwiki} must not double-count");
+  }
+
+  @Test
+  void midWalkFailureAndResultingTotalMismatch_countAsOneFetchError() {
+    // The other double-count pairing: the dropped page is itself what makes the merged rows fall
+    // short of meta.total, so the failed page fetch and the mismatch are one and the same failure.
+    server.enqueue(jsonOk(pageBodyWithTotal(1, 3, 3, rows(1))));
+    server.enqueue(new MockResponse().setResponseCode(503));
+
+    List<ILoggingEvent> events =
+        captureClientLog(
+            () ->
+                assertFalse(
+                    client
+                        .fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities")
+                        .complete(),
+                    "a walk abandoned on page 2 of 3 is not a complete census"));
+
+    assertTrue(
+        events.stream()
+            .anyMatch(
+                e ->
+                    e.getLevel() == Level.WARN
+                        && e.getFormattedMessage().contains("failed mid-pagination")),
+        "the dropped page must still WARN: " + messages(events));
+    assertTrue(
+        events.stream()
+            .anyMatch(
+                e ->
+                    e.getLevel() == Level.WARN
+                        && e.getFormattedMessage().contains("meta.total reports")),
+        "the resulting total mismatch must still WARN: " + messages(events));
+    assertEquals(
+        1.0,
+        fetchErrorCount(),
+        "a dropped page and the row-count shortfall it causes are one failed fetch, not two");
+  }
+
+  @Test
   void pageFailingMidWalk_isIncomplete() {
     server.enqueue(jsonOk(pageBody(1, 3, rows(1))));
     server.enqueue(new MockResponse().setResponseCode(503));
@@ -541,6 +622,21 @@ class ScWikiClientTest {
         .formatted(data, currentPage, lastPage, total);
   }
 
+  // A 2xx page whose meta states a total but has LOST last_page — the shape a partially renamed
+  // meta block produces, and the one that makes a single fetch trip two census problems at once
+  // (full page 1 without a page count, and a merged row count below the stated total).
+  private String pageBodyWithTotalWithoutLastPage(int total, String dataCommaSeparated) {
+    String data = dataCommaSeparated == null ? "" : dataCommaSeparated.trim();
+    return """
+    {
+      "data": [%s],
+      "links": {"first":"","last":"","prev":null,"next":null},
+      "meta": {"current_page":1,"per_page":3,"total":%d}
+    }
+    """
+        .formatted(data, total);
+  }
+
   // A 2xx page with data but NO meta object at all — the shape an upstream field rename produces,
   // since ScWikiResponseDto/ScWikiMetaDto are @JsonIgnoreProperties(ignoreUnknown = true) and
   // decode
@@ -566,6 +662,29 @@ class ScWikiClientTest {
       sb.append("{\"uuid\":\"00000000-0000-0000-0000-%012d\",\"name\":\"Row%d\"}".formatted(i, i));
     }
     return sb.toString();
+  }
+
+  // Runs `call` with a ListAppender attached to the ScWikiClient logger and returns everything the
+  // client logged while it ran. Mirrors UexClientTest.captureUexLog.
+  private List<ILoggingEvent> captureClientLog(Runnable call) {
+    Logger clientLog = (Logger) LoggerFactory.getLogger(ScWikiClient.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    clientLog.addAppender(appender);
+    try {
+      call.run();
+      return List.copyOf(appender.list);
+    } finally {
+      clientLog.detachAppender(appender);
+    }
+  }
+
+  // Captured log events as one assertion-message-friendly string.
+  private static String messages(List<ILoggingEvent> events) {
+    return events.stream()
+        .map(e -> e.getLevel() + " " + e.getFormattedMessage())
+        .toList()
+        .toString();
   }
 
   private static ParameterizedTypeReference<ScWikiResponseDto<ScWikiCommodityDto>>

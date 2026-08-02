@@ -2,7 +2,47 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Ingest-Gateway: Der API-Vertrag der beiden Ingest-Endpunkte ist jetzt als OpenAPI-Dokument veröffentlicht.** `ingest/src/main/resources/api/openapi.json` beschreibt Schemata, Statuscodes und die Bearer-Authentifizierung, gegen die der Desktop-Extraktor entwickelt wird — bisher gab es dafür nur den Quelltext. Wie beim Backend wird das Dokument aus dem Test erzeugt und ist in der Produktion nicht abrufbar (REQ-INGEST-010, REQ-API-007).
+
+- **Fehler im Browser werden jetzt serverseitig erfasst.** Brach nach einer Teil-Aktualisierung ein Skript ab, sah der Nutzer nur ein totes Bedienfeld und im Server-Log stand nichts davon. Der Browser meldet solche Fehler jetzt an `POST /internal/client-error` (nur angemeldet, auf fünf Meldungen je Sitzung gedeckelt); übertragen werden ausschließlich Meldung, Quelle, Zeile, Spalte und Fehlerart — kein Stacktrace, keine Seiteninhalte, keine Formulareingaben.
+
+- **Die Protokolle der Wartungsjobs und der Keycloak-Konsole sind jetzt in der Log-Auswertung lesbar.** Ausrollen, Sicherung, Aufräumen und Wiederherstellungsprobe schrieben ihre Ausgabe nur in Dateien auf dem Server — nach einer nächtlichen Alarmmail führte der einzige Weg zur Ursache über SSH. Jede betroffene Alarmmeldung nennt jetzt die passende Abfrage, und ein Wächter meldet, wenn einer der zehn überwachten Log-Kanäle verstummt.
+
+- **Änderungen an Rollenberechtigungen stehen jetzt im Aktivitätsprotokoll.** Es war die letzte Mutation im Bereich „Rollen“, die keine Spur hinterließ. Der Eintrag nennt die hinzugefügten und entfernten Berechtigungen und ist im Protokoll-Reiter filterbar; ein unbekannter Wert wird dabei nur gezählt, nie benannt (REQ-AUDIT-001).
+
+### Changed
+
+- **Protokollierung: Eine abgewiesene Anfrage ist jetzt zuordenbar, Routine-Rauschen verschwindet.** Abweisungen wegen fehlender Freigabe nannten den Betroffenen nicht, Zeilen des Frontends trugen die Organisationseinheit nicht, und jeder Tastendruck in einem Suchfeld erzeugte bei einer Störung eine Warnung. Warnungen sind jetzt wieder Warnungen, Routinefälle liegen auf DEBUG, Client-IPs verschwinden aus dem Log, und ein Speicherkonflikt nennt die betroffene Zeile samt beider Versionsstände.
+
+- **Eingaben aus Such- und Formularfeldern können keine Log-Zeilen mehr fälschen.** Ein eingefügter Zeilenumbruch mit gefälschtem Fehler-Präfix las sich bei der Auswertung wie eine echte Meldung. Solche Werte werden jetzt in allen drei Diensten bereinigt und gekürzt, bevor sie ins Log gelangen.
+
+- **Ein stillgelegter Log-Kanal fällt jetzt auf, und ein Neustart schneidet das Log-Ende nicht mehr ab.** Konnte ein Ausgabekanal seine Datei nicht öffnen, schrieb er stillschweigend ins Nichts, während die Fehlerzählung unauffällig blieb. Solche Störungen melden sich jetzt selbst; beim Herunterfahren bleiben fünf statt einer Sekunde, um den Puffer zu leeren (REQ-OBS-017).
+
+- **Benutzerabgleich meldet jetzt, was er getan hat.** Wie viele Konten neu als ausgeschieden markiert und wie viele Rollen mangels Entsprechung auf „Gast“ zurückgefallen sind, stand nirgends. Beides wird jetzt je Lauf zusammengefasst; auffällig viele Fälle erzeugen eine Warnung.
+
+- **Zusätzliche Betriebskennzahlen.** Gezählt werden jetzt verdrängte Sitzungen an der Zehn-Sitzungen-Grenze, abgebrochene Benachrichtigungskanäle samt Ursache, verweigerte Live-Abonnements samt Grund und die gemeldeten Browser-Fehler. Drei neue Alarme werten sie aus: auffällig viele Browser-Fehler, dauerhaft verdrängte Sitzungen und ein SC-Wiki-Abgleich, der an drei Tagen in Folge unvollständig blieb.
+
+- **Log-Level lassen sich jetzt im laufenden Betrieb umstellen.** Bisher kostete jede DEBUG-Diagnose eine Konfigurationsänderung samt Neustart — ausgerechnet die aussagekräftigsten Zeilen liegen aber bewusst auf DEBUG. Im Backend dürfen das nur Administratoren; Frontend und Ingest-Gateway geben ihre Stufen in der Produktion nur noch aus, weil ihr Wartungszugang keine Anmeldung kennt, und ein Neustart verwirft jede Änderung (REQ-OBS-016, ADR-0090).
+
+- **Geplante Aufgaben sind im Log als ein Lauf erkennbar.** Die acht nächtlichen Jobs schrieben ohne Kennung; bei überlappenden Zeitplänen ließen sich ihre Zeilen nicht mehr auseinanderhalten. Jeder Lauf bekommt jetzt eine eigene Kennung aus Job-Name und Zufallssuffix.
+
+- **Anmeldung über Discord: Eine Ablehnung nennt jetzt ihren Grund.** Zeitüberschreitung, DNS-Problem, Discord-Drosselung, Ausfall auf Discord-Seite oder unlesbare Antwort endeten alle in derselben nichtssagenden Meldung. Auch der stillschweigend übersprungene Dublettencheck beim Anlegen eines Kontos wird jetzt protokolliert.
+
+- **Ingest-Gateway: Jede Ablehnung ist jetzt im Log nachvollziehbar.** Bisher blieben eine Drosselung, ein abgelehntes Extrakt und ein abgelaufenes Token ohne jede Spur — im Log stand nur der Statuscode. Protokolliert werden jetzt der ausgelöste Limiter, die verletzte Feldregel, beide Größen beim Größen-Limit und die Form des Extrakts; Nutzdaten, Namen, Token und Client-IPs bleiben außen vor.
+
+- **Ingest-Gateway: 401 und 403 liefern jetzt eine auswertbare Fehlermeldung.** Beide antworteten bisher mit leerem Rumpf; der Extraktor konnte "Token erneuern" nicht von "nicht berechtigt" unterscheiden. Sie tragen jetzt dieselbe Fehlerstruktur wie alle übrigen Antworten des Gateways (REQ-API-004).
+
+- **Ingest-Gateway: Ist die Zwischenablage nicht erreichbar, kommt eine Wiederholen-Antwort statt eines Serverfehlers.** Fiel Redis aus, meldete das Gateway einen 500er und schrieb einen Fehler-Stacktrace ins Log, obwohl die Übergabe ans Backend bereits geglückt war. Jetzt gibt es einen 503 mit Wartezeit, eine Warnung statt eines Fehlers und einen eigenen Alarm, der auf Redis zeigt statt aufs Backend (REQ-INGEST-003).
+
+- **Ingest-Gateway: Protokollierung auf dem Stand von Backend und Frontend.** Jede Zeile trägt jetzt zusätzlich den Nutzer (Keycloak-`sub`, nie Name oder E-Mail), langsame Anfragen werden wie in den anderen Modulen als Warnung protokolliert, und jede Weiterleitung ans Backend hinterlässt eine Zeile mit Dauer. Neu einstellbar über `APP_LOGGING_*` (REQ-OBS-001/-002/-003).
+
 ### Fixed
+
+- **Katalogabgleich: Ein unvollständiger Abruf löscht keine Einträge mehr.** Brach der Seitendurchlauf des SC-Wiki mittendrin ab oder fehlte die Seitenangabe, wertete der Abgleich den Rest des Katalogs als gelöscht und markierte ihn entsprechend. Ein unvollständiger Lauf übernimmt jetzt seine Zeilen, verzichtet aber auf das Aufräumen und meldet den Grund. Beim UEX-Abgleich bleibt zudem eine leere oder fehlerhafte Antwort nicht mehr unbemerkt, und ein unveränderter Katalog ist als solcher erkennbar statt als Nulllauf.
+
+- **Live-Aktualisierung: Eine verweigerte Anmeldung an einem Raum bleibt nicht mehr unbemerkt.** Lehnte der Server das Abonnement ab, wirkte die Seite weiterhin aktuell, obwohl sie keine Peer-Änderungen mehr erhielt. Sie zeigt jetzt den Hinweis „Aktualisierungen verfügbar“, und war die Ablehnung nur eine vorübergehende Störung, versucht sie es genau einmal erneut.
 
 - **Sicherheit: Netty auf 4.2.16.Final angehoben (u. a. CVE-2026-56820, CVE-2026-56819, CVE-2026-55833).** Die von Spring Boot vorgegebene Version 4.2.15.Final war über eine fehlende Zertifikatsprüfung im OCSP-Client (Umgehung der Sperrprüfung durch Replay), ein Speicherleck im HTTP/2-Codec sowie eine SPDY-Header-Dekodierung mit CPU-erschöpfendem Denial-of-Service angreifbar; die gepatchte Version wird jetzt erzwungen. Betroffen sind reale Laufzeitpfade (WebClient im Frontend, Redis-Anbindung über Lettuce). Die parallel gemeldete gleiche CVE-Reihe auf der Netty-4.1.x-Linie betrifft ausschließlich eine Nur-Kompilierzeit-Abhängigkeit des Keycloak-SPI-Moduls (vom Keycloak-Container zur Laufzeit bereitgestellt) und wurde begründet unterdrückt.
 
@@ -16,49 +56,13 @@
 
 ### Added
 
-- **Ingest-Gateway: Der API-Vertrag der beiden Ingest-Endpunkte ist jetzt als OpenAPI-Dokument veröffentlicht.** `ingest/src/main/resources/api/openapi.json` beschreibt Schemata, Statuscodes und die Bearer-Authentifizierung, gegen die der Desktop-Extraktor entwickelt wird — bisher gab es dafür nur den Quelltext. Wie beim Backend wird das Dokument aus dem Test erzeugt und ist in der Produktion nicht abrufbar (REQ-INGEST-010, REQ-API-007).
-
-- **Fehler im Browser werden jetzt serverseitig erfasst.** Brach nach einer Teil-Aktualisierung ein Skript ab, sah der Nutzer nur ein totes Bedienfeld und im Server-Log stand nichts davon. Der Browser meldet solche Fehler jetzt an `POST /internal/client-error` (nur angemeldet, auf fünf Meldungen je Sitzung gedeckelt); übertragen werden ausschließlich Meldung, Quelle, Zeile, Spalte und Fehlerart — kein Stacktrace, keine Seiteninhalte, keine Formulareingaben.
-
-- **Die Protokolle der Wartungsjobs und der Keycloak-Konsole sind jetzt in der Log-Auswertung lesbar.** Ausrollen, Sicherung, Aufräumen und Wiederherstellungsprobe schrieben ihre Ausgabe nur in Dateien auf dem Server — nach einer nächtlichen Alarmmail führte der einzige Weg zur Ursache über SSH. Jede betroffene Alarmmeldung nennt jetzt die passende Abfrage, und ein Wächter meldet, wenn einer der zehn überwachten Log-Kanäle verstummt.
-
-- **Änderungen an Rollenberechtigungen stehen jetzt im Aktivitätsprotokoll.** Es war die letzte Mutation im Bereich „Rollen", die keine Spur hinterließ. Der Eintrag nennt die hinzugefügten und entfernten Berechtigungen und ist im Protokoll-Reiter filterbar (REQ-AUDIT-001).
-
 - **Lager: Markierte Einträge lassen sich jetzt auch gesammelt umbuchen.** Neben "Markierte ausbuchen" steht in "Mein Lager" ein "Markierte umbuchen" — dieselbe Auswahl wird verschoben statt ausgebucht: an einen anderen Ort bzw. Nutzer oder als persönlich bzw. ins gemeinsame Lager. Jeder markierte Eintrag wandert vollständig und nimmt seine Auftrags- und Einsatz-Marken mit. Einträge, die bereits am Ziel liegen, werden übersprungen und mitgezählt; die Meldung nennt beide Zahlen (REQ-INV-036, ADR-0124).
 
 ### Changed
 
-- **Protokollierung: Eine abgewiesene Anfrage ist jetzt zuordenbar, Routine-Rauschen verschwindet.** Abweisungen wegen fehlender Freigabe nannten den Betroffenen nicht, Zeilen des Frontends trugen die Organisationseinheit nicht, und jeder Tastendruck in einem Suchfeld erzeugte bei einer Störung eine Warnung. Warnungen sind jetzt wieder Warnungen, Routinefälle liegen auf DEBUG und lassen sich im Betrieb einschalten. Client-IPs verschwinden aus dem Log; vermerkt wird nur noch, woher der Drosselungs-Schlüssel stammt. Ein Speicherkonflikt nennt jetzt die betroffene Zeile und beide Versionsstände.
-
-- **Eingaben aus Such- und Formularfeldern können keine Log-Zeilen mehr fälschen.** Ein eingefügter Zeilenumbruch mit gefälschtem Fehler-Präfix las sich bei der Auswertung wie eine echte Meldung. Solche Werte werden jetzt in allen drei Diensten bereinigt und gekürzt, bevor sie ins Log gelangen.
-
-- **Ein stillgelegter Log-Kanal fällt jetzt auf, und ein Neustart schneidet das Log-Ende nicht mehr ab.** Konnte ein Ausgabekanal seine Datei nicht öffnen, schrieb er stillschweigend ins Nichts, während die Fehlerzählung unauffällig blieb. Solche Störungen melden sich jetzt selbst; beim Herunterfahren bleiben fünf statt einer Sekunde, um den Puffer zu leeren (REQ-OBS-017).
-
-- **Benutzerabgleich meldet jetzt, was er getan hat.** Wie viele Konten neu als ausgeschieden markiert und wie viele Rollen mangels Entsprechung auf „Gast" zurückgefallen sind, stand nirgends. Beides wird jetzt je Lauf zusammengefasst; auffällig viele Fälle erzeugen eine Warnung.
-
-- **Zusätzliche Betriebskennzahlen.** Gezählt werden jetzt verdrängte Sitzungen an der Zehn-Sitzungen-Grenze, abgebrochene Benachrichtigungskanäle samt Ursache, verweigerte Live-Abonnements samt Grund und die gemeldeten Browser-Fehler.
-
-- **Log-Level lassen sich jetzt im laufenden Betrieb umstellen.** Bisher kostete jede DEBUG-Diagnose eine Konfigurationsänderung samt Neustart — ausgerechnet die aussagekräftigsten Zeilen liegen aber bewusst auf DEBUG. Alle drei Dienste bieten dafür jetzt einen Endpunkt, der von außen nicht erreichbar ist und dessen Änderungen ein Neustart wieder verwirft (REQ-OBS-016).
-
-- **Geplante Aufgaben sind im Log als ein Lauf erkennbar.** Die acht nächtlichen Jobs schrieben ohne Kennung; bei überlappenden Zeitplänen ließen sich ihre Zeilen nicht mehr auseinanderhalten. Jeder Lauf bekommt jetzt eine eigene Kennung aus Job-Name und Zufallssuffix.
-
-- **Anmeldung über Discord: Eine Ablehnung nennt jetzt ihren Grund.** Zeitüberschreitung, DNS-Problem, Discord-Drosselung, Ausfall auf Discord-Seite oder unlesbare Antwort endeten alle in derselben nichtssagenden Meldung. Auch der stillschweigend übersprungene Dublettencheck beim Anlegen eines Kontos wird jetzt protokolliert.
-
-- **Ingest-Gateway: Jede Ablehnung ist jetzt im Log nachvollziehbar.** Bisher blieben eine Drosselung, ein abgelehntes Extrakt und ein abgelaufenes Token ohne jede Spur — im Log stand nur der Statuscode. Protokolliert werden jetzt der ausgelöste Limiter samt Wartezeit, die verletzte Feldregel, beide Größen beim Größen-Limit sowie die Form des empfangenen Extrakts (Anzahl Aufträge, Zeilen, Bilder). Nutzdaten, Namen, Token und Client-IPs bleiben weiterhin außen vor.
-
-- **Ingest-Gateway: 401 und 403 liefern jetzt eine auswertbare Fehlermeldung.** Beide antworteten bisher mit leerem Rumpf; der Extraktor konnte "Token erneuern" nicht von "nicht berechtigt" unterscheiden. Sie tragen jetzt dieselbe Fehlerstruktur wie alle übrigen Antworten des Gateways (REQ-API-004).
-
-- **Ingest-Gateway: Ist die Zwischenablage nicht erreichbar, kommt eine Wiederholen-Antwort statt eines Serverfehlers.** Fiel Redis aus, meldete das Gateway einen 500er und schrieb einen Fehler-Stacktrace ins Log, obwohl die Übergabe ans Backend bereits geglückt war. Jetzt gibt es einen 503 mit Wartezeit, eine Warnung statt eines Fehlers und einen eigenen Alarm, der auf Redis zeigt statt aufs Backend (REQ-INGEST-003).
-
-- **Ingest-Gateway: Protokollierung auf dem Stand von Backend und Frontend.** Jede Zeile trägt jetzt zusätzlich den Nutzer (Keycloak-`sub`, nie Name oder E-Mail), langsame Anfragen werden wie in den anderen Modulen als Warnung protokolliert, jede Weiterleitung ans Backend hinterlässt eine Zeile mit Dauer, und beim Start nennt ein Banner die wirksame Konfiguration. Neu einstellbar über `APP_LOGGING_*` (REQ-OBS-001/-002/-003).
-
 - **Lager: Beim Um- und Ausbuchen entfällt die Herkunft-Eingabe, wenn es nichts zu entscheiden gibt.** Ist ein Eintrag genau einem Einsatz bzw. genau einem Auftrag zugeordnet und bleibt kein freier Rest, kann die Menge nur von dieser einen Marke kommen — das Feld wird jetzt mit der um- bzw. ausgebuchten Menge vorbefüllt, gesperrt und als automatisch gefüllt gekennzeichnet, statt das Absenden zu blockieren, bis der Wert von Hand nachgetragen wird. Es folgt jeder späteren Änderung der Menge. Gibt es mehrere Marken oder einen Rest, bleibt die Aufteilung wie bisher freie Wahl (REQ-INV-027).
 
 ### Fixed
-
-- **Katalogabgleich: Ein unvollständiger Abruf löscht keine Einträge mehr.** Brach der Seitendurchlauf des SC-Wiki mittendrin ab oder fehlte die Seitenangabe, wertete der Abgleich den Rest des Katalogs als gelöscht und markierte ihn entsprechend. Ein unvollständiger Lauf übernimmt jetzt seine Zeilen, verzichtet aber auf das Aufräumen und meldet den Grund. Beim UEX-Abgleich bleibt zudem eine leere oder fehlerhafte Antwort nicht mehr unbemerkt, und ein unveränderter Katalog ist als solcher erkennbar statt als Nulllauf.
-
-- **Live-Aktualisierung: Eine verweigerte Anmeldung an einem Raum bleibt nicht mehr unbemerkt.** Lehnte der Server das Abonnement ab, wirkte die Seite weiterhin aktuell, obwohl sie keine Peer-Änderungen mehr erhielt. Sie zeigt jetzt den Hinweis „Aktualisierungen verfügbar". Ebenso wird erfasst, wenn einzelne Bedienfelder aus einer Aktualisierung herausgefiltert werden — bisher blieb genau ein Feld stehen, während der Rest der Seite weiterlief.
 
 - **Kompakte Schaltflächen in dichten Tabellen sind jetzt tatsächlich kompakt.** Die Varianten für Zeilen-Aktionen waren seit ihrer Einführung wirkungslos: eine später deklarierte Regel überschrieb sie, sodass jede "dichte" Schaltfläche in voller Größe erschien. Aktionsspalten in Lager, Kartellbank, Materialbörse, Einsätzen und Operationen werden dadurch spürbar schmaler — alle übrigen Schaltflächen behalten unverändert ihre 44px-Zielgröße (REQ-UI-009).
 

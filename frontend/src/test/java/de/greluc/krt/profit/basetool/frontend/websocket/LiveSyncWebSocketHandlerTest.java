@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.websocket;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Level;
@@ -1229,6 +1231,134 @@ class LiveSyncWebSocketHandlerTest {
     // WARN is not a client-drivable flood.
     assertThat(logAppender.list.stream().filter(e -> e.getLevel() == Level.WARN).count())
         .isEqualTo(1L);
+  }
+
+  // -- Subscribe-frame rate limit (the deny -> re-subscribe cycle) ------------------------------
+
+  @Test
+  void subscribeFrames_areRateLimitedPerSession() throws Exception {
+    // The per-session topic cap cannot bound the subscribe path: completeSubscribe RELEASES the
+    // reserved slot on a deny, so a subscribe -> deny -> subscribe cycle never reaches the cap.
+    // Each turn of that cycle submits an authorization probe to the auth executor, so without a
+    // bucket an authenticated client could drive the executor's queue to rejection at will — and
+    // with it the saturation WARN. The subscribe bucket is what bounds the probe-submission rate.
+    when(authorizer.authorize(any(), any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY);
+    String topic = operationTopic();
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    bob.sent.clear();
+
+    int emitted = LiveSyncWebSocketHandler.SUBSCRIBE_BURST + 20;
+    for (int i = 0; i < emitted; i++) {
+      subscribe(bob, topic);
+    }
+
+    // The clock is frozen (see nanoClock), so the bucket never refills mid-loop: exactly the burst
+    // reaches the authorizer, and every excess frame is dropped as throttled.
+    verify(authorizer, times(LiveSyncWebSocketHandler.SUBSCRIBE_BURST))
+        .authorize(any(), any(), any(), any());
+    assertThat(dropCounter(MetricNames.DROPPED_THROTTLED, "operation"))
+        .isEqualTo(emitted - LiveSyncWebSocketHandler.SUBSCRIBE_BURST);
+    // A throttled subscribe is answered with NOTHING — never a `denied` frame, which the client
+    // treats as terminal for the room and would turn a transient burst into a permanently dead tab.
+    assertThat(bob.sent).hasSize(LiveSyncWebSocketHandler.SUBSCRIBE_BURST);
+  }
+
+  @Test
+  void subscribeThrottle_admitsAFullTopicCapWorthOfSubscribes() throws Exception {
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    bob.sent.clear();
+
+    // A page may legitimately hold MAX_TOPICS_PER_SESSION (16) rooms and subscribes to all of them
+    // the instant its socket opens; the burst sits above that, so the throttle never bites the
+    // feature it protects. (A reconnect re-subscribes on a fresh socket with a fresh, full bucket.)
+    for (int i = 0; i < 16; i++) {
+      subscribe(bob, operationTopic());
+    }
+
+    assertThat(bob.sent).hasSize(16);
+    assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("subscribed");
+    assertThat(dropCounter(MetricNames.DROPPED_THROTTLED, "operation")).isZero();
+  }
+
+  // -- Deny reason on the wire (retryable vs terminal) ------------------------------------------
+
+  @Test
+  void multiplexedSubscribe_indeterminateDeny_isRetryableOnTheWire() throws Exception {
+    when(authorizer.authorize(any(), any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY_INDETERMINATE);
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(bob, missionTopic());
+
+    // Both deny flavours used to be the same opaque `denied` frame, so a 30-second backend blip
+    // stripped live sync from that tab for good. The reason lets krt-live-sync.js retry this one
+    // exactly once on its next reconnect.
+    JsonNode frame = lastBroadcast(bob);
+    assertThat(frame.get("type").asString()).isEqualTo("denied");
+    assertThat(frame.get("reason").asString()).isEqualTo(MetricNames.SUBSCRIBE_DENY_INDETERMINATE);
+  }
+
+  @Test
+  void multiplexedSubscribe_explicitDeny_carriesTheTerminalReasonOnTheWire() throws Exception {
+    when(authorizer.authorize(any(), any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY);
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(bob, operationTopic());
+
+    // A permission verdict must NOT read as retryable — retrying it would just re-deny.
+    JsonNode frame = lastBroadcast(bob);
+    assertThat(frame.get("type").asString()).isEqualTo("denied");
+    assertThat(frame.get("reason").asString()).isEqualTo(MetricNames.SUBSCRIBE_DENY_AUTHZ);
+  }
+
+  @Test
+  void multiplexedSubscribe_preVerdictDenies_carryNoReasonAndAreTerminal() throws Exception {
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+
+    // Refusals decided before any authorization verdict exists: an unparseable topic and the
+    // per-session topic cap. Neither is worth retrying, and the client's terminal default is
+    // exactly "no reason field", so both must omit it.
+    handler.handleTextMessage(
+        bob, new TextMessage("{\"type\":\"subscribe\",\"topic\":\"bogus:not-a-thing\"}"));
+    assertThat(lastBroadcast(bob).has("reason")).isFalse();
+
+    for (int i = 0; i < 16; i++) {
+      subscribe(bob, operationTopic());
+    }
+    bob.sent.clear();
+    subscribe(bob, operationTopic()); // the 17th exceeds MAX_TOPICS_PER_SESSION
+
+    JsonNode capped = lastBroadcast(bob);
+    assertThat(capped.get("type").asString()).isEqualTo("denied");
+    assertThat(capped.has("reason")).isFalse();
+  }
+
+  @Test
+  void multiplexedSubscribe_presenceClassExecutorSaturated_deniedFrameIsRetryable()
+      throws Exception {
+    // Saturation is the archetypal indeterminate outcome: nothing about the caller's permissions
+    // was learned. On a presence class it fails closed, so the refusal the client sees must carry
+    // the retryable reason rather than look like a permission verdict.
+    SimpleMeterRegistry reg = new SimpleMeterRegistry();
+    LiveSyncPresenceService svc = new LiveSyncPresenceService(reg);
+    LiveSyncWebSocketHandler saturated =
+        new LiveSyncWebSocketHandler(
+            svc,
+            fanout,
+            objectMapper,
+            reg,
+            authorizer,
+            runnable -> {
+              throw new RejectedExecutionException("auth executor full");
+            });
+
+    FakeSession bob = multiplexedSession(oidcUser("user-2", "Bob"));
+    saturated.afterConnectionEstablished(bob);
+    saturated.handleTextMessage(bob, subscribeFrame(missionTopic()));
+
+    JsonNode frame = lastBroadcast(bob);
+    assertThat(frame.get("type").asString()).isEqualTo("denied");
+    assertThat(frame.get("reason").asString()).isEqualTo(MetricNames.SUBSCRIBE_DENY_INDETERMINATE);
   }
 
   // ── helpers ────────────────────────────────────────────────────────────────────────────────

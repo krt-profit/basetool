@@ -777,6 +777,29 @@ transaction per pass) rather than per-scrape.
   failed. The fix is a bounded `reason` tag (`transport` / `no_data` / `bad_status` / `pagination`)
   added to `MetricNames`; it splits the existing series, so the `{source=…}` panels and the
   `ExternalFetchErrors` rule need a `sum by (source)` review in the same change.
+  **One fetch, at most one increment (2026-08).** A single `ScWikiClient` page walk can show several
+  symptoms of the *same* break at once — a page failing mid-walk plus the resulting row shortfall
+  tripping the `meta.total` check, or a full page 1 with no `meta.last_page` plus a disagreeing
+  `meta.total`. Each symptom keeps its own WARN (they name different problems), but a per-call
+  `FetchErrorLatch` now lets only the first of them increment the counter, so the series counts failed
+  *fetches* rather than symptoms: a 20-page walk that dies on page 2 contributes `1`, not `2`. One
+  behaviour change rides along — a mid-walk page returning a bodiless `2xx` now contributes `1` where
+  it previously contributed `0`. "One fetch" means one public client call (`fetchAllPagesResult` /
+  `fetchOne`), not one HTTP request.
+  Because the count is now exactly one per incomplete walk, it is also the only usable **proxy for
+  "the SC-Wiki orphan sweep stood down"**: `ScWikiOrphanSweep` refuses to tombstone on an incomplete
+  census and says so in a WARN and nowhere else — the skip touches no meter. `ScWikiCensusIncompleteStreak`
+  (warning) therefore keys on **persistence, not volume**: an error in each of three *consecutive*
+  24 h windows means three daily runs in a row came back incomplete and orphan detection has been off
+  for three days, while `scwiki_sync` kept recording success with a healthy item tally and
+  `ExternalSyncStale` / `SyncZeroItems` / `ScWikiStepFailing` all stayed quiet. The burst-shaped
+  `ExternalFetchErrors` (> 3 in 6 h) catches the outage; this one catches the silent degradation, and
+  the two firing together read as an ordinary multi-day upstream outage. The proxy is a **superset** —
+  a failed fetch on a pass that feeds no sweep also counts, which is the safe direction for a warning —
+  and both the alert comment and the `monitoring/README.md` runbook row say so. Panel 44 on dashboard
+  `07` plots the counter per `source`; it had no panel anywhere before. **Still open:** a dedicated
+  "sweep stood down" meter would let the alert drop the proxy, and belongs with the `reason`-tag work
+  above.
 - `basetool_keycloak_sync_fetch_failures_total` counter (untagged, `KeycloakService.fetchUsers`) and
   `basetool_scheduled_job_step_failures_total{task,step}` counter (`ScWikiScheduler.runStep`; `step`
   = the bounded `commodity`/`vehicle`/`item`/`blueprint`/`manufacturer` literal) both cover a
@@ -976,7 +999,13 @@ is the HTTP verb. The push-channel surfaces (#1041 item 17) add `basetool_notifi
 (`reason` = `throttled` / `send_failed` / `topic_cap` / `authorize_saturated` / `topic_throttled` /
 `section_filtered`)
 counters at the previously-silent throttle, send-failure, topic-cap, subscribe-saturation,
-per-topic-throttle and section-filter branches of the relay — the `topic_throttled` reason (F2/#1243)
+per-topic-throttle and section-filter branches of the relay. Since 2026-08 `reason="throttled"` is
+**shared**: the per-session `subscribe`-frame token bucket (burst 24, refill 1/s — the bound that
+keeps the WARN on the subscribe path honest, because a denied subscribe releases its reserved slot and
+the topic cap therefore never limits a subscribe→deny→subscribe loop) reports its silent drops through
+the same reason within the offending topic class, rather than minting a second throttle literal. A
+`throttled` sample therefore no longer implies a presence frame; splitting them needs a new
+`MetricNames` literal. The `topic_throttled` reason (F2/#1243)
 fires when a room's *aggregate* publish rate exceeds its per-topic token bucket regardless of the
 per-session limit, and `section_filtered` (2026-08) is bumped **once per frame** on any frame that
 lost **at least one** section key to the allow-list filter, on all three publish paths (client
@@ -1002,7 +1031,12 @@ registered with differing tag-key sets, so the `outcome="allowed"` series carrie
 the wire value is unchanged from the existing login-reason literal, so no dashboard or alert is
 affected. Both `07` dashboard panels aggregate with `sum by (topic_class, outcome)` /
 `sum by (reason)` and therefore keep working unchanged — but neither yet **surfaces** the new deny
-split, which is the outstanding follow-up.
+split, which is the outstanding follow-up. The same two literals now also travel **on the wire** in
+the `denied` control frame, so the browser can treat `indeterminate` as retryable: it re-subscribes
+that topic **exactly once** across the whole socket lifetime (`authz` stays terminal). Reading the
+series accordingly — a single transient infrastructure fault can contribute up to **two**
+`outcome="denied", reason="indeterminate"` samples per topic, never more, and the retry is per-topic
+one-shot rather than per-reconnect.
 `basetool_livesync_socket_rejected_total{reason}` (`reason` = `user_cap`; a `/ws/sync`
 socket refused at connect because the user is already at the per-user socket cap — F2/#1243, no
 `topic_class` because a rejected socket has bound no topic; plotted alongside the relay drops on the
@@ -1038,16 +1072,35 @@ Two frontend meters were added by the 2026-08 logging audit:
   each time Spring Security destroys a user's oldest session because they reached the
   `MAX_CONCURRENT_SESSIONS` cap (10). Previously the cap enforced itself in complete silence, so a
   user reporting "I keep getting logged out in the other tab" had no server-side evidence at all.
-  Unlabelled by rule — the principal is PII.
+  Unlabelled by rule — the principal is PII. Backed since 2026-08 by `SessionEvictionSpike`
+  (> 3 evictions/h held 30 m, warning) and by panel 42 on dashboard `07`, beside "Active sessions".
+  The alert is a **sustained rate, not a burst**: eviction is rare by construction (a principal must
+  already hold ten live sessions), so the `for` clause — not the count — is what separates a member
+  cycling devices from the failure mode the meter was written for, a session registry whose cap has
+  filled with *dead* Redis entries so every fresh login evicts a live session. `ActiveSessionsRunaway`
+  cannot corroborate it: `expireNow()` only marks the session, the registry entry and the Redis key
+  both survive, so `basetool_active_sessions` does not even dip. The `> 3` floor is unbaselined
+  (`baseline-tune:`) and errs low.
 - `basetool_client_error_total{kind}` — counter minted by `ClientErrorReportController` for each
   accepted browser-error beacon (REQ-OBS-001). `kind` is resolved **server-side** against exactly
   three literals — `script_error`, `unhandled_rejection`, `resource_error` — and a beacon carrying
   anything else is rejected with 400 and creates **no** series: the endpoint is reachable by every
   authenticated user, so accepting the client's own string would hand a caller unbounded label
   cardinality (REQ-OBS-006). No other dimension is exported; the message and source live only in the
-  `DEBUG` line. **Known gap, to close:** this metric has no Grafana panel and no Prometheus rule
-  under `monitoring/`, which the "metrics move with the code" rule below makes a defect — a
-  post-swap JavaScript regression is currently visible only by querying the series by hand.
+  `DEBUG` line — which is also why the metric has to carry the signal: a JS exception that kills a
+  `krtFetch` handler issues no request at all, so it leaves no access-log line, no
+  `http_server_requests` sample and no 5xx. The 2026-08 gap ("no panel, no rule") is **closed**: panel
+  43 on dashboard `07` plots reports/hour by `kind`, and `ClientErrorSpike` (warning) fires on
+  `> 20` reports/h of one `kind` **and** more than 3× that kind's own daily average, held 30 m. It is
+  a **step change, not a ceiling** — a handful of client errors is permanent background (old browsers,
+  extensions, a tab left open across a deploy still referencing the previous asset build), so a fixed
+  threshold either sits above that floor and misses a surface only a few members use, or below it and
+  fires forever. The baseline is the same series over `[24h]` rather than `offset 1d` on purpose: the
+  counter is registered lazily on the first report, so an offset comparison has an absent-baseline
+  hole where the right-hand side simply does not exist and the rule silently never fires, whereas the
+  trailing window is present whenever the 1 h window is. The spike hour sits inside its own
+  denominator, capping the achievable ratio at 24. Per `kind` so one class stepping up is not diluted
+  by the other two. The `> 20` floor is unbaselined (`baseline-tune:`).
 
 The auth surfaces (#1041 item 18) add `basetool_login_total{outcome,reason}` (`SecurityConfig`'s
 OAuth2 success/failure handlers: `outcome` = `success` / `failure`; on failure `reason` =
@@ -1125,9 +1178,14 @@ so an exported metric cannot silently regress unnoticed: the ingest handoff metr
 / `AccessDeniedSpike` / `PendingApprovalBlockSpike` (and the all-codes HTTP-error panel on dashboard
 `07`); the `basetool_keycloak_sync_fetch_failures_total` and `basetool_scheduled_job_step_failures_total`
 counters feed `KeycloakSyncFetchFailing` / `ScWikiStepFailing`; and `KeycloakEventMetricsAbsent` guards
-the `keycloak_user_events_total` series that `KeycloakLoginErrorSpike` depends on. Adding, renaming or
-removing one of these metrics keeps its alert in `monitoring/prometheus/alerts/business.yml` in sync in
-the same change.
+the `keycloak_user_events_total` series that `KeycloakLoginErrorSpike` depends on. The 2026-08 logging
+audit closed the last three unwatched signals, all in `business-warning`: `basetool_client_error_total`
+→ `ClientErrorSpike`, `basetool_session_evicted_total` → `SessionEvictionSpike`, and
+`basetool_external_fetch_errors_total{source="scwiki"}` → `ScWikiCensusIncompleteStreak` (each
+described with its own metric above, and each carrying a runbook row in `monitoring/README.md` plus a
+panel on dashboard `07` — 42 session evictions, 43 client errors by `kind`, 44 external fetch errors by
+`source`). Adding, renaming or removing one of these metrics keeps its alert in
+`monitoring/prometheus/alerts/business.yml` in sync in the same change.
 
 ### REQ-OBS-012 — Edge posture assertions (deny / redirect / HSTS probes)
 
@@ -1477,12 +1535,17 @@ the backend genuinely uses Spring Data web paging and keeps the auto-config.
 ### REQ-OBS-016 — Log levels are changeable at runtime
 
 All three Spring modules expose the Actuator **`loggers`** endpoint (`management.endpoints.web.exposure.include`)
-so a logger threshold can be raised while the process runs:
+so a logger threshold can be read while the process runs, and — where the posture below allows it —
+raised:
 
 ```bash
-curl -X POST -H 'Content-Type: application/json' \
+# backend, in prod: admin bearer token required (the write is ROLE_ADMIN-gated)
+curl -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer ${ADMIN_TOKEN}" \
   -d '{"configuredLevel":"DEBUG"}' \
-  http://localhost:11272/actuator/loggers/de.greluc.krt.profit.basetool.ingest.filter
+  https://backend:11261/actuator/loggers/de.greluc.krt.profit.basetool.backend.integration.scwiki
+
+# frontend / ingest, in prod: read only — the write operation is not registered
+curl https://localhost:11272/actuator/loggers/de.greluc.krt.profit.basetool.ingest.filter
 ```
 
 Without it, every DEBUG diagnosis costs a config edit, a redeploy and — because each config is a
@@ -1493,22 +1556,67 @@ log (the bot-protection blocks of `REQ-INGEST-009`, the per-IP rate limit, the o
 of issue #1203, a relayed backend 4xx). Those lines existed but were unreachable when they were
 needed.
 
-The endpoint adds **no public surface**. `/actuator/health*` is the only actuator path permitted on
-a public connector; every other one falls through to `anyRequest().authenticated()`. In prod the
-frontend and ingest move their Actuator to the internal-only management port (ADR-0090), reachable
-from `net-monitoring-scrape` and `localhost` alone, and the backend is not internet-reachable at all.
-Level changes are **not persisted** — a restart returns to the configured levels, so a forgotten
-`DEBUG` cannot silently outlive the incident that motivated it.
+The **read** is available in all three modules on every profile. The **write** is not, and "unreachable
+from a public connector" is not a sufficient statement of its posture — it says nothing about the
+connector the endpoint actually lives on. The write posture is therefore stated per module, and it
+differs because the connectors differ:
+
+- **`frontend` + `ingest`, prod — the mutator does not exist.** In prod these two move their Actuator
+  to the internal-only management port (frontend `18091`, ingest `11272`), which is served by an
+  unauthenticated permit-all chain (ADR-0090) because the port is reachable only from
+  `net-monitoring-scrape` and `localhost`. That chain matches `/actuator/**` by **path** and cannot
+  distinguish a read operation from a write one, so exposing `loggers` there exposed the level change
+  too: anything on the monitoring plane could set `ROOT` to `TRACE`, at which point Spring Security,
+  WebClient and Netty write bearer tokens and request bodies into a Loki stream retained 744 h. The
+  fix removes the operation rather than gating it — `management.endpoint.loggers.access: read-only` in
+  each `application-prod.yml`, so the write is never registered and there is nothing for the
+  permit-all chain to guard. `GET /actuator/loggers` still answers on the management port.
+- **`backend` — the mutator survives, gated on `ROLE_ADMIN`.** The backend sets **no**
+  `management.server.port`: its Actuator rides the ordinary `11261` app connector, which is not
+  host-published, sits only on internal Docker networks and — decisively — is covered by the module's
+  *main* security chain. `SecurityConfig` therefore requires `ROLE_ADMIN` on
+  `POST /actuator/loggers/**` (placed after the `/actuator/health` `permitAll()`, before
+  `anyRequest().authenticated()`), while `GET` falls through to the authenticated catch-all. The gate
+  does **not** ride the role hierarchy: `OFFICER` is refused like any other non-admin.
+- **dev / test / e2e — unchanged, full control.** No management port is configured, the
+  `application-prod.yml` files are never loaded, so all three modules keep the runtime write. The
+  backend's `ROLE_ADMIN` matcher lives in `SecurityConfig` and is profile-independent, so it applies
+  locally too.
+
+`/actuator/health*` remains the only actuator path permitted on a public connector; every other one
+falls through to `anyRequest().authenticated()`. Level changes are **not persisted** — a restart
+returns to the configured levels, so a forgotten `DEBUG` cannot silently outlive the incident that
+motivated it. The accepted cost of the split: a prod DEBUG dive is a **backend-only, admin-only**
+operation, and raising a frontend or ingest logger in prod is back to a config edit plus a
+force-recreate.
 
 **Acceptance**
 
-- [x] `GET /actuator/loggers/<name>` reports the effective level and `POST {"configuredLevel":…}`
-  changes it without a restart, in all three modules.
-- [x] The endpoint is unreachable unauthenticated from a public connector.
+- [x] `GET /actuator/loggers/<name>` reports the effective level in all three modules, on whichever
+  connector that module serves Actuator on.
+- [x] Backend: `POST /actuator/loggers/**` answers 401 anonymous, 403 for an authenticated non-admin
+  (`KRT_MEMBER` **and** `OFFICER`), 204 for `ADMIN`, and the change takes effect without a restart;
+  `GET /actuator/loggers` stays reachable for any authenticated user.
+- [x] Frontend + ingest under the **prod** profile: the `loggers` write operation is not registered,
+  so no caller can change a level — including a caller already inside `net-monitoring-scrape` or on
+  `localhost`, where the management port answers without authentication.
+- [x] No actuator **write** operation is reachable unauthenticated on **any** connector of any
+  module — neither the public app connector (404 / authenticated) nor the internal management port
+  (operation removed).
 - [x] A restart discards a runtime level change.
+- [ ] Every endpoint later added to the frontend/ingest `management.endpoints.web.exposure.include`
+  list is checked for write operations, and any it has is set `access: read-only` in
+  `application-prod.yml` in the same change. **Open** — a convention, asserted by no test today; the
+  management port's permit-all chain cannot enforce it.
 
-**Enforced by:** the module `application.yml` exposure lists · **Related:** ADR-0090 (management-port
-isolation), REQ-OBS-005 (fail-closed scrape endpoint)
+**Enforced by:** the module `application.yml` exposure lists ·
+`{frontend,ingest}/src/main/resources/application-prod.yml`
+(`management.endpoint.loggers.access: read-only`) ·
+`backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/SecurityConfig.java` (the
+`ROLE_ADMIN` matcher on `POST /actuator/loggers/**`) ·
+`backend/src/test/java/de/greluc/krt/profit/basetool/backend/config/ActuatorLoggersAuthorizationTest.java` ·
+**Related:** ADR-0090 (management-port isolation and its 2026-08 mutator amendment), REQ-OBS-005
+(fail-closed scrape endpoint)
 
 ### REQ-OBS-017 — A self-disabled log appender must be detectable
 

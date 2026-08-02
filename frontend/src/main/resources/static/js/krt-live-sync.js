@@ -59,7 +59,16 @@
         // is beyond the generous multi-tab cap; don't hammer — back off to the max interval and let
         // it recover quietly once another tab closes and frees a slot.
         const SOCKET_CAP_CLOSE_CODE = 4029;
-        // topic -> { handlers, state: 'idle'|'pending'|'subscribed'|'denied', ackedOnce }
+        // `reason` on a server `denied` control frame marking a fail-CLOSED refusal: the server
+        // could not tell whether the caller may read the room (backend blip, lapsed token snapshot,
+        // saturated auth executor) and refused rather than guessed. Unlike an authorization refusal
+        // this is an availability symptom, so it is worth exactly one retry. Mirrors the server's
+        // bounded deny-reason vocabulary (MetricNames.SUBSCRIBE_DENY_INDETERMINATE); any other or
+        // absent reason is treated as terminal.
+        const DENY_REASON_INDETERMINATE = 'indeterminate';
+        // topic -> { handlers, state: 'idle'|'pending'|'subscribed'|'denied', ackedOnce,
+        // deniedRetryUsed }. 'denied' is terminal (never re-subscribed); a retryable indeterminate
+        // deny drops back to 'idle' instead, which the reconnect path picks up again.
         const topics = Object.create(null);
         const publishBuffer = []; // { topic, sections } queued until the socket is open
         let ws = null;
@@ -109,7 +118,9 @@
 
         function onOpen() {
             reconnectDelay = RECONNECT_BASE_MS;
-            // (Re)subscribe every live topic; a denied topic stays dead (no retry).
+            // (Re)subscribe every live topic; a 'denied' topic stays dead (no retry). A topic whose
+            // deny was the retryable indeterminate flavour was put back to 'idle' by onMessage, so
+            // it is re-subscribed here — once, because its deniedRetryUsed flag is already set.
             Object.keys(topics).forEach(function (t) {
                 if (topics[t].state !== 'denied') {
                     topics[t].state = 'pending';
@@ -151,7 +162,22 @@
                     entry.handlers.onResync();
                 }
             } else if (msg.type === 'denied') {
-                entry.state = 'denied';
+                // A permission refusal is terminal: retrying it would just re-deny. A fail-closed
+                // INDETERMINATE refusal is not a verdict at all — a 30 s backend blip used to
+                // strip live sync from this tab for good — so it earns exactly ONE re-subscribe,
+                // on the next reconnect (the socket is not closed by a deny, so nothing is retried
+                // before then). `deniedRetryUsed` is set on the spot and never cleared, so the
+                // retry cannot loop and a reconnect never carries more than one extra subscribe
+                // frame per topic.
+                const retryable =
+                    msg.reason === DENY_REASON_INDETERMINATE && !entry.deniedRetryUsed;
+                if (retryable) {
+                    entry.deniedRetryUsed = true;
+                }
+                entry.state = retryable ? 'idle' : 'denied';
+                // Fired for both flavours: right now the room IS dead either way, so the surface
+                // must raise its manual-refresh affordance immediately rather than betting on a
+                // reconnect that may be minutes away.
                 if (typeof entry.handlers.onDenied === 'function') {
                     entry.handlers.onDenied();
                 }
@@ -204,7 +230,8 @@
                     return { unsubscribe: function () {} };
                 }
                 const entry =
-                    topics[topic] || (topics[topic] = { state: 'idle', ackedOnce: false });
+                    topics[topic] ||
+                    (topics[topic] = { state: 'idle', ackedOnce: false, deniedRetryUsed: false });
                 entry.handlers = handlers || {};
                 ensureSocket();
                 if (isOpen()) {
@@ -455,17 +482,20 @@
                 onResync: function () {
                     apply(null);
                 },
-                // M7: a denied subscribe is TERMINAL — onOpen deliberately never re-subscribes a
-                // 'denied' topic — so from here on this tab receives no peer change for this room,
-                // ever. Until now no subscriber anywhere passed an onDenied, which made the deny
-                // branch in the socket dead code and left the user staring at a surface that looks
-                // live and silently is not (the exact REQ-FE-010 "silently stale" failure mode).
-                // Reuse the deferred-refresh pill: its label is the bundle-sourced
-                // livesync.updates_available string krt-live-sync.js already renders (F8), so no
-                // new user-visible string is introduced, and its click handler re-renders the
-                // sections in place — which is precisely the manual fallback a dead subscription
-                // leaves the user with. One-shot on purpose: once the user has taken the manual
-                // refresh, re-raising the pill on a timer would nag without adding information.
+                // M7: a denied subscribe stops this tab receiving peer changes for the room — for
+                // good on an authorization refusal, and until the one indeterminate-deny retry on
+                // the next reconnect otherwise (see the socket's `denied` branch). Either way the
+                // room is dead the moment this fires. Until now no subscriber anywhere passed an
+                // onDenied, which made the deny branch in the socket dead code and left the user
+                // staring at a surface that looks live and silently is not (the exact REQ-FE-010
+                // "silently stale" failure mode). Reuse the deferred-refresh pill: its label is the
+                // bundle-sourced livesync.updates_available string krt-live-sync.js already renders
+                // (F8), so no new user-visible string is introduced, and its click handler
+                // re-renders the sections in place — precisely the manual fallback a dead
+                // subscription leaves the user with. One-shot on purpose: once the user has taken
+                // the manual refresh, re-raising the pill on a timer would nag without adding
+                // information; a retry that then succeeds simply restores live updates from that
+                // point on, and any change missed in between is what the pill already covers.
                 onDenied: function () {
                     deferAllVisibleSections();
                 },

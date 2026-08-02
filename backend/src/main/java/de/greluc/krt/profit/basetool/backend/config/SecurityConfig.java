@@ -399,11 +399,27 @@ public class SecurityConfig {
                     .permitAll()
                     // Spring Boot Actuator health endpoint, used by Docker HEALTHCHECK and by
                     // docker-compose `depends_on: condition: service_healthy`. Other actuator
-                    // endpoints stay behind authentication (default `anyRequest().authenticated()`
-                    // catch-all below). `management.endpoint.health.show-details=never` keeps the
+                    // endpoints stay behind authentication (the `anyRequest().authenticated()`
+                    // catch-all below, tightened to ROLE_ADMIN for the mutating loggers POST — see
+                    // the next matcher). `management.endpoint.health.show-details=never` keeps the
                     // response to `{"status":"UP"}` so no internal details leak.
                     .requestMatchers("/actuator/health", "/actuator/health/**")
                     .permitAll()
+                    // REQ-OBS-016: `loggers` is exposed so a log level can be raised at RUNTIME
+                    // during an incident, and its POST variant MUTATES that level. The backend
+                    // configures NO separate management port — Actuator rides the ordinary 11261
+                    // connector, unreachable from the internet only because that connector lives
+                    // on internal Docker networks — so without this rule the write would fall
+                    // through to `anyRequest().authenticated()` below and ANY valid realm JWT
+                    // could set the ROOT logger to TRACE, which makes Spring Security / WebClient
+                    // / Netty write bearer tokens and request bodies into a log stream retained
+                    // for 744 h. Only the mutator is gated; the read (GET /actuator/loggers) stays
+                    // on the authenticated catch-all. Frontend and ingest serve Actuator on a
+                    // dedicated, UNAUTHENTICATED management port where no identity exists to gate
+                    // on, so there the write is removed instead
+                    // (`management.endpoint.loggers.access: read-only`, prod profile only).
+                    .requestMatchers(HttpMethod.POST, "/actuator/loggers/**")
+                    .hasRole(Roles.ADMIN)
                     // Internal machine-to-machine endpoints (REQ-SEC-022): the Keycloak Discord SPI
                     // calls /internal/discord/account-existence during first-broker-login. It bears
                     // no JWT (Keycloak is outside the resource-server trust boundary), so it must

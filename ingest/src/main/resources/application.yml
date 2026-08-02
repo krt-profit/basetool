@@ -131,11 +131,19 @@ management:
       # change plus a redeploy plus a force-recreate. That matters because the most diagnostic lines
       # in this codebase sit at DEBUG on purpose (bot blocks, the per-IP rate limit, the open circuit
       # breaker, a relayed backend 4xx) — without this endpoint they exist but are unreachable during
-      # an incident. It adds no public surface: `/actuator/health*` is the only permitted actuator
-      # path, everything else falls through to `anyRequest().authenticated()` on the public
-      # connector, and in prod the endpoints move to the internal-only management port (ADR-0090).
-      # Read: GET /actuator/loggers/<logger>. Write: POST {"configuredLevel":"DEBUG"} — not
-      # persisted, so a restart returns to the configured levels (REQ-OBS-016).
+      # an incident. It adds no PUBLIC surface: `/actuator/health*` is the only permitted actuator
+      # path there, everything else falls through to `anyRequest().authenticated()` on the public
+      # connector.
+      #
+      # The management port is the other half of the story, and it is not "no surface". In prod the
+      # endpoints move to it, and ADR-0090 leaves that port UNAUTHENTICATED — a trade made when
+      # everything exposed was read-only. `loggers` is not: a ROOT logger at TRACE writes bearer
+      # tokens and request bodies into a Loki stream retained for 744h. There is no identity on
+      # that port to gate on, so application-prod.yml removes the mutator instead
+      # (`management.endpoint.loggers.access: read-only`).
+      # Read: GET /actuator/loggers/<logger> — everywhere, including prod.
+      # Write: POST {"configuredLevel":"DEBUG"} — dev and test only; not persisted, so a restart
+      # returns to the configured levels (REQ-OBS-016).
       exposure:
         include: health, prometheus, loggers
   endpoint:

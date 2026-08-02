@@ -151,6 +151,47 @@ groups:
           summary: "SC-Wiki sync step failing ({{ $labels.step }})"
           description: "The {{ $labels.step }} step of the daily SC-Wiki sync has failed on at least two runs in 48h while the umbrella job keeps recording success — that catalogue slice is silently importing nothing. Check the SC-Wiki upstream and the backend sync logs."
 
+      # (PR #1472, review finding 6a) The SC-Wiki tombstone sweep has stood down on every run for
+      # three days. ScWikiClient marks a page walk INCOMPLETE whenever it cannot vouch for the census
+      # — a page failed mid-walk, meta.last_page went absent while page 1 came back full, or
+      # meta.total disagrees with the merged row count — and ScWikiOrphanSweep then refuses to
+      # tombstone. That refusal is correct: sweeping a half-walked feed soft-deletes every row that
+      # was merely never fetched. But it degrades SILENTLY. If upstream's meta.total turns out to be
+      # unfiltered, or off by the include= expansion, `complete` is false on EVERY run and orphan
+      # detection is off indefinitely while scwiki_sync keeps recording success with a healthy item
+      # tally — ExternalSyncStale, SyncZeroItems and ScWikiStepFailing all stay quiet, and the only
+      # trace is a WARN line per run.
+      #
+      # There is NO metric for "the sweep stood down" — the skip is a log line and nothing else. The
+      # closest faithful proxy is basetool_external_fetch_errors_total{source="scwiki"}: every branch
+      # that makes a walk incomplete increments it — once per fetch, since the FetchErrorLatch
+      # collapses the several symptoms one broken walk can show at the same time into a single
+      # increment — so a run whose census was incomplete always contributes at least one. (The
+      # converse is a superset: a failed fetch on a pass that feeds no sweep counts here too, which
+      # is the safe direction for a "your orphan detection may be off" warning.)
+      #
+      # The distinguishing feature of this mode is PERSISTENCE across runs, not volume, so the rule
+      # checks three CONSECUTIVE daily windows instead of a total: one error in each of the last
+      # three 24h windows means the daily sync came back incomplete on three runs running. A total
+      # over 72h would equally match three errors inside one bad afternoon, which is the transient
+      # ExternalFetchErrors (>3 in 6h) already covers. Both firing together is an ordinary multi-day
+      # upstream outage; this one firing alone is the silent-degradation case. The counter is
+      # registered lazily on the first error, so all three legs are absent (not zero) until one
+      # occurs and the rule cannot fire on a healthy deployment.
+      - alert: ScWikiCensusIncompleteStreak
+        expr: |
+          sum(increase(basetool_external_fetch_errors_total{source="scwiki"}[24h])) > 0
+          and on ()
+          sum(increase(basetool_external_fetch_errors_total{source="scwiki"}[24h] offset 24h)) > 0
+          and on ()
+          sum(increase(basetool_external_fetch_errors_total{source="scwiki"}[24h] offset 48h)) > 0
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "SC-Wiki page walk incomplete on three consecutive days (orphan sweep standing down)"
+          description: "Every one of the last three daily SC-Wiki syncs recorded a fetch/census error, so the page walk was flagged INCOMPLETE and the scwiki_deleted orphan sweep refused to run on all of them — rows the Wiki has actually dropped are no longer being tombstoned, while the sync keeps reporting success. Grep the backend log for 'INCOMPLETE' / 'Skipping the … scwiki_deleted sweep' to see which check fails: a genuinely broken upstream also trips ExternalFetchErrors, whereas this alert alone points at a pagination-contract drift (meta.total counting differently than the merged rows, or meta.last_page renamed)."
+
       # (#1041 item 3) All-jobs staleness. UserSyncStale/ExternalSyncStale covered only user_sync and
       # the two catalogue syncs; the daily notification-retention purge and the hourly default-
       # blueprint back-fill had no staleness guard. No absent() — the last-success gauge is registered
@@ -479,6 +520,34 @@ groups:
           summary: "Frontend session store growing unbounded (>2000 active sessions)"
           description: "basetool_active_sessions has held above 2000 for 1h. Expected steady state is a few hundred; a sustained climb means anonymous/orphan sessions are accreting again (REQ-SEC-025 two-tier TTL regressed) and Redis is heading for its maxmemory noeviction ceiling. Check the session store size (redis SCAN 'basetool:session:sessions:*') and the created-vs-login ratio."
 
+      # (PR #1472) Concurrent-session evictions. Spring Security expires a principal's OLDEST session
+      # once maximumSessions (10, SecurityConfig.MAX_CONCURRENT_SESSIONS) is exceeded, and until
+      # SessionEvictionLoggingStrategy was wired that left no usable trace: Spring's own account of it
+      # is DEBUG on org.springframework.security, which the app pins to INFO, and
+      # ActiveSessionsRunaway above is blind to it because expireNow() only MARKS the session — the
+      # registry entry and the Redis key both survive, so basetool_active_sessions does not so much as
+      # dip. The visible end of the chain was a member's unexplained logout and nothing else.
+      #
+      # Eviction is rare BY CONSTRUCTION: a real user has to hold ten live sessions before the
+      # eleventh login evicts anything, and then hovers at the cap producing at most one eviction per
+      # further login. So this is not tuned against a busy baseline — it is tuned to separate that
+      # from the failure mode the counter was written for, which looks identical from the outside: a
+      # session registry that stopped reaping stale Redis entries, so the cap fills with DEAD sessions
+      # and every fresh login evicts a LIVE one. That mode is not a burst but a floor that never
+      # returns to zero, so the rule is a sustained rate — the `for` clause, not the count, is what
+      # carries it. When it fires alongside ActiveSessionsRunaway the registry is leaking on both
+      # ends; on its own it means the registry is stale rather than merely large.
+      # baseline-tune: >3 evictions in 1h, held 30m (a member cycling devices produces one or two and
+      # stops).
+      - alert: SessionEvictionSpike
+        expr: sum(increase(basetool_session_evicted_total[1h])) > 3
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Concurrent-session evictions sustained (session registry may be stale)"
+          description: "The frontend has evicted more than 3 sessions per hour for 30 minutes because the per-principal concurrent-session cap (10) was full. Members are being logged out with 'This session has been expired'. A sustained stream means the session registry is holding dead Redis sessions against the cap rather than users genuinely cycling more than ten devices — check the registry against the live Redis keys (SCAN 'basetool:session:sessions:*') and correlate with ActiveSessionsRunaway; the backend log line names the cap and the victim's userId (sub)."
+
       # (#1041 item 18) Frontend login broken. This alert exists to catch the ONE break mode no other
       # signal sees: the code-to-token / JWKS / bad-IdP-response failure that hits AFTER the user has
       # already authenticated at Keycloak, so Keycloak emits no login_error user event and
@@ -528,6 +597,40 @@ groups:
         annotations:
           summary: "Elevated CSRF-token rejection rate"
           description: "The frontend has been rejecting CSRF tokens at more than 0.1/s for 15 minutes — likely a systematic CSRF-wiring regression rather than occasional stale tokens (which krtFetch self-heals). Check recent security/template changes and the /csrf endpoint."
+
+      # (PR #1472) Browser-side failures reported by the client error beacon (krt-client-error.js ->
+      # ClientErrorReportController). A JS exception that kills a krtFetch handler produces NO
+      # request, so it leaves no access-log line, no http_server_requests sample and no 5xx — "the
+      # button did nothing" was a user report and nothing else. The controller logs at DEBUG on
+      # purpose (any authenticated tab can trigger the endpoint at frame rate, so INFO/WARN would be
+      # a self-inflicted log flood, REQ-OBS-001), which makes basetool_client_error_total the only
+      # always-on signal — and this rule is what makes it one that is actually watched.
+      #
+      # Why a step change rather than an absolute ceiling: a handful of client errors is permanent
+      # background — old browsers, extensions injecting into the page, a resource_error from a tab
+      # left open across a deploy that still references the previous asset build. A fixed ceiling
+      # either sits above that floor, and then misses a broken surface only a few members use, or
+      # below it, and then fires forever. What is diagnostic is the SHAPE: a deploy that breaks the
+      # client half of a live-update surface makes one `kind` jump within the hour and stay up.
+      #
+      # The baseline is the SAME series over 24h, deliberately not `offset 1d`: the counter is
+      # registered lazily on the first report, so an offset comparison has an absent-baseline hole
+      # (no series a day ago -> no right-hand side -> the rule silently never fires), whereas the
+      # trailing window exists whenever the 1h window does. The spike hour is part of its own
+      # denominator, which caps the achievable ratio at 24 and keeps the trigger honest. Per `kind`
+      # (three bounded literals) so one class stepping up is not diluted by the other two.
+      # baseline-tune: >20 reports/h of one kind AND >3x that kind's own daily average, held 30m.
+      - alert: ClientErrorSpike
+        expr: |
+          sum by (kind) (increase(basetool_client_error_total[1h])) > 20
+          and
+          sum by (kind) (increase(basetool_client_error_total[1h])) > 3 * sum by (kind) (increase(basetool_client_error_total[24h])) / 24
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Browser client errors stepped up ({{ $labels.kind }})"
+          description: "The frontend's client-error beacon has reported {{ $labels.kind }} failures well above their own daily baseline for 30 minutes — the browser half of a page is throwing, which produces no server-side error of any kind. Check what shipped in the last frontend deploy; a script_error / unhandled_rejection step means a krtFetch handler is dying (live update silently stops working on that surface), a resource_error step means an asset the templates still reference is 404ing. Raise ClientErrorReportController to DEBUG via /actuator/loggers to get the message and script URL for the duration of the investigation."
 
       # (#1041 item 19) Discord SPI precheck abuse. The endpoint sits outside /api/**, the rate
       # limiter AND the http_error funnel, so secret-guessing was previously log-only. A sustained

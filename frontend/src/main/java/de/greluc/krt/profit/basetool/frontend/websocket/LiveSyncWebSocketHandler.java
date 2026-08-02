@@ -100,6 +100,13 @@ import tools.jackson.databind.node.ObjectNode;
  * any legitimate use, so they only clamp a crafted flood; both degrade to a bounded re-fetch rate,
  * never data loss.
  *
+ * <p><b>Per-session frame buckets.</b> All three inbound frame types carry the same per-session
+ * token bucket ({@link #allowFrame}): {@code changed} ({@link #CHANGED_BURST}), presence ({@link
+ * #PRESENCE_BURST}) and {@code subscribe} ({@link #SUBSCRIBE_BURST}). The subscribe bucket is what
+ * bounds the rate at which a socket can submit authorization probes to the {@code authExecutor} —
+ * the per-session topic cap does not, because a denied subscribe releases its reserved slot, so a
+ * subscribe → deny → subscribe cycle never reaches the cap.
+ *
  * <p><b>Concurrency &amp; backpressure</b> (preserved verbatim from the mission relay,
  * #1149/#1150): the per-topic session map is a {@link ConcurrentHashMap} whose sets are mutated
  * atomically under the entry's bin lock ({@code compute}/{@code computeIfPresent}), so a concurrent
@@ -160,6 +167,33 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
 
   /** Token-bucket refill rate for inbound presence control frames, in tokens per second. */
   private static final double PRESENCE_REFILL_PER_SEC = 10.0;
+
+  /**
+   * Token-bucket capacity for inbound {@code subscribe} frames per session — the third frame type
+   * to get the same per-session bucket the {@code changed} and presence paths already had.
+   *
+   * <p>The per-session topic cap ({@link #MAX_TOPICS_PER_SESSION}) bounds how many rooms a socket
+   * <em>holds</em>, but not how many subscribe frames it <em>sends</em>: {@link #completeSubscribe}
+   * releases the reserved slot on a deny, so a subscribe → deny → subscribe cycle never reaches the
+   * cap and was previously unbounded — and every non-idempotent subscribe submits an authorization
+   * probe to {@link #authExecutor}. This bucket bounds that submission rate, and with it the rate
+   * at which the saturation branch of {@link #handleSubscribe} can author a log line.
+   *
+   * <p>Sized at 1.5× the topic cap so a page that legitimately subscribes to the maximum number of
+   * rooms the instant its socket opens never trips it; a reconnect re-subscribes on a
+   * <em>fresh</em> socket with a fresh, full bucket, so the reconnect storm is unaffected either.
+   * Package-private for the test.
+   */
+  static final int SUBSCRIBE_BURST = 24;
+
+  /**
+   * Token-bucket refill rate for inbound {@code subscribe} frames, in tokens per second.
+   * Deliberately an order of magnitude below the {@code changed} / presence refills: a socket
+   * subscribes to each of its rooms once and then has essentially no legitimate need for further
+   * subscribe frames, so the sustained allowance only has to cover the occasional re-subscribe, not
+   * a cadence.
+   */
+  private static final double SUBSCRIBE_REFILL_PER_SEC = 1.0;
 
   /**
    * Per-<em>topic</em> token-bucket capacity for accepted {@code changed} frames (F2 / #1243). The
@@ -271,6 +305,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   private static final String ATTR_DISPLAY_NAME = "livesync.displayName";
   private static final String ATTR_CHANGED_RATE = "livesync.changedRate";
   private static final String ATTR_PRESENCE_RATE = "livesync.presenceRate";
+  private static final String ATTR_SUBSCRIBE_RATE = "livesync.subscribeRate";
 
   /**
    * Session-attribute key holding the {@link ConcurrentWebSocketSessionDecorator} wrapping the raw
@@ -587,11 +622,11 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Handles a {@code subscribe} frame: validates the topic, enforces the per-session topic cap and
-   * idempotency, then authorizes the subscribe asynchronously on {@link #authExecutor} (so the
-   * container thread never blocks on a backend probe). A rejected submission (executor saturated)
-   * fails the subscribe open. The room is joined only once {@link #completeSubscribe} confirms an
-   * allow.
+   * Handles a {@code subscribe} frame: validates the topic, applies the per-session subscribe rate
+   * limit, enforces the per-session topic cap and idempotency, then authorizes the subscribe
+   * asynchronously on {@link #authExecutor} (so the container thread never blocks on a backend
+   * probe). A rejected submission (executor saturated) fails the subscribe open. The room is joined
+   * only once {@link #completeSubscribe} confirms an allow.
    *
    * @param session the subscribing session
    * @param node the parsed {@code subscribe} frame
@@ -613,6 +648,18 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     }
     Set<String> subs = subscriptions(session);
     if (subs == null) {
+      return;
+    }
+    // Rate-limit the subscribe path per session with the same bucket primitive the changed and
+    // presence paths use — the topic cap alone does not bound it, because completeSubscribe
+    // releases the reserved slot on a deny (see SUBSCRIBE_BURST). Dropped silently, never answered
+    // with a `denied` control frame: the client treats a deny as terminal for the topic, so
+    // answering a throttled frame that way would turn a transient burst into a permanently dead
+    // room. The client's next reconnect re-subscribes against a fresh bucket.
+    if (!allowSubscribeFrame(session)) {
+      droppedCounter(topic, MetricNames.DROPPED_THROTTLED).increment();
+      log.debug(
+          "Live-sync subscribe to topic {} dropped (per-session throttle)", topic.canonical());
       return;
     }
     if (subs.contains(topic.canonical())) {
@@ -643,13 +690,20 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       LiveSyncSubscriptionAuthorizer.Decision verdict =
           LiveSyncSubscriptionAuthorizer.failOpen(topic);
       droppedCounter(topic, MetricNames.DROPPED_AUTHORIZE_SATURATED).increment();
-      // WARN, not DEBUG: this branch was previously unlogged entirely, and saturation is
-      // infrastructure-triggered — a client cannot provoke it while the executor is healthy, so it
-      // is not a log-flood vector. It matters because it silently degrades authorization for every
-      // subscribe landing on this instance, and on a presence class it fails closed, costing that
-      // tab live updates for the topic for the session (a denied subscribe is terminal).
-      // The deny counter deliberately carries no `saturated` reason value — the
-      // authorize_saturated relay-drop series above is that signal.
+      // WARN, not DEBUG. The earlier justification here — "a client cannot provoke it" — was wrong:
+      // reaching this branch needs a saturated executor AND an inbound subscribe frame, and the
+      // subscribe path used to be the one frame type with no rate limit (the topic cap does not
+      // bound it, because a denied subscribe releases its reserved slot). A crafted client could
+      // therefore cycle subscribe → deny → subscribe, push the queue to rejection and author these
+      // lines at will. It is bucketed now, exactly like the changed and presence paths
+      // (SUBSCRIBE_BURST / SUBSCRIBE_REFILL_PER_SEC), and the per-user socket cap
+      // (MAX_SOCKETS_PER_USER) bounds how many buckets one user can hold — so the sustained line
+      // rate a single caller can drive is a small constant per second, and only while the executor
+      // is already saturated. That is a genuine infrastructure symptom, not a flood vector, and it
+      // matters: saturation silently degrades authorization for every subscribe landing on this
+      // instance, and on a presence class it fails closed, costing that tab live updates for the
+      // topic until it reconnects. The deny counter deliberately carries no `saturated` reason
+      // value — the authorize_saturated relay-drop series above is that signal.
       log.warn(
           "Live-sync subscribe authorization for topic {} was not scheduled (auth executor"
               + " saturated); resolved as {}",
@@ -668,11 +722,12 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    *
    * <p>This is where a completed probe's indeterminate <em>fail-closed</em> verdict is reported at
    * WARN (the executor-saturation branch of {@link #handleSubscribe} reports its own, and no other
-   * path logs one): a denied subscribe is terminal — the client does not retry for the rest of the
-   * session — so a 30-second backend blip permanently strips live updates from every tab that
-   * happened to subscribe during it. That outcome is backend-triggered and bounded to one line per
-   * tab per topic, so it is not a log-flood vector — unlike an explicit permission deny, which is a
-   * routine, user-triggerable verdict and stays at DEBUG in the authorizer.
+   * path logs one): the refusal costs that tab every peer update for the topic until it reconnects,
+   * and the client retries such a deny exactly <em>once</em> on its next reconnect — so a backend
+   * blip outlasting that one retry still leaves the tab on the manual-refresh pill. That outcome is
+   * backend-triggered and bounded to one line per tab per topic, so it is not a log-flood vector —
+   * unlike an explicit permission deny, which is a routine, user-triggerable verdict and stays at
+   * DEBUG in the authorizer.
    *
    * @param session the subscribing session
    * @param topic the topic being authorized
@@ -716,9 +771,14 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Finalises a subscribe: on either deny flavour it drops the reserved slot and refuses; on ALLOW
+   * Finalises a subscribe: on either deny flavour it drops the reserved slot and refuses — with the
+   * flavour's bounded {@code reason} on the {@code denied} frame, so the client can retry a
+   * fail-closed indeterminate refusal once and treat an authorization refusal as terminal; on ALLOW
    * it joins the room (skipping a socket that closed while the probe ran), acks {@code subscribed}
    * and sends the initial presence snapshot for a presence-enabled class.
+   *
+   * <p>Dropping the reserved slot is why the per-session topic cap cannot bound the subscribe rate,
+   * and therefore why {@link #handleSubscribe} rate-limits the frame itself.
    *
    * <p>Deliberately emits no log line of its own — every refusal is already reported by whoever
    * produced the verdict (the authorizer at DEBUG for an explicit deny, {@link
@@ -739,8 +799,12 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       if (subs != null) {
         subs.remove(topic.canonical());
       }
-      sendControlFrame(session, "denied", topic.canonical());
-      subscribeCounter(topic, MetricNames.OUTCOME_DENIED, denyReason(decision)).increment();
+      // The refusal flavour rides the wire frame, not just the metric: an indeterminate (fail-
+      // closed) deny is an availability symptom the client retries once on its next reconnect,
+      // while an authz deny stays terminal. Same bounded vocabulary as the deny metric's tag.
+      String reason = denyReason(decision);
+      sendControlFrame(session, "denied", topic.canonical(), reason);
+      subscribeCounter(topic, MetricNames.OUTCOME_DENIED, reason).increment();
       return;
     }
     WebSocketSession decorated = decorated(session);
@@ -766,9 +830,11 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Maps a refusal to its bounded {@code reason} tag value, so a permission verdict and a
-   * fail-closed availability symptom stop sharing one indistinguishable {@code outcome=denied}
-   * series.
+   * Maps a refusal to its bounded {@code reason} value, so a permission verdict and a fail-closed
+   * availability symptom stop sharing one indistinguishable {@code outcome=denied} series — and, on
+   * the wire, one indistinguishable {@code denied} control frame. The same value is used for both:
+   * a closed two-element vocabulary that is safe as a metric tag (REQ-OBS-006) and stable enough
+   * for the client to branch on.
    *
    * @param decision the refusing verdict
    * @return {@link MetricNames#SUBSCRIBE_DENY_INDETERMINATE} for a fail-closed indeterminate
@@ -887,8 +953,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
 
   /**
    * Sends a tiny control frame ({@code {"type":…,"topic":…}}) — a {@code subscribed} ack or a
-   * {@code denied} refusal — to a multiplexed socket, tolerating a closed/broken peer. Control
-   * frames are low-volume, so no relay-drop metric is recorded here.
+   * {@code denied} refusal — to a multiplexed socket, carrying no {@code reason}. Used for the two
+   * refusals decided before an authorization verdict exists (an unparseable topic, the per-session
+   * topic cap): both are terminal for the client by nature, and an absent {@code reason} is exactly
+   * what its terminal default keys off.
    *
    * @param session the target session (its decorator is resolved and written to)
    * @param type the control-frame type ({@code subscribed} / {@code denied})
@@ -897,6 +965,34 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    */
   private void sendControlFrame(
       @NotNull WebSocketSession session, @NotNull String type, String topicString) {
+    sendControlFrame(session, type, topicString, null);
+  }
+
+  /**
+   * Sends a tiny control frame to a multiplexed socket, tolerating a closed/broken peer. Control
+   * frames are low-volume, so no relay-drop metric is recorded here.
+   *
+   * <p>A {@code denied} frame carries the refusal's {@code reason} when one is known, so the client
+   * can tell an <em>authorization</em> verdict ({@link MetricNames#SUBSCRIBE_DENY_AUTHZ} — the
+   * caller may genuinely not read this room, so the refusal is terminal) from a <em>fail-closed
+   * indeterminate</em> one ({@link MetricNames#SUBSCRIBE_DENY_INDETERMINATE} — an availability
+   * symptom of a backend blip, which {@code krt-live-sync.js} retries exactly once on its next
+   * reconnect). Before the tag rode along, both flavours were the same opaque {@code denied} frame,
+   * so a 30-second blip stripped live sync from that tab permanently. The value comes from {@link
+   * #denyReason(LiveSyncSubscriptionAuthorizer.Decision)}, i.e. the same closed, bounded vocabulary
+   * the deny metric's {@code reason} tag uses — never free text.
+   *
+   * @param session the target session (its decorator is resolved and written to)
+   * @param type the control-frame type ({@code subscribed} / {@code denied})
+   * @param topicString the topic the control frame refers to (echoed as-is; may be an unparseable
+   *     value for a denied unknown-topic subscribe)
+   * @param reason the bounded refusal reason to carry, or {@code null} to omit the field
+   */
+  private void sendControlFrame(
+      @NotNull WebSocketSession session,
+      @NotNull String type,
+      String topicString,
+      @Nullable String reason) {
     WebSocketSession target = decorated(session);
     if (!target.isOpen()) {
       return;
@@ -907,6 +1003,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       root.put("type", type);
       if (topicString != null) {
         root.put("topic", topicString);
+      }
+      if (reason != null) {
+        root.put("reason", reason);
       }
       payload = objectMapper.writeValueAsString(root);
     } catch (JacksonException e) {
@@ -1289,8 +1388,25 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Shared token-bucket primitive backing {@link #allowChangedFrame} and {@link
-   * #allowPresenceFrame}. Consumes and returns {@code true} when a token is available, or {@code
+   * Per-session token-bucket rate limit on inbound {@code subscribe} frames, the third user of
+   * {@link #allowFrame} alongside {@link #allowChangedFrame} and {@link #allowPresenceFrame}.
+   * Bounds the rate at which one socket can submit authorization probes to {@link #authExecutor} —
+   * the per-session topic cap cannot, because {@link #completeSubscribe} releases the reserved slot
+   * on a deny, so a subscribe → deny → subscribe cycle stays below the cap forever (see {@link
+   * #SUBSCRIBE_BURST}).
+   *
+   * @param session the session that sent the frame
+   * @return {@code true} to process the subscribe, {@code false} to drop it as throttled
+   */
+  private boolean allowSubscribeFrame(@NotNull WebSocketSession session) {
+    return allowFrame(session, ATTR_SUBSCRIBE_RATE, SUBSCRIBE_BURST, SUBSCRIBE_REFILL_PER_SEC);
+  }
+
+  /**
+   * Shared token-bucket primitive backing {@link #allowChangedFrame}, {@link #allowPresenceFrame}
+   * and {@link #allowSubscribeFrame} — every inbound frame type goes through this one
+   * implementation, so a new frame type gets the same bounded behaviour rather than a fourth
+   * hand-rolled variant. Consumes and returns {@code true} when a token is available, or {@code
    * false} once the session exceeds {@code burst} frames refilled at {@code refillPerSec}/s. Frames
    * from one session are delivered serially by the container, so the unsynchronised bucket state
    * held in the session attributes under {@code attrKey} needs no locking.

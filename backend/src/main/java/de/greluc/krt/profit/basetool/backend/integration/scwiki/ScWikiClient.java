@@ -135,12 +135,29 @@ public class ScWikiClient {
   }
 
   /**
-   * Increments {@link MetricNames#EXTERNAL_FETCH_ERRORS} for the {@code scwiki} source. Called from
-   * each branch that swallows an upstream network or parse failure into a {@code null} / empty
-   * result, so a sustained Wiki outage is visible even though the sync services treat the empty
-   * payload as a skip and the scheduled job still records a success (REQ-OBS-011).
+   * Increments {@link MetricNames#EXTERNAL_FETCH_ERRORS} for the {@code scwiki} source, but at most
+   * once for the fetch {@code latch} belongs to. Called from each branch that swallows an upstream
+   * network or parse failure — or a broken pagination contract — into a {@code null} / empty /
+   * incomplete result, so a sustained Wiki outage is visible even though the sync services treat
+   * the empty payload as a skip and the scheduled job still records a success (REQ-OBS-011).
+   *
+   * <p>The latch exists because one page walk can exhibit several independent problems at once: a
+   * page failing mid-walk, absent pagination metadata on a full page 1, and a {@code meta.total}
+   * disagreement are not mutually exclusive, and two pairings are in fact the norm — a partially
+   * renamed {@code meta} block loses {@code last_page} while still stating a {@code total}, and a
+   * page dropped mid-walk is itself what makes the merged rows fall short of it. Counting every
+   * symptom would scale the external-error rate with the number of symptoms instead of the number
+   * of failed fetches, so one broken feed would read as a two- or three-fold outage on the
+   * dashboards. Every symptom still gets its own WARN line — an operator wants all of them; it is
+   * only the counter that must stay one-per-fetch.
+   *
+   * @param latch the current fetch's latch; the first call through it records, every later call
+   *     through the same instance is a no-op
    */
-  private void recordFetchError() {
+  private void recordFetchErrorOnce(FetchErrorLatch latch) {
+    if (!latch.claim()) {
+      return;
+    }
     meterRegistry
         .counter(
             MetricNames.EXTERNAL_FETCH_ERRORS, MetricNames.TAG_SOURCE, MetricNames.SOURCE_SCWIKI)
@@ -233,9 +250,11 @@ public class ScWikiClient {
    *       {@code meta.last_page} absent while page 1 came back full (the signature of an upstream
    *       field rename, which {@code @JsonIgnoreProperties(ignoreUnknown = true)} turns into a
    *       silent {@code null} instead of a parse error), a page failing mid-walk, or {@code
-   *       meta.total} disagreeing with the merged row count. Each of those also increments {@link
-   *       MetricNames#EXTERNAL_FETCH_ERRORS} so a contract break is visible in metrics, not just in
-   *       the log.
+   *       meta.total} disagreeing with the merged row count. Each of those warns on its own so an
+   *       operator sees every symptom, and together they increment {@link
+   *       MetricNames#EXTERNAL_FETCH_ERRORS} <b>at most once per call</b> (see {@link
+   *       #recordFetchErrorOnce}) so a contract break is visible in metrics without one failed
+   *       fetch inflating the error rate by its number of symptoms.
    * </ol>
    *
    * <p><b>Why {@code complete} exists (H5):</b> the merged list feeds tombstone sweeps that mark
@@ -281,9 +300,12 @@ public class ScWikiClient {
 
     String firstPageUri = buildPagedUri(endpoint, 1, include, filters);
     String previousEtag = etagByFirstPageUri.get(firstPageUri);
+    // One latch for the whole walk: however many distinct problems this fetch turns out to have,
+    // they collectively contribute exactly one external-fetch-error increment.
+    FetchErrorLatch errorLatch = new FetchErrorLatch();
 
     PageOutcome<T> firstOutcome =
-        fetchSinglePage(firstPageUri, typeRef, resourceLabel, previousEtag);
+        fetchSinglePage(firstPageUri, typeRef, resourceLabel, previousEtag, errorLatch);
     if (firstOutcome.notModified()) {
       // Page-1 304: the catalogue is byte-identical to the last successful fetch. Surface it as a
       // distinct outcome (empty data + notModified=true) so the caller reports its live row count
@@ -320,7 +342,7 @@ public class ScWikiClient {
                 + " never requested and must not be mistaken for deleted rows.",
             resourceLabel,
             accumulated.size());
-        recordFetchError();
+        recordFetchErrorOnce(errorLatch);
         complete = false;
       }
     } else {
@@ -331,14 +353,17 @@ public class ScWikiClient {
     for (int page = 2; page <= lastPage; page++) {
       paceForRateLimit();
       String pageUri = buildPagedUri(endpoint, page, include, filters);
-      ScWikiResponseDto<T> next = fetchSinglePage(pageUri, typeRef, resourceLabel, null).body();
+      ScWikiResponseDto<T> next =
+          fetchSinglePage(pageUri, typeRef, resourceLabel, null, errorLatch).body();
       if (next == null) {
-        // fetchSinglePage already logged the cause and counted the fetch error.
+        // fetchSinglePage already logged the transport cause; the latch keeps this walk's total at
+        // one increment while still covering the bodiless-2xx case it does not count itself.
         log.warn(
             "Page {} of {} failed mid-pagination; returning an INCOMPLETE result of {} row(s).",
             page,
             resourceLabel,
             accumulated.size());
+        recordFetchErrorOnce(errorLatch);
         complete = false;
         break;
       }
@@ -359,7 +384,7 @@ public class ScWikiClient {
           resourceLabel,
           accumulated.size(),
           meta.total());
-      recordFetchError();
+      recordFetchErrorOnce(errorLatch);
       complete = false;
     }
 
@@ -427,6 +452,10 @@ public class ScWikiClient {
    */
   public <T> T fetchOne(String uri, Class<T> type, String resourceLabel) {
     log.debug("Fetching one {} from SC Wiki API: {}", resourceLabel, uri);
+    // One latch for this single-resource fetch too: the transport and the parse branch below are
+    // mutually exclusive today, but the latch makes "one fetch, at most one increment" structural
+    // rather than a property of the current control flow.
+    FetchErrorLatch errorLatch = new FetchErrorLatch();
     // Decode to a raw String, then parse + unwrap with this client's own mapper. The Wiki wraps
     // some
     // single-resource responses in {"data": {…}} and returns others flat, so reading the body as a
@@ -451,7 +480,7 @@ public class ScWikiClient {
             .onErrorResume(
                 e -> {
                   log.warn("Failed to fetch {} from SC Wiki API ({})", resourceLabel, uri, e);
-                  recordFetchError();
+                  recordFetchErrorOnce(errorLatch);
                   return Mono.empty();
                 })
             .blockOptional()
@@ -465,7 +494,7 @@ public class ScWikiClient {
       return objectMapper.treeToValue(payload, type);
     } catch (Exception e) {
       log.warn("Failed to parse {} response from SC Wiki API ({})", resourceLabel, uri, e);
-      recordFetchError();
+      recordFetchErrorOnce(errorLatch);
       return null;
     }
   }
@@ -484,6 +513,8 @@ public class ScWikiClient {
    * @param typeRef typed envelope reference
    * @param resourceLabel log label
    * @param previousEtag optional value for {@code If-None-Match}; {@code null} to skip
+   * @param errorLatch the enclosing fetch's one-increment latch, so a transport failure here and a
+   *     completeness problem the caller detects afterwards do not both count
    * @return the page outcome: a parsed envelope on 2xx, a {@link PageOutcome#notModified()} marker
    *     on 304, or a null-bodied {@link PageOutcome#error()} on empty / error
    */
@@ -491,7 +522,8 @@ public class ScWikiClient {
       String requestUri,
       ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
       String resourceLabel,
-      String previousEtag) {
+      String previousEtag,
+      FetchErrorLatch errorLatch) {
     // .uri(String) parses as a URI template, prepends the configured baseUrl when the URI is
     // relative, and treats already-encoded sequences (%5B / %5D) as literal — exactly what
     // buildPagedUri produces. Passing a URI directly would BYPASS the baseUrl (Spring treats a
@@ -523,7 +555,7 @@ public class ScWikiClient {
         .onErrorResume(
             e -> {
               log.warn("Failed to fetch {} from SC Wiki API ({})", resourceLabel, requestUri, e);
-              recordFetchError();
+              recordFetchErrorOnce(errorLatch);
               return Mono.just(PageOutcome.<T>error());
             })
         .blockOptional()
@@ -706,6 +738,38 @@ public class ScWikiClient {
      */
     private static <T> PageOutcome<T> error() {
       return new PageOutcome<>(null, false);
+    }
+  }
+
+  /**
+   * One-shot claim ticket for a single fetch's {@link MetricNames#EXTERNAL_FETCH_ERRORS} increment.
+   * One instance is created per {@link #fetchAllPagesResult} page walk (and per {@link #fetchOne}
+   * call) and handed to every branch that may want to count an error, so the counter tracks the
+   * number of failed <em>fetches</em> rather than the number of symptoms a failed fetch happened to
+   * show. The counterpart WARN lines are deliberately NOT latched — each one names a different
+   * problem and an operator wants to read all of them.
+   *
+   * <p>Deliberately not thread-safe: a latch never escapes the single thread that drives its walk
+   * (the page loop blocks on each request), so a plain field is both sufficient and cheaper than an
+   * atomic. Do not hoist an instance into a field — one per fetch is the whole contract.
+   */
+  private static final class FetchErrorLatch {
+
+    /** Whether this fetch has already contributed its single counter increment. */
+    private boolean recorded;
+
+    /**
+     * Claims this fetch's one increment for the caller.
+     *
+     * @return {@code true} on the first invocation for this latch — the caller must record —, and
+     *     {@code false} on every subsequent one, meaning the increment is already spent
+     */
+    private boolean claim() {
+      if (recorded) {
+        return false;
+      }
+      recorded = true;
+      return true;
     }
   }
 }
