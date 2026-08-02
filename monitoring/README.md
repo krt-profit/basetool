@@ -34,16 +34,16 @@ to the realm role `Admin`. There is no other exposed monitoring surface.
 
 |      Component       |                      Image                      | Version |
 |----------------------|-------------------------------------------------|---------|
-| Prometheus           | `prom/prometheus`                               | v3.13.0 |
+| Prometheus           | `prom/prometheus`                               | v3.13.1 |
 | Grafana (OSS)        | `grafana/grafana-oss`                           | 13.0.2  |
-| Loki                 | `grafana/loki`                                  | 3.7.3   |
+| Loki                 | `grafana/loki`                                  | 3.7.4   |
 | Tempo                | `grafana/tempo`                                 | 3.0.2   |
-| Alloy                | `grafana/alloy`                                 | v1.17.1 |
-| Alertmanager         | `quay.io/prometheus/alertmanager`               | v0.33.0 |
-| node_exporter        | `quay.io/prometheus/node-exporter`              | v1.11.1 |
-| cAdvisor             | `ghcr.io/google/cadvisor`                       | v0.60.3 |
-| postgres_exporter ×2 | `quay.io/prometheuscommunity/postgres-exporter` | v0.20.0 |
-| redis_exporter       | `oliver006/redis_exporter`                      | v1.86.0 |
+| Alloy                | `grafana/alloy`                                 | v1.18.0 |
+| Alertmanager         | `quay.io/prometheus/alertmanager`               | v0.33.1 |
+| node_exporter        | `quay.io/prometheus/node-exporter`              | v1.12.1 |
+| cAdvisor             | `ghcr.io/google/cadvisor`                       | v0.60.5 |
+| postgres_exporter ×2 | `quay.io/prometheuscommunity/postgres-exporter` | v0.20.1 |
+| redis_exporter       | `oliver006/redis_exporter`                      | v1.88.0 |
 | blackbox_exporter    | `prom/blackbox-exporter`                        | v0.28.0 |
 | docker-socket-proxy  | `tecnativa/docker-socket-proxy`                 | v0.4.2  |
 
@@ -185,7 +185,7 @@ outage pages once, not many times: a `TargetDown` on an app scrape suppresses th
 `application`-scoped warnings, a `BlackboxProbeFailed` suppresses that endpoint's
 `CertificateExpiringSoon` / `Edge*` posture alerts, `HostDiskCritical` suppresses
 `HostDiskWarning` for the same mountpoint, a `ContainerRestartLoop` suppresses that same container's
-resource-pressure warnings (`ContainerWorkingSetHigh` / `ContainerOomKilled` /
+resource-pressure warnings (`ContainerMemoryHigh` / `ContainerOomKilled` /
 `ContainerCpuThrottledHigh` / `ContainerPidsHigh`, joined on `name`), and a `TargetDown` suppresses
 every `instance`-scoped warning derived from that dead target's series. Notifications are grouped by
 `alertname` only, so a multi-target `TargetDown` (or a multi-container restart burst) batches into one
@@ -251,6 +251,92 @@ docker inspect --format '{{.Name}} limit={{.HostConfig.Memory}}' alloy frontend 
 The last command is also how you confirm a compose-definition change actually **reached** the running
 container — a stale limit was the real root cause of a recurring `ContainerWorkingSetHigh` in July 2026,
 before `deploy.sh` learned to apply compose-definition drift.
+
+### Go services (Prometheus, Alloy, Loki, Tempo, cAdvisor, the exporters)
+
+Same budget rule, different metrics — and one extra failure mode. A Go process that is **not** given
+`GOMEMLIMIT` has no idea its cgroup limit exists: the GC sizes the heap off `GOGC` alone (target 2×
+live heap) and the scavenger returns arena pages only lazily, so every concurrency spike ratchets the
+working set **up and it never comes back down**. The symptom is a container pinned near its limit whose
+*live* heap is a fraction of it — which reads like a leak and is not one:
+
+```promql
+go_memstats_heap_alloc_bytes{job="<svc>"}   # live heap — the number that matters
+go_memstats_next_gc_bytes{job="<svc>"}      # GC target; ~2x live under default GOGC
+go_memstats_sys_bytes{job="<svc>"}          # total taken from the OS — compare against the limit
+go_goroutines{job="<svc>"}                  # flat baseline + spikes = pile-ups, not a leak
+```
+
+**Do not compare `sys_bytes` against the limit.** It is *reserved address space*, not resident memory:
+it still counts arena pages the scavenger has already handed back to the OS. On Tempo the gap is
+164 MiB (436.8 reserved vs a 272.6 MiB working set at the same instant). The quantity that tracks the
+working set — and the one `GOMEMLIMIT` actually bounds — is the runtime's **resident** memory:
+
+```promql
+go_memstats_sys_bytes - go_memstats_heap_released_bytes
+```
+
+> **`GOMEMLIMIT` = 75 % of the container limit**, cross-checked to sit well above the measured live
+> heap (`go_memstats_heap_alloc_bytes`) — every service here is at ≥3.7×, so the GC is never pinned at
+> the ceiling in steady state. Re-derive it whenever a limit changes.
+
+**Take every reading time-aligned** (pass the same `time=` to all queries). Mixing a multi-day
+`max_over_time` working set with an instant `go_*` reading yields nonsense — it produced a *negative*
+overhead here before the method was corrected.
+
+### Why `ContainerMemoryHigh` keys off `rss` — decompose before you size
+
+This is the trap that cost four Alloy limit bumps and a round of wrong conclusions in this very
+document. Until 2026-08-02 the alert was `ContainerWorkingSetHigh`, dividing
+`container_memory_working_set_bytes` by the container limit — and that metric is:
+
+```
+container_memory_working_set_bytes  =  anon  +  ACTIVE file pages  (+ kernel)
+```
+
+The file-page term includes the service's **own memory-mapped binary** — clean, file-backed and
+trivially reclaimable, so the kernel evicts it under pressure and re-reads it from disk. It can never
+cause an OOM, yet it counts fully toward the alert's ratio. Page cache also **expands to fill whatever
+cgroup limit it is given**, so raising a limit can never resolve a working-set alert driven by it — the
+ratio just creeps back.
+
+Always split the reading before drawing a conclusion:
+
+```promql
+container_memory_rss{name="<svc>"}          # anonymous — this is what predicts OOM
+container_memory_mapped_file{name="<svc>"}  # the mapped binary — reclaimable, ignore for sizing
+```
+
+Measured 7-day peaks, 2026-08-02 — anon vs. what the alert reported:
+
+|           service           |    anon    | working set | mapped binary |
+|-----------------------------|------------|-------------|---------------|
+| `blackbox-exporter`         | **95.3 %** | ~100 %      | 16.0 MiB      |
+| `alertmanager`              | 48.3 %     | 95.0 %      | 24.5 MiB      |
+| `alloy`                     | 40.5 %     | 94.8 %      | 183.9 MiB     |
+| `node-exporter`             | 33.4 %     | 83.8 %      | 13.5 MiB      |
+| `loki`                      | 68.0 %     | 80.2 %      | 90.9 MiB      |
+| `postgres-exporter-backend` | 42.4 %     | 77.9 %      | 9.5 MiB       |
+| `redis-exporter`            | 40.0 %     | 77.2 %      | 9.5 MiB       |
+
+On the metric that actually predicts OOM, **`blackbox-exporter` was the only service anywhere near its
+limit**; everything else was reporting its binary. On the 32M exporters the mapped binary is roughly
+half the working set (alertmanager: 23.2 anon + 24.5 mapped = its 45.6 MiB "95 %").
+
+So distinguish three cases:
+
+- **High anon, live heap far below it** → the runtime is hoarding arena. `GOMEMLIMIT` is the fix and
+  the limit usually need not move. This was `blackbox-exporter`.
+- **High working set, low anon** → you are looking at the mapped binary or page cache. Not an OOM risk;
+  do **not** raise the limit. This was `alloy` and all four small exporters.
+- **Anon climbing monotonically, or goroutines never returning to baseline** → a real leak. More RAM
+  only postpones it. Nothing in this stack currently matches.
+
+`alloy` is the worked example of the middle case: its `container_memory_mapped_file` went from 0–2 MB
+to 182.5 MiB in a single 6-hour window on 2026-07-31, when the v1.18.0 image bump reached prod. Page
+cache is charged to the cgroup that *first faults a page in*, so after a fresh image pull the container
+running the new binary is billed for it — the same memory as before, re-attributed. Its `rss` was flat
+at 190–217 MB across the whole 21-day window and its goroutines flat at ~397.
 
 ## Grafana sandbox-export workflow
 

@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Monitoring: blackbox-Exporter-Speicherlimit auf 64 MB angehoben (`GOMEMLIMIT` 44 MiB).** Der Probe-Exporter lief seit dem 31.07. dauerhaft auf 97-100 % seines 32-MB-Limits und löste den `ContainerWorkingSetHigh`-Alarm aus, obwohl er nur 9,8 MiB Heap belegt. Ohne `GOMEMLIMIT` kannte die Go-Laufzeit das Container-Limit nicht und behielt den bei jeder Lastspitze angeforderten Speicher dauerhaft; das Limit selbst war seit dem Aufbau des Stacks unverändert, während die Zahl der Probe-Ziele auf 23 gewachsen ist. Greift beim nächsten Deploy.
+
+- **Monitoring: Alle Go-Dienste des Überwachungs-Stacks haben jetzt vorsorglich eine Speicher-Obergrenze (`GOMEMLIMIT`).** Bisher hatten nur Prometheus und Alloy eine; ohne sie kennt die Go-Laufzeit das Container-Limit nicht und kann angeforderten Speicher dauerhaft behalten. Grafana, Loki, Tempo, cAdvisor, Alertmanager, node-exporter, beide Postgres-Exporter und der Redis-Exporter sind jetzt auf 75 % ihres Limits begrenzt — ohne zusätzlichen Speicherbedarf. Greift beim nächsten Deploy.
+
+- **Monitoring: Der Speicheralarm bewertete rund die Hälfte der Meldungen falsch.** `ContainerWorkingSetHigh` misst auch die eingeblendete Programmdatei eines Dienstes mit — die ist aber jederzeit verdrängbar und kann keinen Speichermangel auslösen. Eine Nachmessung aller Container zeigte: bei Alertmanager, Alloy, node-exporter und den Exportern bestand bis zur Hälfte des gemeldeten Werts daraus; tatsächlich knapp war einzig der blackbox-Exporter. Alloys Anstieg vom 31.07. war kein Speicherleck, sondern eine Umbuchung nach dem Image-Wechsel auf Version 1.18.0. Der Alarm wertet jetzt nur noch den nicht verdrängbaren Anteil aus und heißt `ContainerMemoryHigh` (vorher `ContainerWorkingSetHigh`); Messanleitung, ADR-0085 und die Spec halten die Herleitung fest.
+
+
 ## [v1.5.28](https://github.com/krt-profit/basetool/releases/tag/v1.5.28) - 2026-08-02
 
 ### Added

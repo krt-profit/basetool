@@ -52,6 +52,48 @@ x-mon-base: &mon-base
   # cap-relative and unscoped by name (infrastructure.yml, REQ-OBS-014).
   init: true
 
+# =============================================================================================
+# GO SERVICE MEMORY SIZING — why every Go service below carries GOMEMLIMIT
+# =============================================================================================
+# Every service in this file except `socket-proxy` (HAProxy, C) is a Go program. GOMEMLIMIT makes the
+# runtime aware of its cgroup ceiling: without it the GC sizes the heap off GOGC alone (target 2x live
+# heap) and the scavenger returns arena pages only lazily, so a concurrency spike can RATCHET the
+# anonymous footprint up and leave it there until the container is recreated. `blackbox-exporter` hit
+# exactly that (2026-07-31: 97-100% of 32M on a 9.8 MiB live heap, ContainerWorkingSetHigh mailing
+# daily; 95.3% of the limit was genuinely ANONYMOUS memory). Every service here now carries one.
+#
+# READ THIS BEFORE USING A CONTAINER-MEMORY ALERT AS SIZING EVIDENCE. Until 2026-08-02 that alert was
+# `ContainerWorkingSetHigh`, and it was NOT an OOM predictor — an earlier revision of this block drew
+# the wrong conclusion from it. It is now `ContainerMemoryHigh` and keys off `container_memory_rss`
+# instead, for the reason below:
+#
+#   container_memory_working_set_bytes  =  anon  +  ACTIVE file pages  (+ kernel)
+#
+# The file-page term includes the service's own memory-mapped BINARY, which is clean, file-backed and
+# trivially reclaimable — the kernel evicts it under pressure and re-reads it from disk. It can never
+# cause an OOM, but it counts fully toward the alert's ratio. On the small exporters it is roughly HALF
+# the working set (alertmanager: 23.2 MiB anon + 24.5 MiB mapped = its 45.6 MiB "95% of limit"; the
+# 32M exporters map 9.5-16 MiB of binary each). Measured 7-day peaks, anon vs working set:
+#
+#   blackbox 95.3% / ~100%   alertmanager 48.3% / 95.0%   alloy 40.5% / 94.8%
+#   node-exporter 33.4% / 83.8%   loki 68.0% / 80.2%   both postgres-exporters ~42% / ~78%
+#
+# So on the metric that actually predicts OOM, blackbox-exporter was the ONLY service anywhere near its
+# limit. The rest were reporting their binaries. Page cache also grows to fill whatever cgroup limit it
+# is given, which is why raising a limit can never resolve a working-set alert driven by it — see the
+# four-bump history in the `alloy` block below.
+#
+# HOW TO SIZE A GO SERVICE (full recipe in monitoring/README.md -> "Container memory sizing"):
+#   1. Size against `container_memory_rss` (anonymous), NOT the working set.
+#   2. Budget the mapped binary separately: it is a fixed per-image cost, not a load-dependent one.
+#   3. GOMEMLIMIT = 75% of the limit, cross-checked to sit well above the measured live heap
+#      (`go_memstats_heap_alloc_bytes`) — everything below is >=3.7x, so the GC is never pinned.
+#   4. Do NOT compare `go_memstats_sys_bytes` against the limit: that is reserved address space and
+#      runs far above resident memory (tempo: 436.8 reserved vs a 272.6 MiB working set). The resident
+#      figure is `go_memstats_sys_bytes - go_memstats_heap_released_bytes`.
+# Re-derive when changing a limit. A percentage alone is not a budget.
+# =============================================================================================
+
 services:
   # ------------------------------------------------------------------------------------------
   # Prometheus — metrics DB. 180d retention + 40GB cap; admin API (for the weekly TSDB snapshot)
@@ -68,6 +110,14 @@ services:
     # 1024M cgroup HARD limit below and being OOM-killed. Held ~12% under the hard limit to leave
     # room for mmap'd chunks and non-heap runtime memory (neither counts toward GOMEMLIMIT). Keep in
     # step with the memory limit in deploy.resources below.
+    #
+    # NOTE (2026-08-02 sizing sweep): 900MiB is 88% of the 1024M limit — the loosest ratio in this file
+    # and above the 75% the other nine Go services now use, which means that IF Prometheus ever grew
+    # into its GOMEMLIMIT its anonymous memory would land straight on the 90% ContainerMemoryHigh line.
+    # Deliberately left alone: measured live heap is 157.4 MiB against a 7-day working-set peak of
+    # 446.4 MiB (43.6%), so it is nowhere near that ceiling and tightening it would only risk GC
+    # pressure during WAL replay. Re-derive it (75% -> 768MiB) if the retention or cardinality budget
+    # is ever raised.
     environment:
       GOMEMLIMIT: "900MiB"
     command:
@@ -117,6 +167,14 @@ services:
     image: grafana/grafana-oss:13.0.2
     cap_drop: [ALL]
     environment:
+      # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 768MiB = 75% of the 1024M limit.
+      # Grafana is the ONE Go service here with no `go_*` metrics to verify against: Prometheus does
+      # not scrape it (no `grafana` job in prometheus.yml — its own /metrics is behind the OIDC-gated
+      # server), so this is sized from the container working set alone (7-day peak 528.7 MiB = 51.6%).
+      # Grafana also forks plugin subprocesses whose memory the Go runtime does NOT manage and
+      # GOMEMLIMIT does NOT bound, so keep the margin here wider than the exporters' if it is ever
+      # retuned. Add a scrape job first if this service ever needs a real budget.
+      GOMEMLIMIT: "768MiB"
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-https://grafana.profit-base.online/}
       GF_SERVER_PROTOCOL: https
       GF_SERVER_CERT_FILE: /etc/grafana/certs/grafana.crt
@@ -194,6 +252,12 @@ services:
     container_name: loki
     image: grafana/loki:3.7.4
     cap_drop: [ALL]
+    # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 288MiB = 75% of the 384M limit;
+    # measured live heap 76.7 MiB, so the ceiling is ~3.8x actual demand. Loki is the one place where
+    # the working-set reading and the anonymous one broadly agree (80.2% vs 68.0%) — it maps 90.9 MiB
+    # of binary but genuinely uses 261.3 MiB anon, the largest real footprint of the unbudgeted set.
+    environment:
+      GOMEMLIMIT: "288MiB"
     command: -config.file=/etc/loki/loki-config.yml
     # Docker's default 10s stop-grace SIGKILLs Loki ~20s into its dskit graceful shutdown
     # (server.graceful_shutdown_timeout default 30s; loki-config.yml does not override it),
@@ -238,6 +302,12 @@ services:
     # remote_write can basic-auth to Prometheus as the shared `grafana` user (#1041 item 22a).
     command: ["-target=all", "-config.expand-env=true", "-config.file=/etc/tempo/tempo.yaml"]
     environment:
+      # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 768MiB = 75% of the 1G limit;
+      # measured live heap 208.8 MiB, so the ceiling is ~3.7x actual demand (the tightest ratio of the
+      # nine, which is why it is not set lower). Tempo is also the clearest illustration of why
+      # `sys_bytes` must not be compared against the limit directly: 436.8 MiB reserved versus a
+      # 272.6 MiB working set at the same instant — 164 MiB of that is scavenged-back arena.
+      GOMEMLIMIT: "768MiB"
       # Consumed by the metrics-generator remote_write basic_auth (reuses the Prometheus `grafana`
       # web-auth user — owner decision, #1041 item 22a). Same value Grafana uses for its datasource.
       PROMETHEUS_WEB_PASSWORD: ${PROMETHEUS_WEB_PASSWORD:?PROMETHEUS_WEB_PASSWORD must be set for the monitoring stack}
@@ -288,7 +358,7 @@ services:
     cap_drop: [ALL]
     group_add: ["473", "4"]
     # GOMEMLIMIT is a SOFT cap that makes the Go GC reclaim and return memory to the OS BEFORE the
-    # cgroup OOM-kills Alloy. It must sit DELIBERATELY BELOW the ContainerWorkingSetHigh 90% line, NOT
+    # cgroup OOM-kills Alloy. It must sit DELIBERATELY BELOW the 90% container-memory alert line, NOT
     # at it: GOMEMLIMIT bounds the Go runtime's managed memory, but container_memory_working_set_bytes
     # ALSO counts non-runtime RSS (page cache from the ~8 file tailers + docker log source, MADV_FREE
     # pages the kernel has not yet reclaimed). The prior 230MiB was ~90% of the old 256M hard limit —
@@ -311,6 +381,28 @@ services:
     # only reaches if the live heap demands it (GOGC targets 2x live first), so raising it does not
     # force Alloy to consume it. When changing the limit, re-derive from the budget — never re-apply a
     # percentage.
+    #
+    # 2026-08-02 — THE "THIRD RECURRENCE = LEAK" VERDICT BELOW WAS INVESTIGATED AND IS **NOT** A LEAK.
+    # Alloy read 94.8% of this limit on a 7-day working-set peak, which under the old rule would have
+    # condemned it. A 21-day decomposition says otherwise:
+    #
+    #   container_memory_rss        flat 190-217 MB for the whole window, THROUGH the climb
+    #   go_goroutines               flat ~397, then LOWER (~370) — no tailer-reconnect churn
+    #   go_memstats_heap_alloc      154 MiB against this 360MiB GOMEMLIMIT — the runtime is on budget
+    #   container_memory_mapped_file  0-2 MB for 19 days, then 182.5 MiB in ONE 6h window on 07-31
+    #
+    # The whole excess is the memory-mapped Alloy binary. It appeared when the v1.18.0 image bump
+    # (4ea97210c, merged 07-28) reached prod with the 07-31 release deploy: page cache is charged to the
+    # cgroup that FIRST faults a page in, so after a fresh pull the container running the new binary is
+    # billed for it, where the long-resident old image's pages had been billed to the pull. Same memory
+    # as before, different cgroup — and clean file-backed pages the kernel reclaims on demand, so it is
+    # not an OOM risk at all. Alloy's ACTUAL anonymous usage is 40.5% of this limit.
+    #
+    # Do NOT raise the limit a fourth time, and do not chase a leak here either. The four-bump history
+    # (192->256->384->512M) is the signature of chasing a working-set number that partly measures a
+    # binary: page cache expands to fill whatever limit it is given, so the ratio always creeps back.
+    # If this alerts again, check `container_memory_rss` FIRST — see the GO SERVICE MEMORY SIZING block
+    # at the top of this file.
     environment:
       GOMEMLIMIT: "360MiB"
     command:
@@ -360,6 +452,13 @@ services:
     container_name: alertmanager
     image: quay.io/prometheus/alertmanager:v0.33.1
     cap_drop: [ALL]
+    # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 36MiB = 75% of the 48M limit;
+    # measured live heap 7.7 MiB, so the ceiling is ~4.7x actual demand. Preventive, not remedial:
+    # alertmanager READ 95.0% of its limit at the 2026-08-02 sweep, but the decomposition puts 24.5 MiB
+    # of that 45.6 MiB peak in its mapped binary and only 23.2 MiB (48.3%) in anonymous memory. Its 48M
+    # limit is tight for a Go binary of this size, but it is not close to OOM and needs no more RAM.
+    environment:
+      GOMEMLIMIT: "36MiB"
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
@@ -389,6 +488,12 @@ services:
     container_name: node-exporter
     image: quay.io/prometheus/node-exporter:v1.12.1
     pid: host
+    # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 24MiB = 75% of the 32M limit;
+    # measured live heap 2.6 MiB, so the ceiling is ~9.2x actual demand — the widest margin here,
+    # because this exporter genuinely needs almost nothing. Preventive: its 83.8% working-set peak
+    # decomposes to 10.7 MiB anon (33.4%) + 13.5 MiB mapped binary, so it was never near OOM.
+    environment:
+      GOMEMLIMIT: "24MiB"
     command:
       - --path.rootfs=/host
       - --collector.systemd
@@ -419,6 +524,12 @@ services:
     <<: *mon-base
     container_name: cadvisor
     image: ghcr.io/google/cadvisor:v0.60.5
+    # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 96MiB = 75% of the 128M limit;
+    # measured live heap 21.9 MiB, so the ceiling is ~4.4x actual demand. cAdvisor had ample headroom
+    # either way (working-set peak 55.6%, anon 30.6%); this is purely preventive, so its per-container
+    # series churn on every deploy can never grow the arena into the limit.
+    environment:
+      GOMEMLIMIT: "96MiB"
     command:
       - --docker=tcp://socket-proxy:2375
       - --docker_only
@@ -435,7 +546,7 @@ services:
       # — only post-crash TargetDown paged (REQ-OBS-014). This is the default --disable_metrics set
       # with `process` REMOVED — do NOT switch to --enable_metrics=process: that flag REPLACES the
       # whole set (help: "If set, overrides 'disable_metrics'"), which would drop cpu/memory/network
-      # and blind ContainerWorkingSetHigh / ContainerCpuThrottledHigh / ContainerMetricsMissing.
+      # and blind ContainerMemoryHigh / ContainerCpuThrottledHigh / ContainerMetricsMissing.
       # Verified on cadvisor v0.60.5: container_threads{name=...} appears while container_last_seen /
       # container_memory_working_set_bytes stay present.
       #
@@ -530,6 +641,11 @@ services:
       - --collector.database_wraparound
       - --collector.long_running_transactions
     environment:
+      # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 24MiB = 75% of the 32M limit;
+      # measured live heap 3.6 MiB, so the ceiling is ~6.7x actual demand. Preventive: its 77.9%
+      # working-set peak is 13.6 MiB anon (42.4%) plus a 9.5 MiB mapped binary — NOT the blackbox
+      # ratchet, which an earlier revision of this comment wrongly claimed.
+      GOMEMLIMIT: "24MiB"
       DATA_SOURCE_NAME: "postgresql://${PG_EXPORTER_USER:-monitoring}:${PG_EXPORTER_BACKEND_PASSWORD:?PG_EXPORTER_BACKEND_PASSWORD must be set}@db-backend:15432/${POSTGRES_DB:?POSTGRES_DB must be set}?sslmode=disable"
     deploy:
       resources:
@@ -552,6 +668,11 @@ services:
       - --collector.database_wraparound
       - --collector.long_running_transactions
     environment:
+      # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. Same image, same limit and the same
+      # 3.4 MiB live heap as the backend exporter, so the same 24MiB (75% of 32M, ~7.1x the heap). It
+      # sat lower at the sweep (working-set peak 54.8%, anon 42.3%) only because the Keycloak DB is
+      # quieter — and it maps just 3.1 MiB of binary against the backend exporter's 9.5 MiB.
+      GOMEMLIMIT: "24MiB"
       DATA_SOURCE_NAME: "postgresql://${PG_EXPORTER_USER:-monitoring}:${PG_EXPORTER_KEYCLOAK_PASSWORD:?PG_EXPORTER_KEYCLOAK_PASSWORD must be set}@db-keycloak:15433/${KC_POSTGRES_DB:?KC_POSTGRES_DB must be set}?sslmode=disable"
     deploy:
       resources:
@@ -572,6 +693,14 @@ services:
     image: oliver006/redis_exporter:v1.88.0
     cap_drop: [ALL]
     environment:
+      # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 24MiB = 75% of the 32M limit.
+      # This exporter ships with the Go collector DISABLED, so there is no go_memstats_* series to
+      # verify the ratio against (confirmed at the 2026-08-02 sweep: the `redis` job returns container
+      # metrics but no go_*). Sized from the cgroup counters instead: 12.8 MiB anon (40.0% of the limit)
+      # plus a 9.5 MiB mapped binary make up its 77.2% working-set peak — the same shape as the two
+      # postgres-exporters, which is why it gets their value. Preventive, like theirs.
+      # If this ever needs a real budget, enable the Go collector first rather than guessing again.
+      GOMEMLIMIT: "24MiB"
       REDIS_ADDR: redis://redis:6379
       REDIS_USER: ${REDIS_EXPORTER_USER:-monitoring}
       REDIS_PASSWORD: ${REDIS_EXPORTER_PASSWORD:?REDIS_EXPORTER_PASSWORD must be set}
@@ -592,6 +721,30 @@ services:
     container_name: blackbox-exporter
     image: prom/blackbox-exporter:v0.28.0
     cap_drop: [ALL]
+    # GOMEMLIMIT, same soft-cap rationale as prometheus/alloy above: without it the Go runtime has no
+    # idea a cgroup ceiling exists. It sizes the heap off GOGC alone (target 2x live heap) and returns
+    # arena pages only lazily via the scavenger, so every concurrency spike RATCHETS the working set up
+    # and it never comes back down. Measured on prod 2026-08-02T05:51Z while ContainerWorkingSetHigh was
+    # firing: live heap 9.8 MiB, GC target 14.4 MiB, 21 goroutines, 18 fds — yet go_memstats_sys_bytes
+    # 31.3 MiB against a 32 MiB limit. The process did not NEED the memory, the runtime simply kept it.
+    # The climb is visible as ~0.5 MB/day per container life, restarting near 26 MB after each recreate.
+    #
+    # Sized against the measured Go footprint (method + numbers in monitoring/README.md -> "Container
+    # memory sizing" -> "Go services"): working_set tracks the runtime's RESIDENT memory, which is what
+    # GOMEMLIMIT bounds — `go_memstats_sys_bytes - go_memstats_heap_released_bytes`, NOT `sys_bytes`
+    # alone (that is reserved address space and runs far above the working set: 31.3 vs 23.4 MiB here).
+    # GOMEMLIMIT is set at 75% of the limit with the remainder as margin: 44MiB of 64M, expected
+    # working set ~48 MiB = 75%, well under the 90% alert line. 44MiB is also ~4.5x the measured live
+    # heap (9.8 MiB), so the GC is never pinned at the ceiling in steady state — it only clamps the
+    # probe pile-ups that caused the 2026-07-31 step.
+    #
+    # This service is the one where the alert was RIGHT. The plane-wide decomposition that reclassified
+    # every other working-set alert as mapped-binary noise confirms blackbox instead: its 7-day peak was
+    # 30.5 MiB of ANONYMOUS memory against the 32 MiB limit (95.3%) — by far the highest anon ratio in
+    # the stack, with everything else under 70%. The 16.0 MiB it maps peaks separately, at container
+    # start. So the extra RAM here is genuinely needed; for the other eight Go services it was not.
+    environment:
+      GOMEMLIMIT: "44MiB"
     command:
       - --config.file=/etc/blackbox/blackbox.yml
     volumes:
@@ -603,7 +756,17 @@ services:
     deploy:
       resources:
         limits:
-          memory: 32M
+          # 64M (was 32M, unchanged since the stack was built 2026-07-04): the original budget was a
+          # guess made when this exporter probed a handful of targets. It now serves 23 targets across
+          # 12 jobs every 30s — HTTPS with cert-chain validation, DNS, and the ip6-pinned variants — and
+          # its steady state had crept to 26-28.6 MiB, i.e. 78-85% of 32M with no room for a spike. On
+          # 2026-07-31 probes started running into their deadlines (DNS on 1.1.1.1 at exactly its 5.000s
+          # module timeout, ingest 9.74s of 10s); overlapping probes took goroutines from a 21-day-stable
+          # 23-24 up to 52, each holding its own TLS/DNS buffers, and the working set stepped to 97-100%
+          # and stayed there. Ruled out first: no leak (goroutines and fds return to baseline), no cgroup
+          # OOM kill (container_oom_events_total = 0), no host pressure (10-11 GB MemAvailable across the
+          # whole 21-day window). See the GOMEMLIMIT budget arithmetic above.
+          memory: 64M
           pids: 512
     networks:
       - net-monitoring-core
