@@ -118,12 +118,13 @@ inhibit_rules:
   #    those carry no independent signal while ContainerRestartLoop (critical) already pages. Joined on
   #    `name` (present on every cAdvisor container series), so it only ever suppresses the SAME
   #    container's warnings, never an unrelated one. During the 2026-07-15 cascade this collapses the
-  #    per-container ContainerWorkingSetHigh noise under the restart-loop page.
+  #    per-container ContainerMemoryHigh noise under the restart-loop page (that alert was named
+  #    ContainerWorkingSetHigh until 2026-08-02; historical incident notes still use the old name).
   - source_matchers:
       - alertname = "ContainerRestartLoop"
     target_matchers:
       - severity = "warning"
-      - alertname =~ "ContainerWorkingSetHigh|ContainerOomKilled|ContainerCpuThrottledHigh|ContainerPidsHigh"
+      - alertname =~ "ContainerMemoryHigh|ContainerOomKilled|ContainerCpuThrottledHigh|ContainerPidsHigh"
     equal: ['name']
 
   # 5. A down scrape target suppresses every warning derived from that same target's series — its

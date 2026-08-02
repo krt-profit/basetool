@@ -214,7 +214,7 @@ outage pages once, not many times: a `TargetDown` on an app scrape suppresses th
 `application`-scoped warnings, a `BlackboxProbeFailed` suppresses that endpoint's
 `CertificateExpiringSoon` / `Edge*` posture alerts, `HostDiskCritical` suppresses
 `HostDiskWarning` for the same mountpoint, a `ContainerRestartLoop` suppresses that same container's
-resource-pressure warnings (`ContainerWorkingSetHigh` / `ContainerOomKilled` /
+resource-pressure warnings (`ContainerMemoryHigh` / `ContainerOomKilled` /
 `ContainerCpuThrottledHigh` / `ContainerPidsHigh`, joined on `name`), and a `TargetDown` suppresses
 every `instance`-scoped warning derived from that dead target's series. Notifications are grouped by
 `alertname` only, so a multi-target `TargetDown` (or a multi-container restart burst) batches into one
@@ -281,99 +281,121 @@ The last command is also how you confirm a compose-definition change actually **
 container — a stale limit was the real root cause of a recurring `ContainerWorkingSetHigh` in July 2026,
 before `deploy.sh` learned to apply compose-definition drift.
 
-### Alloy memory budget — re-derived for the `keycloak-stdout` stream (2026-08-02)
+### Go services (Prometheus, Alloy, Loki, Tempo, cAdvisor, the exporters)
 
-Adding a container stdout stream to Alloy has twice cost a limit bump, so this change ships with the
-arithmetic written down rather than discovered by an alert. **The numbers below are derived, not
-measured** — see *Before you raise anything* at the end.
-
-**Current values, as committed in `docker-compose.monitoring.yml`** (Compose's `M` suffix is
-binary, so `512M` = 512 MiB):
-
-- Image: `grafana/alloy:v1.18.0`
-- Hard limit (`deploy.resources.limits.memory`): **512M**
-- `GOMEMLIMIT`: **360MiB**
-- `pids` limit: 512
-- `ContainerWorkingSetHigh` fires at 90% of the limit = **461 MiB**
-- Measured headroom constant **above `GOMEMLIMIT`**: **~47 MiB** (2026-07-25 prod snapshot — working
-  set 347 MiB while `GOMEMLIMIT` was 300 MiB). It is an **absolute constant**, not a proportional
-  slice, which is the whole point of budgeting rather than percentaging.
-- Budget the current values satisfy: `working_set ≈ GOMEMLIMIT + 47 MiB ≤ ~80% of limit`
-  → 360 + 47 = **407 MiB = 79.5% of 512 MiB**. ✅
-
-**What that 47 MiB is not: native/off-heap memory.** Do not go hunting for a C-side leak. Alloy's
-genuinely off-heap footprint is ~0 — `working_set ≈ go_sys − heap_released` holds on this container.
-The 47 MiB is Go memory that `GOMEMLIMIT` does not charge against its own target (goroutine stacks,
-GC metadata, mspan/mcache) plus heap pages the runtime has not yet returned to the OS. That is why
-the two statements coexist: `working_set − GOMEMLIMIT ≈ 47 MiB` **and** `working_set − go_sys ≈ 0`.
-
-Size against `container_memory_working_set_bytes`, **never** against `go_memstats_sys_bytes` —
-`go_sys` counts address space already returned to the OS, so reading it as consumption invents a
-leak that is not there (the JVM-container trap in its Go form).
-
-**Why the ratio rule keeps failing here.** ADR-0095 (2026-07-12) added the three app stdout streams
-without a compensating limit bump → chronic `ContainerWorkingSetHigh` from 256M (2026-07-15) →
-384M/300MiB → **paged again** 2026-07-24/25 with no new workload, because "GOMEMLIMIT = 78% of the
-limit" prices the ~47 MiB overhead as a *percentage* when it is a *constant*: 78% + 12% = 90%, exactly
-the alert line. Hence 512M/360MiB, derived from the budget. Do the same subtraction every time; never
-re-apply a percentage.
-
-**Expected delta from this change.** Two additions:
-
-1. **Four ops-automation file tailers** (`ops-deploy` / `ops-backup` / `ops-cleanup` /
-   `ops-restore-drill`). Negligible — a goroutine and a read buffer each, over streams that produce a
-   handful of lines per 5-minute deploy tick, one nightly backup, one weekly cleanup and one monthly
-   drill. Call it low single-digit MiB in total.
-2. **One more `loki.source.docker` stream** (`keycloak-stdout`). This is the term that matters.
-
-Alloy's per-stream cost is dominated by **line throughput**, not stream count. Keycloak runs
-`--log=console,file`, so its console emits the same lines as the file log Alloy already tails: the
-added steady-state work is approximately **one more copy of the existing `app="keycloak"` stream**,
-with more regex per line (the stdout path runs 5 RE2 `stage.replace`s — JWT, e-mail, bearer-keyword,
-`username=`, `ipAddress=` — against the file path's 2). That is a **small fraction** of ADR-0095's
-increment, which added `backend` + `frontend` + `ingest`, whose combined console volume dwarfs
-Keycloak's. Against the current 407 MiB projected working set there are ~54 MiB of headroom below the
-461 MiB alert line, which this delta is expected to fit inside.
-
-**Recommendation: ship at the current 512M / 360MiB and measure — do not raise pre-emptively.**
-Over-provisioning here hides the very leak signal the third-bump rule exists to catch. If the measured
-working set sits sustained **above ~430 MiB (84%)** after 7 days with `keycloak-stdout` flowing, step
-to:
-
-- limit **640M**, `GOMEMLIMIT` **465MiB** — derived, not guessed: `0.8 × 640 = 512 MiB`;
-  `512 − 47 = 465 MiB`; the new alert line becomes `0.9 × 640 = 576 MiB`.
-
-That step costs +128 MiB against the monitoring stack's ~4.24 GiB of declared limits, so confirm host
-headroom before applying it. And if Alloy needs a **third** bump with no added workload, stop bumping
-and treat it as an Alloy-side leak (check `loki.source.docker` tailer-reconnect churn — `could not
-transfer logs: unexpected EOF`) or as fallout from the v1.18.0 dependency jump, per the note in
-`docker-compose.monitoring.yml`.
-
-**Before you raise anything — confirm against real prod usage.** Take a time-aligned snapshot with
-the `q()` helper above while the stream is flowing:
+Same budget rule, different metrics — and one extra failure mode. A Go process that is **not** given
+`GOMEMLIMIT` has no idea its cgroup limit exists: the GC sizes the heap off `GOGC` alone (target 2×
+live heap) and the scavenger returns arena pages only lazily, so every concurrency spike ratchets the
+working set **up and it never comes back down**. The symptom is a container pinned near its limit whose
+*live* heap is a fraction of it — which reads like a leak and is not one:
 
 ```promql
-max by (name) (max_over_time(container_memory_working_set_bytes{name="alloy"}[7d]))
-container_memory_working_set_bytes{name="alloy"} / on(name) container_spec_memory_limit_bytes{name="alloy"}
-go_memstats_sys_bytes{job="alloy"} - go_memstats_heap_released_bytes{job="alloy"}
+go_memstats_heap_alloc_bytes{job="<svc>"}   # live heap — the number that matters
+go_memstats_next_gc_bytes{job="<svc>"}      # GC target; ~2x live under default GOGC
+go_memstats_sys_bytes{job="<svc>"}          # total taken from the OS — compare against the limit
+go_goroutines{job="<svc>"}                  # flat baseline + spikes = pile-ups, not a leak
 ```
 
-Then re-derive the headroom constant as `working_set − GOMEMLIMIT` (**not** `working_set − go_sys` —
-that one is ~0 by construction here). If it has moved away from ~47 MiB, every number in this section
-is stale and must be recomputed before it is used to justify a limit. The third query is the
-cross-check: it should track the working set closely; a large gap means the off-heap assumption above
-no longer holds and the whole model needs revisiting.
+**Do not compare `sys_bytes` against the limit.** It is *reserved address space*, not resident memory:
+it still counts arena pages the scavenger has already handed back to the OS. On Tempo the gap is
+164 MiB (436.8 reserved vs a 272.6 MiB working set at the same instant). The quantity that tracks the
+working set — and the one `GOMEMLIMIT` actually bounds — is the runtime's **resident** memory:
 
-**None of the values above have been measured with `keycloak-stdout` actually running.** They are
-projections from the 2026-07-25 snapshot plus a throughput argument. Treat the 640M/465MiB step as a
-*prepared* option, not an approved change: confirm it against 7 days of real prod usage — and against
-host RAM headroom — before anyone edits `docker-compose.monitoring.yml`.
+```promql
+go_memstats_sys_bytes - go_memstats_heap_released_bytes
+```
 
-**Loki-side cost, for completeness.** `keycloak-stdout` roughly doubles the Keycloak log bytes stored
-at the global 744h retention. It is its own Loki stream, so it has its own `per_stream_rate_limit`
-(5 MB/s, 20 MB burst) and cannot starve `app="keycloak"`, but it does count against the global
-`ingestion_rate_mb: 8`. Watch `LokiDiscardingLines` and the Loki volume's disk usage for a week after
-rollout.
+> **`GOMEMLIMIT` = 75 % of the container limit**, cross-checked to sit well above the measured live
+> heap (`go_memstats_heap_alloc_bytes`) — every service here is at ≥3.7×, so the GC is never pinned at
+> the ceiling in steady state. Re-derive it whenever a limit changes.
+
+**Take every reading time-aligned** (pass the same `time=` to all queries). Mixing a multi-day
+`max_over_time` working set with an instant `go_*` reading yields nonsense — it produced a *negative*
+overhead here before the method was corrected.
+
+### Why `ContainerMemoryHigh` keys off `rss` — decompose before you size
+
+This is the trap that cost four Alloy limit bumps and a round of wrong conclusions in this very
+document. Until 2026-08-02 the alert was `ContainerWorkingSetHigh`, dividing
+`container_memory_working_set_bytes` by the container limit — and that metric is:
+
+```
+container_memory_working_set_bytes  =  anon  +  ACTIVE file pages  (+ kernel)
+```
+
+The file-page term includes the service's **own memory-mapped binary** — clean, file-backed and
+trivially reclaimable, so the kernel evicts it under pressure and re-reads it from disk. It can never
+cause an OOM, yet it counts fully toward the alert's ratio. Page cache also **expands to fill whatever
+cgroup limit it is given**, so raising a limit can never resolve a working-set alert driven by it — the
+ratio just creeps back.
+
+Always split the reading before drawing a conclusion:
+
+```promql
+container_memory_rss{name="<svc>"}          # anonymous — this is what predicts OOM
+container_memory_mapped_file{name="<svc>"}  # the mapped binary — reclaimable, ignore for sizing
+```
+
+Measured 7-day peaks, 2026-08-02 — anon vs. what the alert reported:
+
+|           service           |    anon    | working set | mapped binary |
+|-----------------------------|------------|-------------|---------------|
+| `blackbox-exporter`         | **95.3 %** | ~100 %      | 16.0 MiB      |
+| `alertmanager`              | 48.3 %     | 95.0 %      | 24.5 MiB      |
+| `alloy`                     | 40.5 %     | 94.8 %      | 183.9 MiB     |
+| `node-exporter`             | 33.4 %     | 83.8 %      | 13.5 MiB      |
+| `loki`                      | 68.0 %     | 80.2 %      | 90.9 MiB      |
+| `postgres-exporter-backend` | 42.4 %     | 77.9 %      | 9.5 MiB       |
+| `redis-exporter`            | 40.0 %     | 77.2 %      | 9.5 MiB       |
+
+On the metric that actually predicts OOM, **`blackbox-exporter` was the only service anywhere near its
+limit**; everything else was reporting its binary. On the 32M exporters the mapped binary is roughly
+half the working set (alertmanager: 23.2 anon + 24.5 mapped = its 45.6 MiB "95 %").
+
+So distinguish three cases:
+
+- **High anon, live heap far below it** → the runtime is hoarding arena. `GOMEMLIMIT` is the fix and
+  the limit usually need not move. This was `blackbox-exporter`.
+- **High working set, low anon** → you are looking at the mapped binary or page cache. Not an OOM risk;
+  do **not** raise the limit. This was `alloy` and all four small exporters.
+- **Anon climbing monotonically, or goroutines never returning to baseline** → a real leak. More RAM
+  only postpones it. Nothing in this stack currently matches.
+
+`alloy` is the worked example of the middle case: its `container_memory_mapped_file` went from 0–2 MB
+to 182.5 MiB in a single 6-hour window on 2026-07-31, when the v1.18.0 image bump reached prod. Page
+cache is charged to the cgroup that *first faults a page in*, so after a fresh image pull the container
+running the new binary is billed for it — the same memory as before, re-attributed. Its `rss` was flat
+at 190–217 MB across the whole 21-day window and its goroutines flat at ~397.
+
+### Does `keycloak-stdout` fit in Alloy's budget? (2026-08-02)
+
+Adding a container stdout stream to Alloy has twice cost a limit bump, so this change states the
+arithmetic instead of discovering it through an alert. It is deliberately argued in **anon**, not
+working set — the section above is the reason, and an earlier draft of this very paragraph made the
+working-set mistake it warns about.
+
+- Committed: `mem_limit` **512M**, `GOMEMLIMIT` **360MiB** (~70 % of the limit; the 75 % rule above
+  applies when a limit changes, and this change does not move it).
+- Measured 7-day peak anon: **40.5 % of the limit**, with `rss` flat at 190–217 MB across 21 days
+  and goroutines flat at ~397. On the metric that predicts OOM there is roughly 300 MiB of headroom.
+- The 183.9 MiB `mapped_file` that made Alloy look near its ceiling is the v1.18.0 binary, re-billed
+  to this cgroup after the image pull on 2026-07-31. It is reclaimable and irrelevant to sizing.
+
+Expected delta from this change: four ops-automation **file** tailers (a goroutine and a read buffer
+each, over streams producing a handful of lines per deploy tick, one nightly backup, one weekly
+cleanup and one monthly drill — low single-digit MiB), plus one more `loki.source.docker` stream.
+Only the last one matters, and its cost is dominated by line throughput rather than stream count:
+Keycloak runs `--log=console,file`, so its console repeats the lines Alloy already tails from the
+file, with 5 RE2 `stage.replace`s per line instead of 2. That is a small fraction of the ADR-0095
+increment, which added `backend` + `frontend` + `ingest` consoles at once.
+
+**Recommendation: do not touch the limit. Measure `container_memory_rss{name="alloy"}` after the
+first deploy that carries this config.** These numbers are derived from the 2026-08-02 snapshot
+above, not measured with `keycloak-stdout` running. If anon does climb materially, re-derive
+`GOMEMLIMIT` from the 75 % rule rather than re-applying a ratio to the working set.
+
+**Loki-side cost, for completeness.** `keycloak-stdout` roughly doubles the Keycloak log bytes
+stored, within the existing 31-day retention and ingest rate caps.
 
 ## Grafana sandbox-export workflow
 

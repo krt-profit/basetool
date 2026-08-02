@@ -353,8 +353,8 @@ x-backend: &backend-template
   # MaxRAMPercentage is 57, NOT 75 (lowered 2026-07-25, same sweep as the frontend). At 75 the heap
   # ceiling was 1536 MB and this container's measured overhead (nonheap 230 + other native 208 = 438
   # MB; see the JVM CONTAINER SIZING block in x-frontend) puts a fully-grown heap at 1974 MB = 96% of
-  # the limit — i.e. the heap ceiling could not physically fit under the ContainerWorkingSetHigh 90%
-  # line. Unlike the frontend this had NOT paged, and would not have soon: prod measures heapCommitted
+  # the limit — i.e. the heap ceiling could not physically fit under the 90% container-memory alert
+  # line (ContainerMemoryHigh; named ContainerWorkingSetHigh when this was written). Unlike the frontend this had NOT paged, and would not have soon: prod measures heapCommitted
   # at only 670 MB (heapUsed 416) and a 1108 MB working set = 54% of the limit, so the ceiling was a
   # latent trap, not an active one. 57% caps the heap at 1167 MB, satisfying `H + 438 <= 80% of 2048`
   # (the cap is 1200 MB) for a 1605 MB worst case = 78%.

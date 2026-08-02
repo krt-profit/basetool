@@ -1331,13 +1331,33 @@ therefore alerts on:
   real incident, CHANGELOG v1.1.1), silently blinding the container alerts. `ContainerMetricsMissing`
   (critical) and `CoreContainerMetricsMissing` (warning) guard the named-series count;
   `ContainerOomKilled` and `ContainerCpuThrottledHigh` (warning) surface a single OOM kill and
-  sustained CFS throttling that the coarse `ContainerRestartLoop` / `ContainerWorkingSetHigh` alerts
+  sustained CFS throttling that the coarse `ContainerRestartLoop` / `ContainerMemoryHigh` alerts
   miss. `ContainerRestartLoop` counts restarts with `changes(container_start_time_seconds[15m]) > 3`,
   **not** `increase()` — that metric is a start-time *gauge* (Unix epoch), so `increase()` returned the
   epoch delta between the old and new start times and paged CRITICAL on any single restart, including a
   routine deploy recreate of backend/frontend/ingest (fixed 2026-07-15; the sibling Grafana "Container
   Restarts" panel already used `changes()`; locked by
   `tests/containerrestartloop_changes_test.yml`).
+- **Container memory pressure is measured on ANONYMOUS memory, not the working set** (amended
+  2026-08-02). `ContainerMemoryHigh` (warning) fires when
+  `container_memory_rss / container_spec_memory_limit_bytes > 0.90` for 10m. It was named
+  `ContainerWorkingSetHigh` and divided `container_memory_working_set_bytes` by the limit until a
+  plane-wide measurement showed that metric is **not an OOM predictor**: `working_set` = anon + *active*
+  file pages, and the file term includes each service's own memory-mapped **binary**, which is clean,
+  file-backed and reclaimed by the kernel rather than OOM-killed. On the 32M exporters that binary is
+  roughly **half** the working set. Measured 7-day peaks, anon vs. what the old rule reported —
+  `alertmanager` 48.3 % / 95.0 %, `alloy` 40.5 % / 94.8 %, `node-exporter` 33.4 % / 83.8 %, both
+  `postgres-exporter`s ~42 % / ~78 % — while `blackbox-exporter` (95.3 % anon) was the only container
+  in the stack genuinely near its limit. Page cache also expands to fill whatever cgroup limit it is
+  given, so the old rule was **unfixable by more RAM**: `alloy` was raised 192M → 256M → 384M → 512M
+  chasing it, and its 2026-07-31 jump turned out to be 183.9 MiB of mapped binary re-charged to its
+  cgroup when the v1.18.0 image pull landed (page cache is billed to the cgroup that first faults a
+  page in), against a flat 190–217 MB `rss`. `rss` is cgroup `anon`, so heap, thread stacks (the
+  2026-07-12 ingest native-thread OOM stays covered) and JVM native memory all still count; the JVM
+  apps map almost nothing (`frontend` 0.45 MiB, `ingest` 0.11 MiB), so the REQ-OPS JVM budgets are
+  unaffected. Kernel slab/stack is out of scope here — `ContainerPidsHigh` below covers the task-count
+  angle. Locked by `tests/containermemoryhigh_anon_scope_test.yml`; sizing method and the full table in
+  [`monitoring/README.md`](../../monitoring/README.md) → "Go services".
 - **cgroup-pids exhaustion.** The `pids` cgroup cap (2048 for the four JVM containers
   backend/frontend/ingest/keycloak) limits **every** task in the container, not just JVM threads —
   unreaped child-process zombies and the OS carrier threads behind virtual threads both count against
