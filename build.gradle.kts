@@ -210,6 +210,20 @@ subprojects {
     // Boot BOM `tomcat.version` property as a `{strictly ...}` constraint. Remove once the Boot BOM
     // ships >= 11.0.24 (the OWASP dependencyCheckAggregate gate keeps this honest either way).
     extra["tomcat.version"] = "11.0.24"
+
+    // Third security override in the same vein: the Boot 4.1 BOM pins Netty (via its
+    // `netty-bom` import) to 4.2.15.Final, which carries a July 2026 batch of CVEs including
+    // CVE-2026-56820 (OcspClient does not validate that the CertificateID in an OCSP response
+    // matches the requested CertificateID, allowing a replay/revocation-check bypass),
+    // CVE-2026-56819 (memory leak in the HTTP/2 codec) and CVE-2026-55833 (SPDY header-decoding
+    // DoS via compression-amplified CPU exhaustion) - all >= 7.0 CVSS. This Netty line is on
+    // real runtime classpaths (reactor-netty's WebClient in frontend, Lettuce's Redis client),
+    // unlike the keycloak-spi module's compile-only 4.1.x line (see the suppression file for
+    // that one - Quarkus/Vert.x pin it independently and it is never shipped). Fixed in
+    // 4.2.16.Final, released 2026-07-06 - same conflict-free `{strictly ...}` mechanism as the
+    // PostgreSQL/Tomcat overrides above. Remove once the Boot BOM ships >= 4.2.16.Final (the
+    // OWASP dependencyCheckAggregate gate keeps this honest either way).
+    extra["netty.version"] = "4.2.16.Final"
   }
 
   // JaCoCo coverage. Both modules want the same setup: emit XML + CSV + HTML
