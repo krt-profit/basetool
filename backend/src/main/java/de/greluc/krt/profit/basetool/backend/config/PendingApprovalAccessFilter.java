@@ -32,12 +32,14 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.MDC;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
 
@@ -63,6 +65,15 @@ import tools.jackson.databind.ObjectMapper;
  * exists yet, so a fresh one is minted, echoed as the {@code X-Correlation-Id} response header and
  * logged. Serialization goes through the shared {@link ObjectMapper} so every field is safely
  * JSON-escaped (the request URI in {@code instance} is attacker-controlled).
+ *
+ * <p>Running that early also means the {@code userId} MDC key is still unset — {@code
+ * CorrelationIdFilter} is its only writer in the backend and it never runs on a request this filter
+ * rejects. The block line would therefore claim {@code anonymous} (the logback pattern's default)
+ * for a caller who is demonstrably authenticated, which is worse than no value at all: an identical
+ * controller-level denial renders the real {@code sub}. {@link #writeForbidden} therefore stamps
+ * the JWT {@code sub} for the duration of the rejection write and removes it again, mirroring the
+ * ownership discipline the minted correlation id follows. Only the {@code sub} — never the callsign
+ * or e-mail (REQ-OBS-004).
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -79,6 +90,15 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
 
   /** App-wide correlation-id response header, mirroring {@code LoggingProperties} default. */
   static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
+
+  /**
+   * SLF4J MDC key the logback pattern renders as {@code [<userId>]}, mirroring {@code
+   * LoggingProperties}' default. Hardcoded like {@link #CORRELATION_ID_HEADER}: it is a wire
+   * constant shared with the logback pattern, not a per-deployment override, and reading it from
+   * {@code LoggingProperties} here would make this filter depend on a bean it is constructed
+   * without.
+   */
+  static final String MDC_USER_ID = "userId";
 
   private final MessageSource messageSource;
   private final ProblemResponseFactory problemResponseFactory;
@@ -117,11 +137,71 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
    * chain, so {@code request.getLocale()} is the authoritative source), serializing via the shared
    * {@link ObjectMapper} for uniform JSON escaping.
    *
+   * <p>Owns the {@code userId} MDC key for the duration of the write (see {@link
+   * #stampAuthenticatedSub()}) and removes it again in a {@code finally}, so the DEBUG line names
+   * the blocked caller's {@code sub} without the value bleeding into the next request on a pooled
+   * or virtual thread.
+   *
    * @param request the rejected request (its URI becomes the {@code instance})
    * @param response the response to write the problem body into
    * @throws IOException if serialization or writing the body fails
    */
   private void writeForbidden(HttpServletRequest request, HttpServletResponse response)
+      throws IOException {
+    boolean userIdOwned = stampAuthenticatedSub();
+    try {
+      writeForbiddenBody(request, response);
+    } finally {
+      if (userIdOwned) {
+        MDC.remove(MDC_USER_ID);
+      }
+    }
+  }
+
+  /**
+   * Puts the current {@link JwtAuthenticationToken}'s {@code sub} claim into the {@code userId} MDC
+   * key, unless something already populated that key (the existing value then wins) or the caller
+   * is not JWT-authenticated (the key then stays unset, so the logback pattern's {@code anonymous}
+   * default stays truthful). A pending user always carries a token here — {@link
+   * #isBlockedPendingApiCall} only returns {@code true} for an authenticated principal — but the
+   * guards keep the method safe for the unit tests that drive it with a plain {@code
+   * UsernamePasswordAuthenticationToken}.
+   *
+   * <p>Deliberately duplicated in {@code SecurityProblemResponseHandler} instead of extracted into
+   * the {@code logging} package: {@code logging.CorrelationIdFilter} already depends on {@code
+   * config.LoggingProperties}, so a {@code config -> logging} helper call would close a package
+   * cycle (ADR-0047).
+   *
+   * @return {@code true} when this call stamped the key and must therefore remove it again, {@code
+   *     false} when nothing was stamped
+   */
+  private static boolean stampAuthenticatedSub() {
+    String existing = MDC.get(MDC_USER_ID);
+    if (existing != null && !existing.isBlank()) {
+      return false;
+    }
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (!(auth instanceof JwtAuthenticationToken jwtAuth)) {
+      return false;
+    }
+    String sub = jwtAuth.getToken().getSubject();
+    if (sub == null || sub.isBlank()) {
+      return false;
+    }
+    MDC.put(MDC_USER_ID, sub);
+    return true;
+  }
+
+  /**
+   * Builds and writes the 403 problem document itself — correlation id, DEBUG log line, {@code
+   * basetool_http_error_total} increment, status, headers and the serialized body — with the {@code
+   * userId} MDC key already stamped by the caller.
+   *
+   * @param request the rejected request (its URI becomes the {@code instance})
+   * @param response the response to write the problem body into
+   * @throws IOException if serialization or writing the body fails
+   */
+  private void writeForbiddenBody(HttpServletRequest request, HttpServletResponse response)
       throws IOException {
     String correlationId = UUID.randomUUID().toString();
     Locale locale = request.getLocale();

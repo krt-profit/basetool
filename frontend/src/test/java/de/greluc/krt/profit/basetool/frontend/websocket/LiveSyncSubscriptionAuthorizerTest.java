@@ -37,7 +37,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 /**
  * Tests for {@link LiveSyncSubscriptionAuthorizer} driven by {@link MockWebServer}: a 2xx probe
  * allows the subscribe (replaying the captured bearer + pin), an explicit 403/404 denies it, and a
- * 401 / 5xx / transport error / missing token all fail open (ADR-0094).
+ * 401 / 5xx / transport error / missing token all fail open (ADR-0094) — or, for a presence-enabled
+ * class, fail closed as {@link Decision#DENY_INDETERMINATE} rather than as a plain {@link
+ * Decision#DENY}, which is what keeps an outage distinguishable from a permission verdict.
  */
 class LiveSyncSubscriptionAuthorizerTest {
 
@@ -133,36 +135,48 @@ class LiveSyncSubscriptionAuthorizerTest {
 
   @Test
   void authorize_missionPresence_401_failsClosed() {
-    // A lapsed captured token is indeterminate; for the presence class it must DENY (not admit the
-    // editor snapshot of a mission the caller may not read).
+    // A lapsed captured token is indeterminate; the presence class must refuse (not admit the
+    // editor snapshot of a mission the caller may not read) — but as DENY_INDETERMINATE, so the
+    // relay's deny metric can tell a backend/token outage from a real permission boundary.
     LiveSyncTopic mission = LiveSyncTopic.parse("mission:" + UUID.randomUUID());
     server.enqueue(new MockResponse().setResponseCode(401));
-    assertThat(authorizer.authorize(mission, TOKEN, PIN)).isEqualTo(Decision.DENY);
+    Decision decision = authorizer.authorize(mission, TOKEN, PIN);
+    assertThat(decision).isEqualTo(Decision.DENY_INDETERMINATE);
+    assertThat(decision.denied()).isTrue();
   }
 
   @Test
   void authorize_missionPresence_5xx_failsClosed() {
     LiveSyncTopic mission = LiveSyncTopic.parse("mission:" + UUID.randomUUID());
     server.enqueue(new MockResponse().setResponseCode(503));
-    assertThat(authorizer.authorize(mission, TOKEN, PIN)).isEqualTo(Decision.DENY);
+    assertThat(authorizer.authorize(mission, TOKEN, PIN)).isEqualTo(Decision.DENY_INDETERMINATE);
   }
 
   @Test
   void authorize_missionPresence_nullToken_failsClosedWithoutProbing() {
-    // No captured token: the presence class denies without a probe (the non-presence classes fail
+    // No captured token: the presence class refuses without a probe (the non-presence classes fail
     // open here — authorize_nullToken_allowsWithoutProbing).
     LiveSyncTopic mission = LiveSyncTopic.parse("mission:" + UUID.randomUUID());
-    assertThat(authorizer.authorize(mission, null, PIN)).isEqualTo(Decision.DENY);
+    assertThat(authorizer.authorize(mission, null, PIN)).isEqualTo(Decision.DENY_INDETERMINATE);
     assertThat(server.getRequestCount()).isZero();
   }
 
   @Test
   void authorize_missionPresence_403_denies() {
-    // An explicit refusal denies for every class (unchanged); asserted here for the presence class
-    // so the DENY path is anchored alongside the fail-closed indeterminate ones.
+    // An explicit refusal is a real permission verdict and stays plain DENY for every class — this
+    // is the distinction the fail-closed cases above must NOT collapse into.
     LiveSyncTopic mission = LiveSyncTopic.parse("mission:" + UUID.randomUUID());
     server.enqueue(new MockResponse().setResponseCode(403));
     assertThat(authorizer.authorize(mission, TOKEN, PIN)).isEqualTo(Decision.DENY);
+  }
+
+  @Test
+  void decisionDenied_isTrueForBothRefusals_andFalseForAllow() {
+    // Call sites gate on denied() rather than comparing constants, so a new deny flavour can never
+    // be silently admitted into a room.
+    assertThat(Decision.ALLOW.denied()).isFalse();
+    assertThat(Decision.DENY.denied()).isTrue();
+    assertThat(Decision.DENY_INDETERMINATE.denied()).isTrue();
   }
 
   @Test

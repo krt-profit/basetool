@@ -82,4 +82,16 @@ class MonitoringScrapePropertiesTest {
     // When / Then
     assertThat(properties.isConfigured()).isFalse();
   }
+
+  @Test
+  void shouldNotBeConfiguredWithOnlyTheUsernameSet() {
+    // Given: a half-configured pair is the most likely operator mistake, and it must stay
+    // fail-closed rather than enabling an auth chain no scraper can satisfy.
+    MonitoringScrapeProperties properties = new MonitoringScrapeProperties();
+    properties.setUsername("metrics-scraper");
+    properties.setPassword(null);
+
+    // When / Then
+    assertThat(properties.isConfigured()).isFalse();
+  }
 }

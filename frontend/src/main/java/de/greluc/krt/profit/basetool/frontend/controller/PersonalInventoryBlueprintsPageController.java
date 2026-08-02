@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintCraftabilityDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -85,6 +86,13 @@ public class PersonalInventoryBlueprintsPageController {
    * #FETCH_PAGE_SIZE} per page this matches the backend's own {@code size} clamp ({@code 100000}).
    */
   private static final int MAX_PAGES = 200;
+
+  /**
+   * Character budget for the type-ahead term when it is written to a log line. A product name a
+   * user could plausibly be typing fits comfortably; anything longer is a paste or an attack and is
+   * truncated by {@link LogSafe#text(String, int)} rather than allowed to stretch the line.
+   */
+  private static final int MAX_LOGGED_QUERY = 80;
 
   /**
    * Response type for the product type-ahead search ({@code /api/v1/blueprints/products/search})
@@ -157,7 +165,16 @@ public class PersonalInventoryBlueprintsPageController {
       List<BlueprintProductDto> result = backendApiClient.get(uri, BLUEPRINT_PRODUCT_LIST, query);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
-      log.warn("Blueprint product type-ahead failed for query='{}': {}", q, e.getMessage());
+      // DEBUG, not WARN: this endpoint fires ONE REQUEST PER KEYSTROKE. With the backend down, a
+      // single member typing a product name produces one line per character — a log-flood vector
+      // triggered accidentally by ordinary use, which REQ-OBS-001 puts at DEBUG. The outage itself
+      // is already carried by basetool_backend_client_errors_total and by the WebClient/resilience
+      // logging, so nothing is lost. The query is user-typed free text and goes through LogSafe so
+      // it cannot inject a forged log line (CWE-117).
+      log.debug(
+          "Blueprint product type-ahead failed for query='{}': {}",
+          LogSafe.text(q, MAX_LOGGED_QUERY),
+          e.getMessage());
       return Collections.emptyList();
     }
   }

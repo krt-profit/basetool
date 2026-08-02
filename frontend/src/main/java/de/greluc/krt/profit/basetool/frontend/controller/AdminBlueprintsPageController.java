@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -53,6 +54,14 @@ public class AdminBlueprintsPageController {
 
   /** Page size for the blueprint list — one detail-rich card per row, so kept modest. */
   private static final int PAGE_SIZE = 25;
+
+  /**
+   * Character budget for the search term when it is written to a log line. An output-name or
+   * Wiki-key filter an admin could plausibly be typing fits comfortably; anything longer is a paste
+   * or an attack and is truncated by {@link LogSafe#text(String, int)} rather than allowed to
+   * stretch the line.
+   */
+  private static final int MAX_LOGGED_QUERY = 80;
 
   /** Response type for the paginated blueprint list ({@code GET /api/v1/blueprints}). */
   private static final ParameterizedTypeReference<PageResponse<BlueprintDto>> BLUEPRINT_PAGE_TYPE =
@@ -111,11 +120,18 @@ public class AdminBlueprintsPageController {
         populateEmpty(model);
       }
     } catch (BackendServiceException e) {
-      log.debug("Error loading blueprints data (search={})", trimmed, e);
+      // The search term is admin-typed free text: sanitised before it reaches the logger so a
+      // pasted newline cannot fabricate a second log line (CWE-117). Level unchanged — an
+      // unreachable backend is an expected, already-metered failure.
+      log.debug(
+          "Error loading blueprints data (search={})", LogSafe.text(trimmed, MAX_LOGGED_QUERY), e);
       model.addAttribute("error", "error.admin.blueprints.load");
       populateEmpty(model);
     } catch (Exception e) {
-      log.error("Error loading blueprints data (search={})", trimmed, e);
+      // Stays ERROR: this is the catch(Exception) catch-all for a genuinely unexpected failure,
+      // which REQ-OBS-001 sanctions at ERROR. Same sanitising as the branch above.
+      log.error(
+          "Error loading blueprints data (search={})", LogSafe.text(trimmed, MAX_LOGGED_QUERY), e);
       model.addAttribute("error", "error.admin.blueprints.load");
       populateEmpty(model);
     }

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.integration.scwiki;
 
 import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
+import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiMetaDto;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiResponseDto;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -29,7 +30,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -135,12 +135,29 @@ public class ScWikiClient {
   }
 
   /**
-   * Increments {@link MetricNames#EXTERNAL_FETCH_ERRORS} for the {@code scwiki} source. Called from
-   * each branch that swallows an upstream network or parse failure into a {@code null} / empty
-   * result, so a sustained Wiki outage is visible even though the sync services treat the empty
-   * payload as a skip and the scheduled job still records a success (REQ-OBS-011).
+   * Increments {@link MetricNames#EXTERNAL_FETCH_ERRORS} for the {@code scwiki} source, but at most
+   * once for the fetch {@code latch} belongs to. Called from each branch that swallows an upstream
+   * network or parse failure — or a broken pagination contract — into a {@code null} / empty /
+   * incomplete result, so a sustained Wiki outage is visible even though the sync services treat
+   * the empty payload as a skip and the scheduled job still records a success (REQ-OBS-011).
+   *
+   * <p>The latch exists because one page walk can exhibit several independent problems at once: a
+   * page failing mid-walk, absent pagination metadata on a full page 1, and a {@code meta.total}
+   * disagreement are not mutually exclusive, and two pairings are in fact the norm — a partially
+   * renamed {@code meta} block loses {@code last_page} while still stating a {@code total}, and a
+   * page dropped mid-walk is itself what makes the merged rows fall short of it. Counting every
+   * symptom would scale the external-error rate with the number of symptoms instead of the number
+   * of failed fetches, so one broken feed would read as a two- or three-fold outage on the
+   * dashboards. Every symptom still gets its own WARN line — an operator wants all of them; it is
+   * only the counter that must stay one-per-fetch.
+   *
+   * @param latch the current fetch's latch; the first call through it records, every later call
+   *     through the same instance is a no-op
    */
-  private void recordFetchError() {
+  private void recordFetchErrorOnce(FetchErrorLatch latch) {
+    if (!latch.claim()) {
+      return;
+    }
     meterRegistry
         .counter(
             MetricNames.EXTERNAL_FETCH_ERRORS, MetricNames.TAG_SOURCE, MetricNames.SOURCE_SCWIKI)
@@ -224,10 +241,27 @@ public class ScWikiClient {
    *   <li>For pages 2..N, sleep via {@link #paceForRateLimit()} between requests, fetch without an
    *       {@code If-None-Match} (fresh content this run), and append their {@code data[]}.
    *   <li>Any error / 5xx / timeout returns whatever has been accumulated so far (which may be an
-   *       empty list if the failure was on page 1) with {@code notModified == false}. A genuine
-   *       empty-200 also returns an empty list with {@code notModified == false} — matching the
-   *       {@code UexClient} contract so a real outage still reports zero rows to the caller.
+   *       empty list if the failure was on page 1) with {@code notModified == false} and {@code
+   *       complete == false}. A genuine empty-200 also returns an empty list with {@code
+   *       notModified == false} — matching the {@code UexClient} contract so a real outage still
+   *       reports zero rows to the caller.
+   *   <li>The walk additionally cross-checks the envelope's own pagination metadata and flags the
+   *       result {@link FetchResult#complete() incomplete} when it cannot vouch for the census:
+   *       {@code meta.last_page} absent while page 1 came back full (the signature of an upstream
+   *       field rename, which {@code @JsonIgnoreProperties(ignoreUnknown = true)} turns into a
+   *       silent {@code null} instead of a parse error), a page failing mid-walk, or {@code
+   *       meta.total} disagreeing with the merged row count. Each of those warns on its own so an
+   *       operator sees every symptom, and together they increment {@link
+   *       MetricNames#EXTERNAL_FETCH_ERRORS} <b>at most once per call</b> (see {@link
+   *       #recordFetchErrorOnce}) so a contract break is visible in metrics without one failed
+   *       fetch inflating the error rate by its number of symptoms.
    * </ol>
+   *
+   * <p><b>Why {@code complete} exists (H5):</b> the merged list feeds tombstone sweeps that mark
+   * every catalogue row NOT in it {@code scwiki_deleted}. A half-walked feed still returns hundreds
+   * of perfectly real rows, so the pre-existing "did we see anything at all?" gate waves it through
+   * and the un-fetched remainder gets soft-deleted. The flag is the caller's only way to tell "the
+   * Wiki no longer lists these" from "we never asked".
    *
    * <p><b>Why the flag matters (#1182):</b> a 304 and a genuine empty-200 both yield an empty list,
    * so a caller that only sees the list cannot tell an <em>unchanged</em> (healthy) catalogue from
@@ -252,9 +286,9 @@ public class ScWikiClient {
    *     "blueprints,items"}); {@code null} or blank means no include
    * @param filters optional {@code filter[<key>]=<value>} pairs; {@code null} / empty means none,
    *     and any entry with a blank value is skipped
-   * @return the merged rows across all pages plus the page-1 {@code notModified} flag; the data is
-   *     empty both on a 304 (flag {@code true}) and on a genuine empty-200 / error (flag {@code
-   *     false})
+   * @return the merged rows across all pages plus the page-1 {@code notModified} flag and the
+   *     {@code complete} census flag; the data is empty both on a 304 (flag {@code true}) and on a
+   *     genuine empty-200 / error (flag {@code false})
    */
   public <T> FetchResult<T> fetchAllPagesResult(
       String endpoint,
@@ -266,9 +300,12 @@ public class ScWikiClient {
 
     String firstPageUri = buildPagedUri(endpoint, 1, include, filters);
     String previousEtag = etagByFirstPageUri.get(firstPageUri);
+    // One latch for the whole walk: however many distinct problems this fetch turns out to have,
+    // they collectively contribute exactly one external-fetch-error increment.
+    FetchErrorLatch errorLatch = new FetchErrorLatch();
 
     PageOutcome<T> firstOutcome =
-        fetchSinglePage(firstPageUri, typeRef, resourceLabel, previousEtag);
+        fetchSinglePage(firstPageUri, typeRef, resourceLabel, previousEtag, errorLatch);
     if (firstOutcome.notModified()) {
       // Page-1 304: the catalogue is byte-identical to the last successful fetch. Surface it as a
       // distinct outcome (empty data + notModified=true) so the caller reports its live row count
@@ -278,42 +315,87 @@ public class ScWikiClient {
     ScWikiResponseDto<T> first = firstOutcome.body();
     if (first == null) {
       // Genuine empty-200 / network / parse failure (NOT a 304) — an empty list with the flag
-      // cleared so a real outage still surfaces as zero items to SyncZeroItems.
-      return FetchResult.of(Collections.emptyList());
+      // cleared so a real outage still surfaces as zero items to SyncZeroItems. The walk never
+      // enumerated the catalogue, so it is reported as INCOMPLETE and no caller may tombstone.
+      return FetchResult.partial(Collections.emptyList());
     }
 
     List<T> accumulated = new ArrayList<>();
     if (first.data() != null) {
       accumulated.addAll(first.data());
     }
-    int lastPage =
-        Optional.ofNullable(first.meta())
-            .map(meta -> meta.lastPage() == null ? 1 : meta.lastPage())
-            .orElse(1);
 
+    ScWikiMetaDto meta = first.meta();
+    boolean complete = true;
+    int lastPage = 1;
+    if (meta == null || meta.lastPage() == null) {
+      // The envelope carries no page count. Two very different situations share this shape, and
+      // only one of them is healthy: a genuinely single-page result (page 1 came back short), and
+      // an upstream contract break — a renamed/moved meta field that @JsonIgnoreProperties turns
+      // into a silent null rather than an exception. The tell is a FULL page 1: the Wiki filled the
+      // page size exactly, so there is almost certainly a page 2 we would never ask for, and every
+      // row on it would then read as "no longer in the Wiki feed" to an orphan sweep.
+      if (isFullPage(accumulated.size())) {
+        log.warn(
+            "SC Wiki {} returned no pagination metadata (meta.last_page absent) while page 1 came"
+                + " back full at {} row(s) — treating the page walk as INCOMPLETE; later pages were"
+                + " never requested and must not be mistaken for deleted rows.",
+            resourceLabel,
+            accumulated.size());
+        recordFetchErrorOnce(errorLatch);
+        complete = false;
+      }
+    } else {
+      lastPage = Math.max(1, meta.lastPage());
+    }
+
+    int pagesFetched = 1;
     for (int page = 2; page <= lastPage; page++) {
       paceForRateLimit();
       String pageUri = buildPagedUri(endpoint, page, include, filters);
-      ScWikiResponseDto<T> next = fetchSinglePage(pageUri, typeRef, resourceLabel, null).body();
+      ScWikiResponseDto<T> next =
+          fetchSinglePage(pageUri, typeRef, resourceLabel, null, errorLatch).body();
       if (next == null) {
+        // fetchSinglePage already logged the transport cause; the latch keeps this walk's total at
+        // one increment while still covering the bodiless-2xx case it does not count itself.
         log.warn(
-            "Page {} of {} failed mid-pagination; returning partial result of {} row(s).",
+            "Page {} of {} failed mid-pagination; returning an INCOMPLETE result of {} row(s).",
             page,
             resourceLabel,
             accumulated.size());
+        recordFetchErrorOnce(errorLatch);
+        complete = false;
         break;
       }
+      pagesFetched++;
       if (next.data() != null) {
         accumulated.addAll(next.data());
       }
     }
 
+    if (meta != null && meta.total() != null && meta.total() != accumulated.size()) {
+      // meta.total is the upstream's own row count for this filter. A mismatch means the walk
+      // merged fewer (or more) rows than the feed claims to hold — a dropped page, a page-size
+      // disagreement, or a catalogue that changed mid-walk. Whatever the cause, the accumulated
+      // list is not a faithful census, so it must not drive a tombstone sweep.
+      log.warn(
+          "SC Wiki {} page walk merged {} row(s) but meta.total reports {} — treating the result as"
+              + " INCOMPLETE; the accumulated rows are not a full census of the feed.",
+          resourceLabel,
+          accumulated.size(),
+          meta.total());
+      recordFetchErrorOnce(errorLatch);
+      complete = false;
+    }
+
     log.info(
-        "Fetched {} {} from SC Wiki API across {} page(s).",
+        "Fetched {} {} from SC Wiki API across {} of {} announced page(s) (complete={}).",
         accumulated.size(),
         resourceLabel,
-        Math.max(lastPage, 1));
-    return FetchResult.of(accumulated);
+        pagesFetched,
+        lastPage,
+        complete);
+    return complete ? FetchResult.of(accumulated) : FetchResult.partial(accumulated);
   }
 
   /**
@@ -337,6 +419,20 @@ public class ScWikiClient {
   }
 
   /**
+   * Reports whether a page's row count fills the configured {@code page[size]} exactly, which is
+   * what makes "there is probably another page" the likelier reading of missing pagination
+   * metadata. A non-positive / absent configured page size makes this unanswerable, so it answers
+   * {@code false} — an unknown page size must not manufacture a warning.
+   *
+   * @param rowCount the number of rows page 1 carried
+   * @return {@code true} when the configured page size is known, positive and fully used up
+   */
+  private boolean isFullPage(int rowCount) {
+    Integer pageSize = properties.getPageSize();
+    return pageSize != null && pageSize > 0 && rowCount >= pageSize;
+  }
+
+  /**
    * Fetches a single Wiki resource (e.g. {@code GET /api/items/{uuid}}) and binds it to {@code
    * type}. Used by the R4 closure-mode item sync, which resolves items one UUID at a time rather
    * than walking a list.
@@ -356,6 +452,10 @@ public class ScWikiClient {
    */
   public <T> T fetchOne(String uri, Class<T> type, String resourceLabel) {
     log.debug("Fetching one {} from SC Wiki API: {}", resourceLabel, uri);
+    // One latch for this single-resource fetch too: the transport and the parse branch below are
+    // mutually exclusive today, but the latch makes "one fetch, at most one increment" structural
+    // rather than a property of the current control flow.
+    FetchErrorLatch errorLatch = new FetchErrorLatch();
     // Decode to a raw String, then parse + unwrap with this client's own mapper. The Wiki wraps
     // some
     // single-resource responses in {"data": {…}} and returns others flat, so reading the body as a
@@ -380,7 +480,7 @@ public class ScWikiClient {
             .onErrorResume(
                 e -> {
                   log.warn("Failed to fetch {} from SC Wiki API ({})", resourceLabel, uri, e);
-                  recordFetchError();
+                  recordFetchErrorOnce(errorLatch);
                   return Mono.empty();
                 })
             .blockOptional()
@@ -394,7 +494,7 @@ public class ScWikiClient {
       return objectMapper.treeToValue(payload, type);
     } catch (Exception e) {
       log.warn("Failed to parse {} response from SC Wiki API ({})", resourceLabel, uri, e);
-      recordFetchError();
+      recordFetchErrorOnce(errorLatch);
       return null;
     }
   }
@@ -413,6 +513,8 @@ public class ScWikiClient {
    * @param typeRef typed envelope reference
    * @param resourceLabel log label
    * @param previousEtag optional value for {@code If-None-Match}; {@code null} to skip
+   * @param errorLatch the enclosing fetch's one-increment latch, so a transport failure here and a
+   *     completeness problem the caller detects afterwards do not both count
    * @return the page outcome: a parsed envelope on 2xx, a {@link PageOutcome#notModified()} marker
    *     on 304, or a null-bodied {@link PageOutcome#error()} on empty / error
    */
@@ -420,7 +522,8 @@ public class ScWikiClient {
       String requestUri,
       ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
       String resourceLabel,
-      String previousEtag) {
+      String previousEtag,
+      FetchErrorLatch errorLatch) {
     // .uri(String) parses as a URI template, prepends the configured baseUrl when the URI is
     // relative, and treats already-encoded sequences (%5B / %5D) as literal — exactly what
     // buildPagedUri produces. Passing a URI directly would BYPASS the baseUrl (Spring treats a
@@ -452,7 +555,7 @@ public class ScWikiClient {
         .onErrorResume(
             e -> {
               log.warn("Failed to fetch {} from SC Wiki API ({})", resourceLabel, requestUri, e);
-              recordFetchError();
+              recordFetchErrorOnce(errorLatch);
               return Mono.just(PageOutcome.<T>error());
             })
         .blockOptional()
@@ -535,33 +638,59 @@ public class ScWikiClient {
    * SyncZeroItems} (#1182 — mirrors the {@code UexClient.FetchResult} carve-out for {@code
    * uex_sync}).
    *
+   * <p>{@link #complete()} is the separate, stricter question: did the page walk actually enumerate
+   * the whole feed? It is {@code false} whenever a page failed mid-walk, page 1 itself failed, the
+   * pagination metadata went missing on a full first page, or {@code meta.total} disagreed with the
+   * merged row count. <b>Only a {@code complete} result may drive a tombstone sweep</b> — rows that
+   * were never fetched are indistinguishable from rows the Wiki dropped, and an ungated sweep would
+   * mark the whole un-fetched remainder {@code scwiki_deleted}. {@code ScWikiOrphanSweep} enforces
+   * this; the syncs with an inline sweep check the flag themselves.
+   *
    * @param <T> per-row payload type inside {@link ScWikiResponseDto#data()}
    * @param data the merged rows across all pages; empty on 304 / error
    * @param notModified {@code true} iff page 1 answered 304 Not Modified
+   * @param complete {@code true} iff the page walk enumerated the whole feed and the merged row
+   *     count agreed with the upstream's own {@code meta.total}
    */
-  public record FetchResult<T>(List<T> data, boolean notModified) {
+  public record FetchResult<T>(List<T> data, boolean notModified, boolean complete) {
 
     /**
-     * Wraps a fetched (or empty-on-error / empty-200) list as a <em>modified</em> result.
+     * Wraps a fully-walked list as a <em>modified, complete</em> result — the healthy 2xx outcome,
+     * including a genuine empty-200 whose envelope was intact.
      *
      * @param <T> per-row payload type
      * @param data the merged rows (possibly empty)
-     * @return a result carrying {@code data} with {@code notModified == false}
+     * @return a result carrying {@code data} with {@code notModified == false, complete == true}
      */
     public static <T> FetchResult<T> of(List<T> data) {
-      return new FetchResult<>(data, false);
+      return new FetchResult<>(data, false, true);
+    }
+
+    /**
+     * Wraps a list the page walk could not finish (failed page, missing pagination metadata on a
+     * full page, or a {@code meta.total} mismatch) as an <em>incomplete</em> result. The rows are
+     * still returned — they are valid, they are just not the whole feed — so upserts proceed while
+     * every tombstone sweep stands down.
+     *
+     * @param <T> per-row payload type
+     * @param data the rows merged before the walk was abandoned (possibly empty)
+     * @return a result carrying {@code data} with {@code notModified == false, complete == false}
+     */
+    public static <T> FetchResult<T> partial(List<T> data) {
+      return new FetchResult<>(data, false, false);
     }
 
     /**
      * The {@code 304 Not Modified} result: empty data with {@code notModified == true}. Named
      * {@code unchanged} (not {@code notModified}) so the factory does not clash with the record's
-     * generated {@link #notModified()} accessor.
+     * generated {@link #notModified()} accessor. {@code complete} is {@code false}: a conditional
+     * GET enumerates nothing, so a caller that ignored {@link #notModified()} still cannot sweep.
      *
      * @param <T> per-row payload type
      * @return a not-modified result with an empty data list
      */
     public static <T> FetchResult<T> unchanged() {
-      return new FetchResult<>(List.of(), true);
+      return new FetchResult<>(List.of(), true, false);
     }
   }
 
@@ -609,6 +738,38 @@ public class ScWikiClient {
      */
     private static <T> PageOutcome<T> error() {
       return new PageOutcome<>(null, false);
+    }
+  }
+
+  /**
+   * One-shot claim ticket for a single fetch's {@link MetricNames#EXTERNAL_FETCH_ERRORS} increment.
+   * One instance is created per {@link #fetchAllPagesResult} page walk (and per {@link #fetchOne}
+   * call) and handed to every branch that may want to count an error, so the counter tracks the
+   * number of failed <em>fetches</em> rather than the number of symptoms a failed fetch happened to
+   * show. The counterpart WARN lines are deliberately NOT latched — each one names a different
+   * problem and an operator wants to read all of them.
+   *
+   * <p>Deliberately not thread-safe: a latch never escapes the single thread that drives its walk
+   * (the page loop blocks on each request), so a plain field is both sufficient and cheaper than an
+   * atomic. Do not hoist an instance into a field — one per fetch is the whole contract.
+   */
+  private static final class FetchErrorLatch {
+
+    /** Whether this fetch has already contributed its single counter increment. */
+    private boolean recorded;
+
+    /**
+     * Claims this fetch's one increment for the caller.
+     *
+     * @return {@code true} on the first invocation for this latch — the caller must record —, and
+     *     {@code false} on every subsequent one, meaning the increment is already spent
+     */
+    private boolean claim() {
+      if (recorded) {
+        return false;
+      }
+      recorded = true;
+      return true;
     }
   }
 }

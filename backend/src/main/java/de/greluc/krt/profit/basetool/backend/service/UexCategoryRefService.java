@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.dto.uex.UexCategoryDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.model.UexCategory;
 import de.greluc.krt.profit.basetool.backend.repository.UexCategoryRepository;
+import de.greluc.krt.profit.basetool.backend.support.LogSafe;
 import de.greluc.krt.profit.basetool.backend.support.UexValues;
 import java.time.Instant;
 import java.util.List;
@@ -52,6 +53,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class UexCategoryRefService {
 
+  /**
+   * Cap for the upstream-supplied category {@code section} / {@code name} in log lines. UEX is a
+   * third party we do not control, so both are untrusted free text and go through {@link LogSafe}
+   * first; 64 characters comfortably fit any real category label.
+   */
+  private static final int MAX_LABEL_LOG_LENGTH = 64;
+
   private final UexClient uexClient;
   private final UexCategoryRepository repository;
 
@@ -64,7 +72,15 @@ public class UexCategoryRefService {
   @Transactional
   public List<UexCategory> syncCategories() {
     log.info("Starting synchronization of UEX categories...");
-    List<UexCategoryDto> dtos = uexClient.getCategories();
+    UexClient.FetchResult<UexCategoryDto> fetched = uexClient.getCategories();
+    if (fetched.notModified()) {
+      // A conditional-GET hit: the category table is byte-identical to the last run, so there is
+      // nothing to upsert. The persisted rows are still the current truth and are handed to the
+      // item sync unchanged — this is a healthy no-op, not the outage the WARN below reports.
+      log.info("UEX category catalogue unchanged since the last sync (304) — nothing to import.");
+      return repository.findAll();
+    }
+    List<UexCategoryDto> dtos = fetched.data();
     if (dtos.isEmpty()) {
       log.warn("No categories received from UEX API. Aborting synchronization.");
       return repository.findAll();
@@ -76,7 +92,11 @@ public class UexCategoryRefService {
     int skipped = 0;
     for (UexCategoryDto dto : dtos) {
       if (dto.id() == null || dto.section() == null || dto.name() == null) {
-        log.debug("Skipping category with missing id/section/name: {}", dto);
+        log.debug(
+            "Skipping category with missing id/section/name (id={}, section='{}', name='{}')",
+            dto.id(),
+            LogSafe.text(dto.section(), MAX_LABEL_LOG_LENGTH),
+            LogSafe.text(dto.name(), MAX_LABEL_LOG_LENGTH));
         continue;
       }
       String type = dto.type() == null ? "item" : dto.type();

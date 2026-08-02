@@ -22,8 +22,14 @@ package de.greluc.krt.profit.basetool.frontend.websocket;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.service.LiveSyncPresenceService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -40,8 +46,10 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -83,6 +91,34 @@ class LiveSyncWebSocketHandlerTest {
    * it explicitly.
    */
   private AtomicLong nanoClock;
+
+  /**
+   * Captures the handler's own log events so the tests can assert the <em>level</em> where it is
+   * the contract: a client-supplied {@code changed} frame's filtered section keys must stay at
+   * DEBUG (an attacker-triggerable flood at any higher level), while a backend-triggered
+   * fail-closed subscribe must reach WARN.
+   */
+  private ListAppender<ILoggingEvent> logAppender;
+
+  /** The handler logger's configured level, restored after each test. */
+  private Level previousLogLevel;
+
+  @BeforeEach
+  void attachLogAppender() {
+    Logger logger = (Logger) LoggerFactory.getLogger(LiveSyncWebSocketHandler.class);
+    previousLogLevel = logger.getLevel();
+    logger.setLevel(Level.DEBUG);
+    logAppender = new ListAppender<>();
+    logAppender.start();
+    logger.addAppender(logAppender);
+  }
+
+  @AfterEach
+  void detachLogAppender() {
+    Logger logger = (Logger) LoggerFactory.getLogger(LiveSyncWebSocketHandler.class);
+    logger.detachAppender(logAppender);
+    logger.setLevel(previousLogLevel);
+  }
 
   @BeforeEach
   void setUp() {
@@ -973,6 +1009,358 @@ class LiveSyncWebSocketHandlerTest {
     assertThat(session.sent).isEmpty();
   }
 
+  // -- Section-whitelist filtering is observable (REQ-FE-010 defect class) ----------------------
+
+  @Test
+  void changedFrame_withKeysOutsideTheWhitelist_countsOneSectionFilteredDrop() throws Exception {
+    String topic = missionTopic();
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
+
+    // Two unknown keys in ONE frame: the acting client's vocabulary has drifted from the relay's
+    // accept-list, which is exactly how a panel goes stale for everyone with no error anywhere.
+    handler.handleTextMessage(
+        alice,
+        new TextMessage(
+            "{\"type\":\"changed\",\"topic\":\""
+                + topic
+                + "\",\"sections\":[\"crew\",\"bogus\",\"alsoBogus\"]}"));
+
+    // Counted once per FRAME, not once per rejected key - otherwise one crafted frame is worth
+    // MAX_CHANGED_SECTIONS increments and the series stops meaning "frames that lost a key".
+    assertThat(dropCounter(MetricNames.DROPPED_SECTION_FILTERED)).isEqualTo(1.0);
+  }
+
+  @Test
+  void changedFrame_withOnlyWhitelistedKeys_countsNoSectionFilteredDrop() throws Exception {
+    String topic = missionTopic();
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
+
+    handler.handleTextMessage(alice, changedFrame(topic, "crew", "crew", "mgmt"));
+
+    // A collapsed duplicate is not vocabulary skew, so the healthy path leaves the series flat -
+    // otherwise the signal is useless for spotting the real defect.
+    assertThat(dropCounter(MetricNames.DROPPED_SECTION_FILTERED)).isZero();
+  }
+
+  @Test
+  void changedFrame_withFilteredKeys_logsExactlyOneDebugLineCarryingTheSanitisedKey()
+      throws Exception {
+    String topic = missionTopic();
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
+    logAppender.list.clear();
+
+    handler.handleTextMessage(
+        alice,
+        new TextMessage(
+            "{\"type\":\"changed\",\"topic\":\""
+                + topic
+                + "\",\"sections\":[\"bogusA\",\"bogusB\",\"bogusC\"]}"));
+
+    // One line for the whole frame, at DEBUG because a client can emit these at will: the count is
+    // reported and the first key is the sample, but the other rejected keys get no line of their
+    // own.
+    assertThat(logAppender.list).hasSize(1);
+    ILoggingEvent event = logAppender.list.get(0);
+    assertThat(event.getLevel()).isEqualTo(Level.DEBUG);
+    assertThat(event.getFormattedMessage()).contains("3", "bogusA").doesNotContain("bogusB");
+  }
+
+  @Test
+  void changedFrame_withControlCharsInAFilteredKey_isSanitisedBeforeLogging() throws Exception {
+    String topic = missionTopic();
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
+    logAppender.list.clear();
+
+    // The key is client-supplied free text: a newline plus a fabricated prefix must not be able to
+    // forge a second log line (CWE-117).
+    handler.handleTextMessage(
+        alice,
+        new TextMessage(
+            "{\"type\":\"changed\",\"topic\":\""
+                + topic
+                + "\",\"sections\":[\"bo\\ngus ERROR --- forged\"]}"));
+
+    assertThat(logAppender.list).hasSize(1);
+    assertThat(logAppender.list.get(0).getFormattedMessage()).doesNotContain("\n");
+  }
+
+  @Test
+  void changedFrame_withUnknownTopic_isLoggedAtDebugAndRelaysNothing() throws Exception {
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
+    logAppender.list.clear();
+
+    handler.handleTextMessage(
+        alice, new TextMessage("{\"type\":\"changed\",\"topic\":\"bogus:not-a-thing\"}"));
+
+    // Publish-side vocabulary skew used to be a bare return with no trace at all. DEBUG, since the
+    // topic string is client-supplied.
+    assertThat(logAppender.list).hasSize(1);
+    assertThat(logAppender.list.get(0).getLevel()).isEqualTo(Level.DEBUG);
+    assertThat(fanout.publishedTopics).isEmpty();
+  }
+
+  @Test
+  void publishFromServer_withKeysOutsideTheWhitelist_countsTheSectionFilteredDrop() {
+    // The server-originated publish path filters against the same whitelist, and a server/relay
+    // vocabulary drift is the same silent staleness - so it is counted the same way.
+    handler.publishFromServer("orders", List.of("bogus"));
+
+    assertThat(dropCounter(MetricNames.DROPPED_SECTION_FILTERED, "orders_queue")).isEqualTo(1.0);
+  }
+
+  @Test
+  void deliverFromFanout_withKeysOutsideTheWhitelist_countsTheSectionFilteredDrop() {
+    // Defense-in-depth path: a peer replica on an older vocabulary is the cross-replica version of
+    // the same defect, so it must be visible too.
+    handler.deliverFromFanout("orders", List.of("bogus"));
+
+    assertThat(dropCounter(MetricNames.DROPPED_SECTION_FILTERED, "orders_queue")).isEqualTo(1.0);
+  }
+
+  // -- Subscribe-deny reason split + fail-closed log level (M7) ---------------------------------
+
+  @Test
+  void multiplexedSubscribe_explicitDeny_tagsTheAuthzReason_andStaysBelowWarn() throws Exception {
+    when(authorizer.authorize(any(), any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY);
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    logAppender.list.clear();
+    subscribe(bob, operationTopic());
+
+    // A real permission verdict: a steady trickle is normal, so it must not be tagged (or logged)
+    // like an outage.
+    assertThat(
+            subscribeCounter(
+                MetricNames.OUTCOME_DENIED, "operation", MetricNames.SUBSCRIBE_DENY_AUTHZ))
+        .isEqualTo(1.0);
+    assertThat(logAppender.list).noneMatch(e -> e.getLevel().isGreaterOrEqual(Level.WARN));
+  }
+
+  @Test
+  void multiplexedSubscribe_indeterminateDeny_tagsItsOwnReason_andWarnsOnce() throws Exception {
+    when(authorizer.authorize(any(), any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY_INDETERMINATE);
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    logAppender.list.clear();
+    subscribe(bob, missionTopic());
+
+    // A backend/token outage failing closed is NOT a permission verdict: its own reason value keeps
+    // the two apart on the one always-on signal, and it is promoted to WARN because a denied
+    // subscribe is terminal - the tab stays stale for the rest of the session. Exactly one line for
+    // the one failure (REQ-OBS-001), not one per layer it passed through.
+    assertThat(
+            subscribeCounter(
+                MetricNames.OUTCOME_DENIED, "mission", MetricNames.SUBSCRIBE_DENY_INDETERMINATE))
+        .isEqualTo(1.0);
+    assertThat(logAppender.list.stream().filter(e -> e.getLevel() == Level.WARN).count())
+        .isEqualTo(1L);
+  }
+
+  @Test
+  void multiplexedSubscribe_allowed_carriesTheReasonPlaceholder() throws Exception {
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(bob, operationTopic());
+
+    // Micrometer rejects one meter name registered with differing tag-key sets, so the allowed
+    // series must carry the reason tag too.
+    assertThat(subscribeCounter(MetricNames.OUTCOME_ALLOWED, "operation", MetricNames.REASON_NONE))
+        .isEqualTo(1.0);
+  }
+
+  @Test
+  void multiplexedSubscribe_presenceClassAuthorizerThrows_warnsOnce() throws Exception {
+    LiveSyncSubscriptionAuthorizer throwing = mock(LiveSyncSubscriptionAuthorizer.class);
+    when(throwing.authorize(any(), any(), any(), any()))
+        .thenThrow(new IllegalStateException("probe blew up"));
+    SimpleMeterRegistry reg = new SimpleMeterRegistry();
+    LiveSyncPresenceService svc = new LiveSyncPresenceService(reg);
+    LiveSyncWebSocketHandler h =
+        new LiveSyncWebSocketHandler(svc, fanout, objectMapper, reg, throwing, Runnable::run);
+
+    FakeSession bob = multiplexedSession(oidcUser("user-2", "Bob"));
+    h.afterConnectionEstablished(bob);
+    logAppender.list.clear();
+    h.handleTextMessage(bob, subscribeFrame(missionTopic()));
+
+    // A throwing probe on a presence class fails CLOSED - user-visible and backend-triggered, so it
+    // is a WARN, not the DEBUG the fail-OPEN direction gets.
+    assertThat(logAppender.list.stream().filter(e -> e.getLevel() == Level.WARN).count())
+        .isEqualTo(1L);
+  }
+
+  @Test
+  void multiplexedSubscribe_authorizerThrowsOnFailOpenClass_staysAtDebug() throws Exception {
+    LiveSyncSubscriptionAuthorizer throwing = mock(LiveSyncSubscriptionAuthorizer.class);
+    when(throwing.authorize(any(), any(), any(), any()))
+        .thenThrow(new IllegalStateException("probe blew up"));
+    SimpleMeterRegistry reg = new SimpleMeterRegistry();
+    LiveSyncPresenceService svc = new LiveSyncPresenceService(reg);
+    LiveSyncWebSocketHandler h =
+        new LiveSyncWebSocketHandler(svc, fanout, objectMapper, reg, throwing, Runnable::run);
+
+    FakeSession bob = multiplexedSession(oidcUser("user-2", "Bob"));
+    h.afterConnectionEstablished(bob);
+    logAppender.list.clear();
+    h.handleTextMessage(bob, subscribeFrame(operationTopic()));
+
+    // Failing OPEN costs the user nothing (the subscribe is accepted), so it must not warn.
+    assertThat(logAppender.list).noneMatch(e -> e.getLevel().isGreaterOrEqual(Level.WARN));
+  }
+
+  @Test
+  void multiplexedSubscribe_executorSaturated_warns() throws Exception {
+    SimpleMeterRegistry reg = new SimpleMeterRegistry();
+    LiveSyncPresenceService svc = new LiveSyncPresenceService(reg);
+    LiveSyncWebSocketHandler saturated =
+        new LiveSyncWebSocketHandler(
+            svc,
+            fanout,
+            objectMapper,
+            reg,
+            authorizer,
+            runnable -> {
+              throw new RejectedExecutionException("auth executor full");
+            });
+
+    FakeSession bob = multiplexedSession(oidcUser("user-2", "Bob"));
+    saturated.afterConnectionEstablished(bob);
+    logAppender.list.clear();
+    saturated.handleTextMessage(bob, subscribeFrame(operationTopic()));
+
+    // The saturation branch was previously unlogged entirely; it is infrastructure-triggered, so
+    // WARN is not a client-drivable flood.
+    assertThat(logAppender.list.stream().filter(e -> e.getLevel() == Level.WARN).count())
+        .isEqualTo(1L);
+  }
+
+  // -- Subscribe-frame rate limit (the deny -> re-subscribe cycle) ------------------------------
+
+  @Test
+  void subscribeFrames_areRateLimitedPerSession() throws Exception {
+    // The per-session topic cap cannot bound the subscribe path: completeSubscribe RELEASES the
+    // reserved slot on a deny, so a subscribe -> deny -> subscribe cycle never reaches the cap.
+    // Each turn of that cycle submits an authorization probe to the auth executor, so without a
+    // bucket an authenticated client could drive the executor's queue to rejection at will — and
+    // with it the saturation WARN. The subscribe bucket is what bounds the probe-submission rate.
+    when(authorizer.authorize(any(), any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY);
+    String topic = operationTopic();
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    bob.sent.clear();
+
+    int emitted = LiveSyncWebSocketHandler.SUBSCRIBE_BURST + 20;
+    for (int i = 0; i < emitted; i++) {
+      subscribe(bob, topic);
+    }
+
+    // The clock is frozen (see nanoClock), so the bucket never refills mid-loop: exactly the burst
+    // reaches the authorizer, and every excess frame is dropped as throttled.
+    verify(authorizer, times(LiveSyncWebSocketHandler.SUBSCRIBE_BURST))
+        .authorize(any(), any(), any(), any());
+    assertThat(dropCounter(MetricNames.DROPPED_THROTTLED, "operation"))
+        .isEqualTo(emitted - LiveSyncWebSocketHandler.SUBSCRIBE_BURST);
+    // A throttled subscribe is answered with NOTHING — never a `denied` frame, which the client
+    // treats as terminal for the room and would turn a transient burst into a permanently dead tab.
+    assertThat(bob.sent).hasSize(LiveSyncWebSocketHandler.SUBSCRIBE_BURST);
+  }
+
+  @Test
+  void subscribeThrottle_admitsAFullTopicCapWorthOfSubscribes() throws Exception {
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    bob.sent.clear();
+
+    // A page may legitimately hold MAX_TOPICS_PER_SESSION (16) rooms and subscribes to all of them
+    // the instant its socket opens; the burst sits above that, so the throttle never bites the
+    // feature it protects. (A reconnect re-subscribes on a fresh socket with a fresh, full bucket.)
+    for (int i = 0; i < 16; i++) {
+      subscribe(bob, operationTopic());
+    }
+
+    assertThat(bob.sent).hasSize(16);
+    assertThat(lastBroadcast(bob).get("type").asString()).isEqualTo("subscribed");
+    assertThat(dropCounter(MetricNames.DROPPED_THROTTLED, "operation")).isZero();
+  }
+
+  // -- Deny reason on the wire (retryable vs terminal) ------------------------------------------
+
+  @Test
+  void multiplexedSubscribe_indeterminateDeny_isRetryableOnTheWire() throws Exception {
+    when(authorizer.authorize(any(), any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY_INDETERMINATE);
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(bob, missionTopic());
+
+    // Both deny flavours used to be the same opaque `denied` frame, so a 30-second backend blip
+    // stripped live sync from that tab for good. The reason lets krt-live-sync.js retry this one
+    // exactly once on its next reconnect.
+    JsonNode frame = lastBroadcast(bob);
+    assertThat(frame.get("type").asString()).isEqualTo("denied");
+    assertThat(frame.get("reason").asString()).isEqualTo(MetricNames.SUBSCRIBE_DENY_INDETERMINATE);
+  }
+
+  @Test
+  void multiplexedSubscribe_explicitDeny_carriesTheTerminalReasonOnTheWire() throws Exception {
+    when(authorizer.authorize(any(), any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY);
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(bob, operationTopic());
+
+    // A permission verdict must NOT read as retryable — retrying it would just re-deny.
+    JsonNode frame = lastBroadcast(bob);
+    assertThat(frame.get("type").asString()).isEqualTo("denied");
+    assertThat(frame.get("reason").asString()).isEqualTo(MetricNames.SUBSCRIBE_DENY_AUTHZ);
+  }
+
+  @Test
+  void multiplexedSubscribe_preVerdictDenies_carryNoReasonAndAreTerminal() throws Exception {
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+
+    // Refusals decided before any authorization verdict exists: an unparseable topic and the
+    // per-session topic cap. Neither is worth retrying, and the client's terminal default is
+    // exactly "no reason field", so both must omit it.
+    handler.handleTextMessage(
+        bob, new TextMessage("{\"type\":\"subscribe\",\"topic\":\"bogus:not-a-thing\"}"));
+    assertThat(lastBroadcast(bob).has("reason")).isFalse();
+
+    for (int i = 0; i < 16; i++) {
+      subscribe(bob, operationTopic());
+    }
+    bob.sent.clear();
+    subscribe(bob, operationTopic()); // the 17th exceeds MAX_TOPICS_PER_SESSION
+
+    JsonNode capped = lastBroadcast(bob);
+    assertThat(capped.get("type").asString()).isEqualTo("denied");
+    assertThat(capped.has("reason")).isFalse();
+  }
+
+  @Test
+  void multiplexedSubscribe_presenceClassExecutorSaturated_deniedFrameIsRetryable()
+      throws Exception {
+    // Saturation is the archetypal indeterminate outcome: nothing about the caller's permissions
+    // was learned. On a presence class it fails closed, so the refusal the client sees must carry
+    // the retryable reason rather than look like a permission verdict.
+    SimpleMeterRegistry reg = new SimpleMeterRegistry();
+    LiveSyncPresenceService svc = new LiveSyncPresenceService(reg);
+    LiveSyncWebSocketHandler saturated =
+        new LiveSyncWebSocketHandler(
+            svc,
+            fanout,
+            objectMapper,
+            reg,
+            authorizer,
+            runnable -> {
+              throw new RejectedExecutionException("auth executor full");
+            });
+
+    FakeSession bob = multiplexedSession(oidcUser("user-2", "Bob"));
+    saturated.afterConnectionEstablished(bob);
+    saturated.handleTextMessage(bob, subscribeFrame(missionTopic()));
+
+    JsonNode frame = lastBroadcast(bob);
+    assertThat(frame.get("type").asString()).isEqualTo("denied");
+    assertThat(frame.get("reason").asString()).isEqualTo(MetricNames.SUBSCRIBE_DENY_INDETERMINATE);
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────────────────────
 
   private static String missionTopic() {
@@ -1062,6 +1450,26 @@ class LiveSyncWebSocketHandlerTest {
             .find(MetricNames.LIVESYNC_SUBSCRIBE)
             .tag(MetricNames.TAG_OUTCOME, outcome)
             .tag(MetricNames.TAG_TOPIC_CLASS, topicClass)
+            .counter();
+    return counter == null ? 0.0 : counter.count();
+  }
+
+  /**
+   * Reads the subscribe counter for one exact {@code outcome} / {@code topic_class} / {@code
+   * reason} triple, so a test can prove the deny series is split rather than merely present.
+   *
+   * @param outcome the {@code outcome} tag value
+   * @param topicClass the {@code topic_class} tag value
+   * @param reason the {@code reason} tag value
+   * @return the counter's value, or {@code 0.0} when that exact series was never registered
+   */
+  private double subscribeCounter(String outcome, String topicClass, String reason) {
+    var counter =
+        registry
+            .find(MetricNames.LIVESYNC_SUBSCRIBE)
+            .tag(MetricNames.TAG_OUTCOME, outcome)
+            .tag(MetricNames.TAG_TOPIC_CLASS, topicClass)
+            .tag(MetricNames.TAG_REASON, reason)
             .counter();
     return counter == null ? 0.0 : counter.count();
   }

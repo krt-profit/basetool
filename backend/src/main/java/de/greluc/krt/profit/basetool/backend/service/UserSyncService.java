@@ -54,6 +54,14 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class UserSyncService {
 
+  /**
+   * How many accounts a single run may soft-delete before the line reporting it escalates from INFO
+   * to WARN. Members leave in a trickle; a double-digit batch in one run means something upstream
+   * happened to the roster (a bulk deletion, a realm swap, a partially-degraded fetch) and is worth
+   * looking at even though the run itself "succeeded".
+   */
+  private static final int MISSING_USERS_WARN_THRESHOLD = 10;
+
   private final KeycloakService keycloakService;
   private final UserReconciliationService userReconciliationService;
   private final BankHolderReconciliationService bankHolderReconciliationService;
@@ -101,7 +109,23 @@ public class UserSyncService {
         log.error("Failed to sync user {}", user.id(), e);
       }
     }
-    userReconciliationService.markMissingUsers(keycloakUserIds);
+    // Soft-deleting members is the most consequential write of the whole run, and it used to happen
+    // between two unrelated lines with the affected-row count discarded — a mass-disappearance
+    // (upstream deletion, a realm misconfiguration) left no trace whatsoever. Report it: INFO for
+    // the ordinary trickle of leavers, WARN once a single run flags more than
+    // MISSING_USERS_WARN_THRESHOLD accounts. Counts only — no handles (REQ-OBS-004).
+    int flaggedMissing = userReconciliationService.markMissingUsers(keycloakUserIds);
+    if (flaggedMissing > MISSING_USERS_WARN_THRESHOLD) {
+      log.warn(
+          "User sync flagged {} local users as no longer present in Keycloak in a single run.",
+          flaggedMissing);
+    } else if (flaggedMissing > 0) {
+      log.info(
+          "User sync flagged {} local users as no longer present in Keycloak.", flaggedMissing);
+    }
+    // One aggregate line per run for the role mapping (how many accounts had their roles rewritten,
+    // and how many of those landed on the Guest catch-all).
+    userReconciliationService.logRoleSyncSummary();
     log.info("User sync finished. Synced {} users.", count);
 
     // After the roster is reconciled, keep the bank-holder registry in sync (REQ-BANK-029): every

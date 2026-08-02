@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.service.UexFetchResults.fetched;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -99,7 +100,7 @@ class UexManufacturerServiceTest {
             .isVehicleManufacturer(0)
             .build();
 
-    when(uexClient.getCompanies()).thenReturn(List.of(vehicleDto, itemDto));
+    when(uexClient.getCompanies()).thenReturn(fetched(List.of(vehicleDto, itemDto)));
     when(manufacturerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     uexManufacturerService.syncManufacturers();
@@ -141,7 +142,7 @@ class UexManufacturerServiceTest {
     existing.setAbbreviation("AEGS-Old");
     existing.setUexCompanyId(42);
 
-    when(uexClient.getCompanies()).thenReturn(List.of(dto));
+    when(uexClient.getCompanies()).thenReturn(fetched(List.of(dto)));
     when(aliasRepository.findManufacturerByUexCompanyId(42)).thenReturn(Optional.of(existing));
     when(manufacturerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -171,7 +172,7 @@ class UexManufacturerServiceTest {
     legacy.setAbbreviation("AEGS");
     // legacy: no uexCompanyId yet (hand-seeded / pre-alias) — still unclaimed.
 
-    when(uexClient.getCompanies()).thenReturn(List.of(dto));
+    when(uexClient.getCompanies()).thenReturn(fetched(List.of(dto)));
     when(manufacturerRepository.findByNameIgnoreCase("Aegis Dynamics"))
         .thenReturn(Optional.of(legacy));
     when(manufacturerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -211,7 +212,7 @@ class UexManufacturerServiceTest {
     legacy.setAbbreviation("Esperia");
     // legacy: unclaimed (no uexCompanyId yet).
 
-    when(uexClient.getCompanies()).thenReturn(List.of(dto));
+    when(uexClient.getCompanies()).thenReturn(fetched(List.of(dto)));
     when(manufacturerRepository.findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("Esperia"))
         .thenReturn(Optional.of(legacy));
     when(manufacturerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -253,7 +254,7 @@ class UexManufacturerServiceTest {
             .build();
 
     // Deliberately unsorted: the service must sort ascending so the lowest id (278) is canonical.
-    when(uexClient.getCompanies()).thenReturn(List.of(duplicate, canonical));
+    when(uexClient.getCompanies()).thenReturn(fetched(List.of(duplicate, canonical)));
     Manufacturer[] row = new Manufacturer[1];
     when(manufacturerRepository.save(any()))
         .thenAnswer(
@@ -296,7 +297,7 @@ class UexManufacturerServiceTest {
     UexCompanyDto healthy =
         UexCompanyDto.builder().id(2).name("Aegis Dynamics").nickname("AEGS").build();
 
-    when(uexClient.getCompanies()).thenReturn(List.of(healthy, poison));
+    when(uexClient.getCompanies()).thenReturn(fetched(List.of(healthy, poison)));
     // First save simulates a residual constraint violation (as the per-company tx would surface);
     // the second company must still be saved.
     when(manufacturerRepository.save(any()))
@@ -316,7 +317,7 @@ class UexManufacturerServiceTest {
 
   @Test
   void emptyResponse_skipsWrites() {
-    when(uexClient.getCompanies()).thenReturn(List.of());
+    when(uexClient.getCompanies()).thenReturn(fetched(List.of()));
 
     uexManufacturerService.syncManufacturers();
 

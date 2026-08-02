@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.ingest.config;
 
+import de.greluc.krt.profit.basetool.ingest.filter.UserIdMdcFilter;
+import de.greluc.krt.profit.basetool.ingest.web.SecurityProblemResponseHandler;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -181,18 +183,26 @@ public class SecurityConfig {
    * @param objectMapper serializes the {@link IdentityProviderUnavailableFilter}'s 503 problem body
    * @param meterRegistry counts the identity-provider-unavailable 503 on {@code
    *     basetool_http_error_total} (REQ-OBS-011)
+   * @param loggingProperties supplies the MDC key the {@link UserIdMdcFilter} writes the
+   *     authenticated subject to
    * @return the configured filter chain
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
   @Bean
   public SecurityFilterChain filterChain(
-      HttpSecurity http, ObjectMapper objectMapper, MeterRegistry meterRegistry) throws Exception {
+      HttpSecurity http,
+      ObjectMapper objectMapper,
+      MeterRegistry meterRegistry,
+      LoggingProperties loggingProperties)
+      throws Exception {
     // CSRF stays ENABLED (never disabled) so the gateway carries no weaker posture than the
     // backend. Every real endpoint (/v1/**) is JSON + bearer-token only on a stateless chain with
     // no session cookie, so it can never be driven from a CSRF-vulnerable browser flow — those
     // paths are ignored exactly like the backend's bearer API. The cookie repository never issues a
     // session, and no other state-changing browser endpoint exists, so the CSRF machinery is inert
     // here while keeping the static-analysis posture clean.
+    SecurityProblemResponseHandler securityProblems =
+        new SecurityProblemResponseHandler(objectMapper, meterRegistry);
     CookieCsrfTokenRepository csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
     csrfRepo.setCookieCustomizer(cookie -> cookie.sameSite("Strict").secure(true));
     http.csrf(
@@ -225,7 +235,22 @@ public class SecurityConfig {
                     .permitAll()
                     .anyRequest()
                     .authenticated())
-        .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
+        // REQ-API-004: give the filter-level 401/403 the same problem+json shape (stable `code` +
+        // `correlationId`) as every other ingest error, and a log line — Spring Security's defaults
+        // answer with an empty body and log nothing. Installed BOTH globally and on the resource
+        // server: the latter has its own entry point which would otherwise win for bearer requests,
+        // which is every real request here.
+        .exceptionHandling(
+            exceptions ->
+                exceptions
+                    .authenticationEntryPoint(securityProblems)
+                    .accessDeniedHandler(securityProblems))
+        .oauth2ResourceServer(
+            oauth2 ->
+                oauth2
+                    .jwt(jwt -> {})
+                    .authenticationEntryPoint(securityProblems)
+                    .accessDeniedHandler(securityProblems))
         // REQ-SEC-024: re-map an identity-provider-unreachable failure (JWKS timeout / 5xx /
         // Docker-DNS strand) escaping the bearer-token filter as a re-thrown
         // AuthenticationServiceException to a retryable 503 instead of an opaque 500. Installed
@@ -233,6 +258,15 @@ public class SecurityConfig {
         // reaches it.
         .addFilterBefore(
             new IdentityProviderUnavailableFilter(objectMapper, meterRegistry),
+            org.springframework.security.oauth2.server.resource.web.authentication
+                .BearerTokenAuthenticationFilter.class)
+        // REQ-OBS-001/-002: refine the `userId` MDC field from `anonymous` to the caller's JWT
+        // `sub`. Installed AFTER the bearer-token filter — that is the first point at which the
+        // SecurityContext is populated; the shared servlet filters all run earlier and would only
+        // ever see an empty context. CorrelationIdFilter seeds and clears the key (see its
+        // Javadoc).
+        .addFilterAfter(
+            new UserIdMdcFilter(loggingProperties),
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));

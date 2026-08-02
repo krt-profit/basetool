@@ -22,6 +22,9 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.mapper.PromotionCategoryMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
@@ -41,6 +44,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -165,6 +169,47 @@ class PromotionCategoryServiceTest {
             eq("Grundlagen / Flug Kenntnisse"),
             isNull(),
             isNull());
+  }
+
+  /**
+   * REQ-OBS-004 / CWE-117: the category name is admin-entered free text that reaches the creation
+   * log line verbatim. A newline plus a fabricated level prefix would otherwise read as a genuine
+   * second log line during triage, so the value must go through {@code LogSafe} first.
+   */
+  @Test
+  void create_sanitisesTheCategoryNameBeforeLoggingIt() {
+    UUID topicId = UUID.randomUUID();
+    String forged = "Flug\nERROR --- forged line";
+    PromotionTopic topic = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
+    PromotionCategoryWriteRequest request =
+        new PromotionCategoryWriteRequest(topicId, forged, null, 0, null);
+    PromotionCategory entity = PromotionCategory.builder().name(forged).sortOrder(0).build();
+    PromotionCategoryResponse response =
+        new PromotionCategoryResponse(
+            UUID.randomUUID(), 0L, topicId, "Grundlagen", forged, null, 0, null, null);
+    when(topicRepository.findById(topicId)).thenReturn(Optional.of(topic));
+    when(mapper.toEntity(request)).thenReturn(entity);
+    when(repository.save(entity)).thenReturn(entity);
+    when(mapper.toResponse(entity)).thenReturn(response);
+
+    Logger logger = (Logger) LoggerFactory.getLogger(PromotionCategoryService.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      service.create(request);
+
+      String line =
+          appender.list.stream()
+              .map(ILoggingEvent::getFormattedMessage)
+              .filter(m -> m.contains("Created PromotionCategory"))
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("expected the creation log line"));
+      assertFalse(line.contains("\n"), "no control character may survive into the log: " + line);
+      assertTrue(line.contains("Flug?ERROR"), "the value is kept, only neutralised: " + line);
+    } finally {
+      logger.detachAppender(appender);
+    }
   }
 
   @Test

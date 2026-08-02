@@ -21,10 +21,14 @@ package de.greluc.krt.profit.basetool.ingest.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
 import de.greluc.krt.profit.basetool.ingest.model.dto.HandoffKind;
 import de.greluc.krt.profit.basetool.ingest.model.dto.StagedHandoff;
+import de.greluc.krt.profit.basetool.ingest.support.LogCapture;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -76,6 +80,23 @@ class HandoffStagingServiceTest {
     assertThat(first.get().kind()).isEqualTo(HandoffKind.REFINERY);
     assertThat(first.get().draftJson()).isEqualTo("{\"goodsMatched\":2}");
     assertThat(second).isEmpty();
+  }
+
+  @Test
+  void shouldLogTheDraftLengthButNeverTheDraftOrTheRawIds() {
+    // "Das vorausgefüllte Formular ist leer" is answered by draftLen alone: a 2-byte draft is an
+    // empty backend response. The draft, the raw sub and the raw handoff id must all stay out —
+    // the id is bearer-grade and travels in the browser URL (REQ-OBS-004, REQ-INGEST-003).
+    List<ILoggingEvent> events =
+        LogCapture.capture(
+            HandoffStagingService.class,
+            Level.INFO,
+            () -> service.stage("user-1", HandoffKind.REFINERY, "{\"goodsMatched\":2}"));
+
+    assertThat(events).hasSize(1);
+    String line = events.getFirst().getFormattedMessage();
+    assertThat(line).contains("draftLen=18").contains("sub=u-").contains("hid=h-");
+    assertThat(line).doesNotContain("goodsMatched").doesNotContain("user-1");
   }
 
   @Test

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,6 +32,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.util.ReflectionTestUtils.setField;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.event.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.Role;
@@ -46,12 +51,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -769,6 +776,130 @@ class UserReconciliationServiceTest {
       userReconciliationService.markMissingUsers(ids);
 
       verify(userRepository).markMissingUsers(ids);
+    }
+
+    @Test
+    void returnsTheRepositoryAffectedRowCount_soTheCallerCanReportIt() {
+      // The count used to be discarded at the JPA level (void), which is why a mass
+      // soft-delete left no trace anywhere.
+      List<UUID> ids = List.of(USER_ID);
+      when(userRepository.markMissingUsers(ids)).thenReturn(7);
+
+      assertEquals(7, userReconciliationService.markMissingUsers(ids));
+    }
+
+    @Test
+    void emptyInput_reportsZeroFlagged() {
+      assertEquals(0, userReconciliationService.markMissingUsers(List.of()));
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // logRoleSyncSummary — the per-run role-mapping aggregate
+  // ---------------------------------------------------------------
+
+  @Nested
+  class RoleSyncSummaryTests {
+
+    private ListAppender<ILoggingEvent> appender;
+    private Logger logger;
+
+    @BeforeEach
+    void attachAppender() {
+      logger = (Logger) LoggerFactory.getLogger(UserReconciliationService.class);
+      appender = new ListAppender<>();
+      appender.start();
+      logger.addAppender(appender);
+    }
+
+    @AfterEach
+    void detachAppender() {
+      logger.detachAppender(appender);
+    }
+
+    @Test
+    void quietRun_logsTheAggregateAtInfo() {
+      userReconciliationService.logRoleSyncSummary();
+
+      ILoggingEvent event = onlyEvent();
+      assertEquals(Level.INFO, event.getLevel());
+      assertTrue(event.getFormattedMessage().contains("0 accounts changed roles"));
+    }
+
+    @Test
+    void aMassGuestFallback_escalatesToWarn_withCountsOnly() {
+      // A realm-side role rename: every holder's role name stops resolving, so each account is
+      // re-mapped onto the Guest fallback. Four accounts is one past the threshold.
+      when(roleRepository.findByNameIgnoreCase("Officer")).thenReturn(Optional.empty());
+      when(roleRepository.findByNameIgnoreCase("Guest"))
+          .thenReturn(Optional.of(codeRole("GUEST", "Guest")));
+      for (int i = 0; i < 4; i++) {
+        syncDemotedAccount();
+      }
+
+      userReconciliationService.logRoleSyncSummary();
+
+      ILoggingEvent event = lastEvent();
+      assertEquals(Level.WARN, event.getLevel());
+      String message = event.getFormattedMessage();
+      assertTrue(message.contains("4 accounts changed roles"), message);
+      assertTrue(message.contains("4 of them re-mapped onto the Guest fallback"), message);
+      // REQ-OBS-004: counts only — never the callsign / preferred_username of a demoted account.
+      assertFalse(message.contains("demoted-callsign"), message);
+    }
+
+    @Test
+    void aSingleGuestFallback_staysAtInfo_andTheTalliesResetForTheNextRun() {
+      when(roleRepository.findByNameIgnoreCase("Officer")).thenReturn(Optional.empty());
+      when(roleRepository.findByNameIgnoreCase("Guest"))
+          .thenReturn(Optional.of(codeRole("GUEST", "Guest")));
+      syncDemotedAccount();
+
+      userReconciliationService.logRoleSyncSummary();
+      assertEquals(Level.INFO, lastEvent().getLevel());
+      assertTrue(lastEvent().getFormattedMessage().contains("1 accounts changed roles"));
+
+      // A second summary without any further sync must report a clean run, not the previous
+      // run's numbers again.
+      userReconciliationService.logRoleSyncSummary();
+      assertEquals(Level.INFO, lastEvent().getLevel());
+      assertTrue(lastEvent().getFormattedMessage().contains("0 accounts changed roles"));
+    }
+
+    /**
+     * Runs one Admin-API sync of an account that holds {@code Officer} locally while Keycloak's
+     * {@code Officer} no longer resolves — the shape a renamed realm role produces.
+     */
+    private void syncDemotedAccount() {
+      UUID id = UUID.randomUUID();
+      User existing = newUser(id, "demoted-callsign");
+      existing.setInKeycloak(true);
+      existing.setApprovalStatus(ApprovalStatus.ACTIVE);
+      existing.setRoles(new HashSet<>(Set.of(codeRole("OFFICER", "Officer"))));
+      when(userRepository.findById(id)).thenReturn(Optional.of(existing));
+
+      userReconciliationService.syncUser(
+          new KeycloakUserDto(id, "demoted-callsign", null, true, Set.of("Officer"), null));
+    }
+
+    /**
+     * The single log event the appender captured.
+     *
+     * @return that event
+     */
+    private ILoggingEvent onlyEvent() {
+      assertEquals(1, appender.list.size());
+      return appender.list.getFirst();
+    }
+
+    /**
+     * The most recent log event the appender captured.
+     *
+     * @return that event
+     */
+    private ILoggingEvent lastEvent() {
+      assertFalse(appender.list.isEmpty());
+      return appender.list.getLast();
     }
   }
 

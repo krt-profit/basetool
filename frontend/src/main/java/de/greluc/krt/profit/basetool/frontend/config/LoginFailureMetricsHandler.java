@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.ServletException;
@@ -26,6 +27,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.core.AuthenticationException;
@@ -49,7 +51,15 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationFa
  * exception). Keeping pre-token-exchange traffic OUT of {@code provider_error} is what stops it
  * false-tripping {@code FrontendLoginBroken}; see {@link #isStateError(String)}. See {@link
  * LoginSuccessMetricsHandler} for the paired success signal (#1041 item 18, REQ-OBS-011).
+ *
+ * <p>Each failure is also written to the log exactly once, at the level its bucket warrants (see
+ * {@link #logFailure(String, AuthenticationException)}). The handler used to be metric-only, which
+ * left {@code FrontendLoginBroken} — whose own description says "check the frontend logs" —
+ * pointing at a log that contained nothing about the failure: {@code org.springframework.security}
+ * is pinned to {@code INFO} in {@code logback-spring.xml} / {@code application.yml}, so Spring's
+ * own DEBUG lines about the failed exchange are off in every environment.
  */
+@Slf4j
 public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHandler {
 
   /**
@@ -75,6 +85,20 @@ public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHa
           "consent_required",
           "account_selection_required");
 
+  /**
+   * Character budget for the logged OAuth2 error code. The code is bounded <em>in practice</em> (it
+   * comes from the IdP), but on the authorization-response path it reaches us as the {@code error}
+   * query parameter of the callback, i.e. from the browser — so it is length-capped and stripped of
+   * control characters before it is logged, exactly like any other request-supplied value.
+   */
+  private static final int MAX_LOGGED_ERROR_CODE = 64;
+
+  /**
+   * Hop limit for the root-cause walk, so a self-referential or pathologically deep cause chain
+   * cannot spin the request thread.
+   */
+  private static final int MAX_CAUSE_DEPTH = 16;
+
   private final MeterRegistry meterRegistry;
 
   /**
@@ -90,8 +114,8 @@ public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHa
   }
 
   /**
-   * Counts the failed login under its mapped {@code reason}, then delegates to the default
-   * redirect-to-failure-URL behaviour.
+   * Counts the failed login under its mapped {@code reason}, logs it once at the level that bucket
+   * warrants, then delegates to the default redirect-to-failure-URL behaviour.
    *
    * @param request the current HTTP request
    * @param response the HTTP response to redirect
@@ -105,15 +129,109 @@ public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHa
       @NotNull HttpServletResponse response,
       @NotNull AuthenticationException exception)
       throws IOException, ServletException {
+    String reason = reasonFor(exception);
     meterRegistry
         .counter(
             MetricNames.LOGIN,
             MetricNames.TAG_OUTCOME,
             MetricNames.OUTCOME_FAILURE,
             MetricNames.TAG_REASON,
-            reasonFor(exception))
+            reason)
         .increment();
+    logFailure(reason, exception);
     super.onAuthenticationFailure(request, response, exception);
+  }
+
+  /**
+   * Writes the single log line for this failure: WARN for {@link
+   * MetricNames#LOGIN_REASON_PROVIDER_ERROR} (the bucket {@code FrontendLoginBroken} fires on — a
+   * failed code-to-token exchange, a JWKS/IdP fault, an explicit refusal), DEBUG for {@link
+   * MetricNames#LOGIN_REASON_INVALID_STATE} and {@link MetricNames#LOGIN_REASON_OTHER}. The benign
+   * buckets are attacker- and scanner-driven by construction — every bare hit on {@code
+   * /login/oauth2/code/*} and every {@code prompt=none} probe without a Keycloak SSO cookie lands
+   * there — so anything above DEBUG would be a log-flood vector (REQ-OBS-001).
+   *
+   * <p><b>Abuse envelope of the WARN.</b> {@code provider_error} is not purely operator-triggered:
+   * {@code access_denied} is deliberately mapped into it (see {@link #isStateError(String)}), and
+   * that code is <em>mintable</em> by anyone with a browser through a two-request loop — start an
+   * authorization request, then replay the callback with {@code error=access_denied} and the
+   * matching {@code state}. A determined caller can therefore drive this WARN at request rate. That
+   * is accepted rather than fixed here for one reason: it is the <em>same</em> envelope the
+   * existing {@code basetool_login_total{reason="provider_error"}} counter and the {@code
+   * FrontendLoginBroken} alert already carry, so the log line adds no new exposure — it only makes
+   * an alert that already fires on this traffic explainable. A reader triaging a WARN burst must
+   * know that a flood of them with {@code oauth2ErrorCode=access_denied} is consistent with abuse
+   * and not, by itself, evidence that login is broken. If that envelope is ever tightened, tighten
+   * the metric and the alert with it, not just this line.
+   *
+   * <p>Deliberately absent from the message: {@code OAuth2Error.getDescription()}
+   * (provider-supplied free text and therefore a log-injection surface — it never reaches a logger,
+   * sanitised or not), the {@code code} and {@code state} request parameters, any token, and the
+   * principal. The only two payload fields are the length-capped, control-character-stripped OAuth2
+   * error code and the root cause's class simple name, which is what tells a TLS/DNS/connect fault
+   * apart from a real {@code invalid_grant}.
+   *
+   * @param reason the bucket {@link #reasonFor(AuthenticationException)} mapped this failure to
+   * @param exception the authentication failure being reported
+   */
+  private static void logFailure(
+      @NotNull String reason, @NotNull AuthenticationException exception) {
+    String errorCode = errorCodeOf(exception);
+    String rootCause = rootCauseType(exception);
+    if (MetricNames.LOGIN_REASON_PROVIDER_ERROR.equals(reason)) {
+      log.warn(
+          "OAuth2 login failed: reason={}, oauth2ErrorCode={}, rootCause={}",
+          reason,
+          errorCode,
+          rootCause);
+      return;
+    }
+    log.debug(
+        "OAuth2 login failed: reason={}, oauth2ErrorCode={}, rootCause={}",
+        reason,
+        errorCode,
+        rootCause);
+  }
+
+  /**
+   * Renders the OAuth2 error code of the failure for the log line, or {@link LogSafe#NONE} when the
+   * failure is not an {@link OAuth2AuthenticationException} or carries no {@link
+   * org.springframework.security.oauth2.core.OAuth2Error}. Never touches the error description.
+   *
+   * @param exception the authentication failure being reported
+   * @return the sanitised, length-capped error code, or {@code none}
+   */
+  @NotNull
+  private static String errorCodeOf(@NotNull AuthenticationException exception) {
+    if (exception instanceof OAuth2AuthenticationException oauth2 && oauth2.getError() != null) {
+      return LogSafe.text(oauth2.getError().getErrorCode(), MAX_LOGGED_ERROR_CODE);
+    }
+    return LogSafe.NONE;
+  }
+
+  /**
+   * Walks the cause chain to its end and returns that throwable's class simple name — the field
+   * that separates "Keycloak answered with an error" from "we never reached Keycloak" (a {@code
+   * ConnectException} / {@code SSLHandshakeException} / {@code PrematureCloseException} at the
+   * bottom of the chain). The walk is hop-bounded and stops on a self-reference, so a cyclic chain
+   * cannot hang the request thread. Only the type name is used; the message is never logged,
+   * because it can carry the provider's free-text description.
+   *
+   * @param exception the authentication failure being reported
+   * @return the simple class name of the deepest cause, or of {@code exception} itself when it has
+   *     none
+   */
+  @NotNull
+  private static String rootCauseType(@NotNull Throwable exception) {
+    Throwable current = exception;
+    for (int hop = 0; hop < MAX_CAUSE_DEPTH; hop++) {
+      Throwable cause = current.getCause();
+      if (cause == null || cause == current) {
+        break;
+      }
+      current = cause;
+    }
+    return current.getClass().getSimpleName();
   }
 
   /**

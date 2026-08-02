@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerUexCompanyRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
+import de.greluc.krt.profit.basetool.backend.support.LogSafe;
 import de.greluc.krt.profit.basetool.backend.support.UexValues;
 import java.time.Instant;
 import java.util.HashSet;
@@ -72,6 +73,13 @@ import org.springframework.util.StringUtils;
 @Transactional(readOnly = true)
 public class UexVehicleService {
 
+  /**
+   * Cap for the upstream-supplied vehicle name in log lines. UEX is a third party we do not
+   * control, so the value is untrusted free text and goes through {@link LogSafe} first; 64
+   * characters comfortably fit any real ship name.
+   */
+  private static final int MAX_NAME_LOG_LENGTH = 64;
+
   private final UexClient uexClient;
   private final ShipTypeRepository shipTypeRepository;
   private final ManufacturerRepository manufacturerRepository;
@@ -81,7 +89,14 @@ public class UexVehicleService {
   @Transactional
   public void syncVehicles() {
     log.info("Starting synchronization of UEX vehicles (ships)...");
-    List<UexVehicleDto> vehicles = uexClient.getVehicles();
+    UexClient.FetchResult<UexVehicleDto> fetched = uexClient.getVehicles();
+    if (fetched.notModified()) {
+      // Catalogue byte-identical to the last run: nothing to upsert, and the orphan sweep below is
+      // skipped with it — every ship_type it would tombstone is still in the (unchanged) feed.
+      log.info("UEX vehicle catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexVehicleDto> vehicles = fetched.data();
     if (vehicles.isEmpty()) {
       log.warn("No vehicles received from UEX API. Aborting synchronization.");
       return;
@@ -101,7 +116,11 @@ public class UexVehicleService {
           updated++;
         }
       } catch (Exception e) {
-        log.error("Failed to process UEX vehicle dto: {}", dto, e);
+        log.error(
+            "Failed to process UEX vehicle dto (id={}, name='{}')",
+            dto.id(),
+            LogSafe.text(dto.name(), MAX_NAME_LOG_LENGTH),
+            e);
         skipped++;
       }
     }
@@ -129,7 +148,7 @@ public class UexVehicleService {
    */
   private boolean upsertVehicle(UexVehicleDto dto, Instant now, Set<Integer> seenUexVehicleIds) {
     if (!StringUtils.hasText(dto.name())) {
-      log.debug("Skipping UEX vehicle with missing name: {}", dto);
+      log.debug("Skipping UEX vehicle with missing name (id={}, uuid={})", dto.id(), dto.uuid());
       return false;
     }
 

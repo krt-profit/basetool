@@ -11,10 +11,15 @@
 // app=backend/frontend/ingest; ADDITIONALLY the same three apps' raw container stdout/stderr is now
 // shipped under the DISTINCT app=<svc>-stdout labels and masked HERE (ADR-0095) — this captures the
 // JVM/glibc native errors (pthread_create failed / unable to create native thread, hs_err preamble)
-// that bypass logback and so never reach the JSON file. The Keycloak file log is masked HERE
-// (username= / ipAddress=); NPM access/error, host auth.log and the host security logs (auditd
-// file-integrity, fail2ban bans) are ingested WITH client IPs/usernames (the deliberate, owner-approved
-// 31-day retention). Stream labels stay low-cardinality: app (+ level for the JSON apps).
+// that bypass logback and so never reach the JSON file. Keycloak is shipped TWICE for the same
+// reason: its file log under app=keycloak (masked HERE: username= / ipAddress=) and its container
+// console under app=keycloak-stdout (masked HERE too — the console emits the same username= /
+// ipAddress= fields, plus the OOM-kill preamble and pthread_create EAGAIN lines that are written by
+// the JVM/kernel OUTSIDE Keycloak's own log handler and therefore never reach the file).
+// NPM access/error, host auth.log and the host security logs (auditd file-integrity, fail2ban bans)
+// are ingested WITH client IPs/usernames (the deliberate, owner-approved 31-day retention). The four
+// ops-automation script logs (app=ops-deploy / ops-backup / ops-cleanup / ops-restore-drill) are
+// operator-facing and masked HERE. Stream labels stay low-cardinality: app (+ level for the JSON apps).
 
 logging {
 	level  = "info"
@@ -182,6 +187,103 @@ loki.source.file "host_fail2ban" {
 	forward_to = [loki.write.default.receiver]
 }
 
+// --- Ops-automation script logs (deploy / backup / cleanup / restore-drill) -------------------
+// The four systemd units (scripts/iri-*.service) redirect BOTH stdout and stderr with
+// `StandardOutput=append:/var/log/iri-*.log` / `StandardError=append:...`. `append:` REPLACES
+// journald for those streams — it does not tee to it — so `journalctl -u iri-deploy.service` shows
+// only systemd's own unit lifecycle records (Starting / Succeeded / Failed) and NOT a single line
+// the script printed. Before these tails, the only record of WHY a 03:40 DeployRolledBack fired
+// (health-gate timeout vs cosign signature rejection vs "no previous digest pin to roll back to" vs
+// the rollback itself failing) lived in a host file reachable only through an approval-gated SSH
+// session — the alert named the outcome and nothing else. Shipping them makes the deploy narrative
+// queryable in Grafana at 03:41 (`{app="ops-deploy"}`), which is where the ops-automation alert
+// annotations now point.
+//
+// No new mount is needed: /var/log is already mounted read-only at /hostlog (docker-compose.
+// monitoring.yml), and the files are 0640 deploy:adm, which Alloy's supplementary `adm` group
+// (GID 4, `group_add`) already reads. logrotate rotates them with `copytruncate` (the unit holds
+// the fd open across the rotation), so the inode survives and the tailer resumes after the
+// truncate instead of needing a re-open — no gap, no duplicate replay.
+//
+// Retention/privacy: these are operator-facing operational logs with no end-user identity, so they
+// inherit the global 744h retention and carry NO REQ-OBS-010 IP-retention impact. The mask below is
+// defense-in-depth (REQ-OBS-004), not a precondition.
+local.file_match "ops_deploy" {
+	path_targets = [{__path__ = "/hostlog/iri-deploy.log", app = "ops-deploy"}]
+}
+
+loki.source.file "ops_deploy" {
+	targets    = local.file_match.ops_deploy.targets
+	forward_to = [loki.process.ops_automation_mask.receiver]
+}
+
+local.file_match "ops_backup" {
+	path_targets = [{__path__ = "/hostlog/iri-backup.log", app = "ops-backup"}]
+}
+
+loki.source.file "ops_backup" {
+	targets    = local.file_match.ops_backup.targets
+	forward_to = [loki.process.ops_automation_mask.receiver]
+}
+
+// The unit and its log file are named iri-docker-cleanup; the stream label is shortened to
+// ops-cleanup to keep the app label set short and symmetric with its three siblings.
+local.file_match "ops_cleanup" {
+	path_targets = [{__path__ = "/hostlog/iri-docker-cleanup.log", app = "ops-cleanup"}]
+}
+
+loki.source.file "ops_cleanup" {
+	targets    = local.file_match.ops_cleanup.targets
+	forward_to = [loki.process.ops_automation_mask.receiver]
+}
+
+local.file_match "ops_restore_drill" {
+	path_targets = [{__path__ = "/hostlog/iri-restore-drill.log", app = "ops-restore-drill"}]
+}
+
+loki.source.file "ops_restore_drill" {
+	targets    = local.file_match.ops_restore_drill.targets
+	forward_to = [loki.process.ops_automation_mask.receiver]
+}
+
+// Shipper-side masking for the four ops-automation streams. The first three stages are exactly the
+// <svc>-stdout replaces of loki.process.container_mask below (JWT / e-mail / bearer-token keyword):
+// these scripts drive docker, restic and cosign, whose error output can echo a registry token, a
+// repository URL with an embedded credential, or an operator address verbatim, and nothing masks
+// them at the source — a shell script has no PiiMaskingPatternLayout. RE2 patterns (no possessive
+// groups). Note a known, accepted cosmetic side effect of reusing the token-keyword stage verbatim:
+// deploy.sh's WARN about an unparseable expiry sidecar names `/etc/iri/ghcr-pull-token.expiry`, and
+// the keyword stage masks the `.expiry` suffix as if it were a token value. The message still
+// identifies the file; over-masking a filename is the right trade against under-masking a token.
+loki.process "ops_automation_mask" {
+	forward_to = [loki.write.default.receiver]
+
+	stage.replace {
+		expression = "(eyJ[a-zA-Z0-9_-]{5,}\\.eyJ[a-zA-Z0-9_-]{5,}\\.[a-zA-Z0-9_-]{5,})"
+		replace    = "JWT_***"
+	}
+
+	stage.replace {
+		expression = "([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})"
+		replace    = "***"
+	}
+
+	stage.replace {
+		expression = "(?i)(bearer\\s+|token\\s*[:=]?\\s*|session[-_]?id\\s*[:=]?\\s*|authorization\\s*[:=]?\\s*(?:bearer\\s+)?)([a-zA-Z0-9\\-_.+/=]+)"
+		replace    = "${1}***"
+	}
+
+	// deploy.sh logs `logging in to <registry> as <GHCR_USERNAME>` (deploy.sh:881) on EVERY tick, so
+	// the GHCR account name would otherwise be written into Loki several hundred times a day — a real
+	// account name, which REQ-OBS-004 forbids logging. Anchored on that exact sentence so an image
+	// reference or a digest that merely contains " as " is left untouched; the registry host stays
+	// visible because it is the operationally useful half of the line.
+	stage.replace {
+		expression = "(logging in to \\S+ as )(\\S+)"
+		replace    = "${1}***"
+	}
+}
+
 // --- Container logs via the GET-only docker-socket-proxy -------------------------------------
 // Selected by the compose service label so it is independent of the project-prefixed container name.
 discovery.docker "containers" {
@@ -205,9 +307,16 @@ discovery.relabel "containers" {
 	// prod, and that evidence otherwise lived only in host docker-json logs (lost after 5x10MB rotation,
 	// SSH-only). The regex is fully anchored, so `redis` never matches `redis-exporter` and the exact
 	// `backend` alternative never matches `db-backend` / `postgres-exporter-backend`.
+	// `keycloak` is kept for the SAME reason as the three app services (owner-approved 2026-08-02):
+	// Keycloak runs `--log=console,file`, so its own handler writes both, but the failures that kill
+	// the container are emitted by the JVM and the kernel OUTSIDE that handler — the OOM-kill preamble
+	// and `pthread_create failed (EAGAIN)` reach the container's stderr and NOTHING else. Those lines
+	// existed only in the host json-file driver (5x10MB, SSH-only) and were unreachable from Loki. Note
+	// that the alternative is exactly `keycloak`: anchored, it matches neither `keycloak-dev` nor
+	// `db-keycloak` / `postgres-exporter-keycloak`, which keep their existing streams.
 	rule {
 		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
-		regex         = "backend|frontend|ingest|npm|redis|db-backend|db-keycloak|prometheus|grafana|loki|tempo|alloy|alertmanager|node-exporter|cadvisor|socket-proxy|postgres-exporter-backend|postgres-exporter-keycloak|redis-exporter|blackbox-exporter"
+		regex         = "backend|frontend|ingest|keycloak|npm|redis|db-backend|db-keycloak|prometheus|grafana|loki|tempo|alloy|alertmanager|node-exporter|cadvisor|socket-proxy|postgres-exporter-backend|postgres-exporter-keycloak|redis-exporter|blackbox-exporter"
 		action        = "keep"
 	}
 	// (#1041 item 24) Map every monitoring-plane service to a bounded `mon-<service>` app label.
@@ -246,6 +355,19 @@ discovery.relabel "containers" {
 		regex         = "(backend|frontend|ingest)"
 		target_label  = "app"
 		replacement   = "$1-stdout"
+	}
+	// Keycloak's container console -> app=keycloak-stdout, deliberately DISTINCT from the app=keycloak
+	// FILE stream so KeycloakErrorRateHigh ({app="keycloak"}, the fail-open Discord-SPI detector) keeps
+	// counting each ERROR exactly once instead of double-counting the console copy of the same line.
+	// This label was already referenced in docker-compose.yml's KC_LOG_LEVEL comment while no producer
+	// existed for it; the keep rule above and this mapping are what make it real. Kept as its own rule
+	// rather than folded into the (backend|frontend|ingest) alternation because Keycloak needs the
+	// username= / ipAddress= masking that the three app streams do not (see container_mask below).
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		regex         = "keycloak"
+		target_label  = "app"
+		replacement   = "keycloak-stdout"
 	}
 }
 
@@ -311,8 +433,10 @@ loki.process "container_mask" {
 	// default-uncaught-handler stack trace — bypasses it). Mirror the source-side PiiMasker (JWT / e-mail
 	// / bearer-token keyword) here as defense-in-depth so this reversal of the file-only decision cannot
 	// leak a token or address the source masker would have caught. RE2 patterns (no possessive groups).
+	// keycloak-stdout is included: it is an identity provider, so a token or an address on its console
+	// is likelier here than anywhere else, and its console has no source-side masker at all.
 	stage.match {
-		selector = "{app=~\"(backend|frontend|ingest)-stdout\"}"
+		selector = "{app=~\"(backend|frontend|ingest|keycloak)-stdout\"}"
 
 		stage.replace {
 			expression = "(eyJ[a-zA-Z0-9_-]{5,}\\.eyJ[a-zA-Z0-9_-]{5,}\\.[a-zA-Z0-9_-]{5,})"
@@ -326,6 +450,25 @@ loki.process "container_mask" {
 
 		stage.replace {
 			expression = "(?i)(bearer\\s+|token\\s*[:=]?\\s*|session[-_]?id\\s*[:=]?\\s*|authorization\\s*[:=]?\\s*(?:bearer\\s+)?)([a-zA-Z0-9\\-_.+/=]+)"
+			replace    = "${1}***"
+		}
+	}
+
+	// Keycloak's console handler emits the SAME structured fields as its file handler (it runs
+	// `--log=console,file`), so the console copy carries `username=` and `ipAddress=` exactly like the
+	// file log — which loki.process.keycloak_mask scrubs above. Without this block, adding the stdout
+	// stream would have re-introduced through the back door the very PII the file mask was written to
+	// remove. Patterns are byte-identical to keycloak_mask so the two Keycloak streams read the same.
+	stage.match {
+		selector = "{app=\"keycloak-stdout\"}"
+
+		stage.replace {
+			expression = "(username=)(\\S+)"
+			replace    = "${1}***"
+		}
+
+		stage.replace {
+			expression = "(ipAddress=)(\\S+)"
 			replace    = "${1}***"
 		}
 	}

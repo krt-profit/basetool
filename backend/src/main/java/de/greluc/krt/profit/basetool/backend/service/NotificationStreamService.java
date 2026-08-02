@@ -135,6 +135,15 @@ public class NotificationStreamService {
     // remapping.
     // They were already polled out, so that remove() is a harmless no-op.
     for (SseEmitter old : evicted) {
+      // The eviction is otherwise invisible: basetool_sse_connections stays flat PRECISELY because
+      // the cap holds, so a user whose tabs keep knocking each other off the push channel produced
+      // no signal at all. Count every retirement (untagged — the recipient sub must never become a
+      // label) and leave the sub in a DEBUG line for the "one of my tabs stopped updating" report.
+      meterRegistry.counter(MetricNames.SSE_EMITTERS_EVICTED).increment();
+      log.debug(
+          "Evicting oldest SSE emitter for recipient {}: per-recipient cap {} reached",
+          recipientSub,
+          MAX_EMITTERS_PER_SUB);
       retireReplaced(old);
     }
     emitter.onCompletion(() -> remove(recipientSub, emitter));
@@ -155,7 +164,7 @@ public class NotificationStreamService {
     try {
       emitter.send(SseEmitter.event().name("connected").data("ok"));
     } catch (IOException | RuntimeException e) {
-      recordSendFailure(MetricNames.SSE_EVENT_CONNECTED);
+      recordSendFailure(MetricNames.SSE_EVENT_CONNECTED, recipientSub, e);
       remove(recipientSub, emitter);
     }
     return emitter;
@@ -177,7 +186,7 @@ public class NotificationStreamService {
         try {
           emitter.send(SseEmitter.event().name("notification").data("new"));
         } catch (IOException | RuntimeException e) {
-          recordSendFailure(MetricNames.SSE_EVENT_NOTIFICATION);
+          recordSendFailure(MetricNames.SSE_EVENT_NOTIFICATION, recipientSub, e);
           remove(recipientSub, emitter);
         }
       }
@@ -203,7 +212,7 @@ public class NotificationStreamService {
                   try {
                     emitter.send(SseEmitter.event().name("heartbeat").data("ok"));
                   } catch (IOException | RuntimeException e) {
-                    recordSendFailure(MetricNames.SSE_EVENT_HEARTBEAT);
+                    recordSendFailure(MetricNames.SSE_EVENT_HEARTBEAT, recipientSub, e);
                     remove(recipientSub, emitter);
                   }
                 }));
@@ -222,14 +231,58 @@ public class NotificationStreamService {
   }
 
   /**
-   * Bumps {@code basetool_sse_send_failures_total} for a push that failed on the named SSE event,
-   * just before the dead emitter is dropped. The {@code event} tag is a fixed literal ({@code
-   * connected} / {@code notification} / {@code heartbeat}) — never recipient data.
+   * Bumps {@code basetool_sse_send_failures_total} for a push that failed on the named SSE event
+   * and leaves the throwable in a DEBUG line, just before the dead emitter is dropped. The {@code
+   * event} tag is a fixed literal ({@code connected} / {@code notification} / {@code heartbeat})
+   * and the {@code cause} tag is the bounded three-value shape from {@link #causeTag}; neither ever
+   * carries recipient data.
+   *
+   * <p>DEBUG and not higher on purpose: a broken pipe here is the normal outcome of closing a
+   * browser tab, so every level above DEBUG is a client-triggerable log flood (REQ-OBS-001). The
+   * recipient {@code sub} is the one identifier that may be logged (REQ-OBS-004) and is what makes
+   * a "my notifications stopped" report answerable.
    *
    * @param event the SSE event name whose send failed
+   * @param recipientSub the {@code sub} of the recipient whose emitter died
+   * @param cause the exception the emitter write threw — logged, not swallowed
    */
-  private void recordSendFailure(@NotNull String event) {
-    meterRegistry.counter(MetricNames.SSE_SEND_FAILURES, MetricNames.TAG_EVENT, event).increment();
+  private void recordSendFailure(
+      @NotNull String event, @NotNull UUID recipientSub, @NotNull Throwable cause) {
+    meterRegistry
+        .counter(
+            MetricNames.SSE_SEND_FAILURES,
+            MetricNames.TAG_EVENT,
+            event,
+            MetricNames.TAG_CAUSE,
+            causeTag(cause))
+        .increment();
+    log.debug(
+        "Dropping SSE emitter of recipient {} after a failed '{}' push",
+        recipientSub,
+        event,
+        cause);
+  }
+
+  /**
+   * Maps a failed emitter write onto the bounded {@code cause} tag vocabulary: an {@link
+   * IOException} is the benign client hang-up, an {@link IllegalStateException} means the emitter
+   * had already completed (a registry lifecycle race, not a dead client), anything else is {@code
+   * other}. Derived from the exception TYPE only — a message or class name would be an unbounded
+   * label (REQ-OBS-006).
+   *
+   * @param cause the exception the emitter write threw
+   * @return {@link MetricNames#CAUSE_IO}, {@link MetricNames#CAUSE_ILLEGAL_STATE} or {@link
+   *     MetricNames#CAUSE_OTHER}
+   */
+  @NotNull
+  private static String causeTag(@NotNull Throwable cause) {
+    if (cause instanceof IOException) {
+      return MetricNames.CAUSE_IO;
+    }
+    if (cause instanceof IllegalStateException) {
+      return MetricNames.CAUSE_ILLEGAL_STATE;
+    }
+    return MetricNames.CAUSE_OTHER;
   }
 
   /**

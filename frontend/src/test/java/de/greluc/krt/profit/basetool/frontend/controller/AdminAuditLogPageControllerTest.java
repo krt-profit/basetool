@@ -58,6 +58,22 @@ import tools.jackson.databind.json.JsonMapper;
 @SuppressWarnings("unchecked")
 class AdminAuditLogPageControllerTest {
 
+  /**
+   * The nine non-bank area tabs, mirroring the controller's private domain list. Every generic
+   * audit event type the backend can emit must be offered by one of these tabs.
+   */
+  private static final List<String> GENERIC_DOMAINS =
+      List.of(
+          "INVENTORY",
+          "JOB_ORDER",
+          "REFINERY",
+          "PERSONAL_INVENTORY",
+          "MISSION",
+          "OPERATION",
+          "ROLE",
+          "PROMOTION",
+          "MARKET");
+
   private BackendApiClient backendApiClient;
   private AdminAuditLogPageController controller;
 
@@ -168,6 +184,31 @@ class AdminAuditLogPageControllerTest {
     assertTrue(eventTypes.contains("PROMOTION_EVALUATION_CREATED"));
   }
 
+  // The Rollen area audits every role/permission mutation (REQ-AUDIT-001). The role-permission-set
+  // change must be selectable in that tab's filter and carry a label, or it renders as a raw key.
+  @Test
+  void roleTab_offersRolePermissionsChangedFilterWithLabel() throws Exception {
+    // Given
+    Model model = new ConcurrentModel();
+    when(backendApiClient.get(any(String.class), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+
+    // When
+    controller.auditLog("ROLE", null, null, null, null, 0, null, model);
+
+    // Then
+    List<String> eventTypes = (List<String>) model.getAttribute("eventTypes");
+    assertNotNull(eventTypes);
+    assertTrue(
+        eventTypes.contains("ROLE_PERMISSIONS_CHANGED"),
+        "ROLE audit filter list is missing ROLE_PERMISSIONS_CHANGED");
+    assertEquals("admin.audit.event.", model.getAttribute("eventKeyPrefix"));
+    Properties labels = loadDefaultBundle();
+    assertTrue(
+        labels.containsKey("admin.audit.event.ROLE_PERMISSIONS_CHANGED"),
+        "Missing i18n label admin.audit.event.ROLE_PERMISSIONS_CHANGED");
+  }
+
   @Test
   void unknownDomain_fallsBackToBankTab() {
     // Given
@@ -227,6 +268,40 @@ class AdminAuditLogPageControllerTest {
     }
   }
 
+  // The same guard for the nine generic areas: a type the backend can emit but that no area tab
+  // offers is invisible in the viewer's filter, and one without a label renders as a raw key. This
+  // is the defect M8 hit when ROLE_PERMISSIONS_CHANGED was added to the Rollen area.
+  @Test
+  void everyProducedGenericAuditEventType_isFilterableAndLabelled() throws Exception {
+    // Given: the produced set (from openapi) and the union of the nine area filter lists
+    Set<String> produced = genericAuditEventTypesFromOpenApi();
+    assertTrue(
+        produced.contains("MEMBERSHIP_GRANTED"),
+        "sanity: openapi should list the ROLE-domain MEMBERSHIP_GRANTED");
+
+    when(backendApiClient.get(any(String.class), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    Set<String> filterable = new HashSet<>();
+    for (String domain : GENERIC_DOMAINS) {
+      Model model = new ConcurrentModel();
+      controller.auditLog(domain, null, null, null, null, 0, null, model);
+      List<String> types = (List<String>) model.getAttribute("eventTypes");
+      assertNotNull(types, "no event-type list for domain " + domain);
+      filterable.addAll(types);
+    }
+    Properties labels = loadDefaultBundle();
+
+    // Then: each produced type is offered by some area tab and carries a label
+    for (String type : produced) {
+      assertTrue(
+          filterable.contains(type),
+          "No area tab (AdminAuditLogPageController) offers produced event type " + type);
+      assertTrue(
+          labels.containsKey("admin.audit.event." + type),
+          "Missing i18n label admin.audit.event." + type);
+    }
+  }
+
   /**
    * The bank audit event types the backend can emit, read from the {@code BankAuditEventDto
    * .eventType} enum in the committed openapi document — the cross-module contract between the
@@ -236,6 +311,32 @@ class AdminAuditLogPageControllerTest {
    * @throws Exception when the spec cannot be located or parsed
    */
   private static Set<String> bankAuditEventTypesFromOpenApi() throws Exception {
+    return auditEventTypesFromOpenApi("BankAuditEventDto");
+  }
+
+  /**
+   * The generic-area audit event types the backend can emit, read from the {@code
+   * AuditEventDto.eventType} enum in the committed openapi document. Covers all nine non-bank
+   * domains at once — the document does not say which domain a type belongs to, so the assertion
+   * above checks membership in the union of the nine per-tab lists.
+   *
+   * @return the produced generic audit event-type names
+   * @throws Exception when the spec cannot be located or parsed
+   */
+  private static Set<String> genericAuditEventTypesFromOpenApi() throws Exception {
+    return auditEventTypesFromOpenApi("AuditEventDto");
+  }
+
+  /**
+   * Reads the {@code eventType} enum of one audit DTO schema out of the committed openapi document,
+   * walking up from the working directory until {@code backend/src/main/resources/api/openapi.json}
+   * is found (the test runs from the module directory, the spec lives in the sibling module).
+   *
+   * @param schema the openapi schema name, {@code BankAuditEventDto} or {@code AuditEventDto}
+   * @return the enum constant names declared for that schema's {@code eventType}
+   * @throws Exception when the spec cannot be located or parsed
+   */
+  private static Set<String> auditEventTypesFromOpenApi(String schema) throws Exception {
     Path relative = Paths.get("backend", "src", "main", "resources", "api", "openapi.json");
     Path spec = null;
     for (Path dir = Paths.get("").toAbsolutePath(); dir != null; dir = dir.getParent()) {
@@ -250,13 +351,13 @@ class AdminAuditLogPageControllerTest {
     JsonNode enumNode =
         root.path("components")
             .path("schemas")
-            .path("BankAuditEventDto")
+            .path(schema)
             .path("properties")
             .path("eventType")
             .path("enum");
     assertTrue(
         enumNode.isArray() && !enumNode.isEmpty(),
-        "BankAuditEventDto.eventType enum not found in openapi.json");
+        schema + ".eventType enum not found in openapi.json");
     Set<String> types = new HashSet<>();
     for (JsonNode value : enumNode) {
       types.add(value.asString());

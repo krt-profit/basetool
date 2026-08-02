@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.ingest.config;
 
+import de.greluc.krt.profit.basetool.ingest.logging.WebClientLoggingFilter;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
@@ -76,10 +77,13 @@ public class WebClientConfig {
    */
   private final io.micrometer.observation.ObservationRegistry observationRegistry;
 
+  /** Emits the one-line-per-relay outbound access log with its elapsed time (REQ-OBS-001). */
+  private final WebClientLoggingFilter webClientLoggingFilter;
+
   /**
    * The backend-facing {@link WebClient}: a 5&nbsp;s connect timeout, 15&nbsp;s read/write/response
-   * timeouts, profile-gated TLS trust, and a response decoder capped at the configured max payload
-   * size so a hostile or buggy backend response cannot exhaust heap.
+   * timeouts, profile-gated TLS trust, the outbound call log, and a response decoder capped at the
+   * configured max payload size so a hostile or buggy backend response cannot exhaust heap.
    *
    * @return a {@link WebClient} bound to the configured backend base URL
    */
@@ -90,6 +94,7 @@ public class WebClientConfig {
         .baseUrl(ingestProperties.getBackendBaseUrl())
         .clientConnector(new ReactorClientHttpConnector(buildHttpClient()))
         .observationRegistry(observationRegistry)
+        .filter(webClientLoggingFilter.callLogging())
         .codecs(codecs -> codecs.defaultCodecs().maxInMemorySize(maxInMemory))
         .build();
   }

@@ -157,7 +157,11 @@ public class ScWikiVehicleSyncService {
     }
 
     ScWikiOrphanSweep.sweepDeletedOrphans(
-        seen, s -> shipTypeRepository.markScwikiDeletedExcept(s, now), log, "ship_type");
+        seen,
+        result.complete(),
+        s -> shipTypeRepository.markScwikiDeletedExcept(s, now),
+        log,
+        "ship_type");
     syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
     log.info(
         "Finished SC Wiki vehicle sync: {} linked, {} created WIKI_ONLY.", linked, createdWikiOnly);

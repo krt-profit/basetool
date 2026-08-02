@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -60,6 +61,7 @@ import tools.jackson.databind.ObjectMapper;
  * bucket map is bounded ({@link RateLimitBuckets#boundedLru(int)}) so a flood of distinct IPs
  * cannot grow it without limit (security audit INGEST-RATELIMIT-1).
  */
+@Slf4j
 @Component
 @Order(RateLimitingFilter.ORDER)
 @RequiredArgsConstructor
@@ -97,6 +99,17 @@ public class RateLimitingFilter extends OncePerRequestFilter {
           .increment();
       long retryAfterSeconds =
           Math.max(1, TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()));
+      // DEBUG, not WARN: this is the pre-auth front line on the only internet-facing surface, so an
+      // attacker decides how often it fires and an INFO/WARN here would be a log-flood vector (the
+      // same reasoning as BotProtectionFilter). The bounded `bucket="ip"` counter is the prod
+      // signal; on a 429 without the SubjectRateLimiter WARN, this limiter is the one that
+      // rejected. The client IP is deliberately not logged — app logs stay PII-free (REQ-OBS-004),
+      // and the edge log carries the address.
+      log.debug(
+          "Per-IP ingest rate limit exceeded (capacity={} per {}, retryAfter={}s)",
+          properties.getCapacity(),
+          properties.getRefillPeriod(),
+          retryAfterSeconds);
       response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds));
       ProblemResponseWriter.write(
           response,

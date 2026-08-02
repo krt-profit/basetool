@@ -1,16 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
+    <!--
+      Logback's own failures (a rollover that cannot rename, a full disk, an IO error that makes an
+      appender self-disable) are reported ONLY through the internal status system — never through
+      the appenders, which in that scenario are exactly what is broken. Without a status listener
+      those statuses are collected in memory and surface nowhere, so a dead FILE / ERROR_FILE
+      appender leaves no trace at all, while `logback_events_total` keeps counting: that metric is a
+      TurboFilter on the LOGGER, so it increments for events that were never written. The result is
+      LogbackErrorSpike firing while pointing at errors nobody can read.
+      OnErrorConsoleStatusListener reports WARN/ERROR statuses only (no startup INFO noise) and
+      writes them to System.err — the one sink that still works when the file appenders are dead,
+      and one the `<svc>-stdout` Loki stream already ships (ADR-0095). Keep it as the FIRST child of
+      <configuration> so faults raised while the remaining appenders are being built are reported
+      too.
+    -->
+    <statusListener class="ch.qos.logback.core.status.OnErrorConsoleStatusListener"/>
+
     <include resource="org/springframework/boot/logging/logback/defaults.xml" />
     <property name="LOG_FILE" value="logs/frontend.log"/>
     <property name="LOG_ERROR_FILE" value="logs/frontend-error.log"/>
     <!--
-      MDC-enriched pattern.
+      MDC-enriched pattern. Same three fields, in the same order and the same colours as the
+      backend, so a correlated incident reads identically across both modules.
       - %X{correlationId:-} renders the per-request correlation id set by CorrelationIdFilter.
       - %X{userId:-anonymous} renders the OIDC `sub` of the authenticated user (or "anonymous").
-      These two fields are the single most important addition for production debugging / support.
+      - %X{orgUnitId:-} renders the active OrgUnit context. Empty for anonymous callers and for
+        admins in "all OrgUnits" mode; the bracket stays so the column position is stable for log
+        parsing.
+      These fields are the audit-trail backbone for multi-tenant incident triage.
     -->
-    <property name="LOG_PATTERN_CONSOLE" value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr([%X{correlationId:-}]){magenta} %clr([%X{userId:-anonymous}]){blue} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
-    <property name="LOG_PATTERN_FILE" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [%X{correlationId:-}] [%X{userId:-anonymous}] --- [%t] %-40.40logger{39} : %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
+    <property name="LOG_PATTERN_CONSOLE" value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr([%X{correlationId:-}]){magenta} %clr([%X{userId:-anonymous}]){blue} %clr([%X{orgUnitId:-}]){cyan} %clr([%X{traceId:-},%X{spanId:-}]){faint} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
+    <property name="LOG_PATTERN_FILE" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [%X{correlationId:-}] [%X{userId:-anonymous}] [%X{orgUnitId:-}] [%X{traceId:-},%X{spanId:-}] --- [%t] %-40.40logger{39} : %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
@@ -39,12 +59,12 @@
         </encoder>
     </appender>
 
-    <!-- Dedicated ERROR-only appender for quick incident scans. -->
+    <!--
+      Dedicated ERROR-only appender for quick incident scans. The ERROR threshold filter lives on
+      the ASYNC_ERROR_FILE wrapper below, not here — see the rationale there.
+    -->
     <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_ERROR_FILE}</file>
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>ERROR</level>
-        </filter>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <fileNamePattern>logs/frontend-error.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
             <maxFileSize>20MB</maxFileSize>
@@ -66,16 +86,39 @@
       only matters under extreme sustained load, at which point the calling thread backpressures
       rather than losing audit data. CONSOLE stays synchronous on purpose: stdout is cheap and we
       want the last lines before a JVM crash to flush deterministically.
+
+      maxFlushTime=5000 raises logback's 1s default drain budget on stop(): once it elapses the
+      worker exits and everything still queued is thrown away, so a shutdown triggered by the very
+      failure we want to read about could truncate up to a full queue of already-accepted events.
+      5s is enough to drain a 512-slot queue to disk and stays far below the container's stop grace
+      period (ADR-0072), so it cannot turn a graceful stop into a SIGKILL.
     -->
     <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
         <queueSize>512</queueSize>
         <discardingThreshold>0</discardingThreshold>
+        <maxFlushTime>5000</maxFlushTime>
         <appender-ref ref="FILE" />
     </appender>
 
     <appender name="ASYNC_ERROR_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <!--
+          The ERROR threshold gate sits on the async wrapper rather than on the inner
+          RollingFileAppender. Be precise about what this does and does not buy: with
+          discardingThreshold=0 nothing was ever DROPPED, so no event was lost under either
+          arrangement and the file content is identical. The win is where the gate runs. Logback
+          evaluates an appender's filter chain on the CALLING thread before handing the event to the
+          appender, so a non-ERROR event is now rejected before it is enqueued, instead of being
+          copied into the queue (with its MDC snapshot) only for the worker to discard it at write
+          time. That also stops the 128-slot queue — deliberately sized for ERROR-only volume — from
+          carrying the full INFO stream, where a burst could fill it and backpressure request threads
+          on events that were all going to be thrown away anyway.
+        -->
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>ERROR</level>
+        </filter>
         <queueSize>128</queueSize>
         <discardingThreshold>0</discardingThreshold>
+        <maxFlushTime>5000</maxFlushTime>
         <appender-ref ref="ERROR_FILE" />
     </appender>
 
@@ -97,6 +140,10 @@
             <encoder class="de.greluc.krt.profit.basetool.frontend.logging.PiiMaskingLogstashEncoder">
                 <includeMdcKeyName>correlationId</includeMdcKeyName>
                 <includeMdcKeyName>userId</includeMdcKeyName>
+                <!-- orgUnitId on the structured JSON appender, matching the backend, so log
+                     shippers can index the active OrgUnit context as a first-class field instead of
+                     parsing it out of the message pattern. -->
+                <includeMdcKeyName>orgUnitId</includeMdcKeyName>
                 <!-- REQ-OBS-009 (epic #936 Phase 1b): trace correlation fields for the Grafana
                      logs<->traces links. Meaningful only while tracing is
                      enabled (MONITORING_TRACING_ENABLED=true); while disabled, at most dangling
@@ -111,6 +158,7 @@
         <appender name="ASYNC_JSON_FILE" class="ch.qos.logback.classic.AsyncAppender">
             <queueSize>512</queueSize>
             <discardingThreshold>0</discardingThreshold>
+            <maxFlushTime>5000</maxFlushTime>
             <appender-ref ref="JSON_FILE" />
         </appender>
     </springProfile>

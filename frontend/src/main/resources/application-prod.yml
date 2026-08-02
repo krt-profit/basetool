@@ -75,6 +75,21 @@ management:
       key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD}
       key-store-type: PKCS12
       key-alias: basetool
+  endpoint:
+    # REQ-OBS-016, prod only: the exposure list (application.yml) includes `loggers`, and its POST
+    # variant MUTATES a live log level. On the management port above there is no authentication to
+    # gate that on — every container on net-monitoring-scrape reaches 18091 unauthenticated — and a
+    # ROOT logger flipped to TRACE makes Spring Security / WebClient / Netty write bearer tokens and
+    # request bodies into a Loki stream retained for 744 h. So the write is not merely gated here,
+    # it does not exist: `read-only` keeps GET /actuator/loggers (the whole diagnostic value during
+    # an incident) and leaves the write operation unregistered.
+    # The backend is deliberately the OTHER shape and that asymmetry is intentional: it configures
+    # no management port at all, so its /actuator/loggers rides the ordinary 11261 connector behind
+    # SecurityConfig's filter chain, where the mutator CAN carry an identity check and is gated on
+    # ROLE_ADMIN instead of being removed. Full runtime control stays available in dev/test/e2e,
+    # which set no management port and never load this file.
+    loggers:
+      access: read-only
 
 app:
   backend-url: ${BACKEND_URL:https://backend:11261}

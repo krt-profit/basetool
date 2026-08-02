@@ -195,7 +195,11 @@ public class ScWikiManufacturerSyncService {
     }
 
     ScWikiOrphanSweep.sweepDeletedOrphans(
-        seen, s -> manufacturerRepository.markScwikiDeletedExcept(s, now), log, "manufacturer");
+        seen,
+        result.complete(),
+        s -> manufacturerRepository.markScwikiDeletedExcept(s, now),
+        log,
+        "manufacturer");
     syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
     log.info(
         "Finished SC Wiki manufacturer reconciliation: {} newly linked, {} refreshed, {} conflicts,"

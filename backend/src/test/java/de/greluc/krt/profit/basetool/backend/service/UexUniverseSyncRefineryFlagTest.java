@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.service.UexFetchResults.fetched;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
@@ -122,18 +123,24 @@ class UexUniverseSyncRefineryFlagTest {
 
     when(uexClient.getTerminals())
         .thenReturn(
-            List.of(
-                terminalDto(
-                    244,
-                    "Refinement Processing - MIC-L5",
-                    Terminal.TYPE_REFINERY,
-                    "MIC-L5 Modern Icarus Station",
-                    null,
-                    1),
-                terminalDto(
-                    788, "Refinement Center - Levski", Terminal.TYPE_REFINERY, null, "Levski", 1),
-                terminalDto(
-                    999, "Shop - MIC-L3", "item", "MIC-L3 Endless Odyssey Station", null, 1)));
+            fetched(
+                List.of(
+                    terminalDto(
+                        244,
+                        "Refinement Processing - MIC-L5",
+                        Terminal.TYPE_REFINERY,
+                        "MIC-L5 Modern Icarus Station",
+                        null,
+                        1),
+                    terminalDto(
+                        788,
+                        "Refinement Center - Levski",
+                        Terminal.TYPE_REFINERY,
+                        null,
+                        "Levski",
+                        1),
+                    terminalDto(
+                        999, "Shop - MIC-L3", "item", "MIC-L3 Endless Odyssey Station", null, 1))));
 
     service.syncTerminals();
     service.reconcileRefineryTerminalFlags();
@@ -179,14 +186,15 @@ class UexUniverseSyncRefineryFlagTest {
 
     when(uexClient.getTerminals())
         .thenReturn(
-            List.of(
-                terminalDto(
-                    500,
-                    "Refinement Processing - Retired",
-                    Terminal.TYPE_REFINERY,
-                    "Retired Station",
-                    null,
-                    0)));
+            fetched(
+                List.of(
+                    terminalDto(
+                        500,
+                        "Refinement Processing - Retired",
+                        Terminal.TYPE_REFINERY,
+                        "Retired Station",
+                        null,
+                        0))));
 
     service.syncTerminals();
     service.reconcileRefineryTerminalFlags();

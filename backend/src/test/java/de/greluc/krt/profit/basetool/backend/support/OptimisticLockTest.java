@@ -177,4 +177,62 @@ class OptimisticLockTest {
             () -> OptimisticLock.check(2L, 1L, String.class, null));
     assertTrue(ex.getPersistentClassName().contains("String"), ex.getPersistentClassName());
   }
+
+  /**
+   * The compared version pair travels on the exception message. It is the only field that separates
+   * genuine contention from the REQ-FE-003 failure mode where a fragment never re-echoes the bumped
+   * version, so its exact shape is the contract {@code GlobalExceptionHandler} logs.
+   */
+  @Nested
+  class VersionPairMessage {
+
+    @Test
+    void checkReportsClientAsExpectedAndPersistedAsPersisted() {
+      ObjectOptimisticLockingFailureException ex =
+          assertThrows(
+              ObjectOptimisticLockingFailureException.class,
+              () -> OptimisticLock.check(9L, 4L, String.class, ID));
+      assertEquals("expected=4 persisted=9", ex.getMessage());
+    }
+
+    @Test
+    void checkOptionalClientReportsTheSamePair() {
+      ObjectOptimisticLockingFailureException ex =
+          assertThrows(
+              ObjectOptimisticLockingFailureException.class,
+              () -> OptimisticLock.checkOptionalClient(9L, 4L, String.class, ID));
+      assertEquals("expected=4 persisted=9", ex.getMessage());
+    }
+
+    @Test
+    void checkRequiredReportsAnAbsentPersistedVersionAsNull() {
+      Long persisted = null;
+      ObjectOptimisticLockingFailureException ex =
+          assertThrows(
+              ObjectOptimisticLockingFailureException.class,
+              () -> OptimisticLock.checkRequired(persisted, 5L, String.class, ID));
+      assertEquals("expected=5 persisted=null", ex.getMessage());
+    }
+
+    @Test
+    void omittedClientVersionRendersAsNullRatherThanBeingDropped() {
+      // The "client sent no version at all" case must stay distinguishable from "client sent 0".
+      ObjectOptimisticLockingFailureException ex =
+          assertThrows(
+              ObjectOptimisticLockingFailureException.class,
+              () -> OptimisticLock.check(3L, null, String.class, ID));
+      assertEquals("expected=null persisted=3", ex.getMessage());
+    }
+
+    @Test
+    void entityTypeAndIdentifierSurviveAlongsideTheMessage() {
+      // The message overload must not cost us the two fields the handler also logs.
+      ObjectOptimisticLockingFailureException ex =
+          assertThrows(
+              ObjectOptimisticLockingFailureException.class,
+              () -> OptimisticLock.check(9L, 4L, String.class, ID));
+      assertEquals(ID, ex.getIdentifier());
+      assertTrue(ex.getPersistentClassName().contains("String"), ex.getPersistentClassName());
+    }
+  }
 }

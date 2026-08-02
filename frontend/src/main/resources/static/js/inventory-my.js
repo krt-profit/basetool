@@ -792,6 +792,85 @@ function restoreMyInventoryFilters() {
     return changed;
 }
 
+// ===================== Filter panel collapse (REQ-INV-037) =====================================
+// The filter widgets are a full row above the table and wrap onto lines of their own, which
+// pushes the bulk bar and the table down. The panel collapses out of the flow; the preference is
+// per browser and lives in the SAME localStorage object as the filter values, under a top-level
+// slot. Top-level, not per view, because it describes the page's chrome rather than one view's
+// selection — switching Material <-> Items must not silently re-open a panel the user closed.
+//
+// persistMyInventoryFilters() re-reads the whole object and replaces only its view slot, so the
+// two writers never clobber each other.
+const MY_INVENTORY_FILTER_PANEL_KEY = 'panelCollapsed';
+
+// Number of dimensions currently narrowing the table. Derived from the very snapshot the
+// persistence layer stores, so a filter dimension added there is counted here automatically
+// instead of silently missing from the badge. A multi-select is null in that snapshot when zero
+// OR all of its boxes are ticked — both mean "no filter" on this page — so "all ticked"
+// correctly counts as nothing.
+function countActiveMyInventoryFilters() {
+    const snapshot = snapshotMyInventoryFilters();
+    let active = 0;
+    ['materials', 'gameItems', 'jobOrders', 'missions'].forEach(function (dimension) {
+        if (Array.isArray(snapshot[dimension]) && snapshot[dimension].length > 0) active++;
+    });
+    if (typeof snapshot.minQuality === 'string' && snapshot.minQuality !== '') active++;
+    if (snapshot.personalOnly === true) active++;
+    if (snapshot.nonPersonalOnly === true) active++;
+    return active;
+}
+
+// Re-renders the count chip on the toggle. Called from filterMyInventory, which every filter
+// change — including the reset button — funnels through, so the chip cannot fall behind the
+// widgets.
+function updateMyFilterCountBadge() {
+    const badge = document.getElementById('myFilterCount');
+    if (!badge) return;
+    const active = countActiveMyInventoryFilters();
+    badge.hidden = active === 0;
+    const value = document.getElementById('myFilterCountValue');
+    if (value) value.textContent = String(active);
+    // The bare digit reads out as "Filter 3". The visually-hidden twin spells it out instead,
+    // rather than putting the count into a dynamic aria-label — that would shadow the visible
+    // "Filter" text and break voice control's "click Filter".
+    const label = document.getElementById('myFilterCountLabel');
+    if (!label) return;
+    const template = badge.getAttribute('data-label') || '';
+    label.textContent = active === 0 ? '' : template.replace('{0}', String(active));
+}
+
+function setMyFilterPanelCollapsed(collapsed) {
+    const toggle = document.getElementById('myFilterToggle');
+    const panel = document.getElementById('myFilterPanel');
+    if (!toggle || !panel) return;
+    panel.hidden = collapsed;
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+}
+
+function toggleMyFilterPanel() {
+    const panel = document.getElementById('myFilterPanel');
+    if (!panel) return;
+    const collapsed = !panel.hidden;
+    setMyFilterPanelCollapsed(collapsed);
+    const stored = readMyInventoryFilterPref() || {};
+    stored[MY_INVENTORY_FILTER_PANEL_KEY] = collapsed;
+    writeMyInventoryFilterPref(stored);
+}
+
+// Applies the stored collapse preference on load. With no preference stored yet the panel
+// collapses only when nothing is filtered: opening a narrowed table with its filter row out of
+// sight would leave the user hunting for the reason, which is exactly the trap the count chip
+// exists to close.
+function initMyFilterPanel() {
+    if (!document.getElementById('myFilterToggle')) return;
+    updateMyFilterCountBadge();
+    const stored = readMyInventoryFilterPref();
+    const saved = stored ? stored[MY_INVENTORY_FILTER_PANEL_KEY] : undefined;
+    setMyFilterPanelCollapsed(
+        typeof saved === 'boolean' ? saved : countActiveMyInventoryFilters() === 0,
+    );
+}
+
 function filterMyInventory() {
     // REQ-INV-030: the rebuilt fragment URL is derived from the page's own filter state PLUS the
     // active view, so a filter change, a modal write and a live-sync peer refresh all re-render
@@ -808,6 +887,9 @@ function filterMyInventory() {
     // Persist the current filter selection per browser (REQ-UI-017) — every filter change,
     // including the reset button, funnels through here, so the snapshot is always current.
     persistMyInventoryFilters();
+    // Same funnel, same reason: the count on the (possibly collapsed) toggle must track the
+    // widgets, or a collapsed panel starts hiding an active filter.
+    updateMyFilterCountBadge();
     const itemsView = lagerIsItemsView();
     const activeMaterials = collectMyChecked('matCheck');
     const activeGameItems = collectMyChecked('gameItemCheck');
@@ -992,6 +1074,10 @@ document.addEventListener('DOMContentLoaded', function () {
     if (document.getElementsByClassName('missionCheck').length > 0) {
         updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     }
+    // After the restore, so the count reflects the widgets the user will actually see and the
+    // no-preference default ("collapse only when nothing is filtered") judges the restored state
+    // rather than the bare server-rendered one.
+    initMyFilterPanel();
     if (filtersRestored) filterMyInventory();
 });
 
@@ -2145,6 +2231,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('change', 'inv-my-filter', filterMyInventory);
     window.krtEvents.on('change', 'inv-my-personal-filter', togglePersonalFilter);
     window.krtEvents.on('click', 'inv-my-reset-filter', resetMyInventoryFilter);
+    window.krtEvents.on('click', 'inv-my-toggle-filters', toggleMyFilterPanel);
     window.krtEvents.on('click', 'inv-my-open-bulk', openBulkCheckoutModal);
     window.krtEvents.on('click', 'inv-my-toggle-group', function (el) {
         toggleGroup(el);

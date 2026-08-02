@@ -16,6 +16,20 @@
     <link rel="preload" th:href="@{/fonts/Lato-Regular.woff2}" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" th:href="@{/css/styles.css}">
     <!--
+      Global client-error beacon (audit finding M12). FIRST script in the document and deliberately
+      NOT `defer`: it installs the window `error` + `unhandledrejection` handlers before anything
+      else in this head runs, and a handler installed after the scripts it watches cannot observe
+      their failures. It POSTs a five-field report (message, source, line, column, kind) to the
+      session+CSRF-gated `POST /internal/client-error` on the frontend, rate-limited by a
+      per-session token bucket; the server logs it at DEBUG (raised via /actuator/loggers during a
+      support call) and bumps `basetool_client_error_total{kind}` from a server-side allowlist.
+      Without it a runtime TypeError in a delegated handler — the classic "the button did nothing"
+      after a fragment swap replaced the DOM under it — leaves no trace anywhere on the server.
+      It reads the `_csrf` meta tags directly rather than through `window.krtCsrf`, since it must
+      keep working when the very module that defines that global is what failed to load.
+    -->
+    <script th:src="@{/js/krt-client-error.js}" th:attr="nonce=${cspNonce}"></script>
+    <!--
       Bootstrap stub for `window.krtEvents`. Defines a tiny queuing implementation
       synchronously, BEFORE any external script tag. Every inline `<script>` block on
       every page template can therefore call `window.krtEvents.on(...)` without

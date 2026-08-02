@@ -854,6 +854,59 @@ Ort / Nutzer / OrgUnit-Pool, or the personal marker.
 `InventoryWriteController#bulkRebook`, `templates/inventory-my.html`,
 `static/js/inventory-my.js` · **Issues:** — · **ADR:** ADR-0124
 
+### REQ-INV-037 — The "Mein Lager" filter row collapses, and says so when it hides an active filter
+
+The filter widgets on `/inventory/my` are a full row of multi-selects and checkboxes that wraps
+onto lines of its own, pushing the bulk bar and the table down and leaving the band above the table
+hard to scan. The row therefore lives in a **collapsible panel** below the action bar, toggled by a
+**Filter** button in that bar. Both views (Material and Items) get it; only the active view's form
+exists in the DOM (REQ-INV-030), so one panel serves both.
+
+- **A collapsed panel must never hide the fact that the table is filtered.** The toggle carries a
+  chip with the number of filter dimensions currently narrowing the view, shown whenever that number
+  is greater than zero. Without it the page's worst state is reachable in one click: a short table,
+  no visible reason, and the explanation folded away. The count is derived from the same snapshot
+  REQ-UI-017 persists, so a dimension added there is counted automatically rather than quietly
+  missing from the chip. A multi-select with **all** boxes ticked counts as no filter, matching what
+  that state already means everywhere else on this page.
+- **Rendered expanded, collapsed by script.** The server always emits the panel open; `hidden` is
+  the collapse mechanism and the script applies it on load. A server-rendered collapsed panel would
+  leave a client without JavaScript no way to reach the filters at all — the collapse is a
+  convenience and must degrade to "always visible", never to "unreachable".
+- **First visit collapses only when nothing is filtered.** With no stored preference the panel
+  starts closed on an unfiltered table and open on a filtered one, so a restored filter selection
+  (REQ-UI-017) is never presented as an unexplained short table. Once the user toggles it, their
+  choice wins on every later visit.
+- **The preference is per browser and not per view.** It is stored in the top level of the same
+  `inventory_my_filters` object REQ-UI-017 uses, beside — not inside — the two per-view filter
+  slots, because it describes the page's chrome rather than one view's selection: switching
+  Material ↔ Items must not re-open a panel the user closed. Storage access stays guarded, so a
+  privacy mode that denies it degrades to the default instead of breaking the page.
+- **Accessible by construction.** The toggle is a real `<button>` carrying `aria-expanded` and
+  `aria-controls`, and the chip pairs its digit with a visually-hidden "Aktive Filter: N". The count
+  is *not* pushed into a dynamic `aria-label` on the button — that would shadow the visible "Filter"
+  text and break voice control's "click Filter".
+
+**Acceptance criteria**
+
+- [ ] Both `/inventory/my` and `/inventory/my?view=items` render the toggle, and the filter form
+  sits inside the panel, between the toggle and the bulk bar.
+- [ ] The panel is served expanded (`hidden` absent) on both views.
+- [ ] Collapsing, then reloading, keeps the panel collapsed; the same holds after switching between
+  the Material and the Items view.
+- [ ] With no stored preference, an unfiltered Lager opens collapsed and a filtered one opens
+  expanded.
+- [ ] Selecting a filter, resetting the filters, and a restored REQ-UI-017 selection all leave the
+  chip's number equal to the number of active dimensions; at zero the chip is hidden.
+- [ ] A multi-select with every box ticked leaves the chip hidden.
+- [ ] Toggling the panel performs no navigation and no fetch — the table below is untouched.
+
+**Enforced by:** `InventoryPageControllerMvcTest`
+(`viewMyInventory_rendersTheFilterRowInsideACollapsiblePanel`) · **Code:**
+`templates/inventory-my.html`, `static/js/inventory-my.js`
+(`toggleMyFilterPanel` / `initMyFilterPanel` / `countActiveMyInventoryFilters` /
+`updateMyFilterCountBadge`) · **Issues:** — · **ADR:** — (extends REQ-UI-017 / ADR-0120)
+
 ## Out of scope
 
 - Tenancy / visibility scope of inventory (strict-staffel Lager-View) is governed by

@@ -23,10 +23,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
 import de.greluc.krt.profit.basetool.ingest.config.RateLimitProperties;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.ingest.support.LogCapture;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -73,6 +77,46 @@ class SubjectRateLimiterTest {
                 .counter()
                 .count())
         .isEqualTo(2.0d);
+  }
+
+  @Test
+  void rejectionIsWarnedWithTheBudgetAndRetryDelayButNeverTheSubject() {
+    // Until this line existed a per-subject 429 was invisible in the log — the operator saw only
+    // "-> 429" and could not tell it apart from the coarse per-IP limiter. The subject itself
+    // stays out of the message: it is already the `userId` MDC field (REQ-OBS-001/-004).
+    SubjectRateLimiter limiter = new SubjectRateLimiter(props(1, true), meterRegistry);
+    limiter.requireWithinLimit("2b9f1c3e-0000-4000-8000-abcdefabcdef");
+
+    List<ILoggingEvent> events =
+        LogCapture.capture(
+            SubjectRateLimiter.class,
+            Level.INFO,
+            () -> {
+              try {
+                limiter.requireWithinLimit("2b9f1c3e-0000-4000-8000-abcdefabcdef");
+              } catch (RateLimitedException expected) {
+                // The throw is the contract; the log line is what is under test.
+              }
+            });
+
+    assertThat(events).hasSize(1);
+    assertThat(events.getFirst().getLevel()).isEqualTo(Level.WARN);
+    assertThat(events.getFirst().getFormattedMessage())
+        .contains("capacity=1")
+        .contains("retryAfter=")
+        .doesNotContain("2b9f1c3e");
+  }
+
+  @Test
+  void anAcceptedCallLogsNothing() {
+    // The access log already records every request; a line per accepted call would only add noise.
+    SubjectRateLimiter limiter = new SubjectRateLimiter(props(5, true), meterRegistry);
+
+    List<ILoggingEvent> events =
+        LogCapture.capture(
+            SubjectRateLimiter.class, Level.DEBUG, () -> limiter.requireWithinLimit("sub-a"));
+
+    assertThat(events).isEmpty();
   }
 
   @Test

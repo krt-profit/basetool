@@ -129,3 +129,29 @@ jobs:
 
       - name: Check PID-1 reaping invariant
         run: python3 .github/scripts/check_pid1_reaping.py
+
+  monitoring-image-pins:
+    name: monitoring-image-pins
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Dependabot bumps the image tags in docker-compose.monitoring.yml; nothing used to update the
+      # docs that quote them. That drifted unnoticed for months — on 2026-08-02 the monitoring
+      # runbook's version table was stale on 8 of 12 rows. The tables lost their hand-maintained
+      # Version column in the same change (a copy of the compose file cannot stay true, and it never
+      # described the RUNNING container anyway), but the runbooks still pin tags inside COPY-PASTEABLE
+      # commands — `docker run ... grafana/alloy:<tag> fmt /cfg/config.alloy`. Those must stay pinned
+      # to be reproducible, and a stale one is the sharper hazard: the command still succeeds, just
+      # against a binary that is not deployed, so the wrong answer is silent. This gate keeps them
+      # honest. `--fix` rewrites every drifted pin in one go.
+      - name: Check documented monitoring image pins
+        # chmod first, mirroring the migration-numbering gate: this repo is developed on Windows
+        # where `core.filemode=false`, so a local `chmod +x` is not recorded and the executable bit
+        # is easy to lose on a re-add. Without this the job dies with exit 126 before running a
+        # single check -- which is how it failed the first time.
+        run: |
+          chmod +x scripts/check-monitoring-image-pins.sh
+          scripts/check-monitoring-image-pins.sh

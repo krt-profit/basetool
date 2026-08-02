@@ -81,7 +81,11 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Every sync method follows the same pattern: pull the full UEX catalog for that entity, upsert
  * by UEX id (with name-based fallback for legacy rows missing the id), per-field dirty checking to
- * minimize write traffic. Empty UEX responses short-circuit without wiping local data.
+ * minimize write traffic. Empty UEX responses short-circuit without wiping local data. An
+ * <em>unchanged</em> catalogue ({@code 304 Not Modified}, served from the {@link UexClient}
+ * conditional-GET cache) short-circuits the same way but is reported at INFO instead of WARN — a
+ * fully-cached run is the healthy steady state and must not read like the outage the WARN
+ * describes.
  */
 @Slf4j
 @Service
@@ -110,7 +114,12 @@ public class UexUniverseSyncService {
   @Transactional
   public void syncCities() {
     log.info("Starting sync for Citys...");
-    List<UexCityDto> dtos = uexClient.getCities();
+    UexClient.FetchResult<UexCityDto> fetched = uexClient.getCities();
+    if (fetched.notModified()) {
+      log.info("UEX city catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexCityDto> dtos = fetched.data();
     if (dtos.isEmpty()) {
       log.warn("No cities received from UEX API. Aborting city synchronization.");
       return;
@@ -207,7 +216,12 @@ public class UexUniverseSyncService {
   @Transactional
   public void syncFactions() {
     log.info("Starting sync for Factions...");
-    List<UexFactionDto> dtos = uexClient.getFactions();
+    UexClient.FetchResult<UexFactionDto> fetched = uexClient.getFactions();
+    if (fetched.notModified()) {
+      log.info("UEX faction catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexFactionDto> dtos = fetched.data();
     if (dtos.isEmpty()) {
       log.warn("No factions received from UEX API. Aborting faction synchronization.");
       return;
@@ -254,7 +268,13 @@ public class UexUniverseSyncService {
   @Transactional
   public void syncJurisdictions() {
     log.info("Starting sync for Jurisdictions...");
-    List<UexJurisdictionDto> dtos = uexClient.getJurisdictions();
+    UexClient.FetchResult<UexJurisdictionDto> fetched = uexClient.getJurisdictions();
+    if (fetched.notModified()) {
+      log.info(
+          "UEX jurisdiction catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexJurisdictionDto> dtos = fetched.data();
     if (dtos.isEmpty()) {
       log.warn("No jurisdictions received from UEX API. Aborting jurisdiction synchronization.");
       return;
@@ -298,7 +318,12 @@ public class UexUniverseSyncService {
   @Transactional
   public void syncMoons() {
     log.info("Starting sync for Moons...");
-    List<UexMoonDto> dtos = uexClient.getMoons();
+    UexClient.FetchResult<UexMoonDto> fetched = uexClient.getMoons();
+    if (fetched.notModified()) {
+      log.info("UEX moon catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexMoonDto> dtos = fetched.data();
     if (dtos.isEmpty()) {
       log.warn("No moons received from UEX API. Aborting moon synchronization.");
       return;
@@ -346,7 +371,12 @@ public class UexUniverseSyncService {
   @Transactional
   public void syncOrbits() {
     log.info("Starting sync for Orbits...");
-    List<UexOrbitDto> dtos = uexClient.getOrbits();
+    UexClient.FetchResult<UexOrbitDto> fetched = uexClient.getOrbits();
+    if (fetched.notModified()) {
+      log.info("UEX orbit catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexOrbitDto> dtos = fetched.data();
     if (dtos.isEmpty()) {
       log.warn("No orbits received from UEX API. Aborting orbit synchronization.");
       return;
@@ -393,7 +423,12 @@ public class UexUniverseSyncService {
   @Transactional
   public void syncOutposts() {
     log.info("Starting sync for Outposts...");
-    List<UexOutpostDto> dtos = uexClient.getOutposts();
+    UexClient.FetchResult<UexOutpostDto> fetched = uexClient.getOutposts();
+    if (fetched.notModified()) {
+      log.info("UEX outpost catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexOutpostDto> dtos = fetched.data();
     if (dtos.isEmpty()) {
       log.warn("No outposts received from UEX API. Aborting outpost synchronization.");
       return;
@@ -467,7 +502,12 @@ public class UexUniverseSyncService {
   @Transactional
   public void syncPlanets() {
     log.info("Starting sync for Planets...");
-    List<UexPlanetDto> dtos = uexClient.getPlanets();
+    UexClient.FetchResult<UexPlanetDto> fetched = uexClient.getPlanets();
+    if (fetched.notModified()) {
+      log.info("UEX planet catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexPlanetDto> dtos = fetched.data();
     if (dtos.isEmpty()) {
       log.warn("No planets received from UEX API. Aborting planet synchronization.");
       return;
@@ -516,7 +556,14 @@ public class UexUniverseSyncService {
   @Transactional
   public void syncPois() {
     log.info("Starting sync for Pois...");
-    List<UexPoiDto> dtos = uexClient.getPoi();
+    UexClient.FetchResult<UexPoiDto> fetched = uexClient.getPoi();
+    if (fetched.notModified()) {
+      log.info(
+          "UEX point-of-interest catalogue unchanged since the last sync (304) — nothing to"
+              + " import.");
+      return;
+    }
+    List<UexPoiDto> dtos = fetched.data();
     if (dtos.isEmpty()) {
       log.warn("No points of interest received from UEX API. Aborting POI synchronization.");
       return;
@@ -593,7 +640,13 @@ public class UexUniverseSyncService {
   @Transactional
   public void syncSpaceStations() {
     log.info("Starting sync for SpaceStations...");
-    List<UexSpaceStationDto> dtos = uexClient.getSpaceStations();
+    UexClient.FetchResult<UexSpaceStationDto> fetched = uexClient.getSpaceStations();
+    if (fetched.notModified()) {
+      log.info(
+          "UEX space station catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexSpaceStationDto> dtos = fetched.data();
     if (dtos.isEmpty()) {
       log.warn("No space stations received from UEX API. Aborting space station synchronization.");
       return;
@@ -696,7 +749,12 @@ public class UexUniverseSyncService {
   @Transactional
   public void syncTerminals() {
     log.info("Starting sync for Terminals...");
-    List<UexTerminalDto> dtos = uexClient.getTerminals();
+    UexClient.FetchResult<UexTerminalDto> fetched = uexClient.getTerminals();
+    if (fetched.notModified()) {
+      log.info("UEX terminal catalogue unchanged since the last sync (304) — nothing to import.");
+      return;
+    }
+    List<UexTerminalDto> dtos = fetched.data();
     if (dtos.isEmpty()) {
       log.warn("No terminals received from UEX API. Aborting terminal synchronization.");
       return;

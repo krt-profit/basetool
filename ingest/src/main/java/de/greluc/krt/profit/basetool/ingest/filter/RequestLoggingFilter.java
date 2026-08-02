@@ -19,11 +19,13 @@
 
 package de.greluc.krt.profit.basetool.ingest.filter;
 
+import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.annotation.Order;
@@ -35,8 +37,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * and elapsed duration — so a handoff no longer succeeds or fails without a correlated log trace
  * (the gateway previously logged only a sparse relay WARN and nothing at all for a
  * 413/429/success), bringing ingest in line with the backend/frontend one-line-per-request
- * contract. The {@code correlationId} is rendered from the MDC by the logback pattern and is
- * therefore not duplicated into the message.
+ * contract. The {@code correlationId} and {@code userId} are rendered from the MDC by the logback
+ * pattern and are therefore not duplicated into the message.
+ *
+ * <p>A request that exceeds {@link LoggingProperties#slowRequestThresholdMs()} is escalated to WARN
+ * with the {@code Slow request} marker, exactly as in the backend/frontend (REQ-OBS-001). The
+ * gateway needs no counterpart to their SSE-relay carve-out: it serves two short synchronous POSTs
+ * and holds no async request open, so no endpoint can cross the threshold by design.
  *
  * <p>{@code getRequestURI()} excludes the query string, so no user-supplied query text reaches the
  * log; the ingest {@code /v1} paths carry no entity ids either, so the path is safe to log
@@ -51,6 +58,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Slf4j
 @Component
 @Order(RequestLoggingFilter.ORDER)
+@RequiredArgsConstructor
 public class RequestLoggingFilter extends OncePerRequestFilter {
 
   /**
@@ -58,6 +66,8 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
    * filters.
    */
   public static final int ORDER = CorrelationIdFilter.ORDER + 5;
+
+  private final LoggingProperties loggingProperties;
 
   @Override
   protected void doFilterInternal(
@@ -70,13 +80,13 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
       filterChain.doFilter(request, response);
     } finally {
       long durationMs = (System.nanoTime() - start) / 1_000_000L;
-      if (log.isInfoEnabled()) {
-        log.info(
-            "{} {} -> {} in {} ms",
-            request.getMethod(),
-            request.getRequestURI(),
-            response.getStatus(),
-            durationMs);
+      String method = request.getMethod();
+      String path = request.getRequestURI();
+      int status = response.getStatus();
+      if (durationMs >= loggingProperties.slowRequestThresholdMs()) {
+        log.warn("Slow request {} {} -> {} in {} ms", method, path, status, durationMs);
+      } else if (log.isInfoEnabled()) {
+        log.info("{} {} -> {} in {} ms", method, path, status, durationMs);
       }
     }
   }

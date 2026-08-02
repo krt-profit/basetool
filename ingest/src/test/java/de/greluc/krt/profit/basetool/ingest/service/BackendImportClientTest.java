@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractDto;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractGoodDto;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractOrderDto;
+import de.greluc.krt.profit.basetool.ingest.support.TestLoggingProperties;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -49,7 +50,9 @@ class BackendImportClientTest {
     backend = new MockWebServer();
     backend.start();
     WebClient webClient = WebClient.builder().baseUrl(backend.url("/").toString()).build();
-    client = new BackendImportClient(webClient, CircuitBreakerRegistry.ofDefaults());
+    client =
+        new BackendImportClient(
+            webClient, CircuitBreakerRegistry.ofDefaults(), TestLoggingProperties.defaults());
   }
 
   @AfterEach
@@ -98,6 +101,45 @@ class BackendImportClientTest {
     assertThat(request.getHeader("Accept-Language")).isEqualTo("de");
     assertThat(request.getHeader("X-Correlation-Id")).isEqualTo("cid-9");
     assertThat(request.getHeader("Content-Type")).contains("application/json");
+  }
+
+  @Test
+  void shouldOmitTheOptionalRelayHeadersWhenTheyAreAbsentOrBlank() throws Exception {
+    // Given: the controller passes through whatever the caller sent, so a missing Accept-Language
+    // and a whitespace-only correlation id both have to end up as "header not set" rather than as
+    // an empty header the backend would then have to defend against.
+    backend.enqueue(
+        new MockResponse()
+            .setResponseCode(200)
+            .addHeader("Content-Type", "application/json")
+            .setBody("{}"));
+
+    // When
+    client.forwardRefineryExtract("tok-123", "   ", "  ", sampleExtract());
+
+    // Then
+    RecordedRequest request = backend.takeRequest();
+    assertThat(request.getHeader("Authorization")).isEqualTo("Bearer tok-123");
+    assertThat(request.getHeader("Accept-Language")).isNull();
+    assertThat(request.getHeader("X-Correlation-Id")).isNull();
+  }
+
+  @Test
+  void shouldRelayTheCorrelationIdOnTheBlueprintPathToo() throws Exception {
+    // Given
+    backend.enqueue(
+        new MockResponse()
+            .setResponseCode(200)
+            .addHeader("Content-Type", "application/json")
+            .setBody("{}"));
+
+    // When
+    client.forwardBlueprintPreview("tok-abc", "en", "cid-3", "{}".getBytes(StandardCharsets.UTF_8));
+
+    // Then
+    RecordedRequest request = backend.takeRequest();
+    assertThat(request.getHeader("Accept-Language")).isEqualTo("en");
+    assertThat(request.getHeader("X-Correlation-Id")).isEqualTo("cid-3");
   }
 
   @Test

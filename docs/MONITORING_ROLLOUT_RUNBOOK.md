@@ -45,22 +45,29 @@ every 5 minutes. The monitoring apply is **env-gated and non-gating**: once
 `docker compose -p iri-monitoring --project-directory /var/iri/code -f docker-compose.monitoring.yml up -d`
 **after** the app stack is healthy. A monitoring failure only logs; it never rolls back the apps.
 
-**Deployed image versions** (pinned in `docker-compose.monitoring.yml`, verified 2026-07):
+**Deployed images.** The versions are **not** restated here — they are pinned in
+`docker-compose.monitoring.yml`, and a copy in prose goes stale on the next Dependabot bump. This
+table was wrong on 8 of its 12 rows before the column was removed, which is worse than no table at
+all: it tells a responder they are debugging a version they are not running.
 
-|      Component      |                      Image                      |  Version  |
-|---------------------|-------------------------------------------------|-----------|
-| Prometheus          | `prom/prometheus`                               | `v3.13.0` |
-| Grafana OSS         | `grafana/grafana-oss`                           | `13.0.2`  |
-| Loki                | `grafana/loki`                                  | `3.7.3`   |
-| Tempo               | `grafana/tempo`                                 | `3.0.2`   |
-| Alloy               | `grafana/alloy`                                 | `v1.17.1` |
-| Alertmanager        | `quay.io/prometheus/alertmanager`               | `v0.33.0` |
-| node_exporter       | `quay.io/prometheus/node-exporter`              | `v1.11.1` |
-| cAdvisor            | `ghcr.io/google/cadvisor`                       | `v0.60.3` |
-| postgres_exporter   | `quay.io/prometheuscommunity/postgres-exporter` | `v0.20.0` |
-| redis_exporter      | `oliver006/redis_exporter`                      | `v1.86.0` |
-| blackbox_exporter   | `prom/blackbox-exporter`                        | `v0.28.0` |
-| docker-socket-proxy | `tecnativa/docker-socket-proxy`                 | `v0.4.2`  |
+```bash
+grep -E '^\s+image:' docker-compose.monitoring.yml
+```
+
+|      Component      |                      Image                      |
+|---------------------|-------------------------------------------------|
+| Prometheus          | `prom/prometheus`                               |
+| Grafana OSS         | `grafana/grafana-oss`                           |
+| Loki                | `grafana/loki`                                  |
+| Tempo               | `grafana/tempo`                                 |
+| Alloy               | `grafana/alloy`                                 |
+| Alertmanager        | `quay.io/prometheus/alertmanager`               |
+| node_exporter       | `quay.io/prometheus/node-exporter`              |
+| cAdvisor            | `ghcr.io/google/cadvisor`                       |
+| postgres_exporter   | `quay.io/prometheuscommunity/postgres-exporter` |
+| redis_exporter      | `oliver006/redis_exporter`                      |
+| blackbox_exporter   | `prom/blackbox-exporter`                        |
+| docker-socket-proxy | `tecnativa/docker-socket-proxy`                 |
 
 **Adjacent products** (UI click-paths verified against these): **Keycloak 26.6**, **NPM 2.15.1**,
 Grafana 13.x, Hetzner Cloud Console (current), healthchecks.io (current). Realm: `iri`. Public hosts:
@@ -273,7 +280,7 @@ sudo chmod 600 /var/iri/monitoring/secrets/alertmanager.yml
 # Validate the RENDERED file with amtool from the pinned Alertmanager image.
 docker run --rm \
   -v /var/iri/monitoring/secrets/alertmanager.yml:/cfg.yml:ro \
-  --entrypoint amtool quay.io/prometheus/alertmanager:v0.33.0 check-config /cfg.yml
+  --entrypoint amtool quay.io/prometheus/alertmanager:v0.33.1 check-config /cfg.yml
 # expect: "Checking '/cfg.yml'  SUCCESS" and no unresolved ${...} placeholders.
 
 # Immediately unset the SMTP secrets from your shell environment.
@@ -641,7 +648,7 @@ docker run --rm --network net-monitoring-core curlimages/curl:8.11.1 \
 ```bash
 # amtool against the RENDERED alertmanager config (Phase 3.5 already did this):
 docker run --rm -v /var/iri/monitoring/secrets/alertmanager.yml:/cfg.yml:ro \
-  --entrypoint amtool quay.io/prometheus/alertmanager:v0.33.0 check-config /cfg.yml
+  --entrypoint amtool quay.io/prometheus/alertmanager:v0.33.1 check-config /cfg.yml
 
 # promtool against the committed prometheus config + alert rules:
 docker run --rm -v /var/iri/code/monitoring/prometheus:/p:ro \
@@ -649,7 +656,7 @@ docker run --rm -v /var/iri/code/monitoring/prometheus:/p:ro \
 
 # alloy config check:
 docker run --rm -v /var/iri/code/monitoring/alloy:/a:ro \
-  grafana/alloy:v1.17.1 fmt /a/config.alloy >/dev/null && echo "alloy config parses"
+  grafana/alloy:v1.18.0 fmt /a/config.alloy >/dev/null && echo "alloy config parses"
 ```
 
 ### 8.3 Fire a test alert; confirm the mail + healthchecks.io green
@@ -657,7 +664,7 @@ docker run --rm -v /var/iri/code/monitoring/alloy:/a:ro \
 ```bash
 # Add a transient alert straight into Alertmanager from a core-net container.
 docker run --rm --network net-monitoring-core --entrypoint amtool \
-  quay.io/prometheus/alertmanager:v0.33.0 \
+  quay.io/prometheus/alertmanager:v0.33.1 \
   --alertmanager.url=http://alertmanager:9093 \
   alert add alertname="RolloutCanary" severity="critical" \
   --annotation=summary="monitoring rollout canary — please ignore"

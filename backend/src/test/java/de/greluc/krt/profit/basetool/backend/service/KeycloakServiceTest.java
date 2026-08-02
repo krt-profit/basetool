@@ -28,6 +28,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.config.KeycloakSyncProperties;
 import de.greluc.krt.profit.basetool.backend.exception.ExternalServiceException;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
@@ -46,6 +50,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.ssl.NoSuchSslBundleException;
 import org.springframework.boot.ssl.SslBundle;
 import org.springframework.boot.ssl.SslBundles;
@@ -813,6 +818,64 @@ class KeycloakServiceTest {
     properties.setClientId("client");
     properties.setClientSecret("secret");
     return properties;
+  }
+
+  /**
+   * The role index must state how many of the app's roles the realm still knows — and must NOT
+   * escalate merely because one of them found no counterpart. The local catalog deliberately
+   * contains local-only roles (the seeded {@code Guest} fallback), so a per-role "missing from the
+   * realm" warning would fire on every single run and be tuned out long before a real rename
+   * happened.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void fetchUsers_logsTheRoleIntersectionAtInfo_andDoesNotWarnAboutTheLocalOnlyGuestRole()
+      throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = writeProperties(server);
+      properties.setPageSize(100);
+
+      UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(
+          jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
+      // The realm knows ADMIN but not the app's local-only Guest fallback.
+      server.enqueue(jsonResponse("[{\"name\":\"ADMIN\"}]"));
+      server.enqueue(jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\"}]"));
+      server.enqueue(jsonResponse("[]"));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+
+      Logger logger = (Logger) LoggerFactory.getLogger(KeycloakService.class);
+      ListAppender<ILoggingEvent> appender = new ListAppender<>();
+      appender.start();
+      logger.addAppender(appender);
+      try {
+        service.fetchUsers(List.of("ADMIN", "Guest"), Set.of());
+      } finally {
+        logger.detachAppender(appender);
+      }
+
+      ILoggingEvent index =
+          appender.list.stream()
+              .filter(e -> e.getFormattedMessage().startsWith("Keycloak role index"))
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("the role intersection must be reported"));
+      assertEquals(Level.INFO, index.getLevel());
+      assertTrue(
+          index.getFormattedMessage().contains("1 of 2 mappable app roles matched"),
+          index.getFormattedMessage());
+      assertTrue(
+          appender.list.stream().noneMatch(e -> e.getLevel() == Level.WARN),
+          "an unmatched local-only role must not warn — it would fire on every run");
+    } finally {
+      server.shutdown();
+    }
   }
 
   /**

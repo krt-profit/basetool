@@ -85,7 +85,7 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
 
     // Fast path: an honestly-declared oversized body is rejected without reading it.
     if (declared > max) {
-      reject(response);
+      reject(response, declared, max);
       return;
     }
 
@@ -94,7 +94,9 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
     if (declared < 0) {
       byte[] body = readWithinCap(request.getInputStream(), max);
       if (body == null) {
-        reject(response);
+        // The stream is abandoned the moment the cap is crossed, so the exact size is unknown by
+        // design — `declared` stays -1, which is itself the diagnostic (a chunked body).
+        reject(response, declared, max);
         return;
       }
       filterChain.doFilter(new CachedBodyRequest(request, body), response);
@@ -108,13 +110,21 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
    * Writes the standard 413 {@code application/problem+json} response.
    *
    * @param response the response to populate
+   * @param declaredBytes the body's declared {@code Content-Length}, or {@code -1} for a chunked
+   *     body whose real size was never fully read
+   * @param maxBytes the configured cap the body exceeded
    * @throws IOException if writing the body fails
    */
-  private void reject(@NotNull HttpServletResponse response) throws IOException {
+  private void reject(@NotNull HttpServletResponse response, long declaredBytes, long maxBytes)
+      throws IOException {
     // REQ-OBS-011: the DoS guard was silent (no log, no metric) unlike the sibling bot / rate-limit
     // filters — count and DEBUG-log each 413 so a flood of oversized-body probes is detectable.
+    // Both sizes are logged because the reject alone does not say which of the two very different
+    // situations it is: a cap set below what a legitimate extract needs (declared just over max),
+    // or a hostile body (declared orders of magnitude over, or -1 for a chunked flood).
     meterRegistry.counter(MetricNames.INGEST_PAYLOAD_REJECTED).increment();
-    log.debug("Ingest payload rejected: body exceeds the configured cap");
+    log.debug(
+        "Ingest payload rejected: declared={} bytes exceeds max={} bytes", declaredBytes, maxBytes);
     ProblemResponseWriter.write(
         response,
         objectMapper,

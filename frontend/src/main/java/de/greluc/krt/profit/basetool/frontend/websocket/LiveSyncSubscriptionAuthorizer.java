@@ -69,12 +69,47 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 @RequiredArgsConstructor
 public class LiveSyncSubscriptionAuthorizer {
 
-  /** The outcome of a subscribe-authorization check. */
+  /**
+   * The outcome of a subscribe-authorization check.
+   *
+   * <p>The two refusals are kept apart because they mean opposite things operationally: {@link
+   * #DENY} is a real permission verdict a user hit, {@link #DENY_INDETERMINATE} is the tool failing
+   * closed while it could not tell. Both refuse the subscribe, so callers gate on {@link #denied()}
+   * rather than comparing constants; what differs is the deny metric's {@code reason} tag, the log
+   * level, and — since the flavour also rides the {@code denied} control frame — what the client
+   * does next: an indeterminate refusal earns one retry on the next reconnect, an authorization
+   * refusal is terminal for that tab.
+   */
   public enum Decision {
-    /** The subscribe is authorized (or failed open). */
+    /** The subscribe is authorized (or failed open on an indeterminate outcome). */
     ALLOW,
-    /** The subscribe is refused by an explicit backend authorization denial. */
-    DENY
+    /**
+     * The subscribe is refused by an explicit authorization denial — a backend 403/404, a withheld
+     * capability flag, or a locally role-gated room whose required role the caller does not hold.
+     */
+    DENY,
+    /**
+     * The subscribe is refused because the authorization outcome was <em>indeterminate</em> (no
+     * captured token, a transient 401/5xx/timeout/transport failure, auth-executor saturation, or a
+     * probe that threw) and the topic class is presence-enabled, so it fails <b>closed</b> (F1).
+     * Not a permission verdict: a rising rate here is a backend/token availability problem, and one
+     * such deny costs the tab live updates for that topic until it reconnects — the client retries
+     * this flavour once (and only once) on its next reconnect, so a blip that outlasts the retry
+     * still leaves that tab on the manual-refresh pill for the session.
+     */
+    DENY_INDETERMINATE;
+
+    /**
+     * Whether this verdict refuses the subscribe, i.e. is either refusal rather than {@link
+     * #ALLOW}. Call sites that only need "join the room or not" use this so a further deny flavour
+     * can be added without them silently starting to admit it.
+     *
+     * @return {@code true} for {@link #DENY} and {@link #DENY_INDETERMINATE}, {@code false} for
+     *     {@link #ALLOW}
+     */
+    public boolean denied() {
+      return this != ALLOW;
+    }
   }
 
   /**
@@ -91,13 +126,17 @@ public class LiveSyncSubscriptionAuthorizer {
    * able to read — a cross-user identity leak the opaque-keys argument does not cover. Such a topic
    * therefore fails closed: an indeterminate verdict denies rather than admits.
    *
+   * <p>The fail-closed refusal is {@link Decision#DENY_INDETERMINATE}, never {@link Decision#DENY}:
+   * it is an availability symptom, not a permission verdict, and collapsing the two makes a backend
+   * outage read exactly like users hitting permission boundaries.
+   *
    * @param topic the topic whose class decides the fail direction
-   * @return {@link Decision#ALLOW} for a non-presence class, {@link Decision#DENY} for a presence
-   *     one
+   * @return {@link Decision#ALLOW} for a non-presence class, {@link Decision#DENY_INDETERMINATE}
+   *     for a presence one
    */
   @NotNull
   static Decision failOpen(@NotNull LiveSyncTopic topic) {
-    return topic.topicClass().presenceEnabled() ? Decision.DENY : Decision.ALLOW;
+    return topic.topicClass().presenceEnabled() ? Decision.DENY_INDETERMINATE : Decision.ALLOW;
   }
 
   /**
@@ -125,9 +164,10 @@ public class LiveSyncSubscriptionAuthorizer {
    *     available (then the subscribe fails open)
    * @param activeOrgUnitId the active-org-unit pin captured at handshake, relayed as {@code
    *     X-Active-Org-Unit-Id} so the probe scopes exactly like the page's own read, or {@code null}
-   * @return {@link Decision#ALLOW} to accept the subscribe (including every fail-open case), or
-   *     {@link Decision#DENY} on an explicit backend 403/404 (resource topic) or a withheld
-   *     capability (global topic)
+   * @return {@link Decision#ALLOW} to accept the subscribe (including every fail-open case), {@link
+   *     Decision#DENY} on an explicit backend 403/404 (resource topic) or a withheld capability
+   *     (global topic), or {@link Decision#DENY_INDETERMINATE} when a presence-enabled class failed
+   *     closed on an indeterminate outcome
    */
   @NotNull
   public Decision authorize(
@@ -145,9 +185,11 @@ public class LiveSyncSubscriptionAuthorizer {
    * @param activeOrgUnitId the active-org-unit pin captured at handshake, or {@code null}
    * @param authorities the authorities captured at handshake for a local role check, or {@code
    *     null} when none were captured (then a locally role-gated room fails open)
-   * @return {@link Decision#ALLOW} to accept the subscribe (including every fail-open case), or
-   *     {@link Decision#DENY} on an explicit backend refusal (resource/dual-resource topic), a
-   *     withheld capability (capability topic), or a missing required role (local topic)
+   * @return {@link Decision#ALLOW} to accept the subscribe (including every fail-open case), {@link
+   *     Decision#DENY} on an explicit backend refusal (resource/dual-resource topic), a withheld
+   *     capability (capability topic) or a missing required role (local topic), or {@link
+   *     Decision#DENY_INDETERMINATE} when a presence-enabled class failed closed on an
+   *     indeterminate outcome
    */
   @NotNull
   public Decision authorize(

@@ -28,6 +28,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.jboss.logging.Logger;
 import org.keycloak.util.JsonSerialization;
 
 /**
@@ -48,6 +49,9 @@ import org.keycloak.util.JsonSerialization;
  * <p>This class never logs the secret, the candidate names/e-mail, or the response body.
  */
 public class BackendAccountChecker {
+
+  /** A fail-open UNKNOWN silently disables the duplicate-account check, so each cause is logged. */
+  private static final Logger LOG = Logger.getLogger(BackendAccountChecker.class);
 
   /** HTTP header carrying the shared secret presented to the internal backend endpoint. */
   static final String SECRET_HEADER = "X-KRT-SPI-Secret";
@@ -94,6 +98,7 @@ public class BackendAccountChecker {
     try {
       body = buildBody(username, email, serverNickname);
     } catch (IOException e) {
+      LOG.warnf(e, "Could not serialise the account-existence probe body; skipping the check.");
       return Result.UNKNOWN;
     }
 
@@ -103,15 +108,25 @@ public class BackendAccountChecker {
           httpClient.send(
               buildRequest(url, sharedSecret, body), HttpResponse.BodyHandlers.ofString());
     } catch (IOException e) {
-      // TLS handshake failure / timeout / connection reset / DNS failure — fail open.
+      // TLS handshake failure / timeout / connection reset / DNS failure — fail open. Logged
+      // because failing OPEN means the duplicate-account check silently did not happen: the login
+      // proceeds and nothing else records that the probe never ran.
+      LOG.warnf(
+          e,
+          "Account-existence probe could not reach the backend (%s); skipping the check.",
+          e.getClass().getSimpleName());
       return Result.UNKNOWN;
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+      LOG.warn("Account-existence probe was interrupted; skipping the check.");
       return Result.UNKNOWN;
     }
 
     if (response.statusCode() != 200) {
-      // 503 (feature off) / 401 (bad secret) / 5xx / anything else — fail open.
+      // 503 (feature off) / 401 (bad secret) / 5xx / anything else — fail open. The status is the
+      // diagnosis and a 401 in particular is a misconfiguration that would otherwise never surface.
+      LOG.warnf(
+          "Account-existence probe answered HTTP %d; skipping the check.", response.statusCode());
       return Result.UNKNOWN;
     }
     return parseExists(response.body());
@@ -180,6 +195,7 @@ public class BackendAccountChecker {
     try {
       root = JsonSerialization.readValue(body, JsonNode.class);
     } catch (IOException e) {
+      LOG.warnf(e, "Account-existence response was not readable JSON; skipping the check.");
       return Result.UNKNOWN;
     }
     if (root == null) {

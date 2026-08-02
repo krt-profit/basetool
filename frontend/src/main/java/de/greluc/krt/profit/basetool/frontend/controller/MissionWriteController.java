@@ -25,6 +25,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
+import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationDto;
@@ -2202,7 +2203,9 @@ public class MissionWriteController {
           ? odt.toInstant()
           : ((java.time.LocalDateTime) parsed).atZone(MISSION_TIME_ZONE).toInstant();
     } catch (Exception e) {
-      log.warn("Failed to parse datetime string: {}", value, e);
+      // The raw form value is client-supplied free text; sanitise it before it reaches the
+      // logger so an embedded newline cannot forge a second log line (CWE-117).
+      log.warn("Failed to parse datetime string: {}", LogSafe.text(value, 64), e);
       return null;
     }
   }

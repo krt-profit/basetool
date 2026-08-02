@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -30,6 +31,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.mapper.PersonalBlueprintMapper;
@@ -55,6 +59,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -150,6 +155,40 @@ class PersonalBlueprintServiceTest {
     ArgumentCaptor<PersonalBlueprint> captor = ArgumentCaptor.forClass(PersonalBlueprint.class);
     verify(repository).save(captor.capture());
     assertSame(ref, captor.getValue().getOutputItem());
+  }
+
+  /**
+   * REQ-OBS-004 / CWE-117: the admin add-on-behalf line echoes the RAW, client-supplied product key
+   * (not the resolved product's), so a newline plus a fabricated level prefix would otherwise read
+   * as a genuine second log line during triage. The value must go through {@code LogSafe} first.
+   */
+  @Test
+  void addForUser_sanitisesTheClientSuppliedProductKeyBeforeLoggingIt() {
+    String forged = "k\nERROR --- forged line";
+    when(blueprintProductService.resolveByProductKey(forged))
+        .thenReturn(Optional.of(new ResolvedProduct("k", "Arclight Pistol", null)));
+    when(repository.existsByOwnerSubAndProductKey(SUB, "k")).thenReturn(false);
+    when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(mapper.toResponse(any(), anyBoolean())).thenReturn(sampleResponse());
+
+    Logger logger = (Logger) LoggerFactory.getLogger(PersonalBlueprintService.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      service.addForUser(SUB, new PersonalBlueprintCreateRequest(forged, null, null));
+
+      String line =
+          appender.list.stream()
+              .map(ILoggingEvent::getFormattedMessage)
+              .filter(m -> m.contains("Admin added blueprint"))
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("expected the admin-add log line"));
+      assertFalse(line.contains("\n"), "no control character may survive into the log: " + line);
+      assertTrue(line.contains("k?ERROR"), "the value is kept, only neutralised: " + line);
+    } finally {
+      logger.detachAppender(appender);
+    }
   }
 
   @Test

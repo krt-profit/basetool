@@ -22,11 +22,11 @@ package de.greluc.krt.profit.basetool.ingest.filter;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.ingest.support.LogCapture;
+import de.greluc.krt.profit.basetool.ingest.support.TestLoggingProperties;
+import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.slf4j.LoggerFactory;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -34,32 +34,84 @@ import org.springframework.mock.web.MockHttpServletResponse;
 /** Unit tests for the ingest {@link RequestLoggingFilter} one-line-per-request access log. */
 class RequestLoggingFilterTest {
 
+  private static MockHttpServletRequest ingestRequest() {
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/v1/refinery-extract");
+    request.setRequestURI("/v1/refinery-extract");
+    return request;
+  }
+
   @Test
   void logsExactlyOneInfoAccessLineForAV1Request() throws Exception {
-    Logger logger = (Logger) LoggerFactory.getLogger(RequestLoggingFilter.class);
-    Level original = logger.getLevel();
-    logger.setLevel(Level.INFO);
-    ListAppender<ILoggingEvent> appender = new ListAppender<>();
-    appender.start();
-    logger.addAppender(appender);
-    try {
-      MockHttpServletRequest request = new MockHttpServletRequest("POST", "/v1/refinery-extract");
-      request.setRequestURI("/v1/refinery-extract");
-      MockHttpServletResponse response = new MockHttpServletResponse();
-      response.setStatus(200);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    response.setStatus(200);
 
-      new RequestLoggingFilter().doFilter(request, response, new MockFilterChain());
+    List<ILoggingEvent> events =
+        LogCapture.capture(
+            RequestLoggingFilter.class,
+            Level.INFO,
+            () ->
+                new RequestLoggingFilter(TestLoggingProperties.defaults())
+                    .doFilter(ingestRequest(), response, new MockFilterChain()));
 
-      long lines =
-          appender.list.stream()
-              .filter(e -> e.getLevel() == Level.INFO)
-              .filter(e -> e.getFormattedMessage().contains("POST /v1/refinery-extract -> 200"))
-              .count();
-      assertThat(lines).isEqualTo(1);
-    } finally {
-      logger.detachAppender(appender);
-      logger.setLevel(original);
-    }
+    assertThat(events)
+        .filteredOn(e -> e.getLevel() == Level.INFO)
+        .filteredOn(e -> e.getFormattedMessage().contains("POST /v1/refinery-extract -> 200"))
+        .hasSize(1);
+  }
+
+  @Test
+  void escalatesToWarnOnceTheSlowRequestThresholdIsCrossed() throws Exception {
+    // A zero-millisecond threshold makes every request "slow", so the WARN branch is exercised
+    // without sleeping (REQ-OBS-001).
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    response.setStatus(200);
+
+    List<ILoggingEvent> events =
+        LogCapture.capture(
+            RequestLoggingFilter.class,
+            Level.INFO,
+            () ->
+                new RequestLoggingFilter(TestLoggingProperties.withThresholds(0L, 1500L))
+                    .doFilter(ingestRequest(), response, new MockFilterChain()));
+
+    assertThat(events).hasSize(1);
+    assertThat(events.getFirst().getLevel()).isEqualTo(Level.WARN);
+    assertThat(events.getFirst().getFormattedMessage())
+        .startsWith("Slow request POST /v1/refinery-extract -> 200 in ");
+  }
+
+  @Test
+  void stillLogsTheAccessLineWhenTheChainThrows() {
+    // The line is emitted from a finally block, so an exploding downstream filter must not swallow
+    // it — that is what keeps a 500 attributable.
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    response.setStatus(500);
+    MockFilterChain exploding =
+        new MockFilterChain() {
+          @Override
+          public void doFilter(
+              jakarta.servlet.ServletRequest request,
+              jakarta.servlet.ServletResponse servletResponse) {
+            throw new IllegalStateException("boom");
+          }
+        };
+
+    List<ILoggingEvent> events =
+        LogCapture.capture(
+            RequestLoggingFilter.class,
+            Level.INFO,
+            () -> {
+              try {
+                new RequestLoggingFilter(TestLoggingProperties.defaults())
+                    .doFilter(ingestRequest(), response, exploding);
+              } catch (IllegalStateException expected) {
+                // Propagated to the container as usual; the access line must exist regardless.
+              }
+            });
+
+    assertThat(events).hasSize(1);
+    assertThat(events.getFirst().getFormattedMessage())
+        .startsWith("POST /v1/refinery-extract -> 500 in ");
   }
 
   @Test
@@ -67,6 +119,15 @@ class RequestLoggingFilterTest {
     MockHttpServletRequest actuator = new MockHttpServletRequest("GET", "/actuator/health");
     actuator.setRequestURI("/actuator/health");
 
-    assertThat(new RequestLoggingFilter().shouldNotFilter(actuator)).isTrue();
+    assertThat(new RequestLoggingFilter(TestLoggingProperties.defaults()).shouldNotFilter(actuator))
+        .isTrue();
+  }
+
+  @Test
+  void filtersV1Paths() {
+    assertThat(
+            new RequestLoggingFilter(TestLoggingProperties.defaults())
+                .shouldNotFilter(ingestRequest()))
+        .isFalse();
   }
 }

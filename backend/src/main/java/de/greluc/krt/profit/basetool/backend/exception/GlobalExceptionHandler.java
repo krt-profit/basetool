@@ -30,6 +30,7 @@ import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -297,6 +298,11 @@ public class GlobalExceptionHandler {
    * OPTIMISTIC_LOCK}. The frontend uses this code to trigger a re-fetch + re-edit prompt rather
    * than surfacing the raw error.
    *
+   * <p>The WARN line additionally carries the conflicting entity, its identifier and the compared
+   * version pair (see {@link #optimisticLockContext(Exception)}), which is what separates genuine
+   * contention from the REQ-FE-003 failure mode where a fragment never re-echoes the bumped {@code
+   * version} and the same client 409s forever with nobody else editing.
+   *
    * @param ex thrown optimistic-locking exception
    * @param request servlet request, used for the {@code instance} URI and access-log enrichment
    * @return RFC 7807 problem-detail response
@@ -317,12 +323,38 @@ public class GlobalExceptionHandler {
             request,
             "concurrency-conflict",
             CODE_OPTIMISTIC_LOCK);
-    logProblem(
-        request,
-        pd,
-        "Optimistic locking conflict",
-        Map.of("exception", ex.getClass().getSimpleName()));
+    logProblem(request, pd, "Optimistic locking conflict", optimisticLockContext(ex));
     return toEntity(pd);
+  }
+
+  /**
+   * Builds the structured {@code extra} context for the 409 WARN line: always the exception's
+   * simple name, plus — when the throwable is Spring's {@link
+   * ObjectOptimisticLockingFailureException} — the entity class name, the entity identifier and the
+   * exception message. For the conflicts the {@code support.OptimisticLock} helpers raise, that
+   * message is the {@code expected=<client> persisted=<persisted>} version pair; for a conflict
+   * Hibernate raised during flush it is Hibernate's own stale-state text. Either way it is the only
+   * field that distinguishes a real concurrent edit from a stale client echo.
+   *
+   * <p>Deliberately no Mission-style composite section key: every mission section has its own URI,
+   * so the affected entity, id and section are already derivable from the method + {@code
+   * requestURI} the same line logs. REQ-OBS-004 holds — the identifier is a UUID (or {@code null},
+   * or a bounded {@code SystemSetting} key) at every call site and the message is numbers only, so
+   * no user-supplied text reaches the log. A {@link LinkedHashMap} keeps the field order stable
+   * across log lines (and tolerates a {@code null} identifier, which {@code Map.of} would reject).
+   *
+   * @param ex the optimistic-locking throwable being mapped to the 409
+   * @return the mutable, insertion-ordered context map appended verbatim to the WARN line
+   */
+  private static Map<String, Object> optimisticLockContext(Exception ex) {
+    Map<String, Object> context = new LinkedHashMap<>();
+    context.put("exception", ex.getClass().getSimpleName());
+    if (ex instanceof ObjectOptimisticLockingFailureException conflict) {
+      context.put("entity", String.valueOf(conflict.getPersistentClassName()));
+      context.put("entityId", String.valueOf(conflict.getIdentifier()));
+      context.put("versions", String.valueOf(conflict.getMessage()));
+    }
+    return context;
   }
 
   // --- 409 Pessimistic Locking ----------------------------------------------------------

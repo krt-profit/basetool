@@ -24,10 +24,12 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 
 /**
@@ -63,6 +65,14 @@ import org.springframework.stereotype.Component;
 @Component
 @Slf4j
 public class TaskMetrics {
+
+  /**
+   * MDC key the correlation filter and the logback patterns use. Restated as a literal rather than
+   * injected from {@code LoggingProperties}: this class sits in the {@code metrics} leaf package on
+   * purpose (ADR-0047) and must not grow a dependency on {@code config}. Same precedent as {@code
+   * SecurityProblemResponseHandler} and {@code BasetoolErrorController}.
+   */
+  private static final String MDC_CORRELATION_ID = "correlationId";
 
   private final MeterRegistry registry;
   private final Map<ScheduledJob, AtomicLong> lastSuccessHolders = new ConcurrentHashMap<>();
@@ -125,6 +135,7 @@ public class TaskMetrics {
     long startNanos = System.nanoTime();
     String outcome = MetricNames.OUTCOME_SUCCESS;
     Integer items = null;
+    boolean mdcOwned = openRunContext(job);
     try {
       items = work.run();
       lastSuccess.set(Instant.now().getEpochSecond());
@@ -133,7 +144,39 @@ public class TaskMetrics {
       log.error("Scheduled job '{}' failed", job.label(), e);
     } finally {
       emitJobMetrics(job, outcome, startNanos, items);
+      if (mdcOwned) {
+        MDC.remove(MDC_CORRELATION_ID);
+      }
     }
+  }
+
+  /**
+   * Tags this run with its own {@code correlationId} so every line it emits — the job body's own
+   * start/finish lines, anything the services it calls log, and the failure {@code ERROR} above —
+   * can be pulled out as one unit.
+   *
+   * <p>A scheduler thread carries no request, so {@code CorrelationIdFilter} never runs for it and
+   * the field was previously empty on every scheduled line. With eight jobs on overlapping
+   * schedules that made a nightly window unreadable: the lines interleave with nothing to say which
+   * run they belong to. The id is {@code <job-label>-<8 hex>}, so it is greppable by job as well as
+   * by run ({@code |= "user_sync"} finds every line of every user-sync run, the full id narrows it
+   * to one).
+   *
+   * <p>An id that is already present is left untouched and not cleared afterwards: {@link
+   * #recordCountingRethrow} runs inside an admin request that already owns a real request
+   * correlation id, and overwriting it would sever the manual trigger from its HTTP call.
+   *
+   * @param job the job about to run
+   * @return {@code true} when this call installed the id and must therefore remove it again
+   */
+  private static boolean openRunContext(@NotNull ScheduledJob job) {
+    String existing = MDC.get(MDC_CORRELATION_ID);
+    if (existing != null && !existing.isBlank()) {
+      return false;
+    }
+    String runId = Long.toHexString(ThreadLocalRandom.current().nextLong() >>> 32);
+    MDC.put(MDC_CORRELATION_ID, job.label() + "-" + runId);
+    return true;
   }
 
   /**

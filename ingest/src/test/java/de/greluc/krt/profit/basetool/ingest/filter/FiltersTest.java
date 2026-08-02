@@ -21,11 +21,15 @@ package de.greluc.krt.profit.basetool.ingest.filter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
 import de.greluc.krt.profit.basetool.ingest.config.RateLimitProperties;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.ingest.support.LogCapture;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -137,6 +141,83 @@ class FiltersTest {
     // The within-cap chunked body is buffered and re-served unchanged to the controller.
     assertThat(chain.getRequest()).isNotNull();
     assertThat(chain.getRequest().getInputStream().readAllBytes()).hasSize(50);
+  }
+
+  @Test
+  void sizeFilterLogsBothSizesSoATooLowCapIsDistinguishableFromAHostileBody() throws Exception {
+    IngestProperties properties = new IngestProperties();
+    properties.setMaxPayloadBytes(10);
+    PayloadSizeLimitFilter filter =
+        new PayloadSizeLimitFilter(properties, objectMapper, meterRegistry);
+
+    List<ILoggingEvent> events =
+        LogCapture.capture(
+            PayloadSizeLimitFilter.class,
+            Level.DEBUG,
+            () ->
+                filter.doFilter(
+                    ingestRequestWithBody(100),
+                    new MockHttpServletResponse(),
+                    new MockFilterChain()));
+
+    assertThat(events).hasSize(1);
+    assertThat(events.getFirst().getFormattedMessage())
+        .isEqualTo("Ingest payload rejected: declared=100 bytes exceeds max=10 bytes");
+  }
+
+  @Test
+  void sizeFilterReportsAChunkedRejectAsDeclaredMinusOne() throws Exception {
+    // The stream is abandoned the moment the cap is crossed, so -1 is the honest value — and it is
+    // itself the diagnostic: the body arrived without a Content-Length.
+    IngestProperties properties = new IngestProperties();
+    properties.setMaxPayloadBytes(10);
+    PayloadSizeLimitFilter filter =
+        new PayloadSizeLimitFilter(properties, objectMapper, meterRegistry);
+
+    List<ILoggingEvent> events =
+        LogCapture.capture(
+            PayloadSizeLimitFilter.class,
+            Level.DEBUG,
+            () ->
+                filter.doFilter(
+                    chunkedIngestRequest(100),
+                    new MockHttpServletResponse(),
+                    new MockFilterChain()));
+
+    assertThat(events).hasSize(1);
+    assertThat(events.getFirst().getFormattedMessage()).contains("declared=-1 bytes");
+  }
+
+  @Test
+  void rateLimitFilterLogsThePerIpRejectAtDebugWithoutTheClientAddress() throws Exception {
+    // DEBUG, not WARN: an attacker decides how often the pre-auth limiter fires, so a higher level
+    // would be a log-flood vector. The client IP stays out — app logs are PII-free (REQ-OBS-004).
+    RateLimitProperties properties = new RateLimitProperties();
+    properties.setEnabled(true);
+    properties.setCapacity(1);
+    properties.setRefillTokens(1);
+    properties.setRefillPeriod(Duration.ofMinutes(1));
+    RateLimitingFilter filter =
+        new RateLimitingFilter(properties, objectMapper, new SimpleMeterRegistry());
+    filter.doFilter(
+        ingestRequestWithBody(10), new MockHttpServletResponse(), new MockFilterChain());
+
+    List<ILoggingEvent> events =
+        LogCapture.capture(
+            RateLimitingFilter.class,
+            Level.DEBUG,
+            () ->
+                filter.doFilter(
+                    ingestRequestWithBody(10),
+                    new MockHttpServletResponse(),
+                    new MockFilterChain()));
+
+    assertThat(events).hasSize(1);
+    assertThat(events.getFirst().getLevel()).isEqualTo(Level.DEBUG);
+    assertThat(events.getFirst().getFormattedMessage())
+        .contains("capacity=1")
+        .contains("retryAfter=")
+        .doesNotContain("127.0.0.1");
   }
 
   @Test
