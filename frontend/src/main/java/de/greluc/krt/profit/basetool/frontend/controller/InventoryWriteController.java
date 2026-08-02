@@ -23,6 +23,8 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BulkCheckoutRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BulkRebookRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BulkRebookResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryAllocationInput;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryAllocationWriteDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemBookOutDto;
@@ -550,6 +552,46 @@ public class InventoryWriteController {
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Failed to bulk-checkout inventory items (ajax)", e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /**
+   * AJAX proxy for the bulk rebooking (Massen-Umbuchen, REQ-INV-036) of several owned inventory
+   * rows in one call. The "Mein Lager" bulk bar collects the marked ids plus the chosen mode and
+   * target, and posts them here; this forwards to the backend {@code POST
+   * /api/v1/inventory/bulk-rebook} (which enforces per-row ownership and moves each row in full).
+   *
+   * <p>Returns the backend's moved/skipped counts so the page can distinguish a full success from a
+   * selection that was largely already at the target. The empty/missing id list is guarded here
+   * rather than via {@code @Valid} — which the frontend {@code GlobalExceptionHandler} would
+   * surface as a 500 — so the page gets a clean 422 {@code problem+json}, mirroring {@link
+   * #bulkCheckout}. On a backend failure the {@code problem+json} is propagated so {@code
+   * krtFetch.handleProblem} can drive the optimistic-lock reload-confirm or an error toast.
+   *
+   * @param request the marked ids, the rebooking mode and its target fields
+   * @return {@code 200} with the moved/skipped counts, otherwise the propagated backend error
+   */
+  @PostMapping("/bulk-rebook")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> bulkRebook(
+      @RequestBody BulkRebookRequest request) {
+    if (request == null || request.itemIds() == null || request.itemIds().isEmpty()) {
+      return inventoryValidationError("VALIDATION");
+    }
+    if (request.mode() == null) {
+      return inventoryValidationError("VALIDATION");
+    }
+    try {
+      BulkRebookResultDto result =
+          backendApiClient.post(
+              "/api/v1/inventory/bulk-rebook", request, BulkRebookResultDto.class);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.debug("Failed to bulk-rebook inventory items (ajax): {}", e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Failed to bulk-rebook inventory items (ajax)", e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }

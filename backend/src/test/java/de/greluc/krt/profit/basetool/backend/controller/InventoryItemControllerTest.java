@@ -29,8 +29,11 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.model.BulkRebookMode;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationDimension;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationWriteDto;
@@ -65,7 +68,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
  * Pure-Mockito unit tests for {@link InventoryItemController}. The controller is otherwise a
- * delegating thin shell, but four behaviours need an explicit pin because regressing them is silent
+ * delegating thin shell, but five behaviours need an explicit pin because regressing them is silent
  * at the type level:
  *
  * <ul>
@@ -83,6 +86,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
  *       isLogistician} flag — because the service deliberately refuses to remove items owned by
  *       another user, regardless of role. The test confirms the boundary helper is NEVER consulted
  *       for bulk checkout.
+ *   <li>{@code POST /bulk-rebook} (REQ-INV-036) carries the same owner-only contract: it forwards
+ *       the calling user's id and never consults {@code isLogisticianOrAbove()}, so an admin cannot
+ *       bulk-move another member's stock through it.
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -1180,6 +1186,34 @@ class InventoryItemControllerTest {
     // future (e.g. "let's just accept the same isLogistician flag everywhere") would change
     // the data-isolation contract.
     verify(inventoryItemService).bulkCheckout(request, ownerId);
+    verify(authHelperService, never()).isLogisticianOrAbove();
+  }
+
+  // ── POST /inventory/bulk-rebook ──────────────────────────────────────
+
+  @Test
+  void bulkRebook_forwardsOwnerOnly_neverConsultsIsLogistician() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    BulkRebookRequest request =
+        new BulkRebookRequest(
+            List.of(UUID.randomUUID(), UUID.randomUUID()),
+            BulkRebookMode.LOCATION,
+            null,
+            UUID.randomUUID(),
+            null,
+            Boolean.TRUE);
+    BulkRebookResultDto expected = new BulkRebookResultDto(2, 0);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(inventoryItemService.bulkRebook(request, ownerId)).thenReturn(expected);
+
+    BulkRebookResultDto result = controller.bulkRebook(jwt, request);
+
+    // Same data-isolation contract as bulk checkout: the bulk rebooking is owner-scoped from the
+    // JWT and deliberately NOT role-overridable — an admin must use the single-row endpoints to
+    // move someone else's stock. Pin that isLogisticianOrAbove() is never consulted here.
+    assertThat(result).isSameAs(expected);
+    verify(inventoryItemService).bulkRebook(request, ownerId);
     verify(authHelperService, never()).isLogisticianOrAbove();
   }
 

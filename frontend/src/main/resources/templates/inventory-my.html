@@ -310,6 +310,12 @@
             <button type="button" id="bulkCheckoutBtn" class="btn btn-ghost" disabled
                     th:text="#{inventory.bulk.checkout.btn}"
                     data-trigger="inv-my-open-bulk">Markierte ausbuchen</button>
+            <!-- Massen-Umbuchen (REQ-INV-036): the same marked selection, moved in full instead of
+                 discarded — to another Ort/Nutzer, or across the personal marker. Shares the
+                 selection set and the enabled/disabled state with "Markierte ausbuchen". -->
+            <button type="button" id="bulkRebookBtn" class="btn btn-ghost" disabled
+                    th:text="#{inventory.bulk.rebook.btn}"
+                    data-trigger="inv-my-open-bulk-rebook">Markierte umbuchen</button>
             <span id="bulkCheckoutCount" class="krtm-color-var-color-gray-2-font-size-0-9rem-cdef"></span>
         </div>
 
@@ -687,6 +693,81 @@
     </div>
 </div>
 
+<!-- Massen-Umbuchen modal (REQ-INV-036) — the bulk counterpart of #umbuchenModal. Two differences
+     from the single-row dialog: there is no amount input (every marked row moves in full, since the
+     selection spans collapsed stacks and later pages and a per-row quantity could not be reviewed),
+     and the two personal directions are OWN radio options instead of one direction inferred from the
+     source row — a bulk selection can mix personal and shared stock, so the target state is stated
+     explicitly and rows already in it are skipped server-side. -->
+<div id="bulkRebookModal" class="modal krtm-display-none-5790">
+    <div class="modal-content hud-box">
+        <span class="close" data-trigger="inv-my-close-bulk-rebook"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></span>
+        <h2 class="mt-0" th:text="#{inventory.bulk.rebook.modal.title}">Markierte umbuchen</h2>
+        <p id="bulkRebookModalMessage" class="krtm-color-var-color-gray-1-font-family-lato-sans-e55d"></p>
+        <form id="bulkRebookForm">
+            <div class="form-group mb-1">
+                <label class="form-label" th:text="#{inventory.rebook.mode}">Umbuchungsart</label>
+                <div class="krtm-display-flex-gap-1-5rem-flex-wrap-wrap-82c0">
+                    <label class="flex-gap-sm cursor-pointer">
+                        <input type="radio" name="bulkRebookMode" value="LOCATION" checked data-trigger="inv-my-toggle-bulk-rebook-mode" class="m-0"> <span th:text="#{inventory.rebook.mode.location}">Ort / Nutzer</span>
+                    </label>
+                    <label class="flex-gap-sm cursor-pointer">
+                        <input type="radio" name="bulkRebookMode" value="PERSONALIZE" data-trigger="inv-my-toggle-bulk-rebook-mode" class="m-0"> <span th:text="#{inventory.rebook.mode.personalize}">Als persönlich umbuchen</span>
+                    </label>
+                    <label class="flex-gap-sm cursor-pointer">
+                        <input type="radio" name="bulkRebookMode" value="DEPERSONALIZE" data-trigger="inv-my-toggle-bulk-rebook-mode" class="m-0"> <span th:text="#{inventory.rebook.mode.depersonalize}">Ins gemeinsame Lager umbuchen</span>
+                    </label>
+                </div>
+            </div>
+
+            <div id="bulkRebookTransferFields" class="form-group krtm-margin-bottom-1rem-c2c0">
+                <div class="flex-gap-md">
+                    <div class="flex-1">
+                        <label for="bulkRebookTargetUserId" class="form-label" th:text="#{inventory.bookout.targetUser}">Umbuchen zu Nutzer</label>
+                        <select id="bulkRebookTargetUserId" data-trigger="inv-my-bulk-rebook-user-changed" class="w-full">
+                            <option th:each="user : ${users}" th:value="${user.id}" th:text="${user.effectiveName}"></option>
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label for="bulkRebookTargetLocationId" class="form-label" th:text="#{inventory.bookout.targetLocation}">Umbuchen zu Ort</label>
+                        <!-- Server-side location search (remote-locations): no preloaded catalog. Unlike
+                             the single-row modal there is no current location to seed — the selection can
+                             span many — so it opens empty and the user picks the destination. -->
+                        <select id="bulkRebookTargetLocationId" class="w-full" data-krt-combobox="remote-locations"></select>
+                    </div>
+                </div>
+            </div>
+
+            <p id="bulkRebookPersonalHint" class="krtm-color-var-color-gray-1-font-family-lato-sans-c5ea krtm-hidden"></p>
+
+            <!-- One org-unit picker for both pools that need one: the LOCATION target owner's, and the
+                 owner's own for DEPERSONALIZE. PERSONALIZE hides it — a personalized row keeps its
+                 source stamp. -->
+            <div id="bulkRebookOrgUnitWrapper" class="krtm-display-none-margin-top-0-75rem-d00c">
+                <label for="bulkRebookOrgUnitId" class="form-label" th:text="#{inventory.rebook.targetOrgUnit}">Buchen in OrgUnit</label>
+                <select id="bulkRebookOrgUnitId" class="w-full"></select>
+            </div>
+
+            <!-- REQ-INV-026: the per-action stock-merge opt-in, applied to every moved row. Always
+                 offered here (unlike the single-row modal, which hides it for PIECE): a bulk selection
+                 can mix SCU and PIECE stock, and the backend ignores the flag for the rows that
+                 always merge anyway. -->
+            <div id="bulkRebookMergeRow" class="form-group check-row mb-1">
+                <input type="checkbox" id="bulkRebookMergeStock">
+                <div>
+                    <label for="bulkRebookMergeStock" th:text="#{inventory.merge.label}">Mit vorhandenem Bestand zusammenführen</label>
+                    <p class="form-hint" th:text="#{inventory.merge.help}">Fügt diese Menge mit vorhandenem, gleichartigem Bestand zu einem Eintrag zusammen. Gilt nur für diese Buchung.</p>
+                </div>
+            </div>
+
+            <div class="mt-2-flex-gap">
+                <button type="submit" id="bulkRebookSubmitBtn" class="btn btn--cta" th:text="#{inventory.bulk.rebook.modal.confirm}">Umbuchen</button>
+                <button type="button" class="btn btn-ghost" data-trigger="inv-my-close-bulk-rebook" th:text="#{inventory.bulk.rebook.modal.cancel}">Abbrechen</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <th:block th:replace="~{fragments/toast :: toast}" />
 <!-- Shared Materialbörse release / edit modal, reused by the "Für Börse freigeben" leaf checkbox -->
 <th:block th:replace="~{fragments/materialboerse-modal :: releaseModal}"/>
@@ -705,6 +786,21 @@
         errorConflict: /*[[#{inventory.bulk.checkout.error.conflict}]]*/ 'Konflikt bei der Massenausbuchung. Bitte lade die Seite neu.',
         modalMessage: /*[[#{inventory.bulk.checkout.modal.message}]]*/ 'Sollen die {0} markierten Eintr\u00e4ge vollst\u00e4ndig ausgebucht werden?',
         selectAllFailed: /*[[#{inventory.bulk.selectAll.error}]]*/ 'Die Eintr\u00e4ge konnten nicht ermittelt werden.'
+    };
+
+    // REQ-INV-036 Massen-Umbuchen strings. `success` covers the all-moved case, `successPartial` the
+    // mixed one ({0} moved / {1} skipped) and `noneMoved` the all-skipped one \u2014 the page must not
+    // report a selection that was entirely already-at-target as a plain success.
+    var bulkRebookI18n = {
+        modalMessage: /*[[#{inventory.bulk.rebook.modal.message}]]*/ 'Sollen die {0} markierten Eintr\u00e4ge vollst\u00e4ndig umgebucht werden?',
+        success: /*[[#{inventory.bulk.rebook.success}]]*/ 'Massenumbuchung erfolgreich: {0} Eintr\u00e4ge umgebucht.',
+        successPartial: /*[[#{inventory.bulk.rebook.success.partial}]]*/ '{0} Eintr\u00e4ge umgebucht, {1} \u00fcbersprungen (lagen bereits am Ziel).',
+        noneMoved: /*[[#{inventory.bulk.rebook.none}]]*/ 'Kein Eintrag umgebucht \u2013 alle markierten Eintr\u00e4ge liegen bereits am Ziel.',
+        errorEmpty: /*[[#{inventory.bulk.rebook.error.empty}]]*/ 'Bitte mindestens einen Eintrag ausw\u00e4hlen.',
+        errorFailed: /*[[#{inventory.bulk.rebook.error.failed}]]*/ 'Fehler bei der Massenumbuchung.',
+        errorNoTarget: /*[[#{inventory.bulk.rebook.error.noTarget}]]*/ 'Bitte einen Ziel-Ort oder Ziel-Nutzer ausw\u00e4hlen.',
+        hintPersonalize: /*[[#{inventory.bulk.rebook.hint.personalize}]]*/ 'Alle markierten Eintr\u00e4ge werden als pers\u00f6nlich markiert.',
+        hintDepersonalize: /*[[#{inventory.bulk.rebook.hint.depersonalize}]]*/ 'Alle markierten Eintr\u00e4ge werden ins gemeinsame Lager umgebucht.'
     };
 
     // #577 part 2: the single book-out and the bulk-checkout now save in place through the shared

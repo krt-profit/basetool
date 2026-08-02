@@ -236,6 +236,34 @@ class InventoryPageControllerMvcTest {
                         List.of("id=\"bulkSelectAllBtn\"", "id=\"bulkCheckoutBtn\""))));
   }
 
+  // REQ-INV-036: the Massen-Umbuchen action renders in the same bulk bar, after "Markierte
+  // ausbuchen", and its modal offers all three modes — LOCATION plus BOTH personal directions,
+  // which a bulk selection needs because it can mix personal and shared stock (the single-row
+  // modal, by contrast, infers one direction from the source row).
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewMyInventory_rendersBulkRebookButtonAndModalWithAllThreeModes() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/my"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("id=\"bulkRebookBtn\"")))
+        .andExpect(content().string(containsString("data-trigger=\"inv-my-open-bulk-rebook\"")))
+        .andExpect(content().string(containsString("id=\"bulkRebookModal\"")))
+        .andExpect(content().string(containsString("id=\"bulkRebookForm\"")))
+        .andExpect(content().string(containsString("value=\"PERSONALIZE\"")))
+        .andExpect(content().string(containsString("value=\"DEPERSONALIZE\"")))
+        // The bulk-rebook button follows the bulk-checkout button in the bar.
+        .andExpect(
+            content()
+                .string(
+                    stringContainsInOrder(
+                        List.of("id=\"bulkCheckoutBtn\"", "id=\"bulkRebookBtn\""))));
+  }
+
   // REQ-FE-016: the Umbuchen modal's target-location select is a server-side-search combobox
   // (remote-locations) on both Lager views — the marker value must sit on the (statically
   // attributed) select, which renders EMPTY (no preloaded catalog options; the modal-opening JS

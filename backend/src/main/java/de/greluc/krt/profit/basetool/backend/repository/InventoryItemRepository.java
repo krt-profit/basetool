@@ -985,6 +985,27 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   Optional<InventoryItem> findByIdForUpdate(@Param("id") UUID id);
 
   /**
+   * Loads one row of a bulk rebooking (Massen-Umbuchen, REQ-INV-036) under a pessimistic write
+   * lock.
+   *
+   * <p>Same locking as {@link #findByIdForUpdate} — the bulk bar carries no {@code @Version} to
+   * echo (its "Alle markieren" id set is resolved server-side), so the row lock, not an optimistic
+   * token, is what serialises two concurrent writers. Unlike {@code findByIdForUpdate} the graph
+   * also pulls {@code gameItem}: a rebooking copies the catalog reference <em>pair</em> onto the
+   * moved row (design §4.4), so fetching only {@code material} would lazy-load the game item once
+   * per row. Kept as its own method rather than widening {@code findByIdForUpdate}, whose
+   * bulk-checkout caller never reads the catalog reference. The two allocation collections stay
+   * lazy — both are bags, so graphing them together would raise {@code MultipleBagFetchException}.
+   *
+   * @param id the inventory row id.
+   * @return the locked row, or empty when unknown.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @EntityGraph(attributePaths = {"material", "gameItem", "user", "location", "owningOrgUnit"})
+  @Query("SELECT i FROM InventoryItem i WHERE i.id = :id")
+  Optional<InventoryItem> findByIdForRebook(@Param("id") UUID id);
+
+  /**
    * Loads every warehouse row that shares the <em>physical</em> stock identity of a just-written
    * row, locked {@code PESSIMISTIC_WRITE} ({@code FOR UPDATE}) — the merge candidates for the
    * write-time stock merge (REQ-INV-026). Since Variante C (REQ-INV-027) the group key is the row's

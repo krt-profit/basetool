@@ -784,6 +784,76 @@ already known at storage time.
 `templates/refinery-orders-details.html`, `static/js/refinery-orders-details.js` · **Issues:** — ·
 **ADR:** —
 
+### REQ-INV-036 — "Markierte umbuchen": the bulk bar moves the whole selection, skipping already-at-target rows
+
+The "Mein Lager" bulk bar (`/inventory/my`, both the Material and the Items view) offers
+**"Markierte umbuchen"** next to "Markierte ausbuchen", acting on the **same** marked selection
+(REQ-INV-034) but *moving* the rows instead of discarding them. It is the bulk counterpart of the
+single-row Umbuchen modal (REQ-INV-007 / REQ-INV-025) and covers both of its destinations: another
+Ort / Nutzer / OrgUnit-Pool, or the personal marker.
+
+- **Every marked row moves in full.** There is no per-row amount. The selection spans collapsed
+  stacks and later pages, so a per-row quantity could not be reviewed before submitting; moving the
+  whole row keeps the action predictable, lets each moved row inherit **all** of its job-order /
+  mission earmarks unchanged ("Marken mitnehmen", REQ-INV-027 — a full move with no explicit
+  deduct-from plan resolves to "every slice in full"), and leaves no source remainder. Each source
+  row is therefore always deleted; its allocations cascade away (V217) after being copied onto the
+  target, and its free-text note is carried over so a whole-row relocation cannot silently lose it.
+- **Three explicit modes**, not an inferred direction. `LOCATION` moves to the picked target user /
+  location / owning org unit; `PERSONALIZE` and `DEPERSONALIZE` are **separate** modes rather than
+  one direction derived from the source row, because a bulk selection can mix personal and shared
+  stock and a per-row flip would make the outcome depend on what happened to be marked. A `LOCATION`
+  request that carries neither a target user nor a target location is rejected (REQ-INV-025 parity),
+  so it can never report an all-skipped success.
+- **Skip already-at-target, abort on everything else** (ADR-0124). A row already sitting in the
+  requested target state — same user *and* location for `LOCATION`, already personal / already
+  shared for the two personal modes — is **skipped and counted**, not failed: "Alle markieren"
+  routinely marks rows that are already at the destination, and failing on them would make the
+  action unusable. Every *other* obstacle aborts the whole transaction so nothing is written: an
+  unknown id (404), a row owned by another user (403), an unknown target (404), and a job-order /
+  mission earmark blocking a `PERSONALIZE` (400 — a personal row may never carry either association,
+  and silently dropping the link would lose the assignment). The whole selection is validated before
+  the first write, so the earmark rejection names how many rows block it rather than only the first.
+- **The counts are reported, not rounded up.** The endpoint answers `{rebooked, skipped}` and the
+  page phrases its toast from both: all-moved reads as a success, a mixed run names both numbers,
+  and an all-skipped run is reported as "nothing moved" rather than as a success.
+- **Owner-scoped, like the bulk checkout.** `POST /api/v1/inventory/bulk-rebook` derives the owner
+  from the JWT and is deliberately **not** role-overridable — an admin must use the single-row
+  endpoints to move another member's stock. The selection carries no client `@Version` (the bulk bar
+  holds only ids, and the server-resolved select-all set never carries versions), so each row is
+  loaded under a pessimistic write lock instead; the ids are deduplicated and locked in sorted order
+  so two concurrent bulk rebookings over overlapping selections cannot deadlock.
+- **Merge opt-in applies per moved row** (REQ-INV-026). The modal always offers the checkbox — a bulk
+  selection can mix SCU and PIECE stock, and the flag is ignored for the rows that always merge.
+- **Audit:** one summarizing `INVENTORY_BULK_REBOOKED` event per action carrying the mode and the
+  moved/skipped counts, mirroring `INVENTORY_BULK_CHECKED_OUT`; the individual moves are not audited
+  separately. A run that moved nothing records no event, because it mutated no state.
+
+**Acceptance**
+
+- [ ] `/inventory/my` (Material and Items view) renders "Markierte umbuchen" after "Markierte
+  ausbuchen"; both are enabled exactly when the selection is non-empty, and the modal offers all
+  three modes.
+- [ ] Rebooking a selection to a target location moves every marked row in full and skips those
+  already at that location; the response counts both and the toast names both numbers.
+- [ ] An unknown id, a foreign row, or an earmarked row in a `PERSONALIZE` selection leaves the
+  whole selection unchanged (no partial write) and surfaces the matching status.
+- [ ] A moved row arrives carrying the source's job-order / mission slices at their full amounts,
+  and the source row is gone.
+- [ ] `POST /api/v1/inventory/bulk-rebook` never consults `isLogisticianOrAbove()`.
+- [ ] A rebooking that moved at least one row records exactly one `INVENTORY_BULK_REBOOKED` audit
+  event with the mode and both counts; an all-skipped run records none.
+
+**Enforced by:** `InventoryCheckoutServiceBulkRebookTest`, `InventoryItemControllerTest`
+(`bulkRebook_forwardsOwnerOnly_neverConsultsIsLogistician`), `InventoryBulkRebookAjaxControllerTest`,
+`InventoryPageControllerMvcTest`
+(`viewMyInventory_rendersBulkRebookButtonAndModalWithAllThreeModes`) · **Code:**
+`InventoryCheckoutService#bulkRebook`, `InventoryItemService#bulkRebook`,
+`InventoryItemController#bulkRebook`, `InventoryItemRepository#findByIdForRebook`,
+`BulkRebookRequest` / `BulkRebookResultDto` / `BulkRebookMode`,
+`InventoryWriteController#bulkRebook`, `templates/inventory-my.html`,
+`static/js/inventory-my.js` · **Issues:** — · **ADR:** ADR-0124
+
 ## Out of scope
 
 - Tenancy / visibility scope of inventory (strict-staffel Lager-View) is governed by

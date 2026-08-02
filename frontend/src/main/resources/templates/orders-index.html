@@ -47,8 +47,9 @@
             </label>
             <!-- Squadron multi-select filter (REQ-ORDERS-027): check the squadrons whose orders to
                  show (matching responsible OR requesting side). All active squadrons are offered;
-                 default = all checked (= no narrowing). The selection is persisted per-user in
-                 localStorage by orders-index.js (not a server cookie) and re-applied on load. The
+                 default = all checked (= no narrowing). The selection is persisted per BROWSER in
+                 localStorage by orders-index.js (bare key, no user id; not a server cookie —
+                 ADR-0120) and re-applied on load. The
                  dropdown mirrors the Lager multi-select (.multi-select-container). The backend filter
                  is a display preference, not an access-control gate. -->
             <th:block th:unless="${requesterView}">
@@ -145,10 +146,11 @@
                     <span th:text="${order.handle}"></span>
                 </td>
                 <td class="p-0" th:with="matCount=${order.type == 'ITEM' ? (order.aggregatedMaterials != null ? order.aggregatedMaterials.size() : 0) : (order.materials != null ? order.materials.size() : 0)}">
-                    <!-- Collapsible material sublist (default collapsed, per-user localStorage state
-                         restored on load + after every fragment swap by orders-index.js — the same
-                         idiom as the Lager tree, REQ-INV-002). The toggle button + the count stay
-                         visible; only the tables collapse. -->
+                    <!-- Collapsible material sublist (default collapsed, per-BROWSER localStorage
+                         state restored on load + after every fragment swap by orders-index.js — the
+                         same idiom as the Lager tree, REQ-INV-002, but keyed per browser: this key
+                         carries no user id where the Lager tree's does). The toggle button + the
+                         count stay visible; only the tables collapse. -->
                     <button type="button" class="btn btn-ghost ord-materials-toggle" data-trigger="ord-toggle-materials" th:data-order-id="${order.id}" aria-expanded="false">
                         <span class="toggle-icon" aria-hidden="true">&#9654;</span>
                         <span th:text="#{orders.index.materials}">Materialien</span>

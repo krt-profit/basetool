@@ -34,7 +34,7 @@
  * same end-of-body position (after the modals and the toast fragment), never with defer.
  */
 
-/* global stackEntriesI18n, bulkI18n, inventoryConflictI18n, bookOutI18n, umbuchenI18n, assocI18n, showInventoryToast, openNoteModal, closeNoteModal, updateNoteCounter, saveNote, removeNote */
+/* global stackEntriesI18n, bulkI18n, bulkRebookI18n, inventoryConflictI18n, bookOutI18n, umbuchenI18n, assocI18n, showInventoryToast, openNoteModal, closeNoteModal, updateNoteCounter, saveNote, removeNote */
 
 // Which Lager view is active (REQ-INV-030): the Material <-> Items switch is server-rendered
 // navigation, so the authoritative state is the page URL's view= parameter — which every filter
@@ -91,8 +91,11 @@ function applyBulkSelectionToLoaded(root) {
 function updateBulkCheckoutState() {
     const count = bulkSelectedIds.size;
     const btn = document.getElementById('bulkCheckoutBtn');
+    const rebookBtn = document.getElementById('bulkRebookBtn');
     const countSpan = document.getElementById('bulkCheckoutCount');
     if (btn) btn.disabled = count === 0;
+    // Massen-Umbuchen (REQ-INV-036) acts on the same selection, so it shares the enabled state.
+    if (rebookBtn) rebookBtn.disabled = count === 0;
     if (countSpan) countSpan.textContent = count > 0 ? '(' + count + ')' : '';
     // Update group-select-all checkboxes — they mirror only their currently-loaded leaf boxes (a
     // collapsed group has none loaded, so it stays unchecked even under a view-wide select-all; the
@@ -300,7 +303,228 @@ async function executeBulkCheckout() {
 window.addEventListener('click', function (event) {
     const bulkModal = document.getElementById('bulkCheckoutModal');
     if (event.target === bulkModal) closeBulkCheckoutModal();
+    const rebookModal = document.getElementById('bulkRebookModal');
+    if (event.target === rebookModal) closeBulkRebookModal();
 });
+
+// ── Massen-Umbuchen (REQ-INV-036) ──────────────────────────────────────────────────────────────
+// The bulk counterpart of the single-row Umbuchen modal: the SAME marked selection (bulkSelectedIds),
+// moved in full instead of discarded. Two deliberate differences from the single-row dialog: there is
+// no amount input — the selection spans collapsed stacks and later pages (REQ-INV-034), so a per-row
+// quantity could not be reviewed before submitting — and the two personal directions are explicit
+// radio options rather than one direction inferred from the source row, because a bulk selection can
+// mix personal and shared stock. Rows already sitting in the chosen target state are skipped
+// server-side and reported back, so the toast never claims more than actually moved.
+let bulkRebookInFlight = false;
+
+// The mode radio's current value; LOCATION is both the default and the fallback.
+function bulkRebookMode() {
+    const checked = document.querySelector('input[name="bulkRebookMode"]:checked');
+    return checked ? checked.value : 'LOCATION';
+}
+
+// The page-local showInventoryToast targets a #toast element that does not exist on this page (see
+// executeBulkCheckout), so the bulk-rebook errors go through the working global toast.
+function showBulkRebookError(message) {
+    if (typeof window.showFrontendErrorToast === 'function') {
+        window.showFrontendErrorToast(message);
+    }
+}
+
+// The caller's own user id, read from the tree's data-user-id (both the Material and the Items view
+// render it). Read at call time, never cached: the tree lives inside the swapped fragment, so a
+// stored reference would go stale on every re-swap.
+function currentInventoryUserId() {
+    const table = document.getElementById('inventoryTable');
+    return table ? table.getAttribute('data-user-id') : null;
+}
+
+// Populates the single org-unit picker with whichever pool the active mode needs: the LOCATION
+// destination owner's memberships, or the caller's own when de-personalizing. PERSONALIZE has no
+// pool to pick — a personalized row keeps its source stamp — so the picker stays hidden there.
+function refreshBulkRebookOrgUnitPicker() {
+    const wrapper = document.getElementById('bulkRebookOrgUnitWrapper');
+    const select = document.getElementById('bulkRebookOrgUnitId');
+    if (!wrapper || !select) return;
+    const mode = bulkRebookMode();
+    select.innerHTML = '';
+    wrapper.style.display = 'none';
+    if (mode === 'PERSONALIZE') return;
+    const userSelect = document.getElementById('bulkRebookTargetUserId');
+    const ownerId =
+        mode === 'LOCATION' && userSelect && userSelect.value
+            ? userSelect.value
+            : currentInventoryUserId();
+    if (!ownerId) return;
+    // ?allKinds=true surfaces the owner's Bereich/OL memberships too, not just Staffel/SK (the
+    // endpoint default) — mirroring the single-row pickers (#1328). Fetched through the frontend's
+    // /users/{id}/memberships proxy: the frontend origin maps no /api/v1/users/** route.
+    fetch('/users/' + encodeURIComponent(ownerId) + '/memberships?allKinds=true', {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+    })
+        .then(function (r) {
+            return r.ok ? r.json() : [];
+        })
+        .then(function (memberships) {
+            if (!Array.isArray(memberships) || memberships.length < 1) return;
+            memberships.forEach(function (opt) {
+                const o = document.createElement('option');
+                o.value = opt.orgUnitId;
+                o.textContent = opt.orgUnitName;
+                select.appendChild(o);
+            });
+            wrapper.style.display = 'block';
+        })
+        .catch(function () {
+            wrapper.style.display = 'none';
+        });
+}
+
+// Shows the fields the active mode needs, hides the rest, and repopulates the org-unit picker.
+function toggleBulkRebookMode() {
+    const mode = bulkRebookMode();
+    const transferFields = document.getElementById('bulkRebookTransferFields');
+    const hint = document.getElementById('bulkRebookPersonalHint');
+    if (transferFields) transferFields.style.display = mode === 'LOCATION' ? 'block' : 'none';
+    if (hint) {
+        hint.classList.toggle('krtm-hidden', mode === 'LOCATION');
+        if (mode === 'PERSONALIZE') hint.textContent = bulkRebookI18n.hintPersonalize;
+        else if (mode === 'DEPERSONALIZE') hint.textContent = bulkRebookI18n.hintDepersonalize;
+    }
+    refreshBulkRebookOrgUnitPicker();
+}
+
+function openBulkRebookModal() {
+    const ids = getCheckedItemIds();
+    if (ids.length === 0) {
+        showBulkRebookError(bulkRebookI18n.errorEmpty);
+        return;
+    }
+    const msgEl = document.getElementById('bulkRebookModalMessage');
+    if (msgEl) msgEl.textContent = bulkRebookI18n.modalMessage.replace('{0}', ids.length);
+
+    // Reset on every open so a previous run's mode and target cannot leak into the next one.
+    const locationRadio = document.querySelector('input[name="bulkRebookMode"][value="LOCATION"]');
+    if (locationRadio) locationRadio.checked = true;
+    const mergeCheckbox = document.getElementById('bulkRebookMergeStock');
+    if (mergeCheckbox) mergeCheckbox.checked = false;
+    // The destination location opens EMPTY. Unlike the single-row modal there is no current location
+    // to seed — the selection can span many — and an empty picker keeps the user from moving stock to
+    // a location they never consciously chose.
+    const tl = document.getElementById('bulkRebookTargetLocationId');
+    if (tl && tl.krtCombobox) tl.krtCombobox.setValue('');
+    else if (tl) tl.value = '';
+    // Default the destination owner to the caller: a bulk move usually only relocates own stock.
+    const tu = document.getElementById('bulkRebookTargetUserId');
+    const me = currentInventoryUserId();
+    if (tu && me) tu.value = me;
+
+    toggleBulkRebookMode();
+    // `.modal` centres its content via display:flex; opening with inline `flex` (not `block`)
+    // preserves that centring (matches the canonical .krtm-modal-open = flex, #1328).
+    document.getElementById('bulkRebookModal').style.display = 'flex';
+}
+
+function closeBulkRebookModal() {
+    document.getElementById('bulkRebookModal').style.display = 'none';
+}
+
+// Reports the moved/skipped split honestly: a run that only skipped rows (everything already sat at
+// the target) must not read as a success, and a partial run must name both numbers.
+function reportBulkRebookOutcome(body) {
+    const rebooked = body && typeof body.rebooked === 'number' ? body.rebooked : 0;
+    const skipped = body && typeof body.skipped === 'number' ? body.skipped : 0;
+    if (rebooked === 0) {
+        showBulkRebookError(bulkRebookI18n.noneMoved);
+        return;
+    }
+    const message =
+        skipped > 0
+            ? bulkRebookI18n.successPartial.replace('{0}', rebooked).replace('{1}', skipped)
+            : bulkRebookI18n.success.replace('{0}', rebooked);
+    if (typeof window.showFrontendSuccessToast === 'function') {
+        window.showFrontendSuccessToast(message);
+    }
+}
+
+function submitBulkRebook(event) {
+    if (event) event.preventDefault();
+    if (bulkRebookInFlight || !window.krtFetch) return;
+    const ids = getCheckedItemIds();
+    if (ids.length === 0) {
+        closeBulkRebookModal();
+        showBulkRebookError(bulkRebookI18n.errorEmpty);
+        return;
+    }
+    const mode = bulkRebookMode();
+
+    let targetUserId = null;
+    let targetLocationId = null;
+    if (mode === 'LOCATION') {
+        targetUserId = document.getElementById('bulkRebookTargetUserId').value || null;
+        targetLocationId = document.getElementById('bulkRebookTargetLocationId').value || null;
+        // The backend rejects a target-less transfer (REQ-INV-025 parity). Catch it here so the user
+        // gets a precise message instead of a generic failure toast.
+        if (!targetUserId && !targetLocationId) {
+            showBulkRebookError(bulkRebookI18n.errorNoTarget);
+            return;
+        }
+    }
+
+    // The picker is populated asynchronously, so read it only while it is actually shown; otherwise
+    // send null and let the backend resolve the destination owner's default pool.
+    const orgWrapper = document.getElementById('bulkRebookOrgUnitWrapper');
+    const orgSelect = document.getElementById('bulkRebookOrgUnitId');
+    const orgUnitId =
+        orgWrapper && window.getComputedStyle(orgWrapper).display !== 'none' && orgSelect
+            ? orgSelect.value || null
+            : null;
+    const mergeCheckbox = document.getElementById('bulkRebookMergeStock');
+
+    // Collect every earmarked order across the marked entries before the write: a LOCATION move
+    // carries the order slices onto the moved rows, so those order collections must refresh too.
+    const affectedOrderIds = [];
+    ids.forEach(function (itemId) {
+        collectLeafOrderIds(itemId).forEach(function (orderId) {
+            if (affectedOrderIds.indexOf(orderId) < 0) affectedOrderIds.push(orderId);
+        });
+    });
+
+    const submitBtn = document.getElementById('bulkRebookSubmitBtn');
+    bulkRebookInFlight = true;
+    if (submitBtn) submitBtn.disabled = true;
+    window.krtFetch
+        .write({
+            method: 'POST',
+            url: '/inventory/bulk-rebook',
+            payload: {
+                itemIds: ids,
+                mode: mode,
+                targetUserId: targetUserId,
+                targetLocationId: targetLocationId,
+                targetOwningOrgUnitId: orgUnitId,
+                mergeStock: !!(mergeCheckbox && mergeCheckbox.checked),
+            },
+            toast: false,
+            errorMessage: bulkRebookI18n.errorFailed,
+            conflict: inventoryConflictI18n,
+            onSuccess: function (body) {
+                closeBulkRebookModal();
+                reportBulkRebookOutcome(body);
+                // filterMyInventory() re-swaps the grouped table and clears the bulk selection (set,
+                // count, buttons + toggle label) at its start, so no manual reset is needed here.
+                filterMyInventory();
+                broadcastInventoryChanged();
+                broadcastOrdersChanged(affectedOrderIds);
+                broadcastBoardChanged();
+            },
+        })
+        .then(function () {
+            bulkRebookInFlight = false;
+            if (submitBtn) submitBtn.disabled = false;
+        });
+}
 
 function toggleMultiSelect(id) {
     const el = document.getElementById(id);
@@ -2087,6 +2311,15 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'inv-my-remove-note', removeNote);
     window.krtEvents.on('click', 'inv-my-close-bulk', closeBulkCheckoutModal);
     window.krtEvents.on('click', 'inv-my-execute-bulk', executeBulkCheckout);
+    // Massen-Umbuchen (REQ-INV-036).
+    window.krtEvents.on('click', 'inv-my-open-bulk-rebook', openBulkRebookModal);
+    window.krtEvents.on('click', 'inv-my-close-bulk-rebook', closeBulkRebookModal);
+    window.krtEvents.on('change', 'inv-my-toggle-bulk-rebook-mode', toggleBulkRebookMode);
+    window.krtEvents.on(
+        'change',
+        'inv-my-bulk-rebook-user-changed',
+        refreshBulkRebookOrgUnitPicker,
+    );
 }
 
 // The book-out form is a stable top-level element (outside the swapped table container), so a
@@ -2101,4 +2334,10 @@ if (bookOutFormEl) {
 let umbuchenFormEl = document.getElementById('umbuchenForm');
 if (umbuchenFormEl) {
     umbuchenFormEl.addEventListener('submit', submitUmbuchen);
+}
+// The Massen-Umbuchen form is a stable top-level element too, so one bound submit listener survives
+// the grouped-table re-swaps. It carries no amount input, so no scu-decimal capture phase applies.
+let bulkRebookFormEl = document.getElementById('bulkRebookForm');
+if (bulkRebookFormEl) {
+    bulkRebookFormEl.addEventListener('submit', submitBulkRebook);
 }

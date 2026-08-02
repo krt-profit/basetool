@@ -37,6 +37,8 @@ import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationDimension;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationInput;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationWriteDto;
@@ -1182,6 +1184,21 @@ public class InventoryItemService {
   @Transactional
   public void bulkCheckout(BulkCheckoutRequest request, UUID currentUserId) {
     inventoryCheckoutService.bulkCheckout(request, currentUserId);
+  }
+
+  /**
+   * Bulk rebooking (Massen-Umbuchen, REQ-INV-036): moves every listed row of the caller's own
+   * inventory to another location/owner or across the personal marker in one action. Rows already
+   * sitting in the requested target state are skipped and counted; any other obstacle aborts the
+   * whole action. Delegates to {@link InventoryCheckoutService#bulkRebook}.
+   *
+   * @param request the selection, the mode and the mode's target fields
+   * @param currentUserId the UUID of the authenticated user (JWT sub)
+   * @return how many rows moved and how many were skipped as already-at-target
+   */
+  @Transactional
+  public BulkRebookResultDto bulkRebook(BulkRebookRequest request, UUID currentUserId) {
+    return inventoryCheckoutService.bulkRebook(request, currentUserId);
   }
 
   /**

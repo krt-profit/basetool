@@ -188,7 +188,9 @@ function restoreOrderMaterials(root) {
 
 // ---- Multi-select squadron filter (default all, localStorage-persisted, REQ-ORDERS-027) ---------
 // A checkbox dropdown of the active squadrons (mirrors the Lager .multi-select-container). The
-// selection is stored per-user in localStorage; the list is filtered SERVER-side (the queue is
+// selection is stored per BROWSER in localStorage (the key is bare — no user id, unlike the Lager
+// tree's data-user-id suffix — so two accounts on one profile share it, ADR-0120); the list is
+// filtered SERVER-side (the queue is
 // paginated), so a change re-fetches the results fragment. "All checked" == no filter (show every
 // scoped order, incl. SK-only); a subset sends its ids; "none checked" sends a nil-uuid sentinel
 // (empty result). Absence of the key means "no saved preference" (leave the server default = all).

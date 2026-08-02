@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.model.BulkRebookMode;
 import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.model.FinanceType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -39,6 +40,8 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
@@ -1055,6 +1058,331 @@ public class InventoryCheckoutService {
         null,
         currentUserId,
         AuditDetails.of("count", toDelete.size()));
+  }
+
+  /**
+   * Bulk rebooking (Massen-Umbuchen, REQ-INV-036): moves every listed row of the caller's own
+   * inventory in one action — to another location / owner ({@link BulkRebookMode#LOCATION}) or
+   * across the personal marker ({@link BulkRebookMode#PERSONALIZE} / {@link
+   * BulkRebookMode#DEPERSONALIZE}). Each row moves in <em>full</em>; there is no per-row amount, so
+   * every moved row inherits all of its job-order / mission earmarks unchanged and no source
+   * remainder is ever left behind.
+   *
+   * <p><strong>Skip vs. abort.</strong> A row that already sits in the requested target state —
+   * same user <em>and</em> location for {@code LOCATION}, already personal / already shared for the
+   * two personal modes — is <em>skipped</em> and counted, not treated as an error: a "Alle
+   * markieren" selection (REQ-INV-034) spans the whole filtered view, so it routinely contains rows
+   * that are already at the destination, and failing the action on them would make bulk rebooking
+   * unusable. Every <em>other</em> obstacle — an unknown id, a row owned by someone else, or a
+   * job-order / mission earmark blocking a {@code PERSONALIZE} — aborts the whole transaction so
+   * nothing is written, mirroring {@link #bulkCheckout}. The returned counts therefore never hide a
+   * failure.
+   *
+   * <p>Concurrency: the selection carries no client {@code @Version} to echo (the bulk bar holds
+   * only ids, and its server-resolved select-all set never carries versions), so each row is loaded
+   * under a pessimistic write lock via {@link InventoryItemRepository#findByIdForRebook} — the row
+   * lock, not an optimistic token, is what serialises two concurrent writers. The ids are
+   * deduplicated and locked in a deterministic (sorted) order so two concurrent bulk rebookings
+   * over overlapping selections cannot deadlock by grabbing the same rows in opposite orders. The
+   * whole selection is loaded and validated before the first write, which keeps a mid-loop abort
+   * from depending on how far the loop had got and lets the earmark rejection name the exact count.
+   *
+   * <p>Follows the bulk-update-after-loop discipline: the per-row writes go through JPA
+   * saves/deletes and {@link #mergeStockIfRequested} only — no {@code @Modifying(clearAutomatically
+   * = true)} query runs inside the loop, so the persistence context is never detached
+   * mid-iteration. Each source row is removed entirely (a full move always depletes it), so its
+   * allocations cascade away (FK {@code ON DELETE CASCADE}, V217) and no Materialbörse ratchet is
+   * needed — as with the single full-amount transfer, an offer backed by a moved row cascades away
+   * with it.
+   *
+   * @param request the selection, the mode and the mode's target fields
+   * @param currentUserId the authenticated caller's user id; every listed row must belong to them
+   * @return how many rows moved and how many were skipped as already-at-target
+   * @throws NotFoundException when an id is unknown, or the target user / location does not exist
+   * @throws AccessDeniedException when a listed row belongs to another user
+   * @throws BadRequestException when a {@code LOCATION} rebooking carries neither a target user nor
+   *     a target location, or when a {@code PERSONALIZE} selection contains a row earmarked for a
+   *     job order or mission
+   */
+  @Transactional
+  public BulkRebookResultDto bulkRebook(BulkRebookRequest request, UUID currentUserId) {
+    log.info(
+        "Bulk rebook ({}) requested by user {} for {} items",
+        request.mode(),
+        currentUserId,
+        request.itemIds().size());
+
+    final List<InventoryItem> rows = loadOwnRowsForRebook(request.itemIds(), currentUserId);
+    // The rows all belong to the caller (enforced above), so any row's owner is the caller — used
+    // as
+    // the membership gate for the org-unit picker when the request keeps the current owner.
+    final User owner = rows.getFirst().getUser();
+
+    final boolean mergeStock = Boolean.TRUE.equals(request.mergeStock());
+    final BulkRebookResultDto result =
+        switch (request.mode()) {
+          case LOCATION -> bulkRebookToTarget(rows, request, owner, mergeStock);
+          case PERSONALIZE -> bulkRebookPersonalMarker(rows, request, true, mergeStock);
+          case DEPERSONALIZE -> bulkRebookPersonalMarker(rows, request, false, mergeStock);
+        };
+
+    log.info(
+        "Bulk rebook ({}) completed for user {}: {} rebooked, {} skipped",
+        request.mode(),
+        currentUserId,
+        result.rebooked(),
+        result.skipped());
+    // Audit only a rebooking that actually moved something: an all-skipped run mutated no state, so
+    // recording it would add noise to the audit log without describing a change (REQ-AUDIT-001
+    // covers state-mutating activities). One summarizing event per action, as for bulk checkout.
+    if (result.rebooked() > 0) {
+      auditService.record(
+          AuditEventType.INVENTORY_BULK_REBOOKED,
+          null,
+          null,
+          currentUserId,
+          AuditDetails.of("mode", request.mode())
+              .with("rebooked", result.rebooked())
+              .with("skipped", result.skipped()));
+    }
+    return result;
+  }
+
+  /**
+   * Phase one of {@link #bulkRebook}: loads every distinct listed row under a pessimistic write
+   * lock in sorted id order and asserts the caller owns it, before any write happens.
+   *
+   * @param itemIds the requested ids (may contain duplicates; deduplicated here)
+   * @param currentUserId the authenticated caller's user id
+   * @return the locked, owned rows in sorted id order; never empty (the DTO validates non-empty)
+   * @throws NotFoundException when an id is unknown
+   * @throws AccessDeniedException when a row belongs to another user
+   */
+  private List<InventoryItem> loadOwnRowsForRebook(List<UUID> itemIds, UUID currentUserId) {
+    final List<UUID> orderedIds = itemIds.stream().distinct().sorted().toList();
+    final List<InventoryItem> rows = new ArrayList<>(orderedIds.size());
+    for (UUID itemId : orderedIds) {
+      InventoryItem item =
+          inventoryItemRepository
+              .findByIdForRebook(itemId)
+              .orElseThrow(() -> new NotFoundException("Inventory item not found: " + itemId));
+      if (!item.getUser().getId().equals(currentUserId)) {
+        log.warn(
+            "User {} attempted to bulk-rebook item {} owned by {}",
+            currentUserId,
+            itemId,
+            item.getUser().getId());
+        throw new AccessDeniedException("You are not allowed to rebook inventory item: " + itemId);
+      }
+      rows.add(item);
+    }
+    return rows;
+  }
+
+  /**
+   * The {@link BulkRebookMode#LOCATION} branch of {@link #bulkRebook}: moves every row to the
+   * requested target user / location, keeping each row's own value for whichever of the two the
+   * request left blank. Rows already sitting at the target are skipped.
+   *
+   * @param rows the locked, owned source rows
+   * @param request the bulk request (read for the two targets and the org-unit pick)
+   * @param owner the rows' owner, the membership gate when the request keeps the current owner
+   * @param mergeStock the per-action stock-merge opt-in
+   * @return the moved / skipped counts
+   * @throws BadRequestException when neither a target user nor a target location was given
+   * @throws NotFoundException when the target user or location is unknown
+   */
+  private BulkRebookResultDto bulkRebookToTarget(
+      List<InventoryItem> rows, BulkRebookRequest request, User owner, boolean mergeStock) {
+    // REQ-INV-025 parity: a transfer with no target at all would silently move nothing, so reject
+    // it
+    // up front rather than reporting an all-skipped success.
+    if (request.targetUserId() == null && request.targetLocationId() == null) {
+      throw new BadRequestException("Bulk transfer requires a target user or a target location");
+    }
+    final User targetUser =
+        request.targetUserId() == null
+            ? null
+            : userRepository
+                .findById(request.targetUserId())
+                .orElseThrow(() -> new NotFoundException("Target user not found"));
+    final Location targetLocation =
+        request.targetLocationId() == null
+            ? null
+            : locationRepository
+                .findById(request.targetLocationId())
+                .orElseThrow(() -> new NotFoundException("Target location not found"));
+
+    // Resolved once: every row has the same owner, so the destination owner — and therefore the
+    // membership gate for the picked pool — is constant across the whole selection.
+    final OrgUnit targetOwningOrgUnit =
+        ownerScopeService.resolveOrgUnitForPickerOutputNullable(
+            targetUser != null ? targetUser : owner, request.targetOwningOrgUnitId());
+
+    int rebooked = 0;
+    int skipped = 0;
+    for (InventoryItem item : rows) {
+      final User rowTargetUser = targetUser != null ? targetUser : item.getUser();
+      final Location rowTargetLocation =
+          targetLocation != null ? targetLocation : item.getLocation();
+      if (isSameStackTarget(item, rowTargetUser, rowTargetLocation)) {
+        skipped++;
+        continue;
+      }
+      rebookWholeRow(
+          item,
+          rowTargetUser,
+          rowTargetLocation,
+          targetOwningOrgUnit,
+          Boolean.TRUE.equals(item.getPersonal()),
+          mergeStock);
+      rebooked++;
+    }
+    return new BulkRebookResultDto(rebooked, skipped);
+  }
+
+  /**
+   * Whether a row already sits at the requested transfer target and therefore has nothing to move —
+   * the {@code LOCATION} skip predicate. Mirrors the single transfer's "must change either the user
+   * or the location" rule (which rejects); in bulk the same situation is a skip.
+   *
+   * @param item the source row
+   * @param targetUser the row's resolved destination owner (never {@code null})
+   * @param targetLocation the row's resolved destination location (may be {@code null} on a row
+   *     without one)
+   * @return {@code true} iff neither the owner nor the location would change
+   */
+  private static boolean isSameStackTarget(
+      InventoryItem item, User targetUser, Location targetLocation) {
+    final boolean sameUser = targetUser.getId().equals(item.getUser().getId());
+    final boolean sameLocation =
+        targetLocation == null
+            ? item.getLocation() == null
+            : item.getLocation() != null
+                && targetLocation.getId().equals(item.getLocation().getId());
+    return sameUser && sameLocation;
+  }
+
+  /**
+   * The {@link BulkRebookMode#PERSONALIZE} / {@link BulkRebookMode#DEPERSONALIZE} branch of {@link
+   * #bulkRebook}: moves every row to the requested personal state. Rows already in that state are
+   * skipped.
+   *
+   * <p>Personalizing is refused for the whole selection when any row carries a job-order or mission
+   * earmark — a {@code personal = true} row may never hold either association, and silently
+   * dropping the link would lose the assignment. The check runs across all rows before the first
+   * write so the rejection can name how many rows block it rather than only the first one found.
+   *
+   * @param rows the locked, owned source rows
+   * @param request the bulk request (read for the org-unit pick)
+   * @param targetPersonal {@code true} to personalize, {@code false} to move into the shared pool
+   * @param mergeStock the per-action stock-merge opt-in
+   * @return the moved / skipped counts
+   * @throws BadRequestException when personalizing a selection that contains an earmarked row
+   */
+  private BulkRebookResultDto bulkRebookPersonalMarker(
+      List<InventoryItem> rows,
+      BulkRebookRequest request,
+      boolean targetPersonal,
+      boolean mergeStock) {
+    final List<InventoryItem> movable =
+        rows.stream()
+            .filter(row -> Boolean.TRUE.equals(row.getPersonal()) != targetPersonal)
+            .toList();
+    if (targetPersonal) {
+      final long earmarked =
+          movable.stream()
+              .filter(
+                  row ->
+                      !row.getJobOrderAllocations().isEmpty()
+                          || !row.getMissionAllocations().isEmpty())
+              .count();
+      if (earmarked > 0) {
+        throw new BadRequestException(
+            "Stock assigned to a job order or mission cannot be marked personal: "
+                + earmarked
+                + " of the selected entries are assigned");
+      }
+    }
+
+    // De-personalizing stamps the new shared rows onto the picked pool (validated against the
+    // owner's memberships); personalizing carries each row's existing stamp over, exactly as the
+    // single-row rebooking does — personal visibility is owner-scoped regardless of the stamp.
+    final OrgUnit sharedTargetOrgUnit =
+        targetPersonal || movable.isEmpty()
+            ? null
+            : ownerScopeService.resolveOrgUnitForPickerOutputNullable(
+                movable.getFirst().getUser(), request.targetOwningOrgUnitId());
+
+    for (InventoryItem item : movable) {
+      rebookWholeRow(
+          item,
+          item.getUser(),
+          item.getLocation(),
+          targetPersonal ? item.getOwningOrgUnit() : sharedTargetOrgUnit,
+          targetPersonal,
+          mergeStock);
+    }
+    return new BulkRebookResultDto(movable.size(), rows.size() - movable.size());
+  }
+
+  /**
+   * Moves one row of a bulk rebooking in full: inserts the target row carrying the source's entire
+   * quantity and all of its earmarks, then removes the (now empty) source.
+   *
+   * <p>Append-only, exactly like the single-row transfer / rebooking: the moved quantity is
+   * inserted as its own row and only then optionally folded into a matching target stack by {@link
+   * #mergeStockIfRequested}. Because the whole quantity moves, the source always depletes and is
+   * deleted — its allocations cascade away (V217) after being copied onto the target, and no
+   * remainder is left to ratchet a Materialbörse offer against.
+   *
+   * @param source the locked source row
+   * @param targetUser the destination owner
+   * @param targetLocation the destination location
+   * @param targetOwningOrgUnit the pool to stamp onto the new row, or {@code null} for an ownerless
+   *     row
+   * @param targetPersonal the personal marker the new row carries
+   * @param mergeStock the per-action stock-merge opt-in
+   */
+  private void rebookWholeRow(
+      InventoryItem source,
+      User targetUser,
+      Location targetLocation,
+      OrgUnit targetOwningOrgUnit,
+      boolean targetPersonal,
+      boolean mergeStock) {
+    final double amount = source.getAmount() != null ? source.getAmount() : 0.0;
+
+    InventoryItem newItem = new InventoryItem();
+    newItem.setUser(targetUser);
+    newItem.setOwningOrgUnit(targetOwningOrgUnit);
+    newItem.setMaterial(source.getMaterial());
+    // Copy the catalog reference pair as a unit (design §4.4): without the gameItem the moved
+    // item-row copy would violate the XOR CHECK (chk_inventory_item_catalog_xor, V220) → 500.
+    newItem.setGameItem(source.getGameItem());
+    newItem.setLocation(targetLocation);
+    newItem.setQuality(source.getQuality());
+    newItem.setAmount(InventoryItem.roundToScuScale(amount));
+    newItem.setPersonal(targetPersonal);
+    newItem.setNote(source.getNote());
+
+    // Variante C (REQ-INV-027, "Marken mitnehmen"): a full move with no explicit "deduct from" plan
+    // resolves to "every slice in full", so the target inherits all of the source's earmarks and
+    // the
+    // source keeps none — which is what deleting it below leaves behind anyway. A personal target
+    // resolves to an empty plan: the caller already rejected an earmarked personalize, and a
+    // de-personalize source is itself personal and so carries no slices.
+    Map<UUID, Double> orderReductions =
+        AllocationReductions.resolveReductionPlan(source, null, amount, true);
+    Map<UUID, Double> missionReductions =
+        AllocationReductions.resolveReductionPlan(source, null, amount, false);
+    applyTransferInherit(source, newItem, orderReductions, missionReductions);
+    final InventoryItem savedNew = inventoryItemRepository.save(newItem);
+    inventoryItemRepository.delete(source);
+
+    // Fold the moved quantity into a matching target stack when it applies (PIECE and game items
+    // always, SCU on the per-action opt-in); the freshly inserted row is the survivor.
+    mergeStockIfRequested(savedNew, mergeStock);
   }
 
   /**
