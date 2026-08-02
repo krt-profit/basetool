@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -39,8 +40,13 @@
     if (!root) {
         return;
     }
-    const statusUrl = root.dataset.statusUrl;
-    const homeUrl = root.dataset.homeUrl;
+    // Default to '' rather than leaving these `string | undefined`: the guard
+    // below rejects the empty string exactly as it rejects a missing attribute,
+    // so the behaviour is unchanged and the polling closures below (hoisted
+    // function declarations, which do not inherit the guard's narrowing) see a
+    // plain string.
+    const statusUrl = root.dataset.statusUrl || '';
+    const homeUrl = root.dataset.homeUrl || '';
     if (!statusUrl || !homeUrl) {
         return;
     }

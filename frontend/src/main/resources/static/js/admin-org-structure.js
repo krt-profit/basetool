@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -41,7 +42,7 @@
     }
 
     function fieldValue(id) {
-        const el = document.getElementById(id);
+        const el = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
         return el ? el.value.trim() : '';
     }
 
@@ -110,14 +111,16 @@
             const id = row.getAttribute('data-org-unit-id');
             window.krtFetch.write({
                 method: 'PATCH',
-                url: '/admin/org-structure/org-units/' + encodeURIComponent(id) + '/parent',
+                url: '/admin/org-structure/org-units/' + encodeURIComponent(String(id)) + '/parent',
                 // Serialize per org-unit + read the row version lazily so a rapid second parent
                 // change on the same unit queues behind the first and ships the fresh version.
                 serialize: 'org-unit:' + id,
                 payload: function () {
                     const version = row.getAttribute('data-version');
                     return {
-                        parentOrgUnitId: emptyToNull(select.value),
+                        parentOrgUnitId: emptyToNull(
+                            /** @type {HTMLSelectElement} */ (select).value,
+                        ),
                         version: version == null ? null : Number(version),
                     };
                 },

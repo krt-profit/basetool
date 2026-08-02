@@ -1,3 +1,4 @@
+// @ts-check
 /* exported krtSearchableSelect */
 /*
  * KRT searchable select (combobox).
@@ -57,6 +58,7 @@
      * @returns {HTMLElement|null} the label element (with an id), or null
      */
     function findLabel(select, uid) {
+        /** @type {HTMLElement | null} */
         let label = null;
         if (select.id) {
             label = document.querySelector('label[for="' + select.id + '"]');
@@ -283,7 +285,7 @@
             // The original <select> id now lives on the hidden input (see the passthrough above),
             // so a label bound via for="<select-id>" would focus the hidden field on click.
             // Repoint it to the visible textbox so clicking the label opens the combobox.
-            labelEl.htmlFor = input.id;
+            /** @type {HTMLLabelElement} */ (labelEl).htmlFor = input.id;
         }
 
         const listbox = document.createElement('ul');
@@ -341,7 +343,9 @@
             mirrorItemData(preselected);
         }
 
-        select.parentNode.replaceChild(wrapper, select);
+        // The parent is never null here: `select` was just found by querySelectorAll
+        // over the live document and nothing detaches it between there and here.
+        /** @type {Node} */ (select.parentNode).replaceChild(wrapper, select);
 
         // ---- per-instance state + behaviour ---------------------------------
         let rendered = [];
@@ -866,7 +870,8 @@
     }
     // Live update (REQ-FE-*): re-enhance user pickers inside any fragment swapped in via krtFetch.
     document.addEventListener('krt:swapped', function (event) {
-        enhanceWithin((event.detail && event.detail.container) || document);
+        const detail = /** @type {CustomEvent} */ (event).detail;
+        enhanceWithin((detail && detail.container) || document);
     });
 
     window.krtSearchableSelect = krtSearchableSelect;

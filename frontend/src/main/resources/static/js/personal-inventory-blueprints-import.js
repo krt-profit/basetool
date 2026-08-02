@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Personal Inventory — Blueprints import flow (#327, Phase 6).
  * Accepts the SCMDB log-watcher export, the Basetool Blueprint Extractor JSON, and the

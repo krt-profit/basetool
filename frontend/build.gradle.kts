@@ -471,6 +471,7 @@ val prettierCheck =
         "--check",
         "src/main/resources/static/css/**/*.css",
         "src/main/resources/static/js/**/*.js",
+        "types/**/*.d.ts",
       )
     )
     ignoreExitValue.set(false)
@@ -481,6 +482,7 @@ val prettierCheck =
         exclude("vendor/**")
       }
     )
+    inputs.files(fileTree("types") { include("**/*.d.ts") })
     inputs.file("package.json")
     inputs.file(".prettierrc.json")
     inputs.file(".prettierignore")
@@ -496,9 +498,64 @@ tasks.register<NpxTask>("prettierApply") {
       "--write",
       "src/main/resources/static/css/**/*.css",
       "src/main/resources/static/js/**/*.js",
+      "types/**/*.d.ts",
     )
   )
   ignoreExitValue.set(false)
 }
 
-tasks.named("check").configure { dependsOn(lintCss, lintHtml, lintJs, prettierCheck) }
+// ---------------------------------------------------------------------------
+// Static type checking of the hand-written browser scripts (ADR-0125).
+//
+// TypeScript runs here as a CHECKER ONLY (`noEmit` in tsconfig.json): nothing is
+// compiled, no bundle is produced, no <script> tag changes and the scripts stay
+// classic non-module scripts sharing one global scope (ADR-0069). Files opt in
+// individually with a leading `// @ts-check`; everything else is parsed for its
+// types but not checked, so the gate was green from the first commit.
+//
+// The backend DTO shapes come from the OpenAPI spec rather than being restated
+// by hand: `generateApiTypes` derives them on every build, so the frontend's
+// view of a DTO cannot drift from the contract the backend publishes. The
+// generated file is build output and is never committed.
+// ---------------------------------------------------------------------------
+val openApiSpec = rootProject.file("backend/src/main/resources/api/openapi.json")
+val generatedApiTypes = layout.buildDirectory.file("generated/ts/api.d.ts")
+
+val generateApiTypes =
+  tasks.register<NpxTask>("generateApiTypes") {
+    group = "build"
+    description =
+      "Generates TypeScript types for the backend DTOs from the OpenAPI spec (build output)."
+    dependsOn(tasks.named("npmInstall"))
+    command.set("openapi-typescript")
+    args.set(listOf(openApiSpec.absolutePath, "-o", generatedApiTypes.get().asFile.absolutePath))
+    ignoreExitValue.set(false)
+    inputs.file(openApiSpec)
+    inputs.file("package.json")
+    outputs.file(generatedApiTypes)
+  }
+
+val typecheckJs =
+  tasks.register<NpxTask>("typecheckJs") {
+    group = "verification"
+    description =
+      "Type-checks the opted-in browser scripts with tsc --noEmit (strict; fails on findings)."
+    dependsOn(tasks.named("npmInstall"), generateApiTypes)
+    command.set("tsc")
+    args.set(listOf("-p", "tsconfig.json"))
+    ignoreExitValue.set(false)
+    inputs.files(
+      fileTree("src/main/resources/static/js") {
+        include("**/*.js")
+        exclude("vendor/**")
+      }
+    )
+    inputs.files(fileTree("types") { include("**/*.d.ts") })
+    inputs.file(generatedApiTypes)
+    inputs.file("package.json")
+    inputs.file("tsconfig.json")
+  }
+
+tasks.named("check").configure {
+  dependsOn(lintCss, lintHtml, lintJs, prettierCheck, typecheckJs)
+}

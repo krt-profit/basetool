@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -38,7 +39,7 @@
 function poToggleAll(openState) {
     const nodes = document.querySelectorAll('details.rank-group');
     nodes.forEach(function (d) {
-        d.open = openState;
+        /** @type {HTMLDetailsElement} */ (d).open = openState;
     });
 }
 document.addEventListener('DOMContentLoaded', function () {

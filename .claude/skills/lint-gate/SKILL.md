@@ -15,10 +15,10 @@ the how-to behind that rule.
 
 ## The three strict asset linters CI gates independently
 
-**ALL lint tasks must be green locally before *every* push — no exceptions.** Formatting (`spotlessApply` + `:frontend:prettierApply`) is necessary but **not sufficient**: the frontend also runs three *strict* asset linters that fail CI independently and are **not** covered by Spotless/Prettier/Checkstyle — **`:frontend:lintCss`** (Stylelint: e.g. media-query *range* notation `(width <= Npx)` not `(max-width: Npx)`, and modern `rgb(r g b / a%)` not `rgba(...)`), **`:frontend:lintJs`** (ESLint: `no-var` → use `let`/`const`, unused caught errors must be `_`-prefixed, etc.), and **`:frontend:lintHtml`** (HTMLHint). Before pushing any change that touches `src/main/resources/static/**` (CSS/JS) or `templates/**`, run — and get to **zero findings** — the full local gate for both modules:
+**ALL lint tasks must be green locally before *every* push — no exceptions.** Formatting (`spotlessApply` + `:frontend:prettierApply`) is necessary but **not sufficient**: the frontend also runs three *strict* asset linters that fail CI independently and are **not** covered by Spotless/Prettier/Checkstyle — **`:frontend:lintCss`** (Stylelint: e.g. media-query *range* notation `(width <= Npx)` not `(max-width: Npx)`, and modern `rgb(r g b / a%)` not `rgba(...)`), **`:frontend:lintJs`** (ESLint: `no-var` → use `let`/`const`, unused caught errors must be `_`-prefixed, etc.), and **`:frontend:lintHtml`** (HTMLHint) — plus the static type check **`:frontend:typecheckJs`** (`tsc --noEmit` over the files carrying `// @ts-check`; REQ-FE-018, ADR-0125). Before pushing any change that touches `src/main/resources/static/**` (CSS/JS) or `templates/**`, run — and get to **zero findings** — the full local gate for both modules:
 
 ```bash
-./gradlew :backend:check :frontend:lintCss :frontend:lintJs :frontend:lintHtml :frontend:prettierCheck
+./gradlew :backend:check :frontend:lintCss :frontend:lintJs :frontend:lintHtml :frontend:prettierCheck :frontend:typecheckJs
 ```
 
 (or the whole `./gradlew check`, which wires them all in).

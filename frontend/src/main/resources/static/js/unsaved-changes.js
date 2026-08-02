@@ -1,3 +1,4 @@
+// @ts-check
 document.addEventListener('DOMContentLoaded', function () {
     if (window.__unsavedChangesInitialized) return;
     window.__unsavedChangesInitialized = true;
@@ -11,14 +12,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Track input changes
     document.addEventListener('input', function (e) {
-        let form = e.target.closest('form');
+        let form = /** @type {Element} */ (e.target).closest('form');
         if (form && !form.classList.contains('no-track')) {
             isDirty = true;
         }
     });
 
     document.addEventListener('change', function (e) {
-        let form = e.target.closest('form');
+        let form = /** @type {Element} */ (e.target).closest('form');
         if (form && !form.classList.contains('no-track')) {
             isDirty = true;
         }
@@ -36,7 +37,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Intercept internal link clicks
     document.addEventListener('click', function (event) {
-        let a = event.target.closest('a');
+        let a = /** @type {Element} */ (event.target).closest('a');
 
         if (!a || !a.href) return;
 

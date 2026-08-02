@@ -1,0 +1,49 @@
+{
+  "//": [
+    "Type-checking configuration for the hand-written browser scripts under",
+    "src/main/resources/static/js. TypeScript runs here as a CHECKER ONLY",
+    "(noEmit) — nothing is compiled, no bundle is produced and no script tag",
+    "changes. See ADR-0125.",
+    "",
+    "checkJs is deliberately FALSE: files opt in individually with a leading",
+    "`// @ts-check` comment. That keeps the gate green on day one for the ~40k",
+    "lines that predate it and lets coverage grow file by file without a",
+    "big-bang migration.",
+    "",
+    "moduleDetection MUST stay `legacy`: package.json declares `type: module`,",
+    "so under the default `auto` TypeScript would classify every .js file as an",
+    "ES module and give each its own scope. The scripts are loaded as classic",
+    "<script> tags sharing ONE global lexical environment (ADR-0069) — `legacy`",
+    "reproduces that, and is what lets the checker see cross-file globals and",
+    "cross-file redeclaration collisions."
+  ],
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "target": "ES2023",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "legacy",
+    "strict": true,
+    "noImplicitAny": false,
+    "useUnknownInCatchVariables": false,
+    "types": [],
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "src/main/resources/static/js/**/*.js",
+    "types/**/*.d.ts"
+  ],
+  "exclude": [
+    "src/main/resources/static/js/vendor/**",
+    "node_modules",
+    "build"
+  ]
+}

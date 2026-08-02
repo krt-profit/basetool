@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -52,10 +53,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // In-place search + page-size + pagination (the page-size/pagination links carry the
     // .page-btn class, so krtFetch.swap intercepts them). The GET form is the no-JS fallback.
-    const filterForm = document.getElementById('squadron-filter-form');
+    const filterForm = /** @type {HTMLFormElement | null} */ (
+        document.getElementById('squadron-filter-form')
+    );
     const resultsContainer = document.getElementById('squadron-results');
     const clearLink = document.getElementById('squadron-filter-clear');
-    const searchInput = document.getElementById('squadron-ship-filter');
+    const searchInput = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('squadron-ship-filter')
+    );
     let squadronFilterTimer = null;
 
     function applySquadronFilter(url) {
@@ -73,7 +78,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const params = new URLSearchParams();
             for (const [key, value] of data.entries()) {
                 if (value !== '') {
-                    params.append(key, value);
+                    params.append(key, String(value));
                 }
             }
             const query = params.toString();

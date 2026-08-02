@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Global HTML-escape helpers used by inline templates and other static
  * scripts to safely interpolate user/admin-controlled strings into

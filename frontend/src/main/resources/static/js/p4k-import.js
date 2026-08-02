@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Admin - P4K catalog import flow (asynchronous background jobs).
  *

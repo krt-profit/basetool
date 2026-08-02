@@ -150,6 +150,8 @@ ArchUnit rules in `backend`/`frontend` `ArchitectureTest.java` enforce architect
 
 Checkstyle runs with `maxWarnings = 0` and Spotless is wired into `check` — any unformatted file or new Checkstyle warning fails CI. The frontend additionally runs strict asset linters (`:frontend:lintCss`, `:frontend:lintJs`, `:frontend:lintHtml`) that are not covered by Spotless/Prettier; run `spotlessApply` **and** those before pushing changes under `src/main/resources/static/**` or `templates/**`.
 
+The frontend's browser scripts are also statically type-checked by `:frontend:typecheckJs` (strict, in `check`). TypeScript runs there as a **checker only** — `tsc --noEmit`, no compilation, no bundle, no renamed files; the sources stay JavaScript and opt in per file with a leading `// @ts-check`. Backend DTO types are generated from `backend/src/main/resources/api/openapi.json` by `:frontend:generateApiTypes` on every build and are never committed, so the frontend's view of a DTO cannot drift from the published contract. See [ADR-0125](docs/adr/0125-typed-javascript-via-checkjs-not-typescript.md), REQ-FE-018, and [`docs/TYPESCRIPT_MIGRATION_PLAN.md`](docs/TYPESCRIPT_MIGRATION_PLAN.md) for the (currently unscheduled) full-TypeScript path.
+
 ### End-to-end (E2E) tests
 
 Playwright-Java drives the real frontend through a browser. The suite lives in the `frontend` module's `e2e` source set and is **not** wired into `check` (it needs Docker and a downloaded browser).

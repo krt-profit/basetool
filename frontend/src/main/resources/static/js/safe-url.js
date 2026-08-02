@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Same-origin URL guard for form-action and navigation sinks.
  *

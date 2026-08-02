@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Personal Inventory — Blueprints sub-page: master-detail view (V3).
  *
@@ -108,7 +109,7 @@
             s += 'Z';
         }
         const date = new Date(s);
-        if (isNaN(date)) {
+        if (isNaN(date.getTime())) {
             return iso;
         }
         return new Intl.DateTimeFormat(undefined, {
@@ -153,7 +154,7 @@
 
         // Deeplink: keep the existing ?q= server-filter param intact.
         try {
-            const url = new URL(window.location);
+            const url = new URL(window.location.href);
             url.searchParams.set('bp', attr(row, 'data-id'));
             history.replaceState(null, '', url);
         } catch (_e) {
@@ -931,14 +932,14 @@
         craftableToggle = document.getElementById('krt-bp-craftable-toggle');
         restoreToggles();
         if (refineryToggle) {
-            refineryOn = refineryToggle.checked;
+            refineryOn = /** @type {HTMLInputElement} */ (refineryToggle).checked;
             if (!refineryToggle.dataset.wired) {
                 refineryToggle.addEventListener('change', onRefineryToggle);
                 refineryToggle.dataset.wired = '1';
             }
         }
         if (craftableToggle) {
-            craftableOnly = craftableToggle.checked;
+            craftableOnly = /** @type {HTMLInputElement} */ (craftableToggle).checked;
             if (!craftableToggle.dataset.wired) {
                 craftableToggle.addEventListener('change', onCraftableToggle);
                 craftableToggle.dataset.wired = '1';
