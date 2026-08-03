@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Die Formatierungsprüfung des Frontends schlug auf Windows-Arbeitsplätzen grundlos fehl.** Für TypeScript-Deklarationsdateien fehlte die Zeilenenden-Regel, sodass ein frischer Checkout unter Windows drei Dateien mit CRLF anlegte und Prettier sie beanstandete, obwohl niemand sie angefasst hatte — auf dem Linux-Server blieb der Fehler unsichtbar. `.gitattributes` deckt jetzt auch `*.ts` ab; die Dateiinhalte bleiben unverändert (ADR-0125).
+
 ### Added
 
 - **Blueprint-Import: Munition aus einem deutschen Star-Citizen-Client wird jetzt direkt erkannt.** Ein deutscher Client schreibt „(30 Schuss)" statt „(30 cap)"; solche Namen mussten bisher beim ersten Import einmal von Hand zugeordnet werden — rund 13 Stück. Die Zuordnungen sind jetzt vorbelegt. Wer sie bereits selbst zugeordnet hat, behält seine Zuordnung (#1485).
