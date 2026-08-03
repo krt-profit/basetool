@@ -1040,7 +1040,56 @@ minted when absent) · **Code:** `RedisSessionConfig#sessionRepositoryCustomizer
 `SessionLifetimeUpgradeSuccessHandler`, `SecurityConfig#oauth2LoginSuccessHandler` · **Monitoring:**
 `ActiveSessionsRunaway` · **ADR:** [ADR-0088](../adr/0088-two-tier-session-idle-timeout.md)
 
+### REQ-SEC-027 — Approved client software is a contractual obligation, not only a gate
+
+(REQ-SEC-026 — linking a pending Discord registration onto an existing account — is carried by
+[`discord-integration.md`](discord-integration.md); this requirement continues the series at the
+next free number.)
+
+The rule that **only client software expressly approved by the operator may access the platform's
+interfaces** is binding on users through the Terms of Use, not merely enforced at the ingest
+gateway. Until 2026-08-03 it existed solely as operator documentation (`README.md`,
+[`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md),
+[`desktop-ingest.md`](desktop-ingest.md)) — text a user never sees and that is no part of the
+agreement. Blocking the author of an unapproved client was therefore only possible under the
+no-reason clause of terms section 8, which reads as arbitrary rather than as a named breach.
+
+Terms section 4 now carries the obligation as its own bullet (`terms.list_4_1_5`), and it is
+deliberately **broader than the ingest path**: it names the platform's interfaces generally — "in
+particular the ingest interface and the HTTP APIs" — so the next interface inherits it without a
+terms amendment. Three properties are load-bearing and must survive any rewording:
+
+- **Develop, distribute *and* use are all covered.** Prohibiting only "use" leaves the author of an
+  unapproved client untouched while their users carry the breach.
+- **Own credentials are no defence.** Section 3(2) prohibits handing credentials to third parties
+  and therefore does not reach the actual case: a member running a foreign tool under their *own*
+  account. The bullet says so explicitly.
+- **Approval is operator-granted, in text form, and revocable.** Approval by conduct (a tolerated
+  client) or by a third party would hollow out the allowlist that
+  [`desktop-ingest.md`](desktop-ingest.md) REQ-INGEST-011 enforces technically.
+
+The technical gate and the contractual clause are **independent layers with different reach**: the
+gate stops any unapproved client for everyone and is the operative control (REQ-INGEST-011); the
+clause is what makes an individual's conduct a breach and thus supports a sanction under section 8.
+Neither substitutes for the other — removing the gate does not become acceptable because a clause
+exists.
+
+**Acceptance**
+
+- [ ] The obligation is rendered on `/terms` in both locales, not only declared in the bundle.
+- [ ] The obligation names interfaces generally, not the ingest path alone.
+- [ ] `terms.last_updated` reflects the date the obligation took effect (2026-08-03).
+
+**Enforced by:** `TermsTemplateBundleParityTest` (every `terms.*` clause is both declared and
+rendered — a renumbered section cannot silently drop a bullet), `MessageBundleConsistencyTest` (DE/EN
+key parity, so the clause cannot exist in one locale only) · **Text:** `terms.list_4_1_5` in
+`messages_de.properties` / `messages.properties` / `messages_en.properties`, rendered by
+`templates/terms.html` · **Technical counterpart:** REQ-INGEST-011
+([`desktop-ingest.md`](desktop-ingest.md)), ADR-0018
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the
-confidential-client migration decision (see ADR-0001).
+confidential-client migration decision (see ADR-0001). Recording a user's **consent** to the terms
+(an acceptance gate with per-version re-consent) is not covered here — the terms currently take
+effect on access (section intro) and section 12 treats continued use as acceptance.

@@ -10,6 +10,8 @@
 
 - **Neue Kennzahl `basetool_livesync_peer_rooms` samt Panel im Betriebs-Dashboard.** Sie zeigt je Oberfläche, in wie vielen Räumen mehrere Personen gleichzeitig sind. Ohne sie ist ein Ausbleiben von Aktualisierungen nicht davon zu unterscheiden, dass schlicht niemand gemeinsam bearbeitet hat.
 
+- **Nutzungsbedingungen: Nur vom Betreiber freigegebene Client-Software darf die Schnittstellen nutzen.** Bisher stand diese Regel nur in der Entwicklerdokumentation und war damit nicht Vertragsbestandteil — ein Sperrgrund ließ sich nur über die Klausel „ohne Angabe von Gründen" stützen. Abschnitt 4 nennt sie jetzt ausdrücklich, für alle Schnittstellen und einschließlich Entwicklung und Bereitstellung fremder Clients (REQ-SEC-027, Stand 03.08.2026).
+
 ### Changed
 
 - **Sicherheit: Die JWT-Audience-Prüfung des Backends läuft jetzt in jedem E2E-Durchlauf scharf.** Bisher war sie nirgends aktiv — die Produktion wäre der erste Ort gewesen, an dem der Prüfpfad überhaupt ausgeführt wird, und dort weist eine fehlende `aud` jede Anmeldung ab. Der E2E-Realm schreibt die Audience jetzt in seine Tokens, der E2E-Stack prüft sie, und ein Paritätstest verhindert, dass beides auseinanderläuft (Audit L-1, REQ-SEC-024). In Produktion bleibt die Prüfung unverändert aus.
