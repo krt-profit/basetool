@@ -32,6 +32,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -90,6 +91,15 @@ import tools.jackson.databind.node.ObjectNode;
  * relay it to their local rooms; {@link #deliverFromFanout(String, List)} is the consume-side entry
  * a Redis subscriber calls. Because local relay happens first, a fan-out outage degrades to
  * single-instance behaviour, never worse (ADR-0094).
+ *
+ * <p><b>Cross-replica presence</b> (ADR-0126, #1237). Editor-presence dots follow the same
+ * local-first shape on a second channel, but carry <em>state</em> rather than a signal: every local
+ * presence change broadcasts locally and then gossips this instance's complete snapshot for the
+ * topic via {@link LiveSyncFanout#publishPresence(String, Map)}, the reaper re-gossips each tracked
+ * topic every tick, and {@link #deliverPresenceFromFanout(String, String, Map)} replaces the
+ * publishing replica's partition in the presence store and re-broadcasts the merged dots. Full
+ * snapshots rather than deltas make the mirror converge after a dropped message with no ordering or
+ * acknowledgement assumptions; consume never re-publishes, so replicas cannot echo each other.
  *
  * <p><b>Abuse bounds</b> (F2 / #1243). Publishing needs no subscription, so two levers are capped
  * independently: a <b>per-user socket cap</b> ({@link #MAX_SOCKETS_PER_USER}) bounds how many
@@ -351,8 +361,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
 
   /**
    * Builds the handler. Binds the {@code basetool_presence_ws_sessions} gauge (live sockets summed
-   * across all rooms) and one {@code basetool_livesync_subscriptions{topic_class}} gauge per topic
-   * class; the reaper starts ticking immediately.
+   * across all rooms) and, per topic class, one {@code
+   * basetool_livesync_subscriptions{topic_class}} gauge (sockets in that class) plus one {@code
+   * basetool_livesync_peer_rooms{topic_class}} gauge (rooms of that class holding two or more
+   * sockets); the reaper starts ticking immediately.
    *
    * @param presenceService in-memory editor-presence store
    * @param fanout cross-replica fan-out seam (no-op when single-instance)
@@ -423,6 +435,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
           .tag(MetricNames.TAG_TOPIC_CLASS, topicClass.metricLabel())
           .description("Live live-sync subscriptions for this topic class.")
           .register(meterRegistry);
+      Gauge.builder(MetricNames.LIVESYNC_PEER_ROOMS, this, h -> h.peerRoomCount(topicClass))
+          .tag(MetricNames.TAG_TOPIC_CLASS, topicClass.metricLabel())
+          .description("Live rooms of this topic class holding two or more subscribers.")
+          .register(meterRegistry);
     }
     this.reaper =
         Executors.newSingleThreadScheduledExecutor(
@@ -459,6 +475,30 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       }
     }
     return total;
+  }
+
+  /**
+   * Counts the rooms of a given topic class that currently hold two or more sockets (backs the
+   * per-class {@code basetool_livesync_peer_rooms} gauge, #1238).
+   *
+   * <p>Deliberately distinct from {@link #subscriptionCount(LiveSyncTopicClass)}: that sums sockets
+   * across the class, which cannot tell two peers sharing one room (peer-sync live, a {@code
+   * changed} relay is possible) from two separate single-viewer rooms (peer-sync inert, {@link
+   * #relayLocal} skips the origin so nothing can ever be relayed). Only this count makes a {@code
+   * changed}-frame flatline interpretable.
+   *
+   * @param topicClass the class to count
+   * @return the number of rooms of that class with at least two live sockets
+   */
+  private int peerRoomCount(@NotNull LiveSyncTopicClass topicClass) {
+    int rooms = 0;
+    for (Map.Entry<String, Set<WebSocketSession>> room : sessionsByTopic.entrySet()) {
+      LiveSyncTopic topic = LiveSyncTopic.parse(room.getKey());
+      if (topic != null && topic.topicClass() == topicClass && room.getValue().size() >= 2) {
+        rooms++;
+      }
+    }
+    return rooms;
   }
 
   /**
@@ -615,7 +655,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       if (!hasOtherSession) {
         List<String> cleared = presenceService.clearAll(canonical, userId);
         if (!cleared.isEmpty()) {
-          broadcastSnapshot(topic);
+          broadcastLocalPresenceChange(topic);
         }
       }
     }
@@ -931,7 +971,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       }
     }
     if (mutated || "blur".equals(type) || "focus".equals(type)) {
-      broadcastSnapshot(topic);
+      broadcastLocalPresenceChange(topic);
     }
   }
 
@@ -1224,30 +1264,92 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   private record FilteredSections(List<String> accepted, int rejected, String firstRejectedKey) {}
 
   /**
-   * Reaper tick — drops expired presence entries from every tracked topic and broadcasts the
-   * resulting snapshot to rooms that lost at least one entry. Runs on a single daemon thread; any
-   * thrown exception is logged and swallowed so a transient failure does not kill the reaper.
+   * Reaper tick — three jobs, all on a single daemon thread; any thrown exception is logged and
+   * swallowed so a transient failure does not kill the reaper.
+   *
+   * <ol>
+   *   <li>drop expired local presence entries and broadcast (plus gossip) the shrunken snapshot to
+   *       rooms that lost at least one entry;
+   *   <li>drop peer partitions whose replica has gone quiet past {@link
+   *       LiveSyncPresenceService#REMOTE_PARTITION_TTL} and broadcast those rooms locally — a
+   *       <em>local</em> consequence of remote state, so it is deliberately not re-gossiped;
+   *   <li>re-gossip this instance's presence snapshot for every still-tracked topic (ADR-0126).
+   * </ol>
+   *
+   * <p>The periodic re-gossip is what makes the cross-replica mirror self-healing rather than
+   * delta-ordered: a dropped message, a Redis blip or a replica that started after the fact all
+   * converge within one tick, with no delete frames, no acknowledgements and no assumption that
+   * messages arrive in order. It costs one small message per <em>actively edited</em> topic per
+   * tick — {@link LiveSyncPresenceService#trackedTopics()} is empty whenever nobody has a mission
+   * panel focused, which is the overwhelmingly common case.
    */
   void tickReaper() {
     try {
       reapIdleTopicBuckets(nanoClock.getAsLong());
-      List<LiveSyncPresenceService.TopicSectionRef> affected =
-          presenceService.reapExpired(Instant.now());
-      if (affected.isEmpty()) {
-        return;
-      }
-      Set<String> uniqueTopics = new HashSet<>();
-      for (LiveSyncPresenceService.TopicSectionRef ref : affected) {
-        uniqueTopics.add(ref.topic());
-      }
-      for (String canonical : uniqueTopics) {
-        LiveSyncTopic topic = LiveSyncTopic.parse(canonical);
-        if (topic != null) {
-          broadcastSnapshot(topic);
-        }
-      }
+      Set<String> mirrored = broadcastLocallyExpiredPresence();
+      broadcastRemotelyExpiredPresence();
+      gossipTrackedPresence(mirrored);
     } catch (RuntimeException e) {
       log.warn("Live-sync reaper tick failed", e);
+    }
+  }
+
+  /**
+   * Reaps this instance's expired presence entries and, for every room that lost one, broadcasts
+   * the fresh snapshot locally and gossips it to peers.
+   *
+   * @return the canonical topics already gossiped by this step, so {@link
+   *     #gossipTrackedPresence(Set)} does not publish them a second time in the same tick
+   */
+  @NotNull
+  private Set<String> broadcastLocallyExpiredPresence() {
+    List<LiveSyncPresenceService.TopicSectionRef> affected =
+        presenceService.reapExpired(Instant.now());
+    Set<String> uniqueTopics = new HashSet<>();
+    for (LiveSyncPresenceService.TopicSectionRef ref : affected) {
+      uniqueTopics.add(ref.topic());
+    }
+    for (String canonical : uniqueTopics) {
+      LiveSyncTopic topic = LiveSyncTopic.parse(canonical);
+      if (topic != null) {
+        // Gossips even when the topic just lost its last local editor and is therefore no longer
+        // tracked: that empty snapshot is exactly what drops this instance's partition on the peers
+        // immediately, instead of leaving decayed dots up for a full REMOTE_PARTITION_TTL.
+        broadcastLocalPresenceChange(topic);
+      }
+    }
+    return uniqueTopics;
+  }
+
+  /**
+   * Drops peer partitions that have not been re-gossiped within {@link
+   * LiveSyncPresenceService#REMOTE_PARTITION_TTL} — a replica that crashed, was scaled away or lost
+   * Redis — and broadcasts the shrunken snapshot to this instance's rooms. Nothing is published:
+   * the expiry is a purely local conclusion about a silent peer, and every other replica reaches it
+   * independently on its own tick.
+   */
+  private void broadcastRemotelyExpiredPresence() {
+    for (String canonical : presenceService.reapExpiredRemote(Instant.now())) {
+      LiveSyncTopic topic = LiveSyncTopic.parse(canonical);
+      if (topic != null) {
+        broadcastSnapshot(topic);
+      }
+    }
+  }
+
+  /**
+   * Re-gossips this instance's presence snapshot for every topic it still tracks, skipping the ones
+   * already published earlier in the same tick.
+   *
+   * @param alreadyMirrored canonical topics published by {@link #broadcastLocallyExpiredPresence()}
+   */
+  private void gossipTrackedPresence(@NotNull Set<String> alreadyMirrored) {
+    Instant now = Instant.now();
+    for (String canonical : presenceService.trackedTopics()) {
+      if (alreadyMirrored.contains(canonical)) {
+        continue;
+      }
+      fanout.publishPresence(canonical, presenceService.localSnapshot(canonical, now));
     }
   }
 
@@ -1337,6 +1439,68 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
         frames.increment();
       }
     }
+  }
+
+  /**
+   * Applies a peer replica's gossiped editor-presence snapshot (ADR-0126) — the presence-channel
+   * counterpart of {@link #deliverFromFanout(String, List)} — and re-broadcasts the merged dots to
+   * this instance's room when the merged view actually changed. Nothing is re-published, which is
+   * what keeps two replicas from echoing each other's state forever.
+   *
+   * <p>The payload is re-validated here, not trusted: the topic must parse to a
+   * <em>presence-enabled</em> class (so a peer can never open a presence surface on a class that
+   * has none), and section keys are held to the same shape bound as an inbound client frame. The
+   * publishing replica already applied both, so this is defense-in-depth against a malformed or
+   * older-version peer or a tampered Redis payload — the same posture {@link
+   * #deliverFromFanout(String, List)} takes on the changed channel.
+   *
+   * @param canonicalTopic the canonical topic string (unknown or non-presence topics are ignored)
+   * @param originId the publishing replica's instance id, which keys its partition
+   * @param sections that replica's complete editor set per section; an empty map drops its
+   *     partition
+   */
+  public void deliverPresenceFromFanout(
+      @NotNull String canonicalTopic,
+      @NotNull String originId,
+      @NotNull Map<String, List<LiveSyncPresenceService.PresenceEditor>> sections) {
+    LiveSyncTopic topic = LiveSyncTopic.parse(canonicalTopic);
+    if (topic == null || !topic.topicClass().presenceEnabled()) {
+      return;
+    }
+    Map<String, List<LiveSyncPresenceService.PresenceEditor>> accepted = new LinkedHashMap<>();
+    for (Map.Entry<String, List<LiveSyncPresenceService.PresenceEditor>> entry :
+        sections.entrySet()) {
+      String sectionKey = entry.getKey();
+      if (sectionKey == null
+          || sectionKey.isBlank()
+          || sectionKey.length() > MAX_SECTION_KEY_LENGTH
+          || entry.getValue().isEmpty()) {
+        continue;
+      }
+      accepted.put(sectionKey, entry.getValue());
+    }
+    if (presenceService.applyRemote(topic.canonical(), originId, accepted, Instant.now())) {
+      broadcastSnapshot(topic);
+    }
+  }
+
+  /**
+   * Broadcasts the merged presence snapshot for a topic to this instance's room <em>and</em>
+   * gossips this instance's own half to peer replicas (ADR-0126). Called from every path that
+   * mutates local presence — {@code focus}/{@code blur}, a socket close, a heartbeat-TTL reap — so
+   * a dot appears and disappears on every replica at the same time rather than within the next
+   * gossip tick.
+   *
+   * <p>The peer-driven path ({@link #deliverPresenceFromFanout(String, String, Map)}) deliberately
+   * calls {@link #broadcastSnapshot(LiveSyncTopic)} instead: re-publishing on consume would make
+   * two replicas echo each other indefinitely.
+   *
+   * @param topic the topic whose presence changed locally
+   */
+  private void broadcastLocalPresenceChange(@NotNull LiveSyncTopic topic) {
+    fanout.publishPresence(
+        topic.canonical(), presenceService.localSnapshot(topic.canonical(), Instant.now()));
+    broadcastSnapshot(topic);
   }
 
   private void broadcastSnapshot(@NotNull LiveSyncTopic topic) {

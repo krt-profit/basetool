@@ -152,6 +152,76 @@ headroom on the 16 GB host. Keep the sum of limits under ~14 GB.
 > re-attributed to its cgroup when the v1.18.0 image pull reached prod on 2026-07-31, against a flat
 > 190–217 MB `rss`. Not a leak, not a shortfall — see its compose block.
 
+### Capacity re-tuning against the CPX42 baseline (#937, 2026-08-03)
+
+The data-driven pass this ADR's capacity rule had been waiting for. Seven days of production
+metrics, read-only, after the CPX42 rescale and one week of Phase-2 monitoring. It replaces the
+**ratio-derived** sizing in section 4 above with **measured** sizing wherever the two disagreed —
+and they disagreed most where this ADR guessed hardest.
+
+**The finding that drove it: the databases were sized for a dataset that does not exist.** The
+entire basetool database is **107.7 MB** and the Keycloak database **39.4 MB**. Section 4 scaled
+`shared_buffers` and the container limits up alongside a projected "5000-account working set",
+reasoning from user count rather than from bytes — but Keycloak stores little per user, and the app
+data had not grown the way the projection assumed. `db-backend` was carrying a **2048 MB limit and a
+512 MB buffer pool for a 108 MB database**, against a measured working-set peak of 295 MB. The
+cache-hit ratio was **99.990 %** and **zero** temp files were written in seven days, so nothing was
+being bought with the excess.
+
+|    service    |                                      change                                       |                                  measured basis                                   |
+|---------------|-----------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
+| `db-backend`  | **2048M → 1536M**, `shared_buffers` 512→384MB, `effective_cache_size` 1365→1024MB | working set 295 MB (14 % of limit), DB 107.7 MB, hit ratio 99.990 %, temp files 0 |
+| `db-keycloak` | **768M → 512M**, `shared_buffers` 192→128MB, `effective_cache_size` 512→384MB     | working set 87 MB (11 %), DB 39.4 MB, hit ratio 99.998 %, temp files 0            |
+| `frontend`    | `cpus` **1.0 → 2.0**                                                              | **1506 s throttled / 7 d** — the worst absolute stall in the stack                |
+| `ingest`      | `cpus` **1.0 → 1.5**                                                              | 76.7 % peak throttle ratio, the highest anywhere                                  |
+| `redis`       | `cpus` **0.5 → 1.0**                                                              | 545 s throttled on a single-threaded command loop                                 |
+| `npm`         | `cpus` **0.5 → 1.0**                                                              | 20.0 % peak throttle at the TLS-terminating edge                                  |
+
+**Sum of limits: 14 352 MiB (14.02 GiB) → 13 584 MiB (13.27 GiB)**, i.e. **768 MiB returned**, back
+under this ADR's `~14 GB` review trigger with ~1.97 GiB of host headroom. The CPU quota sum rises
+9.5 → 12.0 on 8 physical vCPU; that is deliberate overcommit of a *burst ceiling*, not a
+reservation, on a host whose 21 containers together average **0.256 cores (3.2 %)**.
+
+**`work_mem` was the trap worth naming.** It is unchanged at 8MB/4MB — but the reason is a
+measurement, not caution: `pg_stat_database_temp_files` was **0** across the whole window, which is
+direct evidence no query ever spilled. The related trap is on the container side: the textbook
+`max_connections × work_mem` product (150 × 8MB = 1200 MB) must **not** be used to size a DB
+container here. It presumes every pooled connection simultaneously runs a sort that fills
+`work_mem` — an analytics workload shape this OLTP app does not have, refuted directly by
+`temp_files = 0` at a connection peak of 31. Size DB containers from the working-set peak.
+
+**Deliberately kept, each against a measurement that would have allowed less:**
+
+- **`backend` 2048M.** The `2048M → 1792M` lever identified above stays **un-taken**; #937 returned
+  its 768 MiB from the Postgres containers instead, so the busiest JVM's ceiling never had to move.
+  The lever remains available. Re-measured: heap 684 MB committed / 647 used of the 1167 MB ceiling,
+  `rss` 55.6 %, GC overhead 0.14 % peak.
+- **`keycloak` 2560M.** Working set 922 MB (36 %), heap 400 MB used of ~1792. Not reclaimed because
+  the *limit is the heap knob* — the image derives the heap from ~70 % of it — so cutting the
+  container also cuts the burst headroom the 5000-account target bought.
+- **HikariCP `maximum-pool-size: 100`.** Active peak **10**, pending peak **0**, timeouts **0**. A
+  lazy pool's unreached ceiling costs nothing, while the ADR-0078 burst it guards against is a spike
+  a quiet baseline week does not contain and whose failure mode is a tool-wide breaker outage.
+- **Redis `maxmemory 384mb` / 512M cgroup.** Used peak **7.07 MB (1.8 %)** across 8191 keys, zero
+  evictions. `noeviction` makes the ceiling a hard failure boundary (a refused write is a failed
+  login), so ADR-0079 bought that headroom on purpose; the measurement confirms the purchase.
+- **Every monitoring-stack memory limit**, and the deliberate absence of CPU quotas there — throttling
+  an exporter would put gaps in the series used to diagnose an incident, precisely when the host is
+  busiest. Rationale now recorded in `docker-compose.monitoring.yml`.
+
+**Two watch items this baseline surfaced, neither actionable yet.** `tempo`'s live heap has more
+than doubled (208.8 → **466.8 MiB**), leaving it only **1.65×** under its `GOMEMLIMIT` where every
+other Go service holds ≥3.7× — it tracks trace volume, so re-measure it before anything else when
+tracing changes. And `npm` now has the highest `rss` ratio of the non-JVM app containers (66.3 % of
+256M), making it the first to need room if the edge ever gains a module.
+
+**Consequence for the capacity rule.** It stands unchanged and is now *satisfied with margin* rather
+than exceeded. What #937 adds is a method constraint: **never size from a ratio applied to the
+container limit** — that is how `shared_buffers` ended up at 4.75× the entire database, and it is the
+same error class as re-applying `MaxRAMPercentage` to a raised limit (PR #1419) or bumping `alloy`
+four times against page cache. Size from a measured peak, state the multiple, and record what would
+trigger a re-review.
+
 ### 5. Preserve the 30-day rolling login (Redis sized instead of TTL cut)
 
 The 30-day Spring-Session idle window is a **deliberate** design premise (it carries the OAuth2

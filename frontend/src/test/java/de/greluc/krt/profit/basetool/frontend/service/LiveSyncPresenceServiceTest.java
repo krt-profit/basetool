@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -38,6 +39,11 @@ import org.junit.jupiter.api.Test;
  * via the snapshot, (b) clearing removes single entries idempotently, (c) the reaper drops entries
  * past TTL and only reports the affected (topic, section) pairs, (d) two tabs of the same user
  * don't wipe each other on a single tab close.
+ *
+ * <p>The cross-replica mirror (ADR-0126, #1237) adds a second group: a peer's partition merges into
+ * the snapshot without touching the local half, is replaced wholesale, reports a change only when
+ * the merged view really changed (so the 10 s re-gossip does not broadcast every tick), and expires
+ * when its replica goes silent.
  */
 class LiveSyncPresenceServiceTest {
 
@@ -217,6 +223,158 @@ class LiveSyncPresenceServiceTest {
 
     service.clearAll(topicA, "user-1");
     assertThat(service.trackedTopics()).containsExactly(topicB);
+  }
+
+  @Test
+  void snapshot_mergesLocalEditorsWithAPeerReplicasPartition() {
+    service.touch(topicA, "crew", "user-1", "Alice");
+    service.applyRemote(topicA, "instance-B", partition("steps", "user-2", "Bob"), Instant.now());
+
+    Map<String, List<LiveSyncPresenceService.Entry>> snap = service.snapshot(topicA, Instant.now());
+
+    assertThat(snap).containsOnlyKeys("crew", "steps");
+    assertThat(snap.get("crew"))
+        .extracting(LiveSyncPresenceService.Entry::userId)
+        .containsExactly("user-1");
+    assertThat(snap.get("steps"))
+        .extracting(LiveSyncPresenceService.Entry::displayName)
+        .containsExactly("Bob");
+  }
+
+  @Test
+  void snapshot_collapsesAUserPresentOnBothThisInstanceAndAPeer() {
+    // Two tabs of one user load-balanced onto different replicas must render as ONE dot, so the
+    // count stays a count of people rather than of sockets.
+    service.touch(topicA, "crew", "user-1", "Alice");
+    service.applyRemote(topicA, "instance-B", partition("crew", "user-1", "Alice"), Instant.now());
+
+    assertThat(service.snapshot(topicA, Instant.now()).get("crew"))
+        .extracting(LiveSyncPresenceService.Entry::userId)
+        .containsExactly("user-1");
+  }
+
+  @Test
+  void localSnapshot_carriesOnlyThisInstancesEditors() {
+    service.touch(topicA, "crew", "user-1", "Alice");
+    service.applyRemote(topicA, "instance-B", partition("steps", "user-2", "Bob"), Instant.now());
+
+    // Gossiping a peer's entries back at it would let two instances keep each other's stale dots
+    // alive indefinitely.
+    assertThat(service.localSnapshot(topicA, Instant.now())).containsOnlyKeys("crew");
+  }
+
+  @Test
+  void applyRemote_reportsAChangeOnlyWhenTheMergedViewActuallyChanges() {
+    Instant now = Instant.now();
+
+    assertThat(service.applyRemote(topicA, "instance-B", partition("crew", "user-2", "Bob"), now))
+        .isTrue();
+    // The 10 s re-gossip restates what we already hold: refresh the partition silently rather than
+    // broadcasting a fresh snapshot to every socket in the room every tick.
+    assertThat(
+            service.applyRemote(
+                topicA, "instance-B", partition("crew", "user-2", "Bob"), now.plusSeconds(10)))
+        .isFalse();
+    assertThat(
+            service.applyRemote(
+                topicA, "instance-B", partition("crew", "user-3", "Carol"), now.plusSeconds(20)))
+        .isTrue();
+  }
+
+  @Test
+  void applyRemote_withAnEmptySnapshot_dropsThePeersPartitionImmediately() {
+    service.applyRemote(topicA, "instance-B", partition("crew", "user-2", "Bob"), Instant.now());
+    assertThat(service.remotePartitionCount()).isEqualTo(1);
+
+    assertThat(service.applyRemote(topicA, "instance-B", Map.of(), Instant.now())).isTrue();
+
+    assertThat(service.remotePartitionCount()).isZero();
+    assertThat(service.snapshot(topicA, Instant.now())).isEmpty();
+    // Idempotent: a second empty snapshot reports no change, so no needless broadcast.
+    assertThat(service.applyRemote(topicA, "instance-B", Map.of(), Instant.now())).isFalse();
+  }
+
+  @Test
+  void applyRemote_refusesAFirstSeenOrigin_onceTheTopicIsAtTheOriginCap() {
+    Instant now = Instant.now();
+    for (int i = 0; i < LiveSyncPresenceService.MAX_REMOTE_ORIGINS_PER_TOPIC; i++) {
+      assertThat(service.applyRemote(topicA, "instance-" + i, partition("crew", "u" + i, "U"), now))
+          .isTrue();
+    }
+
+    assertThat(service.applyRemote(topicA, "instance-spoof", partition("crew", "x", "X"), now))
+        .isFalse();
+    assertThat(service.remotePartitionCount())
+        .isEqualTo(LiveSyncPresenceService.MAX_REMOTE_ORIGINS_PER_TOPIC);
+    // An established origin still updates — the cap refuses newcomers, it never evicts.
+    assertThat(service.applyRemote(topicA, "instance-0", partition("steps", "u0", "U"), now))
+        .isTrue();
+  }
+
+  @Test
+  void applyRemote_truncatesAnOverLongEditorListPerSection() {
+    List<LiveSyncPresenceService.PresenceEditor> editors = new ArrayList<>();
+    for (int i = 0; i < LiveSyncPresenceService.MAX_EDITORS_PER_REMOTE_SECTION + 10; i++) {
+      editors.add(new LiveSyncPresenceService.PresenceEditor("user-" + i, "User " + i));
+    }
+
+    service.applyRemote(topicA, "instance-B", Map.of("crew", editors), Instant.now());
+
+    assertThat(service.snapshot(topicA, Instant.now()).get("crew"))
+        .hasSize(LiveSyncPresenceService.MAX_EDITORS_PER_REMOTE_SECTION);
+  }
+
+  @Test
+  void reapExpiredRemote_dropsASilentReplicasPartition_andReportsTheTopic() {
+    Instant now = Instant.now();
+    service.applyRemote(topicA, "instance-B", partition("crew", "user-2", "Bob"), now);
+    service.applyRemote(topicB, "instance-C", partition("crew", "user-3", "Carol"), now);
+
+    assertThat(service.reapExpiredRemote(now.plusSeconds(5))).isEmpty();
+
+    Instant afterTtl = now.plus(LiveSyncPresenceService.REMOTE_PARTITION_TTL).plusSeconds(1);
+    assertThat(service.reapExpiredRemote(afterTtl)).containsExactlyInAnyOrder(topicA, topicB);
+    assertThat(service.remotePartitionCount()).isZero();
+  }
+
+  @Test
+  void snapshot_hidesAPeerPartitionThatWouldExpireOnTheNextReap() {
+    Instant now = Instant.now();
+    service.applyRemote(topicA, "instance-B", partition("crew", "user-2", "Bob"), now);
+
+    Instant afterTtl = now.plus(LiveSyncPresenceService.REMOTE_PARTITION_TTL).plusSeconds(1);
+    // Same contract the local half already honours: a snapshot never shows state the next reap
+    // would remove.
+    assertThat(service.snapshot(topicA, afterTtl)).isEmpty();
+  }
+
+  @Test
+  void remotePartitionsGauge_reflectsTheMirroredPartitionCount() {
+    assertThat(remotePartitionsGauge()).isEqualTo(0.0d);
+
+    service.applyRemote(topicA, "instance-B", partition("crew", "user-2", "Bob"), Instant.now());
+    service.applyRemote(topicA, "instance-C", partition("crew", "user-3", "Carol"), Instant.now());
+
+    assertThat(remotePartitionsGauge()).isEqualTo(2.0d);
+  }
+
+  /**
+   * Builds a single-section, single-editor peer partition for the mirror tests.
+   *
+   * @param sectionKey the section the editor is on
+   * @param userId the editor's stable id
+   * @param displayName the editor's label
+   * @return the partition as it would arrive from a peer replica
+   */
+  private static Map<String, List<LiveSyncPresenceService.PresenceEditor>> partition(
+      String sectionKey, String userId, String displayName) {
+    return Map.of(
+        sectionKey, List.of(new LiveSyncPresenceService.PresenceEditor(userId, displayName)));
+  }
+
+  private double remotePartitionsGauge() {
+    var gauge = meterRegistry.find(MetricNames.LIVESYNC_PRESENCE_REMOTE_PARTITIONS).gauge();
+    return gauge == null ? 0.0d : gauge.value();
   }
 
   private static void sleepTinyBit() {

@@ -543,6 +543,50 @@ outage, taken **only** on an actual `networks:` change; ordinary bumps keep the 
 in-place `up`. The pinning keeps the recreated gateways stable, so the NPM `/admin`
 allow-list stays valid.
 
+**A Postgres `command:` flag edit recreates the database containers — and is _not_
+operator-gated.** The stateful-infra carve-out below matches only `image:` lines
+(`infra_image_pins()` greps `postgres:` / `quay.io/keycloak/keycloak:`), so a change to a
+`-c shared_buffers=…` / `-c work_mem=…` / `-c max_connections=…` flag looks like any other
+compose edit and **auto-applies on the next 5-minute tick**, recreating `db-backend` and/or
+`db-keycloak` in place. That is safe — the flags are runtime settings, `PGDATA` is untouched,
+and no migration is involved — but it is still a database restart, so treat it as a
+maintenance moment rather than letting it land unattended:
+
+1. **Pause the timer** before promoting, so the apply happens when you are watching:
+
+   ```bash
+   sudo systemctl stop iri-deploy.timer
+   ```
+2. Promote the release as usual (`gh workflow run promote.yml -f version=<version>`).
+3. **Apply deliberately** and watch it through the health gate:
+
+   ```bash
+   sudo -u deploy /var/iri/code/scripts/deploy.sh --force
+   ```
+4. Confirm the flags actually reached the running server — a compose edit that never got
+   applied has bitten this stack before:
+
+   ```bash
+   docker exec db-backend psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -p 15432 \
+     -c "SHOW shared_buffers; SHOW effective_cache_size; SHOW work_mem; SHOW max_connections;"
+   ```
+5. **Restart the timer:**
+
+   ```bash
+   sudo systemctl start iri-deploy.timer
+   ```
+
+Expect a short connection blip: `backend` and `keycloak` are **not** recreated, so their
+pools reconnect against the new server (HikariCP retries within `connection-timeout: 5000`,
+Keycloak's Agroal likewise). `depends_on: service_healthy` only orders a *fresh* `up`, it
+does not restart dependents when only the DB is recreated. The blip is why this belongs in a
+maintenance moment even though nothing is destructive.
+
+**Rollback** is the ordinary config rollback — promote the previous version, or pin the
+config bundle back — because the flags live in `docker-compose.yml`. A health failure during
+step 3 already rolls the compose file back automatically. Lowering `shared_buffers` needs no
+data migration in either direction, so there is no one-way door here.
+
 **Manual recovery, if a stack is ever stranded** (a hand-run `docker compose up`
 after a networks edit, or an older `deploy.sh` without the recreate). Symptoms:
 `UnresolvedAddressException` / `UnknownHostException` for `keycloak` / `db-keycloak`

@@ -2062,7 +2062,7 @@
       },
       "type": "timeseries",
       "title": "Live-sync changed relay/hour by topic class",
-      "description": "Peer-forwarded `changed` frames per topic class (the per-surface breakdown of panel 28). A `changed` flatline on a surface whose viewers keep editing is the early indicator of the REQ-FE-010 stale-peer defect class.",
+      "description": "Peer-forwarded `changed` frames per topic class (the per-surface breakdown of panel 28). A `changed` flatline is only meaningful when read against panel 47 (peer rooms): a room with one viewer relays zero frames by design, because relayLocal skips the origin. A flatline WHILE that class holds peer rooms is the early indicator of the REQ-FE-010 stale-peer defect class; a flatline with no peer rooms just means nobody was co-editing. The positive detector for the same defect is the LiveSyncSectionKeySkew alert (#1238), which needs no occupancy assumption.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2111,7 +2111,7 @@
       },
       "type": "timeseries",
       "title": "Redis fan-out pub/sub & errors/hour",
-      "description": "Cross-replica Redis fan-out for live delivery (ADR-0094): the live-sync changed-relay (basetool_livesync_redis_*) and the notification SSE fan-out (basetool_sse_redis_*). Publishing is fire-and-forget after the local relay, so a rising `errors` stream means cross-replica delivery is silently degraded to single-instance — watched by the LiveSyncRedisFanoutBroken alert.",
+      "description": "Cross-replica Redis fan-out for live delivery (ADR-0094/ADR-0126): the live-sync changed-relay (basetool_livesync_redis_*), the editor-presence gossip (basetool_livesync_presence_*) and the notification SSE fan-out (basetool_sse_redis_*). Publishing is fire-and-forget after the local relay/broadcast, so a rising `errors` stream means cross-replica delivery is silently degraded to single-instance — watched by the LiveSyncRedisFanoutBroken alert, which covers the changed relay and the SSE fan-out only (a lost changed frame costs correctness; a lost presence gossip costs a cosmetic dot, so it is a panel row, not a page). Note the presence rows are a PERIODIC gossip — one message per actively-edited topic per 10 s per replica — so a steady non-zero floor is normal there and a flat zero simply means nobody has a mission panel focused.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2188,6 +2188,42 @@
           "expr": "sum(rate(basetool_sse_redis_errors_total[1h])) * 3600",
           "refId": "F",
           "legendFormat": "notification errors",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(basetool_livesync_presence_published_total[1h])) * 3600",
+          "refId": "G",
+          "legendFormat": "presence gossiped",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(basetool_livesync_presence_consumed_total[1h])) * 3600",
+          "refId": "H",
+          "legendFormat": "presence mirrored",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(basetool_livesync_redis_errors_total{op=~\"presence_.*\"}[1h])) * 3600",
+          "refId": "I",
+          "legendFormat": "presence errors",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(basetool_livesync_presence_remote_partitions)",
+          "refId": "J",
+          "legendFormat": "mirrored partitions (gauge)",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -2447,6 +2483,56 @@
         "w": 12,
         "x": 0,
         "y": 160
+      },
+      "type": "timeseries",
+      "title": "Live-sync peer rooms by topic class",
+      "description": "Rooms currently holding TWO OR MORE subscribers, per topic class (#1238) — the rooms in which peer-sync can actually do anything. Read panel 39 against this one: relayLocal skips the originating session, so a room with a single viewer relays zero `changed` frames however hard that viewer edits, which makes a `changed` flatline the normal state of an unoccupied surface rather than a defect. basetool_livesync_subscriptions cannot substitute — it sums sockets across a class, so two lone viewers in different rooms look identical to two peers in one. Measured over the 21d to 2026-08-03 co-presence is rare (peak concurrent subscriptions: mission 15, bank_staff 6, order_detail 4, others 3 or fewer, operation 1), which is why the per-topic_class changed-flatline alert stays deferred.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (topic_class) (basetool_livesync_peer_rooms)",
+          "refId": "A",
+          "legendFormat": "{{topic_class}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 168
       },
       "type": "timeseries",
       "title": "Ingest auth failures/hour by bearer error",
