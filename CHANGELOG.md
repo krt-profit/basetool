@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Zwei neue Alarme für die Live-Aktualisierung.** Verwirft die Verteilung eine Änderung, sehen die anderen Betrachter unbemerkt einen veralteten Stand — ohne Fehlermeldung auf beiden Seiten. `LiveSyncRelayDropsSustained` schlägt bei anhaltenden Verlusten je Oberfläche an, `LiveSyncSectionKeySkew` beim Senden eines Bereichsschlüssels, den die Verteilung nicht kennt. Beide Schwellen stammen aus 21 Tagen gemessenem Produktivbetrieb (REQ-OBS-011).
+
+- **Neue Kennzahl `basetool_livesync_peer_rooms` samt Panel im Betriebs-Dashboard.** Sie zeigt je Oberfläche, in wie vielen Räumen mehrere Personen gleichzeitig sind. Ohne sie ist ein Ausbleiben von Aktualisierungen nicht davon zu unterscheiden, dass schlicht niemand gemeinsam bearbeitet hat.
+
 ### Fixed
 
 - **Die Formatierungsprüfung des Frontends schlug auf Windows-Arbeitsplätzen grundlos fehl.** Für TypeScript-Deklarationsdateien fehlte die Zeilenenden-Regel, sodass ein frischer Checkout unter Windows drei Dateien mit CRLF anlegte und Prettier sie beanstandete, obwohl niemand sie angefasst hatte — auf dem Linux-Server blieb der Fehler unsichtbar. `.gitattributes` deckt jetzt auch `*.ts` ab; die Dateiinhalte bleiben unverändert (ADR-0125).

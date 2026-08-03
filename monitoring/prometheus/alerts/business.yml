@@ -852,3 +852,68 @@ groups:
         annotations:
           summary: "Redis live-sync/notification fan-out publish errors (cross-replica delivery degraded)"
           description: "The live-sync and/or notification Redis fan-out has failed to publish for 10 minutes — cross-replica live delivery is silently degraded to single-instance (a viewer on one replica stops seeing another replica's changes/notifications; same-replica delivery still works, no user-facing error). Check Redis reachability from the app replicas and the basetool:livesync:changed / basetool:notify:published pub/sub channels (default-user ACL `&*`)."
+
+      # (#1238, REQ-OBS-011) Live-sync relay drops. Every drop branch of the relay means a peer did
+      # NOT get an update it should have had: a throttled or topic-throttled `changed` frame, a write
+      # to a broken socket, a subscribe refused at the per-session topic cap, or a subscribe that
+      # failed OPEN because the authorization executor was saturated. All of them leave a viewer
+      # silently stale — no error client-side, no 5xx, nothing else to see it by.
+      #
+      # THRESHOLD IS MEASURED, NOT GUESSED. #1102 deferred this alert until a production baseline
+      # existed; the baseline was read on 2026-08-03 over the preceding 21 days and is *exactly
+      # zero*: `basetool_presence_relay_dropped_total` had not a single series in prod — Micrometer
+      # creates a counter lazily on first increment, so an empty vector means no drop branch has ever
+      # been taken, on any of the nine topic classes. Relay volume over the same window was small
+      # (mission 1175 `changed` frames, then 53/53/12/10/7/2 for inventory_all, materialboard,
+      # order_detail, bank_staff, orgunit_bank and bank_account; orders_queue 0), so the token
+      # buckets (burst 24, refill 1/s) are nowhere near being exercised. Against a three-week zero,
+      # >3 drops in an hour is a strong anomaly signal and still leaves headroom for the one drop
+      # class that CAN occur benignly: `send_failed` races when a socket closes between the
+      # `isOpen()` pre-check and the write. A one-off race can never reach 4/h, so it stays silent.
+      #
+      # `section_filtered` is deliberately excluded here — it is a code-skew defect, not a capacity
+      # signal, and needs the far lower threshold of LiveSyncSectionKeySkew below.
+      - alert: LiveSyncRelayDropsSustained
+        expr: sum by (topic_class, reason) (increase(basetool_presence_relay_dropped_total{reason!="section_filtered"}[1h])) > 3
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Live-sync relay dropping frames on {{ $labels.topic_class }} ({{ $labels.reason }})"
+          description: "The live-sync relay dropped more than 3 frames in an hour on topic class {{ $labels.topic_class }} for reason {{ $labels.reason }}, sustained for 15m — peers on that surface are silently missing updates. Prod baseline for this counter is zero over 21d, so any sustained stream is anomalous. `throttled`/`topic_throttled`: a client or a room is exceeding its token bucket (misbehaving client, or a genuinely hot room needing a wider bound). `send_failed`: sockets breaking mid-write — check the reverse proxy's WebSocket timeouts. `topic_cap`: a client subscribing past its per-session topic cap (client bug). `authorize_saturated`: the subscribe-authorization executor is saturated and subscribes are failing OPEN — a subscribe was admitted without an authorization check, so treat it as security-relevant and check backend latency."
+
+      # (#1238, REQ-FE-010 / REQ-OBS-011) A section key is being broadcast that the relay's
+      # accept-list does not know, so the relay silently forwards nothing for it and every peer's
+      # matching panel stays stale — with no error on either side. This is THE REQ-FE-010 defect
+      # class, the one that shipped when `objectives`/`frequencies` were added to the mission write
+      # seam but not to the receiver and relay maps, and `section_filtered` is what finally makes it
+      # observable: the counter is bumped once per frame that lost at least one key to the whitelist.
+      #
+      # This replaces the `changed`-flatline alert #1238 originally proposed, which is NOT soundly
+      # constructible: `relayLocal` skips the originating session, so a room with one viewer relays
+      # zero `changed` frames however hard that viewer edits — a flatline is the normal state of an
+      # unoccupied surface. The guard the issue assumed ("while `snapshot` frames keep flowing")
+      # exists only for topic_class=mission, because every snapshot path is gated on
+      # presenceEnabled(), true for MISSION alone. Measured peak CONCURRENT subscriptions per class
+      # over the 21d to 2026-08-03 were mission 15, bank_staff 6, order_detail 4, {inventory_all,
+      # materialboard, orders_queue, orgunit_bank} 3, bank_account 2 and operation 1 — co-presence
+      # never once occurred on `operation`. So a flatline rule would be silent where it could fire
+      # and false where it could not. This rule detects the same defect POSITIVELY instead, needing
+      # no occupancy assumption at all. The new basetool_livesync_peer_rooms{topic_class} gauge is
+      # the co-presence denominator a future flatline rule would need; it is panel-only until it has
+      # its own baseline, and only `mission` looks likely to ever carry enough traffic for one.
+      #
+      # Persistence, not volume, is the discriminator: a real skew is deterministic and re-triggers
+      # on every edit of that section, so `increase[1h] > 0` held for 2h means drops kept arriving
+      # across at least two hours. A single isolated blip decays out of the 1h window and stays
+      # silent. Baseline here is also zero over 21d. Known gap: on a barely-used surface
+      # (bank_account relayed 2 frames in 21 days) a real skew may never sustain 2h — the dashboard
+      # panel remains the backstop there.
+      - alert: LiveSyncSectionKeySkew
+        expr: sum by (topic_class) (increase(basetool_presence_relay_dropped_total{reason="section_filtered"}[1h])) > 0
+        for: 2h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Live-sync section-key skew on {{ $labels.topic_class }} (peers going stale)"
+          description: "The live-sync relay has been filtering unknown section keys out of `changed` frames on topic class {{ $labels.topic_class }} for over 2 hours — a broadcast key is missing from the relay's accept-list, so peers' matching panels stay stale with no visible error (the REQ-FE-010 defect class). A section key must exist at all three mirror points at once: the acting page's seam map, LiveSyncTopicClass.allowedSections, and the receiving client's apply map. Check what the last frontend deploy changed on that surface and raise LiveSyncWebSocketHandler to DEBUG to see the rejected key (logged sanitised, never a metric tag)."
