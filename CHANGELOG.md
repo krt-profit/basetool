@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.30](https://github.com/krt-profit/basetool/releases/tag/v1.5.30) - 2026-08-03
+
 ### Added
 
 - **Ingest-Gateway: Die Schnittstelle ist jetzt auf freigegebene Clients beschränkt.** Bisher wurde jedes gültige Token aus dem Realm akzeptiert — auch eines der Weboberfläche. Das Gateway prüft jetzt Client-Kennung, Berechtigungsumfang und die Herkunftsangabe der Nutzdaten gegen eine Freigabeliste und antwortet sonst mit `403 CLIENT_NOT_ALLOWED`. Wer den Extraktor nutzen darf, ändert sich nicht: jedes Mitglied darf Blueprints und Raffinerie-Aufträge hochladen (REQ-INGEST-011, ADR-0018).
