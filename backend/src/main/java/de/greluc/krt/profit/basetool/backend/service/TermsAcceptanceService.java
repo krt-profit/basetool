@@ -30,13 +30,17 @@ import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.JpaSort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,6 +67,18 @@ public class TermsAcceptanceService {
    * unexpectedly — an evicted entry costs one extra query, never a wrong answer.
    */
   private static final int CACHE_MAX_ENTRIES = 10_000;
+
+  /**
+   * Maps each sort property the admin overview accepts onto its explicit JPQL alias path. Kept in
+   * lockstep with {@code AdminTermsController.ALLOWED_SORT_FIELDS}: the controller decides what a
+   * caller may ask for, this map decides what the query actually sorts on, and a property in one
+   * but not the other fails loudly in {@link #withAliasedSort} rather than reaching Hibernate.
+   */
+  private static final Map<String, String> SORT_PROPERTY_PATHS =
+      Map.of(
+          "username", "u.username",
+          "displayName", "u.displayName",
+          "acceptedAt", "ta.acceptedAt");
 
   private final TermsAcceptanceRepository termsAcceptanceRepository;
   private final TermsVersionProvider termsVersionProvider;
@@ -171,7 +187,43 @@ public class TermsAcceptanceService {
   @Transactional(readOnly = true)
   public Page<TermsAcceptanceStatusDto> findAcceptanceStatus(
       @NotNull String filter, @NotNull Pageable pageable) {
-    return termsAcceptanceRepository.findAcceptanceStatus(currentVersion(), filter, pageable);
+    return termsAcceptanceRepository.findAcceptanceStatus(
+        currentVersion(), filter, withAliasedSort(pageable));
+  }
+
+  /**
+   * Rewrites a sort property into the explicit JPQL alias path it belongs to.
+   *
+   * <p>Spring Data appends a {@link Pageable}'s sort to the query resolved against its
+   * <em>root</em> — here {@code User u}. {@code acceptedAt} does not live on {@code User} but on
+   * the outer-joined {@code TermsAcceptance ta}, so passing it through unchanged makes Hibernate
+   * reject the whole query with {@code Could not resolve attribute 'acceptedAt' of User}. That is a
+   * 500 on the one sort an admin most obviously wants — "who accepted most recently" — and it
+   * surfaces only at runtime, which is why {@code TermsAcceptanceQueryDataTest} pins it.
+   *
+   * <p>{@link JpaSort#unsafe} is safe here despite the name: the caller's property never reaches
+   * the query, only the fixed path this map returns, and an unmapped property is rejected outright
+   * rather than passed along.
+   *
+   * @param pageable the requested page, whose sort properties the controller already whitelisted
+   * @return an equivalent pageable whose sort names aliased paths
+   * @throws IllegalArgumentException if a property has no mapping — a whitelist/mapping mismatch is
+   *     a programming error, not user input
+   */
+  private static @NotNull Pageable withAliasedSort(@NotNull Pageable pageable) {
+    if (pageable.getSort().isUnsorted()) {
+      return pageable;
+    }
+    JpaSort aliased = null;
+    for (Sort.Order order : pageable.getSort()) {
+      String path = SORT_PROPERTY_PATHS.get(order.getProperty());
+      if (path == null) {
+        throw new IllegalArgumentException("Unmapped sort property: " + order.getProperty());
+      }
+      JpaSort next = JpaSort.unsafe(order.getDirection(), path);
+      aliased = aliased == null ? next : aliased.andUnsafe(order.getDirection(), path);
+    }
+    return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), aliased);
   }
 
   /**
