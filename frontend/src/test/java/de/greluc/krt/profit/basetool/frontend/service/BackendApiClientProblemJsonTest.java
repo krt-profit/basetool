@@ -25,6 +25,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import java.io.IOException;
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
@@ -34,6 +38,7 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -105,6 +110,12 @@ class BackendApiClientProblemJsonTest {
                           + "\"code\":\"VALIDATION_FAILED\",\"correlationId\":\"corr-400\",\"fieldErrors\":[{\"field\":\"name\",\"message\":\"must"
                           + " not be blank\"},{\"field\":\"amount\",\"message\":\"must be"
                           + " positive\"}]}");
+              case "/api/v1/terms-gated" ->
+                  problemJson(
+                      403,
+                      "{\"type\":\"urn:problem:terms-not-accepted\",\"title\":\"Forbidden\",\"status\":403,\"detail\":\"Accept"
+                          + " the terms\","
+                          + "\"code\":\"TERMS_NOT_ACCEPTED\",\"correlationId\":\"corr-terms\"}");
               case "/api/v1/no-body" -> new MockResponse().setResponseCode(500);
               default -> new MockResponse().setResponseCode(404);
             };
@@ -167,6 +178,44 @@ class BackendApiClientProblemJsonTest {
         ex.getFieldErrors().stream()
             .anyMatch(fe -> "name".equals(fe.field()) && "must not be blank".equals(fe.message())));
     assertTrue(ex.getFieldErrors().stream().anyMatch(fe -> "amount".equals(fe.field())));
+  }
+
+  /**
+   * A consent-gate 403 is logged at DEBUG, not WARN.
+   *
+   * <p>Not cosmetic. After a Terms-of-Use wording change every member is unconsented at once, and
+   * the role sync plus three unconditional {@code @ControllerAdvice} model attributes each 403 on
+   * every non-static request — so a WARN here is several lines per navigation, per user,
+   * indefinitely, for a feature that is working exactly as designed (REQ-SEC-028, REQ-OBS-001).
+   * Pinned so a future refactor of this branch order cannot quietly reintroduce the flood; the
+   * {@code backend_4xx} metric increment sits outside the branch, so the monitoring signal is
+   * unaffected either way.
+   */
+  @Test
+  void get_ShouldLogTermsGate403AtDebug_NotWarn() {
+    Logger logger = (Logger) LoggerFactory.getLogger(BackendApiClient.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    Level previous = logger.getLevel();
+    logger.setLevel(Level.DEBUG);
+    try {
+      BackendServiceException ex =
+          assertThrows(
+              BackendServiceException.class,
+              () -> backendApiClient.get("/api/v1/terms-gated", String.class, true));
+      assertEquals("TERMS_NOT_ACCEPTED", ex.getProblemCode());
+
+      assertTrue(
+          appender.list.stream().noneMatch(event -> event.getLevel() == Level.WARN),
+          "a consent-gate 403 must not reach WARN");
+      assertTrue(
+          appender.list.stream().anyMatch(event -> event.getLevel() == Level.DEBUG),
+          "the refusal is still recorded, at DEBUG");
+    } finally {
+      logger.setLevel(previous);
+      logger.detachAppender(appender);
+    }
   }
 
   @Test
