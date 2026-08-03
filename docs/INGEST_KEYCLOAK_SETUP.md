@@ -371,21 +371,51 @@ Only when both hold, set `IRI_INGEST_CLIENT_AUDIT_ONLY=false` and restart. The
 > possible without downtime: ship the new extractor with a new id, run both, drop the old id once the
 > per-`client_id` counter shows no traffic on it.
 
-## Step 8 — DPoP (REQ-INGEST-012) — BLOCKED on the extractor
+## Step 8 — DPoP: bind the REFRESH token only (REQ-INGEST-012)
 
-Keycloak has supported DPoP as a non-preview feature since 26.4, and the gateway validates DPoP-bound
-tokens already. **`IRI_INGEST_DPOP_REQUIRED` must stay `false`** until the desktop
-extractor sends DPoP proofs — it sends `Authorization: Bearer` today, so enabling this breaks every
-send on deploy. Validation of a presented DPoP token is active regardless, so there is nothing to
-enable for the migration to begin.
+DPoP protects the credential the extractor writes to disk — its **refresh token**. Access tokens
+stay plain bearer, because the gateway relays them onward to the backend and a sender-constrained
+token cannot survive that second hop (the reasoning is in `REQ-INGEST-012`; getting this wrong broke
+every blueprint send on 2026-08-03).
 
-Two things are worth doing on the Keycloak side **now**, independently of the extractor:
+Since Keycloak 26.4 DPoP needs **no feature flag** and **no per-client switch** to work — it binds
+whenever a client sends a proof. What you configure here is that it binds the refresh token *only*.
 
-- **Do not grant `offline_access`** to `basetool-sc-extractor`, so no long-lived offline token can be
-  minted for a client whose token is persisted on a user machine.
-- **Shorten the client session / access-token lifespans** for that client (Client → Advanced). This
-  is a *per-client* override and therefore free of the problem that forced realm-wide refresh-token
-  rotation off in step 4 — it does not touch the frontend BFF.
+### 8a — Client policy with the DPoP bind enforcer
+
+The refresh-only behaviour lives in a **client policy executor**, not on the client. Realm settings
+→ **Client policies**:
+
+1. **Profiles** → create a profile (e.g. `extractor-dpop`) and add the executor
+   **`dpop-bind-enforcer`**.
+2. In the executor configuration set **`allow-only-refresh-token-binding` = On**. Leave
+   `auto-configure` and `enforce-authorization-code-binding-to-dpop` off unless you have a reason.
+3. **Policies** → create a policy that applies that profile, with a condition scoping it to the
+   client `basetool-sc-extractor` (a `client-access-type` / client-id condition).
+
+> Verified against the Keycloak 26.7 image
+> (`DPoPBindEnforcerExecutor$Configuration`: `auto-configure`,
+> `enforce-authorization-code-binding-to-dpop`, `allow-only-refresh-token-binding`). The per-client
+> **"Require DPoP bound tokens"** switch under *Settings → Capability config* (attribute
+> `dpop.bound.access.tokens`) is the **enforcement** switch — leave it **off**: it would demand
+> DPoP on the access token, which is exactly what must not happen here.
+
+### 8b — Verify
+
+Send once from the extractor, then decode the access token it received:
+
+- `cnf` must be **absent** — the access token is a plain bearer.
+- `token_type` must be `Bearer`, not `DPoP`.
+
+If `cnf.jkt` appears, access-token binding is on: the gateway logs a `WARN` naming exactly that, and
+the backend will refuse the relayed token. Turn `allow-only-refresh-token-binding` back on.
+
+### 8c — Two numbers that bite
+
+Keycloak allows a proof lifetime of **10 seconds** and a clock skew of **15 seconds** (`DPoPUtil`). A
+machine whose clock drifts beyond that fails authentication with no obvious cause — the extractor
+detects and names this case, but if you see unexplained auth failures on one machine, check its clock
+first.
 
 ## Rollback
 

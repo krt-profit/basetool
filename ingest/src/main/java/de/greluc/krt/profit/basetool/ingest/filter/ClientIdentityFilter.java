@@ -29,13 +29,11 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -51,12 +49,11 @@ import tools.jackson.databind.ObjectMapper;
  * this filter never asks whether the caller is entitled, only whether the program making the call
  * is an approved one.
  *
- * <p>Three token-level checks, each inert until configured (see {@link ClientIdentityProperties}):
- * the {@code azp} claim against the client-id allowlist, the configured ingest scope, and — once
- * {@code dpop-required} is set — that the request used the DPoP scheme rather than a plain bearer.
- * The payload-level provenance check cannot live here (the body is not parsed yet) and sits in
- * {@code ProvenanceGuard} instead; both share the {@code CLIENT_NOT_ALLOWED} problem code so a
- * client sees one coherent answer.
+ * <p>Two token-level checks, each inert until configured (see {@link ClientIdentityProperties}):
+ * the {@code azp} claim against the client-id allowlist and the configured ingest scope. The
+ * payload-level provenance check cannot live here (the body is not parsed yet) and sits in {@code
+ * ProvenanceGuard} instead; both share the {@code CLIENT_NOT_ALLOWED} problem code so a client sees
+ * one coherent answer.
  *
  * <p><b>Placement.</b> Inside the Spring Security chain, after {@code
  * BearerTokenAuthenticationFilter} (there is no {@link
@@ -79,9 +76,6 @@ import tools.jackson.databind.ObjectMapper;
 @Slf4j
 @RequiredArgsConstructor
 public class ClientIdentityFilter extends OncePerRequestFilter {
-
-  /** RFC 9449 {@code Authorization} scheme, compared case-insensitively per RFC 9110. */
-  static final String DPOP_SCHEME = "dpop";
 
   /** JWT confirmation claim (RFC 7800); its {@code jkt} member carries the DPoP key thumbprint. */
   static final String CONFIRMATION_CLAIM = "cnf";
@@ -177,9 +171,9 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
   /**
    * Runs the configured checks in order of decreasing severity and returns the first failure.
    *
-   * <p>Order matters for diagnosis, not for security: all three yield the same {@code 403}, but
-   * reporting the token-scheme problem before the claim problems means an operator mid-DPoP-rollout
-   * sees {@code dpop_required} rather than a confusing downstream symptom.
+   * <p>Order matters for diagnosis, not for security: both yield the same {@code 403}, but the
+   * client-identity failure is reported before the scope one because it is the more common
+   * misconfiguration and the more actionable message.
    *
    * <p>Takes the already-extracted {@code azp} rather than the {@link Jwt} itself: the only other
    * claim-derived input, the ingest scope, reaches this through the {@code SecurityContext} as a
@@ -191,12 +185,6 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
    */
   private @Nullable Rejection evaluate(
       @NotNull HttpServletRequest request, @Nullable String authorizedParty) {
-    if (properties.isDpopRequired() && !usesDpopScheme(request)) {
-      return new Rejection(
-          MetricNames.REASON_DPOP_REQUIRED,
-          "This endpoint requires a DPoP-bound token (RFC 9449); a plain bearer token is not"
-              + " accepted.");
-    }
     if (!properties.getAllowedClientIds().isEmpty()) {
       if (authorizedParty == null) {
         // Fail-closed on an ABSENT claim. Treating "no azp" as "nothing to check" would silently
@@ -241,22 +229,33 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Logs a DPoP <em>downgrade</em>: a token that Keycloak sender-constrained to a key (it carries
-   * {@code cnf.jkt}) was presented under the plain bearer scheme, so no proof of possession was
-   * validated. Detected and reported independently of {@code dpop-required} because during the
-   * dual-mode window this is the one DPoP anomaly that is never benign — a client that holds a
-   * bound token has a key, so falling back to bearer is either a client bug or a replay of a token
-   * lifted from somewhere else.
+   * Warns when an access token arrives <b>sender-constrained</b> (it carries the RFC 7800 {@code
+   * cnf.jkt} confirmation), which under the intended realm configuration must never happen.
+   *
+   * <p>This is a canary for a specific, silent misconfiguration. DPoP is used here to bind the
+   * <b>refresh</b> token only — the long-lived credential the extractor persists to disk
+   * (REQ-INGEST-007, REQ-INGEST-012) — while access tokens deliberately stay plain bearer so they
+   * relay cleanly to the backend. If the realm's client policy is ever changed to bind access
+   * tokens too ({@code allow-only-refresh-token-binding} turned off), tokens start arriving with
+   * {@code cnf.jkt} and the relay breaks at the BACKEND, not here: this gateway would still accept
+   * them, forward them as a plain bearer, and the caller would see the backend's opaque "you must
+   * sign in". That is exactly how the 2026-08-03 outage presented, and it cost hours.
+   *
+   * <p>Logged rather than rejected: the token is otherwise valid, and refusing it here would trade
+   * a confusing failure for a different confusing failure. The line is the pointer that names the
+   * cause.
    *
    * @param request the current request
    * @param jwt the authenticated caller's token
    */
   private void warnOnDowngrade(@NotNull HttpServletRequest request, @NotNull Jwt jwt) {
-    if (!isSenderConstrained(jwt) || usesDpopScheme(request)) {
+    if (!isSenderConstrained(jwt)) {
       return;
     }
     log.warn(
-        "DPoP-bound token presented as a plain bearer (no proof validated): path={} {}",
+        "Access token is DPoP-bound (cnf.jkt present) but this gateway relays it as a plain bearer"
+            + " — the backend will refuse it. Expected realm policy binds the REFRESH token"
+            + " only (allow-only-refresh-token-binding): path={} {}",
         request.getMethod(),
         request.getRequestURI());
   }
@@ -275,22 +274,6 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
     }
     return confirmation.get(THUMBPRINT_MEMBER) instanceof String thumbprint
         && !thumbprint.isBlank();
-  }
-
-  /**
-   * Reports whether the request presented its token under the RFC 9449 {@code DPoP} scheme.
-   *
-   * @param request the current request
-   * @return {@code true} when the {@code Authorization} header uses the DPoP scheme
-   */
-  private static boolean usesDpopScheme(@NotNull HttpServletRequest request) {
-    String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
-    if (authorization == null) {
-      return false;
-    }
-    // RFC 9110 makes the auth-scheme case-insensitive; Keycloak and the Spring converter both emit
-    // "DPoP", but a hand-written client may well send "dpop" and must not be misclassified.
-    return authorization.toLowerCase(Locale.ROOT).startsWith(DPOP_SCHEME + " ");
   }
 
   /**

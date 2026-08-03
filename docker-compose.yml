@@ -728,9 +728,6 @@ x-ingest: &ingest-template
     # 2026-08-03). The comparison folds case; these two differ structurally.
     APP_INGEST_CLIENT_IDENTITY_ALLOWED_TOOLS: ${IRI_INGEST_ALLOWED_TOOLS:-}
     APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY: ${IRI_INGEST_CLIENT_AUDIT_ONLY:-false}
-    # MUST stay false until the desktop extractor sends DPoP proofs — it sends Authorization: Bearer
-    # today, so enabling this breaks every send on deploy (REQ-INGEST-012).
-    APP_INGEST_CLIENT_IDENTITY_DPOP_REQUIRED: ${IRI_INGEST_DPOP_REQUIRED:-false}
     # Monitoring plane (epic #936, REQ-OBS-005/-009) — see the backend template for the full
     # rationale. Everything defaults OFF/empty so dev/test/e2e stay inert; the prod .env supplies the
     # real scrape credentials and enables tracing. Only the prod service joins net-monitoring-scrape.

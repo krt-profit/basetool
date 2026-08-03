@@ -206,14 +206,6 @@ public final class MetricNames {
   public static final String REASON_BAD_PROVENANCE = "bad_provenance";
 
   /**
-   * Client-identity reject reason: a plain {@code Authorization: Bearer} request arrived while
-   * {@code app.ingest.client-identity.dpop-required} is enabled (RFC 9449, REQ-INGEST-012). During
-   * the dual-mode migration this counter is the measure of how much of the client population has
-   * not yet moved to DPoP-bound tokens.
-   */
-  public static final String REASON_DPOP_REQUIRED = "dpop_required";
-
-  /**
    * Counter {@code basetool_ingest_auth_failures_total} — tag {@code reason}, the RFC 6750 bearer
    * error code the resource server raised ({@link #AUTH_INVALID_TOKEN} / {@link
    * #AUTH_INVALID_REQUEST} / {@link #AUTH_INSUFFICIENT_SCOPE} / {@link #AUTH_OTHER}).

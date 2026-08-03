@@ -47,8 +47,8 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Unit tests for the {@link ClientIdentityFilter} client-identity gate (REQ-INGEST-011): the {@code
- * azp} allowlist, the required ingest scope and the DPoP requirement, each inert until configured
- * and each fail-closed once it is.
+ * azp} allowlist and the required ingest scope, each inert until configured and each fail-closed
+ * once it is.
  *
  * <p>The tests pin three properties that are easy to regress and expensive to discover in
  * production: a rejection never reaches the chain, a <em>missing</em> claim is refused just like an
@@ -275,37 +275,12 @@ class ClientIdentityFilterTest {
   }
 
   @Test
-  void shouldRejectAPlainBearerWhenDpopIsRequired() throws Exception {
-    ClientIdentityProperties properties = new ClientIdentityProperties();
-    properties.setDpopRequired(true);
-    authenticate(ALLOWED_CLIENT, null);
-
-    filter(properties).doFilter(request, response, chain);
-
-    verify(chain, never()).doFilter(request, response);
-    assertThat(response.getStatus()).isEqualTo(403);
-    assertThat(rejected(MetricNames.REASON_DPOP_REQUIRED)).isEqualTo(1.0d);
-  }
-
-  @Test
-  void shouldAcceptADpopSchemeRequestWhenDpopIsRequired() throws Exception {
-    ClientIdentityProperties properties = new ClientIdentityProperties();
-    properties.setDpopRequired(true);
-    request = new MockHttpServletRequest("POST", "/v1/refinery-extract");
-    // RFC 9110 makes the auth-scheme case-insensitive; a hand-written client may well send "dpop".
-    request.addHeader(HttpHeaders.AUTHORIZATION, "dpop token-value");
-    authenticate(ALLOWED_CLIENT, null);
-
-    filter(properties).doFilter(request, response, chain);
-
-    verify(chain, times(1)).doFilter(request, response);
-    assertThat(rejected(MetricNames.REASON_DPOP_REQUIRED)).isZero();
-  }
-
-  @Test
-  void shouldWarnWhenASenderConstrainedTokenIsPresentedAsAPlainBearer() throws Exception {
-    // The DPoP downgrade: the token is bound to a key (cnf.jkt) but arrived without a proof. During
-    // the dual-mode window this is never benign — a client holding a bound token has the key.
+  void shouldWarnWhenAnAccessTokenArrivesSenderConstrained() throws Exception {
+    // Canary for a silent realm-policy regression (REQ-INGEST-012). Access tokens must stay plain
+    // bearer, because this gateway RELAYS them to the backend and a bound token cannot survive
+    // that second hop. If allow-only-refresh-token-binding is ever turned off, tokens start
+    // arriving with cnf.jkt and the failure lands at the BACKEND as an opaque 'you must sign in'
+    // — exactly how the 2026-08-03 outage presented. This line is what names the cause.
     Jwt jwt =
         Jwt.withTokenValue("t")
             .header("alg", "RS256")
@@ -330,7 +305,9 @@ class ClientIdentityFilterTest {
 
     verify(chain, times(1)).doFilter(request, response);
     assertThat(events).isNotEmpty();
-    assertThat(events.getFirst().getFormattedMessage()).contains("presented as a plain bearer");
+    assertThat(events.getFirst().getFormattedMessage())
+        .contains("DPoP-bound")
+        .contains("allow-only-refresh-token-binding");
   }
 
   @Test
