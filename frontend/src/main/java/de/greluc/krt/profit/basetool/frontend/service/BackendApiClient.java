@@ -106,6 +106,23 @@ public class BackendApiClient {
         .increment();
   }
 
+  /**
+   * Whether a problem code is one of the access gates refusing an authenticated user, rather than a
+   * backend-call failure.
+   *
+   * <p>Both are expected, high-frequency and self-clearing: a pending registration polls until an
+   * admin approves it, and an unconsented session hits the Terms-of-Use gate on every request until
+   * it accepts (REQ-SEC-017, REQ-SEC-028). Neither says anything about backend health, which is
+   * what {@code basetool_backend_client_errors_total} is read as.
+   *
+   * @param problemCode the RFC 7807 {@code code} the backend returned, may be {@code null}
+   * @return {@code true} when the refusal is an expected access gate
+   */
+  private static boolean isExpectedAccessGateRefusal(String problemCode) {
+    return BackendServiceException.CODE_PENDING_APPROVAL.equals(problemCode)
+        || BackendServiceException.CODE_TERMS_NOT_ACCEPTED.equals(problemCode);
+  }
+
   /** GET against the authenticated backend, decoded via a {@link ParameterizedTypeReference}. */
   public <T> T get(String uri, ParameterizedTypeReference<T> responseType) {
     return get(uri, responseType, false);
@@ -538,11 +555,26 @@ public class BackendApiClient {
           parsed.getProblemDetail(),
           parsed.getFieldErrors());
     }
-    countBackendError(
-        parsed.getStatusCode() >= 500
-            ? MetricNames.REASON_BACKEND_5XX
-            : MetricNames.REASON_BACKEND_4XX,
-        method);
+    // The two access-gate refusals are NOT backend-call failures and must not be counted as such.
+    // They are the application telling the user to do something — get approved, accept the terms —
+    // and they arrive at the rate of "every unconsented session, every request". Counting them here
+    // made `BackendCallFailureSustained` (sum(rate(basetool_backend_client_errors_total[5m])) >
+    // 0.5)
+    // fire 38 minutes after the consent gate shipped, at 3.2/s: the alert cannot tell "the backend
+    // is failing" from "the gate is working", and during a rollout the second drowns the first.
+    //
+    // Nothing is lost. The backend counts each refusal itself, by code, in
+    // basetool_http_error_total{code=PENDING_APPROVAL|TERMS_NOT_ACCEPTED}, and the consent rollout
+    // has its own signal in TermsConsentRolloutStalled. Excluding only these two named codes keeps
+    // the alert sensitive to every genuine 4xx storm — which dropping the whole backend_4xx bucket
+    // from the alert expression would not.
+    if (!isExpectedAccessGateRefusal(parsed.getProblemCode())) {
+      countBackendError(
+          parsed.getStatusCode() >= 500
+              ? MetricNames.REASON_BACKEND_5XX
+              : MetricNames.REASON_BACKEND_4XX,
+          method);
+    }
     throw parsed;
   }
 

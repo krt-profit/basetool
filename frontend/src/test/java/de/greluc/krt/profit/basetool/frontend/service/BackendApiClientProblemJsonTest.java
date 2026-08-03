@@ -73,6 +73,8 @@ class BackendApiClientProblemJsonTest {
 
   @Autowired private BackendApiClient backendApiClient;
 
+  @Autowired private io.micrometer.core.instrument.MeterRegistry meterRegistry;
+
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 
   @MockitoBean private OAuth2AuthorizedClientRepository authorizedClientRepository;
@@ -216,6 +218,49 @@ class BackendApiClientProblemJsonTest {
       logger.setLevel(previous);
       logger.detachAppender(appender);
     }
+  }
+
+  /**
+   * A consent-gate 403 is not counted as a backend-call failure.
+   *
+   * <p>{@code BackendCallFailureSustained} alerts on {@code
+   * sum(rate(basetool_backend_client_errors_total[5m])) > 0.5}. Counting the gate's refusals there
+   * made it fire 38 minutes after the consent gate shipped, at 3.2/s, because every unconsented
+   * session hits the gate on every request — the alert could not tell "the backend is failing" from
+   * "the gate is working". The backend counts each refusal itself by code, so no signal is lost.
+   */
+  @Test
+  void get_ShouldNotCountTermsGate403AsABackendCallFailure() {
+    double before = backendErrorCount();
+
+    assertThrows(
+        BackendServiceException.class,
+        () -> backendApiClient.get("/api/v1/terms-gated", String.class, true));
+
+    assertEquals(before, backendErrorCount(), "a consent-gate refusal is not a call failure");
+  }
+
+  /** A genuine 4xx still counts, so the alert keeps its sensitivity to real problems. */
+  @Test
+  void get_ShouldStillCountAGenuine4xxAsABackendCallFailure() {
+    double before = backendErrorCount();
+
+    assertThrows(
+        BackendServiceException.class,
+        () -> backendApiClient.get("/api/v1/forbidden", String.class, true));
+
+    assertEquals(before + 1.0, backendErrorCount(), "a real 4xx must still be counted");
+  }
+
+  /**
+   * Sums the backend-client-error counter across all label combinations.
+   *
+   * @return the current total
+   */
+  private double backendErrorCount() {
+    return meterRegistry.find("basetool.backend.client.errors").counters().stream()
+        .mapToDouble(io.micrometer.core.instrument.Counter::count)
+        .sum();
   }
 
   @Test
