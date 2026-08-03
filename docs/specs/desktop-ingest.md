@@ -489,6 +489,48 @@ Independently of the flag, a **downgrade** is always reported: a token carrying 
 holding a bound token demonstrably has the key, so falling back to bearer is either a client bug or a
 replay of a token lifted from elsewhere.
 
+#### What actually validates a proof, and what protects against replay
+
+Spring composes the proof check in `DPoPProofJwtDecoderFactory` out of `JwtClaimValidator`s for
+`htm` / `htu` / `ath` / `jkt` plus a `JtiClaimValidator`. **Replay protection rests entirely on that
+`jti` validator**, and its properties are worth knowing before anyone reasons about the guarantee:
+
+- the seen-`jti` store is a **static** (JVM-wide) `LinkedHashMap` LRU capped at **`MAX_SIZE = 1000`**,
+- with a freshness window on a **`ChronoUnit.HOURS`** scale — wide by RFC standards.
+
+Neither is a problem here, but for a specific reason worth writing down rather than rediscovering: a
+replayed proof is only useful together with the access token it is bound to, and that token lives
+~5 minutes. The access token's lifetime, not the proof's window or the cache's depth, is what bounds
+the exposure. The cache being per-JVM and cleared on restart is likewise harmless for the same reason
+(one `ingest` container, and a restart inside a 5-minute token window changes nothing an attacker
+could already do with the token itself).
+
+#### Verified negative: no nonce on either side (2026-08-03)
+
+RFC 9449 §8/§9 let an authorization server *or* a resource server demand a `DPoP-Nonce` and signal it
+with `use_dpop_nonce`. **Neither happens here**, and this is recorded because the natural assumption
+is the opposite:
+
+- **Spring Security 7.1.0 has no nonce implementation at all** — verified by scanning every
+  `spring-security-*-7.1.0` jar for `use_dpop_nonce` / nonce handling: zero occurrences. The gateway
+  therefore can never issue a nonce challenge.
+- **Keycloak does not appear to emit `use_dpop_nonce`** either (reported from the extractor side; not
+  independently verified here, so treat this half as a strong indication rather than proof).
+
+Consequence for clients: a nonce-retry path is **unreachable against this gateway**. Keeping one is
+defensible as forward compatibility, but it is then untested code that would execute for the first
+time during an incident — so it should carry a test that drives a synthetic `400`/`401` +
+`DPoP-Nonce`, or be dropped in favour of surfacing the error loudly. What must *not* happen is the
+middle option: retained, never exercised, and assumed to work.
+
+**Trigger to revisit:** Spring Security gaining resource-server nonce support. Until then this
+paragraph is the answer, and re-deriving it costs an afternoon.
+
+The client-side failure modes that *are* reachable, and that deserve the attention the nonce does
+not: a **`jti` must be unique per proof** (a cached or reused proof is refused by the validator
+above), and the **client clock must fall inside the `iat` window** — a badly skewed machine fails
+every send.
+
 **Acceptance**
 
 - [x] A plain bearer request is unaffected while `dpop-required` is false (dual mode).
