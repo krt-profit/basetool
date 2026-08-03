@@ -20,7 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 import lombok.Getter;
@@ -90,8 +91,11 @@ public class TermsVersionProvider {
               + "run the build through Gradle rather than compiling sources directly.");
     }
     Properties properties = new Properties();
-    try (InputStream in = resource.getInputStream()) {
-      properties.load(new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
+    // Reader inside the resource list, not just the stream it wraps: closing the stream alone does
+    // release the file descriptor, but leaving the reader out makes the ownership unclear to both
+    // readers and static analysis.
+    try (Reader reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8)) {
+      properties.load(reader);
     } catch (IOException e) {
       throw new IllegalStateException("Cannot read " + RESOURCE_PATH, e);
     }
