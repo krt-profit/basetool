@@ -67,7 +67,14 @@
                             <span th:if="${row.accepted()}" th:text="#{adminTerms.status.accepted}">Zugestimmt</span>
                             <span th:unless="${row.accepted()}" th:text="#{adminTerms.status.pending}">Offen</span>
                         </td>
-                        <td th:text="${row.acceptedAt() != null ? #temporals.format(row.acceptedAt(), 'dd.MM.yyyy HH:mm') : ''}">—</td>
+                        <!--
+                          Three-argument #temporals.format with an explicit zone, plus the label.
+                          acceptedAt is an Instant: the two-argument form does not throw, it
+                          silently formats in the container's default zone, so the meaning of the
+                          displayed time would depend on TZ. Every other Instant in the template
+                          tree passes the zone and labels it the same way.
+                        -->
+                        <td th:text="${row.acceptedAt() != null ? #temporals.format(row.acceptedAt(), 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : ''}">—</td>
                     </tr>
                     </tbody>
                 </table>

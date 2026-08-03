@@ -509,10 +509,16 @@ public class BackendApiClient {
           parsed.getCorrelationId(),
           parsed.getProblemDetail(),
           parsed.getFieldErrors());
-    } else if (BackendServiceException.CODE_PENDING_APPROVAL.equals(parsed.getProblemCode())) {
-      // Expected, high-frequency 403: a pending-approval session polls several endpoints on every
-      // page load. Log at DEBUG so it does not flood the client-error log (mirrors the backend
-      // PendingApprovalAccessFilter). The backend-4xx metric below is unaffected.
+    } else if (BackendServiceException.CODE_PENDING_APPROVAL.equals(parsed.getProblemCode())
+        || BackendServiceException.CODE_TERMS_NOT_ACCEPTED.equals(parsed.getProblemCode())) {
+      // Expected, high-frequency 403s, not faults. A pending-approval session polls several
+      // endpoints on every page load; an unconsented session 403s on every request, because
+      // BackendRoleSyncFilter's GET /api/v1/users/me is not exempt from the consent gate and its
+      // failure path deliberately leaves the sync stamp unset so the next request retries. After a
+      // terms change that is the whole squadron times every request. Log at DEBUG so neither floods
+      // the client-error log (mirrors the backend PendingApprovalAccessFilter and
+      // TermsAcceptanceAccessFilter, both of which log their own refusal at DEBUG for the same
+      // reason). The backend-4xx metric below is unaffected, so the monitoring signal stays.
       log.debug(
           "Backend client error on {} {}: status={}, code={}, correlationId={}",
           method,

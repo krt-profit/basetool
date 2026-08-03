@@ -83,6 +83,36 @@ class AdminTermsPageControllerTest {
     assertThat(requestedUri()).contains("filter=PENDING");
   }
 
+  /**
+   * The swap path returns the results FRAGMENT, not the whole document.
+   *
+   * <p>This is the interaction the page is for. {@code krtFetch.swap} appends {@code
+   * fragment=results} and writes the response straight into {@code #admin-terms-results}; it bails
+   * only on a redirect or a non-2xx, so a full page comes back 200 and gets nested inside its own
+   * container — header, nav, heading and filter form and all — on every filter change and page
+   * click, with nothing reporting the breakage. Shipped exactly that way and was caught in review.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void returnsTheResultsFragmentForASwap() throws Exception {
+    mockMvc
+        .perform(get("/admin/terms").param("fragment", "results"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("admin/terms :: adminTermsResults"));
+  }
+
+  /**
+   * Any other fragment value renders the whole page, so a stray parameter cannot blank the page.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void rendersTheWholePageForAnUnknownFragmentValue() throws Exception {
+    mockMvc
+        .perform(get("/admin/terms").param("fragment", "something-else"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("admin/terms"));
+  }
+
   /** An explicit filter is honoured and echoed back so the select keeps its selection. */
   @Test
   @WithMockUser(roles = "ADMIN")

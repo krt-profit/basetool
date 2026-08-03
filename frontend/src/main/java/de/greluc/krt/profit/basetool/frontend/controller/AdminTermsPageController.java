@@ -83,13 +83,16 @@ public class AdminTermsPageController {
    *     {@code PENDING} rather than erroring, because the value reaches us from a query string a
    *     user can edit and a broken filter should not be a broken page
    * @param page zero-based page index, clamped at zero
+   * @param fragment {@code results} when {@code krtFetch.swap} is asking for the results section
+   *     alone; anything else renders the whole page
    * @param model receives the rows, the pending count and the echoed filter
-   * @return the {@code admin/terms} view
+   * @return the {@code admin/terms} view, or its {@code adminTermsResults} fragment for a swap
    */
   @GetMapping("/admin/terms")
   public @NotNull String showOverview(
       @RequestParam(required = false, defaultValue = "PENDING") String filter,
       @RequestParam(required = false, defaultValue = "0") int page,
+      @RequestParam(required = false) String fragment,
       @NotNull Model model) {
     String effectiveFilter = normalizeFilter(filter);
     int effectivePage = Math.max(page, 0);
@@ -121,7 +124,14 @@ public class AdminTermsPageController {
     model.addAttribute("termsPage", rows);
     model.addAttribute("termsPendingCount", pending);
     model.addAttribute("termsLoadFailed", rows == null);
-    return "admin/terms";
+    // krtFetch.swap appends `fragment=results` and expects a section-sized response. Returning the
+    // whole document here would nest header, nav, the heading and the filter form INSIDE
+    // #admin-terms-results on every filter change and page click — swap() only bails on a redirect
+    // or a non-2xx, and a full page is neither, so nothing would report the breakage.
+    //
+    // The fragment is named adminTermsResults rather than `results` on purpose: a fragment whose
+    // name equals its container id re-nests itself on swap.
+    return "results".equals(fragment) ? "admin/terms :: adminTermsResults" : "admin/terms";
   }
 
   /**

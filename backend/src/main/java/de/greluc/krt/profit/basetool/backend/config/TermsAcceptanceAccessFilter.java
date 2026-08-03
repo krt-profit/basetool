@@ -28,6 +28,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -37,10 +38,13 @@ import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.server.PathContainer;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.pattern.PathPattern;
+import org.springframework.web.util.pattern.PathPatternParser;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -67,11 +71,41 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
   /** Stable machine-readable code the frontend and the extractor map to a consent prompt. */
   static final String CODE_TERMS_NOT_ACCEPTED = "TERMS_NOT_ACCEPTED";
 
-  /** Consent endpoints, which must stay reachable or the gate has no exit. */
-  static final String TERMS_PATH_PREFIX = "/api/v1/terms";
+  /** Parses the patterns below once; matching is per request and allocation-light. */
+  private static final PathPatternParser PATH_PARSER = PathPatternParser.defaultInstance;
 
-  /** Routing endpoint for a caller who is also pending approval. */
-  static final String REGISTRATION_STATUS_PATH = "/api/v1/users/me/registration-status";
+  /**
+   * The surface this filter guards.
+   *
+   * <p>Matched as a parsed {@link PathPattern} rather than with {@code
+   * requestURI.startsWith("/api/")}, because {@code getRequestURI()} is the <em>raw</em>
+   * percent-encoded URI while Spring MVC routes on the <em>decoded</em> path. A request for {@code
+   * /%61pi/v1/missions} fails a raw prefix test, so the gate would wave it through, and {@code
+   * RequestMappingHandlerMapping} would then decode {@code %61pi} to {@code api} and dispatch it —
+   * the consent record REQ-SEC-028 exists to produce would silently not be required. The default
+   * {@code StrictHttpFirewall} blocks {@code %2e}, {@code %2f}, {@code %25} and friends, but not
+   * {@code %61}.
+   *
+   * <p>{@link PathPattern} matches on {@code PathSegment#valueToMatch()}, which is decoded, so
+   * filter and routing agree. Note that {@code ServletRequestPathUtils} does <em>not</em> solve
+   * this: {@code PathContainer.Element#value()} is contractually the unmodified original.
+   *
+   * <p>Precedent: {@code filter.RateLimitingFilter} matches its configured paths the same way.
+   */
+  private static final PathPattern API_SCOPE = PATH_PARSER.parse("/api/**");
+
+  /**
+   * The only endpoints an unconsented caller may still reach. Patterns, not string prefixes: a bare
+   * {@code startsWith("/api/v1/terms")} would also exempt a future {@code /api/v1/terms-export}.
+   */
+  private static final List<PathPattern> EXEMPT_PATHS =
+      List.of(
+          // The consent resource and its sub-resources — refusing these makes the block permanent
+          // for everyone, because no request would be left that could record consent.
+          PATH_PARSER.parse("/api/v1/terms"),
+          PATH_PARSER.parse("/api/v1/terms/**"),
+          // Lets a caller who is ALSO pending approval be routed to the waiting page instead.
+          PATH_PARSER.parse("/api/v1/users/me/registration-status"));
 
   /** App-wide correlation-id response header. */
   static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
@@ -112,10 +146,10 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
    * @return the blocked user's id, or {@code null} when the request may proceed
    */
   private UUID blockedUserId(HttpServletRequest request) {
-    String path = request.getRequestURI().substring(request.getContextPath().length());
-    if (!path.startsWith("/api/")
-        || path.startsWith(TERMS_PATH_PREFIX)
-        || path.equals(REGISTRATION_STATUS_PATH)) {
+    PathContainer path =
+        PathContainer.parsePath(
+            request.getRequestURI().substring(request.getContextPath().length()));
+    if (!API_SCOPE.matches(path) || EXEMPT_PATHS.stream().anyMatch(p -> p.matches(path))) {
       return null;
     }
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();

@@ -564,6 +564,15 @@ fun termsVersionDigest(bundle: File): String {
       .sorted()
       .joinToString(separator = "\n")
   check(clauses.isNotEmpty()) { "No terms.* entries found in ${bundle.path}" }
+  // A `.properties` value may be continued onto the next line with a trailing backslash, and such a
+  // continuation line starts with neither `terms.` nor contains `=` — so the filter above would
+  // skip it and editing that part of a clause would NOT change the version. That silently defeats
+  // the one property this whole design exists for. No terms.* entry uses a continuation today, so
+  // this guard is a tripwire for the day someone wraps a long clause, not a fix for a live bug.
+  check(clauses.lines().none { it.endsWith("\\") }) {
+    "A terms.* entry in ${bundle.path} uses a backslash line continuation. The digest only sees " +
+      "the first line, so edits to the rest would not re-prompt anyone. Put the clause on one line."
+  }
   return java.security.MessageDigest.getInstance("SHA-256")
     .digest(clauses.toByteArray(Charsets.UTF_8))
     .joinToString("") { "%02x".format(it) }

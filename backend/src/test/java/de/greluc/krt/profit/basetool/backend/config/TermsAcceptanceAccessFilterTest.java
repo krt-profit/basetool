@@ -143,6 +143,47 @@ class TermsAcceptanceAccessFilterTest {
     assertThat(invoke("/api/v1/users/me/registration-status").getStatus()).isEqualTo(200);
   }
 
+  /**
+   * A percent-encoded path prefix does not slip past the gate.
+   *
+   * <p>{@code getRequestURI()} is the raw, still-encoded URI while Spring MVC routes on the decoded
+   * path, so a naive {@code startsWith("/api/")} lets {@code /%61pi/v1/missions} through — and
+   * {@code RequestMappingHandlerMapping} then decodes {@code %61pi} to {@code api} and dispatches
+   * it. The default {@code StrictHttpFirewall} blocks {@code %2e}/{@code %2f}/{@code %25} but not
+   * {@code %61}. Must be a direct filter test: MockMvc normalises the path before the filter sees
+   * it, so it cannot reproduce this.
+   */
+  @Test
+  void isNotSkippableByPercentEncodingThePathPrefix() throws Exception {
+    when(termsConsentCheck.hasAcceptedCurrentTerms(USER_ID)).thenReturn(false);
+
+    assertThat(invoke("/%61pi/v1/missions").getStatus()).isEqualTo(403);
+    verify(filterChain, never()).doFilter(any(), any());
+  }
+
+  /**
+   * The exemption is equally encoding-proof in the other direction: an encoded spelling of the
+   * consent endpoint must still be exempt, or the gate would have no exit for a client that happens
+   * to encode.
+   */
+  @Test
+  void exemptsAnEncodedSpellingOfTheConsentEndpoint() throws Exception {
+    when(termsConsentCheck.hasAcceptedCurrentTerms(USER_ID)).thenReturn(false);
+
+    assertThat(invoke("/api/v1/%74erms/acceptance").getStatus()).isEqualTo(200);
+  }
+
+  /**
+   * A path that merely begins with the consent literal is NOT exempt. Guards the over-broad {@code
+   * startsWith("/api/v1/terms")} the pattern match replaced.
+   */
+  @Test
+  void doesNotExemptAPathThatOnlyStartsWithTheConsentLiteral() throws Exception {
+    when(termsConsentCheck.hasAcceptedCurrentTerms(USER_ID)).thenReturn(false);
+
+    assertThat(invoke("/api/v1/terms-export").getStatus()).isEqualTo(403);
+  }
+
   /** Non-API paths are none of this filter's business. */
   @Test
   void ignoresNonApiPaths() throws Exception {

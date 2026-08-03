@@ -16,7 +16,7 @@
 
 - **Neue Kennzahl `basetool_livesync_peer_rooms` samt Panel im Betriebs-Dashboard.** Sie zeigt je Oberfläche, in wie vielen Räumen mehrere Personen gleichzeitig sind. Ohne sie ist ein Ausbleiben von Aktualisierungen nicht davon zu unterscheiden, dass schlicht niemand gemeinsam bearbeitet hat.
 
-- **Nutzungsbedingungen müssen jetzt bestätigt werden — auch für den Extractor.** Wer sie noch nicht bestätigt hat, landet beim Öffnen des Basetool auf einer Zustimmungsseite; ohne Zustimmung ist keine Nutzung möglich, bei Ablehnung wird man abgemeldet und kann sich jederzeit erneut anmelden. Ändert sich der Text, erscheint die Seite erneut — das erkennt das Tool selbständig am Inhalt, es muss niemand daran denken. Ohne Zustimmung weist auch die Übertragung aus dem Extractor ab, mit dem Hinweis, sich einmal im Browser anzumelden. Wer wann welcher Fassung zugestimmt hat, wird nachvollziehbar gespeichert (REQ-SEC-028, ADR-0127).
+- **Nutzungsbedingungen müssen jetzt bestätigt werden — auch für den Extractor.** Ohne Zustimmung ist keine Nutzung möglich; bei Ablehnung wird man abgemeldet und kann sich jederzeit erneut anmelden und zustimmen. Ändert sich der Text, erscheint die Seite erneut, und wer wann welcher Fassung zugestimmt hat, ist nachvollziehbar gespeichert (REQ-SEC-028, ADR-0127).
 
 - **Neue Adminübersicht „Zustimmung zu den Nutzungsbedingungen“.** Zeigt, wer der geltenden Fassung zugestimmt hat und wer noch nicht, voreingestellt auf die offenen Fälle. Ohne sie wäre nach einer Textänderung nicht zu unterscheiden, ob sich schlicht noch niemand angemeldet hat oder ob die Zustimmung gar nicht funktioniert.
 

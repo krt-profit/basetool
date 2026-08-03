@@ -23,6 +23,15 @@
 > Be precise about what enforcement can and cannot achieve — see the honesty note in
 > `REQ-INGEST-011`: these controls segment *registered* clients from one another and make a foreign
 > caller *visible*; they are not native-client attestation, which is not achievable on Windows.
+>
+> **A second gate applies to the person, not the client.** Since `REQ-SEC-028`, a user who has not
+> accepted the Terms of Use is refused with `403 TERMS_NOT_ACCEPTED`, and that applies here too:
+> the gateway relays the caller's own bearer to the backend (`REQ-INGEST-001`), so the backend's
+> consent filter sees an extractor request exactly like a web request. The gateway needs no rule of
+> its own — it already relays a backend 4xx together with the backend's localized `detail`, so the
+> extractor tells the user to sign in to the Basetool in a browser once and accept. Sending resumes
+> on its own afterwards; no re-install and no token refresh. **Operator consequence: any change to
+> the terms wording stops every extractor** until each user has accepted once (ADR-0127).
 
 ## Context & goal
 

@@ -193,7 +193,33 @@
         return header ? reauthRedirect(header) : false;
     }
 
+    /**
+     * If response carries the X-Terms-Acceptance-Required header, navigates to the consent page and
+     * returns true; otherwise returns false. Safe to call with any Response.
+     *
+     * The sibling of maybeReauthenticate, for the same reason: a gate that can appear mid-session
+     * must not surface as a stalled section or a generic toast. This one fires when a tab was
+     * already open as a new Terms-of-Use wording deployed (REQ-SEC-028) — the moment the feature
+     * first affects anyone. The target comes from the header rather than a hardcoded path so the
+     * context path stays correct.
+     */
+    function maybeTermsGate(response) {
+        if (!response || !response.headers) {
+            return false;
+        }
+        const target =
+            typeof response.headers.get === 'function'
+                ? response.headers.get('X-Terms-Acceptance-Required')
+                : null;
+        if (!target) {
+            return false;
+        }
+        window.location.assign(target);
+        return true;
+    }
+
     window.krtReauth = { redirect: reauthRedirect, check: maybeReauthenticate };
+    window.krtTermsGate = { check: maybeTermsGate };
 
     // ----------------------------------------------- guest edit token (M1)
 
@@ -597,6 +623,12 @@
                 return { ok: false, status: response.status, body: body };
             }
 
+            // The Terms of Use changed while this tab was open: navigate to the consent page rather
+            // than toasting a write error the user cannot act on (REQ-SEC-028).
+            if (maybeTermsGate(response)) {
+                return { ok: false, status: response.status, body: body };
+            }
+
             if (!response.ok) {
                 // Optional caller hook (e.g. 422 field-validation rendering): if it handles the
                 // response it returns truthy and we skip the default toast/conflict handling.
@@ -874,6 +906,11 @@
                 // Session lost its OAuth2 token: redirect to re-login rather than painting an
                 // error/empty fragment (REQ-SEC-012).
                 if (maybeReauthenticate(res)) {
+                    return null;
+                }
+                // Terms-of-Use gate went up mid-session: navigate rather than leave the section
+                // silently stale, which is what a bare redirect-bail would do (REQ-SEC-028).
+                if (maybeTermsGate(res)) {
                     return null;
                 }
                 // A fragment swap must only ever paint section-sized HTML into a small

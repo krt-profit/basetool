@@ -350,6 +350,16 @@ interface KrtReauthApi {
 }
 
 /**
+ * Terms-of-Use consent-gate helper installed by `krt-fetch.js` (REQ-SEC-028). The sibling of
+ * {@link KrtReauthApi}: a gate that can appear mid-session must navigate the browser rather than
+ * stall a fragment swap or toast a write error the user cannot act on.
+ */
+interface KrtTermsGateApi {
+    /** Navigates to the consent page and returns true when the response demanded consent. */
+    check(response: Response): boolean;
+}
+
+/**
  * A control the refinery-order forms address by id: the raw `<select>` before
  * combobox enhancement, or the hidden `<input>` that carries the control's id
  * after it (REQ-FE-016). Only `id` and `value` are ever read, which both carry —
@@ -515,6 +525,7 @@ interface Window {
     krtCsrf: KrtCsrfApi;
     krtGuestToken: KrtGuestTokenApi;
     krtReauth: KrtReauthApi;
+    krtTermsGate: KrtTermsGateApi;
 
     // --- installed by the shared foundation modules
     krtEvents: KrtEventsApi;

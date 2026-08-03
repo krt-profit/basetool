@@ -62,6 +62,13 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
   /** Where a user without consent is sent. */
   static final String CONSENT_PATH = "/terms/accept";
 
+  /**
+   * Response header carrying the consent-page URL to an AJAX caller, mirroring the {@code
+   * X-Reauthenticate} contract for a lost OAuth2 token (REQ-SEC-012). {@code krtFetch} navigates
+   * the browser when it sees this, instead of stalling a swap or toasting a generic write error.
+   */
+  static final String TERMS_GATE_HEADER = "X-Terms-Acceptance-Required";
+
   /** Session attribute holding the epoch millis at which the cached "accepted" was read. */
   static final String SESSION_CHECKED_AT = "krt.terms.checkedAt";
 
@@ -90,8 +97,38 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
       filterChain.doFilter(request, response);
       return;
     }
+    String consentUrl = request.getContextPath() + CONSENT_PATH;
+    if (isAjax(request)) {
+      // A 302 is wrong for an XHR and fails SILENTLY, which is the worst of both worlds: krtFetch's
+      // swap sees `res.redirected` and bails with a dev-only warning, so the section simply stops
+      // updating; a write follows the redirect, gets the consent page as 200 text/html, and shows a
+      // generic error toast. Neither tells the user what happened. This is the case of a tab that
+      // was already open when a new wording deployed — i.e. exactly when the feature first does
+      // anything at all.
+      //
+      // So mirror the contract the codebase already has for a lost OAuth2 token (REQ-SEC-012): a
+      // status plus a header the client acts on, and let krtFetch navigate. Sending the target in
+      // the header rather than hardcoding it client-side keeps the context path correct.
+      log.debug("Consent missing; signalling the gate to the AJAX caller");
+      response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+      response.setHeader(TERMS_GATE_HEADER, consentUrl);
+      return;
+    }
     log.debug("Consent missing; routing {} to the consent page", request.getRequestURI());
-    response.sendRedirect(request.getContextPath() + CONSENT_PATH);
+    response.sendRedirect(consentUrl);
+  }
+
+  /**
+   * Whether this is one of {@code krtFetch}'s XHR calls rather than a browser navigation.
+   *
+   * <p>{@code krtFetch} sets {@code X-Requested-With} on writes and on fragment swaps alike, so the
+   * one header distinguishes both from a real navigation.
+   *
+   * @param request the current request
+   * @return {@code true} for an AJAX call
+   */
+  private static boolean isAjax(HttpServletRequest request) {
+    return "XMLHttpRequest".equals(request.getHeader("X-Requested-With"));
   }
 
   /**

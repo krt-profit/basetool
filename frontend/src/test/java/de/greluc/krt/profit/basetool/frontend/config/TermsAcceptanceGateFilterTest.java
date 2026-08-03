@@ -90,6 +90,31 @@ class TermsAcceptanceGateFilterTest {
     verify(filterChain, never()).doFilter(any(), any());
   }
 
+  /**
+   * An AJAX caller gets a status plus a header it can act on, never a 302.
+   *
+   * <p>This is the tab that was already open when a new wording deployed — the moment the feature
+   * first affects anyone. A redirect fails <em>silently</em> there: a fragment swap bails on {@code
+   * res.redirected} with only a dev warning and the section stops updating, while a write follows
+   * the redirect, receives the consent page as 200 HTML and shows a generic error toast.
+   */
+  @Test
+  void signalsTheGateToAnAjaxCallerInsteadOfRedirecting() throws Exception {
+    stubStatus(false);
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/missions/x/ajax");
+    request.setRequestURI("/missions/x/ajax");
+    request.addHeader("X-Requested-With", "XMLHttpRequest");
+    request.setSession(new org.springframework.mock.web.MockHttpSession());
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    filter.doFilter(request, response, filterChain);
+
+    assertThat(response.getStatus()).isEqualTo(403);
+    assertThat(response.getHeader("X-Terms-Acceptance-Required")).isEqualTo("/terms/accept");
+    assertThat(response.getRedirectedUrl()).isNull();
+    verify(filterChain, never()).doFilter(any(), any());
+  }
+
   /** A consenting user passes through. */
   @Test
   void letsAConsentingUserThrough() throws Exception {

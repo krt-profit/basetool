@@ -111,11 +111,23 @@ public class TermsAcceptanceService implements TermsConsentCheck {
   /**
    * Reports whether the user has accepted the wording currently in force.
    *
+   * <p>Deliberately <strong>not</strong> {@code @Transactional}. This runs on every authenticated
+   * {@code /api/**} request, and a transactional annotation here would put the proxy boundary
+   * <em>outside</em> the cache probe — so every request in the app would begin and commit a
+   * transaction even when the answer came from memory and no statement was ever issued. Hibernate's
+   * delayed connection acquisition keeps a JDBC connection out of it, but the {@code EntityManager}
+   * plus begin/commit is pure overhead on the hottest path there is.
+   *
+   * <p>Dropping it costs nothing: the miss path is a single {@code exists} query, and Spring Data's
+   * own repository proxy already wraps every query method in a read-only transaction. So the
+   * transaction still exists exactly where a statement is issued — it just no longer wraps the
+   * cache hit that issues none. A self-proxy indirection to keep an explicit annotation would add
+   * machinery for no behaviour.
+   *
    * @param userId the user's {@code app_user.id}, i.e. the Keycloak {@code sub}
    * @return {@code true} if consent for the current version is on record
    */
   @Override
-  @Transactional(readOnly = true)
   public boolean hasAcceptedCurrentTerms(@NotNull UUID userId) {
     if (Boolean.TRUE.equals(acceptedCache.getIfPresent(userId))) {
       return true;

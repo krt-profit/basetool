@@ -104,7 +104,7 @@ public interface TermsAcceptanceRepository extends JpaRepository<TermsAcceptance
 
   /**
    * Counts login-capable users who have <em>not</em> accepted the given wording — the headline
-   * number of the admin overview and the value behind the pending-consent gauge.
+   * number of the admin overview.
    *
    * @param termsVersion the wording to report against
    * @return how many users who can still sign in are missing consent for that version
