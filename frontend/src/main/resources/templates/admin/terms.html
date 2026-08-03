@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+    <title th:text="${appTitle} + ' - ' + #{adminTerms.title}">Profit Basetool - Zustimmungen</title>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+<main>
+    <div class="hud-box mt-2">
+        <h1 th:text="#{adminTerms.title}">Zustimmung zu den Nutzungsbedingungen</h1>
+        <p th:text="#{adminTerms.lead}">Wer hat der aktuell geltenden Fassung zugestimmt und wer noch nicht.</p>
+
+        <p th:if="${termsPendingCount != null}"
+           th:text="#{adminTerms.pendingCount(${termsPendingCount})}">Es fehlen noch 0 Zustimmungen.</p>
+
+        <!--
+          The filter is a plain GET form so the page still works without JS; the script below
+          intercepts it and swaps only the results fragment (REQ-FE-001). The container id and the
+          fragment name differ on purpose - identical names make the swap re-nest the fragment
+          inside itself.
+        -->
+        <form id="admin-terms-filter-form" method="get" th:action="@{/admin/terms}" class="mt-2">
+            <label for="admin-terms-filter" th:text="#{adminTerms.filter.label}">Anzeigen</label>
+            <select id="admin-terms-filter" name="filter">
+                <option value="PENDING" th:selected="${termsFilter == 'PENDING'}" th:text="#{adminTerms.filter.pending}">Noch offen</option>
+                <option value="ACCEPTED" th:selected="${termsFilter == 'ACCEPTED'}" th:text="#{adminTerms.filter.accepted}">Zugestimmt</option>
+                <option value="ALL" th:selected="${termsFilter == 'ALL'}" th:text="#{adminTerms.filter.all}">Alle</option>
+            </select>
+            <button type="submit" class="btn btn-outline" th:text="#{adminTerms.filter.apply}">Anwenden</button>
+        </form>
+
+        <div id="admin-terms-results" class="mt-2">
+            <th:block th:fragment="adminTermsResults">
+                <p th:if="${termsLoadFailed}" th:text="#{adminTerms.loadFailed}">Die Übersicht konnte nicht geladen werden.</p>
+
+                <p th:if="${!termsLoadFailed and #lists.isEmpty(termsRows)}"
+                   th:text="#{adminTerms.empty}">Keine Einträge für diese Auswahl.</p>
+
+                <table th:if="${!#lists.isEmpty(termsRows)}">
+                    <thead>
+                    <tr>
+                        <th th:text="#{adminTerms.column.user}">Nutzer</th>
+                        <th th:text="#{adminTerms.column.status}">Status</th>
+                        <th th:text="#{adminTerms.column.acceptedAt}">Zugestimmt am</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${termsRows}">
+                        <td>
+                            <span th:text="${row.displayName() != null ? row.displayName() : row.username()}">Rufzeichen</span>
+                        </td>
+                        <td>
+                            <span th:if="${row.accepted()}" th:text="#{adminTerms.status.accepted}">Zugestimmt</span>
+                            <span th:unless="${row.accepted()}" th:text="#{adminTerms.status.pending}">Offen</span>
+                        </td>
+                        <td th:text="${row.acceptedAt() != null ? #temporals.format(row.acceptedAt(), 'dd.MM.yyyy HH:mm') : ''}">—</td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div th:if="${termsPage != null and termsPage.totalPages() > 1}" class="mt-2">
+                    <span th:text="#{adminTerms.pageOf(${termsPage.page() + 1}, ${termsPage.totalPages()})}">Seite 1 von 1</span>
+                    <a th:if="${termsPage.page() > 0}"
+                       class="btn btn-outline admin-terms-page"
+                       th:href="@{/admin/terms(filter=${termsFilter},page=${termsPage.page() - 1})}"
+                       th:text="#{adminTerms.previous}">Zurück</a>
+                    <a th:if="${termsPage.page() + 1 < termsPage.totalPages()}"
+                       class="btn btn-outline admin-terms-page"
+                       th:href="@{/admin/terms(filter=${termsFilter},page=${termsPage.page() + 1})}"
+                       th:text="#{adminTerms.next}">Weiter</a>
+                </div>
+            </th:block>
+        </div>
+    </div>
+</main>
+<script th:src="@{/js/admin-terms.js}" defer th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>
