@@ -1040,6 +1040,167 @@ minted when absent) · **Code:** `RedisSessionConfig#sessionRepositoryCustomizer
 `SessionLifetimeUpgradeSuccessHandler`, `SecurityConfig#oauth2LoginSuccessHandler` · **Monitoring:**
 `ActiveSessionsRunaway` · **ADR:** [ADR-0088](../adr/0088-two-tier-session-idle-timeout.md)
 
+### REQ-SEC-027 — Approved client software is a contractual obligation, not only a gate
+
+(REQ-SEC-026 — linking a pending Discord registration onto an existing account — is carried by
+[`discord-integration.md`](discord-integration.md); this requirement continues the series at the
+next free number.)
+
+The rule that **only client software expressly approved by the operator may access the platform's
+interfaces** is binding on users through the Terms of Use, not merely enforced at the ingest
+gateway. Until 2026-08-03 it existed solely as operator documentation (`README.md`,
+[`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md),
+[`desktop-ingest.md`](desktop-ingest.md)) — text a user never sees and that is no part of the
+agreement. Blocking the author of an unapproved client was therefore only possible under the
+no-reason clause of terms section 8, which reads as arbitrary rather than as a named breach.
+
+Terms section 4 now carries the obligation as its own bullet (`terms.list_4_1_5`), and it is
+deliberately **broader than the ingest path**: it names the platform's interfaces generally — "in
+particular the ingest interface and the HTTP APIs" — so the next interface inherits it without a
+terms amendment. Three properties are load-bearing and must survive any rewording:
+
+- **Develop, distribute *and* use are all covered.** Prohibiting only "use" leaves the author of an
+  unapproved client untouched while their users carry the breach.
+- **Own credentials are no defence.** Section 3(2) prohibits handing credentials to third parties
+  and therefore does not reach the actual case: a member running a foreign tool under their *own*
+  account. The bullet says so explicitly.
+- **Approval is operator-granted, in text form, and revocable.** Approval by conduct (a tolerated
+  client) or by a third party would hollow out the allowlist that
+  [`desktop-ingest.md`](desktop-ingest.md) REQ-INGEST-011 enforces technically.
+
+The technical gate and the contractual clause are **independent layers with different reach**: the
+gate stops any unapproved client for everyone and is the operative control (REQ-INGEST-011); the
+clause is what makes an individual's conduct a breach and thus supports a sanction under section 8.
+Neither substitutes for the other — removing the gate does not become acceptable because a clause
+exists.
+
+**Acceptance**
+
+- [ ] The obligation is rendered on `/terms` in both locales, not only declared in the bundle.
+- [ ] The obligation names interfaces generally, not the ingest path alone.
+- [ ] `terms.last_updated` reflects the date the obligation took effect (2026-08-03).
+
+**Enforced by:** `TermsTemplateBundleParityTest` (every `terms.*` clause is both declared and
+rendered — a renumbered section cannot silently drop a bullet), `MessageBundleConsistencyTest` (DE/EN
+key parity, so the clause cannot exist in one locale only) · **Text:** `terms.list_4_1_5` in
+`messages_de.properties` / `messages.properties` / `messages_en.properties`, rendered by
+`templates/terms.html` · **Technical counterpart:** REQ-INGEST-011
+([`desktop-ingest.md`](desktop-ingest.md)), ADR-0018
+
+### REQ-SEC-028 — Terms-of-Use consent is recorded, versioned and enforced
+
+Using the platform requires **recorded consent** to the Terms-of-Use wording currently in force.
+Before this, the terms took effect merely on access (section intro) and section 12 treated
+continued use as acceptance — which leaves no evidence of who agreed to which wording, the thing
+actually needed when a clause is enforced against someone (REQ-SEC-027).
+
+**The version is derived from the wording, never declared.** The root Gradle task
+`generateTermsVersion` hashes every `terms.*` entry of the German bundle into the **committed**
+`backend/src/main/resources/terms-version.properties`, which the backend reads at startup.
+Committed rather than build-generated because generating it made the backend build read a frontend
+source file, which the backend Docker image's context does not carry (ADR-0127); drift is caught by
+`TermsVersionParityTest`, so forgetting to regenerate fails CI rather than shipping a stale
+version. Any wording change therefore
+produces a new version and re-prompts everyone, with no number a human has to remember to bump.
+`-PtermsVersion=<value>` pins it for one build when an edit was purely cosmetic, which leaves every
+existing acceptance valid. It is generated for the **backend only**: the backend is the single
+authority on consent, and a second copy in the frontend could disagree with the first.
+`TermsVersionProvider` refuses to start when the resource is missing or blank — an empty version
+would either block every user out of the whole API or, made lenient, wave everyone through a gate
+that only looks armed.
+
+**Consent is append-only.** `terms_acceptance` (V229) holds one row per user and version, never
+updated; re-consent after a change adds history instead of overwriting it. The unique constraint
+`uq_terms_acceptance_user_version` does double duty as the index behind the per-request lookup and
+as the idempotence guard for a double submit.
+
+**Enforced in the backend, surfaced in the frontend.** `TermsAcceptanceAccessFilter` refuses
+`/api/**` with `403 TERMS_NOT_ACCEPTED`; `TermsAcceptanceGateFilter` redirects the web UI to
+`/terms/accept`. The backend is the boundary because it is the one place every caller passes
+through — the web UI and, since the ingest gateway relays the caller's own bearer
+(`REQ-INGEST-001`), the desktop extractor. The gateway needs no copy of the rule: it already
+relays a backend 4xx with the backend's own `detail`.
+
+Four invariants that must survive any rewrite:
+
+- **The consent endpoints are never refused.** Refusing `/api/v1/terms/**` makes the block
+  permanent for everyone, because no request would be left that could record consent.
+- **The terms, the privacy policy and the imprint stay reachable.** A gate that redirects those
+  asks a person to agree to what it prevents them from reading.
+- **No cache may outlive a wording change.** An authenticated session lives 30 days (ADR-0088), so
+  the frontend verdict is re-read every 60 s; the backend caches only *positive* answers, which are
+  monotonic within a process because the version in force is a build artifact.
+- **The gate is armed by default.** It is stood down only under the `test` profile (MockMvc callers
+  are synthetic subjects that cannot consent). A property that must be set to switch it on was
+  rejected: it ships a gate that looks armed and is not. The E2E profile is `dev`, so the gate is
+  live there and `E2eSupport#acceptTermsIfPrompted` clicks through it on every login rather than
+  pre-seeding a row — which keeps the suite exercising the real path.
+
+**Acceptance**
+
+- [ ] A user without consent cannot reach any `/api/**` endpoint but the consent ones.
+- [ ] A wording change re-prompts every user, without anyone editing a version number.
+- [ ] Consent history survives re-consent; a double submit adds no second row.
+- [ ] An admin can see who has and has not accepted.
+
+**Enforced by:** `TermsAcceptanceAccessFilterTest` (refusal, both exemptions, non-UUID subjects),
+`TermsAcceptanceGateFilterTest` (redirect, the readable-documents exemption, fail-open, cache
+bound), `TermsAcceptanceQueryDataTest` + `TermsAcceptanceServiceTest` (append-only history,
+version scoping, one-sided cache, sort translation), `TermsAcceptancePageControllerTest`, `TermsVersionParityTest`,
+`AdminTermsPageControllerTest`, `TermsTemplateBundleParityTest` · **Code:** `TermsVersionProvider`,
+`TermsAcceptanceService`, `support.TermsConsentCheck` (the leaf interface that keeps `config` and
+`service` acyclic per ADR-0047), `TermsController`, `AdminTermsController` · **Monitoring:**
+`basetool_terms_acceptances_total`, `basetool_terms_accepted_users`, `TermsConsentRolloutStalled`
+
+### REQ-SEC-029 — A path-scoped filter matches the DECODED path, never the raw request URI
+
+Any servlet filter whose scope is a path — "apply to `/api/**`", "skip unless `/v1/**`", "cap these
+configured paths" — MUST decide that on the **decoded** path, by matching a parsed `PathPattern`
+against `PathContainer.parsePath(...)`. It MUST NOT use `HttpServletRequest#getRequestURI()` in a
+`startsWith` / `equals` / `List#contains` test.
+
+`getRequestURI()` is the **raw, still percent-encoded** URI per the servlet spec, while Spring MVC
+routes on the **decoded** path. The two therefore disagree, and the disagreement is exploitable in
+one direction only: `GET /%61pi/v1/missions` fails a raw prefix test — the filter skips it — and
+`RequestMappingHandlerMapping` then decodes `%61pi` back to `api` and dispatches it to the handler
+anyway. The default `StrictHttpFirewall` does not close this: it blocklists `%2e`, `%2f`, `%5c`,
+`%25`, `%00`, `;` and `//`, but not ordinary letter escapes, and no custom `HttpFirewall` is
+installed. `ServletRequestPathUtils.getParsedRequestPath(request).pathWithinApplication().value()`
+is **not** the fix either — `PathContainer.Element#value()` is contractually the unmodified
+original; `PathSegment#valueToMatch()`, which `PathPattern` matches on, is the decoded one.
+
+**Direction matters, and only one direction is a defect.** A raw test that decides *inclusion in a
+protective scope* fails **open** — this is the defect. A raw test that decides an *exemption from* a
+gate fails **closed**: encoding can only break such a match, so the caller gets more enforcement,
+not less. Converting an exemption list to decoded matching would *widen* it, so the two frontend
+UX-routing filters deliberately keep their raw string tests — `BackendRoleSyncFilter` (waiting-page
+redirect exemptions, static-asset skip) and `TermsAcceptanceGateFilter` (consent-page redirect
+exemptions) — as do the deny-list bot filters and the backend access log's skip list. The boundary
+in both those cases is the backend gate, which does match on the decoded path.
+
+The rule is enforced by tests, not by review: each converted site carries a **direct filter test**
+driving an encoded spelling. It cannot be a MockMvc test — MockMvc normalises the path before the
+filter runs, so such a test passes against the broken code.
+
+**Acceptance**
+
+- [x] The two `/api/**` access gates refuse `/%61pi/…`: the pending-approval gate (REQ-SEC-017) and
+  the consent gate (REQ-SEC-028).
+- [x] The four ingest-scoped filters — client identity (REQ-INGEST-011), payload cap, rate limit and
+  the access log — share one `IngestPathScope` decision made on the decoded path, so an encoded
+  spelling can neither shed a gate nor go unlogged.
+- [x] The backend body-size cap matches its configured paths as patterns against the decoded path;
+  the scope stays exact, so a path merely prefixed with a configured one is still uncapped.
+- [x] API GET responses keep their revalidation headers under an encoded spelling.
+- [x] Every converted site has a direct filter regression test that fails against the raw idiom.
+
+**Enforced by:** `PendingApprovalAccessFilterTest`, `TermsAcceptanceAccessFilterTest`,
+`IngestPathScopeTest`, `ClientIdentityFilterTest`, `FiltersTest`, `RequestLoggingFilterTest`
+(ingest), `RequestBodySizeLimitFilterTest`, `ApiCacheControlFilterTest` · **Code:**
+`IngestPathScope`, `PendingApprovalAccessFilter`, `TermsAcceptanceAccessFilter`,
+`RequestBodySizeLimitFilter`, `ApiCacheControlFilter`, `RateLimitingFilter` (backend + ingest),
+`PayloadSizeLimitFilter`, `RequestLoggingFilter` (ingest)
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the

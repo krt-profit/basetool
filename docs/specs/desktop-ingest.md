@@ -23,6 +23,15 @@
 > Be precise about what enforcement can and cannot achieve — see the honesty note in
 > `REQ-INGEST-011`: these controls segment *registered* clients from one another and make a foreign
 > caller *visible*; they are not native-client attestation, which is not achievable on Windows.
+>
+> **A second gate applies to the person, not the client.** Since `REQ-SEC-028`, a user who has not
+> accepted the Terms of Use is refused with `403 TERMS_NOT_ACCEPTED`, and that applies here too:
+> the gateway relays the caller's own bearer to the backend (`REQ-INGEST-001`), so the backend's
+> consent filter sees an extractor request exactly like a web request. The gateway needs no rule of
+> its own — it already relays a backend 4xx together with the backend's localized `detail`, so the
+> extractor tells the user to sign in to the Basetool in a browser once and accept. Sending resumes
+> on its own afterwards; no re-install and no token refresh. **Operator consequence: any change to
+> the terms wording stops every extractor** until each user has accepted once (ADR-0127).
 
 ## Context & goal
 
@@ -480,12 +489,24 @@ authentication: the field is client-supplied and the contract that documents it 
 - [x] The `client_id` metric label never carries a raw token claim — it is an allowlist entry or the
   bounded `other` literal.
 - [x] The rejected `tool` is `LogSafe`-sanitized before logging and is never echoed to the caller.
+- [x] The gate cannot be shed by percent-encoding the path. Every filter that limits itself to the
+  ingest surface — client identity, payload cap, rate limit and the access log — decides that
+  through the shared `IngestPathScope`, which matches a parsed `PathPattern` against the **decoded**
+  path. `HttpServletRequest#getRequestURI()` is the raw percent-encoded URI while Spring MVC routes
+  on the decoded one, so a raw `startsWith("/v1/")` test skipped all four for `/%761/refinery-extract`
+  and `RequestMappingHandlerMapping` then decoded and dispatched it to the ingest controller —
+  allowlist, scope, payload cap and rate limit all off, and no access-log line recording it. The
+  default `StrictHttpFirewall` blocks `%2e`/`%2f`/`%25`, but not ordinary letter escapes. The
+  resource server's own `authenticated()` matcher was never affected: it is evaluated on the decoded
+  path, so an encoded call still required a valid realm token.
 
 **Enforced by:** `ClientIdentityFilterTest` (all four checks, fail-closed on absent claims, audit-only,
-bounded label, unauthenticated pass-through), `ProvenanceGuardTest` (allowlist, absent producer,
+bounded label, unauthenticated pass-through, percent-encoded path), `IngestPathScopeTest` (decoded
+scope matching), `FiltersTest` / `RequestLoggingFilterTest` (payload cap, rate limit and access log
+on an encoded path), `ProvenanceGuardTest` (allowlist, absent producer,
 audit-only, log sanitisation, no echo-back) · **Code:** `ClientIdentityFilter`,
-`ClientIdentityProperties`, `ProvenanceGuard`, `Provenance`, `ClientNotAllowedException`,
-`MetricNames` · **Monitoring:** `basetool_ingest_client_total{client_id}`,
+`ClientIdentityProperties`, `IngestPathScope`, `ProvenanceGuard`, `Provenance`,
+`ClientNotAllowedException`, `MetricNames` · **Monitoring:** `basetool_ingest_client_total{client_id}`,
 `basetool_ingest_client_rejected_total{reason}`, alert `IngestUnknownClient`
 
 ### REQ-INGEST-012 — DPoP binds the REFRESH token, never the access token

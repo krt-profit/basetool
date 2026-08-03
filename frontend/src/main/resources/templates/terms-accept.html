@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="${appTitle} + ' - ' + #{termsAccept.title}">Profit Basetool - Nutzungsbedingungen bestätigen</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/terms-accept.css}">
+    </th:block>
+</head>
+<body>
+<!--
+  Deliberately WITHOUT the sidebar: a user who has not consented may not navigate into the tool, and
+  showing them a menu of links that all bounce back here would read as the page being broken. The
+  only ways out are forward (accept) or back out (log off) - plus the imprint, privacy policy and
+  the public terms page, which stay reachable because nobody can be asked to agree to something
+  they are prevented from reading.
+-->
+<header>
+    <nav>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+<main>
+    <div id="terms-accept" class="hud-box mt-2 terms-accept-box">
+        <h1 th:text="#{termsAccept.title}">Nutzungsbedingungen bestätigen</h1>
+        <p class="terms-accept-lead" th:text="#{termsAccept.lead}">Bitte lies die Nutzungsbedingungen und bestätige sie, um das Basetool zu verwenden.</p>
+        <p class="terms-accept-changed" th:text="#{termsAccept.changedHint}">Haben sich die Bedingungen geändert, wird diese Seite erneut angezeigt.</p>
+
+        <div class="terms-accept-scroll" tabindex="0" th:aria-label="#{termsAccept.scrollRegion}">
+            <th:block th:replace="~{fragments/terms-body :: termsBody}" />
+        </div>
+
+        <p id="terms-accept-error" class="terms-accept-error" hidden th:text="#{termsAccept.error}">Die Bestätigung konnte nicht gespeichert werden. Bitte versuche es erneut.</p>
+
+        <div class="terms-accept-actions">
+            <button id="terms-accept-submit" type="button" class="btn btn-primary" th:text="#{termsAccept.accept}">Ich stimme zu</button>
+            <form th:action="@{/logout}" method="post">
+                <button type="submit" class="btn btn-outline" th:text="#{termsAccept.decline}">Ablehnen und abmelden</button>
+            </form>
+        </div>
+        <p class="terms-accept-decline-hint" th:text="#{termsAccept.declineHint}">Ohne Zustimmung ist keine Nutzung möglich. Du kannst dich jederzeit erneut anmelden und zustimmen.</p>
+    </div>
+</main>
+<script th:src="@{/js/terms-accept.js}" defer th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>

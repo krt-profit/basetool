@@ -50,6 +50,7 @@ class SecurityConfigTest {
         new SecurityConfig(
             loggingFilter,
             roleSyncFilter,
+            mock(TermsAcceptanceGateFilter.class),
             botProtectionFilter,
             sessionDebugFilter,
             ssoEntryPoint,

@@ -811,6 +811,31 @@ groups:
           summary: "Ingest client-identity gate rejecting callers ({{ $labels.reason }})"
           description: "The ingest gateway refused a caller under reason '{{ $labels.reason }}'. unknown_client/bad_provenance means an unapproved tool is calling the restricted ingest interface; missing_azp/missing_scope means a Keycloak mapper or scope assignment regressed and the official extractor may be locked out. Check the gateway log for the matching WARN and the allowlist in APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS."
 
+      # Terms-of-Use consent rollout stalled (REQ-SEC-028). After a wording change every member is
+      # blocked until they accept, so the gate refusing callers is EXPECTED for a while — what is
+      # not expected is refusals continuing while nobody gets through, which is what a broken
+      # consent path looks like from the outside.
+      #
+      # Deliberately a conjunction. A flat basetool_terms_accepted_users alone proves nothing (it is
+      # flat all night because nobody is online), and refusals alone are the feature working. Only
+      # "people are hitting the gate AND none of them is getting past it" is a defect.
+      #
+      # `or vector(0)` is load-bearing: basetool_terms_acceptances_total does not exist as a series
+      # until the first acceptance ever recorded, and an absent series makes the `and` yield nothing
+      # — the alert could never fire in exactly the situation it is meant to catch (nobody has
+      # managed to accept). See the increase()-cannot-fire trap.
+      - alert: TermsConsentRolloutStalled
+        expr: |
+          (sum(rate(basetool_http_error_total{code="TERMS_NOT_ACCEPTED"}[15m])) > 0.01)
+          and
+          ((sum(increase(basetool_terms_acceptances_total[1h])) or vector(0)) == 0)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Terms-of-Use consent gate refusing users, but nobody is getting through"
+          description: "The consent gate has been refusing callers for 30 minutes while not a single acceptance was recorded in the last hour. Expected right after a terms change only if nobody has logged in; otherwise the consent path is broken and members are locked out of the tool AND the desktop extractor. Check /admin/terms for who is outstanding, and the frontend log for failures on POST /terms/accept."
+
       # Backend oversized-JSON-body rejections (RequestBodySizeLimitFilter) on the capped import
       # endpoints (refinery import-extract). baseline-tune: >0.2/s sustained is a probing/DoS pattern.
       - alert: RequestBodyRejectedSpike

@@ -343,6 +343,37 @@ final class E2eSupport {
     page.click("#kc-login");
     page.waitForURL(
         url -> url.startsWith(baseUrl), new Page.WaitForURLOptions().setTimeout(30_000));
+    acceptTermsIfPrompted(page, baseUrl);
+  }
+
+  /**
+   * Passes the Terms-of-Use consent gate when it stands between the login and the tool
+   * (REQ-SEC-028).
+   *
+   * <p>The E2E stack runs the {@code dev} profile, not {@code test}, so unlike the unit suites the
+   * gate is genuinely armed here — a freshly seeded user has consented to nothing, and every test
+   * would otherwise land on the consent page instead of its own surface. Clicking through it here
+   * rather than pre-seeding an acceptance row is deliberate: it means the whole E2E suite exercises
+   * the real gate on every login, so a broken consent path fails loudly instead of being silently
+   * bypassed by fixture data.
+   *
+   * <p>Tolerant by design. It only acts when the gate actually appeared, so it stays a no-op once
+   * the user has consented (the acceptance is recorded per user and survives the session), and it
+   * does not fail when the page is already elsewhere.
+   *
+   * @param page the page that just completed the OIDC redirect
+   * @param baseUrl the frontend origin
+   */
+  private static void acceptTermsIfPrompted(Page page, String baseUrl) {
+    page.waitForLoadState();
+    if (!page.url().startsWith(baseUrl + "/terms/accept")) {
+      return;
+    }
+    System.out.println("[E2E][login] consent gate encountered; accepting the Terms of Use");
+    page.click("#terms-accept-submit");
+    page.waitForURL(
+        url -> url.startsWith(baseUrl) && !url.contains("/terms/accept"),
+        new Page.WaitForURLOptions().setTimeout(30_000));
   }
 
   /**

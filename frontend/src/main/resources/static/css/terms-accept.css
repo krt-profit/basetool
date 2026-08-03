@@ -1,0 +1,79 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
+/*
+ * Terms-of-Use consent gate (REQ-SEC-028).
+ *
+ * A page of its own rather than classes in `inline-migration.css`, which is generated from former
+ * inline styles and must not be hand-edited. Wider than the waiting page because it has to render
+ * the full contract legibly, not one sentence.
+ */
+
+.terms-accept-box {
+    max-width: 60rem;
+    margin: 2rem auto;
+}
+
+.terms-accept-lead {
+    font-weight: 700;
+}
+
+.terms-accept-changed {
+    color: var(--color-gray-2-text);
+    font-size: 0.9rem;
+}
+
+/*
+ * The contract scrolls inside its own box instead of the page. Two reasons: the accept button stays
+ * visible without hunting for it at the end of fourteen sections, and the viewer can see at a
+ * glance that there is more text than fits - a page-length wall of text reads as "already read it".
+ * `tabindex="0"` in the template makes the region keyboard-scrollable, which a scrollable div is
+ * not by default.
+ */
+.terms-accept-scroll {
+    max-height: 26rem;
+    overflow-y: auto;
+    margin: 1.5rem 0;
+    padding: 0 1rem 0 0;
+    border: 1px solid var(--color-gray-3);
+}
+
+.terms-accept-scroll:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.terms-accept-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    margin-top: 1rem;
+}
+
+.terms-accept-error {
+    color: var(--color-danger);
+    font-weight: 700;
+}
+
+.terms-accept-decline-hint {
+    margin-top: 1rem;
+    color: var(--color-gray-2-text);
+    font-size: 0.9rem;
+}
+
+/* Phone: the two actions stack, and the contract gets more of the shorter viewport. */
+@media (width <= 480px) {
+    .terms-accept-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .terms-accept-scroll {
+        max-height: 18rem;
+    }
+}

@@ -230,6 +230,31 @@ class ClientIdentityFilterTest {
     assertThat(rejected(MetricNames.REASON_MISSING_SCOPE)).isEqualTo(1.0d);
   }
 
+  /**
+   * A percent-encoded spelling of the ingest path does not shed the gate.
+   *
+   * <p>{@code getRequestURI()} is the raw, still-encoded URI while Spring MVC routes on the decoded
+   * path, so the {@code startsWith("/v1/")} test this replaced skipped the filter for {@code
+   * /%761/refinery-extract} — which {@code RequestMappingHandlerMapping} then decoded to {@code
+   * /v1/refinery-extract} and dispatched to the ingest controller. The whole REQ-INGEST-011
+   * allowlist was one encoded character away from being optional. The default {@code
+   * StrictHttpFirewall} blocks {@code %2e}/{@code %2f}/{@code %25} but not {@code %76}. Must be a
+   * direct filter test: MockMvc normalises the path before the filter runs.
+   */
+  @Test
+  void shouldRejectAForeignClientThatPercentEncodesTheIngestPath() throws Exception {
+    authenticate("some-other-tool", INGEST_SCOPE);
+    MockHttpServletRequest encoded = new MockHttpServletRequest("POST", "/%761/refinery-extract");
+    encoded.setRequestURI("/%761/refinery-extract");
+    encoded.addHeader(HttpHeaders.AUTHORIZATION, "Bearer token-value");
+
+    filter(enforcing()).doFilter(encoded, response, chain);
+
+    verify(chain, never()).doFilter(encoded, response);
+    assertThat(response.getStatus()).isEqualTo(403);
+    assertThat(rejected(MetricNames.REASON_UNKNOWN_CLIENT)).isEqualTo(1.0d);
+  }
+
   @Test
   void shouldNeverUseTheRawAzpAsAMetricLabel() throws Exception {
     // Deriving a label from a token claim is the shape of an unbounded-cardinality bug

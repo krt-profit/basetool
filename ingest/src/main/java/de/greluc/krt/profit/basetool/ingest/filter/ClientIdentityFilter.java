@@ -339,12 +339,17 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
    * {@code /v3/api-docs} are not client-identity gated — they are either unauthenticated by design
    * or guarded by their own chain, and gating them would break the container healthcheck.
    *
+   * <p>Decided on the decoded path via {@link IngestPathScope}, never on the raw {@code
+   * getRequestURI()}: a raw prefix test skips this gate for {@code /%761/…} while the dispatcher
+   * still routes it to the ingest controller, which would hand the whole REQ-INGEST-011 allowlist
+   * to anyone willing to encode one character.
+   *
    * @param request the current request
    * @return {@code true} to bypass the filter
    */
   @Override
   protected boolean shouldNotFilter(@NotNull HttpServletRequest request) {
-    return !request.getRequestURI().startsWith("/v1/");
+    return !IngestPathScope.isIngestRequest(request);
   }
 
   /**

@@ -54,6 +54,21 @@ class FiltersTest {
   }
 
   /**
+   * The same ingest request with one character of the path percent-encoded ({@code %76} = {@code
+   * v}). Spring MVC decodes this back to {@code /v1/refinery-extract} and dispatches it to the
+   * ingest controller, so every protective filter must treat it exactly like the plain spelling.
+   *
+   * @param bodyLength the body size to attach
+   * @return a mock request whose raw URI is encoded but whose decoded path is an ingest path
+   */
+  private static MockHttpServletRequest encodedIngestRequestWithBody(int bodyLength) {
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/%761/refinery-extract");
+    request.setRequestURI("/%761/refinery-extract");
+    request.setContent(new byte[bodyLength]);
+    return request;
+  }
+
+  /**
    * A request that carries a body but reports no {@code Content-Length} — the shape of a {@code
    * Transfer-Encoding: chunked} request, used to exercise the size filter's streaming guard.
    *
@@ -250,5 +265,54 @@ class FiltersTest {
                 .counter()
                 .count())
         .isEqualTo(1.0d);
+  }
+
+  /**
+   * The payload cap survives a percent-encoded spelling of the ingest path.
+   *
+   * <p>{@code getRequestURI()} is raw while Spring MVC routes on the decoded path, so the {@code
+   * startsWith("/v1/")} test this replaced skipped the cap for {@code /%761/refinery-extract} —
+   * which the dispatcher then decoded and delivered to the controller, unbounded. Must be a direct
+   * filter test: MockMvc normalises the path before the filter runs.
+   */
+  @Test
+  void sizeFilterRejectsAnOversizedPayloadOnAPercentEncodedIngestPath() throws Exception {
+    IngestProperties properties = new IngestProperties();
+    properties.setMaxPayloadBytes(10);
+    PayloadSizeLimitFilter filter =
+        new PayloadSizeLimitFilter(properties, objectMapper, meterRegistry);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    MockFilterChain chain = new MockFilterChain();
+
+    filter.doFilter(encodedIngestRequestWithBody(100), response, chain);
+
+    assertThat(response.getStatus()).isEqualTo(HttpStatus.CONTENT_TOO_LARGE.value());
+    assertThat(response.getContentAsString()).contains("PAYLOAD_TOO_LARGE");
+    assertThat(chain.getRequest()).isNull();
+  }
+
+  /**
+   * The rate limiter is not sheddable by encoding the path either — otherwise the budget applies
+   * only to callers who spell the path the obvious way.
+   */
+  @Test
+  void rateLimitFilterCountsAPercentEncodedIngestPathAgainstTheSameBudget() throws Exception {
+    RateLimitProperties properties = new RateLimitProperties();
+    properties.setEnabled(true);
+    properties.setCapacity(1);
+    properties.setRefillTokens(1);
+    properties.setRefillPeriod(Duration.ofMinutes(1));
+    RateLimitingFilter filter =
+        new RateLimitingFilter(properties, objectMapper, new SimpleMeterRegistry());
+
+    filter.doFilter(
+        ingestRequestWithBody(10), new MockHttpServletResponse(), new MockFilterChain());
+
+    MockHttpServletResponse blocked = new MockHttpServletResponse();
+    MockFilterChain secondChain = new MockFilterChain();
+    filter.doFilter(encodedIngestRequestWithBody(10), blocked, secondChain);
+
+    assertThat(blocked.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+    assertThat(secondChain.getRequest()).isNull();
   }
 }

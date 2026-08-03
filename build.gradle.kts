@@ -458,6 +458,47 @@ subprojects {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Terms-of-Use version, derived from the text itself (REQ-SEC-028).
+//
+// The acceptance gate must re-prompt whenever the terms CHANGE, and the only way
+// that cannot go stale is to derive the version from the wording rather than from
+// a number someone remembers to bump. So: hash every `terms.*` entry of the German
+// bundle (the authoritative wording) and use the digest as the version.
+//
+// The result is COMMITTED to `backend/src/main/resources/terms-version.properties`
+// rather than generated into the build directory, and this task is deliberately NOT
+// wired into `processResources`. Both follow the `openapi.json` precedent in this
+// repo, and both exist because of a real failure: generating it at build time made
+// the BACKEND build read a FRONTEND source file, and the backend Docker image copies
+// only `frontend/build.gradle.kts` (for layer caching) — so the image build died with
+// "Input file does not exist" while every local build was green. A committed artifact
+// needs no cross-module build-time dependency at all.
+//
+// Drift is caught by `TermsVersionParityTest`, which re-derives the digest from the
+// bundle and fails the build when the committed file disagrees. Regenerate with:
+//     ./gradlew generateTermsVersion
+//
+// `terms.last_updated` is deliberately INSIDE the hash: the date is part of the
+// document, and bumping it is itself an announcement that the terms changed.
+tasks.register("generateTermsVersion") {
+  description = "Regenerates the committed Terms-of-Use version from the German message bundle."
+  val bundle = rootProject.file("frontend/src/main/resources/messages_de.properties")
+  val target = rootProject.file("backend/src/main/resources/terms-version.properties")
+  // The escape hatch for a purely cosmetic edit (a typo, a reflow): pinning the
+  // version leaves every existing acceptance valid instead of re-prompting the
+  // whole squadron — which, with the gate also covering ingest, would otherwise
+  // stop the desktop extractor for everyone until they log into the web UI.
+  val override = (project.findProperty("termsVersion") as String?)?.takeIf { it.isNotBlank() }
+  outputs.upToDateWhen { false }
+  doLast {
+    val version = override ?: termsVersionDigest(bundle)
+    target.parentFile.mkdirs()
+    target.writeText("basetool.terms.version=" + version + System.lineSeparator(), Charsets.UTF_8)
+    logger.lifecycle("Terms-of-Use version: $version -> ${target.relativeTo(rootDir)}")
+  }
+}
+
 // OWASP Dependency-Check (org.owasp.dependencycheck) 12.2.2. Aggregates over
 // all subprojects via `./gradlew dependencyCheckAggregate`. CVSS gate now fails
 // the build on findings with CVSS 7.0 or higher (audit finding L-8: previously
@@ -508,4 +549,32 @@ dependencyCheck {
     // instead of tens of minutes.
     nvd.delay = 16000
   }
+}
+
+/**
+ * Derives the Terms-of-Use version from a message bundle: every `terms.*` entry, sorted, joined and
+ * SHA-256'd, truncated to 16 hex characters. Kept as one function so the Gradle task and the parity
+ * test cannot drift apart in how they compute it.
+ */
+fun termsVersionDigest(bundle: File): String {
+  val clauses =
+    bundle
+      .readLines(Charsets.UTF_8)
+      .filter { it.startsWith("terms.") && it.contains('=') }
+      .sorted()
+      .joinToString(separator = "\n")
+  check(clauses.isNotEmpty()) { "No terms.* entries found in ${bundle.path}" }
+  // A `.properties` value may be continued onto the next line with a trailing backslash, and such a
+  // continuation line starts with neither `terms.` nor contains `=` — so the filter above would
+  // skip it and editing that part of a clause would NOT change the version. That silently defeats
+  // the one property this whole design exists for. No terms.* entry uses a continuation today, so
+  // this guard is a tripwire for the day someone wraps a long clause, not a fix for a live bug.
+  check(clauses.lines().none { it.endsWith("\\") }) {
+    "A terms.* entry in ${bundle.path} uses a backslash line continuation. The digest only sees " +
+      "the first line, so edits to the rest would not re-prompt anyone. Put the clause on one line."
+  }
+  return java.security.MessageDigest.getInstance("SHA-256")
+    .digest(clauses.toByteArray(Charsets.UTF_8))
+    .joinToString("") { "%02x".format(it) }
+    .substring(0, 16)
 }
