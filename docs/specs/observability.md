@@ -1196,6 +1196,19 @@ has its own `IngestStagingUnavailable` alert — REQ-INGEST-003), and
 with the backend counter, the `application` common tag separating the modules) — paired since #1041
 item 19 with `basetool_ratelimit_requests_total{bucket}` on the per-IP filter and the per-subject
 limiter, feeding the same `RateLimitRejectionRatioHigh` ratio alert.
+`basetool_ingest_auth_failures_total{reason}` counts every `401` under its RFC 6750 bearer error
+code (`invalid_token` / `invalid_request` / `insufficient_scope`, anything else collapsing to
+`other`). It exists because a `401` was otherwise **undiagnosable in production**: it is logged at
+`DEBUG` with nothing but the exception class — deliberately, since this is the only internet-facing
+surface and an anonymous scanner would flood the log at any higher level — so an operator chasing a
+failing client had no signal whatsoever. On 2026-08-03 a client reporting "you must sign in" could
+equally have meant a malformed header, a bad signature, a wrong issuer, an expired token or a failed
+audience check, and nothing separated them. The tag is the error **code**, never the description:
+Spring embeds the decode failure verbatim there and it can quote parts of the presented token, which
+must never reach an appender or a label (REQ-OBS-004). **Deliberately not alerted** — unauthenticated
+probes against a public surface are constant background noise, so a threshold here would be a pager
+generator; it is a dashboard panel you consult when a specific client is failing, the same treatment
+`basetool_bot_blocked_total` gets.
 `basetool_ingest_client_total{client_id}` and `basetool_ingest_client_rejected_total{reason}`
 (REQ-INGEST-011) cover the client-identity gate: the first answers "which software is actually
 driving the gateway", which no other signal carried — the handoff counter is tagged by draft kind and

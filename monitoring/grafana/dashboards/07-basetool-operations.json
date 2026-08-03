@@ -2525,6 +2525,55 @@
           }
         }
       ]
+    },
+    {
+      "id": 48,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 168
+      },
+      "type": "timeseries",
+      "title": "Ingest auth failures/hour by bearer error",
+      "description": "Every ingest 401 under its RFC 6750 bearer error code. The 401 itself logs at DEBUG only (scanner-flood protection on the public surface), so this is the sole signal an operator has when a client fails to authenticate. invalid_token covers malformed header, bad signature, wrong issuer, expired AND failed audience - check the gateway config before assuming the client is at fault. Deliberately not alerted: unauthenticated probes are constant noise.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (reason) (rate(basetool_ingest_auth_failures_total[1h])) * 3600",
+          "refId": "A",
+          "legendFormat": "{{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
     }
   ]
 }
