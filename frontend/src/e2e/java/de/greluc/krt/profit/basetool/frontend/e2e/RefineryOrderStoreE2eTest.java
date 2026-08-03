@@ -126,14 +126,30 @@ class RefineryOrderStoreE2eTest {
         page.locator("[data-trigger='rod-open-store']").click();
         assertThat(page.locator("#storeModal"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
-        // Submit clears the fixed footer first (it can intercept the click) and blocks until the
-        // post-submit redirect has fully settled — see E2eSupport#clickSubmitClearingFooter.
-        E2eSupport.clickSubmitClearingFooter(page.locator("#storeForm button[type='submit']"));
-        // Success redirects to the list; a validation/backend failure would re-render the detail
-        // page (/refinery-orders/{id}) with the modal reopened, so the bare list URL is the signal.
-        page.waitForURL(
-            url -> url.endsWith("/refinery-orders"),
-            new Page.WaitForURLOptions().setTimeout(20_000));
+        // Drop the fixed footer so the modal's submit is clickable, then wait for the store POST's
+        // own response. E2eSupport#clickSubmitClearingFooter is deliberately NOT used here: it
+        // waits for a settled post-submit *navigation* document, and since #1238 a successful store
+        // performs none — it re-renders in place — so that helper would hang out its full timeout.
+        page.evaluate(
+            "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+                + " 'none'; } }");
+        page.waitForResponse(
+            response ->
+                response.url().contains("/refinery-orders/" + orderId + "/store")
+                    && "POST".equals(response.request().method()),
+            () -> page.locator("#storeForm button[type='submit']").click());
+        // A successful store STAYS on the detail page (REQ-FE-001): the modal closes and the
+        // `order` section is re-rendered from the now-COMPLETED order, which drops the Einlagern
+        // button its status gate no longer satisfies. That button disappearing is the success
+        // signal — a validation/backend failure keeps the modal open with the button intact.
+        assertThat(page.locator("#storeModal"))
+            .not()
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+        assertThat(page.locator("[data-trigger='rod-open-store']"))
+            .hasCount(0, new LocatorAssertions.HasCountOptions().setTimeout(20_000));
+        assertTrue(
+            page.url().contains("/refinery-orders/" + orderId),
+            "an in-place store leaves the user on the order detail page");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "refinery-store-ui");
         throw failure;

@@ -90,6 +90,72 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
+  void refineryOrderSeamMap_matchesTheRefineryOrderTopicWhitelist() throws IOException {
+    // #1238: the refinery-order detail page broadcasts and receives on refinery-order:{id}; its
+    // REFINERY_ORDER_SECTIONS map drives BOTH sides, so it must match the whitelist exactly.
+    Set<String> jsKeys =
+        seamMapKeys("/static/js/refinery-orders-details.js", "REFINERY_ORDER_SECTIONS");
+    assertThat(jsKeys)
+        .as(
+            "REFINERY_ORDER_SECTIONS keys in refinery-orders-details.js vs"
+                + " LiveSyncTopicClass.REFINERY_ORDER whitelist")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.REFINERY_ORDER.allowedSections());
+  }
+
+  @Test
+  void refineryOrderCrossPublishes_onlyEverSendWhitelistedKeys() throws IOException {
+    // #1238: an earmarked store row changes its job order's material roll-up, so the detail page
+    // cross-publishes to the `order:{id}` room it does not itself render. That raw sendChanged(...)
+    // call is NOT covered by any seam-map parity test, and the relay drops an out-of-whitelist key
+    // silently — leaving exactly those peers stale with no error (the REQ-FE-010 defect class).
+    // `refinery`/`queue` and `inventory`/`stock` are deliberately absent: since #1235 the write
+    // controller publishes both server-side for every refinery mutation, so the client must not
+    // duplicate them.
+    String js = readResource("/static/js/refinery-orders-details.js");
+    assertSendChangedKeysWhitelisted(
+        js, "'order:' \\+ jobOrderId", LiveSyncTopicClass.ORDER.allowedSections());
+    assertThat(js)
+        .as("the refinery detail page must not duplicate the server-side inventory/queue publishes")
+        .doesNotContain("sendChanged('inventory'")
+        .doesNotContain("sendChanged('refinery'");
+  }
+
+  /**
+   * Asserts every section key of each {@code sendChanged(<topicExpression>, [...])} call in {@code
+   * js} is inside {@code whitelist}, and that at least one such call exists (so a silent rename of
+   * the call site fails the build rather than quietly disabling the check).
+   *
+   * @param js the module source to scan
+   * @param topicExpressionRegex the regex matching the call's topic argument as written in the
+   *     source
+   * @param whitelist the topic class's accepted section keys
+   */
+  private static void assertSendChangedKeysWhitelisted(
+      String js, String topicExpressionRegex, Set<String> whitelist) {
+    Matcher matcher =
+        Pattern.compile("sendChanged\\(\\s*" + topicExpressionRegex + "\\s*,\\s*\\[([^\\]]*)\\]")
+            .matcher(js);
+    int callsSeen = 0;
+    while (matcher.find()) {
+      callsSeen++;
+      for (String rawKey : matcher.group(1).split(",")) {
+        String key = rawKey.trim().replaceAll("^['\"]|['\"]$", "");
+        if (key.isEmpty()) {
+          continue;
+        }
+        assertThat(whitelist)
+            .as(
+                "cross-published sendChanged key '%s' (topic %s) must be whitelisted",
+                key, topicExpressionRegex)
+            .contains(key);
+      }
+    }
+    assertThat(callsSeen)
+        .as("at least one sendChanged(%s, …) call must exist", topicExpressionRegex)
+        .isPositive();
+  }
+
+  @Test
   void materialCollectionSeamMap_isASubsetOfTheOrderTopicWhitelist() throws IOException {
     // #1309: the standalone material-collection page joins order:{id} to refresh its table on a
     // delivered flip / row move, but renders only a SUBSET of the ORDER sections (it reuses the

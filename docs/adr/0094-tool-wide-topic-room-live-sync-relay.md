@@ -238,10 +238,37 @@ concurrent) on both apps so a socket surge can never hit "too many open files".
   The per-fragment authorization the `bank` staff room already relies on for its management-only
   `grants` section is what keeps the admin sections protected.
 
-  One gap remains, and it is a *page* limitation rather than a relay one: the refinery **detail**
-  page publishes but cannot receive, because it is still a classic form-post surface with no
-  fragment seam. It needs the REQ-FE-001 conversion before a scoped `refinery:{id}` room would
-  have anything to re-render.
+  The one gap that rollout left was a *page* limitation rather than a relay one: the refinery
+  **detail** page published but could not receive, being a classic form-post surface with no
+  fragment seam. #1238 closed it — first the REQ-FE-001 conversion (two seams, `?fragment=order` /
+  `?fragment=store`, with save and store re-rendering in place), then the scoped
+  `refinery-order:{id}` room on top.
+
+- **A surface has to be a fragment-swap surface first.** That ordering is the general lesson, not a
+  refinery detail: the registry row is the cheap part, the REQ-FE-001 conversion is the work, and a
+  navigate-away write path is the tell that a surface is not ready for a room at all. A room added
+  to a page that navigates away has nothing to re-render and no receiver to target.
+
+- **A scoped room and its global sibling need distinct metric labels, not just distinct prefixes.**
+
+  # 1238's class took the wire prefix `refinery-order` and the label `refinery_order` alongside
+
+  # 1235's global `refinery` / `refinery_queue`. `LiveSyncTopic.parse` would have coped with a shared
+
+  `refinery` prefix by its id segment (as `bank` does), so the prefix choice is cosmetic; the
+  **labels** are load-bearing, because `order`/`orders` and `mission`/`missions` showed that
+  near-identical `topic_class` values read as one accidental duplicate series on the ops dashboard.
+
+- **Cross-publishing belongs wherever the knowledge is, and must not be done twice.** A refinery
+  store refreshes the queue, books stock into the Lager, and can consume a job-order earmark. The
+  first two are published **server-side** by `RefineryOrderWriteController` (#1235), which also
+  covers the no-JS path from the same call site; the third stays **client-side**, because only the
+  store dialog knows which job orders its rows picked. #1238 initially broadcast `inventory`/`stock`
+  from the client too — a duplicate of the server-side poke that only became visible when the two
+  branches merged. A duplicated poke is merely wasteful (receivers coalesce); the opposite mistake —
+  a raw `sendChanged` outside any seam map whose key the relay silently drops — strands exactly the
+  peers it exists for. So `LiveSyncSectionMapParityTest` pins the surviving client call's keys
+  against the target room's whitelist *and* asserts the server-owned ones are absent.
 
 ## Alternatives considered
 

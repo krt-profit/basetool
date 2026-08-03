@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Raffinerieauftrag-Detailseite: Speichern und Einlagern bleiben jetzt auf der Seite, und zwei Personen sehen die Änderungen des anderen live.** Bisher sprang die Seite nach jeder Aktion zurück zur Liste, und ein zweiter Betrachter merkte von einer fremden Änderung nur den Versionskonflikt beim eigenen Speichern. Formular, Materialtabelle und der Einlagern-Dialog werden jetzt an Ort und Stelle aktualisiert; wird die Ausbeute einem Auftrag zugeordnet, frischt sich dessen offene Materialübersicht mit auf. Abbrechen führt weiterhin zur Liste, da der Auftrag die Arbeitsliste verlässt (REQ-FE-001/REQ-FE-015, #1238).
+
 - **Blueprint-Import: Munition aus einem deutschen Star-Citizen-Client wird jetzt direkt erkannt.** Ein deutscher Client schreibt „(30 Schuss)" statt „(30 cap)"; solche Namen mussten bisher beim ersten Import einmal von Hand zugeordnet werden — rund 13 Stück. Die Zuordnungen sind jetzt vorbelegt. Wer sie bereits selbst zugeordnet hat, behält seine Zuordnung (#1485).
 
 - **Zwei neue Alarme für die Live-Aktualisierung.** Verwirft die Verteilung eine Änderung, sehen die anderen Betrachter unbemerkt einen veralteten Stand — ohne Fehlermeldung auf beiden Seiten. `LiveSyncRelayDropsSustained` schlägt bei anhaltenden Verlusten je Oberfläche an, `LiveSyncSectionKeySkew` beim Senden eines Bereichsschlüssels, den die Verteilung nicht kennt. Beide Schwellen stammen aus 21 Tagen gemessenem Produktivbetrieb (REQ-OBS-011).

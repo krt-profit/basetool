@@ -634,6 +634,12 @@ interface Window {
     opNotifyChanged?: (...args: any[]) => void;
 
     // --- page-local state flags and legacy inline-template callbacks
+    /**
+     * The refinery order the detail page is showing — keys its `refinery-order:{id}` live-sync room
+     * and the base URL its `?fragment=` section refreshes are pulled from. Set by the page bootstrap
+     * of refinery-orders-details.html; absent on every other page.
+     */
+    refineryOrderId?: string | null;
     __unsavedChangesInitialized?: boolean;
     __ordersDragging?: boolean;
     resetUnsavedChanges?: () => void;

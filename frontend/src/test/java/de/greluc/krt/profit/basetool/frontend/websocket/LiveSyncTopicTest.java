@@ -242,6 +242,34 @@ class LiveSyncTopicTest {
   }
 
   @Test
+  void parse_keepsTheScopedRefineryOrderRoomAndTheGlobalRefineryQueueApart() {
+    // #1238 sits next to #1235's global refinery queue, so the two must never collapse into one
+    // another. The scoped detail room took the distinct `refinery-order` stem rather than reusing
+    // `refinery`, which makes each of the four spellings below resolve exactly one way.
+    UUID id = UUID.randomUUID();
+
+    LiveSyncTopic detail = LiveSyncTopic.parse("refinery-order:" + id);
+    assertThat(detail).isNotNull();
+    assertThat(detail.topicClass()).isEqualTo(LiveSyncTopicClass.REFINERY_ORDER);
+    assertThat(detail.resourceId()).isEqualTo(id);
+    assertThat(detail.canonical()).isEqualTo("refinery-order:" + id);
+
+    LiveSyncTopic queue = LiveSyncTopic.parse("refinery");
+    assertThat(queue).isNotNull();
+    assertThat(queue.topicClass()).isEqualTo(LiveSyncTopicClass.REFINERY);
+    assertThat(queue.resourceId()).isNull();
+
+    // The scoped class needs its id, and the global one rejects a prefixed id (no scoped class uses
+    // the bare `refinery` prefix) — so neither spelling can ever land in the other's room.
+    assertThat(LiveSyncTopic.parse("refinery-order")).isNull();
+    assertThat(LiveSyncTopic.parse("refinery:" + id)).isNull();
+
+    // The labels are the part that keeps them apart on the ops dashboard (REQ-OBS-011).
+    assertThat(LiveSyncTopicClass.REFINERY_ORDER.metricLabel()).isEqualTo("refinery_order");
+    assertThat(LiveSyncTopicClass.REFINERY.metricLabel()).isEqualTo("refinery_queue");
+  }
+
+  @Test
   void everyScopedClassExposesAnAuthProbePathWithAnIdPlaceholder() {
     for (LiveSyncTopicClass topicClass : LiveSyncTopicClass.values()) {
       if (topicClass.scoped()) {

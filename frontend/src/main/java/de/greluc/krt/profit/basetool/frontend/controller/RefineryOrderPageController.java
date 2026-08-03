@@ -92,6 +92,14 @@ public class RefineryOrderPageController {
   /** Page size applied when the request carries none (or a non-whitelisted one). */
   private static final int DEFAULT_PAGE_SIZE = 50;
 
+  /**
+   * The detail page's {@code ?fragment=} selector for the edit form / goods editor + action row.
+   */
+  private static final String FRAGMENT_ORDER = "order";
+
+  /** The detail page's {@code ?fragment=} selector for the Einlagern dialog's form body. */
+  private static final String FRAGMENT_STORE = "store";
+
   /** Captured generic type for decoding a paged {@code /refinery-orders} list response. */
   private static final ParameterizedTypeReference<PageResponse<RefineryOrderListDto>>
       REFINERY_ORDER_LIST_PAGE =
@@ -506,21 +514,43 @@ public class RefineryOrderPageController {
   }
 
   /**
-   * Renders the detail view of a single refinery order ({@code /refinery-orders/{id}}).
+   * Renders the detail view of a single refinery order ({@code /refinery-orders/{id}}), either as
+   * the full page or — when {@code fragment} names a section — as that section's fragment for an
+   * in-place AJAX swap (REQ-FE-001 / REQ-FE-015).
    *
    * <p>The {@code canEdit} flag is resolved here (not in the template): logisticians can edit every
    * order; the order's owner can edit their own. Backend's PUT enforces the same rule so this is
    * purely a UX gate.
    *
+   * <p>The two fragments are the seams the page's own save/store and its {@code
+   * refinery-order:{id}} live-sync receiver re-render: {@code order} (the edit form, the goods
+   * editor and the status-gated action row) and {@code store} (the Einlagern dialog's rows, derived
+   * from the order's output goods). Each skips the catalog lookups the other one needs
+   * (ADR-0078/ADR-0081 fragment-gating) — a {@code store} refresh never pays for the missions
+   * catalog, an {@code order} refresh never pays for the active-job-order lookup. An unknown
+   * fragment name, or a backend failure while rendering one, degrades to a section-sized inline
+   * error rather than a redirect, so a flaky peer-refresh never dumps a whole page into a small
+   * swap container.
+   *
    * @param id refinery order id
+   * @param fragment when {@code "order"} or {@code "store"}, only that section's fragment is
+   *     rendered; otherwise the full page
    * @param model Thymeleaf model populated with order, edit/role flags and the dropdown catalogs
    * @param principal authenticated OIDC user (used to derive owner and logistician flags)
-   * @return the {@code refinery-orders-details} view name
+   * @return the {@code refinery-orders-details} view name, one of its section fragment selectors,
+   *     or {@code :: fragmentError} on an unknown fragment / failed fragment load
    */
   @GetMapping("/{id}")
   @PreAuthorize("isAuthenticated()")
   public String viewOrderDetail(
-      @PathVariable UUID id, Model model, @AuthenticationPrincipal OidcUser principal) {
+      @PathVariable UUID id,
+      @RequestParam(required = false) String fragment,
+      Model model,
+      @AuthenticationPrincipal OidcUser principal) {
+    String section = fragment == null ? null : fragment.toLowerCase(java.util.Locale.ROOT);
+    if (section != null && !FRAGMENT_ORDER.equals(section) && !FRAGMENT_STORE.equals(section)) {
+      return "refinery-orders-details :: fragmentError";
+    }
     boolean isLogistician = isLogistician(principal);
 
     if (!model.containsAttribute("refineryOrderForm") || !model.containsAttribute("storeForm")) {
@@ -664,6 +694,12 @@ public class RefineryOrderPageController {
         }
       } catch (Exception e) {
         log.error("Failed to fetch refinery order details", e);
+        // A fragment request must never answer with a redirect: krtFetch.swap would bail silently
+        // and leave the section stale. Answer section-sized instead (the full page still
+        // redirects).
+        if (section != null) {
+          return "refinery-orders-details :: fragmentError";
+        }
         model.addAttribute("errorToast", "error.refineryorder.load");
         return "redirect:/refinery-orders";
       }
@@ -682,8 +718,12 @@ public class RefineryOrderPageController {
     model.addAttribute("locations", fetchLocations(preserveLocation));
     model.addAttribute("allLocations", fetchAllLocations());
     RefineryOrderForm formInModel = (RefineryOrderForm) model.getAttribute("refineryOrderForm");
-    UUID preserveMissionId = formInModel != null ? formInModel.getMissionId() : null;
-    model.addAttribute("missions", fetchMissions(preserveMissionId));
+    // The missions catalog is a size=1000 uncached read and is referenced only by the `order`
+    // section's "Einsatz" picker, so a `store` fragment refresh skips it entirely.
+    if (!FRAGMENT_STORE.equals(section)) {
+      UUID preserveMissionId = formInModel != null ? formInModel.getMissionId() : null;
+      model.addAttribute("missions", fetchMissions(preserveMissionId));
+    }
     // The owner + per-item receiver pickers are now server-side searchable comboboxes
     // (remote-users,
     // #1193): instead of preloading the whole roster, seed only the display names of the users the
@@ -701,7 +741,11 @@ public class RefineryOrderPageController {
       }
     }
     model.addAttribute("seedUserNames", resolveSeedUserNames(seedIds));
-    model.addAttribute("jobOrders", fetchActiveJobOrders());
+    // The active-job-order lookup backs only the store dialog's per-row "Auftrag" picker, so an
+    // `order` fragment refresh skips it.
+    if (!FRAGMENT_ORDER.equals(section)) {
+      model.addAttribute("jobOrders", fetchActiveJobOrders());
+    }
     model.addAttribute("roundingMode", fetchRoundingMode());
 
     // Pre-load the UEX yield map for the order's current location so the detail page can render
@@ -714,6 +758,12 @@ public class RefineryOrderPageController {
       currentLocationId = orderForLookup.location().id();
     }
     model.addAttribute("materialYieldBonuses", fetchYieldsForLocation(currentLocationId));
+    if (FRAGMENT_ORDER.equals(section)) {
+      return "refinery-orders-details :: refineryOrderSection";
+    }
+    if (FRAGMENT_STORE.equals(section)) {
+      return "refinery-orders-details :: refineryStoreSection";
+    }
     return "refinery-orders-details";
   }
 
