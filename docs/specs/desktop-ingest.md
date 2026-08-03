@@ -415,7 +415,7 @@ Four checks, each **inert until configured** and each **fail-closed** once it is
 |---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------|
 | Client id     | JWT `azp` against an allowlist                                                                                                                                                                                                                            | `app.ingest.client-identity.allowed-client-ids` |
 | Capability    | `SCOPE_<value>` authority from the `scope` claim — must name a scope **only** the extractor carries **and** one that is emitted into the claim; the shipped `extractor-ingest` fails both (shared with the frontend, and `include.in.token.scope: false`) | `…required-scope`                               |
-| Producer      | payload `tool` field against an allowlist                                                                                                                                                                                                                 | `…allowed-tools`                                |
+| Producer      | payload `tool` field against an allowlist — the extractor emits a DIFFERENT spelling per export path (`basetool-sc-extractor` on refinery, `Basetool SC Extractor` on blueprints), so both must be listed; compared case-insensitively                    | `…allowed-tools`                                |
 | Token binding | DPoP scheme required (`REQ-INGEST-012`)                                                                                                                                                                                                                   | `…dpop-required`                                |
 
 A missing claim is refused exactly like an unknown one: treating "no `azp`" as "nothing to check"
@@ -431,6 +431,22 @@ done by a PR, so shipping these pre-enabled would reject every real extractor to
 `audit-only` flag runs every configured check but never rejects, so the operator can measure the real
 client population (`basetool_ingest_client_rejected_total` staying at zero) before enforcing — the
 same sequencing discipline `REQ-INGEST-008` imposes on the audience validator.
+
+> **`audit-only` covers these three checks only — not the audience.** The ingest audience lives in
+> `app.security.jwt.expected-audiences` and is enforced by the resource server's `JwtDecoder`, a
+> different mechanism entirely: it starts refusing the moment it is configured, regardless of
+> `audit-only`, and it answers **`401`** where these gates answer `403`. A client therefore reports
+> "you must sign in" rather than "not approved", which points diagnosis at the wrong layer. The
+> 2026-08-03 incident had the audience set alongside the audit-only variables and the rollout
+> believed to be observe-only. The runbook now orders the audience **last**, after the audit-only
+> pass has completed.
+
+**Every rejection names which check refused it.** All four used to share one identical problem
+`detail`, so a client message could not distinguish a token-level refusal from the payload-provenance
+one and the operator had to reach for the log to find out — which, during the 2026-08-03 incident,
+had already been discarded with the recreated container. The `detail` now carries a short,
+non-sensitive clause naming the failing category; it never echoes the configured allowlist or scope
+value, so it diagnoses without disclosing configuration to a caller that was just refused.
 
 **Honesty about what this achieves.** These gates **segment registered clients from one another**: a
 frontend session token cannot drive the gateway, an approved integration is individually scoped and

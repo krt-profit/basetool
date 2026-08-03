@@ -722,6 +722,10 @@ x-ingest: &ingest-template
     # AND carries include.in.token.scope=false), so setting it here would reject every caller
     # including the real extractor — use `extractor-ingest-only` (runbook step 7a).
     APP_INGEST_CLIENT_IDENTITY_REQUIRED_SCOPE: ${IRI_INGEST_REQUIRED_SCOPE:-}
+    # Accepted payload `tool` provenance. BOTH extractor spellings are required: it emits
+    # `basetool-sc-extractor` on the refinery path but the display name `Basetool SC Extractor` on
+    # the blueprint path, so listing only the slug rejects every blueprint send (incident
+    # 2026-08-03). The comparison folds case; these two differ structurally.
     APP_INGEST_CLIENT_IDENTITY_ALLOWED_TOOLS: ${IRI_INGEST_ALLOWED_TOOLS:-}
     APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY: ${IRI_INGEST_CLIENT_AUDIT_ONLY:-false}
     # MUST stay false until the desktop extractor sends DPoP proofs — it sends Authorization: Bearer

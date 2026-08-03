@@ -184,6 +184,28 @@ class ClientIdentityFilterTest {
   }
 
   @Test
+  void shouldNameTheFailingCheckSoTheClientMessageIsDiagnosable() throws Exception {
+    // The 2026-08-03 incident: all four checks answered with one identical sentence, so the client
+    // message could not distinguish a token-level refusal from the payload-provenance one and the
+    // operator had to reach for a log that the container recreation had already discarded.
+    authenticate("some-other-tool", INGEST_SCOPE);
+    filter(enforcing()).doFilter(request, response, chain);
+    String unknownClientBody = response.getContentAsString();
+
+    // A scope failure must read differently from an identity failure.
+    SecurityContextHolder.clearContext();
+    MockHttpServletResponse scopeResponse = new MockHttpServletResponse();
+    authenticate(ALLOWED_CLIENT, null);
+    filter(enforcing()).doFilter(request, scopeResponse, mock(FilterChain.class));
+
+    assertThat(unknownClientBody).contains("client identity");
+    assertThat(scopeResponse.getContentAsString()).contains("missing ingest scope");
+    assertThat(unknownClientBody).isNotEqualTo(scopeResponse.getContentAsString());
+    // The refused caller still learns nothing about the configuration itself.
+    assertThat(unknownClientBody).doesNotContain(ALLOWED_CLIENT).doesNotContain(INGEST_SCOPE);
+  }
+
+  @Test
   void shouldFailClosedWhenTheAzpClaimIsAbsentEntirely() throws Exception {
     // A MISSING claim must not be the lenient branch. If it were, a realm change that stopped
     // stamping azp would silently disable the gate instead of failing loudly.

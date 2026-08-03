@@ -312,6 +312,21 @@ IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest
 
 > **Do not point the gateway at `basetool-backend`.** That is the backend's audience and every
 > frontend token carries it — the check would pass for tokens this interface must refuse.
+>
+> ### ⚠️ `AUDIT_ONLY` does NOT cover this variable — set it LAST
+>
+> `IRI_INGEST_CLIENT_AUDIT_ONLY` only softens the three checks in `ClientIdentityProperties` (client
+> id, scope, provenance). **The audience check is a different mechanism**: it lives in the
+> resource server's `JwtDecoder`, so it starts refusing the moment it is set, regardless of
+> audit-only — and it refuses with **`401`**, not the `403` the other gates use. A client will
+> report "you must be signed in" rather than "not approved", which points at the wrong problem.
+>
+> This bit in production on **2026-08-03**: the audience was set alongside the audit-only
+> variables, so it was live while the rollout was believed to be observe-only.
+>
+> Therefore: leave `IRI_INGEST_EXPECTED_AUDIENCES` **empty** until 7c has completed its audit-only
+> pass and enforcement is on, then set it as the final step and re-test a real send immediately. If
+> sends start failing with 401, this variable is the first thing to clear.
 
 ### 7b — Use the exclusive scope for the scope check
 
@@ -336,7 +351,9 @@ Setting it to `extractor-ingest` would look configured and enforce nothing.
 IRI_INGEST_ALLOWED_CLIENT_IDS=basetool-sc-extractor
 # NOTE: the exclusive scope from 7a, NOT the shared `extractor-ingest`.
 IRI_INGEST_REQUIRED_SCOPE=extractor-ingest-only
-IRI_INGEST_ALLOWED_TOOLS=basetool-sc-extractor
+# BOTH spellings: the extractor emits the slug on the refinery path but the display
+# name on the blueprint path. Only the slug = every blueprint send 403s (2026-08-03).
+IRI_INGEST_ALLOWED_TOOLS=basetool-sc-extractor,Basetool SC Extractor
 IRI_INGEST_CLIENT_AUDIT_ONLY=true
 ```
 

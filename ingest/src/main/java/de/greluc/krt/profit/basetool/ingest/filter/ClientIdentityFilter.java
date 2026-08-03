@@ -201,28 +201,43 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
       if (authorizedParty == null) {
         // Fail-closed on an ABSENT claim. Treating "no azp" as "nothing to check" would silently
         // disable the gate the moment a realm change stopped stamping the claim.
-        return new Rejection(MetricNames.REASON_MISSING_AZP, notApprovedDetail());
+        return new Rejection(
+            MetricNames.REASON_MISSING_AZP, notApprovedDetail("no client identity in the token"));
       }
       if (!properties.getAllowedClientIds().contains(authorizedParty)) {
-        return new Rejection(MetricNames.REASON_UNKNOWN_CLIENT, notApprovedDetail());
+        return new Rejection(
+            MetricNames.REASON_UNKNOWN_CLIENT, notApprovedDetail("client identity"));
       }
     }
     if (!properties.getRequiredScope().isBlank() && !hasRequiredScope()) {
-      return new Rejection(MetricNames.REASON_MISSING_SCOPE, notApprovedDetail());
+      return new Rejection(
+          MetricNames.REASON_MISSING_SCOPE, notApprovedDetail("missing ingest scope"));
     }
     return null;
   }
 
   /**
-   * The single user-facing sentence for every client-identity rejection. Deliberately explicit
-   * rather than a bare "forbidden": the extractor surfaces the problem {@code detail} verbatim, so
-   * this is where the support boundary is actually communicated to whoever built the calling tool.
+   * The user-facing sentence for a client-identity rejection, naming <em>which</em> check refused.
    *
+   * <p>Deliberately explicit rather than a bare "forbidden": the extractor surfaces the problem
+   * {@code detail} verbatim, so this is where the support boundary is actually communicated to
+   * whoever built the calling tool.
+   *
+   * <p><b>Why the failing check is named.</b> All four checks used to answer with one identical
+   * sentence, which cost real time during the 2026-08-03 production incident: the message could not
+   * distinguish a token-level refusal from the payload-provenance one, so the operator had to reach
+   * for the log to learn which of four gates had fired — and the container had already been
+   * recreated by then, taking its log with it. The {@code failedCheck} clause is coarse on purpose:
+   * it names the category, never the configured allowlist or scope value, so it diagnoses without
+   * disclosing configuration to a caller that was just refused.
+   *
+   * @param failedCheck short, non-sensitive name of the check that refused the caller
    * @return the problem detail for a non-approved client
    */
-  private static @NotNull String notApprovedDetail() {
-    return "This client is not approved for the basetool ingest path. Only the official basetool"
-        + " SC extractor is supported; other tools are not permitted.";
+  private static @NotNull String notApprovedDetail(@NotNull String failedCheck) {
+    return "This client is not approved for the basetool ingest path ("
+        + failedCheck
+        + "). Only the official basetool SC extractor is supported; other tools are not permitted.";
   }
 
   /**
