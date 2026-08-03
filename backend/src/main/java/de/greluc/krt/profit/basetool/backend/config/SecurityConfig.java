@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.config;
 import de.greluc.krt.profit.basetool.backend.support.Permissions;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import de.greluc.krt.profit.basetool.backend.support.TermsConsentCheck;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -285,10 +286,22 @@ public class SecurityConfig {
       MessageSource messageSource,
       ProblemResponseFactory problemResponseFactory,
       ObjectMapper objectMapper,
-      MeterRegistry meterRegistry)
+      MeterRegistry meterRegistry,
+      TermsConsentCheck termsConsentCheck)
       throws Exception {
 
     boolean isTest = java.util.Arrays.asList(env.getActiveProfiles()).contains("test");
+
+    // REQ-SEC-028: the consent boundary is ARMED BY DEFAULT and stood down only under the `test`
+    // profile, mirroring the CSRF carve-out below. The alternative — a property that must be set to
+    // switch it on — was rejected: it ships a gate that looks armed and is not, which is the exact
+    // failure TermsVersionProvider refuses to start for. MockMvc callers authenticate as synthetic
+    // subjects that have no acceptance row and could not create one, so leaving it armed would
+    // 403 roughly 120 pre-existing tests without testing anything about consent;
+    // TermsAcceptanceAccessFilterTest drives the real filter directly instead.
+    // NOTE: this carve-out is `test`-only. The E2E profile is NOT `test`, so the gate is live
+    // there and E2E users must actually accept.
+    TermsConsentCheck effectiveConsentCheck = isTest ? userId -> true : termsConsentCheck;
 
     if (isTest) {
       // CSRF is intentionally disabled in the `test` Spring profile so MockMvc
@@ -654,6 +667,20 @@ public class SecurityConfig {
                 messageSource, problemResponseFactory, objectMapper, meterRegistry),
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
+        // REQ-SEC-028: refuse the API until the Terms of Use are accepted. Enforced HERE rather
+        // than only in the frontend because the backend is the one place every caller passes
+        // through — the web UI and, since the gateway relays the caller's own bearer
+        // (REQ-INGEST-001), the desktop extractor. Placed AFTER the pending-approval filter so a
+        // user who is both pending and unconsented gets the approval message, which is the one
+        // they can actually act on.
+        .addFilterAfter(
+            new TermsAcceptanceAccessFilter(
+                effectiveConsentCheck,
+                messageSource,
+                problemResponseFactory,
+                objectMapper,
+                meterRegistry),
+            PendingApprovalAccessFilter.class)
         // REQ-SEC-024: catch an identity-provider-unreachable failure (JWKS fetch timeout / 5xx /
         // Docker-DNS strand) escaping the bearer-token filter as a re-thrown
         // AuthenticationServiceException and re-map it to a retryable 503 instead of the opaque 500

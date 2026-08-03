@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.TermsAcceptance;
 import de.greluc.krt.profit.basetool.backend.model.dto.TermsAcceptanceStatusDto;
 import de.greluc.krt.profit.basetool.backend.repository.TermsAcceptanceRepository;
+import de.greluc.krt.profit.basetool.backend.support.TermsConsentCheck;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
@@ -59,7 +60,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class TermsAcceptanceService {
+public class TermsAcceptanceService implements TermsConsentCheck {
 
   /**
    * Upper bound on cached acceptances. Sized well above the real member count so the cache never
@@ -113,6 +114,7 @@ public class TermsAcceptanceService {
    * @param userId the user's {@code app_user.id}, i.e. the Keycloak {@code sub}
    * @return {@code true} if consent for the current version is on record
    */
+  @Override
   @Transactional(readOnly = true)
   public boolean hasAcceptedCurrentTerms(@NotNull UUID userId) {
     if (Boolean.TRUE.equals(acceptedCache.getIfPresent(userId))) {

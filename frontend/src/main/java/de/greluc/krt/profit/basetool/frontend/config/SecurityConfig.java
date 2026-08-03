@@ -74,6 +74,7 @@ public class SecurityConfig {
 
   private final RequestLoggingFilter requestLoggingFilter;
   private final BackendRoleSyncFilter backendRoleSyncFilter;
+  private final TermsAcceptanceGateFilter termsAcceptanceGateFilter;
   private final BotProtectionFilter botProtectionFilter;
 
   /**
@@ -152,6 +153,9 @@ public class SecurityConfig {
             org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter
                 .class)
         .addFilterBefore(backendRoleSyncFilter, AuthorizationFilter.class)
+        // AFTER the role sync on purpose: a still-pending registration must meet the approval
+        // waiting page, not be bounced between two gates (REQ-SEC-028).
+        .addFilterAfter(termsAcceptanceGateFilter, BackendRoleSyncFilter.class)
         // Audit finding H-6: previously `/missions/**`, `/operations/**`, `/hangar/import/**`,
         // `/hangar/ships/all` and `/inventory/**` were carved out of CSRF protection entirely.
         // Those routes are session-cookie-authenticated frontend handlers — exactly the surface
