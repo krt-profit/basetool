@@ -770,9 +770,11 @@ services:
     # restricted `monitoring` user; `--requirepass` below is kept only as redundant belt-and-braces.
     # A missing/empty ACL file makes redis exit at startup, which the deploy health-gate turns into a
     # clean rollback rather than a silent breakage. Untouched for redis-dev.
-    # ADR-0094: the live-sync + notification fan-outs PUBLISH/SUBSCRIBE on the pub/sub channels
-    # `basetool:livesync:changed` (frontend) and `basetool:notify:published` (backend). The `default`
-    # user's `&*` grant (above) already covers these; the restricted `monitoring` user must NOT gain
+    # ADR-0094 / ADR-0126: the live-sync + notification fan-outs PUBLISH/SUBSCRIBE on the pub/sub
+    # channels `basetool:livesync:changed` (frontend), `basetool:livesync:presence` (frontend,
+    # cross-instance editor-presence gossip, #1237) and `basetool:notify:published` (backend). The
+    # `default` user's `&*` grant (above) already covers all three — a new channel needs no ACL
+    # change as long as that grant stays a wildcard; the restricted `monitoring` user must NOT gain
     # `&*`. Pub/sub adds no keys, so the 384mb noeviction budget (ADR-0079) is unaffected.
     command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --loglevel notice --aclfile /etc/redis/users.acl --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
     # A service-level `volumes:` replaces the merged template value, so the data volume is re-listed

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die Bearbeitungs-Anzeige auf der Missionsseite gilt jetzt über alle Serverinstanzen hinweg.** Der Hinweis „wird gerade bearbeitet von“ erschien bisher nur, wenn beide Bearbeiter zufällig von derselben Instanz bedient wurden; bei mehreren Instanzen fehlte er, obwohl die Änderungen selbst korrekt ankamen. Die Anzeige wird jetzt zwischen den Instanzen abgeglichen — fällt Redis aus, verhält sie sich wie bisher instanzlokal (ADR-0126, neuer Kanal `basetool:livesync:presence`, einstellbar über `APP_LIVESYNC_REDIS_PRESENCE_CHANNEL`).
+
 ## [v1.5.30](https://github.com/krt-profit/basetool/releases/tag/v1.5.30) - 2026-08-03
 
 ### Added
