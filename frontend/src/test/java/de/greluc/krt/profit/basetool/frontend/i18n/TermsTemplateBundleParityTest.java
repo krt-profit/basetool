@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -49,8 +50,13 @@ import org.junit.jupiter.api.Test;
  */
 class TermsTemplateBundleParityTest {
 
-  /** The Terms of Use Thymeleaf template under the module's main resources. */
-  private static final Path TEMPLATE = Path.of("src/main/resources/templates/terms.html");
+  /**
+   * Root of the Thymeleaf templates. The whole tree is scanned rather than a single file because
+   * the terms wording lives in {@code fragments/terms-body.html} and is rendered by both the public
+   * {@code /terms} page and the consent gate — pinning one file would report every clause as
+   * unrendered the moment it moved into the fragment, which is exactly what happened when it did.
+   */
+  private static final Path TEMPLATE_ROOT = Path.of("src/main/resources/templates");
 
   /** German locale bundle, the authoritative source of the terms wording. */
   private static final Path BUNDLE = Path.of("src/main/resources/messages_de.properties");
@@ -62,9 +68,9 @@ class TermsTemplateBundleParityTest {
   private static final String TERMS_PREFIX = "terms.";
 
   /**
-   * Asserts that the set of {@code terms.*} keys referenced by {@code terms.html} is exactly the
-   * set declared in the German bundle, reporting each side of the difference separately so the
-   * failure names the orphaned clause rather than just a count mismatch.
+   * Asserts that the set of {@code terms.*} keys referenced by any template is exactly the set
+   * declared in the German bundle, reporting each side of the difference separately so the failure
+   * names the orphaned clause rather than just a count mismatch.
    *
    * @throws IOException if the template or the German bundle cannot be read from disk
    */
@@ -82,18 +88,22 @@ class TermsTemplateBundleParityTest {
   }
 
   /**
-   * Collects every {@code terms.*} key that {@code terms.html} resolves through a {@code #{...}}
-   * message expression, including the ones inside {@code th:text} on list items.
+   * Collects every {@code terms.*} key that any template resolves through a {@code #{...}} message
+   * expression, including the ones inside {@code th:text} on list items.
    *
    * @return the referenced keys, sorted for a deterministic failure message
    * @throws IOException if the template cannot be read from disk
    */
   private static Set<String> referencedKeys() throws IOException {
-    String template = Files.readString(TEMPLATE, StandardCharsets.UTF_8);
     Set<String> keys = new TreeSet<>();
-    Matcher matcher = TERMS_EXPRESSION.matcher(template);
-    while (matcher.find()) {
-      keys.add(matcher.group(1));
+    try (Stream<Path> templates = Files.walk(TEMPLATE_ROOT)) {
+      for (Path template : templates.filter(Files::isRegularFile).toList()) {
+        Matcher matcher =
+            TERMS_EXPRESSION.matcher(Files.readString(template, StandardCharsets.UTF_8));
+        while (matcher.find()) {
+          keys.add(matcher.group(1));
+        }
+      }
     }
     return keys;
   }

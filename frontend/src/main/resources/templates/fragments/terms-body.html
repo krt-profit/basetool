@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="de">
+<body>
+<!--
+  The Terms of Use text itself, factored out so the public /terms page and the consent gate render
+  the SAME wording from the SAME source. Duplicating it would let the two drift, and a gate that
+  shows different text from the page it claims to reproduce is worse than no gate: the user would
+  be consenting to something other than what is on file. TermsTemplateBundleParityTest pins every
+  terms.* key as declared-and-rendered across the templates, so a clause added to the bundle but
+  not to this fragment fails the build.
+-->
+<th:block th:fragment="termsBody">
+    <p th:text="#{terms.intro}">Diese Nutzungsbedingungen regeln die Nutzung des Profit Basetool.</p>
+
+    <h2 th:text="#{terms.h1_1}">1. Geltungsbereich und Vertragspartner</h2>
+    <p th:text="#{terms.p_1_1}">Diese Nutzungsbedingungen gelten zwischen dem Betreiber und allen Nutzern.</p>
+    <p th:text="#{terms.p_1_2}">Die Plattform ist ein internes Verwaltungswerkzeug.</p>
+
+    <h2 th:text="#{terms.h1_2}">2. Zweck der Plattform</h2>
+    <p th:text="#{terms.p_2_1}">Die Plattform unterstützt die organisationsinterne Verwaltung.</p>
+
+    <h2 th:text="#{terms.h1_3}">3. Zugang und Registrierung</h2>
+    <p th:text="#{terms.p_3_1}">Der Zugang erfolgt über Single Sign-On.</p>
+    <p th:text="#{terms.p_3_2}">Der Nutzer ist verpflichtet, seine Zugangsdaten geheim zu halten.</p>
+    <p th:text="#{terms.p_3_3}">Pro Person ist nur ein Account zulässig.</p>
+
+    <h2 th:text="#{terms.h1_4}">4. Pflichten der Nutzer</h2>
+    <p th:text="#{terms.p_4_1}">Der Nutzer verpflichtet sich insbesondere zu Folgendem:</p>
+    <ul class="krtm-list-style-type-disc-margin-left-2rem-a571">
+        <li th:text="#{terms.list_4_1_1}">Wahrheitsgemäße Angaben.</li>
+        <li th:text="#{terms.list_4_1_2}">Bestimmungsgemäße Nutzung.</li>
+        <li th:text="#{terms.list_4_1_3}">Keine rechtswidrigen Inhalte.</li>
+        <li th:text="#{terms.list_4_1_4}">Keine technischen Eingriffe.</li>
+        <li th:text="#{terms.list_4_1_5}">Nur freigegebene Client-Software an den Schnittstellen.</li>
+        <li th:text="#{terms.list_4_1_6}">Sicherheitslücken melden.</li>
+    </ul>
+
+    <h2 th:text="#{terms.h1_5}">5. Nutzerinhalte</h2>
+    <p th:text="#{terms.p_5_1}">Der Nutzer behält die Rechte an eingestellten Inhalten.</p>
+    <p th:text="#{terms.p_5_2}">Der Nutzer räumt dem Betreiber ein Nutzungsrecht ein.</p>
+    <p th:text="#{terms.p_5_3}">Verantwortlichkeit für eingestellte Inhalte.</p>
+
+    <h2 th:text="#{terms.h1_6}">6. Rollen, Rechte und Sichtbarkeit</h2>
+    <p th:text="#{terms.p_6_1}">Die Plattform kennt verschiedene Rollen.</p>
+    <p th:text="#{terms.p_6_2}">Sichtbarkeit eingestellter Informationen.</p>
+
+    <h2 th:text="#{terms.h1_7}">7. Verfügbarkeit</h2>
+    <p th:text="#{terms.p_7_1}">Privates, ehrenamtlich betriebenes Projekt.</p>
+    <p th:text="#{terms.p_7_2}">Kein Anspruch auf permanente Verfügbarkeit.</p>
+
+    <h2 th:text="#{terms.h1_8}">8. Sperrung und Beendigung</h2>
+    <p th:text="#{terms.p_8_1}">Administratoren können den Zugang sperren.</p>
+    <p th:text="#{terms.p_8_2}">Speicherung nach Beendigung der Nutzung.</p>
+
+    <h2 th:text="#{terms.h1_9}">9. Geistiges Eigentum und Marken</h2>
+    <p th:text="#{terms.p_9_1}">Der Quellcode steht unter der veröffentlichten Lizenz.</p>
+    <p th:text="#{terms.p_9_2}">Marken und Logos der Organisationen.</p>
+    <p th:text="#{terms.p_9_3}">Star-Citizen-bezogene Marken.</p>
+
+    <h2 th:text="#{terms.h1_10}">10. Haftung</h2>
+    <p th:text="#{terms.p_10_1}">Bereitstellung ohne Gewährleistung ("as is").</p>
+    <p th:text="#{terms.p_10_2}">Haftungsbeschränkung auf Vorsatz und grobe Fahrlässigkeit.</p>
+    <p th:text="#{terms.p_10_3}">Keine Haftung für Nutzerinhalte und externe Dienste.</p>
+
+    <h2 th:text="#{terms.h1_11}">11. Datenschutz</h2>
+    <p>
+        <span th:text="#{terms.p_11_1}">Die Verarbeitung personenbezogener Daten ist in der gesonderten Datenschutzerklärung geregelt.</span>
+        (<a th:href="@{/privacy}" th:text="#{privacy.title}">Datenschutzerklärung</a>)
+    </p>
+
+    <h2 th:text="#{terms.h1_12}">12. Änderungen der Nutzungsbedingungen</h2>
+    <p th:text="#{terms.p_12_1}">Vorbehalt der Anpassung dieser Nutzungsbedingungen.</p>
+    <p th:text="#{terms.p_12_2}">Fortgesetzte Nutzung gilt als Zustimmung.</p>
+
+    <h2 th:text="#{terms.h1_13}">13. Anwendbares Recht und Gerichtsstand</h2>
+    <p th:text="#{terms.p_13_1}">Es gilt das Recht der Bundesrepublik Deutschland.</p>
+
+    <h2 th:text="#{terms.h1_14}">14. Salvatorische Klausel</h2>
+    <p th:text="#{terms.p_14_1}">Salvatorische Klausel.</p>
+
+    <br>
+    <p><em th:text="#{terms.last_updated}">Stand dieser Nutzungsbedingungen: 03.08.2026</em></p>
+</th:block>
+</body>
+</html>
