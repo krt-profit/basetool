@@ -178,6 +178,17 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
           return;
         }
 
+        // REQ-SEC-028: while the Terms-of-Use gate is closed for this session, the backend refuses
+        // /api/v1/users/me with 403 TERMS_NOT_ACCEPTED. The failure path below deliberately leaves
+        // the sync stamp unset so the next request retries, which turns "unconsented" into one
+        // futile round trip per non-static request — for every member at once, right after a
+        // wording change. Skipping it costs nothing: the sync could not have succeeded, and the
+        // moment consent is recorded the cached verdict is cleared and the next request syncs.
+        if (TermsAcceptanceGateFilter.consentKnownMissing(request)) {
+          filterChain.doFilter(request, response);
+          return;
+        }
+
         if (isDue(session.getAttribute(ROLES_SYNCED_AT_FLAG), ROLE_RESYNC_MILLIS)) {
           log.debug(
               "Session exists, starting role sync for user: {}", maskPrincipal(token.getName()));

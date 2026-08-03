@@ -19,9 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.TermsAcceptanceGateFilter;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TermsStatusDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -95,13 +97,18 @@ public class TermsAcceptancePageController {
    * decides where to go next, so the browser makes one navigation instead of following a redirect
    * inside an XHR and rendering the start page into a fragment.
    *
+   * @param request the current request, whose session caches the gate verdict to be cleared
    * @return {@code 204} once consent is recorded, {@code 502} if the backend could not record it
    */
   @PostMapping("/terms/accept")
   @ResponseBody
-  public @NotNull ResponseEntity<Void> recordAcceptance() {
+  public @NotNull ResponseEntity<Void> recordAcceptance(@NotNull HttpServletRequest request) {
     try {
       backendApiClient.post(TERMS_ACCEPTANCE_URI, null, Void.class);
+      // Drop the gate's cached "not accepted" immediately rather than waiting for it to expire.
+      // Without this the very next request still reads the stale verdict, which both re-checks the
+      // gate and keeps BackendRoleSyncFilter skipping a sync that would now succeed.
+      TermsAcceptanceGateFilter.clearCachedVerdict(request);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
       // Logged at WARN, not DEBUG: unlike the status read this is the user actively trying to get

@@ -132,6 +132,49 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
   }
 
   /**
+   * Discards this session's cached verdict, so the next request re-reads it from the backend.
+   *
+   * <p>Called after consent is recorded. Without it the very next request still sees the stale "not
+   * accepted" — which re-checks the gate and keeps {@link BackendRoleSyncFilter} skipping a sync
+   * that would now succeed, for up to {@link #RECHECK_MILLIS}. The attribute names stay private to
+   * this filter; callers ask it to forget rather than reaching into its session keys.
+   *
+   * @param request the current request, whose session holds the cached verdict
+   */
+  public static void clearCachedVerdict(@NotNull HttpServletRequest request) {
+    HttpSession session = request.getSession(false);
+    if (session != null) {
+      session.removeAttribute(SESSION_ACCEPTED);
+      session.removeAttribute(SESSION_CHECKED_AT);
+    }
+  }
+
+  /**
+   * Whether this session is known to be missing consent, from the verdict this filter cached.
+   *
+   * <p>Exists so {@code BackendRoleSyncFilter} can skip a backend read that cannot succeed: it runs
+   * <em>before</em> this filter, and every one of its {@code /api/v1/users/me} calls is refused
+   * with {@code 403 TERMS_NOT_ACCEPTED} while the gate is closed. Its failure path deliberately
+   * leaves the sync stamp unset so the next request retries — which, after a wording change, is one
+   * futile round trip per non-static request for every member at once.
+   *
+   * <p>Conservative on purpose: only a cached, still-fresh {@code false} counts. An absent or
+   * expired entry answers {@code false} here, so the sync runs — this only ever skips work already
+   * known to be pointless, and never suppresses a sync on a guess.
+   *
+   * @param request the current request
+   * @return {@code true} when a fresh cached verdict says consent is missing
+   */
+  static boolean consentKnownMissing(@NotNull HttpServletRequest request) {
+    HttpSession session = request.getSession(false);
+    if (session == null || !Boolean.FALSE.equals(session.getAttribute(SESSION_ACCEPTED))) {
+      return false;
+    }
+    Object checkedAt = session.getAttribute(SESSION_CHECKED_AT);
+    return checkedAt instanceof Long millis && System.currentTimeMillis() - millis < RECHECK_MILLIS;
+  }
+
+  /**
    * Whether the {@code test} profile is active, in which case this filter stands down entirely.
    *
    * <p>Same carve-out and same reason as the backend boundary: MockMvc callers are synthetic

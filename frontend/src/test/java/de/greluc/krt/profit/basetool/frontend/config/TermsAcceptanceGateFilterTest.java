@@ -192,6 +192,51 @@ class TermsAcceptanceGateFilterTest {
         .isLessThan(java.time.Duration.ofHours(1).toMillis());
   }
 
+  /**
+   * A cached "not accepted" is visible to {@code BackendRoleSyncFilter}, which uses it to skip a
+   * {@code /api/v1/users/me} call the consent gate would refuse anyway — one futile round trip per
+   * non-static request, for everyone at once, right after a wording change.
+   */
+  @Test
+  void reportsAFreshNegativeVerdictSoTheRoleSyncCanSkipItsDoomedCall() throws Exception {
+    stubStatus(false);
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/missions");
+    request.setRequestURI("/missions");
+    request.setSession(new org.springframework.mock.web.MockHttpSession());
+
+    assertThat(TermsAcceptanceGateFilter.consentKnownMissing(request)).isFalse();
+    filter.doFilter(request, new MockHttpServletResponse(), filterChain);
+
+    assertThat(TermsAcceptanceGateFilter.consentKnownMissing(request)).isTrue();
+  }
+
+  /**
+   * Only a cached negative counts. An unknown verdict must report false so the sync still runs —
+   * this may skip work already known to be pointless, never work that might succeed.
+   */
+  @Test
+  void reportsNothingKnownForASessionThatWasNeverChecked() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/missions");
+    request.setSession(new org.springframework.mock.web.MockHttpSession());
+
+    assertThat(TermsAcceptanceGateFilter.consentKnownMissing(request)).isFalse();
+  }
+
+  /** Recording consent discards the verdict at once, rather than leaving it stale until it ages. */
+  @Test
+  void clearingTheVerdictMakesTheNextRequestReReadIt() throws Exception {
+    stubStatus(false);
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/missions");
+    request.setRequestURI("/missions");
+    request.setSession(new org.springframework.mock.web.MockHttpSession());
+    filter.doFilter(request, new MockHttpServletResponse(), filterChain);
+    assertThat(TermsAcceptanceGateFilter.consentKnownMissing(request)).isTrue();
+
+    TermsAcceptanceGateFilter.clearCachedVerdict(request);
+
+    assertThat(TermsAcceptanceGateFilter.consentKnownMissing(request)).isFalse();
+  }
+
   /** Stubs the backend consent status. */
   private void stubStatus(boolean accepted) {
     when(backendApiClient.get(any(String.class), eq(TermsStatusDto.class)))
