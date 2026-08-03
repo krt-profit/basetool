@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -35,6 +36,14 @@
  */
 
 /* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, MSG_SAVING, MSG_REFINERY_UPDATE_FAILED, MSG_REFINERY_STORE_FAILED, MSG_REFINERY_CANCEL_FAILED, MSG_CANCEL_CONFIRM, MSG_CANCEL_TITLE, MSG_CANCEL_DISMISS, STORE_INHERITED_ORG_UNIT_ID, STORE_ORG_UNIT_PLACEHOLDER, RATING_LEVELS, SPEED_LEVELS, showFrontendErrorToast */
+
+/**
+ * A form control of a material or store row. The renumbering passes read and
+ * rewrite `id`, `name` and `value`, none of which live on the bare `Element`
+ * that `querySelectorAll('input, select, textarea')` is typed to yield.
+ *
+ * @typedef {HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement} RodFormControl
+ */
 
 // Initialize the shared yield-badge module with the server-rendered map for this order's
 // refinery. Subsequent location/material changes update the badge via the module's helpers
@@ -81,8 +90,12 @@ function _submitRefinery(form, errorMessage, onFailure, submitter) {
 }
 
 function calcScu(index) {
-    const unitInput = document.getElementById('outputQuantity_' + index);
-    const scuInput = document.getElementById('outputQuantityScu_' + index);
+    const unitInput = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('outputQuantity_' + index)
+    );
+    const scuInput = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('outputQuantityScu_' + index)
+    );
     if (unitInput && scuInput) {
         let valStr = unitInput.value.replace(/\./g, '').replace(',', '.');
         const val = parseInt(valStr);
@@ -103,15 +116,18 @@ function closeStoreModal() {
     if (typeof window.resetUnsavedChanges === 'function') {
         window.resetUnsavedChanges();
     }
-    document.getElementById('storeModal').style.display = 'none';
+    const modal = document.getElementById('storeModal');
+    if (modal) modal.style.display = 'none';
 }
 
 function openStoreModal() {
-    document.getElementById('storeModal').style.display = 'flex';
+    const modal = document.getElementById('storeModal');
+    if (modal) modal.style.display = 'flex';
 }
 
 function duplicateStoreItem(btn) {
     const container = document.getElementById('storeItemsContainer');
+    if (!container) return;
     const blockToCopy = btn.closest('.store-item-block');
     const newBlock = blockToCopy.cloneNode(true);
 
@@ -148,14 +164,17 @@ function duplicateStoreItem(btn) {
     // still a plain select). Because the template no longer preloads the roster, the source's chosen
     // receiver is carried over by SEEDING one option (value + the visible committed label) so the
     // fresh combobox shows the same receiver instead of resetting to empty.
-    const tpl = document.getElementById('store-user-select-tpl');
+    const tpl = /** @type {HTMLTemplateElement | null} */ (
+        document.getElementById('store-user-select-tpl')
+    );
+    const tplSelect = tpl ? tpl.content.firstElementChild : null;
     const sourceUser = blockToCopy.querySelector('[id^="storeUser_"]');
     const sourceUserValue = sourceUser ? sourceUser.value : '';
     const sourceUserInput = blockToCopy.querySelector('.krt-combobox__input');
     const sourceUserLabel = sourceUserInput ? sourceUserInput.value : '';
     const clonedUser = newBlock.querySelector('[id^="storeUser_"]');
-    if (tpl && clonedUser) {
-        const freshUser = tpl.content.firstElementChild.cloneNode(true);
+    if (tplSelect && clonedUser) {
+        const freshUser = /** @type {HTMLSelectElement} */ (tplSelect.cloneNode(true));
         freshUser.id = `storeUser_${newIndex}`;
         freshUser.name = `items[${newIndex}].userId`;
         if (sourceUserValue) {
@@ -195,10 +214,14 @@ function duplicateStoreItem(btn) {
 
 function reindexStoreItems() {
     const container = document.getElementById('storeItemsContainer');
+    if (!container) return;
     const allBlocks = container.querySelectorAll('.store-item-block');
     allBlocks.forEach((block, index) => {
         const nameRegex = /items\[\d+\]/g;
-        block.querySelectorAll('input, select, textarea').forEach((el) => {
+        const controls = /** @type {NodeListOf<RodFormControl>} */ (
+            block.querySelectorAll('input, select, textarea')
+        );
+        controls.forEach((el) => {
             if (el.name) {
                 el.name = el.name.replace(nameRegex, `items[${index}]`);
             }
@@ -268,7 +291,7 @@ function rebuildOrgUnitOptions(selectEl, options) {
     if (!storeItemsContainer) return;
     storeItemsContainer.querySelectorAll('.store-item-block').forEach(syncStorePersonalJobOrder);
     storeItemsContainer.addEventListener('change', (e) => {
-        const sel = e.target;
+        const sel = /** @type {RodFormControl | null} */ (e.target);
         if (!sel || !sel.id) return;
         if (sel.id.startsWith('storePersonal_')) {
             syncStorePersonalJobOrder(sel.closest('.store-item-block'));
@@ -318,7 +341,9 @@ function updateOutputMaterial(selectElement) {
 document.addEventListener('DOMContentLoaded', function () {
     // Attribute-only selector: matches the raw <select> before enhancement and the hidden
     // <input> carrying the id after it (REQ-FE-016).
-    const inputSelects = document.querySelectorAll('[id^="inputMaterialId_"]');
+    const inputSelects = /** @type {NodeListOf<KrtRefineryControl>} */ (
+        document.querySelectorAll('[id^="inputMaterialId_"]')
+    );
     inputSelects.forEach((select) => {
         if (select.value) {
             updateOutputMaterial(select);
@@ -343,8 +368,12 @@ function setStartedAtNow() {
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
 
-    const dateInput = document.querySelector('.datetime-split-group .date-part');
-    const timeInput = document.querySelector('.datetime-split-group .time-part');
+    const dateInput = /** @type {HTMLInputElement | null} */ (
+        document.querySelector('.datetime-split-group .date-part')
+    );
+    const timeInput = /** @type {HTMLInputElement | null} */ (
+        document.querySelector('.datetime-split-group .time-part')
+    );
 
     if (dateInput && timeInput) {
         dateInput.value = `${year}-${month}-${day}`;
@@ -356,10 +385,11 @@ function setStartedAtNow() {
 
 function addMaterialRow() {
     const container = document.getElementById('materials-container');
+    if (!container) return;
     const entries = container.querySelectorAll('.material-entry');
     const count = entries.length;
 
-    const template = entries[0].cloneNode(true);
+    const template = /** @type {HTMLElement} */ (entries[0].cloneNode(true));
 
     // The input-material picker is an enhanced combobox (REQ-FE-016); its clone is dead
     // (listeners dropped, duplicated ARIA ids, no native <select> left to re-enhance).
@@ -368,8 +398,11 @@ function addMaterialRow() {
     // (renumbered by the loop below), and let krtEnhanceComboboxes upgrade it once the row
     // is inserted.
     const clonedPicker = template.querySelector('.krt-combobox');
-    if (clonedPicker) {
-        const hiddenField = clonedPicker.querySelector('input[type="hidden"]');
+    const pickerParent = clonedPicker ? clonedPicker.parentNode : null;
+    if (clonedPicker && pickerParent) {
+        const hiddenField = /** @type {HTMLInputElement | null} */ (
+            clonedPicker.querySelector('input[type="hidden"]')
+        );
         const freshSelect = document.createElement('select');
         if (hiddenField) {
             freshSelect.id = hiddenField.id;
@@ -378,12 +411,12 @@ function addMaterialRow() {
         freshSelect.required = true;
         freshSelect.setAttribute('data-trigger', 'rod-update-output');
         freshSelect.setAttribute('data-krt-combobox', 'remote-materials-raw');
-        clonedPicker.parentNode.replaceChild(freshSelect, clonedPicker);
+        pickerParent.replaceChild(freshSelect, clonedPicker);
         // The enhancer re-pointed row 0's label (for="krt-cb-N-input") and minted its id; the
         // clone carries both, which the /_\d+$/ renumbering below cannot fix — strip the id
         // (else every added row duplicates it) and re-bind the label to the rebuilt select's
         // field id so the renumber loop and the fresh enhancement pick it up cleanly.
-        const clonedLabel = freshSelect.parentNode.querySelector('label');
+        const clonedLabel = pickerParent.querySelector('label');
         if (clonedLabel) {
             clonedLabel.removeAttribute('id');
             if (hiddenField) {
@@ -421,7 +454,9 @@ function addMaterialRow() {
         }
     }
 
-    const inputs = template.querySelectorAll('input, select');
+    const inputs = /** @type {NodeListOf<RodFormControl>} */ (
+        template.querySelectorAll('input, select')
+    );
     inputs.forEach((input) => {
         if (input.id) {
             input.id = input.id.replace(/_\d+$/, '_' + count);
@@ -432,16 +467,18 @@ function addMaterialRow() {
         // The delegated rod-calc-scu handler reads data-index to know which row's
         // SCU field to update; without renumbering, calcScu() always targets row 0.
         if (input.hasAttribute('data-index')) {
-            input.setAttribute('data-index', count);
+            input.setAttribute('data-index', String(count));
         }
-        if (input.tagName.toLowerCase() === 'select') {
+        if (input instanceof HTMLSelectElement) {
             input.selectedIndex = 0;
         } else {
             input.value = '';
         }
     });
 
-    const displaySpan = template.querySelector('span[id^="outputMaterialDisplay_"]');
+    const displaySpan = /** @type {HTMLElement | null} */ (
+        template.querySelector('span[id^="outputMaterialDisplay_"]')
+    );
     if (displaySpan) {
         displaySpan.id = displaySpan.id.replace(/_\d+$/, '_' + count);
         displaySpan.innerText = '-';
@@ -478,9 +515,12 @@ function removeMaterialRow(button) {
     entry.remove();
 
     const container = document.getElementById('materials-container');
+    if (!container) return;
     const entries = container.querySelectorAll('.material-entry');
     entries.forEach((entry, index) => {
-        const inputs = entry.querySelectorAll('input, select');
+        const inputs = /** @type {NodeListOf<RodFormControl>} */ (
+            entry.querySelectorAll('input, select')
+        );
         inputs.forEach((input) => {
             if (input.id) {
                 input.id = input.id.replace(/_\d+$/, '_' + index);
@@ -489,7 +529,7 @@ function removeMaterialRow(button) {
                 input.name = input.name.replace(/\[\d+\]/, '[' + index + ']');
             }
             if (input.hasAttribute('data-index')) {
-                input.setAttribute('data-index', index);
+                input.setAttribute('data-index', String(index));
             }
         });
         const displaySpan = entry.querySelector('span[id^="outputMaterialDisplay_"]');
@@ -515,19 +555,30 @@ function removeMaterialRow(button) {
 }
 
 function updateMethodRatings() {
-    const methodSelect = document.getElementById('refiningMethodId');
+    const methodSelect = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('refiningMethodId')
+    );
     const ratingsDiv = document.getElementById('methodRatings');
     if (!methodSelect || !ratingsDiv) return;
 
+    const yieldVal = document.getElementById('ratingYieldVal');
+    const costVal = document.getElementById('ratingCostVal');
+    const speedVal = document.getElementById('ratingSpeedVal');
     const selectedOption = methodSelect.options[methodSelect.selectedIndex];
 
     if (selectedOption && selectedOption.value !== '') {
-        document.getElementById('ratingYieldVal').innerText =
-            RATING_LEVELS[selectedOption.getAttribute('data-yield')] || '-';
-        document.getElementById('ratingCostVal').innerText =
-            RATING_LEVELS[selectedOption.getAttribute('data-cost')] || '-';
-        document.getElementById('ratingSpeedVal').innerText =
-            SPEED_LEVELS[selectedOption.getAttribute('data-speed')] || '-';
+        if (yieldVal) {
+            yieldVal.innerText =
+                RATING_LEVELS[selectedOption.getAttribute('data-yield') || ''] || '-';
+        }
+        if (costVal) {
+            costVal.innerText =
+                RATING_LEVELS[selectedOption.getAttribute('data-cost') || ''] || '-';
+        }
+        if (speedVal) {
+            speedVal.innerText =
+                SPEED_LEVELS[selectedOption.getAttribute('data-speed') || ''] || '-';
+        }
         ratingsDiv.style.display = 'flex';
     } else {
         ratingsDiv.style.display = 'none';
@@ -535,10 +586,18 @@ function updateMethodRatings() {
 }
 
 function updateEndsAt() {
-    const startedAtInput = document.getElementById('startedAt');
-    const durationHoursInput = document.getElementById('durationHours');
-    const durationMinutesInput = document.getElementById('durationMinutes');
-    const endsAtDisplay = document.querySelector('#endsAtDisplay span');
+    const startedAtInput = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('startedAt')
+    );
+    const durationHoursInput = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('durationHours')
+    );
+    const durationMinutesInput = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('durationMinutes')
+    );
+    const endsAtDisplay = /** @type {HTMLElement | null} */ (
+        document.querySelector('#endsAtDisplay span')
+    );
 
     if (!startedAtInput || !durationHoursInput || !durationMinutesInput || !endsAtDisplay) return;
 
@@ -548,7 +607,7 @@ function updateEndsAt() {
 
     if (startedAt) {
         const startDate = new Date(startedAt);
-        if (!isNaN(startDate)) {
+        if (!isNaN(startDate.getTime())) {
             const totalMinutes = hours * 60 + minutes;
             const endDate = new Date(startDate.getTime() + totalMinutes * 60000);
 
@@ -591,14 +650,18 @@ document.addEventListener('DOMContentLoaded', function () {
  * Server bleibt Source of Truth; dies ist lediglich eine UI-Vorschau.
  */
 function updateProfitPreview() {
-    const expensesEl = document.getElementById('expenses');
-    const otherExpensesEl = document.getElementById('otherExpenses');
-    const oreSalesEl = document.getElementById('oreSales');
-    const preview = document.getElementById('profitPreview');
+    const expensesEl = /** @type {HTMLInputElement | null} */ (document.getElementById('expenses'));
+    const otherExpensesEl = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('otherExpenses')
+    );
+    const oreSalesEl = /** @type {HTMLInputElement | null} */ (document.getElementById('oreSales'));
+    const preview = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('profitPreview')
+    );
     if (!preview) return;
-    const expenses = parseFloat(expensesEl && expensesEl.value) || 0;
-    const otherExpenses = parseFloat(otherExpensesEl && otherExpensesEl.value) || 0;
-    const oreSales = parseFloat(oreSalesEl && oreSalesEl.value) || 0;
+    const expenses = parseFloat((expensesEl && expensesEl.value) || '') || 0;
+    const otherExpenses = parseFloat((otherExpensesEl && otherExpensesEl.value) || '') || 0;
+    const oreSales = parseFloat((oreSalesEl && oreSalesEl.value) || '') || 0;
     const profit = Math.round(oreSales - expenses - otherExpenses);
     preview.value = profit.toLocaleString();
     preview.classList.toggle('text-danger', profit < 0);
@@ -615,8 +678,9 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     // on `document` and `blur` does not bubble. The profit-preview re-runs after the
     // restore so the read-only Gewinn/Verlust field reflects the implicit 0 immediately.
     window.krtEvents.on('focusout', 'rod-update-profit', function (el) {
-        if (el.value.trim() === '') {
-            el.value = '0';
+        const field = /** @type {HTMLInputElement} */ (el);
+        if (field.value.trim() === '') {
+            field.value = '0';
             updateProfitPreview();
         }
     });
@@ -630,7 +694,9 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         updateOutputMaterial(el);
     });
     window.krtEvents.on('change', 'rod-location-change', function (el) {
-        window.krtRefineryYield.onLocationChange(el);
+        // The location picker is a combobox (REQ-FE-016): a <select> before enhancement, the
+        // hidden <input> carrying its id afterwards — onLocationChange only reads .value.
+        window.krtRefineryYield.onLocationChange(/** @type {KrtRefineryControl} */ (el));
     });
     window.krtEvents.on('input', 'rod-calc-scu', function (el) {
         calcScu(el.getAttribute('data-index'));
@@ -643,7 +709,9 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('submit', 'rod-disable-submit', function (el) {
         // Disable the submit button + relabel it so a double-click does not file the form twice
         // (the old inline onsubmit handler did the same thing).
-        const btn = el.querySelector('button[type=submit]');
+        const btn = /** @type {HTMLButtonElement | null} */ (
+            el.querySelector('button[type=submit]')
+        );
         if (btn) {
             btn.disabled = true;
             // Relabel only the text <span> so the leading <svg> save icon survives;
@@ -675,7 +743,9 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             e.preventDefault();
             // rod-disable-submit (document-delegated) disables + relabels the button after this
             // handler; capture the original label now so a failed store can restore it (no reload).
-            const btn = storeForm.querySelector('button[type=submit]');
+            const btn = /** @type {HTMLButtonElement | null} */ (
+                storeForm.querySelector('button[type=submit]')
+            );
             const btnLabel = btn ? btn.querySelector('span') : null;
             const originalLabel = btnLabel ? btnLabel.textContent : null;
             _submitRefinery(storeForm, MSG_REFINERY_STORE_FAILED, function () {
