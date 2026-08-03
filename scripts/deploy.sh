@@ -120,6 +120,27 @@ LOCKFILE="${IRI_LOCKFILE:-/var/lock/iri-deploy.lock}"
 TOKEN_FILE="${IRI_GHCR_TOKEN_FILE:-/etc/iri/ghcr-pull-token}"
 HEALTH_TIMEOUT="${IRI_HEALTH_TIMEOUT:-180}"
 
+# IRI_MONITORING_ENABLED gates reconcile_monitoring_reloads. It is read from the compose `.env` when
+# the environment does not already carry it — because that is where an operator naturally puts it,
+# next to every other IRI_* setting, and where putting it has NO effect otherwise: this script runs
+# from `iri-deploy.service`, which deliberately declares no `EnvironmentFile=`, so a value set in
+# `.env` is invisible to it. That mismatch produced a silent, expensive failure twice: the flag
+# reads `true` on disk, the deploy logs "IRI_MONITORING_ENABLED != 'true'" every tick, and monitoring
+# config changes are rsynced to disk but never reloaded into the running Prometheus — so fixed alert
+# rules keep firing their old version (2026-07-13, and again 2026-08-03).
+#
+# An explicit environment value still wins, so a systemd `Environment=` drop-in keeps working and
+# overrides the file. Only THIS key is read: sourcing `.env` would pull every production secret into
+# this process's environment for no reason. The value is stripped of quotes and whitespace so
+# `IRI_MONITORING_ENABLED="true"` behaves like the bare form.
+if [[ -z "${IRI_MONITORING_ENABLED:-}" && -r "${COMPOSE_DIR}/.env" ]]; then
+  IRI_MONITORING_ENABLED="$(
+    sed -n 's/^[[:space:]]*IRI_MONITORING_ENABLED[[:space:]]*=[[:space:]]*//p' "${COMPOSE_DIR}/.env" |
+      tail -n 1 | tr -d '"'\''[:space:]'
+  )"
+  export IRI_MONITORING_ENABLED
+fi
+
 REGISTRY="${IRI_REGISTRY:-ghcr.io}"
 NAMESPACE="${IRI_IMAGE_NAMESPACE:-krt-profit}"
 GHCR_USERNAME="${IRI_GHCR_USERNAME:-deploy-bot}"

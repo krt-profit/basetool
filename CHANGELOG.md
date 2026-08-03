@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Deployment: `IRI_MONITORING_ENABLED` wirkt jetzt auch, wenn es in der `.env` steht.** Der Deploy-Dienst liest diese Datei nicht ein, meldete deshalb bei jedem Lauf `IRI_MONITORING_ENABLED != 'true'` und spielte geänderte Monitoring-Konfiguration zwar auf die Platte, lud sie aber nie in das laufende Prometheus — korrigierte Alarmregeln feuerten dadurch weiter in ihrer alten Fassung. Ein explizit gesetzter Wert hat weiterhin Vorrang, und es wird ausschließlich dieser eine Schlüssel gelesen.
+
 ## [v1.5.32](https://github.com/krt-profit/basetool/releases/tag/v1.5.32) - 2026-08-03
 
 ## [v1.5.31](https://github.com/krt-profit/basetool/releases/tag/v1.5.31) - 2026-08-03
