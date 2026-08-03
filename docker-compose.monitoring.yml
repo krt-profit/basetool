@@ -103,7 +103,7 @@ services:
   prometheus:
     <<: *mon-base
     container_name: prometheus
-    image: prom/prometheus:v3.13.1
+    image: prom/prometheus:v3.13.2
     cap_drop: [ALL]
     # GOMEMLIMIT (Go soft memory limit): as the Go heap nears this, the runtime GC gets aggressive
     # to stay under it, so a WAL-replay / peak spike trades CPU for memory instead of hitting the
