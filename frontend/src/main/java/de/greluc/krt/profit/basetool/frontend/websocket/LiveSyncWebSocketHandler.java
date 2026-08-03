@@ -351,8 +351,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
 
   /**
    * Builds the handler. Binds the {@code basetool_presence_ws_sessions} gauge (live sockets summed
-   * across all rooms) and one {@code basetool_livesync_subscriptions{topic_class}} gauge per topic
-   * class; the reaper starts ticking immediately.
+   * across all rooms) and, per topic class, one {@code
+   * basetool_livesync_subscriptions{topic_class}} gauge (sockets in that class) plus one {@code
+   * basetool_livesync_peer_rooms{topic_class}} gauge (rooms of that class holding two or more
+   * sockets); the reaper starts ticking immediately.
    *
    * @param presenceService in-memory editor-presence store
    * @param fanout cross-replica fan-out seam (no-op when single-instance)
@@ -423,6 +425,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
           .tag(MetricNames.TAG_TOPIC_CLASS, topicClass.metricLabel())
           .description("Live live-sync subscriptions for this topic class.")
           .register(meterRegistry);
+      Gauge.builder(MetricNames.LIVESYNC_PEER_ROOMS, this, h -> h.peerRoomCount(topicClass))
+          .tag(MetricNames.TAG_TOPIC_CLASS, topicClass.metricLabel())
+          .description("Live rooms of this topic class holding two or more subscribers.")
+          .register(meterRegistry);
     }
     this.reaper =
         Executors.newSingleThreadScheduledExecutor(
@@ -459,6 +465,30 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       }
     }
     return total;
+  }
+
+  /**
+   * Counts the rooms of a given topic class that currently hold two or more sockets (backs the
+   * per-class {@code basetool_livesync_peer_rooms} gauge, #1238).
+   *
+   * <p>Deliberately distinct from {@link #subscriptionCount(LiveSyncTopicClass)}: that sums sockets
+   * across the class, which cannot tell two peers sharing one room (peer-sync live, a {@code
+   * changed} relay is possible) from two separate single-viewer rooms (peer-sync inert, {@link
+   * #relayLocal} skips the origin so nothing can ever be relayed). Only this count makes a {@code
+   * changed}-frame flatline interpretable.
+   *
+   * @param topicClass the class to count
+   * @return the number of rooms of that class with at least two live sockets
+   */
+  private int peerRoomCount(@NotNull LiveSyncTopicClass topicClass) {
+    int rooms = 0;
+    for (Map.Entry<String, Set<WebSocketSession>> room : sessionsByTopic.entrySet()) {
+      LiveSyncTopic topic = LiveSyncTopic.parse(room.getKey());
+      if (topic != null && topic.topicClass() == topicClass && room.getValue().size() >= 2) {
+        rooms++;
+      }
+    }
+    return rooms;
   }
 
   /**

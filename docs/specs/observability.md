@@ -1014,11 +1014,44 @@ symptom of a section-key skew is one panel going stale while the rest of the pag
 which an all-rejected-only counter would never see. The rejected key is client-supplied and therefore
 never becomes a tag value; it appears once, sanitised, in the `DEBUG` line (REQ-OBS-001) —
 the component that shipped the REQ-FE-010 staleness defect. Since #1102 (REQ-FE-015 / ADR-0094) both
-counters carry a bounded `topic_class` label (one of the eight `LiveSyncTopicClass` labels: `mission`,
-`operation`, `order_detail`, `orders_queue`, `bank_account`, `bank_staff`, `orgunit_bank`, `materialboard`), and
-the meter names stay put — a rename would break the `07` panels and this alert set. A `changed`-frame
-flatline (overall on panel 28, or per surface on the `topic_class` breakdown) while `snapshot` frames
-keep flowing is the early indicator for that defect class (panels only, baselined before alerting).
+counters carry a bounded `topic_class` label (one of the nine `LiveSyncTopicClass` labels: `mission`,
+`operation`, `order_detail`, `orders_queue`, `bank_account`, `bank_staff`, `orgunit_bank`,
+`materialboard`, `inventory_all`), and
+the meter names stay put — a rename would break the `07` panels and this alert set.
+
+Both drop signals are **alerted** since #1238, on a threshold measured rather than guessed: read on
+2026-08-03 over the preceding 21 days, `basetool_presence_relay_dropped_total` had **no series at
+all** in production — Micrometer creates a counter lazily on first increment, so an empty vector
+means no drop branch has ever been taken, on any topic class. Against that zero,
+`LiveSyncRelayDropsSustained` warns on >3 drops/h per (`topic_class`, `reason`) sustained 15m, which
+still tolerates the one benign drop class (a `send_failed` race when a socket closes between the
+`isOpen()` pre-check and the write). `section_filtered` is excluded from it and carries its own
+`LiveSyncSectionKeySkew` rule instead — it is a deterministic *code* skew rather than a capacity
+signal, so it triggers on **persistence** (`increase[1h] > 0` held for 2h) at a volume far below the
+capacity threshold. Known gap: on a barely-used surface (`bank_account` relayed 2 frames in those
+21 days) a real skew may never sustain 2h, and panel 29 remains the backstop there.
+
+The `changed`-frame **flatline** alert proposed alongside them in #1238 was evaluated and
+**rejected as unsound**; the signal stays panel-only. Two structural reasons, both verified in code
+and confirmed by the same baseline read: `relayLocal` skips the originating session, so a room with
+a single viewer relays **zero** `changed` frames however hard that viewer edits — a flatline is the
+normal state of an unoccupied surface, not a defect — and the guard the issue assumed ("while
+`snapshot` frames keep flowing") exists **only** for `topic_class="mission"`, because every snapshot
+path is gated on `presenceEnabled()`, true for `MISSION` alone. Measured peak *concurrent*
+subscriptions per class over that window were `mission` 15, `bank_staff` 6, `order_detail` 4,
+`inventory_all`/`materialboard`/`orders_queue`/`orgunit_bank` 3, `bank_account` 2 and `operation`
+**1** — co-presence never once occurred on `operation`. A flatline rule would therefore be silent
+where it could fire and false where it could not. `LiveSyncSectionKeySkew` detects the same
+REQ-FE-010 defect class **positively**, with no occupancy assumption at all.
+
+What a future flatline rule would need is co-presence, which `basetool_livesync_subscriptions`
+cannot express (it sums sockets across a class, so two lone viewers in separate rooms read
+identically to two peers in one). #1238 therefore adds the gauge
+`basetool_livesync_peer_rooms{topic_class}` — live rooms of that class holding **two or more**
+subscribers, the honest denominator for panel 39 (`07` panel 47). It is panel-only until it has its
+own production baseline, and on the measured co-presence rates only `mission` looks likely to ever
+carry enough traffic to support such a rule.
+
 The tool-wide live-sync relay adds five more meters: `basetool_livesync_subscriptions{topic_class}`
 (open `/ws/sync` subscriptions per topic class — the live per-surface load denominator),
 `basetool_livesync_subscribe_total{topic_class,outcome,reason}` (`outcome` = `allowed` / `denied`,
