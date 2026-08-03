@@ -71,6 +71,27 @@ public final class E2eStackExtension implements BeforeAllCallback {
   /** Local image tag the compose build override tags the freshly built images with. */
   private static final String IMAGE_TAG = "e2e-local";
 
+  /**
+   * The JWT {@code aud} value the E2E stack's backend enforces (audit L-1, REQ-SEC-024). Fed to the
+   * compose stack as {@code IRI_BACKEND_EXPECTED_AUDIENCES}, which the {@code x-backend} anchor
+   * maps onto {@code APP_SECURITY_JWT_EXPECTED_AUDIENCES} → {@code
+   * app.security.jwt.expected-audiences}.
+   *
+   * <p>Enforcement is ON here on purpose: the knob stays empty (off) in the deployed prod {@code
+   * .env} until an operator flips it, so without this the enforced code path — the custom {@code
+   * resourceServerJwtDecoder} and its {@code aud} validator — would never run against a real
+   * Keycloak token anywhere, and the first execution ever would be in production, where a missing
+   * audience rejects every token and takes the whole app down. Running the whole suite against it
+   * turns that one-way prod change into a rehearsed one.
+   *
+   * <p>The value MUST match the {@code aud-basetool-backend} audience mapper on the {@code
+   * basetool-frontend} client in {@code realm-export.e2e.json} — every E2E token, browser-flow and
+   * {@link BackendSeeder} ROPC alike, is minted by that client. {@code
+   * E2eAudienceEnforcementParityTest} pins the two together so a realm edit that drops the mapper
+   * fails with that message instead of a 401 on every test.
+   */
+  static final String EXPECTED_AUDIENCE = "basetool-backend";
+
   /** Canonical IRIDIUM Squadron id, opted into Job-Order processing during bootstrap. */
   private static final String IRIDIUM_SQUADRON_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -561,6 +582,9 @@ public final class E2eStackExtension implements BeforeAllCallback {
     env.put("SERVER_SSL_KEY_STORE_PASSWORD", KEYSTORE_PW);
     env.put("IRI_KEYSTORE_HOST_PATH", "./keystore.p12");
     env.put("IRI_BASETOOL_VERSION", IMAGE_TAG);
+    // Audit L-1 / REQ-SEC-024: exercise the enforced `aud` path. See EXPECTED_AUDIENCE — the
+    // e2e realm stamps this audience, so turning the knob on here rehearses the prod flip.
+    env.put("IRI_BACKEND_EXPECTED_AUDIENCES", EXPECTED_AUDIENCE);
     return env;
   }
 

@@ -132,11 +132,13 @@ app:
       jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
       # Audit L-1 / security review: enforce the JWT `aud` claim so the backend accepts only tokens
       # minted for it (aud=basetool-backend), not any validly-signed token from the realm. The value
-      # comes from the compose env (IRI_BACKEND_EXPECTED_AUDIENCES), EMPTY by default so dev / e2e
-      # stay off (their realms don't stamp the audience). Enable it in the prod .env ONLY after
-      # confirming every token the backend receives carries aud=basetool-backend — the realm's
-      # `extractor-ingest` client scope (a DEFAULT scope on the basetool-frontend client,
-      # realm-config.reference.json) stamps it. A premature/wrong value rejects every token.
+      # comes from the compose env (IRI_BACKEND_EXPECTED_AUDIENCES), EMPTY by default so a stack
+      # whose realm does not stamp the audience stays off. The E2E stack runs it ENFORCED (its realm
+      # stamps aud=basetool-backend), so this path is rehearsed on every e2e-labelled PR rather than
+      # first executing in prod. Enable it in the prod .env ONLY after confirming every token the
+      # DEPLOYED realm mints carries aud=basetool-backend — the realm's `extractor-ingest` client
+      # scope (a DEFAULT scope on the basetool-frontend client, realm-config.reference.json) stamps
+      # it. A premature/wrong value rejects every token.
       expected-audiences: ${APP_SECURITY_JWT_EXPECTED_AUDIENCES:}
 
 # SC Wiki catalogue sync. The per-sync feature flags default to false in code

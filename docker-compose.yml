@@ -380,9 +380,12 @@ x-backend: &backend-template
     SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
     KEYCLOAK_ISSUER_URI: https://keycloak.profit-base.online/realms/iri
-    # JWT audience enforcement (security review, audit L-1). Empty by default so dev / e2e stay off
-    # (those realms do not stamp aud). Set IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend in the prod
-    # .env — together with IRI_INGEST_EXPECTED_AUDIENCES — ONLY after confirming the realm stamps
+    # JWT audience enforcement (security review, audit L-1). Empty by default, so a stack whose realm
+    # does not stamp aud — a hand-rolled local test realm — stays off. The E2E suite is the exception
+    # and runs ENFORCED: its realm stamps aud=basetool-backend and E2eStackExtension sets this var,
+    # so the enforced code path is exercised on every e2e-labelled PR. Set
+    # IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend in the prod .env — together with
+    # IRI_INGEST_EXPECTED_AUDIENCES — ONLY after confirming the DEPLOYED realm stamps
     # aud=basetool-backend on frontend tokens (the `extractor-ingest` default client scope does).
     # Enabling it before that rejects every token and breaks the app; set the var back to empty to
     # disable instantly.
@@ -699,7 +702,9 @@ x-ingest: &ingest-template
     REDIS_HOST: redis
     REDIS_PORT: 6379
     REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
-    # JWT audience enforcement (security review). Empty by default so dev / e2e stay off. Enforce in
+    # JWT audience enforcement (security review). Empty by default. Unlike the backend, the gateway
+    # is NOT part of the E2E stack (E2eStackExtension brings up no ingest service), so its enforced
+    # path has unit coverage only — SecurityConfigTest — and no end-to-end rehearsal. Enforce in
     # prod by setting IRI_INGEST_EXPECTED_AUDIENCES=basetool-backend — together with the backend's
     # IRI_BACKEND_EXPECTED_AUDIENCES — ONLY after the realm stamps aud=basetool-backend on both the
     # extractor and frontend tokens (#641, docs/INGEST_KEYCLOAK_SETUP.md); enabling it earlier rejects
