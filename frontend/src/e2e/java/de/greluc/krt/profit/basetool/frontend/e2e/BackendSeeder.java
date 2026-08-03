@@ -86,6 +86,13 @@ public final class BackendSeeder {
    */
   private static final int MAX_VERSION_RETRIES = 4;
 
+  /**
+   * Users whose Terms-of-Use consent this run has already recorded. {@link #passwordGrant} runs on
+   * every seeder entry point, so without this the acceptance call would repeat ~30 times per run.
+   */
+  private final java.util.Set<String> termsAcceptedUsers =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
+
   private final HttpClient http;
 
   /** Builds a seeder whose HTTP client trusts the backend's self-signed dev certificate. */
@@ -2570,10 +2577,51 @@ public final class BackendSeeder {
       throw new IllegalStateException(
           "Keycloak password grant failed: HTTP " + response.statusCode() + " " + response.body());
     }
-    return JsonParser.parseString(response.body())
-        .getAsJsonObject()
-        .get("access_token")
-        .getAsString();
+    String token =
+        JsonParser.parseString(response.body()).getAsJsonObject().get("access_token").getAsString();
+    ensureTermsAccepted(username, token);
+    return token;
+  }
+
+  /**
+   * Records the seeded user's consent to the Terms of Use, so its API calls are not refused with
+   * {@code 403 TERMS_NOT_ACCEPTED} (REQ-SEC-028).
+   *
+   * <p>The E2E stack runs the {@code dev} profile, not {@code test}, so the consent gate is armed
+   * here — and this seeder is an API client, not a browser, so unlike {@code
+   * E2eSupport#acceptTermsIfPrompted} it can never click through a page. Without this every seeded
+   * fixture fails with a 403 before a single browser has opened.
+   *
+   * <p>Deliberately the real {@code POST /api/v1/terms/acceptance} rather than an inserted row or a
+   * profile carve-out: the seeder is acting as that user, and a user genuinely has to have
+   * accepted. Recording it through the endpoint the application uses keeps the seeder honest and
+   * keeps the gate itself exercised by the suite.
+   *
+   * <p>Done once per user per run — the call is idempotent server-side, but {@link #passwordGrant}
+   * runs on every seeder entry point, so caching it avoids ~30 redundant round trips.
+   *
+   * @param username the user the token belongs to, used as the cache key
+   * @param token that user's bearer token
+   * @throws Exception on transport failure
+   */
+  private void ensureTermsAccepted(String username, String token) throws Exception {
+    if (!termsAcceptedUsers.add(username)) {
+      return;
+    }
+    HttpRequest request =
+        HttpRequest.newBuilder(URI.create(BACKEND_BASE_URL + "/api/v1/terms/acceptance"))
+            .header("Authorization", "Bearer " + token)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.noBody())
+            .build();
+    int status = http.send(request, BodyHandlers.ofString()).statusCode();
+    if (status < 200 || status >= 300) {
+      // Do not fail here: leave the failure to the seeding call that actually needed consent, whose
+      // message names the fixture. Re-arm the cache so a transient blip is retried on the next
+      // grant rather than silently sticking for the whole run.
+      termsAcceptedUsers.remove(username);
+      System.out.printf("[E2E][seeder] terms acceptance returned HTTP %d%n", status);
+    }
   }
 
   /**
