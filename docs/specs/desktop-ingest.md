@@ -324,6 +324,11 @@ precede turning the check on, in that order.
 - [x] No new role/authority appears in `ROLES_AND_PERMISSIONS.md` for ingest.
 - [x] Enabling `app.security.jwt.expected-audiences` is gated on both clients already
   emitting `aud=basetool-backend` (documented runbook step, #641).
+- [x] The sequencing is rehearsed rather than first attempted in prod: the E2E realm stamps
+  `aud=basetool-backend` on its frontend client and the E2E backend runs with the check ON, so
+  "mapper present → tokens accepted" is proven on every e2e-labelled PR (#1247). This covers the
+  backend half only — the gateway is not in the E2E stack, and the deployed realm's mappers still
+  have to be confirmed on the host before the prod flip.
 
 **Enforced by:** `SecurityConfigTest` (the audience validator), `ArchitectureTest` (every surface is
 authorization-annotated; the gateway adds no new authority) · **Code:** ingest `SecurityConfig`, the

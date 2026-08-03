@@ -119,7 +119,9 @@ app:
   security:
     jwt:
       # Opt-in audience check. Empty by default; set to `basetool-backend` ONLY after both the
-      # extractor and frontend tokens carry that audience (docs/INGEST_KEYCLOAK_SETUP.md).
+      # extractor and frontend tokens carry that audience (docs/INGEST_KEYCLOAK_SETUP.md). The
+      # gateway is not part of the E2E stack, so unlike the backend this path has no end-to-end
+      # rehearsal — SecurityConfigTest is its only coverage.
       expected-audiences: ${APP_SECURITY_JWT_EXPECTED_AUDIENCES:}
   monitoring:
     scrape:
