@@ -50,6 +50,10 @@ Mining_Hub_V0.3.0.py
 !.env.example
 /frontend/logs/
 /backend/logs/
+# The ingest module was missing here while its siblings were covered. `*.log` above does not
+# match logback's rotated `*.log.gz`, so a local test run left compressed logs staged as
+# untracked files ready to be committed by a `git add .`.
+/ingest/logs/
 /ToDo.md
 /.claude/worktrees/
 /input/

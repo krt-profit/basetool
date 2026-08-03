@@ -1146,6 +1146,21 @@ has its own `IngestStagingUnavailable` alert — REQ-INGEST-003), and
 with the backend counter, the `application` common tag separating the modules) — paired since #1041
 item 19 with `basetool_ratelimit_requests_total{bucket}` on the per-IP filter and the per-subject
 limiter, feeding the same `RateLimitRejectionRatioHigh` ratio alert.
+`basetool_ingest_client_total{client_id}` and `basetool_ingest_client_rejected_total{reason}`
+(REQ-INGEST-011) cover the client-identity gate: the first answers "which software is actually
+driving the gateway", which no other signal carried — the handoff counter is tagged by draft kind and
+the access log by path, so a second producer appearing alongside the extractor used to be invisible.
+The `client_id` value is bounded **by construction**: it is the matched allowlist entry or the literal
+`other`, never the raw `azp`, because deriving a label from a token claim is the shape of an
+unbounded-cardinality bug (REQ-OBS-011). The reject counter's `reason` (`unknown_client` /
+`missing_azp` / `missing_scope` / `bad_provenance` / `dpop_required`) is kept as a label because it
+splits into two operationally **opposite** causes: `unknown_client` / `bad_provenance` mean a foreign
+tool is calling the restricted interface, while `missing_azp` / `missing_scope` mean a Keycloak mapper
+or scope assignment regressed and the legitimate extractor is being locked out. It is also bumped
+while `app.ingest.client-identity.audit-only` is set — counting what the gate *would* have rejected is
+precisely how the operator measures the blast radius before enforcing — and it backs the
+`IngestUnknownClient` alert, deliberately not baseline-tuned away: reaching that counter required a
+valid realm token, so it cannot be produced by an anonymous scanner and a single occurrence is signal.
 `basetool_ingest_payload_rejected_total` (untagged, `PayloadSizeLimitFilter`) counts each
 oversized-body 413 the INGEST-DOS-1 guard refuses — previously silent (no log, no metric) unlike the
 sibling bot / rate-limit filters — and backs `IngestPayloadRejectedSpike` (logging audit). Its

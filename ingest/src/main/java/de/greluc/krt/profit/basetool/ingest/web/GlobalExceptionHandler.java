@@ -163,6 +163,34 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /**
+   * The caller's client software is not approved for the ingest path (REQ-INGEST-011) — the
+   * payload-level provenance reject raised by {@code ProvenanceGuard}. Answered {@code 403} with
+   * the same {@code CLIENT_NOT_ALLOWED} code the token-level gate writes from {@code
+   * ClientIdentityFilter}, so a client sees one coherent answer regardless of which half refused
+   * it.
+   *
+   * <p>No log line is emitted here: the guard already logged the reject at {@code WARN} with the
+   * declared provenance, which is the whole diagnostic value, and REQ-OBS-001 allows exactly one
+   * line per failure. The {@code basetool_ingest_client_rejected_total} counter is likewise the
+   * guard's; this adds only the shared {@code basetool_http_error_total} tally so the 403 shows up
+   * alongside every other error code on the dashboard.
+   *
+   * @param ex the provenance rejection, carrying the detail sent to the caller
+   * @return a 403 problem naming the approved-clients-only rule
+   */
+  @ExceptionHandler(ClientNotAllowedException.class)
+  public @NotNull ProblemDetail handleClientNotAllowed(@NotNull ClientNotAllowedException ex) {
+    meterRegistry
+        .counter(MetricNames.HTTP_ERROR, MetricNames.TAG_CODE, MetricNames.CODE_CLIENT_NOT_ALLOWED)
+        .increment();
+    return problem(
+        HttpStatus.FORBIDDEN,
+        "Client not allowed",
+        MetricNames.CODE_CLIENT_NOT_ALLOWED,
+        ex.getMessage());
+  }
+
+  /**
    * The backend returned an error status. A 4xx keeps the backend status and relays only the
    * backend problem's sanitised {@code detail} (see {@link #backendDetail}, which
    * content-type-checks and caps it — never the raw body); a 5xx is collapsed to 502 so the gateway

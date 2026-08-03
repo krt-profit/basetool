@@ -705,6 +705,28 @@ x-ingest: &ingest-template
     # extractor and frontend tokens (#641, docs/INGEST_KEYCLOAK_SETUP.md); enabling it earlier rejects
     # every token and breaks the app. Unset the var to disable instantly.
     APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${IRI_INGEST_EXPECTED_AUDIENCES:-}
+    # Client-identity gate (REQ-INGEST-011): WHICH CLIENT SOFTWARE may drive the gateway. The user
+    # gate is unchanged — every member may ingest. THE INGEST INTERFACE IS RESTRICTED TO CLIENTS
+    # APPROVED BY THE BASETOOL DEVELOPER (@greluc): approval = a Keycloak client registration AND an
+    # entry in the allowlist below, two independent gates. Removing the allowlist entry revokes a
+    # client within one access-token lifespan, without a Keycloak change or a release.
+    #
+    # Everything defaults EMPTY, which makes each check INERT, so dev / e2e / an un-provisioned prod
+    # stay unaffected. The Keycloak-side scopes and mappers are an operator step that cannot ship in
+    # a PR (docs/INGEST_KEYCLOAK_SETUP.md step 7), so shipping these pre-enabled would reject every
+    # real extractor token on deploy. Roll out with IRI_INGEST_CLIENT_AUDIT_ONLY=true, watch
+    # basetool_ingest_client_rejected_total stay at zero, then enforce.
+    APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS: ${IRI_INGEST_ALLOWED_CLIENT_IDS:-}
+    # Must name a scope ONLY the extractor carries AND one that is emitted into the `scope` claim.
+    # The shipped `extractor-ingest` scope fails both (it is a default scope on basetool-frontend too
+    # AND carries include.in.token.scope=false), so setting it here would reject every caller
+    # including the real extractor — use `extractor-ingest-only` (runbook step 7a).
+    APP_INGEST_CLIENT_IDENTITY_REQUIRED_SCOPE: ${IRI_INGEST_REQUIRED_SCOPE:-}
+    APP_INGEST_CLIENT_IDENTITY_ALLOWED_TOOLS: ${IRI_INGEST_ALLOWED_TOOLS:-}
+    APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY: ${IRI_INGEST_CLIENT_AUDIT_ONLY:-false}
+    # MUST stay false until the desktop extractor sends DPoP proofs — it sends Authorization: Bearer
+    # today, so enabling this breaks every send on deploy (REQ-INGEST-012).
+    APP_INGEST_CLIENT_IDENTITY_DPOP_REQUIRED: ${IRI_INGEST_DPOP_REQUIRED:-false}
     # Monitoring plane (epic #936, REQ-OBS-005/-009) — see the backend template for the full
     # rationale. Everything defaults OFF/empty so dev/test/e2e stay inert; the prod .env supplies the
     # real scrape credentials and enables tracing. Only the prod service joins net-monitoring-scrape.

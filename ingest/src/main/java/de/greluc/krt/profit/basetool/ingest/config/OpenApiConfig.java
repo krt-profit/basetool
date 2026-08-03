@@ -61,7 +61,17 @@ public class OpenApiConfig {
                         + " Keycloak JWT, relays the payload to the backend's import endpoints with"
                         + " that same bearer, stages the returned draft in Redis for a single-use"
                         + " browser pickup, and returns the handoff the desktop extractor opens."
-                        + " Nothing is interpreted or persisted here."))
+                        + " Nothing is interpreted or persisted here.\n\n"
+                        + "## Restricted interface — approved clients only\n\n"
+                        + "This document is published so that the official basetool SC extractor"
+                        + " can be developed against a stable contract. It is NOT an open"
+                        + " integration API. **Only client software explicitly approved by the"
+                        + " basetool developer (@greluc) may use this interface.** Approval means"
+                        + " a dedicated Keycloak client registration AND an entry on the gateway's"
+                        + " client allowlist; unapproved callers are rejected with"
+                        + " `403 CLIENT_NOT_ALLOWED`, are unsupported, and may break without"
+                        + " notice. Building or distributing an unapproved client is not"
+                        + " permitted — if you want to integrate, ask first."))
         .addSecurityItem(new SecurityRequirement().addList("bearer-jwt"))
         .components(
             new Components()

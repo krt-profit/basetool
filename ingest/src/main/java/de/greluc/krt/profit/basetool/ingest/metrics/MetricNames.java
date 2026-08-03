@@ -144,6 +144,85 @@ public final class MetricNames {
   /** Bot-block rule: a never-served file extension (answered 404). */
   public static final String BOT_RULE_FILE_EXTENSION = "file_extension";
 
+  /**
+   * Counter {@code basetool_ingest_client_total} — tag {@code client_id}. Bumped once per accepted
+   * ingest call with the calling client's {@code azp} (REQ-INGEST-011, REQ-OBS-011). Answers "which
+   * software is actually driving the gateway", which no other signal carries: the handoff counter
+   * is tagged by draft kind and the access log by path, so a second producer appearing alongside
+   * the extractor was previously invisible.
+   *
+   * <p>The tag value is bounded by construction — it is the matched entry of the configured
+   * allowlist, or the literal {@link #CLIENT_ID_OTHER} for anything else. The raw {@code azp} is
+   * never used as a label: even though Keycloak only ever stamps a registered client id, deriving a
+   * label from a token claim is the shape of an unbounded-cardinality bug and is exactly what
+   * REQ-OBS-011 forbids.
+   */
+  public static final String INGEST_CLIENT = "basetool.ingest.client";
+
+  /**
+   * Counter {@code basetool_ingest_client_rejected_total} — tag {@code reason}. Bumped whenever the
+   * client-identity gate refuses a caller, and — importantly — also when it <em>would have</em>
+   * refused one while {@code app.ingest.client-identity.audit-only} is set. That is what makes the
+   * audit-only rollout usable: the operator configures the gates, watches this counter stay at zero
+   * for a scrape interval, and only then enforces (REQ-INGEST-011).
+   *
+   * <p>It is also the alerting hook: a non-zero rate means either a foreign client is probing the
+   * ingress or a legitimate one drifted out of the allowlist. Both need a human, which is why
+   * {@code IngestUnknownClient} fires on it rather than leaving it to a dashboard nobody watches.
+   */
+  public static final String INGEST_CLIENT_REJECTED = "basetool.ingest.client.rejected";
+
+  /** Tag key: the calling client's Keycloak client id, bounded by the configured allowlist. */
+  public static final String TAG_CLIENT_ID = "client_id";
+
+  /**
+   * Bounded {@code client_id} tag value for a caller whose {@code azp} is not on the allowlist (or
+   * absent). Keeps the label set finite while still separating "the known extractor" from
+   * "something else"; the {@code reason} on {@link #INGEST_CLIENT_REJECTED} says which of the two
+   * it was.
+   */
+  public static final String CLIENT_ID_OTHER = "other";
+
+  /** Client-identity reject reason: the token's {@code azp} is not on the configured allowlist. */
+  public static final String REASON_UNKNOWN_CLIENT = "unknown_client";
+
+  /**
+   * Client-identity reject reason: the token carries no {@code azp} claim at all while the
+   * allowlist is configured. Separated from {@link #REASON_UNKNOWN_CLIENT} because it points at a
+   * Keycloak mapper/realm change rather than at a foreign caller — same rejection, entirely
+   * different fix.
+   */
+  public static final String REASON_MISSING_AZP = "missing_azp";
+
+  /** Client-identity reject reason: the token lacks the configured ingest scope. */
+  public static final String REASON_MISSING_SCOPE = "missing_scope";
+
+  /**
+   * Client-identity reject reason: the payload's {@code tool} provenance is not on the configured
+   * allowlist. Distinct from the token-level reasons because it is the only one a caller can forge,
+   * so a spike here alongside a clean {@code azp} reads as "someone is hand-building payloads with
+   * a real extractor token" rather than as an infrastructure fault.
+   */
+  public static final String REASON_BAD_PROVENANCE = "bad_provenance";
+
+  /**
+   * Client-identity reject reason: a plain {@code Authorization: Bearer} request arrived while
+   * {@code app.ingest.client-identity.dpop-required} is enabled (RFC 9449, REQ-INGEST-012). During
+   * the dual-mode migration this counter is the measure of how much of the client population has
+   * not yet moved to DPoP-bound tokens.
+   */
+  public static final String REASON_DPOP_REQUIRED = "dpop_required";
+
+  /**
+   * Error code: the caller authenticated successfully but its <em>client software</em> is not
+   * approved for the ingest path — 403 (REQ-INGEST-011). Deliberately distinct from {@link
+   * #CODE_ACCESS_DENIED}, which means the <em>user</em> lacks a permission: here the user is fully
+   * entitled and it is the tool that is refused, and the extractor surfaces the problem detail
+   * verbatim, so conflating the two would tell a member "you are not allowed" when the truth is
+   * "use the official extractor".
+   */
+  public static final String CODE_CLIENT_NOT_ALLOWED = "CLIENT_NOT_ALLOWED";
+
   private MetricNames() {
     // Constants holder — not instantiable.
   }

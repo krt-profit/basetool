@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.ingest.model.dto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
@@ -41,8 +42,11 @@ import java.util.List;
  * @param expenses the order expenses read from screen
  * @param durationMinutes the refining duration in minutes
  * @param totalYieldScu the total yield in SCU read from screen
- * @param sourceImages provenance for the stitched capture(s)
- * @param goods the per-row reads; non-empty, at most 100
+ * @param sourceImages provenance for the stitched capture(s); non-empty, at most 50 — a genuine
+ *     extraction is always stitched from at least one screenshot, so an empty list marks a payload
+ *     that no real capture produced (ADR-0008 amendment, REQ-INGEST-011)
+ * @param goods the per-row reads; non-empty, at most 100 — an order with no rows carries nothing to
+ *     import (ADR-0008 amendment)
  */
 public record RefineryExtractOrderDto(
     @NotNull @Size(max = 32) String panelType,
@@ -55,5 +59,5 @@ public record RefineryExtractOrderDto(
     @PositiveOrZero @DecimalMax("1000000000.0") Double expenses,
     @PositiveOrZero Long durationMinutes,
     @PositiveOrZero Double totalYieldScu,
-    @Size(max = 50) List<@NotNull @Valid RefineryExtractImageDto> sourceImages,
-    @NotNull @Size(max = 100) List<@NotNull @Valid RefineryExtractGoodDto> goods) {}
+    @NotEmpty @Size(max = 50) List<@NotNull @Valid RefineryExtractImageDto> sourceImages,
+    @NotEmpty @Size(max = 100) List<@NotNull @Valid RefineryExtractGoodDto> goods) {}

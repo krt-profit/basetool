@@ -2341,6 +2341,104 @@
           }
         }
       ]
+    },
+    {
+      "id": 45,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 152
+      },
+      "type": "timeseries",
+      "title": "Ingest calls/hour by client",
+      "description": "Which client software is driving the ingest gateway (REQ-INGEST-011). The label is bounded by construction: an allowlist entry, or the literal 'other'. Traffic on 'other' means a caller whose azp is not on the allowlist - expected only while the gate runs in audit-only.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (client_id) (rate(basetool_ingest_client_total[1h])) * 3600",
+          "refId": "A",
+          "legendFormat": "{{client_id}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 152
+      },
+      "type": "timeseries",
+      "title": "Ingest client rejections/hour by reason",
+      "description": "Client-identity gate rejections (REQ-INGEST-011), also counted while audit-only is set. unknown_client / bad_provenance = an unapproved tool is calling the restricted interface. missing_azp / missing_scope = a Keycloak mapper or scope assignment regressed and the official extractor may be locked out. Backs the IngestUnknownClient alert.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (reason) (rate(basetool_ingest_client_rejected_total[1h])) * 3600",
+          "refId": "A",
+          "legendFormat": "{{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
     }
   ]
 }

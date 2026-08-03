@@ -47,6 +47,31 @@ record family. Key shape decisions:
 - The frontend never interprets the extract; it relays the bytes and renders the
   backend's draft + issues (Phase 2).
 
+## Amendment 1 (2026-08-03) — `sourceImages` and `goods` become required within v1
+
+**Status:** accepted · **Approved by:** @greluc (explicit, in-chat) · **Spec:** `REQ-INGEST-011`
+
+Within `schemaVersion: 1`, `orders[].sourceImages` and `orders[].goods` are now **`@NotEmpty`**
+rather than optional/nullable. This is a **breaking tightening of a frozen contract** and is
+therefore recorded here rather than applied silently; it was approved explicitly because the
+alternative — enforcing it only at the ingest edge — would have produced the worse outcome of the
+gateway rejecting payloads the same user could still import through the browser upload.
+
+Rationale: a genuine extraction is always stitched from at least one screenshot and always yields at
+least one row, so neither empty case can come from the real producer. Requiring them costs legitimate
+clients nothing and fails a hand-assembled payload that did not bother to fabricate plausible capture
+metadata. The producer already emits both as non-nullable lists, so no released extractor build is
+affected.
+
+**Applied in lockstep on both sides** — gateway `RefineryExtractOrderDto` *and* backend
+`RefineryExtractOrderDto` — deliberately: the two records are kept constraint-identical so the edge
+never diverges from what the backend accepts, and the manual browser-upload path is tightened by the
+same change. The backend's `deriveStartedAt` stays null-tolerant as defence in depth.
+
+This is the one carve-out from the "new optional fields may land within v1; anything breaking
+requires `schemaVersion: 2`" rule above. It is justified only because the change cannot reject any
+payload the real producer emits; a tightening that *could* still requires the version bump.
+
 ## Alternatives considered
 
 - **Multipart upload of raw screenshots to the backend:** rejected by ADR-0007

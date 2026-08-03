@@ -66,6 +66,8 @@ class IngestControllerTest {
 
   private static final String REFINERY_BODY =
       "{\"schemaVersion\":1,\"orders\":[{\"panelType\":\"SETUP\","
+          + "\"sourceImages\":[{\"name\":\"shot.png\",\"width\":1920,\"height\":1080,"
+          + "\"cropMode\":\"vlm\"}],"
           + "\"goods\":[{\"rawMaterialName\":\"Iron\",\"inputQuantity\":1,\"refine\":true}]}]}";
 
   @Autowired private WebApplicationContext context;
@@ -83,7 +85,7 @@ class IngestControllerTest {
 
   @Test
   void shouldStageRefineryDraftAndReturnHandoff() throws Exception {
-    when(backendImportClient.forwardRefineryExtract(anyString(), any(), any(), any()))
+    when(backendImportClient.forwardRefineryExtract(anyString(), any(), any()))
         .thenReturn("{\"goodsMatched\":1}");
     when(handoffStagingService.stage(anyString(), eq(HandoffKind.REFINERY), anyString()))
         .thenReturn("HID123");
@@ -134,7 +136,7 @@ class IngestControllerTest {
 
   @Test
   void shouldStageBlueprintPreview() throws Exception {
-    when(backendImportClient.forwardBlueprintPreview(anyString(), any(), any(), any()))
+    when(backendImportClient.forwardBlueprintPreview(anyString(), any(), any()))
         .thenReturn("{\"total\":2}");
     when(handoffStagingService.stage(anyString(), eq(HandoffKind.BLUEPRINT), anyString()))
         .thenReturn("BP1");
@@ -163,7 +165,7 @@ class IngestControllerTest {
 
   @Test
   void shouldRelayBackend4xxVerbatim() throws Exception {
-    when(backendImportClient.forwardRefineryExtract(anyString(), any(), any(), any()))
+    when(backendImportClient.forwardRefineryExtract(anyString(), any(), any()))
         .thenThrow(
             WebClientResponseException.create(
                 HttpStatus.BAD_REQUEST.value(),
@@ -261,7 +263,7 @@ class IngestControllerTest {
 
   @Test
   void shouldReturn502WhenBackendUnreachable() throws Exception {
-    when(backendImportClient.forwardRefineryExtract(anyString(), any(), any(), any()))
+    when(backendImportClient.forwardRefineryExtract(anyString(), any(), any()))
         .thenThrow(
             new WebClientRequestException(
                 new RuntimeException("connection refused"),

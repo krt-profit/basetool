@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
@@ -48,8 +49,11 @@ import java.util.List;
  * @param expenses total order cost in aUEC; {@code null} when un-quoted
  * @param durationMinutes processing time in minutes (from e.g. {@code "20h 58m"}); nullable
  * @param totalYieldScu PROCESSING-only figure; always {@code null} on SETUP and ignored in v1
- * @param sourceImages screenshots this order was stitched from (provenance only)
- * @param goods stitched, deduplicated material rows in on-screen order
+ * @param sourceImages screenshots this order was stitched from (provenance only); non-empty, at
+ *     most 50 — a genuine extraction always has at least one capture, so an empty list marks a
+ *     payload no real extraction produced (ADR-0008 amendment, REQ-INGEST-011)
+ * @param goods stitched, deduplicated material rows in on-screen order; non-empty, at most 100 — an
+ *     order with no rows carries nothing to import (ADR-0008 amendment)
  */
 public record RefineryExtractOrderDto(
     @NotNull @Size(max = 32) String panelType,
@@ -62,5 +66,5 @@ public record RefineryExtractOrderDto(
     @PositiveOrZero @DecimalMax("1000000000.0") Double expenses,
     @PositiveOrZero Long durationMinutes,
     @PositiveOrZero Double totalYieldScu,
-    @Size(max = 50) List<@NotNull @Valid RefineryExtractImageDto> sourceImages,
-    @NotNull @Size(max = 100) List<@NotNull @Valid RefineryExtractGoodDto> goods) {}
+    @NotEmpty @Size(max = 50) List<@NotNull @Valid RefineryExtractImageDto> sourceImages,
+    @NotEmpty @Size(max = 100) List<@NotNull @Valid RefineryExtractGoodDto> goods) {}
