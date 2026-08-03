@@ -48,7 +48,7 @@
 
 <main>
     <span id="os-i18n" hidden
-          th:attr="data-saved=#{admin.orgStructure.success.saved},data-error=#{admin.orgStructure.error.action}"></span>
+          th:attr="data-saved=#{admin.orgStructure.success.saved},data-error=#{admin.orgStructure.error.action},data-refresh-error=#{admin.orgStructure.refresh.error}"></span>
 
     <div class="greeting hud-box">
         <h1 th:text="#{admin.orgStructure.title}">Organisationsstruktur</h1>
@@ -62,11 +62,19 @@
         <p th:text="#{${error}}">Fehler beim Laden.</p>
     </div>
 
+    <!--
+      The two create forms are one live-sync section ("forms"): both their parent pickers list units
+      a peer can create, so a peer's create makes them stale together (#1235, REQ-FE-015). The stable
+      #org-structure-forms container survives the swap; the inner th:block is what ?fragment=forms
+      renders.
+    -->
+    <div id="org-structure-forms">
+    <th:block th:fragment="orgStructureForms">
     <!-- ===== Create the Organisationsleitung (only when none exists yet) ===== -->
     <div class="hud-box mt-2">
         <h2 th:text="#{admin.orgStructure.ol.create}">Organisationsleitung anlegen</h2>
         <p th:if="${hasOl}" class="text-muted" th:text="#{admin.orgStructure.ol.exists}">Die Organisationsleitung besteht bereits.</p>
-        <form id="ol-form" th:unless="${hasOl}">
+        <form id="ol-form" data-trigger="os-create-ol" th:unless="${hasOl}">
             <div class="form-grid">
                 <div class="form-group">
                     <label for="ol-name" th:text="#{admin.orgStructure.field.name}">Name</label>
@@ -90,7 +98,7 @@
     <!-- ===== Create a Bereich ===== -->
     <div class="hud-box mt-2">
         <h2 th:text="#{admin.orgStructure.bereich.create}">Bereich anlegen</h2>
-        <form id="bereich-form">
+        <form id="bereich-form" data-trigger="os-create-bereich">
             <div class="form-grid">
                 <div class="form-group">
                     <label for="bereich-name" th:text="#{admin.orgStructure.field.name}">Name</label>
@@ -126,8 +134,12 @@
             </div>
         </form>
     </div>
+    </th:block>
+    </div>
 
     <!-- ===== The hierarchy: every unit + its parent edge ===== -->
+    <div id="org-structure-units">
+    <th:block th:fragment="orgStructureUnits">
     <div class="hud-box mt-2">
         <h2 th:text="#{admin.orgStructure.units.title}">Einheiten und Zuordnung</h2>
         <p class="text-muted" th:text="#{admin.orgStructure.units.hint}">Wähle die übergeordnete Einheit; Staffeln/Spezialkommandos gehören in einen Bereich, Bereiche in die Organisationsleitung.</p>
@@ -149,7 +161,7 @@
                 <td>
                     <span th:if="${n.kind == 'ORGANISATIONSLEITUNG'}" class="text-muted"
                           th:text="#{admin.orgStructure.root}">Wurzel</span>
-                    <select th:unless="${n.kind == 'ORGANISATIONSLEITUNG'}" class="os-parent-select" data-parent-select
+                    <select th:unless="${n.kind == 'ORGANISATIONSLEITUNG'}" class="os-parent-select" data-trigger="os-parent-select"
                             th:attr="aria-label=#{admin.orgStructure.setParent} + ' ' + ${n.name}">
                         <option value="" th:text="#{admin.orgStructure.noParent}"
                                 th:selected="${n.parentOrgUnitId == null}">— keine —</option>
@@ -169,6 +181,8 @@
             </tr>
             </tbody>
         </table>
+    </div>
+    </th:block>
     </div>
 </main>
 

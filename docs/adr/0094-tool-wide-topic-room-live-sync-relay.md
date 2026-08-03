@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-10
 - **Deciders:** @greluc
-- **Related:** REQ-FE-015 · REQ-FE-010 · REQ-NOTIF-006/-010 · REQ-OBS-011 · ADR-0031 (mission relay — generalized here) · ADR-0016 (notification SSE — its Redis deferral is discharged here) · ADR-0079 (Redis AOF/noeviction) · ADR-0084 (readiness excludes optional externals) · ADR-0085 (5000-account capacity) · #1102 · #1115 · #1120 · #1241 · #1243 (publish-amplification bounds) · #1236 (legacy-alias removal)
+- **Related:** REQ-FE-015 · REQ-FE-010 · REQ-NOTIF-006/-010 · REQ-OBS-011 · ADR-0031 (mission relay — generalized here) · ADR-0016 (notification SSE — its Redis deferral is discharged here) · ADR-0079 (Redis AOF/noeviction) · ADR-0084 (readiness excludes optional externals) · ADR-0085 (5000-account capacity) · #1102 · #1115 · #1120 · #1241 · #1243 (publish-amplification bounds) · #1236 (legacy-alias removal) · #1307/#1309 (Lager) · #1235 (Phase-3 completion)
 
 ## Context
 
@@ -213,13 +213,35 @@ concurrent) on both apps so a socket surge can never hit "too many open files".
   (`docs/LIVESYNC_ROLLOUT_RUNBOOK.md`: clean `down` + redeploy because the in-place `up`
   strands containers on network changes, plus an ACL pre-check that the `default` user's
   explicit `users.acl` entry retains `&*` channel permissions for the two channels).
-- **Presence dots are per-instance** until the tracked follow-up lands; the remaining
-  Phase-3 surfaces (Lager, Raffinerie, Rollen/Org-Struktur, `/missions` list) and a baselined
-  drop-rate alert are tracked follow-up issues as well. The one-release legacy alias removal
-  has since landed (#1236), and the cross-instance presence follow-up landed in #1237
-  ([ADR-0126](0126-cross-instance-editor-presence-via-snapshot-gossip.md)) — presence now
-  rides a **third** channel, `basetool:livesync:presence`, which the `default` user's `&*`
-  grant already covers.
+- **Every deferral recorded here has since been discharged.** Presence dots were per-instance at
+  the time of this decision; cross-instance presence landed in #1237
+  ([ADR-0126](0126-cross-instance-editor-presence-via-snapshot-gossip.md)), so presence now rides a
+  **third** channel, `basetool:livesync:presence`, which the `default` user's `&*` grant already
+  covers. The baselined drop-rate alert landed in #1238 (`LiveSyncRelayDropsSustained` plus
+  `LiveSyncSectionKeySkew`, thresholds measured over 21 production days). The one-release legacy
+  alias removal landed in #1236.
+
+  The **Phase-3 surfaces are done** as well: Lager shipped as the `inventory` room (#1307/#1309),
+  and Raffinerie, Rollen (`/members`), Org-Struktur (the admin editor plus the Organigramm) and the
+  `/missions` list shipped in #1235 as the `refinery`, `members`, `org-structure` and `missions`
+  rooms. All four are global rooms with the 1500 ms coalesce window; three of them publish through
+  the `LiveSyncLocalBus` server seam rather than the client, because their mutations navigate away
+  or happen on a different page than the list they invalidate — the same reasoning that put the
+  anonymous order-create on that seam, now the general rule (see REQ-FE-015).
+
+  Two consequences of that rollout are worth recording. The `org-structure` room is the first
+  shared by **two different pages** rendering disjoint parts of one whitelist, so its parity check
+  is a subset-plus-union assertion rather than set-equality — set-equality per page is impossible,
+  and subsets alone would let an orphaned registry key through. And it is deliberately
+  **authenticated-only** rather than ADMIN-gated even though the editor is ADMIN-only: the
+  Organigramm is member-visible, so gating the room would cut members off from their own chart.
+  The per-fragment authorization the `bank` staff room already relies on for its management-only
+  `grants` section is what keeps the admin sections protected.
+
+  One gap remains, and it is a *page* limitation rather than a relay one: the refinery **detail**
+  page publishes but cannot receive, because it is still a classic form-post surface with no
+  fragment seam. It needs the REQ-FE-001 conversion before a scoped `refinery:{id}` room would
+  have anything to re-render.
 
 ## Alternatives considered
 

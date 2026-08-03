@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.websocket;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -91,6 +92,93 @@ class LiveSyncTopicTest {
   void parse_rejectsGlobalOrdersQueueTopicCarryingAnId() {
     // `orders` is a global room; a prefixed id violates its scope.
     assertThat(LiveSyncTopic.parse("orders:" + UUID.randomUUID())).isNull();
+  }
+
+  @Test
+  void parse_acceptsGlobalMissionsListTopic_andDistinguishesItFromTheMissionDetailRoom() {
+    // #1235: the `mission`/`missions` stem repeats the `order`/`orders` shape and must not collide
+    // — a bare `missions` is the global list room, `mission:{id}` the per-mission detail room.
+    // A silent collision here would route mission-detail presence frames into the list room.
+    UUID id = UUID.randomUUID();
+
+    LiveSyncTopic list = LiveSyncTopic.parse("missions");
+    assertThat(list).isNotNull();
+    assertThat(list.topicClass()).isEqualTo(LiveSyncTopicClass.MISSIONS_LIST);
+    assertThat(list.resourceId()).isNull();
+    assertThat(list.canonical()).isEqualTo("missions");
+
+    LiveSyncTopic detail = LiveSyncTopic.parse("mission:" + id);
+    assertThat(detail).isNotNull();
+    assertThat(detail.topicClass()).isEqualTo(LiveSyncTopicClass.MISSION);
+    assertThat(detail.resourceId()).isEqualTo(id);
+
+    // `missions` is global (an id violates its scope); `mission` is scoped (the bare prefix does).
+    assertThat(LiveSyncTopic.parse("missions:" + id)).isNull();
+    assertThat(LiveSyncTopic.parse("mission")).isNull();
+  }
+
+  @Test
+  void parse_acceptsGlobalRefineryTopic_andRejectsAnIdOnIt() {
+    // #1235: the refinery-order queue room is a bare-prefix global room.
+    LiveSyncTopic topic = LiveSyncTopic.parse("refinery");
+
+    assertThat(topic).isNotNull();
+    assertThat(topic.topicClass()).isEqualTo(LiveSyncTopicClass.REFINERY);
+    assertThat(topic.resourceId()).isNull();
+    assertThat(topic.canonical()).isEqualTo("refinery");
+    assertThat(LiveSyncTopic.parse("refinery:" + UUID.randomUUID())).isNull();
+  }
+
+  @Test
+  void parse_acceptsGlobalMembersTopic_andRejectsAnIdOnIt() {
+    // #1235: the Mitgliederverwaltung roster room ("Rollen") is a bare-prefix global room.
+    LiveSyncTopic topic = LiveSyncTopic.parse("members");
+
+    assertThat(topic).isNotNull();
+    assertThat(topic.topicClass()).isEqualTo(LiveSyncTopicClass.MEMBERS);
+    assertThat(topic.resourceId()).isNull();
+    assertThat(topic.canonical()).isEqualTo("members");
+    assertThat(LiveSyncTopic.parse("members:" + UUID.randomUUID())).isNull();
+  }
+
+  @Test
+  void parse_acceptsGlobalOrgStructureTopic_andRejectsAnIdOnIt() {
+    // #1235: the hyphenated prefix shared by the admin editor and the Organigramm. The hyphen is
+    // load-bearing — LiveSyncTopic matches prefixes exactly, so a rename would silently 404 the
+    // room rather than fall back to a neighbouring class.
+    LiveSyncTopic topic = LiveSyncTopic.parse("org-structure");
+
+    assertThat(topic).isNotNull();
+    assertThat(topic.topicClass()).isEqualTo(LiveSyncTopicClass.ORG_STRUCTURE);
+    assertThat(topic.resourceId()).isNull();
+    assertThat(topic.canonical()).isEqualTo("org-structure");
+    assertThat(LiveSyncTopic.parse("org-structure:" + UUID.randomUUID())).isNull();
+  }
+
+  @Test
+  void membersTopic_isTheOnlyNewClassGatedByALocalAdminRoleCheck() {
+    // #1235: the roster room mirrors the page's class-level ADMIN gate with a backend-free local
+    // check, while the other three new rooms are authenticated-only on purpose — the missions and
+    // refinery lists are isAuthenticated(), and org-structure must admit the members who can see
+    // the Organigramm. Pinning this stops a later "tighten it up" from silently cutting members
+    // off from their own chart.
+    assertThat(LiveSyncTopicClass.MEMBERS.requiredAnyRole()).containsExactly("ROLE_ADMIN");
+    assertThat(LiveSyncTopicClass.MISSIONS_LIST.requiredAnyRole()).isNull();
+    assertThat(LiveSyncTopicClass.REFINERY.requiredAnyRole()).isNull();
+    assertThat(LiveSyncTopicClass.ORG_STRUCTURE.requiredAnyRole()).isNull();
+
+    // None of the four probes the backend, and none carries presence (only `mission` does).
+    for (LiveSyncTopicClass added :
+        List.of(
+            LiveSyncTopicClass.MISSIONS_LIST,
+            LiveSyncTopicClass.REFINERY,
+            LiveSyncTopicClass.MEMBERS,
+            LiveSyncTopicClass.ORG_STRUCTURE)) {
+      assertThat(added.authProbePath()).as("%s auth probe", added).isNull();
+      assertThat(added.capabilityField()).as("%s capability", added).isNull();
+      assertThat(added.presenceEnabled()).as("%s presence", added).isFalse();
+      assertThat(added.scoped()).as("%s scope", added).isFalse();
+    }
   }
 
   @Test
