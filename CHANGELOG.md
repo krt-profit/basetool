@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Ingest-Gateway: Die Schnittstelle ist jetzt auf freigegebene Clients beschränkt.** Bisher wurde jedes gültige Token aus dem Realm akzeptiert — auch eines der Weboberfläche. Das Gateway prüft jetzt Client-Kennung, Berechtigungsumfang und die Herkunftsangabe der Nutzdaten gegen eine Freigabeliste und antwortet sonst mit `403 CLIENT_NOT_ALLOWED`. Wer den Extraktor nutzen darf, ändert sich nicht: jedes Mitglied darf Blueprints und Raffinerie-Aufträge hochladen (REQ-INGEST-011, ADR-0018).
+
+- **Ingest-Gateway: Unterstützung für schlüsselgebundene Token (DPoP, RFC 9449).** Ein abgeflossenes Token ist damit ohne den zugehörigen privaten Schlüssel wertlos — relevant, weil der Extraktor sein Token dauerhaft auf dem Rechner speichert. Vorerst im Parallelbetrieb: einfache Bearer-Token funktionieren unverändert weiter, bis der Extraktor nachzieht (REQ-INGEST-012).
+
+- **Neue Betriebskennzahlen für das Ingest-Gateway.** Gezählt werden jetzt die aufrufende Client-Software und jede Abweisung der Freigabeprüfung samt Grund. Der neue Alarm `IngestUnknownClient` unterscheidet dabei „ein fremdes Werkzeug ruft an" von „eine Keycloak-Zuordnung ist kaputt und sperrt den echten Extraktor aus".
+
+### Changed
+
+- **Ingest-Gateway: Zwei vom Client gelieferte Kopfzeilen wurden ungeprüft an das Backend weitergereicht.** `X-Correlation-Id` und `Accept-Language` wurden roh auf den internen Aufruf kopiert, obwohl das Gateway als einziger Dienst aus dem Internet erreichbar ist. Beide werden jetzt geprüft; die Korrelations-Kennung stammt aus der bereits validierten Quelle. Das behebt zugleich, dass ein Vorgang in Gateway- und Backend-Log unter verschiedenen Kennungen auftauchen konnte (REQ-OBS-002).
+
+- **Raffinerie-Import: Quellbilder und Materialzeilen sind jetzt Pflicht.** Ein Auftrag ohne Zeilen enthält nichts zu importieren, und eine echte Auswertung entsteht immer aus mindestens einem Screenshot. Gateway und Backend prüfen identisch, sodass der Datei-Upload im Browser dieselbe Regel anwendet; vom Extraktor erzeugte Dateien sind nicht betroffen (ADR-0008).
+
+- **Ingest-Gateway: Der Blueprint-Pfad protokolliert jetzt die Herkunft der Nutzdaten.** Bisher stand dort nur die Größe in Bytes, sodass ein strukturell auffälliger Export von einem normalen nicht zu unterscheiden war.
+
 ## [v1.5.29](https://github.com/krt-profit/basetool/releases/tag/v1.5.29) - 2026-08-02
 
 ### Added

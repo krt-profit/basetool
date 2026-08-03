@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.ingest.logging.LogSafe;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.model.dto.HandoffKind;
 import de.greluc.krt.profit.basetool.ingest.model.dto.IngestResponseDto;
+import de.greluc.krt.profit.basetool.ingest.model.dto.Provenance;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractDto;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractOrderDto;
 import de.greluc.krt.profit.basetool.ingest.ratelimit.SubjectRateLimiter;
@@ -52,6 +53,7 @@ public class IngestService {
   private final HandoffStagingService handoffStagingService;
   private final IngestProperties ingestProperties;
   private final SubjectRateLimiter subjectRateLimiter;
+  private final ProvenanceGuard provenanceGuard;
   private final MeterRegistry meterRegistry;
 
   /**
@@ -59,8 +61,8 @@ public class IngestService {
    *
    * @param sub the authenticated caller's subject (scopes the staged handoff)
    * @param bearer the caller's raw JWT, forwarded to the backend
-   * @param acceptLanguage the caller's resolved locale (relayed; may be {@code null})
-   * @param correlationId the request correlation id (relayed; may be {@code null})
+   * @param acceptLanguage the caller's resolved locale (sanitized, then relayed; may be {@code
+   *     null})
    * @param extract the validated extract payload
    * @return the handoff id, kind and frontend URL for the extractor to open
    */
@@ -68,15 +70,16 @@ public class IngestService {
       @NotNull String sub,
       @NotNull String bearer,
       String acceptLanguage,
-      String correlationId,
       @NotNull RefineryExtractDto extract) {
     // Per-subject throttle (REQ-INGEST-005): bound how hard one authenticated caller can drive the
     // backend import endpoints. Checked before the backend relay so an over-budget caller is
     // rejected without forwarding.
     subjectRateLimiter.requireWithinLimit(sub);
+    // Payload-level client-identity check (REQ-INGEST-011), before the "Relaying…" line so a
+    // rejected producer never reads as an accepted send in the log.
+    provenanceGuard.requireApprovedTool(Provenance.from(extract));
     logAcceptedExtract(extract);
-    String draftJson =
-        backendImportClient.forwardRefineryExtract(bearer, acceptLanguage, correlationId, extract);
+    String draftJson = backendImportClient.forwardRefineryExtract(bearer, acceptLanguage, extract);
     String handoffId = handoffStagingService.stage(sub, HandoffKind.REFINERY, draftJson);
     countHandoff(HandoffKind.REFINERY);
     return response(handoffId, HandoffKind.REFINERY, ingestProperties.getRefineryPath());
@@ -122,25 +125,37 @@ public class IngestService {
    *
    * @param sub the authenticated caller's subject (scopes the staged handoff)
    * @param bearer the caller's raw JWT, forwarded to the backend
-   * @param acceptLanguage the caller's resolved locale (relayed; may be {@code null})
-   * @param correlationId the request correlation id (relayed; may be {@code null})
+   * @param acceptLanguage the caller's resolved locale (sanitized, then relayed; may be {@code
+   *     null})
    * @param blueprintJson the blueprint export JSON bytes to forward as the upload
+   * @param provenance the export's self-declared producer, read from the opaque body by the
+   *     controller
    * @return the handoff id, kind and frontend URL for the extractor to open
    */
   public @NotNull IngestResponseDto ingestBlueprint(
       @NotNull String sub,
       @NotNull String bearer,
       String acceptLanguage,
-      String correlationId,
-      byte @NotNull [] blueprintJson) {
+      byte @NotNull [] blueprintJson,
+      @NotNull Provenance provenance) {
     // Per-subject throttle (REQ-INGEST-005); see ingestRefinery for the rationale.
     subjectRateLimiter.requireWithinLimit(sub);
-    // The export is opaque to the gateway, so its size is the only shape there is to record — and
-    // it is what separates "the extractor sent an empty file" from a genuine backend reject.
-    log.info("Relaying blueprint export ({} bytes)", blueprintJson.length);
+    // Payload-level client-identity check (REQ-INGEST-011); see ingestRefinery.
+    provenanceGuard.requireApprovedTool(provenance);
+    // The export body stays opaque to the gateway (the backend owns that contract), so the size is
+    // the only shape there is — it separates "the extractor sent an empty file" from a genuine
+    // backend reject. The envelope's provenance triple is logged alongside it: this path used to
+    // record nothing but the byte count, which left a structurally odd blueprint export
+    // indistinguishable from a normal one while the refinery path had its shape line from day one.
+    // Both provenance strings are client-supplied free text and go through LogSafe.
+    log.info(
+        "Relaying blueprint export ({} bytes, schemaVersion={}, tool={}/{})",
+        blueprintJson.length,
+        provenance.schemaVersion(),
+        LogSafe.text(provenance.tool(), MAX_LOGGED_PROVENANCE),
+        LogSafe.text(provenance.toolVersion(), MAX_LOGGED_PROVENANCE));
     String draftJson =
-        backendImportClient.forwardBlueprintPreview(
-            bearer, acceptLanguage, correlationId, blueprintJson);
+        backendImportClient.forwardBlueprintPreview(bearer, acceptLanguage, blueprintJson);
     String handoffId = handoffStagingService.stage(sub, HandoffKind.BLUEPRINT, draftJson);
     countHandoff(HandoffKind.BLUEPRINT);
     return response(handoffId, HandoffKind.BLUEPRINT, ingestProperties.getBlueprintPath());

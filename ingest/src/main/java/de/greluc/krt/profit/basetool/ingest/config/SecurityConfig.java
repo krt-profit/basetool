@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.ingest.config;
 
+import de.greluc.krt.profit.basetool.ingest.filter.ClientIdentityFilter;
 import de.greluc.krt.profit.basetool.ingest.filter.UserIdMdcFilter;
 import de.greluc.krt.profit.basetool.ingest.web.SecurityProblemResponseHandler;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -32,6 +33,7 @@ import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -185,6 +187,7 @@ public class SecurityConfig {
    *     basetool_http_error_total} (REQ-OBS-011)
    * @param loggingProperties supplies the MDC key the {@link UserIdMdcFilter} writes the
    *     authenticated subject to
+   * @param clientIdentityProperties the configured client-identity gate (REQ-INGEST-011)
    * @return the configured filter chain
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
@@ -193,7 +196,8 @@ public class SecurityConfig {
       HttpSecurity http,
       ObjectMapper objectMapper,
       MeterRegistry meterRegistry,
-      LoggingProperties loggingProperties)
+      LoggingProperties loggingProperties,
+      ClientIdentityProperties clientIdentityProperties)
       throws Exception {
     // CSRF stays ENABLED (never disabled) so the gateway carries no weaker posture than the
     // backend. Every real endpoint (/v1/**) is JSON + bearer-token only on a stateless chain with
@@ -249,6 +253,16 @@ public class SecurityConfig {
             oauth2 ->
                 oauth2
                     .jwt(jwt -> {})
+                    // RFC 9449 DPoP (REQ-INGEST-012). Explicit opt-in: the resource-server DSL does
+                    // NOT enable it implicitly alongside jwt(). It is additive and safe to switch
+                    // on
+                    // before any client uses it — the converter only engages for an `Authorization:
+                    // DPoP` request, so a plain bearer call is untouched. That dual-mode window is
+                    // required, not merely convenient: the desktop extractor sends `Bearer` today,
+                    // so demanding DPoP here would break every send the moment this deploys.
+                    // Whether a plain bearer is still ACCEPTED is decided later, by
+                    // `app.ingest.client-identity.dpop-required` in ClientIdentityFilter.
+                    .dPoP(Customizer.withDefaults())
                     .authenticationEntryPoint(securityProblems)
                     .accessDeniedHandler(securityProblems))
         // REQ-SEC-024: re-map an identity-provider-unreachable failure (JWKS timeout / 5xx /
@@ -269,6 +283,14 @@ public class SecurityConfig {
             new UserIdMdcFilter(loggingProperties),
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
+        // REQ-INGEST-011: the client-identity gate (azp allowlist, ingest scope, DPoP requirement).
+        // Installed AFTER UserIdMdcFilter, not merely after the bearer filter, so its WARN lines
+        // already carry the acting subject in the `userId` MDC field and never have to repeat it
+        // (REQ-OBS-002/-004). Every check inside is inert until configured, so this is a no-op on a
+        // deployment that has not run the Keycloak setup yet.
+        .addFilterAfter(
+            new ClientIdentityFilter(clientIdentityProperties, meterRegistry, objectMapper),
+            UserIdMdcFilter.class)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
     return http.build();
   }

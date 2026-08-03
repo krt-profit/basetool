@@ -3,6 +3,27 @@
 
 # Desktop one-click ingest (send-to-basetool)
 
+> ## ⚠️ Restricted interface — approved clients only
+>
+> **The ingest interface may be used exclusively by client software that the basetool developer
+> (@greluc) has explicitly approved.** It is published (`REQ-INGEST-010`) so that the official
+> desktop extractor can be developed against a stable contract — it is **not** an open integration
+> API.
+>
+> Approval means two independent things, and both are required: a dedicated **Keycloak client
+> registration**, and an entry on the gateway's **client allowlist**
+> (`APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS`). Neither a stray Keycloak registration nor a
+> configuration slip grants access on its own, and removing the allowlist entry revokes a client
+> immediately, without a release.
+>
+> Any other tool is rejected with `403 CLIENT_NOT_ALLOWED` (`REQ-INGEST-011`), is unsupported, and
+> may break without notice. **Building or distributing an unapproved client is not permitted.** If
+> you want to integrate, ask first.
+>
+> Be precise about what enforcement can and cannot achieve — see the honesty note in
+> `REQ-INGEST-011`: these controls segment *registered* clients from one another and make a foreign
+> caller *visible*; they are not native-client attestation, which is not achievable on Windows.
+
 ## Context & goal
 
 The desktop extractor (`basetool-bp-extractor`) produces refinery-extract and
@@ -72,10 +93,16 @@ new **public** Keycloak client (`basetool-sc-extractor`) via the **Device Author
 Grant** (RFC 8628) with PKCE and **no client secret**. The gateway requires
 `isAuthenticated()` — no elevated role; any member may ingest, mirroring `REQ-REFINERY-011`.
 The token carries `aud=basetool-backend` (stamped by the dedicated `extractor-ingest` client
-scope, #641); the **same** bearer is forwarded to and accepted by the backend. No separate
-ingest audience is provisioned — the gateway only relays to the backend, so it accepts the
-same `basetool-backend` audience the backend requires. All data is scoped to the token's
-`sub`; the gateway never acts for a different user.
+scope, #641); the **same** bearer is forwarded to and accepted by the backend. All data is scoped to
+the token's `sub`; the gateway never acts for a different user.
+
+> **Amended (ADR-0018 amendment 1, `REQ-INGEST-011`).** This requirement originally stated that *no
+> separate ingest audience is provisioned*, on the grounds that the gateway only relays. That is
+> **superseded**: a dedicated `aud=basetool-ingest` is provisioned and the gateway requires it, so
+> that a `basetool-frontend` session token — which necessarily carries `basetool-backend` — cannot
+> drive the ingest ingress. The token carries **both** audiences; the backend keeps requiring
+> `basetool-backend`. `isAuthenticated()` for the *user* is unchanged; what was added is a gate on
+> the *client software*.
 
 **Acceptance**
 
@@ -374,6 +401,112 @@ unreachable from a deployed environment; the committed file is the contract, not
 (`/v3/api-docs` is permitted and titled) · **Code:** `ingest/.../config/OpenApiConfig`,
 `IngestController` (`@Operation`/`@ApiResponses`/`@Tag`), `IngestResponseDto` (`@Schema`),
 `application-prod.yml`
+
+### REQ-INGEST-011 — Client-identity gate: approved clients only
+
+The ingest interface is restricted to client software the basetool developer (@greluc) has
+explicitly approved. This is a control over **which program** calls the gateway; it does **not**
+change who may use it — that stays `isAuthenticated()` for every member (`REQ-INGEST-002`/`-008`,
+unchanged). Every member may upload blueprints and refinery jobs **with the approved extractor**.
+
+Four checks, each **inert until configured** and each **fail-closed** once it is:
+
+|     Check     |                                                                                                                          Source                                                                                                                           |                     Config                      |
+|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------|
+| Client id     | JWT `azp` against an allowlist                                                                                                                                                                                                                            | `app.ingest.client-identity.allowed-client-ids` |
+| Capability    | `SCOPE_<value>` authority from the `scope` claim — must name a scope **only** the extractor carries **and** one that is emitted into the claim; the shipped `extractor-ingest` fails both (shared with the frontend, and `include.in.token.scope: false`) | `…required-scope`                               |
+| Producer      | payload `tool` field against an allowlist                                                                                                                                                                                                                 | `…allowed-tools`                                |
+| Token binding | DPoP scheme required (`REQ-INGEST-012`)                                                                                                                                                                                                                   | `…dpop-required`                                |
+
+A missing claim is refused exactly like an unknown one: treating "no `azp`" as "nothing to check"
+would silently disable the gate the moment a realm change stopped stamping it. The reject reasons
+stay distinct (`unknown_client`, `missing_azp`, `missing_scope`, `bad_provenance`, `dpop_required`)
+because they split into two operationally opposite causes — a foreign tool calling, versus a Keycloak
+mapper regression locking the legitimate extractor out.
+
+**Nothing carries a default.** The allowlist contents are operational configuration, not source: the
+code shows *that* a gate exists, the environment decides *who* passes it. Empty-means-inert is
+load-bearing, not laziness — the Keycloak-side mappers and scopes are an operator step that cannot be
+done by a PR, so shipping these pre-enabled would reject every real extractor token on deploy. The
+`audit-only` flag runs every configured check but never rejects, so the operator can measure the real
+client population (`basetool_ingest_client_rejected_total` staying at zero) before enforcing — the
+same sequencing discipline `REQ-INGEST-008` imposes on the audience validator.
+
+**Honesty about what this achieves.** These gates **segment registered clients from one another**: a
+frontend session token cannot drive the gateway, an approved integration is individually scoped and
+individually revocable, and a non-member is excluded entirely. They are **not** anti-tamper. The
+extractor is a public OAuth client (`REQ-INGEST-002`) whose client id is readable both from the
+distributed binary and from the wire during the device flow, so a member who deliberately reproduces
+it obtains a token that passes every check here. Native-client attestation is not achievable on
+Windows — there is no App Attest / Play Integrity equivalent for a Win32 binary — and any secret
+embedded to compensate would be extractable, which is why none is used. The design therefore leans on
+**containment** (the ingest path persists nothing, `REQ-INGEST-004`, so a foreign caller can do
+nothing a browser upload could not) and on **visibility** (`IngestUnknownClient`) rather than on a
+prevention claim that would not hold.
+
+The payload `tool` check is the weakest of the four and is telemetry with a reject attached, never
+authentication: the field is client-supplied and the contract that documents it is published.
+
+**Acceptance**
+
+- [x] With nothing configured the gate is a no-op; a build that ships it does not reject any token.
+- [x] A token whose `azp` is not on the allowlist is refused `403 CLIENT_NOT_ALLOWED` and never
+  reaches the backend relay.
+- [x] A token with **no** `azp` at all is refused under its own `missing_azp` reason.
+- [x] A token lacking the configured ingest scope is refused.
+- [x] A payload whose `tool` is absent or unknown is refused under `bad_provenance`.
+- [x] Under `audit-only` every one of the above is served but still counted and logged at `WARN`.
+- [x] The `client_id` metric label never carries a raw token claim — it is an allowlist entry or the
+  bounded `other` literal.
+- [x] The rejected `tool` is `LogSafe`-sanitized before logging and is never echoed to the caller.
+
+**Enforced by:** `ClientIdentityFilterTest` (all four checks, fail-closed on absent claims, audit-only,
+bounded label, unauthenticated pass-through), `ProvenanceGuardTest` (allowlist, absent producer,
+audit-only, log sanitisation, no echo-back) · **Code:** `ClientIdentityFilter`,
+`ClientIdentityProperties`, `ProvenanceGuard`, `Provenance`, `ClientNotAllowedException`,
+`MetricNames` · **Monitoring:** `basetool_ingest_client_total{client_id}`,
+`basetool_ingest_client_rejected_total{reason}`, alert `IngestUnknownClient`
+
+### REQ-INGEST-012 — DPoP: sender-constrained tokens
+
+The gateway validates DPoP-bound access tokens (RFC 9449) via Spring Security's
+`DPoPAuthenticationProvider`, enabled explicitly through the resource-server DSL (`dPoP(...)` — it is
+**not** implied by `jwt(...)`). Keycloak has supported DPoP as a non-preview feature since 26.4.
+
+The motivation is not impersonation — a DPoP key is generated by the client, so a hand-rolled tool
+makes its own. It is **token theft**: the extractor persists a refresh token on the user's machine
+(`REQ-INGEST-007`), and sender-constraining makes a leaked token useless without the matching private
+key. That is the concrete risk when data flows through unvetted software.
+
+**Dual-mode is mandatory, not a convenience.** The desktop extractor sends
+`Authorization: Bearer` today, so `dpop-required` **must** stay `false` until it ships DPoP support;
+enabling it earlier breaks every send on deploy. Validation of a presented DPoP token is active
+regardless, so the migration window costs nothing — the flag only decides whether a plain bearer is
+still *accepted*, i.e. it closes the downgrade path once the client population has migrated.
+
+Independently of the flag, a **downgrade** is always reported: a token carrying the RFC 7800
+`cnf.jkt` confirmation presented under the plain bearer scheme is logged at `WARN`, because a client
+holding a bound token demonstrably has the key, so falling back to bearer is either a client bug or a
+replay of a token lifted from elsewhere.
+
+**Acceptance**
+
+- [x] A plain bearer request is unaffected while `dpop-required` is false (dual mode).
+- [x] With `dpop-required` enabled, a plain bearer request is refused under `dpop_required`.
+- [x] A DPoP-scheme request is accepted, with the scheme compared case-insensitively (RFC 9110).
+- [x] A `cnf.jkt` token presented as a plain bearer is logged as a downgrade.
+
+**Enforced by:** `DpopResourceServerTest` — the protocol-level proof: a **real** ES256-signed
+`dpop+jwt` with `htm`/`htu`/`iat`/`jti`/`ath` and a JWK thumbprint matching the token's `cnf.jkt` is
+accepted, while a proof signed by a different key, one bound to a different URL, and a DPoP-scheme
+request with no proof are each refused. The acceptance case cannot pass vacuously: with DPoP
+inactive, a `DPoP`-scheme request is never authenticated at all and would answer 401, so a 200 can
+only mean the proof was really validated. Additionally `ClientIdentityFilterTest` (dual mode,
+`dpop-required` enforcement, case-insensitive scheme, downgrade warning) and `IngestControllerTest`
+(the suite runs through the real filter chain with `dPoP(...)` enabled, so bearer behaviour is proven
+unchanged — wiring evidence, with the JWT decoder mocked and no Keycloak involved) ·
+**Code:** ingest `SecurityConfig`, `ClientIdentityFilter` · **Open cross-repo item:** the extractor
+must send DPoP proofs before `dpop-required` can be enabled (`basetool-sc-extractor` repo).
 
 ## Out of scope
 

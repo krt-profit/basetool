@@ -775,6 +775,31 @@ groups:
           summary: "Ingest oversized-payload rejections spiking"
           description: "The ingest gateway is refusing oversized /v1 request bodies (413) at an elevated rate — likely an oversized-body probing / DoS attempt against the public ingest surface, or a misconfigured client. Check the NPM edge and the fail2ban jails."
 
+      # (REQ-INGEST-011) The client-identity gate refused a caller whose CLIENT SOFTWARE is not
+      # approved for the ingest path — the interface is restricted to clients the basetool developer
+      # has explicitly approved (a Keycloak client registration plus an allowlist entry). Reaching
+      # this point required a VALID realm token, so unlike the pre-auth bot / rate-limit rejects it
+      # cannot be produced by an anonymous scanner and every occurrence is worth a look.
+      #
+      # The reason separates the two very different causes, which is why it is kept as a label:
+      #   unknown_client / bad_provenance -> a foreign tool is calling the ingress
+      #   missing_azp / missing_scope     -> a Keycloak mapper or scope assignment regressed, i.e.
+      #                                      SELF-INFLICTED, and the legitimate extractor is being
+      #                                      locked out right now
+      # It also fires while `audit-only` is set (the gate counts what it WOULD have rejected), which
+      # is exactly how the operator measures the blast radius before enforcing.
+      #
+      # Threshold: any sustained occurrence. This is deliberately not baseline-tuned away — a single
+      # foreign client calling once a minute is the signal, not noise.
+      - alert: IngestUnknownClient
+        expr: sum by (reason) (rate(basetool_ingest_client_rejected_total[10m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ingest client-identity gate rejecting callers ({{ $labels.reason }})"
+          description: "The ingest gateway refused a caller under reason '{{ $labels.reason }}'. unknown_client/bad_provenance means an unapproved tool is calling the restricted ingest interface; missing_azp/missing_scope means a Keycloak mapper or scope assignment regressed and the official extractor may be locked out. Check the gateway log for the matching WARN and the allowlist in APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS."
+
       # Backend oversized-JSON-body rejections (RequestBodySizeLimitFilter) on the capped import
       # endpoints (refinery import-extract). baseline-tune: >0.2/s sustained is a probing/DoS pattern.
       - alert: RequestBodyRejectedSpike

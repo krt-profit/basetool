@@ -57048,7 +57048,7 @@
             "minItems" : 0
           }
         },
-        "required" : [ "goods", "panelType" ]
+        "required" : [ "goods", "panelType", "sourceImages" ]
       },
       "ImportIssueDto" : {
         "type" : "object",
@@ -58485,10 +58485,10 @@
           "qualityConsistentWithCatalog" : {
             "type" : "boolean"
           },
-          "missionFreeForGameItem" : {
+          "catalogReferenceValid" : {
             "type" : "boolean"
           },
-          "catalogReferenceValid" : {
+          "missionFreeForGameItem" : {
             "type" : "boolean"
           }
         },

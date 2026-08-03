@@ -14,6 +14,19 @@ SMTP and real URLs redacted — see [`docs/keycloak/README.md`](keycloak/README.
 throwaway `frontend/src/e2e/resources/realm-export.e2e.json` test artifact — do **not** copy its
 `directAccessGrantsEnabled: true`.
 
+> ## ⚠️ The ingest interface is restricted to approved clients
+>
+> **Only client software explicitly approved by the basetool developer (@greluc) may use the ingest
+> interface.** Approving a client means doing **both** of the following — neither alone grants
+> access:
+>
+> 1. registering a dedicated Keycloak client for it (steps 1–3 below), and
+> 2. adding its client id to `APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS` on the gateway.
+>
+> Removing the allowlist entry revokes a client immediately (existing access tokens expire within the
+> access-token lifespan, ~5 min) without needing a Keycloak change or a release. Do not add a client
+> id here on anyone's request but the owner's.
+
 ## What this sets up
 
 The desktop extractor (`basetool-bp-extractor`) must obtain a **minimal, per-user,
@@ -210,6 +223,146 @@ This sets `app.security.jwt.expected-audiences`, which the backend's already-pre
 `audienceValidator`) activates — layering an `aud` check on top of the existing signature /
 issuer / expiry validation. Restart the backend. Smoke-test: the frontend still works
 (pages load, writes succeed) **and** an extractor ingest call still reaches the backend.
+
+## Step 7 — Client-identity gate (REQ-INGEST-011)
+
+Everything below is **inert until configured**, and each check is fail-closed once enabled. Do it in
+this order; the audit-only pass is what keeps it from locking out the real extractor.
+
+### 7a — ⚠️ First: `extractor-ingest` is currently shared with the frontend
+
+**This is the trap, and in the deployed realm it is already sprung.** Step 3 above offered two ways
+to give the frontend its `basetool-backend` audience, and the realm took the shared-scope route. Per
+[`docs/keycloak/realm-config.reference.json`](keycloak/realm-config.reference.json), the
+`extractor-ingest` scope is a **default scope on both** `basetool-frontend` **and**
+`basetool-sc-extractor`.
+
+Two consequences, and both silently defeat step 7 if ignored:
+
+- `APP_INGEST_CLIENT_IDENTITY_REQUIRED_SCOPE=extractor-ingest` would be satisfied by a **frontend
+  session token** — the scope check would not discriminate at all.
+- An audience mapper added to `extractor-ingest` would stamp `aud=basetool-ingest` onto **frontend
+  tokens too**, so the audience gate would pass for exactly the tokens it exists to refuse.
+
+**Fix the scope topology before anything else.** Create a **new** client scope that only the
+extractor ever gets, and put the ingest-specific mapper there:
+
+|             Setting              |           Value           |
+|----------------------------------|---------------------------|
+| Setting                          | Value                     |
+| -------------------------------- | ------------------------- |
+| Name                             | `extractor-ingest-only`   |
+| Type                             | Default                   |
+| Protocol                         | `openid-connect`          |
+| **Include in token scope**       | **On** ⚠️ see below       |
+
+> **⚠️ `Include in token scope` must be On — the shared scope has it Off.** Spring Security derives
+> the `SCOPE_…` authority from the token's `scope` claim, and the deployed `extractor-ingest` scope
+> carries `include.in.token.scope: "false"` (see
+> [`realm-config.reference.json`](keycloak/realm-config.reference.json)), so its name never reaches
+> the claim. With that setting the gateway's `required-scope` check would reject **every** caller,
+> the real extractor included — not merely fail to discriminate. Verify the flag on the new scope
+> before enabling the check.
+
+Add an **Audience** mapper to it — name `aud-basetool-ingest`, *Included Custom Audience* =
+`basetool-ingest`, *Add to access token* **On** — and assign the scope as a **Default** scope to
+`basetool-sc-extractor` **only**.
+
+Equivalent realm-export fragment (already reflected in
+[`realm-config.reference.json`](keycloak/realm-config.reference.json)):
+
+```json
+{
+  "name": "extractor-ingest-only",
+  "protocol": "openid-connect",
+  "attributes": {
+    "include.in.token.scope": "true",
+    "display.on.consent.screen": "false"
+  },
+  "protocolMappers": [
+    {
+      "name": "aud-basetool-ingest",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-audience-mapper",
+      "config": {
+        "included.custom.audience": "basetool-ingest",
+        "access.token.claim": "true",
+        "id.token.claim": "false"
+      }
+    }
+  ]
+}
+```
+
+Leave the existing shared `extractor-ingest` scope untouched: it
+still stamps `aud=basetool-backend` for both clients, which is what step 6 depends on.
+
+Verify on **both** live tokens before continuing:
+
+- extractor token → `aud` contains **both** `basetool-backend` and `basetool-ingest`; `scope`
+  contains `extractor-ingest-only`
+- frontend token → `aud` contains `basetool-backend` but **not** `basetool-ingest`; `scope` does
+  **not** contain `extractor-ingest-only`
+
+Only then, on the **gateway** (not the backend):
+
+```properties
+APP_SECURITY_JWT_EXPECTED_AUDIENCES=basetool-ingest
+```
+
+> **Do not point the gateway at `basetool-backend`.** That is the backend's audience and every
+> frontend token carries it — the check would pass for tokens this interface must refuse.
+
+### 7b — Use the exclusive scope for the scope check
+
+Because of 7a, the value below is the **new** scope, not the shared one:
+
+```properties
+APP_INGEST_CLIENT_IDENTITY_REQUIRED_SCOPE=extractor-ingest-only
+```
+
+Setting it to `extractor-ingest` would look configured and enforce nothing.
+
+### 7c — Configure, run in audit-only, then enforce
+
+```properties
+# gateway env
+APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS=basetool-sc-extractor
+# NOTE: the exclusive scope from 7a, NOT the shared `extractor-ingest`.
+APP_INGEST_CLIENT_IDENTITY_REQUIRED_SCOPE=extractor-ingest-only
+APP_INGEST_CLIENT_IDENTITY_ALLOWED_TOOLS=basetool-sc-extractor
+APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY=true
+```
+
+Restart, then watch for at least one full scrape interval:
+
+- `basetool_ingest_client_rejected_total` must stay at **zero**. Any value means a legitimate caller
+  would have been locked out — read the `reason` label before proceeding.
+- `basetool_ingest_client_total{client_id="basetool-sc-extractor"}` should carry the traffic. If it
+  lands on `client_id="other"` instead, the `azp` is not what the allowlist expects.
+
+Only when both hold, set `APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY=false` and restart. The
+`IngestUnknownClient` alert fires on the same counter afterwards.
+
+> Multiple client ids are supported (comma-separated), which is what makes a client-id **rotation**
+> possible without downtime: ship the new extractor with a new id, run both, drop the old id once the
+> per-`client_id` counter shows no traffic on it.
+
+## Step 8 — DPoP (REQ-INGEST-012) — BLOCKED on the extractor
+
+Keycloak has supported DPoP as a non-preview feature since 26.4, and the gateway validates DPoP-bound
+tokens already. **`APP_INGEST_CLIENT_IDENTITY_DPOP_REQUIRED` must stay `false`** until the desktop
+extractor sends DPoP proofs — it sends `Authorization: Bearer` today, so enabling this breaks every
+send on deploy. Validation of a presented DPoP token is active regardless, so there is nothing to
+enable for the migration to begin.
+
+Two things are worth doing on the Keycloak side **now**, independently of the extractor:
+
+- **Do not grant `offline_access`** to `basetool-sc-extractor`, so no long-lived offline token can be
+  minted for a client whose token is persisted on a user machine.
+- **Shorten the client session / access-token lifespans** for that client (Client → Advanced). This
+  is a *per-client* override and therefore free of the problem that forced realm-wide refresh-token
+  rotation off in step 4 — it does not touch the frontend BFF.
 
 ## Rollback
 

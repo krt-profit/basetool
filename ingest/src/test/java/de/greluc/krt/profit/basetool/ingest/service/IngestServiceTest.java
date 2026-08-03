@@ -29,6 +29,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.model.dto.HandoffKind;
+import de.greluc.krt.profit.basetool.ingest.model.dto.Provenance;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractDto;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractGoodDto;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractImageDto;
@@ -50,10 +51,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class IngestServiceTest {
 
+  /** Provenance of a well-formed blueprint export, as the controller reads it off the body. */
+  private static final Provenance BLUEPRINT_PROVENANCE =
+      new Provenance("krt-extractor", "1.2.3", 1);
+
   @Mock private BackendImportClient backendImportClient;
   @Mock private HandoffStagingService handoffStagingService;
   @Mock private IngestProperties ingestProperties;
   @Mock private SubjectRateLimiter subjectRateLimiter;
+  @Mock private ProvenanceGuard provenanceGuard;
 
   private SimpleMeterRegistry meterRegistry;
   private IngestService service;
@@ -67,18 +73,19 @@ class IngestServiceTest {
             handoffStagingService,
             ingestProperties,
             subjectRateLimiter,
+            provenanceGuard,
             meterRegistry);
   }
 
   @Test
   void ingestRefinery_countsAcceptedHandoffUnderRefineryKind() {
-    when(backendImportClient.forwardRefineryExtract(any(), any(), any(), any()))
+    when(backendImportClient.forwardRefineryExtract(any(), any(), any()))
         .thenReturn("{\"draft\":true}");
     when(handoffStagingService.stage(any(), any(), any())).thenReturn("handoff-1");
     when(ingestProperties.getRefineryPath()).thenReturn("/refinery/import");
     when(ingestProperties.getFrontendBaseUrl()).thenReturn("https://frontend.test");
 
-    service.ingestRefinery("sub-1", "bearer", null, null, mock(RefineryExtractDto.class));
+    service.ingestRefinery("sub-1", "bearer", null, mock(RefineryExtractDto.class));
 
     assertThat(handoffCounter(HandoffKind.REFINERY)).isEqualTo(1.0d);
   }
@@ -87,7 +94,7 @@ class IngestServiceTest {
   void ingestRefinery_logsThePayloadShapeWithoutAnyScreenRead() {
     // The gateway interprets nothing, so these counts are the only handle on "what did the client
     // actually push?". No material name and no quantity is logged — only structure.
-    when(backendImportClient.forwardRefineryExtract(any(), any(), any(), any()))
+    when(backendImportClient.forwardRefineryExtract(any(), any(), any()))
         .thenReturn("{\"draft\":true}");
     when(handoffStagingService.stage(any(), any(), any())).thenReturn("handoff-1");
     when(ingestProperties.getRefineryPath()).thenReturn("/refinery/import");
@@ -97,7 +104,7 @@ class IngestServiceTest {
         LogCapture.capture(
             IngestService.class,
             Level.INFO,
-            () -> service.ingestRefinery("sub-1", "bearer", null, null, extract()));
+            () -> service.ingestRefinery("sub-1", "bearer", null, extract()));
 
     assertThat(events).hasSize(1);
     assertThat(events.getFirst().getFormattedMessage())
@@ -110,7 +117,7 @@ class IngestServiceTest {
   @Test
   void ingestRefinery_sanitisesClientSuppliedProvenanceBeforeLoggingIt() {
     // `tool` is free text from an internet-facing client; a newline in it would forge a log line.
-    when(backendImportClient.forwardRefineryExtract(any(), any(), any(), any()))
+    when(backendImportClient.forwardRefineryExtract(any(), any(), any()))
         .thenReturn("{\"draft\":true}");
     when(handoffStagingService.stage(any(), any(), any())).thenReturn("handoff-1");
     when(ingestProperties.getRefineryPath()).thenReturn("/refinery/import");
@@ -123,14 +130,14 @@ class IngestServiceTest {
         LogCapture.capture(
             IngestService.class,
             Level.INFO,
-            () -> service.ingestRefinery("sub-1", "bearer", null, null, forged));
+            () -> service.ingestRefinery("sub-1", "bearer", null, forged));
 
     assertThat(events.getFirst().getFormattedMessage()).doesNotContain("\n");
   }
 
   @Test
   void ingestBlueprint_logsTheExportSizeBecauseTheBodyIsOpaque() {
-    when(backendImportClient.forwardBlueprintPreview(any(), any(), any(), any()))
+    when(backendImportClient.forwardBlueprintPreview(any(), any(), any()))
         .thenReturn("{\"preview\":true}");
     when(handoffStagingService.stage(any(), any(), any())).thenReturn("handoff-2");
     when(ingestProperties.getBlueprintPath()).thenReturn("/blueprint/import");
@@ -140,11 +147,16 @@ class IngestServiceTest {
         LogCapture.capture(
             IngestService.class,
             Level.INFO,
-            () -> service.ingestBlueprint("sub-1", "bearer", null, null, new byte[] {1, 2, 3}));
+            () ->
+                service.ingestBlueprint(
+                    "sub-1", "bearer", null, new byte[] {1, 2, 3}, BLUEPRINT_PROVENANCE));
 
     assertThat(events).hasSize(1);
+    // The provenance triple rides along: this path used to log only the byte count, which left a
+    // structurally odd blueprint export indistinguishable from a normal one (REQ-INGEST-011).
     assertThat(events.getFirst().getFormattedMessage())
-        .isEqualTo("Relaying blueprint export (3 bytes)");
+        .isEqualTo(
+            "Relaying blueprint export (3 bytes, schemaVersion=1, tool=krt-extractor/1.2.3)");
   }
 
   /** An order carrying two goods rows and one source image, for the shape assertions above. */
@@ -173,13 +185,13 @@ class IngestServiceTest {
 
   @Test
   void ingestBlueprint_countsAcceptedHandoffUnderBlueprintKind() {
-    when(backendImportClient.forwardBlueprintPreview(any(), any(), any(), any()))
+    when(backendImportClient.forwardBlueprintPreview(any(), any(), any()))
         .thenReturn("{\"preview\":true}");
     when(handoffStagingService.stage(any(), any(), any())).thenReturn("handoff-2");
     when(ingestProperties.getBlueprintPath()).thenReturn("/blueprint/import");
     when(ingestProperties.getFrontendBaseUrl()).thenReturn("https://frontend.test");
 
-    service.ingestBlueprint("sub-1", "bearer", null, null, new byte[] {1, 2, 3});
+    service.ingestBlueprint("sub-1", "bearer", null, new byte[] {1, 2, 3}, BLUEPRINT_PROVENANCE);
 
     assertThat(handoffCounter(HandoffKind.BLUEPRINT)).isEqualTo(1.0d);
   }

@@ -108,6 +108,49 @@ does the pre-fill. Concretely:
   this epic; the refinery spec's out-of-scope note is updated accordingly
   (`REQ-REFINERY-018`).
 
+## Amendment 1 (2026-08-03) — client-identity gate and a dedicated ingest audience
+
+**Status:** accepted · **Approved by:** @greluc · **Spec:** `REQ-INGEST-011`, `REQ-INGEST-012`
+
+The original decision reads: *"it accepts the same `aud=basetool-backend` token the backend requires
+(no separate ingest audience is provisioned — the gateway only relays to the backend)."* **That is
+reversed.** The reasoning held while the only question was "can this token reach the backend"; it
+does not hold once the question is "**which client software** may drive this ingress".
+
+Two things changed the requirement. First, the gateway accepted *any* token from the realm — a
+`basetool-frontend` session token included — because it checked only `isAuthenticated()`. Second, the
+owner's constraint became explicit: the interface is restricted to clients he has approved, because
+the security of other tools cannot be vouched for and supporting them is not intended.
+
+Amended decision:
+
+1. **Provision a dedicated `basetool-ingest` audience** on the extractor's client scope, alongside
+   the existing `basetool-backend` one (a token carries both). The gateway's already-present
+   `app.security.jwt.expected-audiences` knob is pointed at `basetool-ingest`; the backend keeps
+   requiring `basetool-backend`. A frontend token then cannot drive the gateway even if relayed.
+   This needs **no gateway code** — only the Keycloak mapper and the environment variable — but it is
+   a decision reversal and is recorded as such rather than done silently.
+2. **Add an `azp` allowlist, an ingest-scope requirement and a payload-provenance allowlist**, each
+   inert until configured and fail-closed once enabled (`REQ-INGEST-011`). Approval of a client
+   therefore requires *both* a Keycloak registration *and* a gateway allowlist entry — two
+   independent gates, and the allowlist doubles as an instant kill switch.
+3. **Enable DPoP validation** (`REQ-INGEST-012`) in dual mode, to sender-constrain the refresh token
+   the extractor persists.
+
+**Consequence to state plainly:** none of this is native-client attestation, and it is not presented
+as such. The extractor is a public client whose id is readable from the binary and from the wire, so
+a member who deliberately reproduces it passes every check. Windows offers no App Attest / Play
+Integrity equivalent, and an embedded secret would be extractable — so the design buys **segmentation
+of registered clients**, **an explicit and communicable support boundary**, and **visibility** of a
+foreign caller, on top of the containment that was already load-bearing (the ingest path persists
+nothing). Prevention against a determined member is out of reach and is documented as out of reach.
+
+**Alternatives rejected in this amendment:** moving the ingest module to a private repository
+(security by obscurity — the client id is in the distributed binary and on the wire regardless, the
+API contract is deliberately published, and the monorepo split would tax every future change); an
+embedded shared secret or HMAC in the binary (extractable, and worse than nothing because it feels
+protective); a per-member release flag (rejected by the owner — every member may use the extractor).
+
 ## Alternatives considered
 
 - **C1 — expose the backend directly.** Rejected: puts the entire authenticated API on the

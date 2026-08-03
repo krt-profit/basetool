@@ -2,7 +2,7 @@
   "openapi" : "3.1.0",
   "info" : {
     "title" : "KRT Basetool Ingest Gateway API",
-    "description" : "Forward-only ingest gateway for the KRT Basetool. It validates the caller's Keycloak JWT, relays the payload to the backend's import endpoints with that same bearer, stages the returned draft in Redis for a single-use browser pickup, and returns the handoff the desktop extractor opens. Nothing is interpreted or persisted here.",
+    "description" : "Forward-only ingest gateway for the KRT Basetool. It validates the caller's Keycloak JWT, relays the payload to the backend's import endpoints with that same bearer, stages the returned draft in Redis for a single-use browser pickup, and returns the handoff the desktop extractor opens. Nothing is interpreted or persisted here.\n\n## Restricted interface — approved clients only\n\nThis document is published so that the official basetool SC extractor can be developed against a stable contract. It is NOT an open integration API. **Only client software explicitly approved by the basetool developer (@greluc) may use this interface.** Approval means a dedicated Keycloak client registration AND an entry on the gateway's client allowlist; unapproved callers are rejected with `403 CLIENT_NOT_ALLOWED`, are unsupported, and may break without notice. Building or distributing an unapproved client is not permitted — if you want to integrate, ask first.",
     "version" : "1.0"
   },
   "servers" : [ {
@@ -14,7 +14,7 @@
   } ],
   "tags" : [ {
     "name" : "Ingest",
-    "description" : "Forward-only ingest of extractor payloads. Both endpoints relay to the backend with the caller's own bearer and answer with a single-use browser handoff."
+    "description" : "Forward-only ingest of extractor payloads. Both endpoints relay to the backend with the caller's own bearer and answer with a single-use browser handoff.\n\n**RESTRICTED INTERFACE — APPROVED CLIENTS ONLY.** This API is published so that the official basetool SC extractor can be developed against a stable contract. It is NOT an open integration API. Only client software explicitly approved by the basetool developer (@greluc) may use it; approval means a dedicated Keycloak client registration plus an entry on the gateway's client allowlist. Any other tool is rejected with 403 CLIENT_NOT_ALLOWED, is unsupported, and may break without notice. Building or distributing an unapproved client is not permitted — if you want to integrate, ask first."
   } ],
   "paths" : {
     "/v1/refinery-extract" : {
@@ -24,17 +24,13 @@
         "description" : "Accepts the frozen RefineryExtract JSON contract v1 (ADR-0008). The gateway validates the envelope, forwards it to the backend refinery import with the caller's own bearer, and stages the returned draft under the caller's subject. No screenshot and no image bytes are ever transmitted or stored.",
         "operationId" : "ingestRefineryExtract",
         "parameters" : [ {
+          "name" : "X-Correlation-Id",
+          "in" : "header",
+          "description" : "Optional correlation id, echoed on the response and propagated to the backend for cross-module tracing. Accepted only as up to 128 characters of [A-Za-z0-9._-]; any other value is ignored and a fresh id is generated."
+        }, {
           "name" : "Accept-Language",
           "in" : "header",
           "description" : "Caller locale, relayed so backend problems come back localized.",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "name" : "X-Correlation-Id",
-          "in" : "header",
-          "description" : "Correlation id, relayed and echoed for cross-module tracing.",
           "required" : false,
           "schema" : {
             "type" : "string"
@@ -73,6 +69,12 @@
               "application/problem+json" : { }
             }
           },
+          "403" : {
+            "description" : "The caller's client software is not approved for this interface (code CLIENT_NOT_ALLOWED). Only clients explicitly approved by the basetool developer may call it — see the endpoint group description.",
+            "content" : {
+              "application/problem+json" : { }
+            }
+          },
           "413" : {
             "description" : "Payload exceeds the size cap.",
             "content" : {
@@ -107,17 +109,13 @@
         "description" : "The body is an opaque blueprint-export JSON object; the gateway only checks that it is a JSON object and relays it to the backend preview as a file upload. The backend parses and name-matches it, exactly as a manual file import would.",
         "operationId" : "ingestBlueprintPreview",
         "parameters" : [ {
+          "name" : "X-Correlation-Id",
+          "in" : "header",
+          "description" : "Optional correlation id, echoed on the response and propagated to the backend for cross-module tracing. Accepted only as up to 128 characters of [A-Za-z0-9._-]; any other value is ignored and a fresh id is generated."
+        }, {
           "name" : "Accept-Language",
           "in" : "header",
           "description" : "Caller locale, relayed so backend problems come back localized.",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "name" : "X-Correlation-Id",
-          "in" : "header",
-          "description" : "Correlation id, relayed and echoed for cross-module tracing.",
           "required" : false,
           "schema" : {
             "type" : "string"
@@ -154,6 +152,12 @@
           },
           "401" : {
             "description" : "Caller is not authenticated.",
+            "content" : {
+              "application/problem+json" : { }
+            }
+          },
+          "403" : {
+            "description" : "The caller's client software is not approved for this interface (code CLIENT_NOT_ALLOWED). Only clients explicitly approved by the basetool developer may call it — see the endpoint group description.",
             "content" : {
               "application/problem+json" : { }
             }
@@ -374,7 +378,7 @@
             "minItems" : 0
           }
         },
-        "required" : [ "goods", "panelType" ]
+        "required" : [ "goods", "panelType", "sourceImages" ]
       },
       "IngestResponseDto" : {
         "type" : "object",

@@ -246,7 +246,8 @@
         "extractor-ingest",
         "roles",
         "profile",
-        "email"
+        "email",
+        "extractor-ingest-only"
       ]
     },
     {
@@ -288,6 +289,30 @@
           "protocolMapper": "oidc-audience-mapper",
           "config": {
             "included.custom.audience": "basetool-backend",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "name": "extractor-ingest-only",
+      "description": "Exclusive to basetool-sc-extractor. Stamps aud=basetool-ingest and puts its own name in the scope claim, so the ingest gateway can gate on BOTH the audience and the SCOPE_ authority (REQ-INGEST-011). Deliberately NOT assigned to basetool-frontend - that is the whole point: extractor-ingest is shared with the frontend and therefore cannot discriminate.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false",
+        "include.in.openid.provider.metadata": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "aud-basetool-ingest",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "basetool-ingest",
             "access.token.claim": "true",
             "id.token.claim": "false",
             "introspection.token.claim": "true",

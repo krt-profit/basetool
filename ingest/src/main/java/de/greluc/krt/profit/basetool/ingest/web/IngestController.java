@@ -20,10 +20,12 @@
 package de.greluc.krt.profit.basetool.ingest.web;
 
 import de.greluc.krt.profit.basetool.ingest.model.dto.IngestResponseDto;
+import de.greluc.krt.profit.basetool.ingest.model.dto.Provenance;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractDto;
 import de.greluc.krt.profit.basetool.ingest.service.IngestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -61,11 +63,36 @@ import tools.jackson.databind.ObjectMapper;
     name = "Ingest",
     description =
         "Forward-only ingest of extractor payloads. Both endpoints relay to the backend with the"
-            + " caller's own bearer and answer with a single-use browser handoff.")
+            + " caller's own bearer and answer with a single-use browser handoff.\n\n"
+            + "**RESTRICTED INTERFACE — APPROVED CLIENTS ONLY.** This API is published so that the"
+            + " official basetool SC extractor can be developed against a stable contract. It is"
+            + " NOT an open integration API. Only client software explicitly approved by the"
+            + " basetool developer (@greluc) may use it; approval means a dedicated Keycloak client"
+            + " registration plus an entry on the gateway's client allowlist. Any other tool is"
+            + " rejected with 403 CLIENT_NOT_ALLOWED, is unsupported, and may break without notice."
+            + " Building or distributing an unapproved client is not permitted — if you want to"
+            + " integrate, ask first.")
 public class IngestController {
 
   /** Media type every error response carries (RFC 7807); referenced from the response docs. */
   private static final String PROBLEM_JSON = MediaType.APPLICATION_PROBLEM_JSON_VALUE;
+
+  /** Name of the optional inbound correlation header, documented on both operations. */
+  private static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
+
+  /**
+   * Description of {@link #CORRELATION_ID_HEADER} in the published contract.
+   *
+   * <p>The header is documented but deliberately <b>not</b> bound as a controller argument: it is
+   * consumed by {@code CorrelationIdFilter}, which validates it against a strict charset and mints
+   * a fresh id when it fails. Binding it here and threading it onward is what previously let an
+   * unvalidated client value be copied onto the internal backend call (security audit) — the relay
+   * now takes the sanitized id from the MDC instead.
+   */
+  private static final String CORRELATION_ID_HEADER_DESCRIPTION =
+      "Optional correlation id, echoed on the response and propagated to the backend for"
+          + " cross-module tracing. Accepted only as up to 128 characters of [A-Za-z0-9._-]; any"
+          + " other value is ignored and a fresh id is generated.";
 
   private final IngestService ingestService;
   private final ObjectMapper objectMapper;
@@ -77,7 +104,6 @@ public class IngestController {
    * @param jwt the authenticated caller's token (its {@code sub} scopes the handoff; its raw value
    *     is the bearer forwarded to the backend)
    * @param acceptLanguage the caller's locale, relayed so backend problems are localized
-   * @param correlationId the request correlation id, relayed for cross-module tracing
    * @param extract the validated extract payload
    * @return the handoff id, kind and frontend URL
    */
@@ -91,7 +117,12 @@ public class IngestController {
           "Accepts the frozen RefineryExtract JSON contract v1 (ADR-0008). The gateway validates"
               + " the envelope, forwards it to the backend refinery import with the caller's own"
               + " bearer, and stages the returned draft under the caller's subject. No screenshot"
-              + " and no image bytes are ever transmitted or stored.")
+              + " and no image bytes are ever transmitted or stored.",
+      parameters =
+          @Parameter(
+              name = CORRELATION_ID_HEADER,
+              in = ParameterIn.HEADER,
+              description = CORRELATION_ID_HEADER_DESCRIPTION))
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -107,6 +138,13 @@ public class IngestController {
     @ApiResponse(
         responseCode = "401",
         description = "Caller is not authenticated.",
+        content = @Content(mediaType = PROBLEM_JSON)),
+    @ApiResponse(
+        responseCode = "403",
+        description =
+            "The caller's client software is not approved for this interface (code"
+                + " CLIENT_NOT_ALLOWED). Only clients explicitly approved by the basetool developer"
+                + " may call it — see the endpoint group description.",
         content = @Content(mediaType = PROBLEM_JSON)),
     @ApiResponse(
         responseCode = "413",
@@ -132,12 +170,9 @@ public class IngestController {
       @Parameter(description = "Caller locale, relayed so backend problems come back localized.")
           @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage,
-      @Parameter(description = "Correlation id, relayed and echoed for cross-module tracing.")
-          @RequestHeader(value = "X-Correlation-Id", required = false)
-          String correlationId,
       @Valid @RequestBody @NotNull RefineryExtractDto extract) {
     return ingestService.ingestRefinery(
-        jwt.getSubject(), jwt.getTokenValue(), acceptLanguage, correlationId, extract);
+        jwt.getSubject(), jwt.getTokenValue(), acceptLanguage, extract);
   }
 
   /**
@@ -149,7 +184,6 @@ public class IngestController {
    * @param jwt the authenticated caller's token (its {@code sub} scopes the handoff; its raw value
    *     is the bearer forwarded to the backend)
    * @param acceptLanguage the caller's locale, relayed so backend problems are localized
-   * @param correlationId the request correlation id, relayed for cross-module tracing
    * @param export the blueprint export JSON; must be a JSON object
    * @return the handoff id, kind and frontend URL
    */
@@ -163,6 +197,11 @@ public class IngestController {
           "The body is an opaque blueprint-export JSON object; the gateway only checks that it is a"
               + " JSON object and relays it to the backend preview as a file upload. The backend"
               + " parses and name-matches it, exactly as a manual file import would.",
+      parameters =
+          @Parameter(
+              name = CORRELATION_ID_HEADER,
+              in = ParameterIn.HEADER,
+              description = CORRELATION_ID_HEADER_DESCRIPTION),
       requestBody =
           @io.swagger.v3.oas.annotations.parameters.RequestBody(
               required = true,
@@ -193,6 +232,13 @@ public class IngestController {
         description = "Caller is not authenticated.",
         content = @Content(mediaType = PROBLEM_JSON)),
     @ApiResponse(
+        responseCode = "403",
+        description =
+            "The caller's client software is not approved for this interface (code"
+                + " CLIENT_NOT_ALLOWED). Only clients explicitly approved by the basetool developer"
+                + " may call it — see the endpoint group description.",
+        content = @Content(mediaType = PROBLEM_JSON)),
+    @ApiResponse(
         responseCode = "413",
         description = "Payload exceeds the size cap.",
         content = @Content(mediaType = PROBLEM_JSON)),
@@ -216,15 +262,16 @@ public class IngestController {
       @Parameter(description = "Caller locale, relayed so backend problems come back localized.")
           @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage,
-      @Parameter(description = "Correlation id, relayed and echoed for cross-module tracing.")
-          @RequestHeader(value = "X-Correlation-Id", required = false)
-          String correlationId,
       @RequestBody @NotNull JsonNode export) {
     if (!export.isObject()) {
       throw new BadRequestException("The blueprint export must be a JSON object.");
     }
     byte[] bytes = objectMapper.writeValueAsBytes(export);
+    // The body stays opaque (the backend parses it), but the envelope's provenance triple is read
+    // here so the blueprint path gets the same client-identity check and shape logging the refinery
+    // path has (REQ-INGEST-011). The export carries `tool`/`toolVersion`/`schemaVersion` itself, so
+    // this needs no extra header and no extractor change.
     return ingestService.ingestBlueprint(
-        jwt.getSubject(), jwt.getTokenValue(), acceptLanguage, correlationId, bytes);
+        jwt.getSubject(), jwt.getTokenValue(), acceptLanguage, bytes, Provenance.from(export));
   }
 }

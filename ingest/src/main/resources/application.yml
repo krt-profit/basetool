@@ -80,6 +80,37 @@ app:
     # guarantees. Env-overridable so the value can be tuned from .env without rebuilding the image.
     handoff-ttl: ${APP_INGEST_HANDOFF_TTL:PT30M}
     max-payload-bytes: 2097152
+    # Client-identity gate (REQ-INGEST-011): WHICH CLIENT SOFTWARE may drive the gateway. The user
+    # gate is unchanged and stays isAuthenticated() for every member (REQ-INGEST-002/-008).
+    #
+    # THE INGEST INTERFACE IS RESTRICTED TO CLIENTS APPROVED BY THE BASETOOL DEVELOPER (@greluc).
+    # Approval = a dedicated Keycloak client registration PLUS an entry in the allowlist below. Two
+    # independent gates, so neither a stray Keycloak registration nor a config slip grants access on
+    # its own, and removing the allowlist entry is the instant kill switch.
+    #
+    # Every value is EMPTY by default, which makes each check inert — the Keycloak-side mappers and
+    # scopes are an operator step that cannot be done by a PR (docs/INGEST_KEYCLOAK_SETUP.md), so
+    # shipping these pre-enabled would reject every real extractor token on deploy. Configure, verify
+    # against a live token with audit-only, then enforce (same sequencing as REQ-INGEST-008).
+    #
+    # No defaults are baked in on purpose: the code shows THAT a gate exists, the environment decides
+    # WHO passes it.
+    client-identity:
+      # Keycloak client ids (azp) allowed to call /v1/**, e.g. `basetool-sc-extractor`. Comma-separated.
+      # Several at once are supported so a client-id rotation needs no downtime.
+      allowed-client-ids: ${APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS:}
+      # OAuth scope an ingest token must carry, e.g. `extractor-ingest` -> SCOPE_extractor-ingest.
+      # Only discriminating if that scope was NOT also assigned to the frontend client (runbook step 3).
+      required-scope: ${APP_INGEST_CLIENT_IDENTITY_REQUIRED_SCOPE:}
+      # Accepted payload `tool` provenance, e.g. `basetool-sc-extractor`. Client-supplied and hence
+      # forgeable — telemetry with a reject attached, never authentication.
+      allowed-tools: ${APP_INGEST_CLIENT_IDENTITY_ALLOWED_TOOLS:}
+      # true = run every configured check but never reject; log + count only. The safe way to enable
+      # the gates in prod: configure, watch basetool_ingest_client_rejected_total stay at zero, flip off.
+      audit-only: ${APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY:false}
+      # true = require a DPoP-bound token (RFC 9449); a plain bearer is refused. MUST stay false until
+      # the desktop extractor ships DPoP support — it sends `Authorization: Bearer` today.
+      dpop-required: ${APP_INGEST_CLIENT_IDENTITY_DPOP_REQUIRED:false}
   rate-limit:
     enabled: true
     capacity: 30

@@ -69,6 +69,9 @@ class RefineryImportControllerTest {
           {
             "panelType": "SETUP",
             "quoted": true,
+            "sourceImages": [
+              { "name": "panel.png", "width": 1920, "height": 1080, "cropMode": "vlm" }
+            ],
             "goods": [
               {
                 "rawMaterialName": "STILERON (ORE)",

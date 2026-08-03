@@ -9,8 +9,17 @@ without ever committing secrets or PII.
 - [`realm-config.reference.json`](realm-config.reference.json) — a **sanitized reference** of the
   prod `iri` realm. It is **not** an importable realm dump and **must not** be used to provision a
   realm directly. It captures the configuration that matters for this codebase (token/session
-  lifetimes, the application clients, the `extractor-ingest` audience scope, roles, security
-  headers) and nothing else.
+  lifetimes, the application clients, the `extractor-ingest` audience scope and the
+  extractor-exclusive `extractor-ingest-only` scope behind the ingest client-identity gate, roles,
+  security headers) and nothing else.
+
+  > **Do not merge the two ingest scopes.** `extractor-ingest` is a **default scope on both**
+  > `basetool-frontend` and `basetool-sc-extractor` and carries `include.in.token.scope: false`;
+  > `extractor-ingest-only` is assigned to the extractor **alone** and emits its name into the
+  > `scope` claim. That separation is exactly what lets the gateway tell an extractor token from a
+  > browser session token (`REQ-INGEST-011`) — putting the `basetool-ingest` audience on the shared
+  > scope, or assigning the exclusive scope to the frontend, silently disables the gate. See
+  > [`INGEST_KEYCLOAK_SETUP.md` step 7a](../INGEST_KEYCLOAK_SETUP.md).
 
 The throwaway **test** realm used by the Playwright e2e suite lives elsewhere, at
 [`frontend/src/e2e/resources/realm-export.e2e.json`](../../frontend/src/e2e/resources/realm-export.e2e.json),

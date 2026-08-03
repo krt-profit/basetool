@@ -61,7 +61,7 @@ The full permission model is in [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS
 - **Frontend** — Thymeleaf-rendered UI calling the backend via a centrally-configured, Resilience4j-wrapped WebClient. No business logic of its own; no direct database or Keycloak Admin API access.
 - **Keycloak** — OAuth2 / OIDC identity provider with a custom KRT theme and a `keycloak-spi` provider JAR (Discord login + the guild/role login gate).
 - **Redis** — Spring Session store; sessions survive frontend restarts.
-- **Ingest** — internet-facing one-click gateway for the desktop extractor; owns no database and relays token-authenticated `POST`s to the backend over the internal network so the backend stays internet-unreachable.
+- **Ingest** — internet-facing one-click gateway for the desktop extractor; owns no database and relays token-authenticated `POST`s to the backend over the internal network so the backend stays internet-unreachable. **Restricted interface:** only client software explicitly approved by the basetool developer (@greluc) may use it — see [`docs/specs/desktop-ingest.md`](docs/specs/desktop-ingest.md).
 
 The tenant unit is the **OrgUnit** — a Staffel (`SQUADRON`), Spezialkommando (`SPECIAL_COMMAND`), Bereich (`BEREICH`) or Organisationsleitung (`ORGANISATIONSLEITUNG`), the latter two stacked above the Staffeln/SKs. Staffel-scoped aggregates (Mission, Operation, Ship, InventoryItem, RefineryOrder) carry an `owning_org_unit_id` (nullable for deliberate *ownerless* rows). Job Orders are scoped separately via `responsible_org_unit_id` (the processing unit, governs visibility) and `requesting_org_unit_id` (the customer). See [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md) for the full per-aggregate scope model.
 
@@ -226,7 +226,7 @@ The exact `keytool` and realm-rewrite recipes (and why real artifacts must never
 
 - **`backend`** — REST API only. Layered `controller` → `service` → `repository` → `model`, with `dto` records, MapStruct `mapper`s, `config`, `integration` (UEX), `task` (scheduled jobs), `filter`/`interceptor`.
 - **`frontend`** — Thymeleaf UI. `service.BackendApiClient` is the single seam to the backend; Redis holds persistent session state.
-- **`ingest`** — internet-facing one-click gateway (desktop extractor → basetool); owns no database, relays to the backend internally.
+- **`ingest`** — internet-facing one-click gateway (desktop extractor → basetool); owns no database, relays to the backend internally. Its published OpenAPI document exists so the official extractor can be built against a stable contract — the interface itself is **restricted to approved clients** (`REQ-INGEST-011`) and is not an open integration API; unapproved callers are refused `403 CLIENT_NOT_ALLOWED`.
 - **`keycloak-spi`** — Keycloak provider JAR: the Discord identity provider and the guild/role login gate.
 - **`keycloak-theme/krt-theme`** — custom Keycloak login + account UI theme.
 - **`scripts`** — server-side operations layer (deploy, cleanup, migration guard) plus their systemd/logrotate units.
