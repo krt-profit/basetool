@@ -108,9 +108,6 @@ app:
       # true = run every configured check but never reject; log + count only. The safe way to enable
       # the gates in prod: configure, watch basetool_ingest_client_rejected_total stay at zero, flip off.
       audit-only: ${APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY:false}
-      # true = require a DPoP-bound token (RFC 9449); a plain bearer is refused. MUST stay false until
-      # the desktop extractor ships DPoP support — it sends `Authorization: Bearer` today.
-      dpop-required: ${APP_INGEST_CLIENT_IDENTITY_DPOP_REQUIRED:false}
   rate-limit:
     enabled: true
     capacity: 30

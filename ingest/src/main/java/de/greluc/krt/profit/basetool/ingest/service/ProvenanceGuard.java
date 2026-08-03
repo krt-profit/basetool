@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.model.dto.Provenance;
 import de.greluc.krt.profit.basetool.ingest.web.ClientNotAllowedException;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -71,7 +72,7 @@ public class ProvenanceGuard {
       return;
     }
     String tool = provenance.tool();
-    if (tool != null && clientIdentityProperties.getAllowedTools().contains(tool)) {
+    if (tool != null && isAllowed(tool)) {
       return;
     }
     meterRegistry
@@ -97,7 +98,33 @@ public class ProvenanceGuard {
         LogSafe.text(provenance.toolVersion(), MAX_LOGGED_PROVENANCE),
         provenance.schemaVersion());
     throw new ClientNotAllowedException(
-        "This client is not approved for the basetool ingest path. Only the official basetool"
-            + " SC extractor is supported; other tools are not permitted.");
+        "This client is not approved for the basetool ingest path (payload provenance). Only the"
+            + " official basetool SC extractor is supported; other tools are not permitted.");
+  }
+
+  /**
+   * Reports whether the declared producer is on the allowlist, compared <b>case-insensitively</b>.
+   *
+   * <p>Case folding is not cosmetic here. The producer strings are hand-maintained constants in a
+   * separately-released client, and this project has already been bitten by exactly that class of
+   * drift: the extractor emits {@code basetool-sc-extractor} on the refinery path but {@code
+   * Basetool SC Extractor} on the blueprint path, which is what broke every blueprint send in the
+   * 2026-08-03 incident. The two spellings differ structurally, so folding case alone would not
+   * have prevented it — both belong on the allowlist — but it removes the adjacent failure mode
+   * where a later release merely re-cases its constant and takes the ingest path down again.
+   *
+   * <p>Uses {@link Locale#ROOT} rather than the default locale: under a Turkish default, {@code
+   * "I".toLowerCase()} yields a dotless ı and an ASCII producer name would stop matching itself.
+   *
+   * @param tool the payload's declared, non-null producer
+   * @return {@code true} when an allowlist entry matches ignoring case
+   */
+  private boolean isAllowed(@NotNull String tool) {
+    for (String allowed : clientIdentityProperties.getAllowedTools()) {
+      if (allowed.toLowerCase(Locale.ROOT).equals(tool.toLowerCase(Locale.ROOT))) {
+        return true;
+      }
+    }
+    return false;
   }
 }
