@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.model.dto.request;
 
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.validation.WholeNumber;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -77,8 +78,15 @@ public record CreateBankBookingRequest(
    * percentage; otherwise no percentage is allowed. The numeric range/whole-number of {@link
    * #splitPercent} is enforced by its own field constraints.
    *
+   * <p>{@code @Schema(hidden = true)} keeps this derived guard out of the generated OpenAPI
+   * document: it is computed from the other fields and is never part of the request payload.
+   * Accessor-derived schema properties are also harvested in unguaranteed {@code
+   * Class#getDeclaredMethods()} order, which rewrote {@code openapi.json} between builds (see
+   * {@code OpenApiDerivedPropertyTest}).
+   *
    * @return {@code true} when the split flag, type and percentage are consistent
    */
+  @Schema(hidden = true)
   @AssertTrue(message = "A split is only valid on a deposit and requires a percentage")
   public boolean isSplitConfigConsistent() {
     if (!splitEnabled) {

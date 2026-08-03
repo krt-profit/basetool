@@ -68,6 +68,17 @@ groups:
       # ScheduledJobFailureStreak never fire during a weeks-long catalogue outage. This counts the
       # swallowed failures directly (basetool_external_fetch_errors_total{source}).
       # baseline-tune: >3 errors in 6h is the issue's initial threshold.
+      #
+      # The healthy baseline for every source is a flat 0 — the threshold buys tolerance for a
+      # transient blip, NOT headroom for a standing per-run error count. Until 2026-08-03 the uex
+      # series sat at 2 per backend process because UexClient counted UEX's empty result set
+      # (`{"status":"ok","http_code":200,"data":null}`, returned for the two permanently empty item
+      # categories 12/69) as a fetch error. Two per run is under the threshold on its own, but the
+      # counter resets on every backend restart and increase() adds the pre-reset segment back, so
+      # two restarts inside the 6h window summed to 4 and fired this alert with no upstream fault
+      # behind it. When triaging, first check whether the errors are a per-run baseline
+      # (resets(...[6h]) vs changes(process_start_time_seconds[6h])): a fixed count repeating every
+      # run points at the client, a burst that does not track the sync cadence points at upstream.
       - alert: ExternalFetchErrors
         expr: sum by (source) (increase(basetool_external_fetch_errors_total[6h])) > 3
         for: 30m
