@@ -979,8 +979,10 @@ transaction per pass) rather than per-scrape.
   degrades cross-replica push). These emit only where the fan-out is enabled (prod); a sustained
   `publish` error stream drives the `LiveSyncRedisFanoutBroken` alert (below).
 
-**Frontend.** `basetool_mission_presence_missions` gauge (missions with a live editor; single-JVM
-edit-awareness, unlabelled), `basetool_active_sessions` gauge (active Spring Session sessions;
+**Frontend.** `basetool_mission_presence_missions` gauge (missions with a live editor tracked in
+**this JVM** — it deliberately stayed local-only when presence became cross-instance in #1237, so
+summing it across replicas still answers "who is editing here"; unlabelled),
+`basetool_active_sessions` gauge (active Spring Session sessions;
 `@Profile("!test")`, maintained by `ActiveSessionsTracker` from Spring Session create/delete/expire
 events and seeded once at startup from the Redis session namespace — it MUST NOT sample the
 Redis-backed `SpringSessionBackedSessionRegistry`, whose `getAllPrincipals()` throws and left the
@@ -1083,7 +1085,19 @@ the same `07` "Presence relay drops/hour" panel), and the cross-replica fan-out 
 `basetool_livesync_redis_published_total{topic_class}` / `basetool_livesync_redis_consumed_total{topic_class}`
 (`changed` signals published to / consumed from the `basetool:livesync:changed` Redis channel;
 own-origin excluded) plus `basetool_livesync_redis_errors_total{op}` (`publish` / `consume`, a
-swallowed fan-out failure that degrades only cross-replica delivery). Together with the backend
+swallowed fan-out failure that degrades only cross-replica delivery). The cross-replica
+**editor-presence** gossip (#1237, ADR-0126) keeps its own series rather than sharing those:
+`basetool_livesync_presence_published_total{topic_class}` /
+`basetool_livesync_presence_consumed_total{topic_class}` and the unlabelled gauge
+`basetool_livesync_presence_remote_partitions` (live `(topic, peer instance)` partitions mirrored
+here — the direct "is cross-instance presence arriving" signal; a flat zero is correct on a
+single-replica deployment, and a zero on a multi-replica one while several replicas report
+`basetool_mission_presence_missions > 0` means the gossip is not landing). Separate names because
+the gossip is *periodic* while the changed relay is *event-driven*: folded together, the steady
+gossip floor would swamp the changed-relay rate the fan-out panel exists to show. Gossip failures
+count under `op=presence_publish` / `presence_consume` on the shared errors counter and are
+deliberately **outside** the `LiveSyncRedisFanoutBroken` expression — a lost `changed` publish costs
+correctness, a lost gossip costs a cosmetic dot. Together with the backend
 `basetool_sse_redis_*` counters above, a sustained `publish`-error stream on either fan-out drives the
 `LiveSyncRedisFanoutBroken` alert (both fire only where the Redis fan-out is enabled, i.e. prod). All labels are fixed literals, pure counts. The `frontend-sse-pool` and
 `frontend-pool` Reactor-Netty connection pools additionally export `reactor.netty.connection.provider.*`
