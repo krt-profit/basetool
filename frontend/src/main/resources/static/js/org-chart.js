@@ -33,6 +33,23 @@
 
 /* global OC_I18N */
 
+// ---- Live multi-user sync — the Organigramm (REQ-FE-010 / REQ-FE-015, ADR-0094, #1235) ---------
+// ORG_CHART_SECTIONS is the single source of truth shared by this page's write-side broadcast and
+// its receive-side refresh (the three-mirror-points rule). Its one key is a SUBSET of the server
+// LiveSyncTopicClass.ORG_STRUCTURE whitelist: the room is shared with the admin Organisationsstruktur
+// editor (admin-org-structure.js), which owns the `units` and `forms` keys. Both surfaces render the
+// same hierarchy, so a position edit here pokes the editor's `units` table and a parent-edge change
+// there pokes this `chart` — publishing to a room needs no subscription to it.
+//
+// The chart is read-only for members and editable by admins; every viewer re-pulls its own
+// authorization-checked chartBody fragment, so no chart data ever rides the socket.
+const ORG_CHART_SECTIONS = {
+    chart: { container: '#oc-chart', fragmentValue: 'chartBody' },
+};
+
+// The admin editor's unit table, poked but never rendered by this page.
+const ORG_CHART_UNITS_SECTION = 'units';
+
 (function () {
     'use strict';
     const chart = document.getElementById('oc-chart');
@@ -87,6 +104,36 @@
                     window.requestAnimationFrame(reapply);
                 })();
             });
+    }
+
+    // Tells peers the hierarchy changed: the tree here plus the admin editor's unit table. Called
+    // only after a write this page made — never when applying an inbound signal, which would echo
+    // straight back into a loop.
+    function broadcastOrgStructureChanged() {
+        if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
+            window.krtLiveSync.sendChanged('org-structure', ['chart', ORG_CHART_UNITS_SECTION]);
+        }
+    }
+
+    if (chart && window.krtLiveSync && typeof window.krtLiveSync.createReceiver === 'function') {
+        window.krtLiveSync.createReceiver({
+            topic: 'org-structure',
+            sections: ORG_CHART_SECTIONS,
+            // Global room: the longer coalesce window (#1125) flattens the re-fetch herd.
+            coalesceMs: 1500,
+            // No keepScroll argument: the peer-driven path has no modal-close reflow to guard
+            // against, so refreshChart reads the live scrollLeft itself.
+            refresh: function () {
+                refreshChart();
+            },
+            // The edit dialog is a plain `.modal` toggled through inline display, NOT a
+            // `.krt-modal-overlay`, so krtLiveSync's generic "any modal open" probe does not see
+            // it. Without this the tree — and every data-version in it — would be swapped out from
+            // under an open dialog, and the admin's next submit would 409 on a stale version.
+            busyTest: function () {
+                return !!modal && window.getComputedStyle(modal).display !== 'none';
+            },
+        });
     }
 
     // One JSON write, headers read fresh from window.krtCsrf (epic #571 / REQ-SEC-010) so the
@@ -255,6 +302,8 @@
                     // does not 409 (no reload). #574/#578/#579 chose the same fragment-swap over a
                     // node patch because the add affordances + ARIA order are derived state.
                     refreshChart(keepScroll);
+                    // #1235: and tell every peer viewing the Organigramm or the admin editor.
+                    broadcastOrgStructureChanged();
                     return null;
                 }
                 return resp

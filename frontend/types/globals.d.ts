@@ -218,10 +218,29 @@ interface KrtSectionWriteConfig {
     keys: Record<string, string>;
     /** Maps a section key to its swap container and Thymeleaf fragment value. */
     sections: Record<string, { container: string; fragmentValue: string }>;
-    /** Late-bound accessor for the URL the section fragments are fetched from. */
-    pageUrl(): string;
-    /** Late-bound accessor for the peer-broadcast channel, when the page has one. */
-    broadcast?(): { send(section: string): void } | null | undefined;
+    /**
+     * Late-bound accessor for the URL the section fragments are fetched from.
+     * Null while the page's entity has no id yet — `refresh()` then resolves
+     * false for that section instead of fetching, so a detail page can install
+     * the seam before the entity exists.
+     */
+    pageUrl(): string | null;
+    /**
+     * Peer-notification closure (REQ-FE-010): called by `refresh`/`notify` with the
+     * changed section keys so the page can publish them to its live-sync room.
+     * Late-bound, since the socket client is installed after this factory runs.
+     */
+    broadcast?(sectionKeys: string[]): void;
+}
+
+/** Options for {@linkcode KrtSectionWriter.refresh}. */
+interface KrtSectionRefreshOpts {
+    /**
+     * `false` suppresses the peer broadcast — mandatory when the refresh IS the
+     * application of a peer's inbound signal, which would otherwise echo straight
+     * back into a loop. Defaults to broadcasting.
+     */
+    broadcast?: boolean;
 }
 
 /** The `{write, refresh, notify}` trio returned by {@linkcode KrtFetchApi.sectionWrite}. */
@@ -233,7 +252,7 @@ interface KrtSectionWriter {
      * peers. Resolves once every swap completed — with one flag per section, in
      * the order given — so callers can then close a modal.
      */
-    refresh(sectionKeys: string | string[], opts?: KrtSwapOpts): Promise<boolean[]>;
+    refresh(sectionKeys: string | string[], opts?: KrtSectionRefreshOpts): Promise<boolean[]>;
     /** Broadcast-only sibling of `refresh` for handlers that already patched the DOM. */
     notify(sectionKeys: string | string[]): void;
 }
@@ -301,8 +320,13 @@ interface KrtLiveSyncApi {
     createReceiver(config: unknown): unknown;
     /** Subscribes to a topic room and returns the subscription handle. */
     subscribe(topic: string, handler: (message: any) => void): unknown;
-    /** Broadcasts that a section changed, so peers re-render it. */
-    sendChanged(topic: string, section: string): void;
+    /**
+     * Broadcasts that one or more sections changed, so peers re-render them. A bare
+     * key is wrapped into a single-element array by the client; the relay then drops
+     * anything outside the topic class's whitelist. Publishing needs no subscription
+     * to the room (ADR-0094), which is what lets two surfaces poke each other.
+     */
+    sendChanged(topic: string, sections: string | string[]): void;
     /** Broadcasts a presence event (focus/blur/heartbeat) for a section. */
     sendPresence(topic: string, kind: string, section: string): void;
     /** The topics currently subscribed on this connection. */
@@ -323,6 +347,111 @@ interface KrtReauthApi {
     redirect(url?: string): void;
     /** Returns true when the response demanded re-authentication. */
     check(response: Response): boolean;
+}
+
+/**
+ * A control the refinery-order forms address by id: the raw `<select>` before
+ * combobox enhancement, or the hidden `<input>` that carries the control's id
+ * after it (REQ-FE-016). Only `id` and `value` are ever read, which both carry —
+ * the union names the two shapes the DOM actually holds at those ids.
+ */
+type KrtRefineryControl = HTMLInputElement | HTMLSelectElement;
+
+/**
+ * The material-row yield-badge manager installed by `refinery-yield-badge.js`
+ * and shared by both refinery-order forms (create + detail). It holds the
+ * `{materialId -> bonusPercent}` map for the order's current refinery in memory,
+ * so a material or location change re-renders the badges without a reload.
+ */
+interface KrtRefineryYieldApi {
+    /**
+     * Replaces the in-memory yield map and the badge tooltip text. The page
+     * bootstrap calls this once with the server-rendered state; a nullish map is
+     * read as "no UEX data for this refinery" and collapses every badge.
+     */
+    init(
+        initialMap: Record<string, number> | null | undefined,
+        helpText: string | null | undefined,
+    ): void;
+    /**
+     * Sets, updates or removes the badge on the material row `rowIndex`. A
+     * nullish `bonus` removes the badge entirely ("no UEX row for this material
+     * at this refinery"); 0 renders a neutral "0%" badge rather than none.
+     */
+    setBadge(rowIndex: string | number, bonus: number | null | undefined): void;
+    /**
+     * Re-renders the badge of the row owning `control`, taking the row index
+     * from the control's trailing `_<n>` id suffix and the material id from its
+     * value. A control with no such id suffix is ignored.
+     */
+    refreshFor(control: KrtRefineryControl | null | undefined): void;
+    /** Re-renders every material row's badge against the current map. */
+    refreshAll(): void;
+    /**
+     * The location picker changed: refetches that refinery's map from the
+     * page-controller proxy and re-renders every badge. Resolves once the new
+     * map is applied — a nullish location, a 4xx or a network failure all fall
+     * back to an empty map rather than rejecting, so the form stays usable when
+     * UEX or the backend is misbehaving.
+     */
+    onLocationChange(control: KrtRefineryControl | null | undefined): Promise<void>;
+}
+
+/** One tag's share of a book-out / transfer deduction plan. */
+interface KrtHerkunftReduction {
+    /** The job-order or mission id the amount is deducted from. */
+    targetId: string;
+    /** The amount taken from that target, already rounded to the material's unit. */
+    amount: number;
+}
+
+/**
+ * The "Herkunft" (provenance) picker installed by `inventory-herkunft.js`: it
+ * lets the book-out and transfer modals split a deduction across the earmarks a
+ * stock entry carries. Each call is scoped by the modal's `prefix` (`'bookout'`
+ * / `'umbuchen'`), so one module serves both dialogs.
+ */
+interface KrtHerkunftApi {
+    /** Renders the picker for the given modal from the source entry's leaf row. */
+    populate(prefix: string, itemId: string): void;
+    /** Recomputes the picker's derived amounts; returns whether the plan is submittable. */
+    recompute(prefix: string): boolean;
+    /**
+     * Reads the current plan for submission. Both dimensions are null when the
+     * picker is inactive or contributes no split, which tells the backend to
+     * apply its own default deduction order.
+     */
+    collect(prefix: string): {
+        jobOrderReductions: KrtHerkunftReduction[] | null;
+        missionReductions: KrtHerkunftReduction[] | null;
+    };
+    /** Recomputes and reports whether the plan is currently submittable. */
+    isValid(prefix: string): boolean;
+    /** Clears and hides the picker, e.g. when its modal closes. */
+    reset(prefix: string): void;
+}
+
+/**
+ * A Materialbörse create/edit dialog — the offer side from
+ * `materialboerse-release.js` (`krtMaterialRelease`) and the request side from
+ * `materialgesuch-modal.js` (`krtMaterialRequest`). Both expose the same pair.
+ */
+interface KrtMaterialDialogApi {
+    /**
+     * Opens the dialog. `mode` selects the variant the dialog renders (`'new'`,
+     * `'edit'`, and the offer dialog's `'lager'` / `'item'` entry points), `ctx`
+     * seeds it — an absent or empty object is the "blank new entry" case — and
+     * `doneOrOpts` is either a bare success callback receiving the response body
+     * or a `{onDone, onCancel}` pair, where `onCancel` fires on a dismissal.
+     */
+    open(
+        mode: string,
+        ctx?: Record<string, unknown> | null,
+        doneOrOpts?:
+            ((body: any) => void) | { onDone?: (body: any) => void; onCancel?: () => void } | null,
+    ): void;
+    /** Closes the dialog and discards its in-progress state. */
+    close(): void;
 }
 
 /**
@@ -470,13 +599,26 @@ interface Window {
         /** Endpoint the owners panel queries, with its own query string already applied. */
         ownersUrl?: string;
     };
-    krtHerkunft?: unknown;
-    krtMaterialRelease?: unknown;
-    krtMaterialRequest?: unknown;
-    krtRefineryYield?: unknown;
+    krtHerkunft?: KrtHerkunftApi;
+    krtMaterialRelease?: KrtMaterialDialogApi;
+    krtMaterialRequest?: KrtMaterialDialogApi;
+    /**
+     * Declared required, not optional: both refinery-order page modules call
+     * `krtRefineryYield.init(...)` unguarded at parse time, and the templates
+     * load `refinery-yield-badge.js` ahead of them. A refinery form rendered
+     * without that script is already broken — the type should not push an
+     * optional-chaining obligation onto every call site to hide it.
+     */
+    krtRefineryYield: KrtRefineryYieldApi;
     krtOpenEditCrewModal?: (...args: any[]) => void;
     krtOperationsReload?: (...args: any[]) => void;
     krtRefreshOrdersQueue?: (...args: any[]) => void;
+    /**
+     * Re-swaps the /members roster for the viewer's own filter + page. Exposed by
+     * the members.html bootstrap so the live-sync receiver in members.js can apply
+     * a peer's member edit / delete / Keycloak sync in place (#1235).
+     */
+    krtRefreshMembersResults?: () => void;
 
     // --- mission page section-write trio (produced by sectionWrite)
     krtMissionWrite?: KrtSectionWriter['write'];
@@ -492,6 +634,12 @@ interface Window {
     opNotifyChanged?: (...args: any[]) => void;
 
     // --- page-local state flags and legacy inline-template callbacks
+    /**
+     * The refinery order the detail page is showing — keys its `refinery-order:{id}` live-sync room
+     * and the base URL its `?fragment=` section refreshes are pulled from. Set by the page bootstrap
+     * of refinery-orders-details.html; absent on every other page.
+     */
+    refineryOrderId?: string | null;
     __unsavedChangesInitialized?: boolean;
     __ordersDragging?: boolean;
     resetUnsavedChanges?: () => void;

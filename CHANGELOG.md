@@ -4,7 +4,13 @@
 
 ### Added
 
+- **Raffinerieauftrag-Detailseite: Speichern und Einlagern bleiben jetzt auf der Seite, und zwei Personen sehen die Änderungen des anderen live.** Bisher sprang die Seite nach jeder Aktion zurück zur Liste, und ein zweiter Betrachter merkte von einer fremden Änderung nur den Versionskonflikt beim eigenen Speichern. Formular, Materialtabelle und der Einlagern-Dialog werden jetzt an Ort und Stelle aktualisiert; wird die Ausbeute einem Auftrag zugeordnet, frischt sich dessen offene Materialübersicht mit auf. Abbrechen führt weiterhin zur Liste, da der Auftrag die Arbeitsliste verlässt (REQ-FE-001/REQ-FE-015, #1238).
+
 - **Blueprint-Import: Munition aus einem deutschen Star-Citizen-Client wird jetzt direkt erkannt.** Ein deutscher Client schreibt „(30 Schuss)" statt „(30 cap)"; solche Namen mussten bisher beim ersten Import einmal von Hand zugeordnet werden — rund 13 Stück. Die Zuordnungen sind jetzt vorbelegt. Wer sie bereits selbst zugeordnet hat, behält seine Zuordnung (#1485).
+
+- **Live-Aktualisierung jetzt auch in Missionsliste, Raffinerie, Mitgliederverwaltung und Organisationsstruktur.** Ändert jemand anderes einen Eintrag, aktualisiert sich die offene Liste an Ort und Stelle statt still zu veralten — bisher half nur ein manuelles Neuladen. Das Organigramm und der Struktur-Editor teilen sich dabei einen Kanal: eine Zuordnungsänderung erreicht beide Ansichten (REQ-FE-015).
+
+- **Einlagern aus der Raffinerie aktualisiert jetzt auch ein offenes Lager.** Die eingelagerte Ausbeute erschien dort bisher erst nach einem Neuladen.
 
 - **Zwei neue Alarme für die Live-Aktualisierung.** Verwirft die Verteilung eine Änderung, sehen die anderen Betrachter unbemerkt einen veralteten Stand — ohne Fehlermeldung auf beiden Seiten. `LiveSyncRelayDropsSustained` schlägt bei anhaltenden Verlusten je Oberfläche an, `LiveSyncSectionKeySkew` beim Senden eines Bereichsschlüssels, den die Verteilung nicht kennt. Beide Schwellen stammen aus 21 Tagen gemessenem Produktivbetrieb (REQ-OBS-011).
 
@@ -24,6 +30,8 @@
 
 - **Vier Dienste dürfen jetzt kurzzeitig mehr Rechenleistung ziehen.** Die Weboberfläche stand pro Woche rund 25 Minuten still, weil ihre Obergrenze kurze Lastspitzen abschnitt — bei einem Server, der im Mittel zu 3 % ausgelastet ist. Betroffen waren Weboberfläche, Ingest-Gateway, Sitzungsspeicher und der vorgelagerte Webserver; spürbar wird das als geringere Wartezeit beim Seitenaufbau (#937).
 
+- **Organisationsstruktur: Die Seite lädt nach dem Anlegen oder Umhängen einer Einheit nicht mehr komplett neu.** Nur der betroffene Abschnitt wird neu gezeichnet; eine halb ausgefüllte Anlegen-Maske bleibt erhalten und wird erst auf Klick aktualisiert.
+
 ### Fixed
 
 - **Ingest-Gateway: Blueprint-Versand aus dem Extractor schlug fehl.** Der Extractor schreibt je Export-Pfad eine andere Herkunftsangabe; die Freigabeliste kannte nur eine davon, wodurch jeder Blueprint-Versand mit „nicht freigegeben" abgewiesen wurde. Beide Schreibweisen sind jetzt dokumentiert, und der Vergleich ignoriert Groß-/Kleinschreibung.
@@ -31,6 +39,8 @@
 - **Ingest-Gateway: Eine Ablehnung nennt jetzt die Ursache.** Alle vier Prüfungen antworteten mit demselben Satz, sodass aus der Meldung nicht hervorging, welche gegriffen hat. Zusätzlich wird jede abgelehnte Anmeldung nach Fehlerart gezählt — ein 401 war bisher im Betrieb nicht auswertbar.
 
 - **Die Formatierungsprüfung des Frontends schlug auf Windows-Arbeitsplätzen grundlos fehl.** Für TypeScript-Deklarationsdateien fehlte die Zeilenenden-Regel, sodass ein frischer Checkout unter Windows drei Dateien mit CRLF anlegte und Prettier sie beanstandete, obwohl niemand sie angefasst hatte — auf dem Linux-Server blieb der Fehler unsichtbar. `.gitattributes` deckt jetzt auch `*.ts` ab; die Dateiinhalte bleiben unverändert (ADR-0125).
+
+- **Auf jeder Einsatz-Detailseite stand dauerhaft eine rote Fehlermeldung.** Der Hinweis „Der Abschnitt konnte nicht aktualisiert werden" ist nur für eine fehlgeschlagene Teil-Aktualisierung gedacht, wurde aber unter den Reitern bei jedem normalen Seitenaufruf angezeigt — obwohl nichts fehlgeschlagen war. Er erscheint jetzt nur noch im Fehlerfall (REQ-FE-005).
 
 ## [v1.5.30](https://github.com/krt-profit/basetool/releases/tag/v1.5.30) - 2026-08-03
 

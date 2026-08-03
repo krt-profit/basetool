@@ -454,8 +454,12 @@ declare const REFINERY_HANDOFF_ID: string | null;
 declare const MATERIAL_ENTRY_TITLE_LABEL: string;
 /** Injected by the page bootstrap (declared in refinery-orders-create.html). */
 declare const MATERIAL_REMOVE_LABEL: string;
-/** Injected by the page bootstrap (declared in refinery-orders-create.html). */
-declare const MATERIAL_YIELD_BONUSES: KrtI18nDict;
+/**
+ * Injected by the page bootstrap (declared in refinery-orders-create.html).
+ * The order's refinery yield map, `materialId -> bonusPercent`; the values are
+ * numbers, not strings — the controller renders a `Map<String, Integer>`.
+ */
+declare const MATERIAL_YIELD_BONUSES: Record<string, number>;
 /** Injected by the page bootstrap (declared in refinery-orders-create.html). */
 declare const MATERIAL_YIELD_BONUS_HELP: string;
 /** Injected by the page bootstrap (declared in refinery-orders-create.html). */
@@ -464,6 +468,12 @@ declare const RATING_LEVELS: KrtI18nDict;
 declare const SPEED_LEVELS: KrtI18nDict;
 
 // --- consumed by: refinery-orders-details.js
+/**
+ * In-place save/store success toasts plus the two live-sync strings (the deferred-refresh pill
+ * label and the section-refresh error). Injected by the page bootstrap (declared in
+ * refinery-orders-details.html).
+ */
+declare const REFINERY_DETAIL_MSG: KrtI18nDict;
 /** Injected by the page bootstrap (declared in refinery-orders-details.html). */
 declare const MSG_CANCEL_CONFIRM: string;
 /** Injected by the page bootstrap (declared in refinery-orders-details.html). */

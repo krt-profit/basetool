@@ -147,6 +147,31 @@ public enum LiveSyncTopicClass {
       "canViewJobOrders"),
 
   /**
+   * Per-refinery-order room: the refinery-order detail page {@code /refinery-orders/{id}} (#1238).
+   * No editor-presence dots; a subscribe is authorized by the same authenticated {@code GET
+   * /api/v1/refinery-orders/{id}} the page performs, so a caller who may not read the order is
+   * denied.
+   *
+   * <p>Two sections: {@code order} (the main edit form — order-level fields, the goods editor and
+   * the status-gated action row) and {@code store} (the Einlagern dialog's form body, whose rows
+   * are derived from the order's output goods). A save changes both, which is why the store
+   * dialog's source data is a section of its own rather than part of the main seam.
+   *
+   * <p>The wire prefix is deliberately {@code refinery-order} rather than a bare {@code refinery},
+   * and the {@code topic_class} metric label {@code refinery_order}: it keeps the {@code refinery}
+   * stem free for a future global refinery-queue room without the two collapsing into one
+   * accidental duplicate series, the same separation {@link #ORDER} / {@link #ORDERS_QUEUE} carry.
+   */
+  REFINERY_ORDER(
+      "refinery-order",
+      true,
+      Set.of("order", "store"),
+      false,
+      "refinery_order",
+      "/api/v1/refinery-orders/{id}",
+      null),
+
+  /**
    * Per-account bank room: a Kartellbank account detail page — the staff {@code
    * /bank/accounts/{id}} and the org-unit {@code /org-unit-bank/accounts/{id}} views (#556, #666).
    * No editor-presence dots. A subscribe is authorized by a <b>dual</b> per-account read: first the
@@ -230,7 +255,82 @@ public enum LiveSyncTopicClass {
    * its own owner- and org-unit-scoped view, which makes a cross-squadron peer refresh a harmless
    * no-op.
    */
-  INVENTORY_ALL("inventory", false, Set.of("stock"), false, "inventory_all", null, null);
+  INVENTORY_ALL("inventory", false, Set.of("stock"), false, "inventory_all", null, null),
+
+  /**
+   * Global mission-list room: the {@code /missions} overview (#1235). A single global room carrying
+   * one opaque {@code list} key — a peer's mission create, core edit (name / status / schedule) or
+   * delete tells the other viewers to re-pull their own filtered, paginated list fragment. Distinct
+   * from the per-mission {@link #MISSION} room despite the shared {@code mission}/{@code missions}
+   * wire stem: {@link LiveSyncTopic#parse(String)} matches the prefix exactly, so the two never
+   * collide (the {@code order}/{@code orders} precedent). Its {@code topic_class} metric label is
+   * {@code missions_list} (the detail room's is {@code mission}) so the two stay separate series.
+   *
+   * <p>No editor-presence dots. A subscribe is authorized by the socket's authentication alone: the
+   * list itself is {@code isAuthenticated()} and every viewer re-fetches its own org-unit-scoped,
+   * guest-redacted page, so a peer outside the acting user's scope simply re-renders the same rows.
+   */
+  MISSIONS_LIST("missions", false, Set.of("list"), false, "missions_list", null, null),
+
+  /**
+   * Global refinery-order queue room: the {@code /refinery-orders} list (#1235). A single global
+   * room carrying one opaque {@code queue} key — a peer's order create, update, store ("Einlagern")
+   * or cancel tells the other viewers to re-pull their own status/onlyMine-filtered results
+   * fragment. No editor-presence dots. A subscribe is authorized by the socket's authentication
+   * alone, matching the list's own {@code isAuthenticated()} gate; the {@code onlyMine} filter is
+   * applied per viewer on its own re-fetch, so a peer's refresh can never surface another user's
+   * narrowing.
+   */
+  REFINERY("refinery", false, Set.of("queue"), false, "refinery_queue", null, null),
+
+  /**
+   * Global member-roster room: the {@code /members} Mitgliederverwaltung list (#1235) — the surface
+   * the issue calls "Rollen", where a member's roles and Staffel memberships are assigned. A single
+   * global room carrying one opaque {@code roster} key — a peer's member edit, delete or manual
+   * Keycloak sync tells the other admins to re-pull their own filtered, paginated table fragment.
+   * No editor-presence dots.
+   *
+   * <p>A subscribe is authorized by a <b>local</b> {@code ROLE_ADMIN} check against the authorities
+   * captured at handshake ({@link #requiredAnyRole}), with no backend call — the same gate the
+   * class-level {@code @PreAuthorize} on the page carries, so the room's subscriber set is exactly
+   * the population that can act on it.
+   */
+  MEMBERS(
+      "members",
+      false,
+      Set.of("roster"),
+      false,
+      "members_roster",
+      null,
+      null,
+      null,
+      Set.of(Roles.authority(Roles.ADMIN))),
+
+  /**
+   * Global org-structure room: the admin Organisationsstruktur editor ({@code
+   * /admin/org-structure}) and the member-visible Organigramm ({@code /org-chart}) — #1235. Three
+   * opaque section keys: {@code units} (the admin editor's unit + parent-edge table), {@code forms}
+   * (its create forms, whose Bereich/Organisationsleitung pickers go stale when a peer adds one)
+   * and {@code chart} (the org-chart tree). The two surfaces share one room because they render the
+   * same hierarchy: an admin's parent-edge change must refresh a member's open Organigramm, and an
+   * org-chart position edit must refresh the admin editor.
+   *
+   * <p>No editor-presence dots. A subscribe is authorized by the socket's authentication alone
+   * rather than an ADMIN gate — the org-chart is deliberately member-visible ({@code
+   * OrgChartPageController} carries no class-level ADMIN check) and a member must receive the
+   * {@code chart} key. The admin-only sections stay protected per-fragment (a non-admin's {@code
+   * /admin/org-structure} fragment GET is refused, and their page has no such container anyway, so
+   * the receiver skips those keys), which is the same per-fragment protection {@link #BANK_STAFF}
+   * relies on for its management-only {@code grants} section.
+   */
+  ORG_STRUCTURE(
+      "org-structure",
+      false,
+      Set.of("units", "forms", "chart"),
+      false,
+      "org_structure",
+      null,
+      null);
 
   private final String prefix;
   private final boolean scoped;

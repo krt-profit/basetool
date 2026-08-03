@@ -104,7 +104,7 @@ class RefineryOrderStorageCalculationTest {
         .thenReturn(orderDto);
     when(oidcUser.getSubject()).thenReturn(UUID.randomUUID().toString());
 
-    controller.viewOrderDetail(orderId, model, oidcUser);
+    controller.viewOrderDetail(orderId, null, model, oidcUser);
 
     RefineryOrderStoreForm storeForm = (RefineryOrderStoreForm) model.getAttribute("storeForm");
     assertNotNull(storeForm);
@@ -165,7 +165,7 @@ class RefineryOrderStorageCalculationTest {
         .thenReturn(settingDto);
     when(oidcUser.getSubject()).thenReturn(UUID.randomUUID().toString());
 
-    controller.viewOrderDetail(orderId, model, oidcUser);
+    controller.viewOrderDetail(orderId, null, model, oidcUser);
 
     RefineryOrderStoreForm storeForm = (RefineryOrderStoreForm) model.getAttribute("storeForm");
     assertNotNull(storeForm);
@@ -241,7 +241,7 @@ class RefineryOrderStorageCalculationTest {
         .thenReturn(settingDto);
     when(oidcUser.getSubject()).thenReturn(UUID.randomUUID().toString());
 
-    controller.viewOrderDetail(orderId, model, oidcUser);
+    controller.viewOrderDetail(orderId, null, model, oidcUser);
 
     RefineryOrderStoreForm storeForm = (RefineryOrderStoreForm) model.getAttribute("storeForm");
     assertNotNull(storeForm);
