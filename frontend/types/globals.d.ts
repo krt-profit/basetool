@@ -220,8 +220,22 @@ interface KrtSectionWriteConfig {
     sections: Record<string, { container: string; fragmentValue: string }>;
     /** Late-bound accessor for the URL the section fragments are fetched from. */
     pageUrl(): string;
-    /** Late-bound accessor for the peer-broadcast channel, when the page has one. */
-    broadcast?(): { send(section: string): void } | null | undefined;
+    /**
+     * Peer-notification closure (REQ-FE-010): called by `refresh`/`notify` with the
+     * changed section keys so the page can publish them to its live-sync room.
+     * Late-bound, since the socket client is installed after this factory runs.
+     */
+    broadcast?(sectionKeys: string[]): void;
+}
+
+/** Options for {@linkcode KrtSectionWriter.refresh}. */
+interface KrtSectionRefreshOpts {
+    /**
+     * `false` suppresses the peer broadcast — mandatory when the refresh IS the
+     * application of a peer's inbound signal, which would otherwise echo straight
+     * back into a loop. Defaults to broadcasting.
+     */
+    broadcast?: boolean;
 }
 
 /** The `{write, refresh, notify}` trio returned by {@linkcode KrtFetchApi.sectionWrite}. */
@@ -233,7 +247,7 @@ interface KrtSectionWriter {
      * peers. Resolves once every swap completed — with one flag per section, in
      * the order given — so callers can then close a modal.
      */
-    refresh(sectionKeys: string | string[], opts?: KrtSwapOpts): Promise<boolean[]>;
+    refresh(sectionKeys: string | string[], opts?: KrtSectionRefreshOpts): Promise<boolean[]>;
     /** Broadcast-only sibling of `refresh` for handlers that already patched the DOM. */
     notify(sectionKeys: string | string[]): void;
 }
@@ -301,8 +315,13 @@ interface KrtLiveSyncApi {
     createReceiver(config: unknown): unknown;
     /** Subscribes to a topic room and returns the subscription handle. */
     subscribe(topic: string, handler: (message: any) => void): unknown;
-    /** Broadcasts that a section changed, so peers re-render it. */
-    sendChanged(topic: string, section: string): void;
+    /**
+     * Broadcasts that one or more sections changed, so peers re-render them. A bare
+     * key is wrapped into a single-element array by the client; the relay then drops
+     * anything outside the topic class's whitelist. Publishing needs no subscription
+     * to the room (ADR-0094), which is what lets two surfaces poke each other.
+     */
+    sendChanged(topic: string, sections: string | string[]): void;
     /** Broadcasts a presence event (focus/blur/heartbeat) for a section. */
     sendPresence(topic: string, kind: string, section: string): void;
     /** The topics currently subscribed on this connection. */
@@ -477,6 +496,12 @@ interface Window {
     krtOpenEditCrewModal?: (...args: any[]) => void;
     krtOperationsReload?: (...args: any[]) => void;
     krtRefreshOrdersQueue?: (...args: any[]) => void;
+    /**
+     * Re-swaps the /members roster for the viewer's own filter + page. Exposed by
+     * the members.html bootstrap so the live-sync receiver in members.js can apply
+     * a peer's member edit / delete / Keycloak sync in place (#1235).
+     */
+    krtRefreshMembersResults?: () => void;
 
     // --- mission page section-write trio (produced by sectionWrite)
     krtMissionWrite?: KrtSectionWriter['write'];

@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-10
 - **Deciders:** @greluc
-- **Related:** REQ-FE-015 · REQ-FE-010 · REQ-NOTIF-006/-010 · REQ-OBS-011 · ADR-0031 (mission relay — generalized here) · ADR-0016 (notification SSE — its Redis deferral is discharged here) · ADR-0079 (Redis AOF/noeviction) · ADR-0084 (readiness excludes optional externals) · ADR-0085 (5000-account capacity) · #1102 · #1115 · #1120 · #1241 · #1243 (publish-amplification bounds) · #1236 (legacy-alias removal)
+- **Related:** REQ-FE-015 · REQ-FE-010 · REQ-NOTIF-006/-010 · REQ-OBS-011 · ADR-0031 (mission relay — generalized here) · ADR-0016 (notification SSE — its Redis deferral is discharged here) · ADR-0079 (Redis AOF/noeviction) · ADR-0084 (readiness excludes optional externals) · ADR-0085 (5000-account capacity) · #1102 · #1115 · #1120 · #1241 · #1243 (publish-amplification bounds) · #1236 (legacy-alias removal) · #1307/#1309 (Lager) · #1235 (Phase-3 completion)
 
 ## Context
 
@@ -213,33 +213,62 @@ concurrent) on both apps so a socket surge can never hit "too many open files".
   (`docs/LIVESYNC_ROLLOUT_RUNBOOK.md`: clean `down` + redeploy because the in-place `up`
   strands containers on network changes, plus an ACL pre-check that the `default` user's
   explicit `users.acl` entry retains `&*` channel permissions for the two channels).
-- **Presence dots are per-instance** until the tracked follow-up lands; the remaining
-  Phase-3 surfaces (Lager, Raffinerie, Rollen/Org-Struktur, `/missions` list) and a baselined
-  drop-rate alert are tracked follow-up issues as well. The one-release legacy alias removal
-  has since landed (#1236), and the cross-instance presence follow-up landed in #1237
-  ([ADR-0126](0126-cross-instance-editor-presence-via-snapshot-gossip.md)) — presence now
-  rides a **third** channel, `basetool:livesync:presence`, which the `default` user's `&*`
-  grant already covers.
-- **A surface has to be a fragment-swap surface first.** The Raffinerie *detail* page could not be
-  covered by the Phase-3 sweep at all: its save / store / cancel all navigated away to the list and
-  the template exposed no `th:fragment` seam, so there was nothing to re-render in place and nothing
-  for a receiver to target. #1238 converted it (two seams, `?fragment=order` / `?fragment=store`,
-  save and store now in place) *and then* added the `refinery-order:{id}` room. The general lesson
-  for the remaining surfaces: the registry row is the cheap part — the REQ-FE-001 conversion is the
-  work, and a navigate-away write path is the tell that a surface is not ready for a room yet.
-- **Prefixes are chosen against the room that does not exist yet.** The new class deliberately took
-  the wire prefix `refinery-order` and the metric label `refinery_order` rather than a bare
-  `refinery`, keeping that stem free for the still-missing global refinery-queue room — the same
-  separation `order`/`orders` and `mission`/`missions` already carry. `LiveSyncTopic.parse` can
-  disambiguate a shared prefix by its id segment (as `bank` does), but distinct `topic_class` labels
-  are what keeps the two from reading as one duplicate series on the ops dashboard, so a new scoped
-  class should pick its stem with the eventual global sibling in mind.
-- **Cross-publishing follows the write, not the page.** A refinery store books stock into the Lager
-  and can consume a job-order earmark, so the detail page pokes the `inventory` and `order:{id}`
-  rooms it does not itself render. Those raw `sendChanged` calls sit outside any seam map, where the
-  relay's silent drop of an out-of-whitelist key would strand exactly the peers the poke exists for —
-  so `LiveSyncSectionMapParityTest` pins their keys against the target rooms' whitelists directly,
-  the way it already does for the materialboard broadcasts.
+- **Every deferral recorded here has since been discharged.** Presence dots were per-instance at
+  the time of this decision; cross-instance presence landed in #1237
+  ([ADR-0126](0126-cross-instance-editor-presence-via-snapshot-gossip.md)), so presence now rides a
+  **third** channel, `basetool:livesync:presence`, which the `default` user's `&*` grant already
+  covers. The baselined drop-rate alert landed in #1238 (`LiveSyncRelayDropsSustained` plus
+  `LiveSyncSectionKeySkew`, thresholds measured over 21 production days). The one-release legacy
+  alias removal landed in #1236.
+
+  The **Phase-3 surfaces are done** as well: Lager shipped as the `inventory` room (#1307/#1309),
+  and Raffinerie, Rollen (`/members`), Org-Struktur (the admin editor plus the Organigramm) and the
+  `/missions` list shipped in #1235 as the `refinery`, `members`, `org-structure` and `missions`
+  rooms. All four are global rooms with the 1500 ms coalesce window; three of them publish through
+  the `LiveSyncLocalBus` server seam rather than the client, because their mutations navigate away
+  or happen on a different page than the list they invalidate — the same reasoning that put the
+  anonymous order-create on that seam, now the general rule (see REQ-FE-015).
+
+  Two consequences of that rollout are worth recording. The `org-structure` room is the first
+  shared by **two different pages** rendering disjoint parts of one whitelist, so its parity check
+  is a subset-plus-union assertion rather than set-equality — set-equality per page is impossible,
+  and subsets alone would let an orphaned registry key through. And it is deliberately
+  **authenticated-only** rather than ADMIN-gated even though the editor is ADMIN-only: the
+  Organigramm is member-visible, so gating the room would cut members off from their own chart.
+  The per-fragment authorization the `bank` staff room already relies on for its management-only
+  `grants` section is what keeps the admin sections protected.
+
+  The one gap that rollout left was a *page* limitation rather than a relay one: the refinery
+  **detail** page published but could not receive, being a classic form-post surface with no
+  fragment seam. #1238 closed it — first the REQ-FE-001 conversion (two seams, `?fragment=order` /
+  `?fragment=store`, with save and store re-rendering in place), then the scoped
+  `refinery-order:{id}` room on top.
+
+- **A surface has to be a fragment-swap surface first.** That ordering is the general lesson, not a
+  refinery detail: the registry row is the cheap part, the REQ-FE-001 conversion is the work, and a
+  navigate-away write path is the tell that a surface is not ready for a room at all. A room added
+  to a page that navigates away has nothing to re-render and no receiver to target.
+
+- **A scoped room and its global sibling need distinct metric labels, not just distinct prefixes.**
+
+  # 1238's class took the wire prefix `refinery-order` and the label `refinery_order` alongside
+
+  # 1235's global `refinery` / `refinery_queue`. `LiveSyncTopic.parse` would have coped with a shared
+
+  `refinery` prefix by its id segment (as `bank` does), so the prefix choice is cosmetic; the
+  **labels** are load-bearing, because `order`/`orders` and `mission`/`missions` showed that
+  near-identical `topic_class` values read as one accidental duplicate series on the ops dashboard.
+
+- **Cross-publishing belongs wherever the knowledge is, and must not be done twice.** A refinery
+  store refreshes the queue, books stock into the Lager, and can consume a job-order earmark. The
+  first two are published **server-side** by `RefineryOrderWriteController` (#1235), which also
+  covers the no-JS path from the same call site; the third stays **client-side**, because only the
+  store dialog knows which job orders its rows picked. #1238 initially broadcast `inventory`/`stock`
+  from the client too — a duplicate of the server-side poke that only became visible when the two
+  branches merged. A duplicated poke is merely wasteful (receivers coalesce); the opposite mistake —
+  a raw `sendChanged` outside any seam map whose key the relay silently drops — strands exactly the
+  peers it exists for. So `LiveSyncSectionMapParityTest` pins the surviving client call's keys
+  against the target room's whitelist *and* asserts the server-owned ones are absent.
 
 ## Alternatives considered
 

@@ -856,14 +856,16 @@ function refineryStoreJobOrderIds(form) {
     return ids;
 }
 
-// A completed store books the refined output into the Lager, and an earmarked row also changes its
-// job order's material roll-up. Both are cross-surface effects of a write made from THIS page, so
-// poke the rooms that own them (REQ-FE-015): the global `inventory` room's `stock` seam, and each
-// touched `order:{id}` room's `materials`/`aggregated` sections. All are existing whitelisted keys —
-// no new mirror points. Publishing needs no subscription.
+// An earmarked store row changes its job order's material roll-up, so poke each touched `order:{id}`
+// room's `materials`/`aggregated` sections (REQ-FE-015; existing whitelisted keys, no new mirror
+// points, and publishing needs no subscription).
+//
+// Deliberately NOT poked here: `refinery`/`queue` and `inventory`/`stock`. Since #1235
+// RefineryOrderWriteController publishes both server-side on every refinery mutation — including the
+// AJAX twins this page calls — so a client broadcast would only duplicate them. The job orders are
+// the one thing that call site cannot know, because they are picked per row in this dialog.
 function crossPublishStoredStock(jobOrderIds) {
     if (!window.krtLiveSync || typeof window.krtLiveSync.sendChanged !== 'function') return;
-    window.krtLiveSync.sendChanged('inventory', ['stock']);
     jobOrderIds.forEach((jobOrderId) => {
         window.krtLiveSync.sendChanged('order:' + jobOrderId, ['materials', 'aggregated']);
     });

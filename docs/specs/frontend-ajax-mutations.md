@@ -1007,6 +1007,10 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `orgunit-bank` (global)  | orgUnitBank, orgUnitBankSettings                                                                                              | no            | member-or-above (the `/org-unit-bank` page gate, local check)                                         |
 | `materialboard` (global) | board, requests                                                                                                               | no            | authenticated                                                                                         |
 | `inventory` (global)     | stock                                                                                                                         | no            | authenticated (every viewer re-fetches its own owner/org-unit-scoped view)                            |
+| `missions` (global list) | list                                                                                                                          | no            | authenticated (the `/missions` list gate; each viewer re-pulls its own scoped, guest-redacted page)   |
+| `refinery` (global)      | queue                                                                                                                         | no            | authenticated (the `/refinery-orders` list gate; the `onlyMine` filter is applied per viewer)         |
+| `members` (global)       | roster                                                                                                                        | no            | `ROLE_ADMIN` (local check — the `/members` class-level page gate)                                     |
+| `org-structure` (global) | units, forms, chart                                                                                                           | no            | authenticated (the Organigramm is member-visible; the admin sections stay protected per fragment)     |
 
 The `inventory` room is the squadron Lager (#1307/#1309): a single opaque `stock` section stands for
 "the inventory changed". **All** inventory views subscribe and re-pull their own fragment on a peer's
@@ -1038,29 +1042,80 @@ seam-map change — and refreshes + broadcasts the order room's own `item-stock`
 book-in auto-earmark changes the Item-Bestand panel (REQ-ORDERS-028); the panel's delivered toggle
 likewise broadcasts `item-stock` on success.
 
-The `refinery-order:{id}` room covers the refinery-order detail page (#1238). Two sections: `order`
+The four **Phase-3 rooms** (#1235) close ADR-0094's tracked coverage gap; all four are global rooms
+whose receivers re-fetch the viewer's *own* filter and page:
+
+- **`missions`** — the `/missions` list. One opaque `list` key: a mission create, core edit
+  (name / status / planned start) or delete re-renders every open list. Participants, units, crew and
+  the party lead do **not** publish here — they do not surface on the list and ride the per-mission
+  `mission:{id}` room. Distinct class from `mission:{id}` despite the shared wire stem; the
+  `order`/`orders` disambiguation rule applies unchanged.
+- **`refinery`** — the `/refinery-orders` list. One opaque `queue` key covering create, edit, store
+  ("Einlagern") and cancel. Storing additionally cross-publishes `inventory`/`stock`, because the
+  refined output is written into the shared Lager and an open Lager would otherwise sit stale.
+  The refinery *detail* page (`/refinery-orders/{id}`) was the gap this rollout left open — a
+  classic navigate-away surface with no `?fragment=` seam, so it published but could not receive.
+  **#1238 closed it**, by converting the page to the fragment-swap standard first and then giving it
+  the scoped `refinery-order:{id}` room described below.
+- **`members`** — the `/members` Mitgliederverwaltung roster, the surface #1235 calls *Rollen*. One
+  opaque `roster` key covering a member edit (rank, display name, Staffel membership and its
+  LOGISTICIAN / MISSION_MANAGER flags), a delete and the manual Keycloak sync. It is the only
+  Phase-3 room with a role gate, matching the page's own ADMIN restriction.
+- **`org-structure`** — shared by the admin Organisationsstruktur editor (`units` = the unit +
+  parent-edge table, `forms` = its create forms, whose Bereich/OL pickers go stale when a peer adds
+  one) and the member-visible Organigramm (`chart`). One room because both render the same
+  hierarchy: an admin's parent-edge change refreshes a peer's chart, and an org-chart position edit
+  refreshes the editor. Subscribe is authenticated-only *by design* — gating the room on ADMIN would
+  cut members off from their own chart; the admin-only fragments stay protected per-fragment, and a
+  receiver silently skips a key whose container its page does not have. Because the two pages each
+  render only part of the whitelist, their seam maps are parity-checked as **subsets** whose
+  **union** must equal the registry whitelist — the union check is what catches an orphaned key no
+  page renders. Each page pokes the other's key through a named constant that the same test pins
+  against the registry.
+
+The **publish side differs per room** and follows one rule: publish from the client when the acting
+page stays open, server-side when it does not. `org-structure` broadcasts from the client
+(`admin-org-structure.js` / `org-chart.js` — both surfaces are XHR-only and stay put, so the origin
+session is excluded and the actor does not re-fetch its own change). `missions`, `refinery` and
+`members` publish **server-side** through `LiveSyncLocalBus`: every one of their mutations navigates
+away (a redirect, or an AJAX `targetUrl` the page immediately follows) or happens on a different page
+than the list it invalidates (`/members/{id}/edit`), so a client broadcast would race the socket
+teardown — and the server call site covers the no-JS form-POST fallback with the same line. A publish
+sits only on the success path: a refused backend write must not make peers re-fetch a change that
+never happened.
+
+Rolling `org-structure` onto the admin editor also retired that page's `window.location.reload()`
+(REQ-FE-001): it now re-renders through `?fragment=units` / `?fragment=forms`. Both create forms and
+every parent select live inside those swapped fragments, so their handlers moved to `document`
+delegation — a direct `addEventListener` would be lost on the first swap, the silent breakage the
+reload previously hid. The `forms` receiver carries an extra busy test: the generic guard only holds
+back a *focused* container, but an admin can type a name, tab away and still have unsaved input, so
+any non-empty create input defers the section behind the "updates available" pill instead.
+
+The `refinery-order:{id}` room (#1238) is the Phase-3 follow-up that closes the refinery detail gap
+above, and it only works because the page was converted to REQ-FE-001 first. Two sections: `order`
 (the edit form, the goods editor and the status-gated action row) and `store` (the Einlagern
 dialog's rows, which are **derived from the order's output goods** and therefore change whenever the
-goods do — which is why the dialog's source data is a section of its own rather than part of the
-main seam). Save and store re-render both in place and broadcast them; **cancel is a REQ-FE-006
+goods do — which is why the dialog's source data is a section of its own rather than part of the main
+seam). Save and store re-render both in place and broadcast them; **cancel is a REQ-FE-006
 navigate-after-AJAX** — a canceled order drops out of the list's default OPEN+IN_PROGRESS working
 set, so the acting client broadcasts and then leaves, while peers still holding the detail page
 refresh into the canceled state. The receiver adds a page-specific `busyTest` for the Einlagern
 dialog: it is an older `.modal`, which the default busy test (`.krt-modal-overlay` only) does not
 recognise, so without it a peer's save would yank a half-filled store form out from under the user.
-A store additionally **cross-publishes**, since it books stock in and can consume an earmark:
-`inventory`/`stock` for every open Lager view, and `order:{id}` `materials`/`aggregated` for each job
-order the dialog's rows earmarked to (read off the row pickers *before* the submit, since the dialog
-is re-rendered on success). Those raw `sendChanged` calls carry no seam map of their own, so
-`LiveSyncSectionMapParityTest` pins their keys against the target rooms' whitelists directly.
 
-The wire prefix is `refinery-order`, not a bare `refinery`, and the `topic_class` metric label is
-`refinery_order` — the same deliberate separation `order`/`orders` and `mission`/`missions` carry, so
-a future global refinery-queue room can be added without either shadowing the other or the two
-collapsing into one accidental duplicate series. **The refinery *list* (`/refinery-orders`) has no
-live-sync room yet:** its status filter is an in-place `?fragment=results` swap (REQ-FE-005), but a
-peer's create/cancel/store still does not reach another viewer's queue. That gap is the remaining
-refinery work, not something this room closes.
+The wire prefix is `refinery-order` and the `topic_class` metric label `refinery_order`, keeping both
+distinct from the global `refinery` / `refinery_queue` queue room — the same separation
+`order`/`orders` and `mission`/`missions` carry. (`LiveSyncTopic.parse` could disambiguate a shared
+`refinery` prefix by its id segment, as `bank` does; distinct metric labels are the part that
+actually matters, so that the two never read as one duplicate series on the ops dashboard.) The
+queue-side effects of a detail-page write need no client code: every refinery mutation, including the
+AJAX twins this page calls, already pokes `refinery`/`queue` — and `inventory`/`stock` on a store —
+**server-side** from `RefineryOrderWriteController`. The one thing the server cannot know is which
+job orders the store dialog's rows earmarked to, so that single cross-publish stays client-side:
+`order:{id}` `materials`/`aggregated` per picked job order, read off the row pickers *before* the
+submit (the dialog is re-rendered on success). It carries no seam map of its own, so
+`LiveSyncSectionMapParityTest` pins its keys against the `order` room's whitelist directly.
 
 The standalone order **material-collection** page (`/orders/{id}/material-collection`) joins the same
 `order:{id}` room in its own right (#1309): its per-row delivered toggle and owner/location moves
@@ -1115,7 +1170,8 @@ bounded re-fetch rate, never data loss.
 
 **Pill, coalescing and resync follow REQ-FE-010 unchanged**, with one sizing addition (5000
 accounts / ≥200 concurrent, ADR-0094): detail-topic receivers keep the 400 ms jittered coalesce
-window; **global-room receivers (`orders`, `bank`, `orgunit-bank`) use 1500 ms** so a change seen by
+window; **every global-room receiver (`orders`, `bank`, `orgunit-bank`, `materialboard`, `inventory`,
+`missions`, `refinery`, `members`, `org-structure`) uses 1500 ms** so a change seen by
 up to ~200 viewers spreads its fragment re-fetch herd instead of spiking. Peer-driven re-fetches
 always preserve the **peer's own** query state (filters, paging, view toggles — the page-URL getter
 is late-bound per viewer); only the acting client's own refresh may deliberately reset paging.
@@ -1161,6 +1217,14 @@ the same `presence` frame — so no client change was needed.
   30 s; with Redis stopped, each instance still shows its own editors' dots.
 - [ ] A section key added to a page seam map without the registry row (or vice versa) fails
   `:frontend:test`.
+- [ ] Every surface REQ-FE-010 covers is on a room: no shared-state page is left reloading on
+  success or leaving peers stale. The Phase-3 four (`missions`, `refinery`, `members`,
+  `org-structure`) were the last gap and are closed (#1235).
+- [ ] Storing a refinery order refreshes a peer's open Lager, not just the refinery queue.
+- [ ] An admin's parent-edge change on `/admin/org-structure` refreshes a *member's* open
+  `/org-chart`, and an org-chart position edit refreshes another admin's open editor.
+- [ ] A backend write that failed publishes nothing — peers do not re-fetch for a change that
+  never happened.
 
 **Enforced by:** `LiveSyncWebSocketHandlerTest` (topic parsing, cross-room isolation, per-topic
 whitelists, publish-without-subscription, per-session rate limit, topic cap, close cleanup, plus the
@@ -1174,20 +1238,25 @@ presence channel: snapshot serialisation, channel-based dispatch, empty-snapshot
 separate error series) · `LiveSyncPresenceServiceTest` (the ADR-0126 mirror: local+remote merge,
 one-dot collapse, wholesale replace, no-change-on-re-gossip, origin/editor caps, partition expiry) ·
 `OperationLiveSyncE2eTest` / `JobOrderQueueLiveSyncE2eTest` / `BankRequestsLiveSyncE2eTest` /
-`MissionOrganisationLiveSyncE2eTest` / `RefineryOrderLiveSyncE2eTest` (one two-context e2e per page
-family) · **Code:**
+`MissionOrganisationLiveSyncE2eTest` / `InventorySharedLagerLiveSyncE2eTest` /
+`RefineryOrderLiveSyncE2eTest` (one two-context e2e per page family) ·
+`MissionListLiveSyncPublishTest` + `RefineryOrderLiveSyncPublishTest` +
+`MemberManagementControllerTest.RosterLiveSyncPublishTests` (the server-side publish fires on success
+and **only** on success) · `AdminOrgStructurePageControllerMvcTest` (the `units` / `forms` fragment
+seams render their own section and nothing else) · `RefineryOrderDetailFragmentMvcTest` (the
+`refinery-order:{id}` sections render section-sized, gate their catalog lookups, and degrade to an
+inline error rather than a redirect) · **Code:**
 `LiveSyncWebSocketHandler`, `LiveSyncTopicClass`, `LiveSyncSubscriptionAuthorizer`,
 `LiveSyncLocalBus`, `RedisLiveSyncFanout`, `LiveSyncPresenceService` (local + mirrored halves),
 `LiveSyncProperties` (`app.livesync.redis.presence-channel`), `krt-live-sync.js`, the per-page seam
 maps
 (`MISSION_SECTIONS`, `OPERATION_SECTIONS`, `ORDER_SECTIONS`, orders-queue seam, bank
 `BANK_ACCOUNT_SECTIONS` / `ORGUNIT_ACCOUNT_SECTIONS` / `BANK_STAFF_SECTIONS` /
-`ORGUNIT_BANK_SECTIONS`, `REFINERY_ORDER_SECTIONS`, materialboard — two section keys: `board`
-(Angebote) and `requests` (Gesuche, REQ-MARKET-018), broadcast by `materialboerse.js` /
-`materialgesuch-modal.js`, pinned by `LiveSyncSectionMapParityTest`) ·
-`RefineryOrderDetailFragmentMvcTest` (the `refinery-order:{id}` sections render section-sized, gate
-their catalog lookups, and degrade to an inline error rather than a redirect) ·
-**ADR:** ADR-0094, ADR-0126 · **Issues:** #1102, #1115, #1120, #1237, #1238
+`ORGUNIT_BANK_SECTIONS`, materialboard — two section keys: `board` (Angebote) and `requests`
+(Gesuche, REQ-MARKET-018), broadcast by `materialboerse.js` / `materialgesuch-modal.js`, pinned by
+`LiveSyncSectionMapParityTest`; Phase-3: `MISSIONS_SECTIONS`, `REFINERY_SECTIONS`,
+`MEMBERS_SECTIONS`, `ORG_STRUCTURE_SECTIONS` + `ORG_CHART_SECTIONS`; `REFINERY_ORDER_SECTIONS`) ·
+**ADR:** ADR-0094, ADR-0126 · **Issues:** #1102, #1115, #1120, #1237, #1235, #1238
 
 ### REQ-FE-016 — Catalog pickers (material / game item / location) are searchable comboboxes
 
