@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Raffinerieauftrag-Detailseite: Speichern und Einlagern bleiben jetzt auf der Seite, und zwei Personen sehen die Änderungen des anderen live.** Bisher sprang die Seite nach jeder Aktion zurück zur Liste, und ein zweiter Betrachter merkte von einer fremden Änderung nur den Versionskonflikt beim eigenen Speichern. Formular, Materialtabelle und der Einlagern-Dialog werden jetzt an Ort und Stelle aktualisiert; das Einlagern frischt zusätzlich offene Lager- und Auftragsansichten auf. Abbrechen führt weiterhin zur Liste, da der Auftrag die Arbeitsliste verlässt (REQ-FE-001/REQ-FE-015, #1238).
+
 - **Zwei neue Alarme für die Live-Aktualisierung.** Verwirft die Verteilung eine Änderung, sehen die anderen Betrachter unbemerkt einen veralteten Stand — ohne Fehlermeldung auf beiden Seiten. `LiveSyncRelayDropsSustained` schlägt bei anhaltenden Verlusten je Oberfläche an, `LiveSyncSectionKeySkew` beim Senden eines Bereichsschlüssels, den die Verteilung nicht kennt. Beide Schwellen stammen aus 21 Tagen gemessenem Produktivbetrieb (REQ-OBS-011).
 
 - **Neue Kennzahl `basetool_livesync_peer_rooms` samt Panel im Betriebs-Dashboard.** Sie zeigt je Oberfläche, in wie vielen Räumen mehrere Personen gleichzeitig sind. Ohne sie ist ein Ausbleiben von Aktualisierungen nicht davon zu unterscheiden, dass schlicht niemand gemeinsam bearbeitet hat.

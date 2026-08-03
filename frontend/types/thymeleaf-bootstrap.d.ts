@@ -464,6 +464,12 @@ declare const RATING_LEVELS: KrtI18nDict;
 declare const SPEED_LEVELS: KrtI18nDict;
 
 // --- consumed by: refinery-orders-details.js
+/**
+ * In-place save/store success toasts plus the two live-sync strings (the deferred-refresh pill
+ * label and the section-refresh error). Injected by the page bootstrap (declared in
+ * refinery-orders-details.html).
+ */
+declare const REFINERY_DETAIL_MSG: KrtI18nDict;
 /** Injected by the page bootstrap (declared in refinery-orders-details.html). */
 declare const MSG_CANCEL_CONFIRM: string;
 /** Injected by the page bootstrap (declared in refinery-orders-details.html). */

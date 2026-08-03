@@ -154,6 +154,22 @@ class LiveSyncTopicTest {
   }
 
   @Test
+  void parse_resolvesTheScopedRefineryOrderRoom() {
+    // #1238: refinery-order:{id} is a scoped room. The bare prefix has no global class, so it must
+    // NOT parse — and the deliberately distinct `refinery-order` stem means a future global
+    // `refinery` queue room can be added without either shadowing the other.
+    UUID id = UUID.randomUUID();
+    LiveSyncTopic topic = LiveSyncTopic.parse("refinery-order:" + id);
+    assertThat(topic).isNotNull();
+    assertThat(topic.topicClass()).isEqualTo(LiveSyncTopicClass.REFINERY_ORDER);
+    assertThat(topic.resourceId()).isEqualTo(id);
+    assertThat(topic.canonical()).isEqualTo("refinery-order:" + id);
+    assertThat(LiveSyncTopic.parse("refinery-order")).isNull();
+    assertThat(LiveSyncTopic.parse("refinery")).isNull();
+    assertThat(LiveSyncTopic.parse("refinery:" + id)).isNull();
+  }
+
+  @Test
   void everyScopedClassExposesAnAuthProbePathWithAnIdPlaceholder() {
     for (LiveSyncTopicClass topicClass : LiveSyncTopicClass.values()) {
       if (topicClass.scoped()) {

@@ -451,8 +451,12 @@ refinery-import (#591), asset-management (#578), bank (#579), promotion (#580), 
 ### REQ-FE-006 — Navigate-after-AJAX for create / finalize flows that legitimately land elsewhere
 
 Some write flows finish by landing the user on a **different** page — creating an entity navigates
-to its detail page or the list, and the refinery detail-page actions (save / store / cancel) redirect
-to the refinery-order list. For these flows the no-reload guarantee of REQ-FE-001 applies to the
+to its detail page or the list, and cancelling a refinery order returns to the refinery-order list
+(a canceled order drops out of that list's default OPEN+IN_PROGRESS working set, so there is nothing
+useful left to stay on). Refinery **save** and **store** used to navigate too; since #1238 they are
+ordinary REQ-FE-001 in-place section swaps on the `refinery-order:{id}` seams, so a store now leaves
+the user on the completed order rather than bouncing them to the list. For the flows that do still
+navigate, the no-reload guarantee of REQ-FE-001 applies to the
 **failure path**: a client-side validation error or a backend save error keeps the user on the page
 with their entered data and shows an inline KRT toast, instead of the classic full reload that
 discards a half-filled form. On success the handler deliberately navigates to the server-returned
@@ -472,7 +476,8 @@ submit helper can surface them inline.
 
 - [ ] A client-side or backend validation/save error on a create / refinery-finalize submit keeps the
   document on the same URL with the entered data intact and shows an inline toast — no full reload.
-- [ ] On success the page navigates exactly once to the server-supplied `targetUrl`.
+- [ ] On success a genuinely-navigating flow (create, refinery cancel) navigates exactly once to the
+  server-supplied `targetUrl`; a refinery save / store instead re-renders its sections in place.
 - [ ] With JavaScript disabled the classic form still `POST→redirect`s (the twin is header-gated).
 
 **Enforced by:** create/refinery navigate-after-AJAX MVC tests (`X-Requested-With` twins return
@@ -994,6 +999,7 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `operation:{id}`         | overview, missions, payout, finance                                                                                           | no            | `GET /api/v1/operations/{id}`                                                                         |
 | `order:{id}`             | header, materials, aggregated, items, item-stock, handovers, item-handovers, item-handover-lines, blueprint-owners, assignees | no            | `GET /api/v1/orders/{id}` (a requesting-owner is admitted; their re-fetches stay redacted)            |
 | `orders` (global queue)  | queue                                                                                                                         | no            | capabilities `canViewJobOrders` (guests and requesters are refused)                                   |
+| `refinery-order:{id}`    | order, store                                                                                                                  | no            | `GET /api/v1/refinery-orders/{id}`                                                                    |
 | `bank:{accountId}`       | account, bookings, chart                                                                                                      | no            | staff account read, falling back to the org-unit account read; refused only when both explicitly deny |
 | `bank` (staff-global)    | grid, requestQueue, manage, grants                                                                                            | no            | `ROLE_BANK_EMPLOYEE` (local check)                                                                    |
 | `orgunit-bank` (global)  | orgUnitBank, orgUnitBankSettings                                                                                              | no            | member-or-above (the `/org-unit-bank` page gate, local check)                                         |
@@ -1029,6 +1035,30 @@ pokes `inventory`/`stock` — the existing seam, so Lager viewers see the fresh 
 seam-map change — and refreshes + broadcasts the order room's own `item-stock` section, because the
 book-in auto-earmark changes the Item-Bestand panel (REQ-ORDERS-028); the panel's delivered toggle
 likewise broadcasts `item-stock` on success.
+
+The `refinery-order:{id}` room covers the refinery-order detail page (#1238). Two sections: `order`
+(the edit form, the goods editor and the status-gated action row) and `store` (the Einlagern
+dialog's rows, which are **derived from the order's output goods** and therefore change whenever the
+goods do — which is why the dialog's source data is a section of its own rather than part of the
+main seam). Save and store re-render both in place and broadcast them; **cancel is a REQ-FE-006
+navigate-after-AJAX** — a canceled order drops out of the list's default OPEN+IN_PROGRESS working
+set, so the acting client broadcasts and then leaves, while peers still holding the detail page
+refresh into the canceled state. The receiver adds a page-specific `busyTest` for the Einlagern
+dialog: it is an older `.modal`, which the default busy test (`.krt-modal-overlay` only) does not
+recognise, so without it a peer's save would yank a half-filled store form out from under the user.
+A store additionally **cross-publishes**, since it books stock in and can consume an earmark:
+`inventory`/`stock` for every open Lager view, and `order:{id}` `materials`/`aggregated` for each job
+order the dialog's rows earmarked to (read off the row pickers *before* the submit, since the dialog
+is re-rendered on success). Those raw `sendChanged` calls carry no seam map of their own, so
+`LiveSyncSectionMapParityTest` pins their keys against the target rooms' whitelists directly.
+
+The wire prefix is `refinery-order`, not a bare `refinery`, and the `topic_class` metric label is
+`refinery_order` — the same deliberate separation `order`/`orders` and `mission`/`missions` carry, so
+a future global refinery-queue room can be added without either shadowing the other or the two
+collapsing into one accidental duplicate series. **The refinery *list* (`/refinery-orders`) has no
+live-sync room yet:** its status filter is an in-place `?fragment=results` swap (REQ-FE-005), but a
+peer's create/cancel/store still does not reach another viewer's queue. That gap is the remaining
+refinery work, not something this room closes.
 
 The standalone order **material-collection** page (`/orders/{id}/material-collection`) joins the same
 `order:{id}` room in its own right (#1309): its per-row delivered toggle and owner/location moves
@@ -1118,14 +1148,18 @@ parity) · `LiveSyncSubscriptionAuthorizerTest` (per-topic allow/deny/fail-open 
 requester-refused queue + bank dual-auth matrix) · `RedisLiveSyncFanoutTest` +
 `RedisLiveSyncFanoutIntegrationTest` (publish-once, origin skip, Redis-down degradation) ·
 `OperationLiveSyncE2eTest` / `JobOrderQueueLiveSyncE2eTest` / `BankRequestsLiveSyncE2eTest` /
-`MissionOrganisationLiveSyncE2eTest` (one two-context e2e per page family) · **Code:**
+`MissionOrganisationLiveSyncE2eTest` / `RefineryOrderLiveSyncE2eTest` (one two-context e2e per page
+family) · **Code:**
 `LiveSyncWebSocketHandler`, `LiveSyncTopicClass`, `LiveSyncSubscriptionAuthorizer`,
 `LiveSyncLocalBus`, `RedisLiveSyncFanout`, `krt-live-sync.js`, the per-page seam maps
 (`MISSION_SECTIONS`, `OPERATION_SECTIONS`, `ORDER_SECTIONS`, orders-queue seam, bank
 `BANK_ACCOUNT_SECTIONS` / `ORGUNIT_ACCOUNT_SECTIONS` / `BANK_STAFF_SECTIONS` /
-`ORGUNIT_BANK_SECTIONS`, materialboard — two section keys: `board` (Angebote) and `requests`
-(Gesuche, REQ-MARKET-018), broadcast by `materialboerse.js` / `materialgesuch-modal.js`, pinned by
-`LiveSyncSectionMapParityTest`) · **ADR:** ADR-0094 · **Issues:** #1102, #1115, #1120
+`ORGUNIT_BANK_SECTIONS`, `REFINERY_ORDER_SECTIONS`, materialboard — two section keys: `board`
+(Angebote) and `requests` (Gesuche, REQ-MARKET-018), broadcast by `materialboerse.js` /
+`materialgesuch-modal.js`, pinned by `LiveSyncSectionMapParityTest`) ·
+`RefineryOrderDetailFragmentMvcTest` (the `refinery-order:{id}` sections render section-sized, gate
+their catalog lookups, and degrade to an inline error rather than a redirect) ·
+**ADR:** ADR-0094 · **Issues:** #1102, #1115, #1120, #1238
 
 ### REQ-FE-016 — Catalog pickers (material / game item / location) are searchable comboboxes
 

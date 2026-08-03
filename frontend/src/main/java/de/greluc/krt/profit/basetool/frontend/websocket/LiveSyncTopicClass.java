@@ -147,6 +147,31 @@ public enum LiveSyncTopicClass {
       "canViewJobOrders"),
 
   /**
+   * Per-refinery-order room: the refinery-order detail page {@code /refinery-orders/{id}} (#1238).
+   * No editor-presence dots; a subscribe is authorized by the same authenticated {@code GET
+   * /api/v1/refinery-orders/{id}} the page performs, so a caller who may not read the order is
+   * denied.
+   *
+   * <p>Two sections: {@code order} (the main edit form — order-level fields, the goods editor and
+   * the status-gated action row) and {@code store} (the Einlagern dialog's form body, whose rows
+   * are derived from the order's output goods). A save changes both, which is why the store
+   * dialog's source data is a section of its own rather than part of the main seam.
+   *
+   * <p>The wire prefix is deliberately {@code refinery-order} rather than a bare {@code refinery},
+   * and the {@code topic_class} metric label {@code refinery_order}: it keeps the {@code refinery}
+   * stem free for a future global refinery-queue room without the two collapsing into one
+   * accidental duplicate series, the same separation {@link #ORDER} / {@link #ORDERS_QUEUE} carry.
+   */
+  REFINERY_ORDER(
+      "refinery-order",
+      true,
+      Set.of("order", "store"),
+      false,
+      "refinery_order",
+      "/api/v1/refinery-orders/{id}",
+      null),
+
+  /**
    * Per-account bank room: a Kartellbank account detail page — the staff {@code
    * /bank/accounts/{id}} and the org-unit {@code /org-unit-bank/accounts/{id}} views (#556, #666).
    * No editor-presence dots. A subscribe is authorized by a <b>dual</b> per-account read: first the

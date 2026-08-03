@@ -211,6 +211,26 @@ concurrent) on both apps so a socket surge can never hit "too many open files".
   Phase-3 surfaces (Lager, Raffinerie, Rollen/Org-Struktur, `/missions` list) and a baselined
   drop-rate alert are tracked follow-up issues as well. The one-release legacy alias removal
   has since landed (#1236).
+- **A surface has to be a fragment-swap surface first.** The Raffinerie *detail* page could not be
+  covered by the Phase-3 sweep at all: its save / store / cancel all navigated away to the list and
+  the template exposed no `th:fragment` seam, so there was nothing to re-render in place and nothing
+  for a receiver to target. #1238 converted it (two seams, `?fragment=order` / `?fragment=store`,
+  save and store now in place) *and then* added the `refinery-order:{id}` room. The general lesson
+  for the remaining surfaces: the registry row is the cheap part — the REQ-FE-001 conversion is the
+  work, and a navigate-away write path is the tell that a surface is not ready for a room yet.
+- **Prefixes are chosen against the room that does not exist yet.** The new class deliberately took
+  the wire prefix `refinery-order` and the metric label `refinery_order` rather than a bare
+  `refinery`, keeping that stem free for the still-missing global refinery-queue room — the same
+  separation `order`/`orders` and `mission`/`missions` already carry. `LiveSyncTopic.parse` can
+  disambiguate a shared prefix by its id segment (as `bank` does), but distinct `topic_class` labels
+  are what keeps the two from reading as one duplicate series on the ops dashboard, so a new scoped
+  class should pick its stem with the eventual global sibling in mind.
+- **Cross-publishing follows the write, not the page.** A refinery store books stock into the Lager
+  and can consume a job-order earmark, so the detail page pokes the `inventory` and `order:{id}`
+  rooms it does not itself render. Those raw `sendChanged` calls sit outside any seam map, where the
+  relay's silent drop of an out-of-whitelist key would strand exactly the peers the poke exists for —
+  so `LiveSyncSectionMapParityTest` pins their keys against the target rooms' whitelists directly,
+  the way it already does for the materialboard broadcasts.
 
 ## Alternatives considered
 
