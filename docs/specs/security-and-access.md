@@ -1152,6 +1152,55 @@ version scoping, one-sided cache, sort translation), `TermsAcceptancePageControl
 `service` acyclic per ADR-0047), `TermsController`, `AdminTermsController` · **Monitoring:**
 `basetool_terms_acceptances_total`, `basetool_terms_accepted_users`, `TermsConsentRolloutStalled`
 
+### REQ-SEC-029 — A path-scoped filter matches the DECODED path, never the raw request URI
+
+Any servlet filter whose scope is a path — "apply to `/api/**`", "skip unless `/v1/**`", "cap these
+configured paths" — MUST decide that on the **decoded** path, by matching a parsed `PathPattern`
+against `PathContainer.parsePath(...)`. It MUST NOT use `HttpServletRequest#getRequestURI()` in a
+`startsWith` / `equals` / `List#contains` test.
+
+`getRequestURI()` is the **raw, still percent-encoded** URI per the servlet spec, while Spring MVC
+routes on the **decoded** path. The two therefore disagree, and the disagreement is exploitable in
+one direction only: `GET /%61pi/v1/missions` fails a raw prefix test — the filter skips it — and
+`RequestMappingHandlerMapping` then decodes `%61pi` back to `api` and dispatches it to the handler
+anyway. The default `StrictHttpFirewall` does not close this: it blocklists `%2e`, `%2f`, `%5c`,
+`%25`, `%00`, `;` and `//`, but not ordinary letter escapes, and no custom `HttpFirewall` is
+installed. `ServletRequestPathUtils.getParsedRequestPath(request).pathWithinApplication().value()`
+is **not** the fix either — `PathContainer.Element#value()` is contractually the unmodified
+original; `PathSegment#valueToMatch()`, which `PathPattern` matches on, is the decoded one.
+
+**Direction matters, and only one direction is a defect.** A raw test that decides *inclusion in a
+protective scope* fails **open** — this is the defect. A raw test that decides an *exemption from* a
+gate fails **closed**: encoding can only break such a match, so the caller gets more enforcement,
+not less. Converting an exemption list to decoded matching would *widen* it, so the two frontend
+UX-routing filters deliberately keep their raw string tests — `BackendRoleSyncFilter` (waiting-page
+redirect exemptions, static-asset skip) and `TermsAcceptanceGateFilter` (consent-page redirect
+exemptions) — as do the deny-list bot filters and the backend access log's skip list. The boundary
+in both those cases is the backend gate, which does match on the decoded path.
+
+The rule is enforced by tests, not by review: each converted site carries a **direct filter test**
+driving an encoded spelling. It cannot be a MockMvc test — MockMvc normalises the path before the
+filter runs, so such a test passes against the broken code.
+
+**Acceptance**
+
+- [x] The two `/api/**` access gates refuse `/%61pi/…`: the pending-approval gate (REQ-SEC-017) and
+  the consent gate (REQ-SEC-028).
+- [x] The four ingest-scoped filters — client identity (REQ-INGEST-011), payload cap, rate limit and
+  the access log — share one `IngestPathScope` decision made on the decoded path, so an encoded
+  spelling can neither shed a gate nor go unlogged.
+- [x] The backend body-size cap matches its configured paths as patterns against the decoded path;
+  the scope stays exact, so a path merely prefixed with a configured one is still uncapped.
+- [x] API GET responses keep their revalidation headers under an encoded spelling.
+- [x] Every converted site has a direct filter regression test that fails against the raw idiom.
+
+**Enforced by:** `PendingApprovalAccessFilterTest`, `TermsAcceptanceAccessFilterTest`,
+`IngestPathScopeTest`, `ClientIdentityFilterTest`, `FiltersTest`, `RequestLoggingFilterTest`
+(ingest), `RequestBodySizeLimitFilterTest`, `ApiCacheControlFilterTest` · **Code:**
+`IngestPathScope`, `PendingApprovalAccessFilter`, `TermsAcceptanceAccessFilter`,
+`RequestBodySizeLimitFilter`, `ApiCacheControlFilter`, `RateLimitingFilter` (backend + ingest),
+`PayloadSizeLimitFilter`, `RequestLoggingFilter` (ingest)
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the

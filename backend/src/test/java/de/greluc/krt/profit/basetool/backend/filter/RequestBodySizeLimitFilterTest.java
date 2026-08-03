@@ -104,6 +104,44 @@ class RequestBodySizeLimitFilterTest {
     assertTrue(chain.called, "the cap applies only to the configured paths");
   }
 
+  /**
+   * The cap is not sheddable by percent-encoding the capped path.
+   *
+   * <p>{@code getRequestURI()} is the raw, still-encoded URI while Spring MVC routes on the decoded
+   * path, so the exact {@code paths.contains(uri)} test this replaced left the cap off for {@code
+   * /%61pi/v1/refinery-orders/import-extract} — which {@code RequestMappingHandlerMapping} then
+   * decoded and delivered to the very controller the cap protects, unbounded. The default {@code
+   * StrictHttpFirewall} blocks {@code %2e}/{@code %2f}/{@code %25} but not {@code %61}. Must be a
+   * direct filter test: MockMvc normalises the path before the filter runs.
+   */
+  @Test
+  void declaredOversizedBody_onPercentEncodedCappedPath_isRejected413() throws Exception {
+    MockHttpServletRequest req =
+        jsonRequest("/%61pi/v1/refinery-orders/import-extract", "x".repeat(200));
+    MockHttpServletResponse resp = new MockHttpServletResponse();
+    TrackingChain chain = new TrackingChain();
+
+    filter.doFilter(req, resp, chain);
+
+    assertEquals(413, resp.getStatus());
+    assertFalse(chain.called, "an encoded spelling of a capped path must not shed the cap");
+  }
+
+  /**
+   * The capped set stays exact: a path that merely starts with a configured one is not capped, so
+   * replacing the string comparison with a literal pattern did not widen the scope.
+   */
+  @Test
+  void oversizedBody_onPathMerelyPrefixedWithACappedPath_passesThrough() throws Exception {
+    MockHttpServletRequest req = jsonRequest(CAPPED_PATH + "-preview", "x".repeat(500));
+    MockHttpServletResponse resp = new MockHttpServletResponse();
+    TrackingChain chain = new TrackingChain();
+
+    filter.doFilter(req, resp, chain);
+
+    assertTrue(chain.called, "only the configured paths are capped");
+  }
+
   @Test
   void multipartUpload_onCappedPath_isSkipped() throws Exception {
     MockHttpServletRequest req = new MockHttpServletRequest("POST", CAPPED_PATH);

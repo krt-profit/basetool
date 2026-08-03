@@ -164,12 +164,16 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
   /**
    * Limits this filter to the ingest endpoints; other paths (actuator, api-docs) are unaffected.
    *
+   * <p>Decided on the decoded path via {@link IngestPathScope}: a raw {@code getRequestURI()}
+   * prefix test would skip the cap for an encoded spelling of the same endpoint, handing back the
+   * unbounded-body vector this filter exists to close.
+   *
    * @param request the current request
-   * @return {@code true} for any path that is not under {@code /v1/}
+   * @return {@code true} for any path that is not under {@code /v1}
    */
   @Override
   protected boolean shouldNotFilter(@NotNull HttpServletRequest request) {
-    return !request.getRequestURI().startsWith("/v1/");
+    return !IngestPathScope.isIngestRequest(request);
   }
 
   /**

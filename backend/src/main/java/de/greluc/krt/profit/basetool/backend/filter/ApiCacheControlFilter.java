@@ -27,16 +27,28 @@ import java.io.IOException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.server.PathContainer;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.pattern.PathPattern;
+import org.springframework.web.util.pattern.PathPatternParser;
 
 /**
  * Adds conservative Cache-Control headers for idempotent API GET responses to enable client-side
  * revalidation via ETag while avoiding stale caches for dynamic data.
+ *
+ * <p>The {@code /api} scope is a parsed {@link PathPattern} matched against the decoded path rather
+ * than a raw {@code getRequestURI().startsWith("/api/")} test: {@code getRequestURI()} is the raw
+ * percent-encoded URI while Spring MVC routes on the decoded path, so an encoded spelling such as
+ * {@code /%61pi/v1/users} reached the API handler with no revalidation headers at all — the one
+ * response class that must never be served stale from an intermediary.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
 public class ApiCacheControlFilter extends OncePerRequestFilter {
+
+  /** The API surface whose GET responses get revalidation headers, parsed once. */
+  private static final PathPattern API_SCOPE = PathPatternParser.defaultInstance.parse("/api/**");
 
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
@@ -44,7 +56,7 @@ public class ApiCacheControlFilter extends OncePerRequestFilter {
       return true;
     }
     String uri = request.getRequestURI();
-    return uri == null || !uri.startsWith("/api/");
+    return uri == null || !API_SCOPE.matches(PathContainer.parsePath(uri));
   }
 
   @Override

@@ -59,6 +59,35 @@ class RequestLoggingFilterTest {
         .hasSize(1);
   }
 
+  /**
+   * An encoded spelling of an ingest path is still logged.
+   *
+   * <p>The {@code startsWith("/v1/")} test this replaced read the raw URI, so {@code
+   * /%761/refinery-extract} — which Spring MVC decodes and dispatches to the ingest controller —
+   * produced no access line at all. That is the worst possible pairing with the sibling filters the
+   * same idiom also skipped: the one request class that evaded the client-identity gate was the one
+   * class that left no trace.
+   */
+  @Test
+  void logsTheAccessLineForAPercentEncodedIngestPath() throws Exception {
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/%761/refinery-extract");
+    request.setRequestURI("/%761/refinery-extract");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    response.setStatus(200);
+
+    List<ILoggingEvent> events =
+        LogCapture.capture(
+            RequestLoggingFilter.class,
+            Level.INFO,
+            () ->
+                new RequestLoggingFilter(TestLoggingProperties.defaults())
+                    .doFilter(request, response, new MockFilterChain()));
+
+    assertThat(events)
+        .filteredOn(e -> e.getFormattedMessage().contains("/%761/refinery-extract -> 200"))
+        .hasSize(1);
+  }
+
   @Test
   void escalatesToWarnOnceTheSlowRequestThresholdIsCrossed() throws Exception {
     // A zero-millisecond threshold makes every request "slow", so the WARN branch is exercised

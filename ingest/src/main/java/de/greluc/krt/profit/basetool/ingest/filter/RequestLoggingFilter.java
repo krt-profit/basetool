@@ -94,11 +94,16 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
   /**
    * Limits the access log to the ingest endpoints; actuator, health and api-docs are unaffected.
    *
+   * <p>Decided on the decoded path via {@link IngestPathScope}. With the raw prefix test an encoded
+   * spelling of an ingest path produced no access-log line at all, which is the worst possible
+   * pairing with the sibling filters it also skipped: the one request class that evaded the
+   * client-identity gate was also the one class that left no trace.
+   *
    * @param request the current request
-   * @return {@code true} for any path that is not under {@code /v1/}
+   * @return {@code true} for any path that is not under {@code /v1}
    */
   @Override
   protected boolean shouldNotFilter(@NotNull HttpServletRequest request) {
-    return !request.getRequestURI().startsWith("/v1/");
+    return !IngestPathScope.isIngestRequest(request);
   }
 }

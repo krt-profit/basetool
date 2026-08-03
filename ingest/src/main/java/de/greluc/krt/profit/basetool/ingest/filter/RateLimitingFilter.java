@@ -124,14 +124,18 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Skips paths outside {@code /v1/} and disables the filter entirely when rate limiting is off.
+   * Skips paths outside {@code /v1} and disables the filter entirely when rate limiting is off.
+   *
+   * <p>The path test goes through {@link IngestPathScope} so it is decided on the decoded path: a
+   * raw prefix test would let a caller shed the limit for good by encoding one character of the
+   * path the dispatcher will decode back anyway.
    *
    * @param request the current request
    * @return {@code true} to bypass the filter
    */
   @Override
   protected boolean shouldNotFilter(@NotNull HttpServletRequest request) {
-    return !properties.isEnabled() || !request.getRequestURI().startsWith("/v1/");
+    return !properties.isEnabled() || !IngestPathScope.isIngestRequest(request);
   }
 
   /**

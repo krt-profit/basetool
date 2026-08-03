@@ -37,14 +37,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.server.PathContainer;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.pattern.PathPattern;
+import org.springframework.web.util.pattern.PathPatternParser;
+import org.springframework.web.util.pattern.PatternParseException;
 
 /**
  * Rejects an oversized non-multipart request body on the configured heavy JSON import paths with
@@ -62,14 +68,80 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * <p>Scoped to {@link RequestBodyLimitProperties#getPaths()} only (the refinery extract by default)
  * and skips multipart uploads (handled by the {@code spring.servlet.multipart} cap), so ordinary
  * small JSON writes and the multipart imports are unaffected.
+ *
+ * <p>The configured paths are matched as parsed {@link PathPattern}s against the <em>decoded</em>
+ * request path, not compared to the raw {@code getRequestURI()}. {@code getRequestURI()} is the raw
+ * percent-encoded URI per the servlet spec while Spring MVC routes on the decoded path, so the
+ * previous exact string comparison left the cap off for {@code /%61pi/v1/refinery-orders/…} — an
+ * encoded spelling the dispatcher decodes and delivers to the very controller the cap protects. The
+ * default {@code StrictHttpFirewall} blocks {@code %2e}, {@code %2f} and {@code %25}, but not
+ * ordinary letter escapes like {@code %61}.
  */
 @Slf4j
-@RequiredArgsConstructor
 public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
 
   private final RequestBodyLimitProperties properties;
   private final AppProblemProperties problemProperties;
   private final MeterRegistry meterRegistry;
+
+  /**
+   * The configured paths, compiled once at construction. A configured entry is normally a literal
+   * path, which compiles to a pattern that matches exactly that path — the semantics of the {@code
+   * List#contains} test this replaced — while still allowing an operator to configure a wildcard.
+   */
+  private final List<PathPattern> cappedPaths;
+
+  /**
+   * Compiles {@link RequestBodyLimitProperties#getPaths()} into {@link PathPattern}s up front, so a
+   * malformed entry fails the context start with a message naming it instead of silently never
+   * matching and leaving the endpoint uncapped at runtime.
+   *
+   * @param properties the validated cap configuration (enabled flag, byte cap, capped paths)
+   * @param problemProperties RFC 7807 problem-type base URI used in the 413 body
+   * @param meterRegistry registry the {@code basetool_request_body_rejected_total} counter binds to
+   * @throws IllegalStateException when a configured path is blank or not valid {@link PathPattern}
+   *     syntax
+   */
+  public RequestBodySizeLimitFilter(
+      RequestBodyLimitProperties properties,
+      AppProblemProperties problemProperties,
+      MeterRegistry meterRegistry) {
+    this.properties = properties;
+    this.problemProperties = problemProperties;
+    this.meterRegistry = meterRegistry;
+    this.cappedPaths = compilePaths(properties.getPaths());
+  }
+
+  /**
+   * Compiles the configured capped paths, failing fast on a malformed entry.
+   *
+   * @param paths the raw configured paths, possibly {@code null} or empty
+   * @return the compiled patterns, unmodifiable because the field is shared across request threads
+   * @throws IllegalStateException when an entry is blank or cannot be parsed
+   */
+  private static List<PathPattern> compilePaths(@Nullable List<String> paths) {
+    if (paths == null || paths.isEmpty()) {
+      return List.of();
+    }
+    List<PathPattern> compiled = new ArrayList<>(paths.size());
+    for (String path : paths) {
+      if (path == null || path.isBlank()) {
+        throw new IllegalStateException(
+            "Blank entry in app.request-body-limit.paths; every entry must be a non-blank path.");
+      }
+      try {
+        compiled.add(PathPatternParser.defaultInstance.parse(path));
+      } catch (PatternParseException ex) {
+        throw new IllegalStateException(
+            "Invalid app.request-body-limit.paths entry '"
+                + path
+                + "'; PathPattern allows ** only as the final segment. Reason: "
+                + ex.getMessage(),
+            ex);
+      }
+    }
+    return Collections.unmodifiableList(compiled);
+  }
 
   @Override
   protected void doFilterInternal(
@@ -97,21 +169,37 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Skips every request the cap does not apply to: the filter is disabled, the path is not in the
-   * configured set, the request has no body ({@code GET}/{@code HEAD}/{@code DELETE}), or it is a
-   * multipart upload (bounded separately by the multipart cap).
+   * Skips every request the cap does not apply to: the filter is disabled, the decoded path matches
+   * none of the configured patterns, the request has no body ({@code GET}/{@code HEAD}/{@code
+   * DELETE}), or it is a multipart upload (bounded separately by the multipart cap).
    *
    * @param request the current request
    * @return {@code true} to bypass the filter
    */
   @Override
   protected boolean shouldNotFilter(@NotNull HttpServletRequest request) {
-    if (!properties.isEnabled() || !properties.getPaths().contains(request.getRequestURI())) {
+    if (!properties.isEnabled() || !isCappedPath(request)) {
       return true;
     }
     String contentType = request.getContentType();
     return contentType != null
         && contentType.toLowerCase().startsWith(MediaType.MULTIPART_FORM_DATA_VALUE);
+  }
+
+  /**
+   * Whether the request's <em>decoded</em> path is one of the capped ones.
+   *
+   * @param request the current request
+   * @return {@code true} when a configured pattern matches, i.e. when the cap applies
+   */
+  private boolean isCappedPath(HttpServletRequest request) {
+    if (cappedPaths.isEmpty()) {
+      return false;
+    }
+    PathContainer path =
+        PathContainer.parsePath(
+            request.getRequestURI().substring(request.getContextPath().length()));
+    return cappedPaths.stream().anyMatch(pattern -> pattern.matches(path));
   }
 
   /**
