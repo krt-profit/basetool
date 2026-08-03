@@ -298,6 +298,15 @@ new PENDING registration (REQ-NOTIF-012), keyed off the PENDING transition itsel
 - [x] The scheduled sync (`syncUser(KeycloakUserDto)`) creates a brand-new non-admin user `PENDING`
   too; it never changes an existing user's approval state.
 - [ ] First admin (Keycloak `ADMIN` realm role) is `ACTIVE` on first login. _(syncUser carve-out; T1.4 e2e.)_
+- [x] The backend API is gated independently of the frontend redirect (which is UX, not the
+  boundary): `PendingApprovalAccessFilter` refuses a caller whose sole authority is
+  `ROLE_PENDING_APPROVAL` with a `403` (`code = PENDING_APPROVAL`) on every `/api/**` endpoint,
+  exempting only the registration-status poll. Scope and exemption are decided on the **decoded**
+  path via parsed `PathPattern`s: `getRequestURI()` is the raw percent-encoded URI while Spring MVC
+  routes on the decoded one, so a raw `startsWith("/api/")` test waved `/%61pi/v1/missions` past the
+  gate and let `RequestMappingHandlerMapping` decode and dispatch it — reaching the many writes gated
+  only on `@PreAuthorize("isAuthenticated()")`. The default `StrictHttpFirewall` blocks `%2e` /
+  `%2f` / `%25`, but not `%61`.
 - [x] Approve ⇒ `ACTIVE` + audit row; reject ⇒ `REJECTED` + reason in the audit.
 - [x] Concurrent approve ⇒ 409 (optimistic `@Version`).
 - [x] Hard-deleting a since-removed (no-longer-in-Keycloak) account first cleans up its V173 approval
@@ -318,7 +327,7 @@ new PENDING registration (REQ-NOTIF-012), keyed off the PENDING transition itsel
   let straight in. The page therefore promises automatic forwarding (`pendingApproval.help`) instead
   of instructing a re-login, and confirms it (`pendingApproval.approved`) before redirecting.
 
-**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (gate) + `UserServiceApprovalTest` (approve/reject + 409) + `UserServiceDiscordSyncTest` (new credential ⇒ PENDING, new admin ⇒ ACTIVE) + `UserServiceSyncTest` (scheduled-sync fail-safe) + `UserServiceDeleteTest` (approval-audit cleanup precedes the user delete) + `BackendRoleSyncFilterTest` (verdict expiry + poll-path exemption) + `PendingApprovalPageControllerTest` (status poll) · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `UserService.deleteUser`, `UserApprovalEventRepository` / `UserRepository.clearApprovedBy` (delete-time FK cleanup), `DiscordRegistrationAdminController`, `BackendRoleSyncFilter` (waiting-page route), `PendingApprovalPageController`, `pending-approval.html`, `pending-approval.js`, `messages*.properties` (`pendingApproval.*`) · **Issues:** #724, post-approval double re-login · **ADR:** ADR-0122
+**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (gate) + `UserServiceApprovalTest` (approve/reject + 409) + `UserServiceDiscordSyncTest` (new credential ⇒ PENDING, new admin ⇒ ACTIVE) + `UserServiceSyncTest` (scheduled-sync fail-safe) + `UserServiceDeleteTest` (approval-audit cleanup precedes the user delete) + `BackendRoleSyncFilterTest` (verdict expiry + poll-path exemption) + `PendingApprovalPageControllerTest` (status poll) + `PendingApprovalAccessFilterTest` (backend `/api/**` gate, incl. the percent-encoded-prefix bypass) · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `PendingApprovalAccessFilter`, `UserService.deleteUser`, `UserApprovalEventRepository` / `UserRepository.clearApprovedBy` (delete-time FK cleanup), `DiscordRegistrationAdminController`, `BackendRoleSyncFilter` (waiting-page route), `PendingApprovalPageController`, `pending-approval.html`, `pending-approval.js`, `messages*.properties` (`pendingApproval.*`) · **Issues:** #724, post-approval double re-login · **ADR:** ADR-0122
 
 ### REQ-NOTIF-012 — Admins notified on new PENDING registration
 

@@ -46,6 +46,8 @@
 
 ### Fixed
 
+- **Sicherheit: Ein noch nicht freigeschaltetes Konto konnte die API über einen kodierten Pfad erreichen.** Die Sperre für Konten, die auf die Freischaltung warten, verglich den rohen Adresspfad, die Weiterleitung dagegen den dekodierten — eine Anfrage auf `/%61pi/...` kam so an der Sperre vorbei und wurde trotzdem an den Endpunkt zugestellt. Beide vergleichen jetzt denselben dekodierten Pfad (REQ-SEC-017).
+
 - **Die API-Dokumentation schrieb sich bei jedem Build selbst um.** `openapi.json` enthielt drei interne Prüfregeln des Lager-Formulars und zwei der Bank als vermeintliche Eingabefelder; deren Reihenfolge war zufällig, wodurch jeder Build die Datei veränderte, ohne dass sich an der Schnittstelle etwas geändert hatte. Die Pseudo-Felder sind entfernt, die Datei ist jetzt reproduzierbar, und ein Test hält das so (REQ-API-007).
 
 - **Fehlalarm „ExternalFetchErrors“ für den UEX-Katalog behoben.** Zwei dauerhaft leere UEX-Kategorien (Jumpsuits, Consumable) wurden bei jedem Abgleich als Abruffehler gezählt, weil UEX ein leeres Ergebnis als `data: null` ausliefert — zusammen mit Backend-Neustarts löste dieser Dauerzähler den Alarm aus, ohne dass eine Störung vorlag. Gezählt wird jetzt nur noch, was UEX selbst als Fehler meldet (REQ-OBS-011).
