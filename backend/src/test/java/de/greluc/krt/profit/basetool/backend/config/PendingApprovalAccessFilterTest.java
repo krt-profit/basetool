@@ -172,6 +172,60 @@ class PendingApprovalAccessFilterTest {
     verify(chain).doFilter(any(), any());
   }
 
+  /**
+   * A percent-encoded path prefix does not slip past the gate.
+   *
+   * <p>{@code getRequestURI()} is the raw, still-encoded URI while Spring MVC routes on the decoded
+   * path, so the {@code startsWith("/api/")} test this replaced let {@code /%61pi/v1/missions}
+   * through — and {@code RequestMappingHandlerMapping} then decodes {@code %61pi} to {@code api}
+   * and dispatches it, handing a non-approved account the {@code isAuthenticated()}-only writes.
+   * The default {@code StrictHttpFirewall} blocks {@code %2e}/{@code %2f}/{@code %25} but not
+   * {@code %61}. Must be a direct filter test: MockMvc normalises the path before the filter sees
+   * it, so it cannot reproduce this.
+   */
+  @Test
+  void pendingUser_cannotBypassTheGateByPercentEncodingThePathPrefix() throws Exception {
+    authenticateWith(PendingApprovalAccessFilter.PENDING_AUTHORITY);
+    FilterChain chain = mock(FilterChain.class);
+
+    MockHttpServletResponse response = run("GET", "/%61pi/v1/missions", chain);
+
+    assertEquals(403, response.getStatus());
+    verify(chain, never()).doFilter(any(), any());
+  }
+
+  /**
+   * The exemption is equally encoding-proof in the other direction: an encoded spelling of the
+   * status endpoint must stay reachable, or a client that happens to percent-encode loses its only
+   * route to the waiting page.
+   */
+  @Test
+  void pendingUser_mayReadOwnRegistrationStatus_evenPercentEncoded() throws Exception {
+    authenticateWith(PendingApprovalAccessFilter.PENDING_AUTHORITY);
+    FilterChain chain = mock(FilterChain.class);
+
+    MockHttpServletResponse response = run("GET", "/api/v1/users/me/%72egistration-status", chain);
+
+    assertEquals(200, response.getStatus());
+    verify(chain).doFilter(any(), any());
+  }
+
+  /**
+   * The exemption stays exact: a path that merely begins with the status literal is still refused.
+   * Guards the literal {@code PathPattern} against being widened into a {@code /**}-suffixed one.
+   */
+  @Test
+  void pendingUser_pathMerelyPrefixedWithTheStatusLiteral_isStillForbidden() throws Exception {
+    authenticateWith(PendingApprovalAccessFilter.PENDING_AUTHORITY);
+    FilterChain chain = mock(FilterChain.class);
+
+    MockHttpServletResponse response =
+        run("GET", PendingApprovalAccessFilter.SELF_STATUS_PATH + "-export", chain);
+
+    assertEquals(403, response.getStatus());
+    verify(chain, never()).doFilter(any(), any());
+  }
+
   @Test
   void pendingUser_nonApiPath_passesThrough() throws Exception {
     authenticateWith(PendingApprovalAccessFilter.PENDING_AUTHORITY);

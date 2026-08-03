@@ -37,10 +37,13 @@ import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.server.PathContainer;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.pattern.PathPattern;
+import org.springframework.web.util.pattern.PathPatternParser;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -85,6 +88,40 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
   /** The only {@code /api} endpoint a pending user may reach (drives the waiting-page routing). */
   static final String SELF_STATUS_PATH = "/api/v1/users/me/registration-status";
 
+  /** Parses the two patterns below once; matching is per request and allocation-light. */
+  private static final PathPatternParser PATH_PARSER = PathPatternParser.defaultInstance;
+
+  /**
+   * The surface this filter guards.
+   *
+   * <p>Matched as a parsed {@link PathPattern} rather than with {@code
+   * requestUri.startsWith("/api/")}, because {@code getRequestURI()} is the <em>raw</em>
+   * percent-encoded URI while Spring MVC routes on the <em>decoded</em> path. A request for {@code
+   * /%61pi/v1/missions} fails a raw prefix test, so the gate would wave it through, and {@code
+   * RequestMappingHandlerMapping} would then decode {@code %61pi} to {@code api} and dispatch it —
+   * handing a PENDING/REJECTED account exactly the {@code isAuthenticated()}-only writes this
+   * filter exists to deny. The default {@code StrictHttpFirewall} blocks {@code %2e}, {@code %2f},
+   * {@code %25} and friends, but not {@code %61}.
+   *
+   * <p>{@link PathPattern} matches on {@code PathSegment#valueToMatch()}, which is decoded, so
+   * filter and routing agree. Note that {@code ServletRequestPathUtils} does <em>not</em> solve
+   * this: {@code PathContainer.Element#value()} is contractually the unmodified original.
+   *
+   * <p>Precedent: {@code filter.RateLimitingFilter} matches its configured paths the same way, and
+   * {@link TermsAcceptanceAccessFilter} guards this same surface with the same construct — the two
+   * gates must agree on what {@code /api} means, so neither may drift back to a raw prefix test.
+   */
+  private static final PathPattern API_SCOPE = PATH_PARSER.parse("/api/**");
+
+  /**
+   * {@link #SELF_STATUS_PATH} as a parsed pattern, so the one exemption is decided on the same
+   * decoded path as the scope above — an encoded spelling of the status endpoint must stay
+   * reachable or a client that happens to percent-encode loses its only route to the waiting page.
+   * Being a literal pattern (no wildcard), it keeps the exact-match semantics of the {@code equals}
+   * test it replaced: a future {@code /api/v1/users/me/registration-status-export} is not exempt.
+   */
+  private static final PathPattern SELF_STATUS_PATTERN = PATH_PARSER.parse(SELF_STATUS_PATH);
+
   /** Stable machine-readable code the frontend maps to the waiting-page routing. */
   static final String CODE_PENDING_APPROVAL = "PENDING_APPROVAL";
 
@@ -118,9 +155,23 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
     filterChain.doFilter(request, response);
   }
 
+  /**
+   * Decides whether this request must be refused: an {@code /api} call — other than the self-status
+   * exemption — made by an authenticated caller carrying the pending marker.
+   *
+   * <p>The path is parsed into a {@link PathContainer} and matched against {@link #API_SCOPE} /
+   * {@link #SELF_STATUS_PATTERN} rather than string-compared, so the gate sees the same decoded
+   * path the dispatcher will route on (see {@link #API_SCOPE}).
+   *
+   * @param request the current request
+   * @return {@code true} when the request must be answered with the 403, {@code false} when it may
+   *     proceed down the chain
+   */
   private boolean isBlockedPendingApiCall(HttpServletRequest request) {
-    String path = request.getRequestURI().substring(request.getContextPath().length());
-    if (!path.startsWith("/api/") || path.equals(SELF_STATUS_PATH)) {
+    PathContainer path =
+        PathContainer.parsePath(
+            request.getRequestURI().substring(request.getContextPath().length()));
+    if (!API_SCOPE.matches(path) || SELF_STATUS_PATTERN.matches(path)) {
       return false;
     }
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
