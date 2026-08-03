@@ -172,6 +172,8 @@ Keep triage fast: confirm the signal in the matching Grafana dashboard, then act
 | **MailDeliveryFailing**                                                                                                  | Outgoing SMTP mail is failing (>2/h). Check the relay host/credentials and the backend logs; registration and approval notifications may be silently lost.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | **MailDroppedConfigDrift**                                                                                               | Mail is enabled but silently going nowhere: check `spring.mail.host` (blank env var?) and the `JavaMailSender` bean; the firing `outcome` label names the gate. Scoped to `dropped_no_host` / `dropped_no_sender` only — the deliberate `APP_MAIL_ENABLED=false` prod kill-switch (`dropped_disabled`) is excluded and never mails, so this alert is expected to stay silent until mail is switched on.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | **SsePushChannelDead**                                                                                                   | The backend has zero live SSE connections while the frontend is still serving real user page traffic (>0.01 req/s excluding probes, 404s and `/actuator*`) — the notification push channel is down and clients fell back to polling. Check reverse-proxy SSE buffering (no response buffering on `/notifications/stream`) and the relay. The guard is deliberately request rate, not `basetool_active_sessions`: that gauge counts 30-day Redis sessions (~365 on prod) and never dips, which made this alert fire every idle night.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **LiveSyncRelayDropsSustained**                                                                                          | The live-sync relay dropped >3 frames in an hour on one `topic_class`/`reason`, sustained 15m — peers on that surface are silently missing updates, with no client-side error and no 5xx. The prod baseline is **zero** (21d to 2026-08-03: the counter had no series at all), so any sustained stream is anomalous. Act on the firing `reason`: `throttled`/`topic_throttled` = a client or a room over its token bucket (misbehaving client, or a genuinely hot room needing a wider bound); `send_failed` = sockets breaking mid-write, check the reverse proxy's WebSocket timeouts; `topic_cap` = a client subscribing past its per-session cap (client bug); `authorize_saturated` = the subscribe-authorization executor is saturated and subscribes are failing **open**, so treat it as security-relevant and check backend latency. `section_filtered` is deliberately excluded here — see the next row.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **LiveSyncSectionKeySkew**                                                                                               | A section key is being broadcast that the relay's accept-list does not know, so peers' matching panels stay stale with no visible error — the REQ-FE-010 defect class. A key must exist at all three mirror points at once: the acting page's seam map, `LiveSyncTopicClass.allowedSections`, and the receiving client's apply map. Check what the last frontend deploy changed on that surface; raise `LiveSyncWebSocketHandler` to DEBUG via `/actuator/loggers` to see the rejected key (logged sanitised, never a metric tag). Triggers on **persistence** (`increase[1h] > 0` for 2h), not rate, because a real skew is deterministic but low-volume. Known gap: on a barely-used surface a skew may never sustain 2h — panel 29 is the backstop. This rule replaces the `changed`-flatline alert of #1238, which is unsound (a single-viewer room relays zero frames by design, and the `snapshot` guard exists only for `mission`); panel 47 (peer rooms) is the co-presence denominator a future flatline rule would need.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **FrontendLoginBroken**                                                                                                  | The frontend logged repeated OAuth2 provider errors (failed code-to-token exchange, JWKS or bad IdP response — `reason="provider_error"`, >=3 in 15m) with zero successes — login is likely broken for everyone at the token-exchange step. Check frontend logs and Keycloak reachability from the frontend (issuer-uri/JWKS) and the OIDC client config. Scoped to `provider_error` on purpose: a lone `invalid_state` failure (bot at the OAuth callback, abandoned/expired login) is benign and no longer trips this; a real state/session-loss break shows as `invalid_state` and via the `redis` readiness indicator.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | **SessionEvictionSpike**                                                                                                 | More than 3 concurrent-session evictions per hour, sustained — members are being logged out with "This session has been expired" because the per-principal cap (10) is full. Eviction is rare by construction, so a stream that does not return to zero points at a session registry holding DEAD Redis sessions against the cap rather than users genuinely cycling more than ten devices. `basetool_active_sessions` cannot corroborate it (`expireNow()` only marks the session, so the gauge never dips) — compare the registry against the live keys (`SCAN 'basetool:session:sessions:*'`) and correlate with `ActiveSessionsRunaway`. The WARN log line carries the cap and the victim’s `userId` (sub), never the callsign.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **CsrfRejectionSpike**                                                                                                   | CSRF-token rejections are elevated (>0.1/s for 15m) — likely a systematic CSRF-wiring regression, not stale tokens (which `krtFetch` self-heals). Check recent security/template changes and the `/csrf` endpoint.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -369,6 +371,90 @@ to 182.5 MiB in a single 6-hour window on 2026-07-31, when the v1.18.0 image bum
 cache is charged to the cgroup that *first faults a page in*, so after a fresh image pull the container
 running the new binary is billed for it — the same memory as before, re-attributed. Its `rss` was flat
 at 190–217 MB across the whole 21-day window and its goroutines flat at ~397.
+
+### CPU limits — read the *average*, size for the *burst* (#937, 2026-08-03)
+
+The memory sections above were the whole story until #937 measured the CPU axis for the first
+time. It behaves the opposite way round, and reading it like the memory metrics gives the wrong
+answer twice over.
+
+```promql
+# how OFTEN a container is stopped mid-period — peak of a 5m ratio over 7 days
+max by (name) (max_over_time((rate(container_cpu_cfs_throttled_periods_total{name!=""}[5m])
+  / clamp_min(rate(container_cpu_cfs_periods_total{name!=""}[5m]), 1))[7d:5m]))
+# the same thing averaged over the whole window — the sustained tax
+sum by (name) (increase(container_cpu_cfs_throttled_periods_total{name!=""}[7d]))
+  / clamp_min(sum by (name) (increase(container_cpu_cfs_periods_total{name!=""}[7d])), 1)
+# how MUCH time was actually lost — the number to argue from
+sum by (name) (increase(container_cpu_cfs_throttled_seconds_total{name!=""}[7d]))
+```
+
+**Take all three.** The peak ratio and the average disagree by two orders of magnitude here
+(frontend: 66.7 % peak vs 0.725 % average), and each alone misleads: the peak says "badly
+starved", the average says "fine". Neither is the decision input — **the absolute throttled
+seconds are** (frontend: 1506 s/week ≈ 25 minutes of stalled rendering).
+
+Three things that make CPU different from memory:
+
+- **A quota is a burst ceiling, not a reservation.** Unused quota costs nothing and is not
+  charged to anyone. Overcommitting the sum past the physical core count is normal and
+  deliberate (this stack runs 12.0 vCPU of quota on 8 physical); the CFS scheduler arbitrates
+  actual contention at run time.
+- **Throttling is per-cgroup against its OWN quota.** It is *not* a contention signal. A
+  container can be throttled on a completely idle host, and an unlimited container can never
+  cause a neighbour's throttling. Do not go looking for the "culprit" — there is none.
+- **5-minute averages hide the workload that gets clipped.** Every throttled service here
+  averaged under 0.6 cores while being throttled: JIT compilation, TLS handshakes and a
+  Reactor/WebClient fan-out are short and *parallel*, so they exceed a 1.0 quota for tens of
+  milliseconds without ever moving a 5m average. If the average is low and the throttle
+  seconds are high, that is the signature — widen the ceiling, do not hunt for load.
+
+Measured 2026-08-03, 7 days, for reference:
+
+|    service    | quota | 5m-peak cores | peak ratio |  avg ratio  | throttled s |
+|---------------|-------|---------------|------------|-------------|-------------|
+| `frontend`    | 1.0   | 0.18          | 66.7 %     | **0.725 %** | **1506**    |
+| `redis`       | 0.5   | 0.015         | 3.3 %      | 0.661 %     | 545         |
+| `ingest`      | 1.0   | 0.10          | **76.7 %** | 0.245 %     | 452         |
+| `keycloak`    | 2.0   | 0.28          | 53.0 %     | 0.106 %     | 417         |
+| `backend`     | 2.0   | 0.51          | 47.0 %     | 0.168 %     | 284         |
+| `db-backend`  | 1.5   | 0.096         | 6.0 %      | 0.104 %     | 164         |
+| `npm`         | 0.5   | 0.030         | 20.0 %     | 0.056 %     | 121         |
+| `db-keycloak` | 1.0   | 0.018         | 1.5 %      | 0.132 %     | 23          |
+
+Host context for all of it: 21 containers averaging **0.256 cores together — 3.2 % of the
+8 vCPU** — with `load15` averaging 0.36. Nothing here is a capacity problem; the four raises
+
+# 937 made (`frontend` 1.0→2.0, `ingest` 1.0→1.5, `redis` 0.5→1.0, `npm` 0.5→1.0) bought latency,
+
+not throughput.
+
+### Postgres — `rss` under-reports a database, and the textbook bound is wrong
+
+Two traps specific to the DB containers, both hit in #937.
+
+**`container_memory_rss` under-reports Postgres.** `shared_buffers` is POSIX shared memory and
+lands in the cgroup's `cache` term, not in `anon`. `db-backend` read **6.96 %** of its limit on
+`rss` while its working set was 295 MB — the buffer pool is the difference. This is the one
+place where the "always size from `rss`" rule above is wrong: **read a DB container from
+`container_memory_working_set_bytes`.**
+
+**Do not size a DB container from `max_connections × work_mem`.** That product (150 × 8MB =
+1200 MB) presumes every pooled connection simultaneously runs a sort that fills `work_mem` — an
+analytics shape this OLTP app does not have. The measurement that settles it:
+
+```promql
+sum by (job) (increase(pg_stat_database_temp_files[7d]))   # 0 = work_mem never overflowed
+sum by (job) (pg_database_size_bytes)                      # how big the data ACTUALLY is
+sum by (job) (rate(pg_stat_database_blks_hit[7d]))
+  / clamp_min(sum by (job) (rate(pg_stat_database_blks_hit[7d]))
+            + sum by (job) (rate(pg_stat_database_blks_read[7d])), 1)   # cache hit ratio
+```
+
+2026-08-03: **107.7 MB** / **39.4 MB** of actual data, **99.990 %** / **99.998 %** hit ratio,
+**0** temp files on both. `shared_buffers` had been scaled by ratio alongside the container
+limit and stood at 4.75× the entire database. Size from `pg_database_size_bytes`, and let
+`temp_files` — not arithmetic — tell you whether `work_mem` is big enough.
 
 ### Does `keycloak-stdout` fit in Alloy's budget? (2026-08-02)
 

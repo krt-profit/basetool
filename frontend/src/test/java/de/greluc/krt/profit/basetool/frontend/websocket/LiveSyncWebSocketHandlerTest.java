@@ -46,6 +46,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -152,6 +153,103 @@ class LiveSyncWebSocketHandlerTest {
     // After the blur the snapshot has no sections at all (the entry was the only one).
     assertThat(broadcast.get("type").asString()).isEqualTo("presence");
     assertThat(broadcast.get("sections").size()).isZero();
+  }
+
+  @Test
+  void focusAndBlur_gossipThisInstancesPresenceSnapshotToPeers() throws Exception {
+    String topic = missionTopic();
+    FakeSession session = openSubscribed(topic, oidcUser("user-1", "Alice"));
+
+    handler.handleTextMessage(session, presenceFrame("focus", topic, "crew"));
+
+    assertThat(fanout.presenceTopics).containsExactly(topic);
+    assertThat(fanout.presenceSnapshots.get(0))
+        .containsOnlyKeys("crew")
+        .extractingByKey("crew")
+        .asInstanceOf(InstanceOfAssertFactories.list(LiveSyncPresenceService.PresenceEditor.class))
+        .extracting(LiveSyncPresenceService.PresenceEditor::userId)
+        .containsExactly("user-1");
+
+    handler.handleTextMessage(session, presenceFrame("blur", topic, "crew"));
+
+    // The blur gossips an EMPTY snapshot rather than nothing at all: that is what drops this
+    // instance's partition on the peers immediately instead of leaving the dot up until the
+    // partition TTL expires (ADR-0126).
+    assertThat(fanout.presenceTopics).containsExactly(topic, topic);
+    assertThat(fanout.presenceSnapshots.get(1)).isEmpty();
+  }
+
+  @Test
+  void deliverPresenceFromFanout_mergesAPeerReplicasEditors_andBroadcastsTheMergedDots()
+      throws Exception {
+    String topic = missionTopic();
+    FakeSession local = openSubscribed(topic, oidcUser("user-1", "Alice"));
+    handler.handleTextMessage(local, presenceFrame("focus", topic, "crew"));
+    local.sent.clear();
+    fanout.presenceTopics.clear();
+
+    handler.deliverPresenceFromFanout(
+        topic,
+        "instance-B",
+        Map.of("steps", List.of(new LiveSyncPresenceService.PresenceEditor("user-2", "Bob"))));
+
+    JsonNode broadcast = lastBroadcast(local);
+    assertThat(broadcast.get("type").asString()).isEqualTo("presence");
+    assertThat(broadcast.get("sections").get("crew").get(0).get("userId").asString())
+        .isEqualTo("user-1");
+    assertThat(broadcast.get("sections").get("steps").get(0).get("displayName").asString())
+        .isEqualTo("Bob");
+    // Consume must never re-publish — two replicas would otherwise echo each other forever.
+    assertThat(fanout.presenceTopics).isEmpty();
+  }
+
+  @Test
+  void deliverPresenceFromFanout_ignoresANonPresenceTopicClass() {
+    String topic = "operation:5f1d2c3b-0000-0000-0000-000000000009";
+
+    handler.deliverPresenceFromFanout(
+        topic,
+        "instance-B",
+        Map.of("overview", List.of(new LiveSyncPresenceService.PresenceEditor("user-2", "Bob"))));
+
+    // A peer must not be able to open a presence surface on a class that carries no dots.
+    assertThat(service.remotePartitionCount()).isZero();
+  }
+
+  @Test
+  void deliverPresenceFromFanout_dropsAnOverLongSectionKey() {
+    String topic = missionTopic();
+
+    handler.deliverPresenceFromFanout(
+        topic,
+        "instance-B",
+        Map.of(
+            "x".repeat(65), List.of(new LiveSyncPresenceService.PresenceEditor("user-2", "Bob"))));
+
+    // Same shape bound an inbound client presence frame carries: a peer replica is re-validated,
+    // not trusted.
+    assertThat(service.remotePartitionCount()).isZero();
+  }
+
+  @Test
+  void reaperTick_reGossipsEveryTrackedPresenceTopic() throws Exception {
+    String topic = missionTopic();
+    FakeSession session = openSubscribed(topic, oidcUser("user-1", "Alice"));
+    handler.handleTextMessage(session, presenceFrame("focus", topic, "crew"));
+    fanout.presenceTopics.clear();
+
+    handler.tickReaper();
+
+    // The periodic re-gossip is what heals a dropped message and seeds a replica that started
+    // after the focus happened.
+    assertThat(fanout.presenceTopics).containsExactly(topic);
+  }
+
+  @Test
+  void reaperTick_gossipsNothing_whenNobodyIsEditing() {
+    handler.tickReaper();
+
+    assertThat(fanout.presenceTopics).isEmpty();
   }
 
   @Test
@@ -701,6 +799,43 @@ class LiveSyncWebSocketHandlerTest {
     // Joined then immediately left: the room is empty (no lingering decorator) and no ack was sent.
     assertThat(presenceGauge(reg)).isZero();
     assertThat(bob.sent).isEmpty();
+  }
+
+  @Test
+  void peerRoomsGauge_countsOnlyRoomsThatActuallyHoldPeers() throws Exception {
+    String room = operationTopic();
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
+    subscribe(alice, room);
+
+    // A lone viewer is not a peer room: relayLocal skips the origin, so nothing can ever be
+    // relayed here and a `changed` flatline is the correct, healthy state.
+    assertThat(subscriptionsGauge("operation")).isEqualTo(1.0);
+    assertThat(peerRoomsGauge("operation")).isZero();
+
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(bob, room);
+
+    // Two sockets in the SAME room — peer-sync is live.
+    assertThat(peerRoomsGauge("operation")).isEqualTo(1.0);
+
+    bob.open = false;
+    handler.afterConnectionClosed(bob, CloseStatus.NORMAL);
+    assertThat(peerRoomsGauge("operation")).isZero();
+  }
+
+  @Test
+  void peerRoomsGauge_separatesCoPresenceFromTwoLoneViewers() throws Exception {
+    // THE case the subscriptions gauge cannot express, and the reason this gauge exists: two
+    // sockets in the same topic class but in DIFFERENT rooms. `subscriptions` reads 2 either way,
+    // so it cannot tell peer-sync being exercised from peer-sync being inert — which is what makes
+    // a `changed`-frame flatline uninterpretable without this gauge (#1238).
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
+    subscribe(alice, operationTopic());
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(bob, operationTopic());
+
+    assertThat(subscriptionsGauge("operation")).isEqualTo(2.0);
+    assertThat(peerRoomsGauge("operation")).isZero();
   }
 
   @Test
@@ -1484,6 +1619,22 @@ class LiveSyncWebSocketHandlerTest {
     return presenceGauge(registry);
   }
 
+  private double peerRoomsGauge(String topicClass) {
+    return registry
+        .get(MetricNames.LIVESYNC_PEER_ROOMS)
+        .tag(MetricNames.TAG_TOPIC_CLASS, topicClass)
+        .gauge()
+        .value();
+  }
+
+  private double subscriptionsGauge(String topicClass) {
+    return registry
+        .get(MetricNames.LIVESYNC_SUBSCRIPTIONS)
+        .tag(MetricNames.TAG_TOPIC_CLASS, topicClass)
+        .gauge()
+        .value();
+  }
+
   private static double presenceGauge(SimpleMeterRegistry reg) {
     return reg.get(MetricNames.PRESENCE_WS_SESSIONS).gauge().value();
   }
@@ -1548,11 +1699,21 @@ class LiveSyncWebSocketHandlerTest {
   private static final class CapturingFanout implements LiveSyncFanout {
     private final List<String> publishedTopics = new ArrayList<>();
     private final List<List<String>> publishedSections = new ArrayList<>();
+    private final List<String> presenceTopics = new ArrayList<>();
+    private final List<Map<String, List<LiveSyncPresenceService.PresenceEditor>>>
+        presenceSnapshots = new ArrayList<>();
 
     @Override
     public void publish(String canonicalTopic, List<String> sections) {
       publishedTopics.add(canonicalTopic);
       publishedSections.add(List.copyOf(sections));
+    }
+
+    @Override
+    public void publishPresence(
+        String canonicalTopic, Map<String, List<LiveSyncPresenceService.PresenceEditor>> sections) {
+      presenceTopics.add(canonicalTopic);
+      presenceSnapshots.add(Map.copyOf(sections));
     }
   }
 

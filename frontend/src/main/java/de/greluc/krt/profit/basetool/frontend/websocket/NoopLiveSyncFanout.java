@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.websocket;
 
+import de.greluc.krt.profit.basetool.frontend.service.LiveSyncPresenceService;
 import java.util.List;
+import java.util.Map;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -44,5 +46,19 @@ public class NoopLiveSyncFanout implements LiveSyncFanout {
   @Override
   public void publish(@NotNull String canonicalTopic, @NotNull List<String> sections) {
     // Single-instance: nothing to fan out.
+  }
+
+  /**
+   * No-op: with one replica the local presence store is already the complete picture, so there is
+   * no peer to gossip the snapshot to and nothing to merge back (ADR-0126).
+   *
+   * @param canonicalTopic the canonical topic (unused)
+   * @param sections this instance's editors per section (unused)
+   */
+  @Override
+  public void publishPresence(
+      @NotNull String canonicalTopic,
+      @NotNull Map<String, List<LiveSyncPresenceService.PresenceEditor>> sections) {
+    // Single-instance: the local presence store is the whole truth.
   }
 }

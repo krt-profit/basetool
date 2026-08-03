@@ -34,18 +34,45 @@ x-db-backend: &db-backend-template
     - FOWNER
     - SETGID
     - SETUID
-  # Container-aware memory tuning. The default Postgres settings (128 kB work_mem,
-  # 128 MB shared_buffers) target a 4 GB host — at our 2048 MB container limit the
-  # buffer pool stays warm and join/sort operations spill to disk far less often.
-  # `effective_cache_size` is an estimate to the planner, not an allocation, so
-  # setting it to ~2/3 of the limit is safe and helps index plans win over seq
-  # scans. shared_buffers/effective_cache_size were scaled up together with the
-  # container RAM (1536M -> 2048M) for the larger 5000-account working set (the app
-  # data — missions, inventory, bank, market — scales with activity, not just user
-  # count). max_connections stays 150: the backend's 100-slot Hikari pool (ADR-0078
-  # mission-scale hardening) plus postgres_exporter + Flyway + admin sessions all fit
-  # with headroom, and 200 concurrent tool users never exceed the 100-slot pool
-  # (request handling runs on virtual threads, not per-user JDBC connections).
+  # ======================== POSTGRES SIZING (measured, #937) ========================
+  # Re-tuned 2026-08-03 against a 7-day production baseline (issue #937, the data-driven
+  # follow-up to the CPX42 rescale). Every value below is derived from a measurement, not
+  # from a ratio applied to the container limit — which is what the previous revision did,
+  # and what produced flags several times larger than the data justifies.
+  #
+  # Measured over the 7 days ending 2026-08-03:
+  #
+  #   total database size            107.7 MB       <- the whole basetool DB
+  #   cache hit ratio                99.990 %
+  #   temp files written             0              <- work_mem never once overflowed
+  #   connections peak / avg         31 / 4.7       of max_connections=150
+  #   container working-set peak     295 MB         of the (then) 2048 MB limit
+  #
+  # shared_buffers 512MB -> 384MB. The old value was 4.75x the ENTIRE database; even the
+  # working set never reached it (295 MB total, so the 512 MB pool was not even fully
+  # faulted in). 384MB still holds the whole 107.7 MB database 3.6x over, so the 99.99 %
+  # hit ratio has enormous margin before it could degrade — the DB would have to quadruple
+  # first, which is the review trigger for this block.
+  #
+  # effective_cache_size 1365MB -> 1024MB. A planner estimate, never an allocation: it
+  # should describe how much of this DB the OS could plausibly keep cached. The host held
+  # >= 9.84 GiB MemAvailable across the whole window, so 1024MB (9.5x the database) keeps
+  # index plans winning over seq scans with room to spare.
+  #
+  # work_mem 8MB and maintenance_work_mem 64MB are DELIBERATELY UNCHANGED. `temp_files=0`
+  # over seven days is direct evidence that no query ever spilled to disk at 8MB — the
+  # setting is demonstrably sufficient, and lowering it would trade a proven-good value for
+  # a spill risk with nothing to gain (work_mem is allocated per sort node on demand, so an
+  # unused ceiling costs zero).
+  #
+  # max_connections stays 150. It is a slot ceiling, not an allocation, and it has to cover
+  # the backend's configured 100-slot Hikari pool (ADR-0078) plus postgres_exporter, Flyway
+  # and admin sessions even though the measured peak was only 31. Note the textbook
+  # `max_connections x work_mem` product (150 x 8MB = 1200 MB) is NOT the operative bound
+  # here and must not be used to size the container: it assumes every connection runs a
+  # sort that fills work_mem simultaneously, which is an analytics workload shape this OLTP
+  # app does not have — `temp_files=0` at a peak of 31 connections is the measurement that
+  # settles it. Size the container from the working-set peak instead (see deploy.resources).
   #
   # `log_error_verbosity=terse` keeps DETAIL lines — which quote row values — out of the log
   # (REQ-OBS-004/-007); do NOT relax it. Its cost is that a rejected statement logs a bare
@@ -58,10 +85,11 @@ x-db-backend: &db-backend-template
   # pool, `postgres_exporter` for the scraper) while they all share the POSTGRES_USER role.
   # `%q` suppresses those fields for non-session processes, keeping startup/checkpointer lines
   # clean. The prefix carries no row data, so the terse PII guarantee is untouched.
+  # =================================================================================
   command: >
     postgres
-    -c shared_buffers=512MB
-    -c effective_cache_size=1365MB
+    -c shared_buffers=384MB
+    -c effective_cache_size=1024MB
     -c work_mem=8MB
     -c maintenance_work_mem=64MB
     -c max_connections=150
@@ -79,24 +107,61 @@ x-db-backend: &db-backend-template
     timeout: 5s
     retries: 5
   stop_grace_period: 60s
-  # Resource budget: the host has 16 GB RAM. After the 5000-account / 200-concurrent
-  # capacity pass the `prod` app services total ~9.5 GB (db-backend 1536->2048M,
-  # db-keycloak 512->768M, keycloak 1536->2560M, redis 256->512M); the separate
-  # monitoring compose stack adds ~2-3 GB, so together they still leave ~4 GB of
-  # headroom for the kernel, the Docker daemon and short-lived bursts. Keep the sum
-  # of limits under ~14 GB so a burst never invites the OOM-killer. The db-backend's
-  # 2048 MB backs the backend's 100-slot Hikari pool (ADR-0078): ~512 MB shared_buffers
-  # + ~100 connections x ~8 MB working memory + overhead, with room for the larger
-  # 5000-account dataset. CPU limits are intentionally overcommitted relative to the
-  # four physical vCPUs because they are per-container burst ceilings, not reserved
-  # shares — the CFS scheduler arbitrates contention at run time. Without these limits
-  # an in-container memory leak would let one service monopolise the host and OOM-kill
-  # its neighbours (Postgres in particular has historically been the casualty when the
-  # JVM heap runs away).
+  # =================== STACK RESOURCE BUDGET (measured, #937) ===================
+  # The host is a Hetzner CPX42: **8 vCPU / 16 GB RAM** (15.24 GiB MemTotal). This block is
+  # the reference budget for every service in this file and in
+  # docker-compose.monitoring.yml; the per-service blocks below only record their own
+  # deltas. Re-derived 2026-08-03 from a 7-day production baseline (#937) — the previous
+  # revision predated the rescale and still described a 4-vCPU / 8-GB host in places.
+  #
+  # Sum of limits after this pass: app 9216 MiB + monitoring 4368 MiB = **13 584 MiB
+  # (13.27 GiB)**, down from 14 352 MiB (14.02 GiB). That is back under ADR-0085's
+  # "keep the sum under ~14 GB" review trigger, with ~1.97 GiB left for the kernel, the
+  # Docker daemon and page cache. The 768 MiB returned came entirely from the two Postgres
+  # containers, which were sized for a dataset ~15x larger than the one that exists (see
+  # the POSTGRES SIZING block above). Nothing that is actually used was reduced.
+  #
+  # Measured context for that decision — over the 7 days ending 2026-08-03 the host never
+  # dropped below **9.84 GiB MemAvailable** and averaged **load15 0.36** (~4.5 % of 8 vCPU),
+  # with all containers together consuming **0.256 cores on average (3.2 % of the host)**.
+  # The stack is nowhere near saturation on either axis; the limits exist to bound a
+  # runaway, not to ration a contended resource.
+  #
+  # CPU limits are intentionally overcommitted (12.0 vCPU of quota on 8 physical vCPU)
+  # because they are per-container BURST ceilings, not reserved shares — the CFS scheduler
+  # arbitrates contention at run time, and an unused quota costs nothing. Several were
+  # RAISED in this pass: the baseline showed real CFS throttling in short bursts (7d-peak
+  # ratios of 77 % on ingest, 67 % on frontend, 53 % on keycloak) even though the 7-day
+  # AVERAGE throttle stayed under 0.73 % everywhere. Peaks that rare do not show up in a
+  # utilisation dashboard but they are exactly the post-deploy JIT-warmup and TLS-handshake
+  # moments where latency is user-visible, and widening a burst ceiling on a host running at
+  # 3.2 % CPU is free. Per-service throttle figures are in each block below.
+  #
+  # Without memory limits an in-container leak would let one service monopolise the host and
+  # OOM-kill its neighbours (Postgres in particular has historically been the casualty when
+  # a JVM heap runs away), so every service keeps one even where it is far above measured
+  # use.
+  #
+  # Method note, learned twice the hard way: size a container from `container_memory_rss`
+  # (anonymous — the OOM predictor), never from `container_memory_working_set_bytes`, which
+  # counts the service's own memory-mapped binary and reclaimable page cache. The one
+  # exception is Postgres: its `shared_buffers` is POSIX shared memory and lands in the
+  # cgroup's `cache` term, NOT in `rss`, so a DB container has to be read from its working
+  # set. Full method + queries: monitoring/README.md -> "Container memory sizing".
+  # ==============================================================================
+  #
+  # db-backend 2048M -> 1536M. Measured working-set peak **295 MB** (14 % of the old limit)
+  # against a **107.7 MB** database; `rss` alone read 6.96 %, the rest being the shared-buffer
+  # pool in `cache`. 1536M is 5.2x the measured peak and leaves the 384MB buffer pool plus a
+  # 100-connection Hikari burst comfortable room. Deliberately NOT cut further: the DB is the
+  # one service where an OOM-kill costs a recovery cycle rather than a restart, and Postgres
+  # is the historical casualty this whole limit scheme exists to protect.
   deploy:
     resources:
       limits:
-        memory: 2048M
+        memory: 1536M
+        # Throttle 7d: peak ratio 6.0 %, average 0.104 %, 164 s total — the quota is not a
+        # constraint for this workload, so it stays at 1.5.
         cpus: '1.5'
         # Fork-bomb / runaway-backend ceiling. max_connections=150 caps live backends at ~150 +
         # background workers, so 512 is generous headroom, not a tight limit.
@@ -119,19 +184,33 @@ x-db-keycloak: &db-keycloak-template
     - FOWNER
     - SETGID
     - SETUID
-  # Smaller tuning than db-backend (768 MB limit vs 2048 MB). Keycloak's working
-  # set is realm config + 5000 user records + persistent user sessions (KC 26
-  # persists sessions to the DB). shared_buffers/effective_cache_size were scaled
-  # up with the container RAM (512M -> 768M) so that working set stays warm at the
-  # 5000-account scale. max_connections 100 -> 120: Keycloak's own DB pool defaults
-  # to ~100 connections, so the raise leaves headroom for postgres_exporter + admin
-  # sessions instead of starving the exporter at the ceiling.
+  # Smaller tuning than db-backend, re-derived 2026-08-03 from the same 7-day baseline
+  # (#937 — see the POSTGRES SIZING block in x-db-backend for the full method). Keycloak's
+  # working set is realm config + user records + persistent user sessions (KC 26 persists
+  # sessions to the DB). Measured over that window:
+  #
+  #   total database size            39.4 MB
+  #   cache hit ratio                99.998 %
+  #   temp files written             0
+  #   connections peak / avg         20 / 3.0      of max_connections=120
+  #   container working-set peak     87 MB         of the (then) 768 MB limit
+  #
+  # shared_buffers 192MB -> 128MB (still 3.3x the entire 39.4 MB database) and
+  # effective_cache_size 512MB -> 384MB (a planner estimate, ~10x the database). Both were
+  # previously scaled by ratio alongside the container RAM for a "5000-account working set"
+  # that does not exist in bytes — Keycloak stores little per user, and the realm plus the
+  # persistent-session table together are under 40 MB.
+  #
+  # work_mem 4MB and maintenance_work_mem 32MB stay: `temp_files=0` over seven days is direct
+  # evidence 4MB never overflowed. max_connections stays 120 — Keycloak's own DB pool defaults
+  # to ~100, and the slot ceiling has to cover it plus postgres_exporter and admin sessions
+  # even though the measured peak was 20.
   # Same terse-verbosity + `log_line_prefix` rationale as db-backend (see the comment there):
   # `%q%u@%d/%a` makes every error line self-attributing without logging any row data.
   command: >
     postgres
-    -c shared_buffers=192MB
-    -c effective_cache_size=512MB
+    -c shared_buffers=128MB
+    -c effective_cache_size=384MB
     -c work_mem=4MB
     -c maintenance_work_mem=32MB
     -c max_connections=120
@@ -149,14 +228,17 @@ x-db-keycloak: &db-keycloak-template
     timeout: 5s
     retries: 5
   stop_grace_period: 60s
-  # Smaller than db-backend, but scaled for the 5000-account target: the working
-  # set (5000 users, persistent sessions, realm config) fits in 192 MB shared_buffers
-  # + page cache within the 768 MB limit. Raised from 512M as the "bump if user count
-  # grows past O(thousands)" note anticipated — the org is now >3000 members.
+  # db-keycloak 768M -> 512M (#937). Measured working-set peak **87 MB** — 11 % of the old
+  # limit — against a 39.4 MB database; `rss` alone read 5.73 %. 512M is 5.9x the measured
+  # peak and holds the 128MB buffer pool plus a full 120-connection slot table with room to
+  # spare. Same "do not cut a database to the bone" reservation as db-backend applies, which
+  # is why this stops at 512M rather than the ~256M the measurement alone would allow.
   deploy:
     resources:
       limits:
-        memory: 768M
+        memory: 512M
+        # Throttle 7d: peak ratio 1.5 %, average 0.132 %, 23 s total — the lowest in the
+        # stack. Quota unchanged.
         cpus: '1.0'
         pids: 512
   volumes:
@@ -185,10 +267,23 @@ x-keycloak: &keycloak-template
   # headroom for 5000 users, the persistent-session working set and 200 concurrent
   # token/refresh flows. The role-indexed user sync (no more per-user Admin-API
   # fan-out) removes the daily burst that previously pressured this heap.
+  #
+  # KEPT at 2560M in the #937 re-tuning pass, against a measured 7-day peak that is well
+  # under it: working set 922 MB (36 %), `rss` 32.7 %, heap 729 MB committed / 400 MB used
+  # of the ~1792 MB auto-heap, GC overhead peaking at 0.07 %. Two reasons not to reclaim it.
+  # First, the limit IS the heap knob here — the image derives the heap from ~70 % of the
+  # limit, so cutting the container also cuts the ceiling that absorbs a token/refresh burst,
+  # and that burst is precisely what the 5000-account target sized this for. Second, the
+  # baseline week carried no login storm; a heap ceiling is insurance against the peak, not
+  # the average, and the reclaimed capacity is not needed anywhere else (the stack now sits
+  # 1.97 GiB under the host budget without it).
   deploy:
     resources:
       limits:
         memory: 2560M
+        # Throttle 7d: peak ratio 53.0 %, average 0.106 %, 417 s total. High peaks but a
+        # negligible average — 2.0 already covers the realm-import and token-burst spikes,
+        # so the quota stays.
         cpus: '2.0'
         # JVM threads count as tasks toward this ceiling; 2048 is generous headroom over Keycloak's
         # working thread set, so it is a runaway ceiling rather than a limit hit under normal load.
@@ -365,10 +460,20 @@ x-backend: &backend-template
   # deliberately NOT reduced even though 2048 MB is generous against a measured 1108 MB peak —
   # shrinking the busiest JVM's ceiling is a capacity decision for the repo owner, and ADR-0085's
   # "sum of limits under ~14 GB" still holds without it.
+  #
+  # Re-measured 2026-08-03 (#937), 7-day peaks: heap 684 MB committed / 647 MB used against the
+  # 1167 MB ceiling, nonheap 224 MB committed, `rss` 55.6 % of the limit, GC overhead peaking at
+  # 0.14 % and averaging 0.007 %. The 57 % ratio derived above is confirmed correct and needs no
+  # change. The 2048M -> 1792M lever ADR-0085 identified (returns 256 MB at MaxRAMPercentage=55)
+  # remains deliberately UN-TAKEN: #937 returned 768 MiB from the two over-sized Postgres
+  # containers instead, which puts the stack back under the ~14 GB trigger without touching the
+  # busiest JVM's ceiling. It stays available if real headroom is ever needed.
   deploy:
     resources:
       limits:
         memory: 2048M
+        # Throttle 7d: peak ratio 47.0 %, average 0.168 %, 284 s total. The 2.0 quota already
+        # absorbs the Flyway-plus-JIT startup burst that produces those peaks; unchanged.
         cpus: '2.0'
         # JVM threads count as tasks toward this ceiling; 2048 is generous headroom over Tomcat +
         # Hikari + scheduler + GC/JIT threads, so it is a runaway ceiling, not a limit hit under load.
@@ -517,11 +622,27 @@ x-redis: &redis-template
   # 384mb Redis maxmemory ceiling (see the command comment) so a transient RDB /
   # AOF-rewrite fork's copy-on-write pages have headroom above the data set. Raised
   # from 256M with the maxmemory bump for the 5000-account session-index growth.
+  #
+  # #937 verdict (2026-08-03, 7-day baseline): both ceilings KEPT, deliberately, against a
+  # measurement that would allow far less — Redis used a peak of **7.07 MB of the 384 MiB
+  # maxmemory (1.8 %)** across **8191 keys**, with an all-time peak of 7.50 MB, an `rss` peak
+  # of 28.5 MB (5.6 % of the cgroup) and **zero evictions**. Extrapolating linearly to the
+  # 5000-account / cap-10-sessions target gives ~43 MB, still an order of magnitude under the
+  # ceiling. This is not dead capacity to reclaim: `maxmemory` is not an allocation (Redis
+  # grows lazily, and 28.5 MB is what it actually occupies), and under `noeviction` reaching
+  # the ceiling means REFUSED WRITES — a failed login, not a slow one. ADR-0079 bought that
+  # headroom on purpose; the measurement confirms the purchase, it does not invalidate it.
   deploy:
     resources:
       limits:
         memory: 512M
-        cpus: '0.5'
+        # 0.5 -> 1.0 (#937). Redis spent **545 s throttled over 7 days** — the second-highest
+        # absolute stall in the stack and a 0.661 % average, on a store whose command loop is
+        # SINGLE-THREADED: a throttled period there stalls every session read behind it, so it
+        # shows up as frontend latency rather than as Redis load. Actual use is 0.015 cores at
+        # peak, so this quota was never about capacity; the extra headroom absorbs the
+        # background AOF-rewrite / RDB-fork threads that push the cgroup over 0.5 in bursts.
+        cpus: '1.0'
         # Redis is effectively single-process (plus a few bg threads + a transient RDB fork); 512 is
         # a fork-bomb ceiling with wide headroom.
         pids: 512
@@ -609,12 +730,29 @@ x-frontend: &frontend-template
   # Keycloak is the same class but already lands ~80%: its image auto-sizes the heap to ~70% of the
   # 2560M limit and Quarkus native memory is far smaller than a Spring Boot JVM's, so it needs no
   # change. Re-measure with the snapshot queries in monitoring/README.md before any future change.
+  #
+  # RE-MEASURED 2026-08-03 (#937), 7-day peaks, confirming the derivation above holds:
+  #   backend    heap 684 committed / 647 used (ceiling 1167), nonheap 224, rss 55.6 % of limit
+  #   frontend   heap 493 committed / 472 used (ceiling  640), nonheap 183, rss 69.4 % of limit
+  #   ingest     heap 248 committed / 118 used (ceiling  307), nonheap  87, rss 69.9 % of limit
+  #   keycloak   heap 729 committed / 400 used (ceiling ~1792), nonheap 269, rss 32.7 % of limit
+  # GC overhead peaked at 0.19 % (frontend) and averaged <= 0.017 % everywhere — no JVM is heap
+  # constrained, and all three MaxRAMPercentage values stay exactly as PR #1419 derived them.
+  # NO JVM MEMORY LIMIT CHANGED in #937; the CPU quotas did (see each block).
   # ==========================================================================================
   deploy:
     resources:
       limits:
         memory: 1280M
-        cpus: '1.0'
+        # 1.0 -> 2.0 (#937). This container had the **worst absolute CFS stall in the entire
+        # stack: 1506 s throttled over 7 days** (0.725 % average, 66.7 % peak ratio) — about
+        # 25 minutes a week in which the user-facing SSR tier was stopped mid-period. Its
+        # 5m-averaged peak is only 0.18 cores, so this is NOT a capacity shortfall: Thymeleaf
+        # rendering plus the WebClient/Reactor pool plus JIT compilation burst above one core
+        # for tens of milliseconds at a time, and a 1.0 quota clips exactly those bursts.
+        # Widening the ceiling costs nothing on a host averaging 3.2 % CPU (quota is a burst
+        # ceiling, not a reservation) and removes a latency tax that lands on every page.
+        cpus: '2.0'
         # JVM thread ceiling — generous headroom (see the backend template).
         pids: 2048
   environment:
@@ -680,11 +818,22 @@ x-ingest: &ingest-template
   # is 321M) and still sits far above the 248M actually committed, so it removes no usable capacity:
   # worst case becomes 396M = 77%. This is the cheapest of the three fixes — a pure ratio correction,
   # no extra RAM, and it is what keeps the stack inside ADR-0085's "sum of limits under ~14 GB".
+  #
+  # Re-measured 2026-08-03 (#937): heap 248M committed / only 118M used against the 307M ceiling,
+  # nonheap 87M, `rss` 69.9 % of the limit, GC overhead peaking at 0.05 %. The 60 % ratio holds and
+  # the memory limit is unchanged.
   deploy:
     resources:
       limits:
         memory: 512M
-        cpus: '1.0'
+        # 1.0 -> 1.5 (#937). Highest throttle RATIO in the stack — 76.7 % of CFS periods at the
+        # 7-day peak, 452 s total (0.245 % average) — against a measured 5m-averaged peak of just
+        # 0.10 cores. A relay that is idle most of the time and then does a TLS handshake, a JWT
+        # validation and a WebClient round-trip in one burst is the classic shape that a narrow
+        # quota clips: the work is short and parallel, not sustained. 1.5 buys that burst room at
+        # no cost (unused quota is not reserved) on the one service that is internet-reachable and
+        # where a stalled request is a failed desktop-extractor send.
+        cpus: '1.5'
         # JVM thread ceiling — generous headroom (see the backend template).
         pids: 2048
   environment:
@@ -775,9 +924,11 @@ services:
     # restricted `monitoring` user; `--requirepass` below is kept only as redundant belt-and-braces.
     # A missing/empty ACL file makes redis exit at startup, which the deploy health-gate turns into a
     # clean rollback rather than a silent breakage. Untouched for redis-dev.
-    # ADR-0094: the live-sync + notification fan-outs PUBLISH/SUBSCRIBE on the pub/sub channels
-    # `basetool:livesync:changed` (frontend) and `basetool:notify:published` (backend). The `default`
-    # user's `&*` grant (above) already covers these; the restricted `monitoring` user must NOT gain
+    # ADR-0094 / ADR-0126: the live-sync + notification fan-outs PUBLISH/SUBSCRIBE on the pub/sub
+    # channels `basetool:livesync:changed` (frontend), `basetool:livesync:presence` (frontend,
+    # cross-instance editor-presence gossip, #1237) and `basetool:notify:published` (backend). The
+    # `default` user's `&*` grant (above) already covers all three — a new channel needs no ACL
+    # change as long as that grant stays a wildcard; the restricted `monitoring` user must NOT gain
     # `&*`. Pub/sub adds no keys, so the 384mb noeviction budget (ADR-0079) is unaffected.
     command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --loglevel notice --aclfile /etc/redis/users.acl --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
     # A service-level `volumes:` replaces the merged template value, so the data volume is re-listed
@@ -1120,16 +1271,24 @@ services:
       - FOWNER
       - DAC_OVERRIDE
       - KILL
-    # Nginx + the SQLite-backed admin UI is feather-light; 256 MB / 0.5 vCPU is
-    # ample for HTTP/HTTPS proxying at our request volume. The pids cap bounds a
-    # fork bomb / worker leak in the exposed container (same 512 as the monitoring
-    # stack; normal operation runs ~45 processes).
+    # Nginx + the SQLite-backed admin UI is feather-light; 256 MB is ample for HTTP/HTTPS
+    # proxying at our request volume. The pids cap bounds a fork bomb / worker leak in the
+    # exposed container (same 512 as the monitoring stack; normal operation runs ~45
+    # processes).
+    #
+    # #937 (2026-08-03, 7-day baseline): memory KEPT at 256M — `rss` peaked at 66.3 % of it,
+    # the highest ratio of any non-JVM app container, so this one has the least room to give
+    # back and is the first to watch if the edge ever gains a module. CPU raised, see below.
     deploy:
       resources:
         limits:
           memory: 256M
-          cpus: '0.5'
-          pids: 512
+          # 0.5 -> 1.0 (#937). 20.0 % peak throttle ratio, 121 s over 7 days, against a
+          # measured 5m-averaged peak of 0.03 cores. nginx does its expensive work — the TLS
+          # handshake — in short parallel bursts across workers, which is what a 0.5 quota
+          # clips; this is the container every user request passes through first, so a clipped
+          # handshake is added latency on the very first byte.
+          cpus: '1.0'
     volumes:
       - /var/iri/npm/data:/data
       - /var/iri/npm/letsencrypt:/etc/letsencrypt
