@@ -464,54 +464,38 @@ subprojects {
 // The acceptance gate must re-prompt whenever the terms CHANGE, and the only way
 // that cannot go stale is to derive the version from the wording rather than from
 // a number someone remembers to bump. So: hash every `terms.*` entry of the German
-// bundle (the authoritative wording — the English bundle is its translation and is
-// held in key-parity by MessageBundleConsistencyTest) and use the digest as the
-// version.
+// bundle (the authoritative wording) and use the digest as the version.
 //
-// It is generated for the BACKEND ONLY, on purpose. The backend is the single
-// authority on whether a user has accepted: the frontend asks it, and the ingest
-// gateway inherits the answer because its relayed call hits the same enforcement
-// filter. Handing the frontend its own copy would create a second source of truth
-// that can disagree with the first. The cross-module direction (a backend resource
-// derived from a frontend file) is safe because both are built from one commit and
-// deployed together — see ADR-0127.
+// The result is COMMITTED to `backend/src/main/resources/terms-version.properties`
+// rather than generated into the build directory, and this task is deliberately NOT
+// wired into `processResources`. Both follow the `openapi.json` precedent in this
+// repo, and both exist because of a real failure: generating it at build time made
+// the BACKEND build read a FRONTEND source file, and the backend Docker image copies
+// only `frontend/build.gradle.kts` (for layer caching) — so the image build died with
+// "Input file does not exist" while every local build was green. A committed artifact
+// needs no cross-module build-time dependency at all.
+//
+// Drift is caught by `TermsVersionParityTest`, which re-derives the digest from the
+// bundle and fails the build when the committed file disagrees. Regenerate with:
+//     ./gradlew generateTermsVersion
 //
 // `terms.last_updated` is deliberately INSIDE the hash: the date is part of the
 // document, and bumping it is itself an announcement that the terms changed.
-val termsVersionOutputDir = layout.buildDirectory.dir("generated/terms")
-
 tasks.register("generateTermsVersion") {
-  description = "Derives the Terms-of-Use version from the German message bundle."
+  description = "Regenerates the committed Terms-of-Use version from the German message bundle."
   val bundle = rootProject.file("frontend/src/main/resources/messages_de.properties")
-  val outputDir = termsVersionOutputDir
+  val target = rootProject.file("backend/src/main/resources/terms-version.properties")
   // The escape hatch for a purely cosmetic edit (a typo, a reflow): pinning the
   // version leaves every existing acceptance valid instead of re-prompting the
   // whole squadron — which, with the gate also covering ingest, would otherwise
   // stop the desktop extractor for everyone until they log into the web UI.
-  // Pass `-PtermsVersion=<value>`; unset means "derive", which is the default.
   val override = (project.findProperty("termsVersion") as String?)?.takeIf { it.isNotBlank() }
-  inputs.file(bundle)
-  inputs.property("override", override).optional(true)
-  outputs.dir(outputDir)
+  outputs.upToDateWhen { false }
   doLast {
-    val version =
-      override
-        ?: run {
-          val clauses =
-            bundle
-              .readLines(Charsets.UTF_8)
-              .filter { it.startsWith("terms.") && it.contains('=') }
-              .sorted()
-              .joinToString("\n")
-          check(clauses.isNotEmpty()) { "No terms.* entries found in ${bundle.path}" }
-          java.security.MessageDigest.getInstance("SHA-256")
-            .digest(clauses.toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
-            .substring(0, 16)
-        }
-    val target = outputDir.get().asFile.resolve("terms-version.properties")
+    val version = override ?: termsVersionDigest(bundle)
     target.parentFile.mkdirs()
-    target.writeText("basetool.terms.version=$version\n", Charsets.UTF_8)
+    target.writeText("basetool.terms.version=" + version + System.lineSeparator(), Charsets.UTF_8)
+    logger.lifecycle("Terms-of-Use version: $version -> ${target.relativeTo(rootDir)}")
   }
 }
 
@@ -565,4 +549,23 @@ dependencyCheck {
     // instead of tens of minutes.
     nvd.delay = 16000
   }
+}
+
+/**
+ * Derives the Terms-of-Use version from a message bundle: every `terms.*` entry, sorted, joined and
+ * SHA-256'd, truncated to 16 hex characters. Kept as one function so the Gradle task and the parity
+ * test cannot drift apart in how they compute it.
+ */
+fun termsVersionDigest(bundle: File): String {
+  val clauses =
+    bundle
+      .readLines(Charsets.UTF_8)
+      .filter { it.startsWith("terms.") && it.contains('=') }
+      .sorted()
+      .joinToString(separator = "\n")
+  check(clauses.isNotEmpty()) { "No terms.* entries found in ${bundle.path}" }
+  return java.security.MessageDigest.getInstance("SHA-256")
+    .digest(clauses.toByteArray(Charsets.UTF_8))
+    .joinToString("") { "%02x".format(it) }
+    .substring(0, 16)
 }

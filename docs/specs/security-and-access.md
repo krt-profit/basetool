@@ -1095,8 +1095,12 @@ continued use as acceptance — which leaves no evidence of who agreed to which 
 actually needed when a clause is enforced against someone (REQ-SEC-027).
 
 **The version is derived from the wording, never declared.** The root Gradle task
-`generateTermsVersion` hashes every `terms.*` entry of the German bundle into
-`terms-version.properties`, which the backend reads at startup. Any wording change therefore
+`generateTermsVersion` hashes every `terms.*` entry of the German bundle into the **committed**
+`backend/src/main/resources/terms-version.properties`, which the backend reads at startup.
+Committed rather than build-generated because generating it made the backend build read a frontend
+source file, which the backend Docker image's context does not carry (ADR-0127); drift is caught by
+`TermsVersionParityTest`, so forgetting to regenerate fails CI rather than shipping a stale
+version. Any wording change therefore
 produces a new version and re-prompts everyone, with no number a human has to remember to bump.
 `-PtermsVersion=<value>` pins it for one build when an edit was purely cosmetic, which leaves every
 existing acceptance valid. It is generated for the **backend only**: the backend is the single
@@ -1142,7 +1146,7 @@ Four invariants that must survive any rewrite:
 **Enforced by:** `TermsAcceptanceAccessFilterTest` (refusal, both exemptions, non-UUID subjects),
 `TermsAcceptanceGateFilterTest` (redirect, the readable-documents exemption, fail-open, cache
 bound), `TermsAcceptanceQueryDataTest` + `TermsAcceptanceServiceTest` (append-only history,
-version scoping, one-sided cache, sort translation), `TermsAcceptancePageControllerTest`,
+version scoping, one-sided cache, sort translation), `TermsAcceptancePageControllerTest`, `TermsVersionParityTest`,
 `AdminTermsPageControllerTest`, `TermsTemplateBundleParityTest` · **Code:** `TermsVersionProvider`,
 `TermsAcceptanceService`, `support.TermsConsentCheck` (the leaf interface that keeps `config` and
 `service` acyclic per ADR-0047), `TermsController`, `AdminTermsController` · **Monitoring:**

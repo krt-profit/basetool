@@ -29,10 +29,23 @@ The cost is real and accepted: a typo fix re-prompts the whole squadron. `-Pterm
 pins the value for one build when an edit was genuinely cosmetic. The default stays derived,
 because the failure mode of the default matters more than the convenience of the exception.
 
-**Generated for the backend only.** The obvious symmetry — give both modules the version — creates
-two sources of truth that can disagree. The backend is the authority; the frontend and the gateway
-learn the answer from it. The cross-module direction (a backend resource derived from a frontend
-file) is safe because both ship from one commit.
+**Committed, not generated during the build.** The first cut generated it into the build directory
+and wired the task into `processResources`. That made the **backend** build read a **frontend**
+source file — and the backend Docker image copies only `frontend/build.gradle.kts` for layer
+caching, so the E2E image build died with `Input file does not exist` while every local build
+stayed green. The artifact is therefore committed to
+`backend/src/main/resources/terms-version.properties` and the task is run explicitly
+(`./gradlew generateTermsVersion`), following the `openapi.json` precedent already in this repo.
+
+What a committed artifact loses is the guarantee that it matches the text — the whole point of
+deriving it. `TermsVersionParityTest` restores that guarantee: it re-derives the digest from the
+bundle and fails the build when the committed file disagrees, so editing the terms and forgetting
+to regenerate breaks CI instead of silently leaving everyone consented to wording that no longer
+exists.
+
+**Backend only.** The obvious symmetry — give both modules the version — creates two sources of
+truth that can disagree. The backend is the authority; the frontend and the gateway learn the
+answer from it.
 
 ### 2. Enforcement lives in the backend, not the frontend
 
