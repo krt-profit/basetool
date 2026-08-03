@@ -32,6 +32,8 @@
 
 ### Fixed
 
+- **Fehlalarm „ExternalFetchErrors“ für den UEX-Katalog behoben.** Zwei dauerhaft leere UEX-Kategorien (Jumpsuits, Consumable) wurden bei jedem Abgleich als Abruffehler gezählt, weil UEX ein leeres Ergebnis als `data: null` ausliefert — zusammen mit Backend-Neustarts löste dieser Dauerzähler den Alarm aus, ohne dass eine Störung vorlag. Gezählt wird jetzt nur noch, was UEX selbst als Fehler meldet (REQ-OBS-011).
+
 - **Ingest-Gateway: Blueprint-Versand aus dem Extractor schlug fehl.** Der Extractor schreibt je Export-Pfad eine andere Herkunftsangabe; die Freigabeliste kannte nur eine davon, wodurch jeder Blueprint-Versand mit „nicht freigegeben" abgewiesen wurde. Beide Schreibweisen sind jetzt dokumentiert, und der Vergleich ignoriert Groß-/Kleinschreibung.
 
 - **Ingest-Gateway: Eine Ablehnung nennt jetzt die Ursache.** Alle vier Prüfungen antworteten mit demselben Satz, sodass aus der Meldung nicht hervorging, welche gegriffen hat. Zusätzlich wird jede abgelehnte Anmeldung nach Fehlerart gezählt — ein 401 war bisher im Betrieb nicht auswertbar.

@@ -74,10 +74,27 @@ import reactor.core.publisher.Mono;
  * WARN No X received from UEX API. Aborting…} it emits for a broken one — and a malformed envelope
  * threw no exception, so it left no {@code basetool_external_fetch_errors_total} trail either. The
  * getters therefore return {@link FetchResult}, not a bare {@code List}: the {@code notModified}
- * flag lets a sync log an unchanged feed at INFO, and this client now distinguishes and reports the
- * envelope-level anomalies (a {@code 200} carrying no {@code data} array, or a non-{@code ok}
- * {@code status}) itself, at WARN and on the error counter. {@link #getRefineriesMethods()} and
- * {@link #getRefineriesYields()} still return plain lists — their caller has not been migrated yet.
+ * flag lets a sync log an unchanged feed at INFO, and this client now reports a non-{@code ok}
+ * envelope {@code status} itself, at WARN and on the error counter. {@link #getRefineriesMethods()}
+ * and {@link #getRefineriesYields()} still return plain lists — their caller has not been migrated
+ * yet.
+ *
+ * <p><b>{@code data: null} is UEX's empty result set, not a fault.</b> The envelope audit
+ * originally also counted a {@code 200} whose {@code data} was absent, on the assumption that it
+ * could only mean a renamed field or an error document dressed as a success. Observation of the
+ * live API disproves that: UEX answers a query that legitimately matches nothing with {@code
+ * {"status":"ok","http_code":200,"data":null}}, and signals a genuine rejection the other way round
+ * — {@code {"status":"requires_id_category_or_id_company_or_uuid","http_code":400,"data":[]}}, an
+ * empty <em>array</em> under a non-2xx code. Errors carry {@code []}; empty successes carry {@code
+ * null}. Two permanently empty item categories (12 {@code Clothing/Jumpsuits} and 69 {@code
+ * Consumable/Consumable}) therefore booked two bogus {@code
+ * basetool_external_fetch_errors_total{source=uex}} increments on <em>every</em> sync run, which is
+ * what fired {@code ExternalFetchErrors} in production on 2026-08-03: the per-run baseline of 2 is
+ * under the rule's {@code > 3} threshold, but the counter resets on every backend restart and
+ * {@code increase()} adds the pre-reset segment back, so two restarts inside the 6 h window summed
+ * to 4. {@link #unwrapEnvelope} consequently keys the audit off {@code status}, the field UEX
+ * actually uses to self-report, and treats an absent {@code data} under an {@code ok} status as
+ * zero rows.
  *
  * <p>ETag storage is an in-memory {@link ConcurrentHashMap} keyed by endpoint URL; entries survive
  * for the lifetime of the application context and are deliberately not persisted (a restart pays
@@ -516,23 +533,31 @@ public class UexClient {
 
   /**
    * Audits a {@code 2xx} envelope and turns it into a {@link FetchResult}, emitting exactly one log
-   * line for the outcome (REQ-OBS-001): INFO with the row count and the reported envelope status on
-   * a healthy response, WARN on either of the two anomalies a {@code 200} can still carry.
+   * line for the outcome (REQ-OBS-001): WARN plus a {@link MetricNames#EXTERNAL_FETCH_ERRORS}
+   * increment when the envelope declares a non-{@code ok} {@code status}, INFO otherwise — with the
+   * row count on a populated payload, and a distinct "no matches at all" line when {@code data} was
+   * absent.
    *
-   * <p>Both anomalies used to be invisible. A {@code 200} whose {@code data} array is absent —
-   * upstream renamed the field, or the response is an error document dressed as a success — threw
-   * no exception, so it produced an empty list with no ERROR log and no {@link
-   * MetricNames#EXTERNAL_FETCH_ERRORS} increment; the only trace was the caller's generic "no rows"
-   * WARN, identical to the one a healthy unchanged feed produced. And {@code status} had no reader
-   * anywhere, so a self-declared upstream failure was simply parsed and discarded. Both now WARN
-   * and count.
+   * <p>The self-declared failure used to be invisible: {@code status} had no reader anywhere, so an
+   * upstream that admitted a problem in the envelope was simply parsed and discarded. It now warns
+   * and counts. The rows are still returned — this client is fail-soft, and the sync services never
+   * wipe local tables from a short payload.
    *
-   * <p>A {@code null} / blank status is deliberately <em>not</em> an anomaly. No code has ever read
-   * the field, so we cannot claim to know that every one of the ~20 endpoints populates it;
+   * <p><b>An absent {@code data} is not an anomaly</b>, because UEX uses exactly that to express an
+   * empty result set ({@code {"status":"ok","http_code":200,"data":null}}) while expressing a
+   * genuine rejection as an empty <em>array</em> under a non-2xx code — which never reaches this
+   * method, since {@link #fetchListWithOutcome} routes every non-2xx into {@code createError()} and
+   * the counting fallback. Counting {@code null} data as a fetch error therefore only ever booked
+   * false positives: see the class Javadoc for the two permanently empty item categories that made
+   * {@code ExternalFetchErrors} fire on 2026-08-03. The catalogue-wide failure this branch was
+   * meant to catch — upstream renaming or dropping the field on every endpoint — is covered by
+   * {@code SyncZeroItems}, which trips when successful runs process zero items, and unlike this
+   * branch it cannot be fooled by a single legitimately empty category.
+   *
+   * <p>A {@code null} / blank status is likewise deliberately <em>not</em> an anomaly. No code read
+   * the field before, so we cannot claim to know that every one of the ~20 endpoints populates it;
    * treating its absence as a fault would risk a WARN on every endpoint of every sweep — a log
-   * flood — to report something we have never observed. A status that is present and is not {@code
-   * ok} is a genuine upstream self-report and does warn. The rows are returned in both cases: this
-   * client is fail-soft, and the sync services never wipe local tables from a short payload.
+   * flood — to report something we have never observed.
    *
    * @param <T> the per-row payload type inside {@code UexResponseDto.data}
    * @param body the decoded envelope
@@ -542,15 +567,10 @@ public class UexClient {
    */
   private <T> FetchResult<T> unwrapEnvelope(UexResponseDto<T> body, String resourceLabel) {
     String status = LogSafe.text(body.status(), MAX_STATUS_LOG_LENGTH);
-    if (body.data() == null) {
-      log.warn(
-          "UEX API answered 200 for {} with no data array at all (envelope status '{}') — reporting"
-              + " zero rows; the local catalogue is left untouched.",
-          resourceLabel,
-          status);
-      recordFetchError();
-      return new FetchResult<>(Collections.emptyList(), false);
-    }
+    // Absent data is UEX's empty result set, so it cannot carry the verdict — normalise it away and
+    // let `status`, the only field the upstream uses to self-report, decide whether this is a
+    // fault.
+    List<T> rows = body.data() == null ? Collections.emptyList() : body.data();
     if (body.status() != null
         && !body.status().isBlank()
         && !ENVELOPE_STATUS_OK.equalsIgnoreCase(body.status().trim())) {
@@ -560,16 +580,22 @@ public class UexClient {
           resourceLabel,
           status,
           ENVELOPE_STATUS_OK,
-          body.data().size());
+          rows.size());
       recordFetchError();
-      return new FetchResult<>(body.data(), false);
+      return new FetchResult<>(rows, false);
+    }
+    if (body.data() == null) {
+      log.info(
+          "Fetched 0 {} from UEX API: the upstream reported no matches at all (envelope status"
+              + " '{}', data null) — an empty result set, not a failure; the local catalogue is"
+              + " left untouched.",
+          resourceLabel,
+          status);
+      return new FetchResult<>(rows, false);
     }
     log.info(
-        "Fetched {} {} from UEX API (envelope status '{}').",
-        body.data().size(),
-        resourceLabel,
-        status);
-    return new FetchResult<>(body.data(), false);
+        "Fetched {} {} from UEX API (envelope status '{}').", rows.size(), resourceLabel, status);
+    return new FetchResult<>(rows, false);
   }
 
   /**

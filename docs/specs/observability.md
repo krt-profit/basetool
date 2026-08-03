@@ -771,12 +771,30 @@ transaction per pass) rather than per-scrape.
   job still records a success, this is the only signal of a sustained catalogue outage; it backs the
   `ExternalFetchErrors` alert. The backend `WebClient.Builder` is wired to the `ObservationRegistry`
   (REQ-OBS-009) so these same calls also emit `http_client_requests_seconds` + client spans.
-  **Known gap, to close:** since the 2026-08 audit this one undifferentiated series carries four
-  distinct causes — a transport failure, a `null` envelope `data`, a non-`ok` envelope `status`, and
-  the SC-Wiki pagination/`total` anomalies (REQ-OBS-001) — so the counter can no longer say *what*
-  failed. The fix is a bounded `reason` tag (`transport` / `no_data` / `bad_status` / `pagination`)
-  added to `MetricNames`; it splits the existing series, so the `{source=…}` panels and the
-  `ExternalFetchErrors` rule need a `sum by (source)` review in the same change.
+  **Known gap, to close:** since the 2026-08 audit this one undifferentiated series carries three
+  distinct causes — a transport failure, a non-`ok` envelope `status`, and the SC-Wiki
+  pagination/`total` anomalies (REQ-OBS-001) — so the counter can no longer say *what* failed. The
+  fix is a bounded `reason` tag (`transport` / `bad_status` / `pagination`) added to `MetricNames`;
+  it splits the existing series, so the `{source=…}` panels and the `ExternalFetchErrors` rule need
+  a `sum by (source)` review in the same change.
+  **`data: null` is not a fetch error (2026-08-03).** A fourth cause used to feed this series — a
+  `UexClient` `200` whose envelope `data` was absent — on the assumption that it could only mean a
+  renamed field or an error document dressed as a success. The live API disproves it: UEX returns
+  `{"status":"ok","http_code":200,"data":null}` for a query that legitimately matches nothing, and
+  reports a genuine rejection as an empty *array* under a non-2xx code (`data: []` with
+  `http_code: 400`) — which never reaches the envelope audit, because every non-2xx is already
+  routed into the counting transport fallback. Errors carry `[]`; empty successes carry `null`. Two
+  real but permanently empty item categories (12 `Clothing/Jumpsuits`, 69 `Consumable/Consumable`)
+  therefore booked two bogus increments on *every* `uex_sync` run. That per-run baseline of 2 sits
+  under the `> 3` threshold on its own, but the counter resets when the backend restarts and
+  `increase()` adds the pre-reset segment back, so two restarts inside the 6 h window summed to 4
+  and fired `ExternalFetchErrors` on 2026-08-03 with no upstream fault behind it. `unwrapEnvelope`
+  now keys the audit off `status` — the field UEX actually uses to self-report — and treats absent
+  `data` under an `ok` status as zero rows, logged at INFO. The catalogue-wide field rename the
+  branch was meant to catch stays covered by `SyncZeroItems` (successful runs processing zero
+  items), which a single legitimately empty category cannot trip. **Consequence for reading this
+  metric:** the healthy `uex` baseline is now a flat `0`, so any non-zero value is a real signal —
+  before this fix it was 2 per process and a genuine outage had to clear that floor to stand out.
   **One fetch, at most one increment (2026-08).** A single `ScWikiClient` page walk can show several
   symptoms of the *same* break at once — a page failing mid-walk plus the resulting row shortfall
   tripping the `meta.total` check, or a full page 1 with no `meta.last_page` plus a disagreeing

@@ -491,10 +491,15 @@ class UexClientTest {
   }
 
   // ─── envelope audit + completion logging (H6) ───────────────────────────
-  // Before this, a 200 with no data array threw nothing and counted nothing, a non-"ok" envelope
-  // status had no reader at all, and the 304 branch logged at DEBUG — dead in production. The three
-  // outcomes were indistinguishable at the call site, which is why 19 endpoints emitted the same
-  // alarming "No X received from UEX API" WARN for a perfectly healthy unchanged feed.
+  // Before this, a non-"ok" envelope status had no reader at all and the 304 branch logged at DEBUG
+  // — dead in production. The outcomes were indistinguishable at the call site, which is why 19
+  // endpoints emitted the same alarming "No X received from UEX API" WARN for a perfectly healthy
+  // unchanged feed.
+  //
+  // H6 also counted an absent `data` array as a fetch error; that half was reverted on 2026-08-03
+  // because UEX uses `data: null` for an empty result set (see the test below), so it fired
+  // ExternalFetchErrors twice per sync run with no upstream fault behind it. `status` is the only
+  // field the upstream self-reports on, so it is the only one the audit keys off.
 
   @Test
   void healthy200_logsCompletionInfoWithRowCountAndEnvelopeStatus() {
@@ -515,10 +520,41 @@ class UexClientTest {
   }
 
   @Test
-  void nullDataEnvelope_warnsAndCountsAFetchError() {
+  void nullDataUnderOkStatus_isAnEmptyResultSetAndDoesNotCount() {
+    // The live API answers a query that legitimately matches nothing with exactly this envelope —
+    // verified against api.uexcorp.space for /items?id_category=12 (Clothing/Jumpsuits) and 69
+    // (Consumable/Consumable), two real but permanently empty categories the item sweep walks on
+    // every run. A genuine rejection comes back the other way round (empty ARRAY under a 400), so
+    // counting absent data as a fetch error only ever booked false positives: two per sync run,
+    // which is what fired ExternalFetchErrors in production on 2026-08-03.
     List<ILoggingEvent> events =
         captureUexLog(
-            () -> server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":null}")),
+            () -> server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":null,\"message\":\"\"}")),
+            client::getCommodities);
+
+    assertTrue(
+        events.stream().noneMatch(e -> e.getLevel() == Level.WARN),
+        "an empty result set is healthy and must not WARN: " + messages(events));
+    assertEquals(
+        0.0,
+        fetchErrorCount(),
+        "an empty result set must NOT increment"
+            + " basetool_external_fetch_errors_total{source=uex}");
+
+    server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":null,\"message\":\"\"}"));
+    UexClient.FetchResult<UexCommodityDto> result = client.getCommodities();
+    assertTrue(result.data().isEmpty(), "absent data still reads as zero rows");
+    assertFalse(
+        result.notModified(), "an empty 200 is not a 304 — the caller must not treat it as cached");
+  }
+
+  @Test
+  void nullDataUnderNonOkStatus_stillWarnsAndCounts() {
+    // The status field, not the absent data, is what UEX uses to self-report — so an envelope that
+    // admits a problem must keep counting even when it carries no rows to be short of.
+    List<ILoggingEvent> events =
+        captureUexLog(
+            () -> server.enqueue(jsonOk("{\"status\":\"error\",\"data\":null}")),
             client::getCommodities);
 
     assertTrue(
@@ -526,12 +562,10 @@ class UexClientTest {
             .anyMatch(
                 e ->
                     e.getLevel() == Level.WARN
-                        && e.getFormattedMessage().contains("no data array")),
-        "a 200 without a data array is a contract break and must WARN: " + messages(events));
+                        && e.getFormattedMessage().contains("envelope status 'error'")),
+        "a self-declared upstream failure must WARN even with no data: " + messages(events));
     assertEquals(
-        1.0,
-        fetchErrorCount(),
-        "a 200 with no data array must increment basetool_external_fetch_errors_total{source=uex}");
+        1.0, fetchErrorCount(), "a non-ok envelope status counts regardless of the data field");
   }
 
   @Test
