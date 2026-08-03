@@ -33,7 +33,6 @@ import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.ClientHttpRequestFactory;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -252,17 +251,23 @@ public class SecurityConfig {
         .oauth2ResourceServer(
             oauth2 ->
                 oauth2
+                    // Bearer only — NO `dPoP(...)` here, deliberately (REQ-INGEST-012).
+                    //
+                    // Accepting a DPoP-bound access token at this gateway is architecturally wrong,
+                    // and enabling it broke every blueprint send on 2026-08-03. The gateway is a
+                    // RELAY: it forwards the caller's own token onward to the backend
+                    // (BackendImportClient#commonHeaders). A sender-constrained token is bound to
+                    // the CLIENT's key and to the `htu` of THIS endpoint, so the second hop can
+                    // neither carry a proof nor be covered by the first one — the backend receives
+                    // a token issued for DPoP as a plain bearer and refuses it. And even where it
+                    // did not refuse, the binding would end at the gateway, which is exactly where
+                    // it would need to hold.
+                    //
+                    // DPoP is still used, one layer up and invisible here: a realm client policy
+                    // binds the REFRESH token — the long-lived credential the extractor persists to
+                    // disk (REQ-INGEST-007) — while access tokens stay plain bearer and relay
+                    // cleanly.
                     .jwt(jwt -> {})
-                    // RFC 9449 DPoP (REQ-INGEST-012). Explicit opt-in: the resource-server DSL does
-                    // NOT enable it implicitly alongside jwt(). It is additive and safe to switch
-                    // on
-                    // before any client uses it — the converter only engages for an `Authorization:
-                    // DPoP` request, so a plain bearer call is untouched. That dual-mode window is
-                    // required, not merely convenient: the desktop extractor sends `Bearer` today,
-                    // so demanding DPoP here would break every send the moment this deploys.
-                    // Whether a plain bearer is still ACCEPTED is decided later, by
-                    // `app.ingest.client-identity.dpop-required` in ClientIdentityFilter.
-                    .dPoP(Customizer.withDefaults())
                     .authenticationEntryPoint(securityProblems)
                     .accessDeniedHandler(securityProblems))
         // REQ-SEC-024: re-map an identity-provider-unreachable failure (JWKS timeout / 5xx /
@@ -283,7 +288,7 @@ public class SecurityConfig {
             new UserIdMdcFilter(loggingProperties),
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
-        // REQ-INGEST-011: the client-identity gate (azp allowlist, ingest scope, DPoP requirement).
+        // REQ-INGEST-011: the client-identity gate (azp allowlist + ingest scope).
         // Installed AFTER UserIdMdcFilter, not merely after the bearer filter, so its WARN lines
         // already carry the acting subject in the `userId` MDC field and never have to repeat it
         // (REQ-OBS-002/-004). Every check inside is inert until configured, so this is a no-op on a
