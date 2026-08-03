@@ -183,6 +183,98 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
+  void missionsListSeamMap_matchesTheMissionsListTopicWhitelist() throws IOException {
+    // #1235: the /missions list joins the global `missions` room (receive-only — its create /
+    // update / delete all redirect, so the broadcast is server-side in MissionWriteController).
+    Set<String> jsKeys = seamMapKeys("/static/js/missions.js", "MISSIONS_SECTIONS");
+    assertThat(jsKeys)
+        .as("MISSIONS_SECTIONS keys in missions.js vs LiveSyncTopicClass.MISSIONS_LIST whitelist")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.MISSIONS_LIST.allowedSections());
+  }
+
+  @Test
+  void refinerySeamMap_matchesTheRefineryTopicWhitelist() throws IOException {
+    // #1235: the /refinery-orders list joins the global `refinery` room (receive-only — every
+    // refinery mutation navigates away, so the broadcast is server-side in
+    // RefineryOrderWriteController).
+    Set<String> jsKeys = seamMapKeys("/static/js/refinery-orders-index.js", "REFINERY_SECTIONS");
+    assertThat(jsKeys)
+        .as("REFINERY_SECTIONS keys in refinery-orders-index.js vs LiveSyncTopicClass.REFINERY")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.REFINERY.allowedSections());
+  }
+
+  @Test
+  void membersSeamMap_matchesTheMembersTopicWhitelist() throws IOException {
+    // #1235: the /members Mitgliederverwaltung roster — the surface the issue calls "Rollen" —
+    // joins the ADMIN-gated global `members` room (receive-only; the edit that invalidates the
+    // roster happens on /members/{id}/edit, so the broadcast is server-side).
+    Set<String> jsKeys = seamMapKeys("/static/js/members.js", "MEMBERS_SECTIONS");
+    assertThat(jsKeys)
+        .as("MEMBERS_SECTIONS keys in members.js vs LiveSyncTopicClass.MEMBERS whitelist")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.MEMBERS.allowedSections());
+  }
+
+  @Test
+  void orgStructureSeamMaps_partitionTheOrgStructureTopicWhitelist() throws IOException {
+    // #1235: the `org-structure` room is shared by TWO pages that each render part of the one
+    // hierarchy, so neither seam map can match the whole whitelist on its own (the
+    // material-collection precedent). Assert both are subsets AND that their union is exactly the
+    // whitelist — the union check is what catches an orphaned registry key no page ever renders,
+    // which a pair of subset assertions alone would let through.
+    Set<String> editorKeys =
+        seamMapKeys("/static/js/admin-org-structure.js", "ORG_STRUCTURE_SECTIONS");
+    Set<String> chartKeys = seamMapKeys("/static/js/org-chart.js", "ORG_CHART_SECTIONS");
+    Set<String> whitelist = LiveSyncTopicClass.ORG_STRUCTURE.allowedSections();
+
+    assertThat(editorKeys)
+        .as("ORG_STRUCTURE_SECTIONS keys in admin-org-structure.js vs the ORG_STRUCTURE whitelist")
+        .isSubsetOf(whitelist);
+    assertThat(chartKeys)
+        .as("ORG_CHART_SECTIONS keys in org-chart.js vs the ORG_STRUCTURE whitelist")
+        .isSubsetOf(whitelist);
+
+    Set<String> union = new LinkedHashSet<>(editorKeys);
+    union.addAll(chartKeys);
+    assertThat(union)
+        .as("every ORG_STRUCTURE section is rendered by exactly one of the two pages")
+        .containsExactlyInAnyOrderElementsOf(whitelist);
+  }
+
+  @Test
+  void orgStructureCrossPublishConstants_nameTheOtherPagesSection() throws IOException {
+    // The two org-structure pages poke EACH OTHER's section by a bare string constant rather than
+    // through their own seam map (publishing needs no subscription, so the key is not in the
+    // publisher's map). A typo there is silently dropped by the relay — the exact REQ-FE-010
+    // "stale peer, no error" failure — so pin both constants against the registry.
+    String editorJs = readResource("/static/js/admin-org-structure.js");
+    String chartJs = readResource("/static/js/org-chart.js");
+    Set<String> whitelist = LiveSyncTopicClass.ORG_STRUCTURE.allowedSections();
+
+    assertThat(whitelist)
+        .as("ORG_STRUCTURE_CHART_SECTION in admin-org-structure.js is a whitelisted key")
+        .contains(constantValue(editorJs, "ORG_STRUCTURE_CHART_SECTION"));
+    assertThat(whitelist)
+        .as("ORG_CHART_UNITS_SECTION in org-chart.js is a whitelisted key")
+        .contains(constantValue(chartJs, "ORG_CHART_UNITS_SECTION"));
+  }
+
+  /**
+   * Reads the string literal assigned to a top-level {@code const <name> = '<value>';} in a JS
+   * module.
+   *
+   * @param js the module source
+   * @param constantName the constant to read
+   * @return the assigned string value
+   */
+  private static String constantValue(String js, String constantName) {
+    Matcher matcher =
+        Pattern.compile("\\b" + Pattern.quote(constantName) + "\\s*=\\s*['\"]([\\w-]+)['\"]")
+            .matcher(js);
+    assertThat(matcher.find()).as("%s = '<value>' assignment present", constantName).isTrue();
+    return matcher.group(1);
+  }
+
+  @Test
   void bankStaffAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
     Set<String> jsKeys = seamMapKeys("/static/js/bank.js", "BANK_ACCOUNT_SECTIONS");
     assertThat(jsKeys)

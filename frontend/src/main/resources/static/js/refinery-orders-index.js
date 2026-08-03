@@ -31,6 +31,52 @@
  * script moved here unchanged.
  */
 
+// ---- Live multi-user sync — the refinery queue (REQ-FE-010 / REQ-FE-015, ADR-0094, #1235) ------
+// When anyone creates, edits, stores ("Einlagern") or cancels a refinery order, every other viewer's
+// list re-fetches its OWN status/onlyMine filter and page in place over the shared /ws/sync
+// `refinery` room. Only the opaque `queue` key crosses the wire; each viewer re-pulls its own
+// authorization-checked results fragment, so the acting user's `onlyMine` narrowing can never leak
+// into a peer's view. REFINERY_SECTIONS mirrors the server LiveSyncTopicClass.REFINERY whitelist
+// (the REQ-FE-010 three-mirror-points rule, build-enforced by LiveSyncSectionMapParityTest).
+//
+// The BROADCAST side is server-side (RefineryOrderWriteController.liveSyncLocalBus): every refinery
+// mutation navigates away, so a client publish would race the socket teardown, and the no-JS
+// form-POST fallback would emit nothing at all. This module is therefore receive-only.
+const REFINERY_SECTIONS = {
+    queue: { container: '#refinery-orders-results', fragmentValue: 'results' },
+};
+
+// Re-renders the results fragment for the CURRENT filter selection without touching history — the
+// peer-driven counterpart of the user-driven applyFilter() below (a peer's change must not push a
+// history entry). Kept top-level so the receiver can be wired before DOMContentLoaded.
+function refreshRefineryResults() {
+    const filterForm = document.getElementById('refinery-filter-form');
+    const resultsContainer = document.getElementById('refinery-orders-results');
+    if (!filterForm || !resultsContainer || !window.krtFetch) return;
+    const params = new URLSearchParams();
+    for (const [key, value] of new FormData(filterForm).entries()) {
+        if (value !== '') params.append(key, value);
+    }
+    const query = params.toString();
+    window.krtFetch.swap({
+        url: '/refinery-orders' + (query ? '?' + query : ''),
+        container: resultsContainer,
+        history: false,
+        preserveScroll: true,
+    });
+}
+
+if (window.krtLiveSync && typeof window.krtLiveSync.createReceiver === 'function') {
+    window.krtLiveSync.createReceiver({
+        topic: 'refinery',
+        sections: REFINERY_SECTIONS,
+        // Global room: the longer coalesce window (#1125) flattens the re-fetch herd when many
+        // viewers receive the same signal at once.
+        coalesceMs: 1500,
+        refresh: refreshRefineryResults,
+    });
+}
+
 function updateRefineryOrderColors() {
     const nowMs = new Date().getTime();
     document.querySelectorAll('.refinery-order-id-display').forEach((el) => {

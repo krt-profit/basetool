@@ -1,3 +1,18 @@
+// ---- Live multi-user sync — the mission list (REQ-FE-010 / REQ-FE-015, ADR-0094, #1235) --------
+// When anyone creates, core-edits (name / status / planned start) or deletes a mission, every other
+// viewer's list re-fetches its OWN filter/page in place over the shared /ws/sync `missions` room.
+// Only the opaque `list` key crosses the wire; each viewer re-pulls its own org-unit-scoped,
+// guest-redacted fragment, so a peer outside the actor's scope simply re-renders the same rows.
+// MISSIONS_SECTIONS mirrors the server LiveSyncTopicClass.MISSIONS_LIST whitelist (the REQ-FE-010
+// three-mirror-points rule, build-enforced by LiveSyncSectionMapParityTest).
+//
+// The BROADCAST side is server-side (MissionWriteController.liveSyncLocalBus): create, update and
+// delete all redirect, so a client publish issued just before that navigation would race the socket
+// teardown. This module is therefore receive-only.
+const MISSIONS_SECTIONS = {
+    list: { container: '#missions-results', fragmentValue: 'results' },
+};
+
 (function () {
     'use strict';
 
@@ -8,11 +23,12 @@
 
     // krtFetch (fragments/head.html) owns the fragment swap + the in-results pagination
     // interception, so the whole list — filter, sort and paginate — stays in place.
-    if (!form || !resultsContainer || !window.krtFetch) return;
+    if (!resultsContainer || !window.krtFetch) return;
 
     let debounceTimer = null;
 
     function buildQueryString() {
+        if (!form) return '';
         const data = new FormData(form);
         const params = new URLSearchParams();
         for (const [key, value] of data.entries()) {
@@ -21,19 +37,41 @@
         return params.toString();
     }
 
-    function loadResults() {
+    // pushHistory=false is the peer-driven path: a peer's change must not push a history entry, or
+    // a busy room would bury the user's own navigation under a stack of identical list URLs.
+    function loadResults(pushHistory) {
         const query = buildQueryString();
         window.krtFetch.swap({
             url: '/missions' + (query ? '?' + query : ''),
             container: resultsContainer,
             indicator: loadingIndicator,
-            history: true,
+            history: pushHistory !== false,
         });
     }
 
+    if (window.krtLiveSync && typeof window.krtLiveSync.createReceiver === 'function') {
+        window.krtLiveSync.createReceiver({
+            topic: 'missions',
+            sections: MISSIONS_SECTIONS,
+            // Global room: the longer coalesce window (#1125) flattens the re-fetch herd when many
+            // viewers receive the same signal at once.
+            coalesceMs: 1500,
+            refresh: function () {
+                loadResults(false);
+            },
+        });
+    }
+
+    // The filter form is absent for anonymous visitors; live sync above still applies.
+    if (!form) return;
+
     function onFilterChange() {
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(loadResults, 300);
+        // Wrapped rather than passed by reference so loadResults never receives a stray timer
+        // argument as its pushHistory flag — a user-driven filter change does push history.
+        debounceTimer = setTimeout(function () {
+            loadResults(true);
+        }, 300);
     }
 
     // Per-browser persistence of the "show past" toggle (REQ-UI-017): one JSON object under a

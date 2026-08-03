@@ -214,6 +214,11 @@
         });
     }
 
+    // Exposed for the live multi-user sync receiver in members.js (#1235, REQ-FE-015): a peer's
+    // member edit / delete / Keycloak sync re-renders THIS viewer's own filtered, paginated roster
+    // through the very same swap the local delete already uses.
+    window.krtRefreshMembersResults = refreshMembersResults;
+
     async function deleteUser(userId) {
         const confirmed = await window.showKrtConfirm(MSG_DELETE_TITLE, MSG_DELETE_CONFIRM, MSG_DELETE_LABEL, MSG_CANCEL_LABEL);
         if (!confirmed) return;
@@ -256,5 +261,6 @@
         });
     }
 </script>
+<script th:src="@{/js/members.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

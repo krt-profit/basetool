@@ -109,6 +109,68 @@ class AdminOrgStructurePageControllerMvcTest {
         .andExpect(content().string(containsString("Iridium")));
   }
 
+  // #1235: the two fragment seams that replaced the page's former window.location.reload(). Each
+  // must render ONLY its own section — a selector that silently fell back to the whole page would
+  // paint a full document (sidebar, <header>, the other section) into the swap container.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void page_admin_unitsFragment_rendersOnlyTheUnitTable() throws Exception {
+    UUID olId = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+    when(backendApiClient.get(eq("/api/v1/org-hierarchy/org-units"), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new OrgUnitNodeDto(
+                    olId, "Organisationsleitung KRT", "OL", "ORGANISATIONSLEITUNG", null, null, 0L),
+                new OrgUnitNodeDto(
+                    UUID.fromString("00000000-0000-0000-0000-0000000000a2"),
+                    "Bereich Profit",
+                    "PRF",
+                    "BEREICH",
+                    olId,
+                    "PROFIT",
+                    0L)));
+
+    mockMvc
+        .perform(get("/admin/org-structure").param("fragment", "units"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("org-units-table")))
+        .andExpect(content().string(containsString("Bereich Profit")))
+        // The create forms belong to the sibling `forms` section, and no page chrome comes along.
+        .andExpect(content().string(org.hamcrest.Matchers.not(containsString("bereich-form"))))
+        .andExpect(content().string(org.hamcrest.Matchers.not(containsString("<header"))));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void page_admin_formsFragment_rendersOnlyTheCreateForms() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/org-hierarchy/org-units"), anyTypeRef()))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/admin/org-structure").param("fragment", "forms"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("bereich-form")))
+        // With no OL yet the create-OL form renders too, and both carry their delegated triggers —
+        // the bindings survive a swap only because they are document-delegated (#1235).
+        .andExpect(content().string(containsString("os-create-ol")))
+        .andExpect(content().string(containsString("os-create-bereich")))
+        .andExpect(content().string(org.hamcrest.Matchers.not(containsString("org-units-table"))))
+        .andExpect(content().string(org.hamcrest.Matchers.not(containsString("<header"))));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void page_admin_unknownFragment_fallsBackToTheFullPage() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/org-hierarchy/org-units"), anyTypeRef()))
+        .thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/admin/org-structure").param("fragment", "bogus"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("org-units-table")))
+        .andExpect(content().string(containsString("bereich-form")));
+  }
+
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void page_nonAdmin_returns403() throws Exception {
