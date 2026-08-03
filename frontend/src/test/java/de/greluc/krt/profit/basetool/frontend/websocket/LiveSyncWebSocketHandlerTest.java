@@ -704,6 +704,43 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   @Test
+  void peerRoomsGauge_countsOnlyRoomsThatActuallyHoldPeers() throws Exception {
+    String room = operationTopic();
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
+    subscribe(alice, room);
+
+    // A lone viewer is not a peer room: relayLocal skips the origin, so nothing can ever be
+    // relayed here and a `changed` flatline is the correct, healthy state.
+    assertThat(subscriptionsGauge("operation")).isEqualTo(1.0);
+    assertThat(peerRoomsGauge("operation")).isZero();
+
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(bob, room);
+
+    // Two sockets in the SAME room — peer-sync is live.
+    assertThat(peerRoomsGauge("operation")).isEqualTo(1.0);
+
+    bob.open = false;
+    handler.afterConnectionClosed(bob, CloseStatus.NORMAL);
+    assertThat(peerRoomsGauge("operation")).isZero();
+  }
+
+  @Test
+  void peerRoomsGauge_separatesCoPresenceFromTwoLoneViewers() throws Exception {
+    // THE case the subscriptions gauge cannot express, and the reason this gauge exists: two
+    // sockets in the same topic class but in DIFFERENT rooms. `subscriptions` reads 2 either way,
+    // so it cannot tell peer-sync being exercised from peer-sync being inert — which is what makes
+    // a `changed`-frame flatline uninterpretable without this gauge (#1238).
+    FakeSession alice = openMultiplexedSession(oidcUser("user-1", "Alice"));
+    subscribe(alice, operationTopic());
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribe(bob, operationTopic());
+
+    assertThat(subscriptionsGauge("operation")).isEqualTo(2.0);
+    assertThat(peerRoomsGauge("operation")).isZero();
+  }
+
+  @Test
   void multiplexedClose_leavesAllSubscribedRooms() throws Exception {
     FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
     subscribe(bob, operationTopic());
@@ -1482,6 +1519,22 @@ class LiveSyncWebSocketHandlerTest {
 
   private double presenceGauge() {
     return presenceGauge(registry);
+  }
+
+  private double peerRoomsGauge(String topicClass) {
+    return registry
+        .get(MetricNames.LIVESYNC_PEER_ROOMS)
+        .tag(MetricNames.TAG_TOPIC_CLASS, topicClass)
+        .gauge()
+        .value();
+  }
+
+  private double subscriptionsGauge(String topicClass) {
+    return registry
+        .get(MetricNames.LIVESYNC_SUBSCRIPTIONS)
+        .tag(MetricNames.TAG_TOPIC_CLASS, topicClass)
+        .gauge()
+        .value();
   }
 
   private static double presenceGauge(SimpleMeterRegistry reg) {
