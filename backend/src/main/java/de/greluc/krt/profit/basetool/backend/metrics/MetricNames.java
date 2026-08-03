@@ -486,6 +486,26 @@ public final class MetricNames {
    */
   public static final String CATEGORY_ITEM_LINE_BLUEPRINT_DRIFT = "item_line_blueprint_drift";
 
+  /**
+   * Counter: a user recorded consent to the Terms of Use (REQ-SEC-028). Untagged on purpose — the
+   * version is already carried by {@link #TERMS_ACCEPTED_USERS}, and tagging a monotonically
+   * growing counter with it would leave a dead series behind after every terms change.
+   */
+  public static final String TERMS_ACCEPTANCES = "basetool.terms.acceptances";
+
+  /**
+   * Gauge: how many users have accepted the terms version this process serves (REQ-SEC-028). The
+   * rollout signal — after a terms change the series starts at zero and climbs, and a flat line
+   * means people are hitting the gate instead of getting through it.
+   */
+  public static final String TERMS_ACCEPTED_USERS = "basetool.terms.accepted.users";
+
+  /**
+   * Tag: the Terms-of-Use version a measurement belongs to. Bounded by construction — one process
+   * serves exactly one version, because the value is a build artifact (REQ-OBS-011).
+   */
+  public static final String TAG_TERMS_VERSION = "terms_version";
+
   private MetricNames() {
     // Constants holder — not instantiable.
   }
