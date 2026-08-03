@@ -30,6 +30,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -91,18 +92,55 @@ public class SecurityProblemResponseHandler
     }
     // Sets WWW-Authenticate + the status only; it never writes a body, so ours still fits.
     bearerEntryPoint.commence(request, response, authException);
-    // Exception class only: a token-decode message can quote parts of the presented JWT.
+    String bearerErrorCode = bearerErrorCode(authException);
+    // Exception class + RFC 6750 code only: the accompanying description embeds the decode failure
+    // verbatim ("An error occurred while attempting to decode the Jwt: …") and can quote parts of
+    // the presented token, which must never reach an appender (REQ-OBS-004).
     log.debug(
-        "Unauthenticated ingest request {} {} ({})",
+        "Unauthenticated ingest request {} {} ({}, {})",
         request.getMethod(),
         request.getRequestURI(),
-        authException.getClass().getSimpleName());
+        authException.getClass().getSimpleName(),
+        bearerErrorCode);
+    // Counted so a 401 is diagnosable at all. The DEBUG line above is invisible in production by
+    // design — this is the only internet-facing surface and an anonymous scanner would otherwise
+    // flood the log — which left an operator chasing a failing client with no signal whatsoever
+    // (2026-08-03). The bounded code separates "malformed header" from "bad signature / wrong
+    // issuer / expired / failed audience", which is the distinction that costs the most time.
+    meterRegistry
+        .counter(MetricNames.INGEST_AUTH_FAILURES, MetricNames.TAG_REASON, bearerErrorCode)
+        .increment();
     write(
         response,
         HttpStatus.UNAUTHORIZED,
         "Unauthenticated",
         MetricNames.CODE_UNAUTHENTICATED,
         "A valid bearer token is required.");
+  }
+
+  /**
+   * Maps an authentication failure to its RFC 6750 bearer error code, kept to the fixed set the
+   * spec defines so the metric label stays bounded (REQ-OBS-011).
+   *
+   * <p>Only the code is taken, never {@code OAuth2Error#getDescription()} — Spring puts the raw
+   * decode failure in there, which can echo fragments of the presented token.
+   *
+   * @param authException the failure Spring Security raised
+   * @return one of the bounded {@code MetricNames.AUTH_*} values
+   */
+  private static @NotNull String bearerErrorCode(@NotNull AuthenticationException authException) {
+    if (!(authException instanceof OAuth2AuthenticationException oauth2Exception)) {
+      return MetricNames.AUTH_OTHER;
+    }
+    String code =
+        oauth2Exception.getError() == null ? null : oauth2Exception.getError().getErrorCode();
+    if (MetricNames.AUTH_INVALID_TOKEN.equals(code)
+        || MetricNames.AUTH_INVALID_REQUEST.equals(code)
+        || MetricNames.AUTH_INSUFFICIENT_SCOPE.equals(code)) {
+      return code;
+    }
+    // Anything outside the RFC set collapses to the bounded literal rather than becoming a label.
+    return MetricNames.AUTH_OTHER;
   }
 
   /**
