@@ -23,6 +23,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.TermsAcceptance;
+import de.greluc.krt.profit.basetool.backend.model.dto.TermsAcceptanceStatusDto;
 import de.greluc.krt.profit.basetool.backend.repository.TermsAcceptanceRepository;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -34,6 +35,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -156,6 +159,29 @@ public class TermsAcceptanceService {
   @Transactional(readOnly = true)
   public List<TermsAcceptance> findAcceptanceHistory(@NotNull UUID userId) {
     return termsAcceptanceRepository.findByUserIdOrderByAcceptedAtDesc(userId);
+  }
+
+  /**
+   * Lists users with their consent state for the wording currently in force — the admin overview.
+   *
+   * @param filter {@code ALL}, {@code ACCEPTED} or {@code PENDING}, already validated by the caller
+   * @param pageable page, size and sort, with sort properties already whitelisted by the caller
+   * @return one page of consent rows
+   */
+  @Transactional(readOnly = true)
+  public Page<TermsAcceptanceStatusDto> findAcceptanceStatus(
+      @NotNull String filter, @NotNull Pageable pageable) {
+    return termsAcceptanceRepository.findAcceptanceStatus(currentVersion(), filter, pageable);
+  }
+
+  /**
+   * Counts login-capable users who have not accepted the wording currently in force.
+   *
+   * @return the number of users still owing consent
+   */
+  @Transactional(readOnly = true)
+  public long countPendingUsers() {
+    return termsAcceptanceRepository.countPendingUsers(currentVersion());
   }
 
   /**
