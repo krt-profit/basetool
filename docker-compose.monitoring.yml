@@ -92,7 +92,33 @@ x-mon-base: &mon-base
 #      runs far above resident memory (tempo: 436.8 reserved vs a 272.6 MiB working set). The resident
 #      figure is `go_memstats_sys_bytes - go_memstats_heap_released_bytes`.
 # Re-derive when changing a limit. A percentage alone is not a budget.
+#
+# 2026-08-03 (#937) re-measurement of every service here against the same 7-day method: all nine
+# GOMEMLIMIT values hold, `blackbox-exporter` now reads **47.6 % anon** on its 64M limit (down from
+# 95.3 % on 32M — the bump plus GOMEMLIMIT=44MiB worked), and **no memory limit in this file
+# changed**. Only two carry notes worth re-reading: `tempo` (live heap doubled to 466.8 MiB, now
+# just 1.65x under its budget — the tightest ratio here) and `prometheus` (the deliberate 88 %
+# exception, re-confirmed at 4.0x). Both are documented in their own blocks.
 # =============================================================================================
+#
+# ---------------------------------------------------------------------------------------------
+# WHY NO SERVICE IN THIS FILE CARRIES A CPU LIMIT — a deliberate asymmetry with the app stack
+# ---------------------------------------------------------------------------------------------
+# Every service in docker-compose.yml has a `cpus:` quota; nothing here does. That asymmetry was
+# checked, not overlooked (#937, 2026-08-03). Measured over 7 days, all 21 containers on the host
+# together averaged **0.256 cores — 3.2 % of the 8 vCPU** — and this whole stack contributed well
+# under half of it. The one eye-catching number is `blackbox-exporter`, whose 5-minute-averaged
+# peak hit **2.62 cores**, by far the largest single reading on the host; its 7-day AVERAGE is
+# 0.021 cores, i.e. that is a probe burst lasting minutes per week, not a workload.
+#
+# Adding quotas here would buy nothing (there is no contention to arbitrate) and would cost the
+# thing a monitoring stack must not lose: a throttled exporter or a throttled Prometheus produces
+# GAPS in the very series used to diagnose an incident, and it does so exactly when the host is
+# busiest. The protection against a monitoring runaway is the memory limit plus `oom_score_adj`,
+# which already sacrifices these containers before any app container. Note also that CFS
+# throttling is per-cgroup against its OWN quota, so an unlimited container here can never be the
+# cause of an app container's throttling — the two are independent.
+# ---------------------------------------------------------------------------------------------
 
 services:
   # ------------------------------------------------------------------------------------------
@@ -118,6 +144,13 @@ services:
     # 446.4 MiB (43.6%), so it is nowhere near that ceiling and tightening it would only risk GC
     # pressure during WAL replay. Re-derive it (75% -> 768MiB) if the retention or cardinality budget
     # is ever raised.
+    #
+    # #937 re-check (2026-08-03, 7-day peaks): live heap **225.1 MiB**, resident **336.0 MiB**,
+    # `rss` 32.8 % of the limit. The exception is RE-CONFIRMED and stays — this ceiling is 4.0x the
+    # live heap, so the "if Prometheus ever grew into its GOMEMLIMIT" caveat above remains
+    # hypothetical, and the 180-day retention target is exactly the workload whose WAL replay the
+    # extra 13 points of headroom exist for. Note the live heap grew 157.4 -> 225.1 MiB as the
+    # archive filled, so re-read this one when retention or cardinality changes, not on a schedule.
     environment:
       GOMEMLIMIT: "900MiB"
     command:
@@ -302,11 +335,20 @@ services:
     # remote_write can basic-auth to Prometheus as the shared `grafana` user (#1041 item 22a).
     command: ["-target=all", "-config.expand-env=true", "-config.file=/etc/tempo/tempo.yaml"]
     environment:
-      # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 768MiB = 75% of the 1G limit;
-      # measured live heap 208.8 MiB, so the ceiling is ~3.7x actual demand (the tightest ratio of the
-      # nine, which is why it is not set lower). Tempo is also the clearest illustration of why
-      # `sys_bytes` must not be compared against the limit directly: 436.8 MiB reserved versus a
-      # 272.6 MiB working set at the same instant — 164 MiB of that is scavenged-back arena.
+      # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 768MiB = 75% of the 1G limit.
+      # Tempo is also the clearest illustration of why `sys_bytes` must not be compared against the
+      # limit directly: 436.8 MiB reserved versus a 272.6 MiB working set at the same instant —
+      # 164 MiB of that is scavenged-back arena.
+      #
+      # #937 re-measurement (2026-08-03, 7-day peaks) — KEPT at 768MiB, but the margin is now the
+      # narrowest in the stack and worth knowing: live heap **466.8 MiB**, resident 551.8 MiB. That
+      # is only **1.65x** below this ceiling, against the >= 3.7x every other Go service holds, and
+      # it has more than doubled since the 208.8 MiB reading above — the service-graph
+      # metrics-generator processes every span, so the live heap tracks trace volume, not time.
+      # It is still the correct value (the GC has 300 MiB of room before it starts working hard,
+      # and resident sits at 54 % of the container), but tempo is THE service to re-measure first
+      # whenever tracing volume changes — raise the limit and re-derive 75 % of it, never re-apply
+      # a percentage to a limit that did not move.
       GOMEMLIMIT: "768MiB"
       # Consumed by the metrics-generator remote_write basic_auth (reuses the Prometheus `grafana`
       # web-auth user — owner decision, #1041 item 22a). Same value Grafana uses for its datasource.
@@ -332,7 +374,14 @@ services:
           # metrics-generator (#1041 item 22a) was enabled, which processes EVERY span to build the
           # graph and is a significant new memory driver, pushing the working set past 512M and
           # resuming the OOM flap. Raised 512M -> 1G: the 16 GB host has ample headroom and 1G clears
-          # the metrics-generator working set with margin (data-driven fine-tune tracked in #937).
+          # the metrics-generator working set with margin.
+          #
+          # #937 CLOSED the deferred fine-tune this line used to point at, with a measurement rather
+          # than a guess: over the 7 days ending 2026-08-03 the resident peak was **551.8 MiB = 54 %
+          # of this limit** and `rss` peaked at 49.2 %. The 1G is correct and stays — it is neither
+          # the OOM risk the 512M was nor dead capacity worth reclaiming (the stack now sits
+          # 1.97 GiB under the host budget without touching it). See the GOMEMLIMIT note above for
+          # why tempo is nonetheless the service to re-measure first.
           memory: 1G
           pids: 512
     networks:

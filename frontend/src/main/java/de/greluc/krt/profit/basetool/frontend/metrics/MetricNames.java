@@ -123,6 +123,36 @@ public final class MetricNames {
    */
   public static final String LIVESYNC_REDIS_ERRORS = "basetool.livesync.redis.errors";
 
+  /**
+   * Counter {@code basetool_livesync_presence_published_total} — tag {@code topic_class};
+   * editor-presence snapshots this instance gossiped to the cross-replica presence channel
+   * (ADR-0126, #1237).
+   *
+   * <p>A separate meter name from {@link #LIVESYNC_REDIS_PUBLISHED} on purpose. Presence gossip is
+   * <em>periodic</em> (one message per tracked topic per reaper tick) while the changed relay is
+   * <em>event-driven</em>, so folding them into one series — even under a distinguishing tag —
+   * would let the steady gossip floor swamp the changed-relay rate that the fan-out dashboard panel
+   * exists to show.
+   */
+  public static final String LIVESYNC_PRESENCE_PUBLISHED = "basetool.livesync.presence.published";
+
+  /**
+   * Counter {@code basetool_livesync_presence_consumed_total} — tag {@code topic_class};
+   * editor-presence snapshots this instance consumed from a peer replica (own-origin messages
+   * excluded, ADR-0126).
+   */
+  public static final String LIVESYNC_PRESENCE_CONSUMED = "basetool.livesync.presence.consumed";
+
+  /**
+   * Gauge {@code basetool_livesync_presence_remote_partitions} (unlabelled) — live {@code (topic,
+   * peer instance)} editor-presence partitions mirrored from other replicas (ADR-0126). Reads a
+   * flat zero on a single-replica deployment; on a multi-replica one, a zero while {@link
+   * #MISSION_PRESENCE_MISSIONS} is non-zero on several replicas means the presence gossip is not
+   * landing. Unlabelled: topic id and instance id are both unbounded (REQ-OBS-006).
+   */
+  public static final String LIVESYNC_PRESENCE_REMOTE_PARTITIONS =
+      "basetool.livesync.presence.remote.partitions";
+
   /** Gauge {@code basetool_active_sessions} — active Spring Session sessions (frontend). */
   public static final String ACTIVE_SESSIONS = "basetool.active.sessions";
 
@@ -248,6 +278,18 @@ public final class MetricNames {
 
   /** Redis fan-out operation: consuming a peer's {@code changed} signal. */
   public static final String OP_CONSUME = "consume";
+
+  /**
+   * Redis fan-out operation: gossiping an editor-presence snapshot to peers (ADR-0126). A distinct
+   * value from {@link #OP_PUBLISH} so the {@code LiveSyncRedisFanoutBroken} alert keeps firing on
+   * the changed relay alone: a failed changed publish silently degrades <em>correctness</em> (a
+   * peer's view stays stale), while a failed presence gossip only costs a cosmetic dot — visible on
+   * the fan-out dashboard panel, not worth a page.
+   */
+  public static final String OP_PRESENCE_PUBLISH = "presence_publish";
+
+  /** Redis fan-out operation: consuming a peer's editor-presence snapshot (ADR-0126). */
+  public static final String OP_PRESENCE_CONSUME = "presence_consume";
 
   /** Tag key: the login outcome on {@link #LOGIN}. */
   public static final String TAG_OUTCOME = "outcome";

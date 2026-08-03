@@ -158,7 +158,7 @@ sudo sshd -T 2>/dev/null | grep -E '^(passwordauthentication|permitrootlogin|cha
 |            Check             |              Command / evidence               |                                            Budget / expected                                            | GO / NO-GO |
 |------------------------------|-----------------------------------------------|---------------------------------------------------------------------------------------------------------|------------|
 | Disk free on `/var/iri`      | `df -h /var/iri`                              | **~50–60 GB free** wanted. Prometheus 180d ≈ 18–31 GB (40 GB cap), Loki 31d ≈ 8–12 GB, Tempo 14d ≈ 5 GB | ☐          |
-| Memory headroom              | `free -m`                                     | **≥ 8 GB** free after the app stack (monitoring adds ≈ 1.5–2 GB of limits)                              | ☐          |
+| Memory headroom              | `free -m`                                     | **≥ 8 GB** free after the app stack (monitoring adds **4.27 GiB** of limits — measured, #937)           | ☐          |
 | Host-auth log source         | `test -f /var/log/auth.log`                   | `auth.log` present → file-based; else **journald** — note which, it drives Alloy                        | ☐          |
 | SSH key-only                 | `sshd -T \| grep passwordauthentication`      | `passwordauthentication no`                                                                             | ☐          |
 | NPM failed-login line format | verify on the **test stack** (see note below) | You can identify an NPM admin-UI failed-login log line for dashboard 08/09                              | ☐          |

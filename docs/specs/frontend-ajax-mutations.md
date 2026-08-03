@@ -665,11 +665,13 @@ random()*COALESCE_MS` — so peers that all received the same `changed` frame wi
 not fire their fragment refetches in one synchronized spike, #1125), and a dropped-then-reconnected
 socket triggers a one-shot resync of every visible section to recover signals missed while offline.
 
-**Multi-instance via Redis pub/sub (ADR-0094).** The `changed` relay fans out across frontend
-replicas through the shared Redis channel described in REQ-FE-015 (local-relay first, so a Redis
-outage degrades to single-instance behaviour, never worse). The **presence dots remain
-per-instance** — an accepted, follow-up-tracked limitation: viewers on different replicas may see
-different editing-awareness dots, while change propagation itself is replica-correct.
+**Multi-instance via Redis pub/sub (ADR-0094, ADR-0126).** The `changed` relay fans out across
+frontend replicas through the shared Redis channel described in REQ-FE-015 (local-relay first, so a
+Redis outage degrades to single-instance behaviour, never worse). Since #1237 the **presence dots
+fan out too**, on a second channel and as full per-origin snapshots rather than deltas: a peer's
+dots appear immediately on a focus/blur and within one 10 s gossip tick otherwise, and a replica
+that goes silent stops contributing dots after 30 s. Losing Redis drops presence back to exactly
+the earlier per-instance behaviour — never worse — because the local broadcast still happens first.
 
 **Backpressure & registry consistency (#1109 Wave 6).** Every socket is wrapped in a
 `ConcurrentWebSocketSessionDecorator` at registration (send-time + buffer-size bounded, TERMINATE on
@@ -1125,6 +1127,24 @@ delivery stays best-effort (reconnect triggers a per-topic resync; REQ-FE-013's 
 sequence guard orders the resulting swaps). The backend notification SSE fan-out follows the same
 pattern on `basetool:notify:published` (REQ-NOTIF-006 polling stays the correctness guarantee).
 
+**Editor-presence dots cross replicas on their own channel** (`basetool:livesync:presence`; #1237,
+ADR-0126) — today that is the `mission:{id}` room, the only presence-enabled class. Presence is
+*state*, not a signal, so it is mirrored differently from `changed`: each instance publishes its
+**complete** snapshot for a topic — `{v, topic, origin, sections:{key:[{userId, displayName}]}}` —
+on every local presence change **and** re-gossips it on each 10 s reaper tick, and a receiver
+replaces that `(topic, origin)` partition wholesale. Full snapshots instead of deltas are what make
+the mirror converge with no delete frames, acknowledgements or ordering assumptions; an empty
+`sections` map is a real message that drops the partition at once. Freshness is judged by
+**arrival**, never by the publisher's clock: a partition expires after 30 s (three missed gossips),
+so a replica that crashed or was scaled away stops contributing dots within half a minute. The
+local half stays authoritative — 120 s heartbeat TTL, `focus`/`blur`, per-topic section cap
+unchanged — the merged snapshot collapses a user present on two replicas to one dot, and consume
+never re-publishes. Same degradation rule as above: with Redis down, presence falls back to exactly
+per-instance dots, because the local broadcast happens before the publish. Consumed payloads are
+re-validated (presence-enabled class only, section-key shape, ≤16 origins per topic, ≤32 editors per
+section) rather than trusted. The browser wire format is unchanged — a peer's dots simply appear in
+the same `presence` frame — so no client change was needed.
+
 **Acceptance**
 
 - [ ] On every covered surface, a mutation by user A appears on user B's view in place — including
@@ -1136,6 +1156,9 @@ pattern on `basetool:notify:published` (REQ-NOTIF-006 polling stays the correctn
   authorized, redaction-applied fragment GET with fresh `data-version` attributes.
 - [ ] With Redis stopped, same-instance peers keep syncing; with two instances and Redis up, a
   change on instance A reaches a viewer on instance B.
+- [ ] With two instances and Redis up, two editors of the same mission served by **different**
+  replicas see each other's presence dots; a replica killed mid-edit stops contributing dots within
+  30 s; with Redis stopped, each instance still shows its own editors' dots.
 - [ ] A section key added to a page seam map without the registry row (or vice versa) fails
   `:frontend:test`.
 
@@ -1146,12 +1169,17 @@ throttle across publishers, idle-bucket reaping) ·
 `LiveSyncTopicTest` + `LiveSyncSectionMapParityTest` (topic-class parsing/exhaustiveness + seam-map
 parity) · `LiveSyncSubscriptionAuthorizerTest` (per-topic allow/deny/fail-open incl.
 requester-refused queue + bank dual-auth matrix) · `RedisLiveSyncFanoutTest` +
-`RedisLiveSyncFanoutIntegrationTest` (publish-once, origin skip, Redis-down degradation) ·
+`RedisLiveSyncFanoutIntegrationTest` (publish-once, origin skip, Redis-down degradation, plus the
+presence channel: snapshot serialisation, channel-based dispatch, empty-snapshot forwarding,
+separate error series) · `LiveSyncPresenceServiceTest` (the ADR-0126 mirror: local+remote merge,
+one-dot collapse, wholesale replace, no-change-on-re-gossip, origin/editor caps, partition expiry) ·
 `OperationLiveSyncE2eTest` / `JobOrderQueueLiveSyncE2eTest` / `BankRequestsLiveSyncE2eTest` /
 `MissionOrganisationLiveSyncE2eTest` / `RefineryOrderLiveSyncE2eTest` (one two-context e2e per page
 family) · **Code:**
 `LiveSyncWebSocketHandler`, `LiveSyncTopicClass`, `LiveSyncSubscriptionAuthorizer`,
-`LiveSyncLocalBus`, `RedisLiveSyncFanout`, `krt-live-sync.js`, the per-page seam maps
+`LiveSyncLocalBus`, `RedisLiveSyncFanout`, `LiveSyncPresenceService` (local + mirrored halves),
+`LiveSyncProperties` (`app.livesync.redis.presence-channel`), `krt-live-sync.js`, the per-page seam
+maps
 (`MISSION_SECTIONS`, `OPERATION_SECTIONS`, `ORDER_SECTIONS`, orders-queue seam, bank
 `BANK_ACCOUNT_SECTIONS` / `ORGUNIT_ACCOUNT_SECTIONS` / `BANK_STAFF_SECTIONS` /
 `ORGUNIT_BANK_SECTIONS`, `REFINERY_ORDER_SECTIONS`, materialboard — two section keys: `board`
@@ -1159,7 +1187,7 @@ family) · **Code:**
 `materialgesuch-modal.js`, pinned by `LiveSyncSectionMapParityTest`) ·
 `RefineryOrderDetailFragmentMvcTest` (the `refinery-order:{id}` sections render section-sized, gate
 their catalog lookups, and degrade to an inline error rather than a redirect) ·
-**ADR:** ADR-0094 · **Issues:** #1102, #1115, #1120, #1238
+**ADR:** ADR-0094, ADR-0126 · **Issues:** #1102, #1115, #1120, #1237, #1238
 
 ### REQ-FE-016 — Catalog pickers (material / game item / location) are searchable comboboxes
 
@@ -1426,8 +1454,8 @@ Convert them when opting a file in.
   explicitly rejected in ADR-0012.
 - Live-collaboration features beyond the section-refresh sync of REQ-FE-010/-015
   (operational-transform text co-editing, server-pushed conflict resolution). Cross-replica fan-out
-  via Redis pub/sub moved **in scope** with REQ-FE-015 / ADR-0094; cross-replica **presence dots**
-  remain out of scope (tracked follow-up).
+  via Redis pub/sub moved **in scope** with REQ-FE-015 / ADR-0094, and cross-replica **presence
+  dots** followed in #1237 / ADR-0126.
 - Backend business-logic changes beyond adding JSON proxy endpoints that reuse existing backend
   APIs/DTOs.
 

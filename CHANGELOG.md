@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Sicherheit: Die JWT-Audience-Prüfung des Backends läuft jetzt in jedem E2E-Durchlauf scharf.** Bisher war sie nirgends aktiv — die Produktion wäre der erste Ort gewesen, an dem der Prüfpfad überhaupt ausgeführt wird, und dort weist eine fehlende `aud` jede Anmeldung ab. Der E2E-Realm schreibt die Audience jetzt in seine Tokens, der E2E-Stack prüft sie, und ein Paritätstest verhindert, dass beides auseinanderläuft (Audit L-1, REQ-SEC-024). In Produktion bleibt die Prüfung unverändert aus.
+
 ### Added
 
 - **Raffinerieauftrag-Detailseite: Speichern und Einlagern bleiben jetzt auf der Seite, und zwei Personen sehen die Änderungen des anderen live.** Bisher sprang die Seite nach jeder Aktion zurück zur Liste, und ein zweiter Betrachter merkte von einer fremden Änderung nur den Versionskonflikt beim eigenen Speichern. Formular, Materialtabelle und der Einlagern-Dialog werden jetzt an Ort und Stelle aktualisiert; das Einlagern frischt zusätzlich offene Lager- und Auftragsansichten auf. Abbrechen führt weiterhin zur Liste, da der Auftrag die Arbeitsliste verlässt (REQ-FE-001/REQ-FE-015, #1238).
@@ -17,6 +21,14 @@
 ### Added
 
 - **Blueprint-Import: Munition aus einem deutschen Star-Citizen-Client wird jetzt direkt erkannt.** Ein deutscher Client schreibt „(30 Schuss)" statt „(30 cap)"; solche Namen mussten bisher beim ersten Import einmal von Hand zugeordnet werden — rund 13 Stück. Die Zuordnungen sind jetzt vorbelegt. Wer sie bereits selbst zugeordnet hat, behält seine Zuordnung (#1485).
+
+### Changed
+
+- **Die Bearbeitungs-Anzeige auf der Missionsseite gilt jetzt über alle Serverinstanzen hinweg.** Der Hinweis „wird gerade bearbeitet von“ erschien bisher nur, wenn beide Bearbeiter zufällig von derselben Instanz bedient wurden; bei mehreren Instanzen fehlte er, obwohl die Änderungen selbst korrekt ankamen. Die Anzeige wird jetzt zwischen den Instanzen abgeglichen — fällt Redis aus, verhält sie sich wie bisher instanzlokal (ADR-0126, neuer Kanal `basetool:livesync:presence`, einstellbar über `APP_LIVESYNC_REDIS_PRESENCE_CHANNEL`).
+
+- **Betriebsmittel des Servers nach einer Messwoche neu zugeschnitten.** Die Datenbanken waren für einen Datenbestand ausgelegt, den es nicht gibt: 2 GB Speicherlimit und ein 512 MB großer Puffer für eine 108 MB kleine Datenbank. Beide Datenbank-Container und ihre Postgres-Einstellungen sind jetzt an den gemessenen Bedarf angepasst — das gibt 768 MB frei, ohne dass irgendwo weniger zur Verfügung steht als benötigt (ADR-0085, #937).
+
+- **Vier Dienste dürfen jetzt kurzzeitig mehr Rechenleistung ziehen.** Die Weboberfläche stand pro Woche rund 25 Minuten still, weil ihre Obergrenze kurze Lastspitzen abschnitt — bei einem Server, der im Mittel zu 3 % ausgelastet ist. Betroffen waren Weboberfläche, Ingest-Gateway, Sitzungsspeicher und der vorgelagerte Webserver; spürbar wird das als geringere Wartezeit beim Seitenaufbau (#937).
 
 ## [v1.5.30](https://github.com/krt-profit/basetool/releases/tag/v1.5.30) - 2026-08-03
 

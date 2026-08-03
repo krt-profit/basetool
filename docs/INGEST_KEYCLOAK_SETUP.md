@@ -198,12 +198,36 @@ Equivalent realm-export keys: `"revokeRefreshToken": false` (see
 
 Do **not** proceed to step 6 until both checks pass.
 
-1. **Extractor token:** run the device flow against `basetool-sc-extractor` (or use the
-   extractor's send action once #645 ships), then decode the access token (jwt.io / `jq`)
-   and confirm `aud` contains `basetool-backend`.
-2. **Frontend token:** log into the frontend normally, capture its access token (server log
-   at debug, or a fresh login in staging), decode it, and confirm `aud` contains
-   `basetool-backend`.
+> **The mechanism itself no longer needs proving here.** Since #1247 the E2E realm stamps
+> `aud=basetool-backend` on its `basetool-frontend` client and the E2E backend runs with
+> `IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend`, so every e2e-labelled PR re-proves that a
+> stamped mapper plus an armed validator accepts real Keycloak tokens. What no CI run can tell you
+> is whether the **deployed** realm stamps the claim — that, and only that, is what this step
+> checks. Note the E2E stack covers the backend only; the gateway is not part of it, so
+> `IRI_INGEST_EXPECTED_AUDIENCES` has unit coverage alone.
+
+**5a — Config check (preferred; handles no live token).** In the Admin Console, for **both**
+`basetool-frontend` and `basetool-sc-extractor`: *Clients → \<client\> → Client scopes* must list
+`extractor-ingest` as a **Default** scope, and *Client scopes → extractor-ingest → Mappers* must
+contain an `oidc-audience-mapper` with `Included Custom Audience = basetool-backend` and *Add to
+access token* ON. Both clients showing that is the condition step 6 depends on. The committed
+[`realm-config.reference.json`](keycloak/realm-config.reference.json) records this shape, but it
+is a sanitized snapshot (2026-06-18), **not** live state — read it from the running realm.
+
+**5b — Token check (confirmation).** Obtain an access token per client (device flow for the
+extractor; a normal frontend login for the browser token) and decode the payload **locally**:
+
+```bash
+P=$(cut -d. -f2 <<<"$TOKEN" | tr '_-' '/+'); while (( ${#P} % 4 )); do P+='='; done; base64 -d <<<"$P" | jq .aud
+```
+
+(The `while` loop restores the base64 padding Keycloak strips; without it `base64 -d` reports
+`invalid input`. Expected output: an array containing `basetool-backend`.)
+
+> ⚠️ **Never paste a live access token into jwt.io or any other online decoder.** It is a bearer
+> credential: whoever holds it is the user until it expires. Decode it locally, and treat any token
+> that has been pasted into a third-party page as compromised. (This runbook previously suggested
+> jwt.io — it should not have.)
 
 If either token is missing the claim, fix the mapper/scope assignment (steps 2–3) and
 re-verify. Enabling step 4's validator while either token lacks the claim is the documented
@@ -218,11 +242,13 @@ Only after step 5 passes on **both** tokens:
 IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend
 ```
 
-This sets `app.security.jwt.expected-audiences`, which the backend's already-present
-`@ConditionalOnProperty` decoder (`SecurityConfig.audienceValidatingJwtDecoder` /
-`audienceValidator`) activates — layering an `aud` check on top of the existing signature /
-issuer / expiry validation. Restart the backend. Smoke-test: the frontend still works
+This sets `app.security.jwt.expected-audiences`, which activates the backend's already-present
+`SecurityConfig#resourceServerJwtDecoder` (a `@ConditionalOnExpression` bean, shared with the
+`jwk-set-uri` knob) and its `audienceValidator` — layering an `aud` check on top of the existing
+signature / issuer / expiry validation. Restart the backend. Smoke-test: the frontend still works
 (pages load, writes succeed) **and** an extractor ingest call still reaches the backend.
+
+Rollback is instant and needs no release: blank the variable (or delete the line) and restart.
 
 ## Step 7 — Client-identity gate (REQ-INGEST-011)
 

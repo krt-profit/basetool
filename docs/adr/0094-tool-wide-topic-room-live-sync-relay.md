@@ -121,6 +121,12 @@ no channel at all, and the bank surfaces would need 3–4 parallel sockets per a
   cosmetic feature; multi-instance *change propagation* is the goal. Consequence: viewers on
   different replicas see different dot sets. Tracked as a follow-up issue.
 
+  > **Superseded by [ADR-0126](0126-cross-instance-editor-presence-via-snapshot-gossip.md)
+  > (#1237).** The follow-up landed: presence is mirrored on a second channel
+  > (`basetool:livesync:presence`) as a **full per-origin snapshot** re-gossiped every reaper
+  > tick, which needs neither shared TTL state nor delta ordering — the assumption that made the
+  > cost look prohibitive here. The `changed` relay below is unchanged.
+
 ### Migration and compatibility
 
 - The generic handler ports the mission handler 1:1 including all #1149/#1150 hardening
@@ -210,7 +216,10 @@ concurrent) on both apps so a socket surge can never hit "too many open files".
 - **Presence dots are per-instance** until the tracked follow-up lands; the remaining
   Phase-3 surfaces (Lager, Raffinerie, Rollen/Org-Struktur, `/missions` list) and a baselined
   drop-rate alert are tracked follow-up issues as well. The one-release legacy alias removal
-  has since landed (#1236).
+  has since landed (#1236), and the cross-instance presence follow-up landed in #1237
+  ([ADR-0126](0126-cross-instance-editor-presence-via-snapshot-gossip.md)) — presence now
+  rides a **third** channel, `basetool:livesync:presence`, which the `default` user's `&*`
+  grant already covers.
 - **A surface has to be a fragment-swap surface first.** The Raffinerie *detail* page could not be
   covered by the Phase-3 sweep at all: its save / store / cancel all navigated away to the list and
   the template exposed no `th:fragment` seam, so there was nothing to re-render in place and nothing
@@ -251,6 +260,11 @@ concurrent) on both apps so a socket surge can never hit "too many open files".
 - **Cross-instance presence dots now (shared Redis state or mirrored presence frames).**
   Deferred: meaningful new surface (TTL coordination, snapshot reconciliation) for a
   cosmetic awareness feature; the store is already the single seam, so it retrofits cleanly.
+  *Taken in #1237 ([ADR-0126](0126-cross-instance-editor-presence-via-snapshot-gossip.md)),
+  and the retrofit was indeed at that seam. The "TTL coordination + snapshot reconciliation"
+  cost estimated here turned out to be avoidable: a periodically re-gossiped **full** snapshot
+  per origin needs neither. Shared Redis state was rejected there for a reason this ADR would
+  have shared — it puts Redis on the read path of every presence broadcast.*
 - **STOMP/SockJS or a message broker for the client channel.** Rejected as in ADR-0031: the
   hand-rolled frame protocol is tiny, shipped and hardened; a broker adds dependency and
   operational surface without changing any bound that matters at 200 concurrent users.

@@ -74,14 +74,16 @@ public class LiveSyncRedisConfig {
       LiveSyncProperties liveSyncProperties) {
     String instanceId = UUID.randomUUID().toString();
     log.info(
-        "Live-sync Redis fan-out enabled (channel={}, instanceId={})",
+        "Live-sync Redis fan-out enabled (channel={}, presenceChannel={}, instanceId={})",
         liveSyncProperties.redis().channel(),
+        liveSyncProperties.redis().presenceChannel(),
         instanceId);
     return new RedisLiveSyncFanout(
         redisTemplate,
         handlerProvider,
         meterRegistry,
         liveSyncProperties.redis().channel(),
+        liveSyncProperties.redis().presenceChannel(),
         instanceId);
   }
 
@@ -112,12 +114,16 @@ public class LiveSyncRedisConfig {
   }
 
   /**
-   * Subscribes the Redis fan-out to its channel so this instance relays peer replicas' {@code
-   * changed} signals to its local rooms, dispatching consumed messages on the bounded {@link
-   * #liveSyncRedisListenerExecutor()} rather than the default unbounded per-message executor (F3).
+   * Subscribes the Redis fan-out to <b>both</b> of its channels — the {@code changed} relay
+   * (ADR-0094) and the editor-presence gossip (ADR-0126) — so this instance relays peer replicas'
+   * change signals to its local rooms and mirrors their presence dots. Consumed messages are
+   * dispatched on the bounded {@link #liveSyncRedisListenerExecutor()} rather than the default
+   * unbounded per-message executor (F3); both channels share that pool, which is sized with the
+   * headroom the changed relay alone needed and absorbs the far smaller presence stream (one small
+   * message per actively-edited topic per 10 s per replica) without further tuning.
    *
    * @param connectionFactory the auto-configured Redis connection factory
-   * @param fanout the Redis fan-out (also the message listener)
+   * @param fanout the Redis fan-out (also the message listener for both channels)
    * @param listenerExecutor the bounded dispatch executor — {@code @Qualifier}'d by bean name so an
    *     added {@link ThreadPoolTaskExecutor} bean can never make this inject ambiguous (the failure
    *     mode that took the backend's equivalent container down once the fan-out was enabled)
@@ -132,6 +138,7 @@ public class LiveSyncRedisConfig {
     container.setConnectionFactory(connectionFactory);
     container.setTaskExecutor(listenerExecutor);
     container.addMessageListener(fanout, new ChannelTopic(fanout.channel()));
+    container.addMessageListener(fanout, new ChannelTopic(fanout.presenceChannel()));
     return container;
   }
 }
