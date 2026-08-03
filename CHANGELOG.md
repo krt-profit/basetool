@@ -10,11 +10,15 @@
 
 - **Neue Kennzahl `basetool_livesync_peer_rooms` samt Panel im Betriebs-Dashboard.** Sie zeigt je Oberfläche, in wie vielen Räumen mehrere Personen gleichzeitig sind. Ohne sie ist ein Ausbleiben von Aktualisierungen nicht davon zu unterscheiden, dass schlicht niemand gemeinsam bearbeitet hat.
 
+- **Blueprint-Import: Munition aus einem deutschen Star-Citizen-Client wird jetzt direkt erkannt.** Ein deutscher Client schreibt „(30 Schuss)" statt „(30 cap)"; solche Namen mussten bisher beim ersten Import einmal von Hand zugeordnet werden — rund 13 Stück. Die Zuordnungen sind jetzt vorbelegt. Wer sie bereits selbst zugeordnet hat, behält seine Zuordnung (#1485).
+
 ### Changed
 
 - **Sicherheit: Die JWT-Audience-Prüfung des Backends läuft jetzt in jedem E2E-Durchlauf scharf.** Bisher war sie nirgends aktiv — die Produktion wäre der erste Ort gewesen, an dem der Prüfpfad überhaupt ausgeführt wird, und dort weist eine fehlende `aud` jede Anmeldung ab. Der E2E-Realm schreibt die Audience jetzt in seine Tokens, der E2E-Stack prüft sie, und ein Paritätstest verhindert, dass beides auseinanderläuft (Audit L-1, REQ-SEC-024). In Produktion bleibt die Prüfung unverändert aus.
 
 - **Ingest-Gateway: DPoP schützt jetzt den dauerhaft gespeicherten Refresh-Token statt des Access-Tokens.** Die ursprüngliche Variante konnte nicht funktionieren: das Gateway reicht das Token an das Backend weiter, und ein schlüsselgebundenes Token übersteht diesen zweiten Schritt nicht — es hätte den Schutz genau dort verloren, wo er greifen soll. Für Nutzer ändert sich nichts (REQ-INGEST-012).
+
+- **Sicherheit: Die JWT-Audience-Prüfung des Backends läuft jetzt in jedem E2E-Durchlauf scharf.** Bisher war sie nirgends aktiv — die Produktion wäre der erste Ort gewesen, an dem der Prüfpfad überhaupt ausgeführt wird, und dort weist eine fehlende `aud` jede Anmeldung ab. Der E2E-Realm schreibt die Audience jetzt in seine Tokens, der E2E-Stack prüft sie, und ein Paritätstest verhindert, dass beides auseinanderläuft (Audit L-1, REQ-SEC-024). In Produktion bleibt die Prüfung unverändert aus.
 
 - **Die Bearbeitungs-Anzeige auf der Missionsseite gilt jetzt über alle Serverinstanzen hinweg.** Der Hinweis „wird gerade bearbeitet von“ erschien bisher nur, wenn beide Bearbeiter zufällig von derselben Instanz bedient wurden; bei mehreren Instanzen fehlte er, obwohl die Änderungen selbst korrekt ankamen. Die Anzeige wird jetzt zwischen den Instanzen abgeglichen — fällt Redis aus, verhält sie sich wie bisher instanzlokal (ADR-0126, neuer Kanal `basetool:livesync:presence`, einstellbar über `APP_LIVESYNC_REDIS_PRESENCE_CHANNEL`).
 
