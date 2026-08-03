@@ -47,6 +47,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
@@ -58,10 +59,12 @@ import org.springframework.web.bind.annotation.ResponseBody;
  *
  * <p>The page is gated to {@code hasRole('ADMIN')} (class-level), mirroring the backend. The write
  * actions are in-place AJAX twins ({@code X-Requested-With} header, JSON body) that relay to the
- * backend and let the page reload on success — an admin, low-traffic surface where a reload is the
- * simplest correct refresh (the CLAUDE.md no-reload fallback). Backend conflicts (a stale parent
- * version, a duplicate name, the OL singleton) are relayed verbatim as {@code problem+json} so the
- * shared {@code krtFetch} client shows the right toast.
+ * backend; on success the page re-renders the affected section through {@link #page}'s {@code
+ * fragment} selector instead of reloading (REQ-FE-001), and broadcasts the change over the {@code
+ * org-structure} live-sync room so a peer's editor — and the member-visible Organigramm — refresh
+ * too (REQ-FE-010, #1235). Backend conflicts (a stale parent version, a duplicate name, the OL
+ * singleton) are relayed verbatim as {@code problem+json} so the shared {@code krtFetch} client
+ * shows the right toast.
  */
 @Controller
 @RequestMapping("/admin/org-structure")
@@ -113,11 +116,18 @@ public class AdminOrgStructurePageController {
    * option pools the parent pickers need (OL for a Bereich's parent, Bereiche for a Staffel/SK's
    * parent).
    *
+   * <p>When {@code fragment} names {@code units} or {@code forms} only that section is rendered, so
+   * a local mutation — or a peer's, relayed over the {@code org-structure} live-sync room — updates
+   * the page in place instead of reloading it (REQ-FE-001/-010, #1235). Both sections are fed by
+   * the same single backend read, so serving one costs no more than serving the whole page.
+   *
+   * @param fragment when {@code "units"} or {@code "forms"}, only that fragment is rendered for an
+   *     in-place AJAX swap; otherwise the full page.
    * @param model the view model.
-   * @return the view name.
+   * @return the view name, or the requested fragment selector.
    */
   @GetMapping
-  public String page(Model model) {
+  public String page(@RequestParam(required = false) String fragment, Model model) {
     List<OrgUnitNodeDto> nodes = List.of();
     try {
       List<OrgUnitNodeDto> fetched = backendApiClient.get(BACKEND_ORG_UNITS, NODE_LIST_TYPE);
@@ -136,6 +146,12 @@ public class AdminOrgStructurePageController {
         "bereiche", nodes.stream().filter(n -> KIND_BEREICH.equals(n.kind())).toList());
     model.addAttribute("hasOl", nodes.stream().anyMatch(n -> KIND_OL.equals(n.kind())));
     model.addAttribute("departments", DEPARTMENTS);
+    if ("units".equalsIgnoreCase(fragment)) {
+      return "admin/org-structure :: orgStructureUnits";
+    }
+    if ("forms".equalsIgnoreCase(fragment)) {
+      return "admin/org-structure :: orgStructureForms";
+    }
     return "admin/org-structure";
   }
 

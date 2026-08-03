@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.HashMap;
@@ -136,6 +137,20 @@ public class MissionWriteController {
    * OidcUser}, so a null principal and an anonymous security context are the same condition.
    */
   private final FrontendAuthHelperService authHelper;
+
+  /**
+   * Server-side live-sync publish seam (REQ-FE-015, ADR-0094, #1235). A mission create, core update
+   * or delete pokes the global {@code missions} list room from here rather than from the client
+   * because all three flows <b>navigate away</b> (redirect to the detail page or back to the list):
+   * a client-side broadcast issued just before that navigation races the socket teardown, while a
+   * server publish is ordered after the mutation actually succeeded. Section edits that do not
+   * surface on the list (participants, units, crew, party lead) deliberately do not publish here —
+   * they ride the per-mission {@code mission:&#123;id&#125;} room instead.
+   */
+  private final LiveSyncLocalBus liveSyncLocalBus;
+
+  /** The single {@code list} section of the global {@code missions} room a core mutation pokes. */
+  private static final List<String> MISSIONS_LIST_SECTION = List.of("list");
 
   /**
    * Parses the create form's {@code objectivesJson} / {@code stepsJson} hidden carriers into the
@@ -841,6 +856,9 @@ public class MissionWriteController {
 
       MissionDto created =
           backendApiClient.post("/api/v1/missions", createRequest, MissionDto.class);
+      // #1235: a new mission row must appear on every open /missions list without a reload. The
+      // creator is about to be redirected off this request, so the poke is issued server-side.
+      liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
       // Land the user straight on the freshly-created mission's Verwaltung tab (?tab=verw deeplink)
       // so they can keep planning (crew, refine goals/steps) without hunting for it in the list.
@@ -897,6 +915,9 @@ public class MissionWriteController {
     }
     try {
       applyMissionUpdate(id, form);
+      // #1235: name / status / planned start all render on the /missions list, so a core edit must
+      // refresh every open list in place. Its AJAX twin publishes the same section.
+      liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Update mission failed", e);
@@ -1039,6 +1060,8 @@ public class MissionWriteController {
     }
     try {
       applyMissionUpdate(id, form);
+      // #1235: mirrors the classic twin above — a core edit changes the /missions list row.
+      liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
       MissionDto refreshed =
           backendApiClient.get("/api/v1/missions/" + id, MissionDto.class, false);
       Map<String, Object> versions = new java.util.LinkedHashMap<>();
@@ -1069,6 +1092,8 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.delete("/api/v1/missions/" + id, Void.class);
+      // #1235: drop the deleted row from every open /missions list without a reload.
+      liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.mission_delete");
     } catch (Exception e) {
       log.error("Delete mission failed", e);

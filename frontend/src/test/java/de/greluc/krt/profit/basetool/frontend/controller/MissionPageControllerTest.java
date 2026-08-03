@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
 import java.util.Collections;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -142,7 +143,8 @@ class MissionPageControllerTest {
             mock(MessageSource.class),
             new MissionPageController(
                 backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
-            authHelper(true));
+            authHelper(true),
+            mock(LiveSyncLocalBus.class));
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class), eq(true))).thenReturn(null);
 
@@ -179,7 +181,8 @@ class MissionPageControllerTest {
             mock(MessageSource.class),
             new MissionPageController(
                 backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
-            authHelper(true));
+            authHelper(true),
+            mock(LiveSyncLocalBus.class));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class), eq(true)))
@@ -216,7 +219,8 @@ class MissionPageControllerTest {
             mock(MessageSource.class),
             new MissionPageController(
                 backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
-            authHelper(false));
+            authHelper(false),
+            mock(LiveSyncLocalBus.class));
     OidcUser user = mock(OidcUser.class);
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class), eq(false))).thenReturn(null);
@@ -248,7 +252,8 @@ class MissionPageControllerTest {
             mock(MessageSource.class),
             new MissionPageController(
                 backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
-            authHelper(false));
+            authHelper(false),
+            mock(LiveSyncLocalBus.class));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(false))).thenReturn(null);
@@ -273,7 +278,8 @@ class MissionPageControllerTest {
             mock(MessageSource.class),
             new MissionPageController(
                 backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
-            authHelper(false));
+            authHelper(false),
+            mock(LiveSyncLocalBus.class));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(false)))
@@ -301,7 +307,8 @@ class MissionPageControllerTest {
             mock(MessageSource.class),
             new MissionPageController(
                 backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
-            authHelper(false));
+            authHelper(false),
+            mock(LiveSyncLocalBus.class));
     OidcUser user = mock(OidcUser.class);
 
     when(backendApiClient.delete(anyString(), eq(Void.class), eq(false))).thenReturn(null);
@@ -331,7 +338,8 @@ class MissionPageControllerTest {
             mock(MessageSource.class),
             new MissionPageController(
                 backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
-            authHelper(true));
+            authHelper(true),
+            mock(LiveSyncLocalBus.class));
 
     when(backendApiClient.delete(anyString(), eq(Void.class), eq(true))).thenReturn(null);
 
@@ -360,7 +368,8 @@ class MissionPageControllerTest {
             mock(MessageSource.class),
             new MissionPageController(
                 backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
-            authHelper(false));
+            authHelper(false),
+            mock(LiveSyncLocalBus.class));
     OidcUser user = mock(OidcUser.class);
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(false))).thenReturn(null);
@@ -399,7 +408,8 @@ class MissionPageControllerTest {
             mock(MessageSource.class),
             new MissionPageController(
                 backendApiClient, mock(FrontendAuthHelperService.class), PARALLEL),
-            authHelper(true));
+            authHelper(true),
+            mock(LiveSyncLocalBus.class));
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), eq(true))).thenReturn(null);
 

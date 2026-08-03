@@ -60,6 +60,7 @@ class MemberManagementControllerTest {
 
   private BackendApiClient backendApiClient;
   private org.springframework.context.MessageSource messageSource;
+  private de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus liveSyncLocalBus;
   private MemberManagementController controller;
   private RedirectAttributes redirectAttributes;
 
@@ -67,7 +68,9 @@ class MemberManagementControllerTest {
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
     messageSource = mock(org.springframework.context.MessageSource.class);
-    controller = new MemberManagementController(backendApiClient, messageSource);
+    liveSyncLocalBus =
+        mock(de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus.class);
+    controller = new MemberManagementController(backendApiClient, messageSource, liveSyncLocalBus);
     redirectAttributes = new RedirectAttributesModelMap();
   }
 
@@ -97,6 +100,75 @@ class MemberManagementControllerTest {
     verify(backendApiClient).delete("/api/v1/users/" + userId, Void.class);
     assertEquals("redirect:/members", view);
     assertEquals("error.user.delete", redirectAttributes.getFlashAttributes().get("errorToast"));
+  }
+
+  // ---------------------------------------------------------------
+  // Live multi-user sync — the `members` roster room (#1235, REQ-FE-015)
+  // ---------------------------------------------------------------
+
+  @Nested
+  class RosterLiveSyncPublishTests {
+
+    @Test
+    void deleteMember_publishesTheRosterSection() {
+      controller.deleteMember(UUID.randomUUID(), redirectAttributes);
+
+      verify(liveSyncLocalBus).publish("members", List.of("roster"));
+    }
+
+    @Test
+    void deleteMemberAjax_publishesTheRosterSection() {
+      controller.deleteMemberAjax(UUID.randomUUID());
+
+      verify(liveSyncLocalBus).publish("members", List.of("roster"));
+    }
+
+    @Test
+    void syncMembersAjax_publishesTheRosterSection() {
+      // A Keycloak reconcile can add, remove or re-rank rows across the whole roster.
+      when(backendApiClient.post(
+              eq("/api/v1/users/sync"),
+              any(),
+              eq(de.greluc.krt.profit.basetool.frontend.model.dto.UserSyncResultDto.class)))
+          .thenReturn(new de.greluc.krt.profit.basetool.frontend.model.dto.UserSyncResultDto(3));
+
+      controller.syncMembersAjax();
+
+      verify(liveSyncLocalBus).publish("members", List.of("roster"));
+    }
+
+    @Test
+    void syncMembersAjax_onBackendFailure_doesNotPublish() {
+      when(backendApiClient.post(
+              eq("/api/v1/users/sync"),
+              any(),
+              eq(de.greluc.krt.profit.basetool.frontend.model.dto.UserSyncResultDto.class)))
+          .thenThrow(new RuntimeException("Keycloak unreachable"));
+
+      controller.syncMembersAjax();
+
+      verify(liveSyncLocalBus, never()).publish(anyString(), any());
+    }
+
+    @Test
+    void deleteMember_onBackendFailure_doesNotPublish() {
+      // The roster did NOT change, so peers must not be told it did — a publish in the catch block
+      // would make every open list re-fetch for nothing on every failed delete.
+      doThrow(new RuntimeException("API Error")).when(backendApiClient).delete(anyString(), any());
+
+      controller.deleteMember(UUID.randomUUID(), redirectAttributes);
+
+      verify(liveSyncLocalBus, never()).publish(anyString(), any());
+    }
+
+    @Test
+    void deleteMemberAjax_onBackendFailure_doesNotPublish() {
+      doThrow(new RuntimeException("API Error")).when(backendApiClient).delete(anyString(), any());
+
+      controller.deleteMemberAjax(UUID.randomUUID());
+
+      verify(liveSyncLocalBus, never()).publish(anyString(), any());
+    }
   }
 
   // ---------------------------------------------------------------

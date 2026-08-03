@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderStoreItemForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,8 +62,27 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Slf4j
 public class RefineryOrderWriteController {
 
-  /** Sole collaborator: relays the create/update/delete/store mutations to the backend API. */
+  /** Relays the create/update/delete/store mutations to the backend API. */
   private final BackendApiClient backendApiClient;
+
+  /**
+   * Server-side live-sync publish seam (REQ-FE-015, ADR-0094, #1235). Every refinery mutation
+   * navigates away — the classic handlers redirect, the AJAX twins answer a {@code targetUrl} the
+   * detail page immediately follows — so a client-side broadcast would race the socket teardown.
+   * Publishing here also covers the no-JS fallback path with the same call site.
+   */
+  private final LiveSyncLocalBus liveSyncLocalBus;
+
+  /** The single {@code queue} section of the global {@code refinery} room a mutation pokes. */
+  private static final List<String> REFINERY_QUEUE_SECTION = List.of("queue");
+
+  /**
+   * The shared-Lager section poked in addition to the refinery queue when an order is
+   * <em>stored</em>: "Einlagern" writes the refined output into the inventory, so an open Lager
+   * (REQ-INV-027, #1307) would otherwise sit stale until a manual reload. The {@code inventory}
+   * room and its {@code stock} key are owned by {@code LiveSyncTopicClass.INVENTORY_ALL}.
+   */
+  private static final List<String> INVENTORY_STOCK_SECTION = List.of("stock");
 
   /**
    * Parses the start instant submitted by the form as a UTC {@link java.time.Instant}.
@@ -136,6 +156,7 @@ public class RefineryOrderWriteController {
       log.debug("Sending refinery order DTO: {}", orderDto);
 
       backendApiClient.post("/api/v1/refinery-orders", orderDto, RefineryOrderDto.class);
+      liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.create");
 
       return "redirect:/refinery-orders";
@@ -185,6 +206,7 @@ public class RefineryOrderWriteController {
         return "redirect:/refinery-orders/" + id;
       }
       backendApiClient.put("/api/v1/refinery-orders/" + id, orderDto, RefineryOrderDto.class);
+      liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.update");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "PUT /api/v1/refinery-orders/{id}", id, e);
@@ -213,6 +235,7 @@ public class RefineryOrderWriteController {
   public String deleteOrder(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.delete("/api/v1/refinery-orders/" + id, Void.class);
+      liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.cancel");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "DELETE /api/v1/refinery-orders/{id}", id, e);
@@ -262,6 +285,9 @@ public class RefineryOrderWriteController {
     try {
       RefineryOrderStoreDto dto = buildStoreDto(form);
       backendApiClient.post("/api/v1/refinery-orders/" + id + "/store", dto, Void.class);
+      liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
+      // Storing the refined output writes inventory rows, so an open Lager must refresh too.
+      liveSyncLocalBus.publish("inventory", INVENTORY_STOCK_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.store");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "POST /api/v1/refinery-orders/{id}/store", id, e);
@@ -451,6 +477,7 @@ public class RefineryOrderWriteController {
     }
     try {
       backendApiClient.put("/api/v1/refinery-orders/" + id, orderDto, RefineryOrderDto.class);
+      liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", "/refinery-orders"));
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException bse) {
@@ -488,6 +515,9 @@ public class RefineryOrderWriteController {
     try {
       backendApiClient.post(
           "/api/v1/refinery-orders/" + id + "/store", buildStoreDto(form), Void.class);
+      liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
+      // Storing the refined output writes inventory rows, so an open Lager must refresh too.
+      liveSyncLocalBus.publish("inventory", INVENTORY_STOCK_SECTION);
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", "/refinery-orders"));
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException bse) {
@@ -516,6 +546,7 @@ public class RefineryOrderWriteController {
   public org.springframework.http.ResponseEntity<Object> deleteOrderAjax(@PathVariable UUID id) {
     try {
       backendApiClient.delete("/api/v1/refinery-orders/" + id, Void.class);
+      liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", "/refinery-orders"));
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException bse) {
@@ -555,6 +586,7 @@ public class RefineryOrderWriteController {
     }
     try {
       backendApiClient.post("/api/v1/refinery-orders", orderDto, RefineryOrderDto.class);
+      liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", "/refinery-orders"));
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException bse) {
