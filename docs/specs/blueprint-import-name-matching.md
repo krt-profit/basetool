@@ -269,8 +269,75 @@ with the functional unique index `uq_blueprint_external_alias_source_lower_name`
 [`V176__make_blueprint_alias_uniqueness_case_insensitive.sql`](../../backend/src/main/resources/db/migration/V176__make_blueprint_alias_uniqueness_case_insensitive.sql)
 · **Precedent:** REQ-REFINERY-010 / V146 (material aliases)
 
+### REQ-INV-021 — Localised client names: seeded aliases for the German capacity suffix
+
+The SC Extractor reads blueprint notifications from **localised** Star Citizen clients, so
+`productName` can arrive spelled the way a non-English client renders it. The German community
+translation keeps the base item name in English and translates only the parenthetical capacity unit:
+
+```
+S71 Rifle Magazine (30 cap)      ← English client
+S71 Rifle Magazine (30 Schuss)   ← German client
+```
+
+`blueprint_external_alias` rows mapping the German spelling onto the English catalogue product are
+**seeded** for every active craftable whose `output_name` carries a `(N cap)` suffix.
+
+*Why seed rather than match at runtime:* `productName` is written byte-verbatim from the game log on
+purpose — it **is** the key this chain resolves on — so the extractor must not fold the suffix
+itself; that would invent a name the game never wrote and would diverge from what the user sees
+in-game. Equally, `BlueprintNameNormalizer` must stay conservative (REQ-INV-006): folding a unit word
+inside parentheses would be a per-language word list bolted onto a class whose whole value is that it
+only touches whitespace, quote glyphs and case. The alias table is the documented place for a curated
+cross-reference, and using it needs no change to the fixed resolution chain.
+
+*Derivation, not a hand-written list:* the German spelling is produced from the local catalogue by
+rewriting the suffix, and `product_key` is computed exactly as `BlueprintNameNormalizer` does. The
+seed therefore cannot drift from a hand-copied name and covers every `(N cap)` craftable present at
+migration time, not merely those observed in a sample corpus.
+
+*`source_system` stays `SCMDB`*, deliberately not a new localisation-specific value:
+`BlueprintImportService` hardcodes `SOURCE = BlueprintExternalAliasSource.SCMDB` for its lookup, so
+any other value would produce rows the import never queries. The name genuinely is an SCMDB-format
+log-export name — the German rendering of one.
+
+**This is a convenience, not a correctness fix.** Without it nothing breaks: the extractor export
+carries no structural `tag` (REQ-INV-019 is a no-op for it), the exact match misses, and the fuzzy
+matcher resolves these names well above threshold with the correct product at rank 1. The seed
+removes a one-time manual pass that would otherwise land on exactly the users localisation support
+just enabled, and that reads like the tool failing to recognise ordinary ammunition.
+
+**Known limit, accepted:** the seed is one-shot. Ammo added by a later SC-Wiki sync gets no alias and
+falls back to the fuzzy matcher — the same outcome as before the seed, for one item instead of
+thirteen. A rerun of the statement is safe and idempotent.
+
+A genuinely different translated name (not just the suffix) is **out of scope**: it scores below
+threshold, the matcher correctly declines to suggest, and the user resolves it once — which the
+alias-learning path then persists for everyone.
+
+**Acceptance**
+
+- [ ] A German `(N Schuss)` name resolves to the English catalogue product via the alias step, with
+  `product_key` identical to `BlueprintNameNormalizer`'s output for the English name.
+- [ ] Both the `(N cap)` and `(N Cap)` spellings the English catalogue itself uses are covered.
+- [ ] Several catalogue variants of one product yield exactly one alias row.
+- [ ] Products without a capacity suffix and soft-deleted rows are skipped.
+- [ ] The seed is idempotent and never overwrites a user- or admin-curated alias for the same
+  spelling.
+- [ ] A German spelling the seed did not cover is still offered by the fuzzy matcher at rank 1.
+
+**Enforced by:** `V228GermanAmmoAliasSeedMigrationTest` (executes the shipped migration file against
+fixtures — derivation, case variants, one-row-per-product, skip rules, idempotency, curated-alias
+precedence), `BlueprintFuzzyMatcherTest#topSuggestions_stillCatchesAGermanCapacitySuffixTheV228SeedDidNotCover`
+· **Code:**
+[`V228__seed_german_ammo_capacity_blueprint_aliases.sql`](../../backend/src/main/resources/db/migration/V228__seed_german_ammo_capacity_blueprint_aliases.sql),
+`BlueprintImportService#resolveViaAlias` (unchanged) · **Issue:** [#1485](https://github.com/krt-profit/basetool/issues/1485)
+
 ## Out of scope
 
+- Non-suffix localisation differences (a genuinely different translated item name) — below the fuzzy
+  threshold by design, resolved once by the user and then persisted by the alias-learning path
+  (REQ-INV-021).
 - The resolved `output_item` / `game_item` name (the recipe-detail view may still show a wrong
   item name) — a separate concern resolved by `external_uuid`, not by this name-correction layer.
 - The fuzzy-suggestion ranking of the import matcher itself (it consumes the corrected master).
