@@ -246,6 +246,11 @@ navigation while filtering did not.
   container untouched, surfaces an optional caller-supplied error toast, and never paints a whole
   page into the small results container. On a backend read failure the mission-detail fragment
   branch returns a **section-sized inline error fragment (HTTP 200)**, not a `redirect:/missions`.
+- [ ] That inline error fragment is **inert on the normal full-page render**: it lives inside a
+  `<template>`, so it can never paint a permanent "the section could not be refreshed" line on a
+  page where nothing failed. A `th:if` on the fragment element itself is *not* the way to do this —
+  it would suppress the intended fragment render too. Thymeleaf still resolves the `th:fragment`
+  inside the `<template>`, and the fragment selector returns only the paragraph.
 
 The same fragment-swap mechanism also re-renders **non-list page sections** after a sub-mutation
 when an in-place DOM patch would be too fragile (structural add/delete, server-derived render state,
@@ -426,7 +431,9 @@ Every classic `POST`→redirect handler stays as the no-JS fallback.
 
 **Enforced by:** lists/pagination e2e (#573) plus the mission-detail (#574), order-detail (#575),
 refinery-import (#591), asset-management (#578), bank (#579), promotion (#580), org/members/profile
-(#581) and admin-CRUD (#582) twin / fragment / endpoint MVC + e2e tests. **Issues:** the epic children
+(#581) and admin-CRUD (#582) twin / fragment / endpoint MVC + e2e tests, plus
+`OperationPageControllerMvcTest` (the error fragment is inert on the full page and still renders
+for an unknown fragment name). **Issues:** the epic children
 (#572) through (#591), most recently (#580), (#581) and (#582), the last child. **Code:**
 `krt-fetch.js` (`swap`), `missions.js`, `operations.js`, `fragments/pagination.html`,
 `mission-detail.html`,
@@ -1509,7 +1516,7 @@ Convert them when opting a file in.
 > **Config:** `frontend/tsconfig.json` (`allowJs` + `noEmit` + `moduleDetection: legacy`),
 > `frontend/build.gradle.kts` (`generateApiTypes`, `typecheckJs`) · **Code:**
 > `frontend/types/globals.d.ts`, `frontend/types/thymeleaf-bootstrap.d.ts`,
-> `frontend/types/dto.d.ts`, the 27 files carrying `// @ts-check` · **ADR:** ADR-0125 ·
+> `frontend/types/dto.d.ts`, the 29 files carrying `// @ts-check` · **ADR:** ADR-0125 ·
 > **Issues:** —
 
 ## Out of scope

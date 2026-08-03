@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -83,6 +84,10 @@ import org.springframework.web.context.WebApplicationContext;
  */
 @SpringBootTest
 class OperationPageControllerMvcTest {
+
+  /** German {@code operation.section.refresh.error} text, as both DE bundles spell it. */
+  private static final String SECTION_REFRESH_ERROR_DE =
+      "Der Abschnitt konnte nicht aktualisiert werden.";
 
   @Autowired private WebApplicationContext context;
 
@@ -489,6 +494,62 @@ class OperationPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("operation-detail :: fragmentError"))
         .andExpect(content().string(containsString("Abschnitt konnte nicht aktualisiert werden")));
+  }
+
+  // The fragmentError paragraph is a direct child of .tab-panes but is NOT a .tab-pane, and the
+  // page's inline CSS only hides .tab-pane — so while it sat outside a <template> it painted a
+  // stray red "Der Abschnitt konnte nicht aktualisiert werden" line under the tabs on EVERY normal
+  // full-page render, with nothing actually broken. The inert <template> wrapper (mirroring
+  // mission-detail / orders-detail) keeps it out of the rendered page while Thymeleaf still
+  // resolves the th:fragment inside it. These two tests pin both halves.
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationDetail_fullPage_doesNotRenderTheSectionRefreshError() throws Exception {
+    UUID opId = UUID.randomUUID();
+    stubDetailEndpoints(
+        opId, new OperationDto(opId, "Op Inert", "", "PLANNED", null, 0L, null, null, null));
+
+    String body =
+        mockMvc
+            .perform(get("/operations/" + opId).locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // A plain not(containsString(...)) cannot express this: the string legitimately survives in two
+    // places the browser never paints — inside the <template> holding the fragment, and in the
+    // inline JS message bootstrap (OPS_DETAIL_MSG.sectionRefreshError, the krtFetch swap-failure
+    // toast). Strip both, and no renderable occurrence may be left.
+    String renderable =
+        body.replaceAll("(?s)<template[^>]*>.*?</template>", "")
+            .replaceAll("(?s)<script[^>]*>.*?</script>", "");
+
+    assertFalse(
+        renderable.contains(SECTION_REFRESH_ERROR_DE),
+        "the fragmentError paragraph must not render on the full operation-detail page");
+    // ...and it is the <template> that keeps it out — the fragment must still be emitted, otherwise
+    // this test would also pass with the fragment deleted outright.
+    assertTrue(
+        body.contains(SECTION_REFRESH_ERROR_DE),
+        "the fragmentError paragraph must still be present (inert) in the page source");
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void operationDetail_fragmentUnknown_stillRendersTheSectionRefreshError() throws Exception {
+    UUID opId = UUID.randomUUID();
+
+    mockMvc
+        .perform(get("/operations/" + opId).param("fragment", "bogus").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(view().name("operation-detail :: fragmentError"))
+        .andExpect(content().string(containsString(SECTION_REFRESH_ERROR_DE)))
+        // The fragment selector extracts only the <p>: the inert wrapper must not travel into the
+        // swap container (a swapped-in <template> would render nothing at all), and no page chrome
+        // comes with it.
+        .andExpect(content().string(not(containsString("<template"))))
+        .andExpect(content().string(not(containsString("id=\"operation-form\""))));
   }
 
   // #1121: the per-mission finance breakdown loads lazily via GET /operations/{id}/finance/{mid}

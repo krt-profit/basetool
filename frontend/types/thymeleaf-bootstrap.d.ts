@@ -454,8 +454,12 @@ declare const REFINERY_HANDOFF_ID: string | null;
 declare const MATERIAL_ENTRY_TITLE_LABEL: string;
 /** Injected by the page bootstrap (declared in refinery-orders-create.html). */
 declare const MATERIAL_REMOVE_LABEL: string;
-/** Injected by the page bootstrap (declared in refinery-orders-create.html). */
-declare const MATERIAL_YIELD_BONUSES: KrtI18nDict;
+/**
+ * Injected by the page bootstrap (declared in refinery-orders-create.html).
+ * The order's refinery yield map, `materialId -> bonusPercent`; the values are
+ * numbers, not strings — the controller renders a `Map<String, Integer>`.
+ */
+declare const MATERIAL_YIELD_BONUSES: Record<string, number>;
 /** Injected by the page bootstrap (declared in refinery-orders-create.html). */
 declare const MATERIAL_YIELD_BONUS_HELP: string;
 /** Injected by the page bootstrap (declared in refinery-orders-create.html). */

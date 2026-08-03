@@ -37,6 +37,9 @@
 - **Ingest-Gateway: Eine Ablehnung nennt jetzt die Ursache.** Alle vier Prüfungen antworteten mit demselben Satz, sodass aus der Meldung nicht hervorging, welche gegriffen hat. Zusätzlich wird jede abgelehnte Anmeldung nach Fehlerart gezählt — ein 401 war bisher im Betrieb nicht auswertbar.
 
 - **Die Formatierungsprüfung des Frontends schlug auf Windows-Arbeitsplätzen grundlos fehl.** Für TypeScript-Deklarationsdateien fehlte die Zeilenenden-Regel, sodass ein frischer Checkout unter Windows drei Dateien mit CRLF anlegte und Prettier sie beanstandete, obwohl niemand sie angefasst hatte — auf dem Linux-Server blieb der Fehler unsichtbar. `.gitattributes` deckt jetzt auch `*.ts` ab; die Dateiinhalte bleiben unverändert (ADR-0125).
+
+- **Auf jeder Einsatz-Detailseite stand dauerhaft eine rote Fehlermeldung.** Der Hinweis „Der Abschnitt konnte nicht aktualisiert werden" ist nur für eine fehlgeschlagene Teil-Aktualisierung gedacht, wurde aber unter den Reitern bei jedem normalen Seitenaufruf angezeigt — obwohl nichts fehlgeschlagen war. Er erscheint jetzt nur noch im Fehlerfall (REQ-FE-005).
+
 ## [v1.5.30](https://github.com/krt-profit/basetool/releases/tag/v1.5.30) - 2026-08-03
 
 ### Added
