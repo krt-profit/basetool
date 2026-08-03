@@ -1,0 +1,134 @@
+# promtool unit tests for the live-sync relay drop alerts (#1238, REQ-OBS-011 / REQ-FE-010).
+#
+# #1102 shipped the relay drop counters panel-only and deferred alerting until a production
+# baseline existed. The baseline was read on 2026-08-03 over the preceding 21 days and is *exactly
+# zero*: `basetool_presence_relay_dropped_total` had no series at all in prod, and Micrometer
+# creates a counter lazily on first increment — so no drop branch has ever been taken on any of the
+# nine topic classes. Both thresholds below are set against that measured zero.
+#
+# The two rules split on runbook action, not on cosmetics:
+#   - LiveSyncRelayDropsSustained — capacity/delivery drops, >3/h sustained. Tolerates the one drop
+#     class that can occur benignly (a `send_failed` race when a socket closes between the
+#     `isOpen()` pre-check and the write).
+#   - LiveSyncSectionKeySkew — `section_filtered` only, which is a deterministic CODE skew (the
+#     REQ-FE-010 stale-peer defect). Low volume by nature, so it triggers on persistence
+#     (`increase[1h] > 0` held for 2h) rather than on rate.
+#
+# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
+#   docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.13.1 test rules tests/livesync_relay_drop_alerts_test.yml
+
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  # The measured prod steady state: frames relayed, not one drop branch ever taken. The drop
+  # counter has no series at all, which must read as silence rather than as missing data.
+  - name: silent - healthy relay with traffic and no drops
+    interval: 1m
+    input_series:
+      - series: 'basetool_presence_relay_frames_total{job="basetool-frontend", topic_class="mission", type="changed"}'
+        values: "0+2x240"
+      - series: 'basetool_presence_relay_frames_total{job="basetool-frontend", topic_class="mission", type="snapshot"}'
+        values: "0+9x240"
+    alert_rule_test:
+      - eval_time: 180m
+        alertname: LiveSyncRelayDropsSustained
+        exp_alerts: []
+      - eval_time: 180m
+        alertname: LiveSyncSectionKeySkew
+        exp_alerts: []
+
+  # The benign drop: a socket closes between the `isOpen()` pre-check and the write, costing exactly
+  # one `send_failed`. A single race must never page — this is why the threshold is >3/h and not >0.
+  - name: silent - a one-off send_failed race
+    interval: 1m
+    input_series:
+      - series: 'basetool_presence_relay_dropped_total{job="basetool-frontend", topic_class="mission", reason="send_failed"}'
+        values: "0x30 1x240"
+    alert_rule_test:
+      - eval_time: 120m
+        alertname: LiveSyncRelayDropsSustained
+        exp_alerts: []
+
+  # The genuine capacity defect: a client or room is steadily over its token bucket and peers are
+  # continuously missing updates. Must fire past the 15m `for`.
+  - name: fires - sustained throttled drops on one room
+    interval: 1m
+    input_series:
+      - series: 'basetool_presence_relay_dropped_total{job="basetool-frontend", topic_class="mission", reason="throttled"}'
+        values: "0+1x240"
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: LiveSyncRelayDropsSustained
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              topic_class: mission
+              reason: throttled
+            exp_annotations:
+              summary: "Live-sync relay dropping frames on mission (throttled)"
+              description: "The live-sync relay dropped more than 3 frames in an hour on topic class mission for reason throttled, sustained for 15m — peers on that surface are silently missing updates. Prod baseline for this counter is zero over 21d, so any sustained stream is anomalous. `throttled`/`topic_throttled`: a client or a room is exceeding its token bucket (misbehaving client, or a genuinely hot room needing a wider bound). `send_failed`: sockets breaking mid-write — check the reverse proxy's WebSocket timeouts. `topic_cap`: a client subscribing past its per-session topic cap (client bug). `authorize_saturated`: the subscribe-authorization executor is saturated and subscribes are failing OPEN — a subscribe was admitted without an authorization check, so treat it as security-relevant and check backend latency."
+
+  # A saturated subscribe-authorization executor fails subscribes OPEN — security-relevant, and it
+  # must reach the operator through the same rule with its own reason label.
+  - name: fires - authorize_saturated fail-open stream
+    interval: 1m
+    input_series:
+      - series: 'basetool_presence_relay_dropped_total{job="basetool-frontend", topic_class="order_detail", reason="authorize_saturated"}'
+        values: "0+1x240"
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: LiveSyncRelayDropsSustained
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              topic_class: order_detail
+              reason: authorize_saturated
+            exp_annotations:
+              summary: "Live-sync relay dropping frames on order_detail (authorize_saturated)"
+              description: "The live-sync relay dropped more than 3 frames in an hour on topic class order_detail for reason authorize_saturated, sustained for 15m — peers on that surface are silently missing updates. Prod baseline for this counter is zero over 21d, so any sustained stream is anomalous. `throttled`/`topic_throttled`: a client or a room is exceeding its token bucket (misbehaving client, or a genuinely hot room needing a wider bound). `send_failed`: sockets breaking mid-write — check the reverse proxy's WebSocket timeouts. `topic_cap`: a client subscribing past its per-session topic cap (client bug). `authorize_saturated`: the subscribe-authorization executor is saturated and subscribes are failing OPEN — a subscribe was admitted without an authorization check, so treat it as security-relevant and check backend latency."
+
+  # A persistent section-key skew: low volume, but it keeps re-triggering because the defect is
+  # deterministic — every edit of that section on that surface loses the key again. One drop every
+  # 5 minutes is far under the capacity rule's >3/h, which is exactly why this rule exists.
+  - name: fires - persistent section-key skew at low volume
+    interval: 5m
+    input_series:
+      - series: 'basetool_presence_relay_dropped_total{job="basetool-frontend", topic_class="mission", reason="section_filtered"}'
+        values: "0+1x60"
+    alert_rule_test:
+      - eval_time: 130m
+        alertname: LiveSyncSectionKeySkew
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              topic_class: mission
+            exp_annotations:
+              summary: "Live-sync section-key skew on mission (peers going stale)"
+              description: "The live-sync relay has been filtering unknown section keys out of `changed` frames on topic class mission for over 2 hours — a broadcast key is missing from the relay's accept-list, so peers' matching panels stay stale with no visible error (the REQ-FE-010 defect class). A section key must exist at all three mirror points at once: the acting page's seam map, LiveSyncTopicClass.allowedSections, and the receiving client's apply map. Check what the last frontend deploy changed on that surface and raise LiveSyncWebSocketHandler to DEBUG to see the rejected key (logged sanitised, never a metric tag)."
+
+  # THE false positive this rule is shaped to avoid, and the exclusion guard in one case. A short
+  # burst of section_filtered drops that then stops (a transient client, a deploy-window blip)
+  # decays out of the 1h window after ~70m — under the 2h `for`, so LiveSyncSectionKeySkew stays
+  # silent. The same burst peaks at 11 drops/h, well past the capacity rule's >3 and sustained far
+  # longer than its 15m `for`, so it also proves `section_filtered` is genuinely excluded there
+  # rather than merely under threshold.
+  - name: silent - a one-off section_filtered burst that stops
+    interval: 1m
+    input_series:
+      - series: 'basetool_presence_relay_dropped_total{job="basetool-frontend", topic_class="mission", reason="section_filtered"}'
+        values: "0+1x10 11x300"
+    alert_rule_test:
+      - eval_time: 180m
+        alertname: LiveSyncSectionKeySkew
+        exp_alerts: []
+      - eval_time: 180m
+        alertname: LiveSyncRelayDropsSustained
+        exp_alerts: []
+      # Mid-burst: the capacity rule must be silent here too, or the exclusion is not doing its job.
+      - eval_time: 45m
+        alertname: LiveSyncRelayDropsSustained
+        exp_alerts: []

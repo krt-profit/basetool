@@ -46,6 +46,28 @@ public final class MetricNames {
   public static final String LIVESYNC_SUBSCRIPTIONS = "basetool.livesync.subscriptions";
 
   /**
+   * Gauge {@code basetool_livesync_peer_rooms} — tag {@code topic_class}; the number of live rooms
+   * of this class currently holding <b>two or more</b> subscribers, i.e. the rooms in which
+   * peer-sync can actually do anything (#1238).
+   *
+   * <p>This is the honest denominator {@link #PRESENCE_RELAY_FRAMES} lacks. {@code
+   * LiveSyncWebSocketHandler#relayLocal} skips the originating session, so a room with a single
+   * viewer relays <b>zero</b> {@code changed} frames no matter how hard that viewer edits — a
+   * {@code changed} flatline is therefore the normal state of an unoccupied surface, not a defect
+   * signal, and reading one without this gauge is how a "peer sync is broken" alert would fire
+   * every time the squadron simply was not co-editing. Measured on prod over the 21 days to
+   * 2026-08-03, peak <em>concurrent</em> subscriptions per class ran from 15 ({@code mission}) down
+   * to 1 ({@code operation} — co-presence never occurred there at all), which is why the {@code
+   * changed}-flatline alert of #1238 stays deferred: only {@code mission} carries enough traffic to
+   * support one.
+   *
+   * <p>Counts rooms, not sockets — {@link #LIVESYNC_SUBSCRIPTIONS} sums sockets across all rooms of
+   * a class and therefore cannot distinguish two peers in one room (peer-sync live) from two
+   * separate single-viewer rooms (peer-sync inert).
+   */
+  public static final String LIVESYNC_PEER_ROOMS = "basetool.livesync.peer.rooms";
+
+  /**
    * Counter {@code basetool_livesync_subscribe_total} — tags {@code topic_class}, {@code outcome}
    * ({@link #OUTCOME_ALLOWED} / {@link #OUTCOME_DENIED}) and {@code reason}; the verdict of a
    * multiplexed {@code /ws/sync} subscribe-authorization check (REQ-FE-015, ADR-0094). A
