@@ -16,6 +16,10 @@
 
 - **Neue Kennzahl `basetool_livesync_peer_rooms` samt Panel im Betriebs-Dashboard.** Sie zeigt je Oberfläche, in wie vielen Räumen mehrere Personen gleichzeitig sind. Ohne sie ist ein Ausbleiben von Aktualisierungen nicht davon zu unterscheiden, dass schlicht niemand gemeinsam bearbeitet hat.
 
+- **Nutzungsbedingungen müssen jetzt bestätigt werden.** Wer sie noch nicht bestätigt hat, landet beim Öffnen des Basetool auf einer Zustimmungsseite; ohne Zustimmung ist keine Nutzung möglich, bei Ablehnung wird man abgemeldet und kann sich jederzeit erneut anmelden. Ändert sich der Text, erscheint die Seite erneut — das erkennt das Tool selbständig am Inhalt, es muss niemand daran denken. Wer wann welcher Fassung zugestimmt hat, wird nachvollziehbar gespeichert (REQ-SEC-028).
+
+- **Neue Adminübersicht „Zustimmung zu den Nutzungsbedingungen“.** Zeigt, wer der geltenden Fassung zugestimmt hat und wer noch nicht, voreingestellt auf die offenen Fälle. Ohne sie wäre nach einer Textänderung nicht zu unterscheiden, ob sich schlicht noch niemand angemeldet hat oder ob die Zustimmung gar nicht funktioniert.
+
 - **Nutzungsbedingungen: Nur vom Betreiber freigegebene Client-Software darf die Schnittstellen nutzen.** Bisher stand diese Regel nur in der Entwicklerdokumentation und war damit nicht Vertragsbestandteil — ein Sperrgrund ließ sich nur über die Klausel „ohne Angabe von Gründen" stützen. Abschnitt 4 nennt sie jetzt ausdrücklich, für alle Schnittstellen und einschließlich Entwicklung und Bereitstellung fremder Clients (REQ-SEC-027, Stand 03.08.2026).
 
 ### Changed
