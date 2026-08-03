@@ -128,7 +128,7 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
     }
     String authorizedParty = claimText(jwt, AUTHORIZED_PARTY_CLAIM);
     String clientLabel = boundedClientLabel(authorizedParty);
-    Rejection rejection = evaluate(request, jwt, authorizedParty);
+    Rejection rejection = evaluate(request, authorizedParty);
 
     if (rejection != null) {
       meterRegistry
@@ -181,13 +181,16 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
    * reporting the token-scheme problem before the claim problems means an operator mid-DPoP-rollout
    * sees {@code dpop_required} rather than a confusing downstream symptom.
    *
+   * <p>Takes the already-extracted {@code azp} rather than the {@link Jwt} itself: the only other
+   * claim-derived input, the ingest scope, reaches this through the {@code SecurityContext} as a
+   * {@code SCOPE_} authority, so passing the token would be a parameter nothing reads.
+   *
    * @param request the current request, inspected for the {@code Authorization} scheme
-   * @param jwt the authenticated caller's token
    * @param authorizedParty the token's {@code azp} claim, or {@code null} when absent
    * @return the first failed check, or {@code null} when every configured check passed
    */
   private @Nullable Rejection evaluate(
-      @NotNull HttpServletRequest request, @NotNull Jwt jwt, @Nullable String authorizedParty) {
+      @NotNull HttpServletRequest request, @Nullable String authorizedParty) {
     if (properties.isDpopRequired() && !usesDpopScheme(request)) {
       return new Rejection(
           MetricNames.REASON_DPOP_REQUIRED,
