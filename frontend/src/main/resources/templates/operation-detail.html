@@ -497,9 +497,15 @@
         </section>
 
         <!-- Section-sized inline error returned when an AJAX fragment (overview/payout/finance) fails
-             to load, so one flaky peer-refresh never injects a redirect into a swap target. -->
-        <p th:fragment="fragmentError" class="desc krtm-color-danger"
-           th:text="#{operation.section.refresh.error}">Abschnitt konnte nicht geladen werden.</p>
+             to load, so one flaky peer-refresh never injects a redirect into a swap target. Held in an
+             inert <template> (mirrors mission-detail / orders-detail) so it never shows in the normal
+             full-page render: it is a direct child of .tab-panes and is not a .tab-pane, so the page
+             CSS — which only hides .tab-pane — left it painting a stray red line under every tab. The
+             fragment selector still extracts the inner <p>, which krtFetch.swap then injects. -->
+        <template>
+            <p th:fragment="fragmentError" class="desc krtm-color-danger"
+               th:text="#{operation.section.refresh.error}">Abschnitt konnte nicht geladen werden.</p>
+        </template>
 
     </div> <!-- End tab-panes -->
 </div> <!-- End page-wrapper -->
