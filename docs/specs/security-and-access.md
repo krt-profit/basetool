@@ -1087,9 +1087,68 @@ key parity, so the clause cannot exist in one locale only) · **Text:** `terms.l
 `templates/terms.html` · **Technical counterpart:** REQ-INGEST-011
 ([`desktop-ingest.md`](desktop-ingest.md)), ADR-0018
 
+### REQ-SEC-028 — Terms-of-Use consent is recorded, versioned and enforced
+
+Using the platform requires **recorded consent** to the Terms-of-Use wording currently in force.
+Before this, the terms took effect merely on access (section intro) and section 12 treated
+continued use as acceptance — which leaves no evidence of who agreed to which wording, the thing
+actually needed when a clause is enforced against someone (REQ-SEC-027).
+
+**The version is derived from the wording, never declared.** The root Gradle task
+`generateTermsVersion` hashes every `terms.*` entry of the German bundle into
+`terms-version.properties`, which the backend reads at startup. Any wording change therefore
+produces a new version and re-prompts everyone, with no number a human has to remember to bump.
+`-PtermsVersion=<value>` pins it for one build when an edit was purely cosmetic, which leaves every
+existing acceptance valid. It is generated for the **backend only**: the backend is the single
+authority on consent, and a second copy in the frontend could disagree with the first.
+`TermsVersionProvider` refuses to start when the resource is missing or blank — an empty version
+would either block every user out of the whole API or, made lenient, wave everyone through a gate
+that only looks armed.
+
+**Consent is append-only.** `terms_acceptance` (V229) holds one row per user and version, never
+updated; re-consent after a change adds history instead of overwriting it. The unique constraint
+`uq_terms_acceptance_user_version` does double duty as the index behind the per-request lookup and
+as the idempotence guard for a double submit.
+
+**Enforced in the backend, surfaced in the frontend.** `TermsAcceptanceAccessFilter` refuses
+`/api/**` with `403 TERMS_NOT_ACCEPTED`; `TermsAcceptanceGateFilter` redirects the web UI to
+`/terms/accept`. The backend is the boundary because it is the one place every caller passes
+through — the web UI and, since the ingest gateway relays the caller's own bearer
+(`REQ-INGEST-001`), the desktop extractor. The gateway needs no copy of the rule: it already
+relays a backend 4xx with the backend's own `detail`.
+
+Four invariants that must survive any rewrite:
+
+- **The consent endpoints are never refused.** Refusing `/api/v1/terms/**` makes the block
+  permanent for everyone, because no request would be left that could record consent.
+- **The terms, the privacy policy and the imprint stay reachable.** A gate that redirects those
+  asks a person to agree to what it prevents them from reading.
+- **No cache may outlive a wording change.** An authenticated session lives 30 days (ADR-0088), so
+  the frontend verdict is re-read every 60 s; the backend caches only *positive* answers, which are
+  monotonic within a process because the version in force is a build artifact.
+- **The gate is armed by default.** It is stood down only under the `test` profile (MockMvc callers
+  are synthetic subjects that cannot consent). A property that must be set to switch it on was
+  rejected: it ships a gate that looks armed and is not. The E2E profile is `dev`, so the gate is
+  live there and `E2eSupport#acceptTermsIfPrompted` clicks through it on every login rather than
+  pre-seeding a row — which keeps the suite exercising the real path.
+
+**Acceptance**
+
+- [ ] A user without consent cannot reach any `/api/**` endpoint but the consent ones.
+- [ ] A wording change re-prompts every user, without anyone editing a version number.
+- [ ] Consent history survives re-consent; a double submit adds no second row.
+- [ ] An admin can see who has and has not accepted.
+
+**Enforced by:** `TermsAcceptanceAccessFilterTest` (refusal, both exemptions, non-UUID subjects),
+`TermsAcceptanceGateFilterTest` (redirect, the readable-documents exemption, fail-open, cache
+bound), `TermsAcceptanceQueryDataTest` + `TermsAcceptanceServiceTest` (append-only history,
+version scoping, one-sided cache, sort translation), `TermsAcceptancePageControllerTest`,
+`AdminTermsPageControllerTest`, `TermsTemplateBundleParityTest` · **Code:** `TermsVersionProvider`,
+`TermsAcceptanceService`, `support.TermsConsentCheck` (the leaf interface that keeps `config` and
+`service` acyclic per ADR-0047), `TermsController`, `AdminTermsController` · **Monitoring:**
+`basetool_terms_acceptances_total`, `basetool_terms_accepted_users`, `TermsConsentRolloutStalled`
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the
-confidential-client migration decision (see ADR-0001). Recording a user's **consent** to the terms
-(an acceptance gate with per-version re-consent) is not covered here — the terms currently take
-effect on access (section intro) and section 12 treats continued use as acceptance.
+confidential-client migration decision (see ADR-0001).
