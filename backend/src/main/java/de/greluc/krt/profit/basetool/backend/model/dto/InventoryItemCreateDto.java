@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 
 import de.greluc.krt.profit.basetool.backend.validation.QuantityAware;
 import de.greluc.krt.profit.basetool.backend.validation.ValidQuantityAmount;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
@@ -97,8 +98,16 @@ public record InventoryItemCreateDto(
    * chk_inventory_item_catalog_xor} so the violation surfaces as a 400 validation error instead of
    * a 500 integrity failure.
    *
+   * <p>{@code @Schema(hidden = true)} keeps this derived guard out of the generated OpenAPI
+   * document: it is computed from {@link #materialId} / {@link #gameItemId} and is never part of
+   * the request payload, so documenting it would invite clients to send a field the server ignores
+   * — and springdoc harvests accessors in {@code Class#getDeclaredMethods()} order, which the JVM
+   * does not guarantee, so the three guards on this record permuted between runs and rewrote {@code
+   * openapi.json} on every build (see {@code OpenApiDerivedPropertyTest}).
+   *
    * @return {@code true} when exactly one catalog reference is set
    */
+  @Schema(hidden = true)
   @AssertTrue(message = "{error.validation.inventory_catalog_xor}")
   public boolean isCatalogReferenceValid() {
     return (materialId == null) != (gameItemId == null);
@@ -109,8 +118,12 @@ public record InventoryItemCreateDto(
    * row requires a quality, a game-item row forbids one. Skipped while the XOR guard above already
    * fails, so a payload with neither reference reports only the XOR violation.
    *
+   * <p>Hidden from the OpenAPI document for the reasons given on {@link
+   * #isCatalogReferenceValid()}.
+   *
    * @return {@code true} when the quality presence matches the catalog kind
    */
+  @Schema(hidden = true)
   @AssertTrue(message = "{error.validation.inventory_quality_by_kind}")
   public boolean isQualityConsistentWithCatalog() {
     if ((materialId == null) == (gameItemId == null)) {
@@ -123,8 +136,12 @@ public record InventoryItemCreateDto(
    * Bean-validation guard rejecting mission references on a game-item payload (REQ-INV-031): item
    * rows are allocatable only to ITEM job orders, never to missions.
    *
+   * <p>Hidden from the OpenAPI document for the reasons given on {@link
+   * #isCatalogReferenceValid()}.
+   *
    * @return {@code true} when a game-item payload carries no mission reference
    */
+  @Schema(hidden = true)
   @AssertTrue(message = "{error.validation.inventory_item_no_mission}")
   public boolean isMissionFreeForGameItem() {
     return gameItemId == null

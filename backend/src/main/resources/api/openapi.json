@@ -57379,9 +57379,6 @@
             "type" : "number",
             "maximum" : 100,
             "minimum" : 1
-          },
-          "splitConfigConsistent" : {
-            "type" : "boolean"
           }
         },
         "required" : [ "amount", "sourceAccountId", "type" ]
@@ -58481,15 +58478,6 @@
             "items" : {
               "$ref" : "#/components/schemas/InventoryAllocationInput"
             }
-          },
-          "catalogReferenceValid" : {
-            "type" : "boolean"
-          },
-          "missionFreeForGameItem" : {
-            "type" : "boolean"
-          },
-          "qualityConsistentWithCatalog" : {
-            "type" : "boolean"
           }
         },
         "required" : [ "amount", "locationId" ]
@@ -59054,9 +59042,6 @@
             "type" : "string",
             "maxLength" : 100,
             "minLength" : 0
-          },
-          "splitConfigConsistent" : {
-            "type" : "boolean"
           }
         },
         "required" : [ "accountId", "amount", "holderId" ]

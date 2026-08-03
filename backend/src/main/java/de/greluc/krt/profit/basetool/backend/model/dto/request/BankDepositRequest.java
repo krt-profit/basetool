@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.model.dto.request;
 
 import de.greluc.krt.profit.basetool.backend.validation.WholeNumber;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -77,8 +78,13 @@ public record BankDepositRequest(
    * carries none. The numeric range/whole-number of {@link #splitPercent} is enforced by its own
    * field constraints — this only pins the presence/absence relationship to {@link #splitEnabled}.
    *
+   * <p>Hidden from the OpenAPI document for the same reason as {@link
+   * CreateBankBookingRequest#isSplitConfigConsistent()}: it is derived from the other fields, never
+   * sent by a client, and accessor-order instability rewrote {@code openapi.json} between builds.
+   *
    * @return {@code true} when the split flag and the percentage are consistent
    */
+  @Schema(hidden = true)
   @AssertTrue(message = "A split deposit requires a percentage; a non-split deposit must omit it")
   public boolean isSplitConfigConsistent() {
     return splitEnabled ? splitPercent != null : splitPercent == null;

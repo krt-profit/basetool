@@ -32,6 +32,8 @@
 
 ### Fixed
 
+- **Die API-Dokumentation schrieb sich bei jedem Build selbst um.** `openapi.json` enthielt drei interne Prüfregeln des Lager-Formulars und zwei der Bank als vermeintliche Eingabefelder; deren Reihenfolge war zufällig, wodurch jeder Build die Datei veränderte, ohne dass sich an der Schnittstelle etwas geändert hatte. Die Pseudo-Felder sind entfernt, die Datei ist jetzt reproduzierbar, und ein Test hält das so (REQ-API-007).
+
 - **Fehlalarm „ExternalFetchErrors“ für den UEX-Katalog behoben.** Zwei dauerhaft leere UEX-Kategorien (Jumpsuits, Consumable) wurden bei jedem Abgleich als Abruffehler gezählt, weil UEX ein leeres Ergebnis als `data: null` ausliefert — zusammen mit Backend-Neustarts löste dieser Dauerzähler den Alarm aus, ohne dass eine Störung vorlag. Gezählt wird jetzt nur noch, was UEX selbst als Fehler meldet (REQ-OBS-011).
 
 - **Ingest-Gateway: Blueprint-Versand aus dem Extractor schlug fehl.** Der Extractor schreibt je Export-Pfad eine andere Herkunftsangabe; die Freigabeliste kannte nur eine davon, wodurch jeder Blueprint-Versand mit „nicht freigegeben" abgewiesen wurde. Beide Schreibweisen sind jetzt dokumentiert, und der Vergleich ignoriert Groß-/Kleinschreibung.
