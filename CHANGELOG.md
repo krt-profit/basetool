@@ -20,6 +20,10 @@
 
 - **Die Bearbeitungs-Anzeige auf der Missionsseite gilt jetzt über alle Serverinstanzen hinweg.** Der Hinweis „wird gerade bearbeitet von“ erschien bisher nur, wenn beide Bearbeiter zufällig von derselben Instanz bedient wurden; bei mehreren Instanzen fehlte er, obwohl die Änderungen selbst korrekt ankamen. Die Anzeige wird jetzt zwischen den Instanzen abgeglichen — fällt Redis aus, verhält sie sich wie bisher instanzlokal (ADR-0126, neuer Kanal `basetool:livesync:presence`, einstellbar über `APP_LIVESYNC_REDIS_PRESENCE_CHANNEL`).
 
+- **Betriebsmittel des Servers nach einer Messwoche neu zugeschnitten.** Die Datenbanken waren für einen Datenbestand ausgelegt, den es nicht gibt: 2 GB Speicherlimit und ein 512 MB großer Puffer für eine 108 MB kleine Datenbank. Beide Datenbank-Container und ihre Postgres-Einstellungen sind jetzt an den gemessenen Bedarf angepasst — das gibt 768 MB frei, ohne dass irgendwo weniger zur Verfügung steht als benötigt (ADR-0085, #937).
+
+- **Vier Dienste dürfen jetzt kurzzeitig mehr Rechenleistung ziehen.** Die Weboberfläche stand pro Woche rund 25 Minuten still, weil ihre Obergrenze kurze Lastspitzen abschnitt — bei einem Server, der im Mittel zu 3 % ausgelastet ist. Betroffen waren Weboberfläche, Ingest-Gateway, Sitzungsspeicher und der vorgelagerte Webserver; spürbar wird das als geringere Wartezeit beim Seitenaufbau (#937).
+
 ## [v1.5.30](https://github.com/krt-profit/basetool/releases/tag/v1.5.30) - 2026-08-03
 
 ### Added

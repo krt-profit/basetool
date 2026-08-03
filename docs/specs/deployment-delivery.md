@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-12.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-08-03.
 > **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md)
 
 # Deployment delivery & promotion
@@ -534,6 +534,64 @@ true`) · `docker-compose.monitoring.yml` (`x-mon-base` anchor, `init: true`) ·
 `.github/scripts/check_pid1_reaping.py` (wired into the `pid1-reaping` job of
 [`repo-lint.yml`](../../.github/workflows/repo-lint.yml), with a self-test that keeps it from
 passing vacuously) · verification recipe in the `x-backend` service comment
+
+### REQ-OPS-020 — Container resource limits are derived from measurement, never from a ratio
+
+Every `memory:` and `cpus:` limit in `docker-compose.yml` and `docker-compose.monitoring.yml`, and
+every runtime sizing knob derived from one (`MaxRAMPercentage`, `GOMEMLIMIT`, Postgres
+`shared_buffers` / `effective_cache_size` / `work_mem`, Redis `maxmemory`, HikariCP
+`maximum-pool-size`), is **derived from a production measurement and carries that measurement in a
+comment next to the value**. Changing any of them without a measurement to point at is a defect,
+even when the direction is "safer".
+
+This requirement exists because the same error class has shipped four separate times, always by
+applying a **percentage or a ratio** where a **budget** was needed:
+
+- `alloy` was raised 192M → 256M → 384M → 512M against a working set that was mostly its own
+  memory-mapped binary — page cache expands to fill whatever limit it is given, so the ratio always
+  crept back (ADR-0085).
+- The JVM limits were raised on the reasoning that "the alert keys off the working_set/limit ratio,
+  so it auto-adjusts" — but `MaxRAMPercentage` is a ratio too, so the heap ceiling scaled with the
+  limit and the watched fraction never moved (PR #1419).
+- Postgres `shared_buffers` was scaled up alongside the container RAM for a projected
+  "5000-account working set", reaching **4.75× the size of the entire database** (#937).
+- `prometheus` and `tempo` carry deliberate deviations from the `GOMEMLIMIT = 75 %` convention;
+  both are recorded *as exceptions with their measurement* rather than silently normalised.
+
+**The binding rules:**
+
+1. **Size from a measured peak over a window of at least seven days, and state the multiple.**
+   "1536M is 5.2× the measured 295 MB working-set peak" is a sizing; "2/3 of the limit" is not.
+2. **Pick the right metric for the runtime.** `container_memory_rss` (anonymous) for Go and JVM
+   services — never `container_memory_working_set_bytes`, which counts the reclaimable mapped
+   binary and cannot cause an OOM. **Postgres is the exception**: `shared_buffers` is POSIX shared
+   memory and lands in the cgroup `cache` term, so a DB container is read from its working set.
+3. **Never re-apply a percentage to a limit that moved.** Re-derive the absolute budget:
+   `ceiling + measured overhead ≤ ~80 % of the limit`.
+4. **Check the floor before tuning a ratio.** If `used + overhead` already exceeds the target, no
+   percentage exists that fits and the container is simply undersized.
+5. **CPU is sized from absolute throttled seconds**, not from a peak or an average throttle ratio
+   (they routinely disagree by two orders of magnitude). A quota is a burst ceiling, not a
+   reservation: overcommitting the sum past the physical core count is permitted and expected.
+6. **Record what would trigger a re-review** — the growth that would invalidate the multiple.
+7. **The sum of all limits across both compose files stays under the host budget with real
+   headroom** (ADR-0085's `~14 GB` review trigger on the 16 GB CPX42). Exceeding it is not
+   forbidden but requires an explicit owner decision recorded in ADR-0085, because the sum bounds
+   the pathological simultaneous-spike case the limits exist to survive.
+
+**Enforced by:** the sizing comments in `docker-compose.yml` (the `POSTGRES SIZING`, `STACK
+RESOURCE BUDGET` and `JVM CONTAINER SIZING` blocks) and `docker-compose.monitoring.yml` (the `GO
+SERVICE MEMORY SIZING` block and the CPU-limit rationale) · the measurement runbook in
+[`monitoring/README.md`](../../monitoring/README.md) → "Container memory sizing" · the capacity rule
+and its measured revisions in [ADR-0085](../adr/0085-scale-user-sync-and-stack-capacity-for-5000-accounts.md).
+
+**Acceptance**
+
+- Every `memory:` / `cpus:` value in either compose file has an adjacent comment naming the measured
+  figure it was derived from and the multiple of headroom it retains.
+- No sizing change is merged whose justification is a percentage of the container limit, a
+  round-number bump, or "to be safe", without a measurement.
+- The sum of limits is recomputed and recorded whenever any limit changes.
 
 ## Out of scope
 
