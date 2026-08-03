@@ -21,7 +21,7 @@ throwaway `frontend/src/e2e/resources/realm-export.e2e.json` test artifact — d
 > access:
 >
 > 1. registering a dedicated Keycloak client for it (steps 1–3 below), and
-> 2. adding its client id to `APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS` on the gateway.
+> 2. adding its client id to `IRI_INGEST_ALLOWED_CLIENT_IDS` on the gateway.
 >
 > Removing the allowlist entry revokes a client immediately (existing access tokens expire within the
 > access-token lifespan, ~5 min) without needing a Keycloak change or a release. Do not add a client
@@ -214,8 +214,8 @@ break.
 Only after step 5 passes on **both** tokens:
 
 ```properties
-# backend env (docker-compose / .env)
-APP_SECURITY_JWT_EXPECTED_AUDIENCES=basetool-backend
+# /var/iri/code/.env on the prod host
+IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend
 ```
 
 This sets `app.security.jwt.expected-audiences`, which the backend's already-present
@@ -239,7 +239,7 @@ to give the frontend its `basetool-backend` audience, and the realm took the sha
 
 Two consequences, and both silently defeat step 7 if ignored:
 
-- `APP_INGEST_CLIENT_IDENTITY_REQUIRED_SCOPE=extractor-ingest` would be satisfied by a **frontend
+- `IRI_INGEST_REQUIRED_SCOPE=extractor-ingest` would be satisfied by a **frontend
   session token** — the scope check would not discriminate at all.
 - An audience mapper added to `extractor-ingest` would stamp `aud=basetool-ingest` onto **frontend
   tokens too**, so the audience gate would pass for exactly the tokens it exists to refuse.
@@ -307,7 +307,7 @@ Verify on **both** live tokens before continuing:
 Only then, on the **gateway** (not the backend):
 
 ```properties
-APP_SECURITY_JWT_EXPECTED_AUDIENCES=basetool-ingest
+IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest
 ```
 
 > **Do not point the gateway at `basetool-backend`.** That is the backend's audience and every
@@ -318,20 +318,26 @@ APP_SECURITY_JWT_EXPECTED_AUDIENCES=basetool-ingest
 Because of 7a, the value below is the **new** scope, not the shared one:
 
 ```properties
-APP_INGEST_CLIENT_IDENTITY_REQUIRED_SCOPE=extractor-ingest-only
+IRI_INGEST_REQUIRED_SCOPE=extractor-ingest-only
 ```
 
 Setting it to `extractor-ingest` would look configured and enforce nothing.
 
 ### 7c — Configure, run in audit-only, then enforce
 
+> **Two names for one setting — use the `IRI_*` one on the host.** The application reads
+> `APP_INGEST_CLIENT_IDENTITY_*` (that is what the spec and the `@ConfigurationProperties` class
+> name), but `docker-compose.yml` maps those from `IRI_*` variables. Putting an `APP_*` name in
+> `/var/iri/code/.env` sets a variable the container never receives — the gate would stay silently
+> inert and look configured. Everything below is the host-side name.
+
 ```properties
-# gateway env
-APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS=basetool-sc-extractor
+# /var/iri/code/.env on the prod host
+IRI_INGEST_ALLOWED_CLIENT_IDS=basetool-sc-extractor
 # NOTE: the exclusive scope from 7a, NOT the shared `extractor-ingest`.
-APP_INGEST_CLIENT_IDENTITY_REQUIRED_SCOPE=extractor-ingest-only
-APP_INGEST_CLIENT_IDENTITY_ALLOWED_TOOLS=basetool-sc-extractor
-APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY=true
+IRI_INGEST_REQUIRED_SCOPE=extractor-ingest-only
+IRI_INGEST_ALLOWED_TOOLS=basetool-sc-extractor
+IRI_INGEST_CLIENT_AUDIT_ONLY=true
 ```
 
 Restart, then watch for at least one full scrape interval:
@@ -341,7 +347,7 @@ Restart, then watch for at least one full scrape interval:
 - `basetool_ingest_client_total{client_id="basetool-sc-extractor"}` should carry the traffic. If it
   lands on `client_id="other"` instead, the `azp` is not what the allowlist expects.
 
-Only when both hold, set `APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY=false` and restart. The
+Only when both hold, set `IRI_INGEST_CLIENT_AUDIT_ONLY=false` and restart. The
 `IngestUnknownClient` alert fires on the same counter afterwards.
 
 > Multiple client ids are supported (comma-separated), which is what makes a client-id **rotation**
@@ -351,7 +357,7 @@ Only when both hold, set `APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY=false` and resta
 ## Step 8 — DPoP (REQ-INGEST-012) — BLOCKED on the extractor
 
 Keycloak has supported DPoP as a non-preview feature since 26.4, and the gateway validates DPoP-bound
-tokens already. **`APP_INGEST_CLIENT_IDENTITY_DPOP_REQUIRED` must stay `false`** until the desktop
+tokens already. **`IRI_INGEST_DPOP_REQUIRED` must stay `false`** until the desktop
 extractor sends DPoP proofs — it sends `Authorization: Bearer` today, so enabling this breaks every
 send on deploy. Validation of a presented DPoP token is active regardless, so there is nothing to
 enable for the migration to begin.
@@ -366,7 +372,7 @@ Two things are worth doing on the Keycloak side **now**, independently of the ex
 
 ## Rollback
 
-- **Step 6:** unset `APP_SECURITY_JWT_EXPECTED_AUDIENCES` and restart the backend — the
+- **Step 6:** unset `IRI_BACKEND_EXPECTED_AUDIENCES` and restart the backend — the
   validator becomes inert (the decoder bean is no longer created); all previously-valid
   tokens are accepted again. This is the fast rollback if anything 401s after step 6.
 - **Steps 1–3:** remove the `extractor-ingest` scope assignment / the `basetool-sc-extractor`
