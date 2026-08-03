@@ -22,7 +22,7 @@ Three properties of the codebase, all measured rather than assumed:
 | Still inline in Thymeleaf templates        | ~2 245 lines in 58 templates |
 | `<script th:src>` tags                     | 106                          |
 | JS build step today                        | none                         |
-| Files under `// @ts-check`                 | 27 of 87                     |
+| Files under `// @ts-check`                 | 28 of 87                     |
 | Backend DTO schemas available from OpenAPI | 253                          |
 
 The blocking constraint is **ADR-0069**. The static scripts are classic non-module `<script>` tags
@@ -159,7 +159,7 @@ the later numbers real.
 
 | Phase |               Scope               |                 Rough effort                  |                    Risk                     |
 |-------|-----------------------------------|-----------------------------------------------|---------------------------------------------|
-| 1     | 60 files to `@ts-check` green     | Large, but incremental and shippable per file | Low                                         |
+| 1     | 59 files to `@ts-check` green     | Large, but incremental and shippable per file | Low                                         |
 | 2     | ~2 245 inline lines, 58 templates | Large                                         | Medium — behaviour-preserving extraction    |
 | 3     | Strictness ratchet                | Medium                                        | Low                                         |
 | 4     | Build step                        | Medium                                        | **High** — first change to asset production |

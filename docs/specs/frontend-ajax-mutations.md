@@ -1378,7 +1378,7 @@ Convert them when opting a file in.
 > **Config:** `frontend/tsconfig.json` (`allowJs` + `noEmit` + `moduleDetection: legacy`),
 > `frontend/build.gradle.kts` (`generateApiTypes`, `typecheckJs`) · **Code:**
 > `frontend/types/globals.d.ts`, `frontend/types/thymeleaf-bootstrap.d.ts`,
-> `frontend/types/dto.d.ts`, the 27 files carrying `// @ts-check` · **ADR:** ADR-0125 ·
+> `frontend/types/dto.d.ts`, the 28 files carrying `// @ts-check` · **ADR:** ADR-0125 ·
 > **Issues:** —
 
 ## Out of scope

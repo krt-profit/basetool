@@ -218,10 +218,20 @@ interface KrtSectionWriteConfig {
     keys: Record<string, string>;
     /** Maps a section key to its swap container and Thymeleaf fragment value. */
     sections: Record<string, { container: string; fragmentValue: string }>;
-    /** Late-bound accessor for the URL the section fragments are fetched from. */
-    pageUrl(): string;
-    /** Late-bound accessor for the peer-broadcast channel, when the page has one. */
-    broadcast?(): { send(section: string): void } | null | undefined;
+    /**
+     * Late-bound accessor for the URL the section fragments are fetched from.
+     * Null while the page's entity has no id yet — `refresh()` then resolves
+     * false for that section instead of fetching, so a detail page can install
+     * the seam before the entity exists.
+     */
+    pageUrl(): string | null;
+    /**
+     * Late-bound peer notification (REQ-FE-010): called by `refresh()` with the
+     * section keys that just changed, unless the refresh is itself the
+     * application of a peer's inbound signal (`opts.broadcast === false`), and
+     * unconditionally by `notify()`. Omitted on pages with no peer sync.
+     */
+    broadcast?(sectionKeys: string[]): void;
 }
 
 /** The `{write, refresh, notify}` trio returned by {@linkcode KrtFetchApi.sectionWrite}. */
@@ -323,6 +333,111 @@ interface KrtReauthApi {
     redirect(url?: string): void;
     /** Returns true when the response demanded re-authentication. */
     check(response: Response): boolean;
+}
+
+/**
+ * A control the refinery-order forms address by id: the raw `<select>` before
+ * combobox enhancement, or the hidden `<input>` that carries the control's id
+ * after it (REQ-FE-016). Only `id` and `value` are ever read, which both carry —
+ * the union names the two shapes the DOM actually holds at those ids.
+ */
+type KrtRefineryControl = HTMLInputElement | HTMLSelectElement;
+
+/**
+ * The material-row yield-badge manager installed by `refinery-yield-badge.js`
+ * and shared by both refinery-order forms (create + detail). It holds the
+ * `{materialId -> bonusPercent}` map for the order's current refinery in memory,
+ * so a material or location change re-renders the badges without a reload.
+ */
+interface KrtRefineryYieldApi {
+    /**
+     * Replaces the in-memory yield map and the badge tooltip text. The page
+     * bootstrap calls this once with the server-rendered state; a nullish map is
+     * read as "no UEX data for this refinery" and collapses every badge.
+     */
+    init(
+        initialMap: Record<string, number> | null | undefined,
+        helpText: string | null | undefined,
+    ): void;
+    /**
+     * Sets, updates or removes the badge on the material row `rowIndex`. A
+     * nullish `bonus` removes the badge entirely ("no UEX row for this material
+     * at this refinery"); 0 renders a neutral "0%" badge rather than none.
+     */
+    setBadge(rowIndex: string | number, bonus: number | null | undefined): void;
+    /**
+     * Re-renders the badge of the row owning `control`, taking the row index
+     * from the control's trailing `_<n>` id suffix and the material id from its
+     * value. A control with no such id suffix is ignored.
+     */
+    refreshFor(control: KrtRefineryControl | null | undefined): void;
+    /** Re-renders every material row's badge against the current map. */
+    refreshAll(): void;
+    /**
+     * The location picker changed: refetches that refinery's map from the
+     * page-controller proxy and re-renders every badge. Resolves once the new
+     * map is applied — a nullish location, a 4xx or a network failure all fall
+     * back to an empty map rather than rejecting, so the form stays usable when
+     * UEX or the backend is misbehaving.
+     */
+    onLocationChange(control: KrtRefineryControl | null | undefined): Promise<void>;
+}
+
+/** One tag's share of a book-out / transfer deduction plan. */
+interface KrtHerkunftReduction {
+    /** The job-order or mission id the amount is deducted from. */
+    targetId: string;
+    /** The amount taken from that target, already rounded to the material's unit. */
+    amount: number;
+}
+
+/**
+ * The "Herkunft" (provenance) picker installed by `inventory-herkunft.js`: it
+ * lets the book-out and transfer modals split a deduction across the earmarks a
+ * stock entry carries. Each call is scoped by the modal's `prefix` (`'bookout'`
+ * / `'umbuchen'`), so one module serves both dialogs.
+ */
+interface KrtHerkunftApi {
+    /** Renders the picker for the given modal from the source entry's leaf row. */
+    populate(prefix: string, itemId: string): void;
+    /** Recomputes the picker's derived amounts; returns whether the plan is submittable. */
+    recompute(prefix: string): boolean;
+    /**
+     * Reads the current plan for submission. Both dimensions are null when the
+     * picker is inactive or contributes no split, which tells the backend to
+     * apply its own default deduction order.
+     */
+    collect(prefix: string): {
+        jobOrderReductions: KrtHerkunftReduction[] | null;
+        missionReductions: KrtHerkunftReduction[] | null;
+    };
+    /** Recomputes and reports whether the plan is currently submittable. */
+    isValid(prefix: string): boolean;
+    /** Clears and hides the picker, e.g. when its modal closes. */
+    reset(prefix: string): void;
+}
+
+/**
+ * A Materialbörse create/edit dialog — the offer side from
+ * `materialboerse-release.js` (`krtMaterialRelease`) and the request side from
+ * `materialgesuch-modal.js` (`krtMaterialRequest`). Both expose the same pair.
+ */
+interface KrtMaterialDialogApi {
+    /**
+     * Opens the dialog. `mode` selects the variant the dialog renders (`'new'`,
+     * `'edit'`, and the offer dialog's `'lager'` / `'item'` entry points), `ctx`
+     * seeds it — an absent or empty object is the "blank new entry" case — and
+     * `doneOrOpts` is either a bare success callback receiving the response body
+     * or a `{onDone, onCancel}` pair, where `onCancel` fires on a dismissal.
+     */
+    open(
+        mode: string,
+        ctx?: Record<string, unknown> | null,
+        doneOrOpts?:
+            ((body: any) => void) | { onDone?: (body: any) => void; onCancel?: () => void } | null,
+    ): void;
+    /** Closes the dialog and discards its in-progress state. */
+    close(): void;
 }
 
 /**
@@ -470,10 +585,17 @@ interface Window {
         /** Endpoint the owners panel queries, with its own query string already applied. */
         ownersUrl?: string;
     };
-    krtHerkunft?: unknown;
-    krtMaterialRelease?: unknown;
-    krtMaterialRequest?: unknown;
-    krtRefineryYield?: unknown;
+    krtHerkunft?: KrtHerkunftApi;
+    krtMaterialRelease?: KrtMaterialDialogApi;
+    krtMaterialRequest?: KrtMaterialDialogApi;
+    /**
+     * Declared required, not optional: both refinery-order page modules call
+     * `krtRefineryYield.init(...)` unguarded at parse time, and the templates
+     * load `refinery-yield-badge.js` ahead of them. A refinery form rendered
+     * without that script is already broken — the type should not push an
+     * optional-chaining obligation onto every call site to hide it.
+     */
+    krtRefineryYield: KrtRefineryYieldApi;
     krtOpenEditCrewModal?: (...args: any[]) => void;
     krtOperationsReload?: (...args: any[]) => void;
     krtRefreshOrdersQueue?: (...args: any[]) => void;
