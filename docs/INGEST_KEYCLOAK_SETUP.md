@@ -198,12 +198,36 @@ Equivalent realm-export keys: `"revokeRefreshToken": false` (see
 
 Do **not** proceed to step 6 until both checks pass.
 
-1. **Extractor token:** run the device flow against `basetool-sc-extractor` (or use the
-   extractor's send action once #645 ships), then decode the access token (jwt.io / `jq`)
-   and confirm `aud` contains `basetool-backend`.
-2. **Frontend token:** log into the frontend normally, capture its access token (server log
-   at debug, or a fresh login in staging), decode it, and confirm `aud` contains
-   `basetool-backend`.
+> **The mechanism itself no longer needs proving here.** Since #1247 the E2E realm stamps
+> `aud=basetool-backend` on its `basetool-frontend` client and the E2E backend runs with
+> `IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend`, so every e2e-labelled PR re-proves that a
+> stamped mapper plus an armed validator accepts real Keycloak tokens. What no CI run can tell you
+> is whether the **deployed** realm stamps the claim — that, and only that, is what this step
+> checks. Note the E2E stack covers the backend only; the gateway is not part of it, so
+> `IRI_INGEST_EXPECTED_AUDIENCES` has unit coverage alone.
+
+**5a — Config check (preferred; handles no live token).** In the Admin Console, for **both**
+`basetool-frontend` and `basetool-sc-extractor`: *Clients → \<client\> → Client scopes* must list
+`extractor-ingest` as a **Default** scope, and *Client scopes → extractor-ingest → Mappers* must
+contain an `oidc-audience-mapper` with `Included Custom Audience = basetool-backend` and *Add to
+access token* ON. Both clients showing that is the condition step 6 depends on. The committed
+[`realm-config.reference.json`](keycloak/realm-config.reference.json) records this shape, but it
+is a sanitized snapshot (2026-06-18), **not** live state — read it from the running realm.
+
+**5b — Token check (confirmation).** Obtain an access token per client (device flow for the
+extractor; a normal frontend login for the browser token) and decode the payload **locally**:
+
+```bash
+P=$(cut -d. -f2 <<<"$TOKEN" | tr '_-' '/+'); while (( ${#P} % 4 )); do P+='='; done; base64 -d <<<"$P" | jq .aud
+```
+
+(The `while` loop restores the base64 padding Keycloak strips; without it `base64 -d` reports
+`invalid input`. Expected output: an array containing `basetool-backend`.)
+
+> ⚠️ **Never paste a live access token into jwt.io or any other online decoder.** It is a bearer
+> credential: whoever holds it is the user until it expires. Decode it locally, and treat any token
+> that has been pasted into a third-party page as compromised. (This runbook previously suggested
+> jwt.io — it should not have.)
 
 If either token is missing the claim, fix the mapper/scope assignment (steps 2–3) and
 re-verify. Enabling step 4's validator while either token lacks the claim is the documented
@@ -218,11 +242,13 @@ Only after step 5 passes on **both** tokens:
 IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend
 ```
 
-This sets `app.security.jwt.expected-audiences`, which the backend's already-present
-`@ConditionalOnProperty` decoder (`SecurityConfig.audienceValidatingJwtDecoder` /
-`audienceValidator`) activates — layering an `aud` check on top of the existing signature /
-issuer / expiry validation. Restart the backend. Smoke-test: the frontend still works
+This sets `app.security.jwt.expected-audiences`, which activates the backend's already-present
+`SecurityConfig#resourceServerJwtDecoder` (a `@ConditionalOnExpression` bean, shared with the
+`jwk-set-uri` knob) and its `audienceValidator` — layering an `aud` check on top of the existing
+signature / issuer / expiry validation. Restart the backend. Smoke-test: the frontend still works
 (pages load, writes succeed) **and** an extractor ingest call still reaches the backend.
+
+Rollback is instant and needs no release: blank the variable (or delete the line) and restart.
 
 ## Step 7 — Client-identity gate (REQ-INGEST-011)
 
@@ -312,6 +338,21 @@ IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest
 
 > **Do not point the gateway at `basetool-backend`.** That is the backend's audience and every
 > frontend token carries it — the check would pass for tokens this interface must refuse.
+>
+> ### ⚠️ `AUDIT_ONLY` does NOT cover this variable — set it LAST
+>
+> `IRI_INGEST_CLIENT_AUDIT_ONLY` only softens the three checks in `ClientIdentityProperties` (client
+> id, scope, provenance). **The audience check is a different mechanism**: it lives in the
+> resource server's `JwtDecoder`, so it starts refusing the moment it is set, regardless of
+> audit-only — and it refuses with **`401`**, not the `403` the other gates use. A client will
+> report "you must be signed in" rather than "not approved", which points at the wrong problem.
+>
+> This bit in production on **2026-08-03**: the audience was set alongside the audit-only
+> variables, so it was live while the rollout was believed to be observe-only.
+>
+> Therefore: leave `IRI_INGEST_EXPECTED_AUDIENCES` **empty** until 7c has completed its audit-only
+> pass and enforcement is on, then set it as the final step and re-test a real send immediately. If
+> sends start failing with 401, this variable is the first thing to clear.
 
 ### 7b — Use the exclusive scope for the scope check
 
@@ -336,7 +377,9 @@ Setting it to `extractor-ingest` would look configured and enforce nothing.
 IRI_INGEST_ALLOWED_CLIENT_IDS=basetool-sc-extractor
 # NOTE: the exclusive scope from 7a, NOT the shared `extractor-ingest`.
 IRI_INGEST_REQUIRED_SCOPE=extractor-ingest-only
-IRI_INGEST_ALLOWED_TOOLS=basetool-sc-extractor
+# BOTH spellings: the extractor emits the slug on the refinery path but the display
+# name on the blueprint path. Only the slug = every blueprint send 403s (2026-08-03).
+IRI_INGEST_ALLOWED_TOOLS=basetool-sc-extractor,Basetool SC Extractor
 IRI_INGEST_CLIENT_AUDIT_ONLY=true
 ```
 
@@ -354,21 +397,51 @@ Only when both hold, set `IRI_INGEST_CLIENT_AUDIT_ONLY=false` and restart. The
 > possible without downtime: ship the new extractor with a new id, run both, drop the old id once the
 > per-`client_id` counter shows no traffic on it.
 
-## Step 8 — DPoP (REQ-INGEST-012) — BLOCKED on the extractor
+## Step 8 — DPoP: bind the REFRESH token only (REQ-INGEST-012)
 
-Keycloak has supported DPoP as a non-preview feature since 26.4, and the gateway validates DPoP-bound
-tokens already. **`IRI_INGEST_DPOP_REQUIRED` must stay `false`** until the desktop
-extractor sends DPoP proofs — it sends `Authorization: Bearer` today, so enabling this breaks every
-send on deploy. Validation of a presented DPoP token is active regardless, so there is nothing to
-enable for the migration to begin.
+DPoP protects the credential the extractor writes to disk — its **refresh token**. Access tokens
+stay plain bearer, because the gateway relays them onward to the backend and a sender-constrained
+token cannot survive that second hop (the reasoning is in `REQ-INGEST-012`; getting this wrong broke
+every blueprint send on 2026-08-03).
 
-Two things are worth doing on the Keycloak side **now**, independently of the extractor:
+Since Keycloak 26.4 DPoP needs **no feature flag** and **no per-client switch** to work — it binds
+whenever a client sends a proof. What you configure here is that it binds the refresh token *only*.
 
-- **Do not grant `offline_access`** to `basetool-sc-extractor`, so no long-lived offline token can be
-  minted for a client whose token is persisted on a user machine.
-- **Shorten the client session / access-token lifespans** for that client (Client → Advanced). This
-  is a *per-client* override and therefore free of the problem that forced realm-wide refresh-token
-  rotation off in step 4 — it does not touch the frontend BFF.
+### 8a — Client policy with the DPoP bind enforcer
+
+The refresh-only behaviour lives in a **client policy executor**, not on the client. Realm settings
+→ **Client policies**:
+
+1. **Profiles** → create a profile (e.g. `extractor-dpop`) and add the executor
+   **`dpop-bind-enforcer`**.
+2. In the executor configuration set **`allow-only-refresh-token-binding` = On**. Leave
+   `auto-configure` and `enforce-authorization-code-binding-to-dpop` off unless you have a reason.
+3. **Policies** → create a policy that applies that profile, with a condition scoping it to the
+   client `basetool-sc-extractor` (a `client-access-type` / client-id condition).
+
+> Verified against the Keycloak 26.7 image
+> (`DPoPBindEnforcerExecutor$Configuration`: `auto-configure`,
+> `enforce-authorization-code-binding-to-dpop`, `allow-only-refresh-token-binding`). The per-client
+> **"Require DPoP bound tokens"** switch under *Settings → Capability config* (attribute
+> `dpop.bound.access.tokens`) is the **enforcement** switch — leave it **off**: it would demand
+> DPoP on the access token, which is exactly what must not happen here.
+
+### 8b — Verify
+
+Send once from the extractor, then decode the access token it received:
+
+- `cnf` must be **absent** — the access token is a plain bearer.
+- `token_type` must be `Bearer`, not `DPoP`.
+
+If `cnf.jkt` appears, access-token binding is on: the gateway logs a `WARN` naming exactly that, and
+the backend will refuse the relayed token. Turn `allow-only-refresh-token-binding` back on.
+
+### 8c — Two numbers that bite
+
+Keycloak allows a proof lifetime of **10 seconds** and a clock skew of **15 seconds** (`DPoPUtil`). A
+machine whose clock drifts beyond that fails authentication with no obvious cause — the extractor
+detects and names this case, but if you see unexplained auth failures on one machine, check its clock
+first.
 
 ## Rollback
 

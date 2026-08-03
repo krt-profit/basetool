@@ -26,6 +26,15 @@ The throwaway **test** realm used by the Playwright e2e suite lives elsewhere, a
 and is deliberately different (10 h test token lifetimes, synthetic users, `directAccessGrants`
 on for ROPC test logins). Do not cross-contaminate the two.
 
+> **One thing the two realms deliberately agree on: the `basetool-backend` audience.** The e2e
+> realm's `basetool-frontend` client carries an `aud-basetool-backend` audience mapper with the
+> same config as the prod `extractor-ingest` scope's mapper — access token only, never the ID
+> token — because the e2e backend runs with `app.security.jwt.expected-audiences` **enabled**
+> (audit L-1, REQ-SEC-024). It sits directly on the client rather than on a client scope only
+> because the e2e realm declares no `clientScopes` at all; the emitted claim is identical. Changing
+> the mapper here breaks every e2e test with a 401 — `E2eAudienceEnforcementParityTest` fails first
+> with an explanation.
+
 ## Provenance & sanitization
 
 `realm-config.reference.json` was derived from a masked Admin-Console export of the prod realm

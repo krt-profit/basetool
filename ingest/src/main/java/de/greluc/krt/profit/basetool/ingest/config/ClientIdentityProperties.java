@@ -110,17 +110,4 @@ public class ClientIdentityProperties {
    * scrape interval, and flip this off once it stays at zero.
    */
   private boolean auditOnly = false;
-
-  /**
-   * When {@code true}, an ingest caller must present a DPoP-bound token (RFC 9449) — a plain {@code
-   * Authorization: Bearer} request is rejected. Default {@code false}, which accepts both schemes.
-   *
-   * <p>The default must stay {@code false} until the desktop extractor ships DPoP support: it sends
-   * {@code Authorization: Bearer} today, so enabling this would break every send on deploy. Spring
-   * Security validates a DPoP-bound token whenever one is presented regardless of this flag, so the
-   * dual-mode window costs nothing — the flag only decides whether a plain bearer is still
-   * <em>allowed</em>, i.e. it is the switch that closes the downgrade path once the client
-   * population has migrated.
-   */
-  private boolean dpopRequired = false;
 }

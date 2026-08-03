@@ -206,12 +206,38 @@ public final class MetricNames {
   public static final String REASON_BAD_PROVENANCE = "bad_provenance";
 
   /**
-   * Client-identity reject reason: a plain {@code Authorization: Bearer} request arrived while
-   * {@code app.ingest.client-identity.dpop-required} is enabled (RFC 9449, REQ-INGEST-012). During
-   * the dual-mode migration this counter is the measure of how much of the client population has
-   * not yet moved to DPoP-bound tokens.
+   * Counter {@code basetool_ingest_auth_failures_total} — tag {@code reason}, the RFC 6750 bearer
+   * error code the resource server raised ({@link #AUTH_INVALID_TOKEN} / {@link
+   * #AUTH_INVALID_REQUEST} / {@link #AUTH_INSUFFICIENT_SCOPE} / {@link #AUTH_OTHER}).
+   *
+   * <p>Exists because a {@code 401} was previously undiagnosable. It is logged at {@code DEBUG}
+   * with nothing but the exception class — deliberately, since this is the only internet-facing
+   * surface and an anonymous scanner would otherwise flood the log — so in production a legitimate
+   * operator chasing a failing client had no signal at all. That cost real time on 2026-08-03: a
+   * client reporting "you must sign in" could have meant a malformed header, a bad signature, a
+   * wrong issuer, an expired token or a missing audience, and nothing distinguished them.
+   *
+   * <p>The tag is the error <b>code</b>, never the description: Spring's description embeds the
+   * decode failure verbatim ("An error occurred while attempting to decode the Jwt: …") and can
+   * therefore quote parts of the presented token, which must never reach an appender or a label
+   * (REQ-OBS-004). The code set is fixed by RFC 6750, so the label stays bounded (REQ-OBS-011).
    */
-  public static final String REASON_DPOP_REQUIRED = "dpop_required";
+  public static final String INGEST_AUTH_FAILURES = "basetool.ingest.auth.failures";
+
+  /**
+   * Bearer error: the token was rejected — malformed header, bad signature, wrong issuer, expired,
+   * or a failed audience check. By far the widest bucket, and the one an operator hits first.
+   */
+  public static final String AUTH_INVALID_TOKEN = "invalid_token";
+
+  /** Bearer error: the request itself was malformed (e.g. two authentication schemes). */
+  public static final String AUTH_INVALID_REQUEST = "invalid_request";
+
+  /** Bearer error: the token is valid but lacks a required scope. */
+  public static final String AUTH_INSUFFICIENT_SCOPE = "insufficient_scope";
+
+  /** Bearer error: anything the resource server raised without an RFC 6750 code. */
+  public static final String AUTH_OTHER = "other";
 
   /**
    * Error code: the caller authenticated successfully but its <em>client software</em> is not
