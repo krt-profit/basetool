@@ -157,6 +157,26 @@ Both generators also **assert** the document's load-bearing parts (title, `beare
 expected paths and request/response schemas) before writing, so a controller that silently stops
 being scanned fails the build instead of quietly shrinking the committed spec.
 
+Regeneration MUST also be **reproducible**: the same tree must produce the same bytes, so a
+`openapi.json` diff always means a real API change. The one thing that broke this was
+accessor-derived schema properties. springdoc harvests bean accessors, and a Jakarta `@AssertTrue`
+cross-field guard looks exactly like a boolean getter — so `InventoryItemCreateDto` published
+`catalogReferenceValid`, `missionFreeForGameItem` and `qualityConsistentWithCatalog`, and the two
+bank request records published `splitConfigConsistent`. Accessors are harvested in
+`Class#getDeclaredMethods()` order, which the JVM does not guarantee (declared *fields* are stable in
+practice, methods are not), so those properties permuted between JVM runs and `./gradlew check`
+rewrote the 1.8 MB document on a tree with no API change at all — measured 2026-08-03: the ordering
+changed in 16 of 24 consecutive commits touching the file, and four regenerations from one tree gave
+three different orderings. Such churn is corrosive precisely because this document is a meaningful
+signal: it is never hand-edited, it must track the controllers, and the PR template gates on it.
+
+**Therefore: a validation guard or any other derived accessor that is not part of the payload MUST
+carry `@Schema(hidden = true)`.** It documents a field no client may send, and it is the only part of
+the document whose order is unstable. `OpenApiDerivedPropertyTest` enforces this from both ends —
+every `@AssertTrue` method on a type published under `components.schemas` must be hidden, and the
+committed document must contain no such property. Prefer `@Schema(hidden = true)` over `@JsonIgnore`
+here: it removes the property from the document without touching Jackson or Bean Validation.
+
 ### REQ-API-008 — Shared controller boilerplate (argument resolvers & response helpers)
 
 Cross-cutting controller boilerplate is factored into `backend/.../web` rather than re-hand-rolled
