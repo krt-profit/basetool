@@ -660,11 +660,13 @@ random()*COALESCE_MS` — so peers that all received the same `changed` frame wi
 not fire their fragment refetches in one synchronized spike, #1125), and a dropped-then-reconnected
 socket triggers a one-shot resync of every visible section to recover signals missed while offline.
 
-**Multi-instance via Redis pub/sub (ADR-0094).** The `changed` relay fans out across frontend
-replicas through the shared Redis channel described in REQ-FE-015 (local-relay first, so a Redis
-outage degrades to single-instance behaviour, never worse). The **presence dots remain
-per-instance** — an accepted, follow-up-tracked limitation: viewers on different replicas may see
-different editing-awareness dots, while change propagation itself is replica-correct.
+**Multi-instance via Redis pub/sub (ADR-0094, ADR-0126).** The `changed` relay fans out across
+frontend replicas through the shared Redis channel described in REQ-FE-015 (local-relay first, so a
+Redis outage degrades to single-instance behaviour, never worse). Since #1237 the **presence dots
+fan out too**, on a second channel and as full per-origin snapshots rather than deltas: a peer's
+dots appear immediately on a focus/blur and within one 10 s gossip tick otherwise, and a replica
+that goes silent stops contributing dots after 30 s. Losing Redis drops presence back to exactly
+the earlier per-instance behaviour — never worse — because the local broadcast still happens first.
 
 **Backpressure & registry consistency (#1109 Wave 6).** Every socket is wrapped in a
 `ConcurrentWebSocketSessionDecorator` at registration (send-time + buffer-size bounded, TERMINATE on
@@ -999,6 +1001,10 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `orgunit-bank` (global)  | orgUnitBank, orgUnitBankSettings                                                                                              | no            | member-or-above (the `/org-unit-bank` page gate, local check)                                         |
 | `materialboard` (global) | board, requests                                                                                                               | no            | authenticated                                                                                         |
 | `inventory` (global)     | stock                                                                                                                         | no            | authenticated (every viewer re-fetches its own owner/org-unit-scoped view)                            |
+| `missions` (global list) | list                                                                                                                          | no            | authenticated (the `/missions` list gate; each viewer re-pulls its own scoped, guest-redacted page)   |
+| `refinery` (global)      | queue                                                                                                                         | no            | authenticated (the `/refinery-orders` list gate; the `onlyMine` filter is applied per viewer)         |
+| `members` (global)       | roster                                                                                                                        | no            | `ROLE_ADMIN` (local check — the `/members` class-level page gate)                                     |
+| `org-structure` (global) | units, forms, chart                                                                                                           | no            | authenticated (the Organigramm is member-visible; the admin sections stay protected per fragment)     |
 
 The `inventory` room is the squadron Lager (#1307/#1309): a single opaque `stock` section stands for
 "the inventory changed". **All** inventory views subscribe and re-pull their own fragment on a peer's
@@ -1029,6 +1035,59 @@ pokes `inventory`/`stock` — the existing seam, so Lager viewers see the fresh 
 seam-map change — and refreshes + broadcasts the order room's own `item-stock` section, because the
 book-in auto-earmark changes the Item-Bestand panel (REQ-ORDERS-028); the panel's delivered toggle
 likewise broadcasts `item-stock` on success.
+
+The four **Phase-3 rooms** (#1235) close ADR-0094's tracked coverage gap; all four are global rooms
+whose receivers re-fetch the viewer's *own* filter and page:
+
+- **`missions`** — the `/missions` list. One opaque `list` key: a mission create, core edit
+  (name / status / planned start) or delete re-renders every open list. Participants, units, crew and
+  the party lead do **not** publish here — they do not surface on the list and ride the per-mission
+  `mission:{id}` room. Distinct class from `mission:{id}` despite the shared wire stem; the
+  `order`/`orders` disambiguation rule applies unchanged.
+- **`refinery`** — the `/refinery-orders` list. One opaque `queue` key covering create, edit, store
+  ("Einlagern") and cancel. Storing additionally cross-publishes `inventory`/`stock`, because the
+  refined output is written into the shared Lager and an open Lager would otherwise sit stale.
+  **Known gap:** the refinery *detail* page (`/refinery-orders/{id}`) publishes but does not
+  receive. It is still a classic form-post surface — its save/store/cancel navigate away rather
+  than swapping a fragment, and it exposes no `?fragment=` seam to re-render — so two users editing
+  the *same* order still do not see each other's change in place; they are protected by the
+  optimistic-lock 409, not by live sync. Closing it needs the page converted to the REQ-FE-001
+  fragment-swap standard first, which is a separate change from this rollout; it would then take a
+  scoped `refinery:{id}` room alongside the global queue.
+- **`members`** — the `/members` Mitgliederverwaltung roster, the surface #1235 calls *Rollen*. One
+  opaque `roster` key covering a member edit (rank, display name, Staffel membership and its
+  LOGISTICIAN / MISSION_MANAGER flags), a delete and the manual Keycloak sync. It is the only
+  Phase-3 room with a role gate, matching the page's own ADMIN restriction.
+- **`org-structure`** — shared by the admin Organisationsstruktur editor (`units` = the unit +
+  parent-edge table, `forms` = its create forms, whose Bereich/OL pickers go stale when a peer adds
+  one) and the member-visible Organigramm (`chart`). One room because both render the same
+  hierarchy: an admin's parent-edge change refreshes a peer's chart, and an org-chart position edit
+  refreshes the editor. Subscribe is authenticated-only *by design* — gating the room on ADMIN would
+  cut members off from their own chart; the admin-only fragments stay protected per-fragment, and a
+  receiver silently skips a key whose container its page does not have. Because the two pages each
+  render only part of the whitelist, their seam maps are parity-checked as **subsets** whose
+  **union** must equal the registry whitelist — the union check is what catches an orphaned key no
+  page renders. Each page pokes the other's key through a named constant that the same test pins
+  against the registry.
+
+The **publish side differs per room** and follows one rule: publish from the client when the acting
+page stays open, server-side when it does not. `org-structure` broadcasts from the client
+(`admin-org-structure.js` / `org-chart.js` — both surfaces are XHR-only and stay put, so the origin
+session is excluded and the actor does not re-fetch its own change). `missions`, `refinery` and
+`members` publish **server-side** through `LiveSyncLocalBus`: every one of their mutations navigates
+away (a redirect, or an AJAX `targetUrl` the page immediately follows) or happens on a different page
+than the list it invalidates (`/members/{id}/edit`), so a client broadcast would race the socket
+teardown — and the server call site covers the no-JS form-POST fallback with the same line. A publish
+sits only on the success path: a refused backend write must not make peers re-fetch a change that
+never happened.
+
+Rolling `org-structure` onto the admin editor also retired that page's `window.location.reload()`
+(REQ-FE-001): it now re-renders through `?fragment=units` / `?fragment=forms`. Both create forms and
+every parent select live inside those swapped fragments, so their handlers moved to `document`
+delegation — a direct `addEventListener` would be lost on the first swap, the silent breakage the
+reload previously hid. The `forms` receiver carries an extra busy test: the generic guard only holds
+back a *focused* container, but an admin can type a name, tab away and still have unsaved input, so
+any non-empty create input defers the section behind the "updates available" pill instead.
 
 The standalone order **material-collection** page (`/orders/{id}/material-collection`) joins the same
 `order:{id}` room in its own right (#1309): its per-row delivered toggle and owner/location moves
@@ -1083,7 +1142,8 @@ bounded re-fetch rate, never data loss.
 
 **Pill, coalescing and resync follow REQ-FE-010 unchanged**, with one sizing addition (5000
 accounts / ≥200 concurrent, ADR-0094): detail-topic receivers keep the 400 ms jittered coalesce
-window; **global-room receivers (`orders`, `bank`, `orgunit-bank`) use 1500 ms** so a change seen by
+window; **every global-room receiver (`orders`, `bank`, `orgunit-bank`, `materialboard`, `inventory`,
+`missions`, `refinery`, `members`, `org-structure`) uses 1500 ms** so a change seen by
 up to ~200 viewers spreads its fragment re-fetch herd instead of spiking. Peer-driven re-fetches
 always preserve the **peer's own** query state (filters, paging, view toggles — the page-URL getter
 is late-bound per viewer); only the acting client's own refresh may deliberately reset paging.
@@ -1094,6 +1154,24 @@ consume. A Redis outage therefore degrades to single-instance behaviour — neve
 delivery stays best-effort (reconnect triggers a per-topic resync; REQ-FE-013's per-container
 sequence guard orders the resulting swaps). The backend notification SSE fan-out follows the same
 pattern on `basetool:notify:published` (REQ-NOTIF-006 polling stays the correctness guarantee).
+
+**Editor-presence dots cross replicas on their own channel** (`basetool:livesync:presence`; #1237,
+ADR-0126) — today that is the `mission:{id}` room, the only presence-enabled class. Presence is
+*state*, not a signal, so it is mirrored differently from `changed`: each instance publishes its
+**complete** snapshot for a topic — `{v, topic, origin, sections:{key:[{userId, displayName}]}}` —
+on every local presence change **and** re-gossips it on each 10 s reaper tick, and a receiver
+replaces that `(topic, origin)` partition wholesale. Full snapshots instead of deltas are what make
+the mirror converge with no delete frames, acknowledgements or ordering assumptions; an empty
+`sections` map is a real message that drops the partition at once. Freshness is judged by
+**arrival**, never by the publisher's clock: a partition expires after 30 s (three missed gossips),
+so a replica that crashed or was scaled away stops contributing dots within half a minute. The
+local half stays authoritative — 120 s heartbeat TTL, `focus`/`blur`, per-topic section cap
+unchanged — the merged snapshot collapses a user present on two replicas to one dot, and consume
+never re-publishes. Same degradation rule as above: with Redis down, presence falls back to exactly
+per-instance dots, because the local broadcast happens before the publish. Consumed payloads are
+re-validated (presence-enabled class only, section-key shape, ≤16 origins per topic, ≤32 editors per
+section) rather than trusted. The browser wire format is unchanged — a peer's dots simply appear in
+the same `presence` frame — so no client change was needed.
 
 **Acceptance**
 
@@ -1106,8 +1184,19 @@ pattern on `basetool:notify:published` (REQ-NOTIF-006 polling stays the correctn
   authorized, redaction-applied fragment GET with fresh `data-version` attributes.
 - [ ] With Redis stopped, same-instance peers keep syncing; with two instances and Redis up, a
   change on instance A reaches a viewer on instance B.
+- [ ] With two instances and Redis up, two editors of the same mission served by **different**
+  replicas see each other's presence dots; a replica killed mid-edit stops contributing dots within
+  30 s; with Redis stopped, each instance still shows its own editors' dots.
 - [ ] A section key added to a page seam map without the registry row (or vice versa) fails
   `:frontend:test`.
+- [ ] Every surface REQ-FE-010 covers is on a room: no shared-state page is left reloading on
+  success or leaving peers stale. The Phase-3 four (`missions`, `refinery`, `members`,
+  `org-structure`) were the last gap and are closed (#1235).
+- [ ] Storing a refinery order refreshes a peer's open Lager, not just the refinery queue.
+- [ ] An admin's parent-edge change on `/admin/org-structure` refreshes a *member's* open
+  `/org-chart`, and an org-chart position edit refreshes another admin's open editor.
+- [ ] A backend write that failed publishes nothing — peers do not re-fetch for a change that
+  never happened.
 
 **Enforced by:** `LiveSyncWebSocketHandlerTest` (topic parsing, cross-room isolation, per-topic
 whitelists, publish-without-subscription, per-session rate limit, topic cap, close cleanup, plus the
@@ -1116,16 +1205,27 @@ throttle across publishers, idle-bucket reaping) ·
 `LiveSyncTopicTest` + `LiveSyncSectionMapParityTest` (topic-class parsing/exhaustiveness + seam-map
 parity) · `LiveSyncSubscriptionAuthorizerTest` (per-topic allow/deny/fail-open incl.
 requester-refused queue + bank dual-auth matrix) · `RedisLiveSyncFanoutTest` +
-`RedisLiveSyncFanoutIntegrationTest` (publish-once, origin skip, Redis-down degradation) ·
+`RedisLiveSyncFanoutIntegrationTest` (publish-once, origin skip, Redis-down degradation, plus the
+presence channel: snapshot serialisation, channel-based dispatch, empty-snapshot forwarding,
+separate error series) · `LiveSyncPresenceServiceTest` (the ADR-0126 mirror: local+remote merge,
+one-dot collapse, wholesale replace, no-change-on-re-gossip, origin/editor caps, partition expiry) ·
 `OperationLiveSyncE2eTest` / `JobOrderQueueLiveSyncE2eTest` / `BankRequestsLiveSyncE2eTest` /
-`MissionOrganisationLiveSyncE2eTest` (one two-context e2e per page family) · **Code:**
+`MissionOrganisationLiveSyncE2eTest` / `InventorySharedLagerLiveSyncE2eTest` (one two-context e2e per
+page family) · `MissionListLiveSyncPublishTest` + `RefineryOrderLiveSyncPublishTest` +
+`MemberManagementControllerTest.RosterLiveSyncPublishTests` (the server-side publish fires on success
+and **only** on success) · `AdminOrgStructurePageControllerMvcTest` (the `units` / `forms` fragment
+seams render their own section and nothing else) · **Code:**
 `LiveSyncWebSocketHandler`, `LiveSyncTopicClass`, `LiveSyncSubscriptionAuthorizer`,
-`LiveSyncLocalBus`, `RedisLiveSyncFanout`, `krt-live-sync.js`, the per-page seam maps
+`LiveSyncLocalBus`, `RedisLiveSyncFanout`, `LiveSyncPresenceService` (local + mirrored halves),
+`LiveSyncProperties` (`app.livesync.redis.presence-channel`), `krt-live-sync.js`, the per-page seam
+maps
 (`MISSION_SECTIONS`, `OPERATION_SECTIONS`, `ORDER_SECTIONS`, orders-queue seam, bank
 `BANK_ACCOUNT_SECTIONS` / `ORGUNIT_ACCOUNT_SECTIONS` / `BANK_STAFF_SECTIONS` /
 `ORGUNIT_BANK_SECTIONS`, materialboard — two section keys: `board` (Angebote) and `requests`
 (Gesuche, REQ-MARKET-018), broadcast by `materialboerse.js` / `materialgesuch-modal.js`, pinned by
-`LiveSyncSectionMapParityTest`) · **ADR:** ADR-0094 · **Issues:** #1102, #1115, #1120
+`LiveSyncSectionMapParityTest`; Phase-3: `MISSIONS_SECTIONS`, `REFINERY_SECTIONS`,
+`MEMBERS_SECTIONS`, `ORG_STRUCTURE_SECTIONS` + `ORG_CHART_SECTIONS`) ·
+**ADR:** ADR-0094, ADR-0126 · **Issues:** #1102, #1115, #1120, #1237, #1235
 
 ### REQ-FE-016 — Catalog pickers (material / game item / location) are searchable comboboxes
 
@@ -1378,7 +1478,7 @@ Convert them when opting a file in.
 > **Config:** `frontend/tsconfig.json` (`allowJs` + `noEmit` + `moduleDetection: legacy`),
 > `frontend/build.gradle.kts` (`generateApiTypes`, `typecheckJs`) · **Code:**
 > `frontend/types/globals.d.ts`, `frontend/types/thymeleaf-bootstrap.d.ts`,
-> `frontend/types/dto.d.ts`, the 28 files carrying `// @ts-check` · **ADR:** ADR-0125 ·
+> `frontend/types/dto.d.ts`, the 29 files carrying `// @ts-check` · **ADR:** ADR-0125 ·
 > **Issues:** —
 
 ## Out of scope
@@ -1392,8 +1492,8 @@ Convert them when opting a file in.
   explicitly rejected in ADR-0012.
 - Live-collaboration features beyond the section-refresh sync of REQ-FE-010/-015
   (operational-transform text co-editing, server-pushed conflict resolution). Cross-replica fan-out
-  via Redis pub/sub moved **in scope** with REQ-FE-015 / ADR-0094; cross-replica **presence dots**
-  remain out of scope (tracked follow-up).
+  via Redis pub/sub moved **in scope** with REQ-FE-015 / ADR-0094, and cross-replica **presence
+  dots** followed in #1237 / ADR-0126.
 - Backend business-logic changes beyond adding JSON proxy endpoints that reuse existing backend
   APIs/DTOs.
 

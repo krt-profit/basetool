@@ -167,6 +167,11 @@ app:
     redis:
       enabled: ${APP_LIVESYNC_REDIS_ENABLED:true}
       channel: ${APP_LIVESYNC_REDIS_CHANNEL:basetool:livesync:changed}
+      # Second channel for the editor-presence gossip (ADR-0126): each instance publishes its own
+      # complete presence snapshot per actively-edited topic, peers mirror it and merge it into the
+      # dots they render. Separate from the changed channel so the consume side can tell the two
+      # payload formats apart and the periodic gossip never masks the changed relay in the metrics.
+      presence-channel: ${APP_LIVESYNC_REDIS_PRESENCE_CHANNEL:basetool:livesync:presence}
   session:
     # Two-tier session idle timeout (REQ-SEC-025, ADR-0088). Every NEW session starts with the short
     # ANONYMOUS window; a successful login promotes it to the long AUTHENTICATED window (in

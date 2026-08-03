@@ -844,6 +844,12 @@ groups:
       # single-instance dev. Sustained publish errors mean the Redis channel is unreachable from a
       # replica (Redis down, ACL/network drift) — check Redis and the basetool:livesync:changed /
       # basetool:notify:published channels (the default user needs `&*` for PUBLISH/SUBSCRIBE).
+      # The op="publish" selector is deliberate and load-bearing: since #1237/ADR-0126 the frontend
+      # also gossips editor-presence snapshots on a THIRD channel (basetool:livesync:presence),
+      # whose failures count under op="presence_publish"/"presence_consume". Those stay OUT of this
+      # expression on purpose — a lost changed frame leaves a peer acting on stale data, a lost
+      # presence gossip costs a cosmetic dot. Presence errors are visible on the `07` Redis fan-out
+      # panel instead. If presence ever stops being cosmetic, widen the selector here, not the tag.
       - alert: LiveSyncRedisFanoutBroken
         expr: sum(rate(basetool_livesync_redis_errors_total{op="publish"}[5m])) > 0 or sum(rate(basetool_sse_redis_errors_total{op="publish"}[5m])) > 0
         for: 10m

@@ -2111,7 +2111,7 @@
       },
       "type": "timeseries",
       "title": "Redis fan-out pub/sub & errors/hour",
-      "description": "Cross-replica Redis fan-out for live delivery (ADR-0094): the live-sync changed-relay (basetool_livesync_redis_*) and the notification SSE fan-out (basetool_sse_redis_*). Publishing is fire-and-forget after the local relay, so a rising `errors` stream means cross-replica delivery is silently degraded to single-instance — watched by the LiveSyncRedisFanoutBroken alert.",
+      "description": "Cross-replica Redis fan-out for live delivery (ADR-0094/ADR-0126): the live-sync changed-relay (basetool_livesync_redis_*), the editor-presence gossip (basetool_livesync_presence_*) and the notification SSE fan-out (basetool_sse_redis_*). Publishing is fire-and-forget after the local relay/broadcast, so a rising `errors` stream means cross-replica delivery is silently degraded to single-instance — watched by the LiveSyncRedisFanoutBroken alert, which covers the changed relay and the SSE fan-out only (a lost changed frame costs correctness; a lost presence gossip costs a cosmetic dot, so it is a panel row, not a page). Note the presence rows are a PERIODIC gossip — one message per actively-edited topic per 10 s per replica — so a steady non-zero floor is normal there and a flat zero simply means nobody has a mission panel focused.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2188,6 +2188,42 @@
           "expr": "sum(rate(basetool_sse_redis_errors_total[1h])) * 3600",
           "refId": "F",
           "legendFormat": "notification errors",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(basetool_livesync_presence_published_total[1h])) * 3600",
+          "refId": "G",
+          "legendFormat": "presence gossiped",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(basetool_livesync_presence_consumed_total[1h])) * 3600",
+          "refId": "H",
+          "legendFormat": "presence mirrored",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(basetool_livesync_redis_errors_total{op=~\"presence_.*\"}[1h])) * 3600",
+          "refId": "I",
+          "legendFormat": "presence errors",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(basetool_livesync_presence_remote_partitions)",
+          "refId": "J",
+          "legendFormat": "mirrored partitions (gauge)",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -2483,6 +2519,55 @@
           "expr": "sum by (topic_class) (basetool_livesync_peer_rooms)",
           "refId": "A",
           "legendFormat": "{{topic_class}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 168
+      },
+      "type": "timeseries",
+      "title": "Ingest auth failures/hour by bearer error",
+      "description": "Every ingest 401 under its RFC 6750 bearer error code. The 401 itself logs at DEBUG only (scanner-flood protection on the public surface), so this is the sole signal an operator has when a client fails to authenticate. invalid_token covers malformed header, bad signature, wrong issuer, expired AND failed audience - check the gateway config before assuming the client is at fault. Deliberately not alerted: unauthenticated probes are constant noise.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (reason) (rate(basetool_ingest_auth_failures_total[1h])) * 3600",
+          "refId": "A",
+          "legendFormat": "{{reason}}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"

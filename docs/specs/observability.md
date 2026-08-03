@@ -979,8 +979,10 @@ transaction per pass) rather than per-scrape.
   degrades cross-replica push). These emit only where the fan-out is enabled (prod); a sustained
   `publish` error stream drives the `LiveSyncRedisFanoutBroken` alert (below).
 
-**Frontend.** `basetool_mission_presence_missions` gauge (missions with a live editor; single-JVM
-edit-awareness, unlabelled), `basetool_active_sessions` gauge (active Spring Session sessions;
+**Frontend.** `basetool_mission_presence_missions` gauge (missions with a live editor tracked in
+**this JVM** — it deliberately stayed local-only when presence became cross-instance in #1237, so
+summing it across replicas still answers "who is editing here"; unlabelled),
+`basetool_active_sessions` gauge (active Spring Session sessions;
 `@Profile("!test")`, maintained by `ActiveSessionsTracker` from Spring Session create/delete/expire
 events and seeded once at startup from the Redis session namespace — it MUST NOT sample the
 Redis-backed `SpringSessionBackedSessionRegistry`, whose `getAllPrincipals()` throws and left the
@@ -1014,9 +1016,10 @@ symptom of a section-key skew is one panel going stale while the rest of the pag
 which an all-rejected-only counter would never see. The rejected key is client-supplied and therefore
 never becomes a tag value; it appears once, sanitised, in the `DEBUG` line (REQ-OBS-001) —
 the component that shipped the REQ-FE-010 staleness defect. Since #1102 (REQ-FE-015 / ADR-0094) both
-counters carry a bounded `topic_class` label (one of the nine `LiveSyncTopicClass` labels: `mission`,
-`operation`, `order_detail`, `orders_queue`, `bank_account`, `bank_staff`, `orgunit_bank`,
-`materialboard`, `inventory_all`), and
+counters carry a bounded `topic_class` label (one of the thirteen `LiveSyncTopicClass` labels:
+`mission`, `operation`, `order_detail`, `orders_queue`, `bank_account`, `bank_staff`, `orgunit_bank`,
+`materialboard`, `inventory_all`, and — since #1235 — `missions_list`, `refinery_queue`,
+`members_roster`, `org_structure`), and
 the meter names stay put — a rename would break the `07` panels and this alert set.
 
 Both drop signals are **alerted** since #1238, on a threshold measured rather than guessed: read on
@@ -1052,6 +1055,14 @@ subscribers, the honest denominator for panel 39 (`07` panel 47). It is panel-on
 own production baseline, and on the measured co-presence rates only `mission` looks likely to ever
 carry enough traffic to support such a rule.
 
+The four Phase-3 rooms added in #1235 (`missions_list`, `refinery_queue`, `members_roster`,
+`org_structure`) join the same two rules automatically — both aggregate by `topic_class` rather than
+enumerating it, so no rule or panel edit was needed. They carry **no baseline yet**: the 21-day read
+above predates them, so their series start empty exactly as every other class did, and the
+zero-based `LiveSyncRelayDropsSustained` threshold applies unchanged. The known low-traffic gap
+applies to them too, and most sharply to `members_roster` and `org_structure` — admin-only surfaces
+where co-presence is rare, so panel 29 stays the backstop for a section-key skew there.
+
 The tool-wide live-sync relay adds five more meters: `basetool_livesync_subscriptions{topic_class}`
 (open `/ws/sync` subscriptions per topic class — the live per-surface load denominator),
 `basetool_livesync_subscribe_total{topic_class,outcome,reason}` (`outcome` = `allowed` / `denied`,
@@ -1083,7 +1094,19 @@ the same `07` "Presence relay drops/hour" panel), and the cross-replica fan-out 
 `basetool_livesync_redis_published_total{topic_class}` / `basetool_livesync_redis_consumed_total{topic_class}`
 (`changed` signals published to / consumed from the `basetool:livesync:changed` Redis channel;
 own-origin excluded) plus `basetool_livesync_redis_errors_total{op}` (`publish` / `consume`, a
-swallowed fan-out failure that degrades only cross-replica delivery). Together with the backend
+swallowed fan-out failure that degrades only cross-replica delivery). The cross-replica
+**editor-presence** gossip (#1237, ADR-0126) keeps its own series rather than sharing those:
+`basetool_livesync_presence_published_total{topic_class}` /
+`basetool_livesync_presence_consumed_total{topic_class}` and the unlabelled gauge
+`basetool_livesync_presence_remote_partitions` (live `(topic, peer instance)` partitions mirrored
+here — the direct "is cross-instance presence arriving" signal; a flat zero is correct on a
+single-replica deployment, and a zero on a multi-replica one while several replicas report
+`basetool_mission_presence_missions > 0` means the gossip is not landing). Separate names because
+the gossip is *periodic* while the changed relay is *event-driven*: folded together, the steady
+gossip floor would swamp the changed-relay rate the fan-out panel exists to show. Gossip failures
+count under `op=presence_publish` / `presence_consume` on the shared errors counter and are
+deliberately **outside** the `LiveSyncRedisFanoutBroken` expression — a lost `changed` publish costs
+correctness, a lost gossip costs a cosmetic dot. Together with the backend
 `basetool_sse_redis_*` counters above, a sustained `publish`-error stream on either fan-out drives the
 `LiveSyncRedisFanoutBroken` alert (both fire only where the Redis fan-out is enabled, i.e. prod). All labels are fixed literals, pure counts. The `frontend-sse-pool` and
 `frontend-pool` Reactor-Netty connection pools additionally export `reactor.netty.connection.provider.*`
@@ -1179,6 +1202,19 @@ has its own `IngestStagingUnavailable` alert — REQ-INGEST-003), and
 with the backend counter, the `application` common tag separating the modules) — paired since #1041
 item 19 with `basetool_ratelimit_requests_total{bucket}` on the per-IP filter and the per-subject
 limiter, feeding the same `RateLimitRejectionRatioHigh` ratio alert.
+`basetool_ingest_auth_failures_total{reason}` counts every `401` under its RFC 6750 bearer error
+code (`invalid_token` / `invalid_request` / `insufficient_scope`, anything else collapsing to
+`other`). It exists because a `401` was otherwise **undiagnosable in production**: it is logged at
+`DEBUG` with nothing but the exception class — deliberately, since this is the only internet-facing
+surface and an anonymous scanner would flood the log at any higher level — so an operator chasing a
+failing client had no signal whatsoever. On 2026-08-03 a client reporting "you must sign in" could
+equally have meant a malformed header, a bad signature, a wrong issuer, an expired token or a failed
+audience check, and nothing separated them. The tag is the error **code**, never the description:
+Spring embeds the decode failure verbatim there and it can quote parts of the presented token, which
+must never reach an appender or a label (REQ-OBS-004). **Deliberately not alerted** — unauthenticated
+probes against a public surface are constant background noise, so a threshold here would be a pager
+generator; it is a dashboard panel you consult when a specific client is failing, the same treatment
+`basetool_bot_blocked_total` gets.
 `basetool_ingest_client_total{client_id}` and `basetool_ingest_client_rejected_total{reason}`
 (REQ-INGEST-011) cover the client-identity gate: the first answers "which software is actually
 driving the gateway", which no other signal carried — the handoff counter is tagged by draft kind and

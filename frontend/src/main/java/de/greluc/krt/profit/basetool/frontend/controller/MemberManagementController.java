@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.MemberEditForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -91,6 +92,18 @@ public class MemberManagementController {
 
   private final BackendApiClient backendApiClient;
   private final MessageSource messageSource;
+
+  /**
+   * Server-side live-sync publish seam (REQ-FE-015, ADR-0094, #1235). A member edit, delete or
+   * manual Keycloak sync pokes the ADMIN-gated global {@code members} room from here rather than
+   * from the client: the edit happens on a <em>different page</em> ({@code /members/&#123;id&#125;
+   * /edit}) than the roster it invalidates, and both the classic redirect handlers and the no-JS
+   * fallback have no client socket to publish from at that moment.
+   */
+  private final LiveSyncLocalBus liveSyncLocalBus;
+
+  /** The single {@code roster} section of the global {@code members} room a mutation pokes. */
+  private static final List<String> MEMBERS_ROSTER_SECTION = List.of("roster");
 
   /**
    * Renders the member list, optionally filtered by free-text search and paginated.
@@ -352,6 +365,8 @@ public class MemberManagementController {
     }
     try {
       applyMemberUpdate(id, form);
+      // #1235: rank / display name / Staffel membership all render on the /members roster.
+      liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
       if ("profile".equals(form.source())) {
         return "redirect:/profile";
@@ -414,6 +429,8 @@ public class MemberManagementController {
     }
     try {
       applyMemberUpdate(id, form);
+      // #1235: mirrors the classic twin above — the roster row changed.
+      liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       Map<String, Object> body = new LinkedHashMap<>();
       body.put("version", currentUserVersion(id, form.version()));
       return ResponseEntity.ok(body);
@@ -548,6 +565,7 @@ public class MemberManagementController {
   public String deleteMember(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.delete("/api/v1/users/" + id, Void.class);
+      liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.user.delete");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "deleteMember", id, e);
@@ -576,6 +594,7 @@ public class MemberManagementController {
   public ResponseEntity<Object> deleteMemberAjax(@PathVariable @NotNull UUID id) {
     try {
       backendApiClient.delete("/api/v1/users/" + id, Void.class);
+      liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       return ResponseEntity.ok(Map.of());
     } catch (BackendServiceException e) {
       return relayBackendError("AJAX member delete failed", e);
@@ -604,6 +623,8 @@ public class MemberManagementController {
       UserSyncResultDto result =
           backendApiClient.post("/api/v1/users/sync", null, UserSyncResultDto.class);
       int syncedCount = result != null ? result.syncedCount() : 0;
+      // #1235: a reconcile can add, remove or re-rank rows across the whole roster.
+      liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       return ResponseEntity.ok(Map.of("syncedCount", syncedCount));
     } catch (BackendServiceException e) {
       return relayBackendError("AJAX member sync failed", e);

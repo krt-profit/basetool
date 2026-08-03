@@ -485,9 +485,12 @@ x-backend: &backend-template
     SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
     KEYCLOAK_ISSUER_URI: https://keycloak.profit-base.online/realms/iri
-    # JWT audience enforcement (security review, audit L-1). Empty by default so dev / e2e stay off
-    # (those realms do not stamp aud). Set IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend in the prod
-    # .env — together with IRI_INGEST_EXPECTED_AUDIENCES — ONLY after confirming the realm stamps
+    # JWT audience enforcement (security review, audit L-1). Empty by default, so a stack whose realm
+    # does not stamp aud — a hand-rolled local test realm — stays off. The E2E suite is the exception
+    # and runs ENFORCED: its realm stamps aud=basetool-backend and E2eStackExtension sets this var,
+    # so the enforced code path is exercised on every e2e-labelled PR. Set
+    # IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend in the prod .env — together with
+    # IRI_INGEST_EXPECTED_AUDIENCES — ONLY after confirming the DEPLOYED realm stamps
     # aud=basetool-backend on frontend tokens (the `extractor-ingest` default client scope does).
     # Enabling it before that rejects every token and breaks the app; set the var back to empty to
     # disable instantly.
@@ -848,7 +851,9 @@ x-ingest: &ingest-template
     REDIS_HOST: redis
     REDIS_PORT: 6379
     REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
-    # JWT audience enforcement (security review). Empty by default so dev / e2e stay off. Enforce in
+    # JWT audience enforcement (security review). Empty by default. Unlike the backend, the gateway
+    # is NOT part of the E2E stack (E2eStackExtension brings up no ingest service), so its enforced
+    # path has unit coverage only — SecurityConfigTest — and no end-to-end rehearsal. Enforce in
     # prod by setting IRI_INGEST_EXPECTED_AUDIENCES=basetool-backend — together with the backend's
     # IRI_BACKEND_EXPECTED_AUDIENCES — ONLY after the realm stamps aud=basetool-backend on both the
     # extractor and frontend tokens (#641, docs/INGEST_KEYCLOAK_SETUP.md); enabling it earlier rejects
@@ -871,11 +876,12 @@ x-ingest: &ingest-template
     # AND carries include.in.token.scope=false), so setting it here would reject every caller
     # including the real extractor — use `extractor-ingest-only` (runbook step 7a).
     APP_INGEST_CLIENT_IDENTITY_REQUIRED_SCOPE: ${IRI_INGEST_REQUIRED_SCOPE:-}
+    # Accepted payload `tool` provenance. BOTH extractor spellings are required: it emits
+    # `basetool-sc-extractor` on the refinery path but the display name `Basetool SC Extractor` on
+    # the blueprint path, so listing only the slug rejects every blueprint send (incident
+    # 2026-08-03). The comparison folds case; these two differ structurally.
     APP_INGEST_CLIENT_IDENTITY_ALLOWED_TOOLS: ${IRI_INGEST_ALLOWED_TOOLS:-}
     APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY: ${IRI_INGEST_CLIENT_AUDIT_ONLY:-false}
-    # MUST stay false until the desktop extractor sends DPoP proofs — it sends Authorization: Bearer
-    # today, so enabling this breaks every send on deploy (REQ-INGEST-012).
-    APP_INGEST_CLIENT_IDENTITY_DPOP_REQUIRED: ${IRI_INGEST_DPOP_REQUIRED:-false}
     # Monitoring plane (epic #936, REQ-OBS-005/-009) — see the backend template for the full
     # rationale. Everything defaults OFF/empty so dev/test/e2e stay inert; the prod .env supplies the
     # real scrape credentials and enables tracing. Only the prod service joins net-monitoring-scrape.
@@ -919,9 +925,11 @@ services:
     # restricted `monitoring` user; `--requirepass` below is kept only as redundant belt-and-braces.
     # A missing/empty ACL file makes redis exit at startup, which the deploy health-gate turns into a
     # clean rollback rather than a silent breakage. Untouched for redis-dev.
-    # ADR-0094: the live-sync + notification fan-outs PUBLISH/SUBSCRIBE on the pub/sub channels
-    # `basetool:livesync:changed` (frontend) and `basetool:notify:published` (backend). The `default`
-    # user's `&*` grant (above) already covers these; the restricted `monitoring` user must NOT gain
+    # ADR-0094 / ADR-0126: the live-sync + notification fan-outs PUBLISH/SUBSCRIBE on the pub/sub
+    # channels `basetool:livesync:changed` (frontend), `basetool:livesync:presence` (frontend,
+    # cross-instance editor-presence gossip, #1237) and `basetool:notify:published` (backend). The
+    # `default` user's `&*` grant (above) already covers all three — a new channel needs no ACL
+    # change as long as that grant stays a wildcard; the restricted `monitoring` user must NOT gain
     # `&*`. Pub/sub adds no keys, so the 384mb noeviction budget (ADR-0079) is unaffected.
     command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --loglevel notice --aclfile /etc/redis/users.acl --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
     # A service-level `volumes:` replaces the merged template value, so the data volume is re-listed

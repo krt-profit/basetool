@@ -18,11 +18,11 @@ Three properties of the codebase, all measured rather than assumed:
 
 |                                            |                              |
 |--------------------------------------------|------------------------------|
-| Hand-written JS                            | 40 023 lines in 87 files     |
+| Hand-written JS                            | 40 982 lines in 89 files     |
 | Still inline in Thymeleaf templates        | ~2 245 lines in 58 templates |
 | `<script th:src>` tags                     | 106                          |
 | JS build step today                        | none                         |
-| Files under `// @ts-check`                 | 28 of 87                     |
+| Files under `// @ts-check`                 | 29 of 89                     |
 | Backend DTO schemas available from OpenAPI | 253                          |
 
 The blocking constraint is **ADR-0069**. The static scripts are classic non-module `<script>` tags
@@ -82,7 +82,7 @@ migration cost is discovered per file, and every fix survives into the TypeScrip
   `inventory-admin.js` declaring the same eight script-scope names — was fixed with ADR-0125 by
   prefixing the admin module's copies, but until both files are checked, nothing stops a third
   page module from reintroducing it.
-- **Exit criteria:** all 87 files carry `// @ts-check`; `checkJs` flipped to `true` globally and the
+- **Exit criteria:** all 89 files carry `// @ts-check`; `checkJs` flipped to `true` globally and the
   per-file comments removed; gate green.
 
 ### Phase 2 — Eliminate the inline template JavaScript
@@ -159,11 +159,11 @@ the later numbers real.
 
 | Phase |               Scope               |                 Rough effort                  |                    Risk                     |
 |-------|-----------------------------------|-----------------------------------------------|---------------------------------------------|
-| 1     | 59 files to `@ts-check` green     | Large, but incremental and shippable per file | Low                                         |
+| 1     | 60 files to `@ts-check` green     | Large, but incremental and shippable per file | Low                                         |
 | 2     | ~2 245 inline lines, 58 templates | Large                                         | Medium — behaviour-preserving extraction    |
 | 3     | Strictness ratchet                | Medium                                        | Low                                         |
 | 4     | Build step                        | Medium                                        | **High** — first change to asset production |
-| 5     | 87 files `.js` → `.ts`            | Large but mechanical                          | Low once Phase 4 holds                      |
+| 5     | 89 files `.js` → `.ts`            | Large but mechanical                          | Low once Phase 4 holds                      |
 | 6     | Modules                           | Medium                                        | **High** — script-ordering semantics        |
 
 Phases 1–3 are worth doing on their own merits and improve the codebase whether or not the
