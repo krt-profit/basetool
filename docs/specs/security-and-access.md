@@ -981,13 +981,21 @@ from masquerading as an application outage (the failure mode that drove the fron
 - [ ] Optional `aud` enforcement (audit L-1) is available on both resource servers via
   `app.security.jwt.expected-audiences` (wired to `IRI_BACKEND_EXPECTED_AUDIENCES` /
   `IRI_INGEST_EXPECTED_AUDIENCES`), sharing the same `resourceServerJwtDecoder` bean. It is **empty
-  by default** (off) so dev / e2e realms — which do not stamp the audience — are unaffected;
-  enabling it in prod requires the realm to stamp `aud=basetool-backend` (the `extractor-ingest`
+  by default** (off) so a stack whose realm does not stamp the audience is unaffected; enabling it
+  in prod requires the deployed realm to stamp `aud=basetool-backend` (the `extractor-ingest`
   default client scope), or every token is rejected.
+- [x] The **backend's** enforced path is exercised end to end, not only in prod: the E2E realm's
+  `basetool-frontend` client carries an `aud-basetool-backend` audience mapper (access token only,
+  mirroring the prod scope's mapper) and `E2eStackExtension` arms the stack with
+  `IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend`, so every e2e-labelled PR runs the whole suite
+  through the audience validator against real Keycloak-minted tokens. `E2eAudienceEnforcementParityTest`
+  pins the enforced constant to the realm's mapper so the two cannot drift into a suite-wide 401.
+  The **ingest gateway** is not part of the E2E stack and keeps unit coverage only.
 
 **Enforced by (both resource servers):** backend `SecurityConfig#resourceServerJwtDecoder` +
 `KeycloakTrustSupport` + `IdentityProviderUnavailableFilter` (tests:
 `IdentityProviderUnavailableFilterTest`, `SecurityConfigInternalJwksDecoderTest`) ·
+`SecurityConfigAudienceValidatorTest` + `E2eAudienceEnforcementParityTest` (the `aud` knob) ·
 `BasetoolErrorController` (503 problem mapping) · the **ingest gateway's** own package-local
 `KeycloakTrustSupport` / `IdentityProviderUnavailableFilter` + matching tests (it cannot depend on
 backend classes across the module boundary, so the pattern is duplicated) · `application-prod.yml`

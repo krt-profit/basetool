@@ -104,6 +104,35 @@ class ProvenanceGuardTest {
   }
 
   @Test
+  void shouldAcceptBothSpellingsTheExtractorActuallyEmits() {
+    // The 2026-08-03 incident: the extractor emits a DIFFERENT producer string per export path —
+    // the slug on the refinery path, the display name on the blueprint path. The allowlist named
+    // only the slug, so every blueprint send was refused with 403 while refinery sends worked.
+    ProvenanceGuard guard = guard(List.of(APPROVED_TOOL, "Basetool SC Extractor"), false);
+
+    assertThatCode(
+            () -> {
+              guard.requireApprovedTool(new Provenance(APPROVED_TOOL, "2.7.0", 1));
+              guard.requireApprovedTool(new Provenance("Basetool SC Extractor", "2.7.0", 1));
+            })
+        .doesNotThrowAnyException();
+    assertThat(rejected()).isZero();
+  }
+
+  @Test
+  void shouldCompareTheProducerIgnoringCase() {
+    // Defence against the adjacent failure: a later release merely re-casing its constant would
+    // otherwise take the ingest path down again. The two real spellings differ structurally, so
+    // case folding alone would not have prevented the incident — it removes the next one.
+    assertThatCode(
+            () ->
+                guard(List.of(APPROVED_TOOL), false)
+                    .requireApprovedTool(new Provenance("Basetool-SC-Extractor", "2.7.0", 1)))
+        .doesNotThrowAnyException();
+    assertThat(rejected()).isZero();
+  }
+
+  @Test
   void shouldRejectAnUnknownProducer() {
     assertThatThrownBy(
             () ->

@@ -4,23 +4,35 @@
 
 ### Added
 
+- **Blueprint-Import: Munition aus einem deutschen Star-Citizen-Client wird jetzt direkt erkannt.** Ein deutscher Client schreibt „(30 Schuss)" statt „(30 cap)"; solche Namen mussten bisher beim ersten Import einmal von Hand zugeordnet werden — rund 13 Stück. Die Zuordnungen sind jetzt vorbelegt. Wer sie bereits selbst zugeordnet hat, behält seine Zuordnung (#1485).
+
 - **Zwei neue Alarme für die Live-Aktualisierung.** Verwirft die Verteilung eine Änderung, sehen die anderen Betrachter unbemerkt einen veralteten Stand — ohne Fehlermeldung auf beiden Seiten. `LiveSyncRelayDropsSustained` schlägt bei anhaltenden Verlusten je Oberfläche an, `LiveSyncSectionKeySkew` beim Senden eines Bereichsschlüssels, den die Verteilung nicht kennt. Beide Schwellen stammen aus 21 Tagen gemessenem Produktivbetrieb (REQ-OBS-011).
 
 - **Neue Kennzahl `basetool_livesync_peer_rooms` samt Panel im Betriebs-Dashboard.** Sie zeigt je Oberfläche, in wie vielen Räumen mehrere Personen gleichzeitig sind. Ohne sie ist ein Ausbleiben von Aktualisierungen nicht davon zu unterscheiden, dass schlicht niemand gemeinsam bearbeitet hat.
-
-### Fixed
-
-- **Die Formatierungsprüfung des Frontends schlug auf Windows-Arbeitsplätzen grundlos fehl.** Für TypeScript-Deklarationsdateien fehlte die Zeilenenden-Regel, sodass ein frischer Checkout unter Windows drei Dateien mit CRLF anlegte und Prettier sie beanstandete, obwohl niemand sie angefasst hatte — auf dem Linux-Server blieb der Fehler unsichtbar. `.gitattributes` deckt jetzt auch `*.ts` ab; die Dateiinhalte bleiben unverändert (ADR-0125).
-
-### Added
 
 - **Blueprint-Import: Munition aus einem deutschen Star-Citizen-Client wird jetzt direkt erkannt.** Ein deutscher Client schreibt „(30 Schuss)" statt „(30 cap)"; solche Namen mussten bisher beim ersten Import einmal von Hand zugeordnet werden — rund 13 Stück. Die Zuordnungen sind jetzt vorbelegt. Wer sie bereits selbst zugeordnet hat, behält seine Zuordnung (#1485).
 
 ### Changed
 
+- **Sicherheit: Die JWT-Audience-Prüfung des Backends läuft jetzt in jedem E2E-Durchlauf scharf.** Bisher war sie nirgends aktiv — die Produktion wäre der erste Ort gewesen, an dem der Prüfpfad überhaupt ausgeführt wird, und dort weist eine fehlende `aud` jede Anmeldung ab. Der E2E-Realm schreibt die Audience jetzt in seine Tokens, der E2E-Stack prüft sie, und ein Paritätstest verhindert, dass beides auseinanderläuft (Audit L-1, REQ-SEC-024). In Produktion bleibt die Prüfung unverändert aus.
+
+- **Ingest-Gateway: DPoP schützt jetzt den dauerhaft gespeicherten Refresh-Token statt des Access-Tokens.** Die ursprüngliche Variante konnte nicht funktionieren: das Gateway reicht das Token an das Backend weiter, und ein schlüsselgebundenes Token übersteht diesen zweiten Schritt nicht — es hätte den Schutz genau dort verloren, wo er greifen soll. Für Nutzer ändert sich nichts (REQ-INGEST-012).
+
+- **Sicherheit: Die JWT-Audience-Prüfung des Backends läuft jetzt in jedem E2E-Durchlauf scharf.** Bisher war sie nirgends aktiv — die Produktion wäre der erste Ort gewesen, an dem der Prüfpfad überhaupt ausgeführt wird, und dort weist eine fehlende `aud` jede Anmeldung ab. Der E2E-Realm schreibt die Audience jetzt in seine Tokens, der E2E-Stack prüft sie, und ein Paritätstest verhindert, dass beides auseinanderläuft (Audit L-1, REQ-SEC-024). In Produktion bleibt die Prüfung unverändert aus.
+
+- **Die Bearbeitungs-Anzeige auf der Missionsseite gilt jetzt über alle Serverinstanzen hinweg.** Der Hinweis „wird gerade bearbeitet von“ erschien bisher nur, wenn beide Bearbeiter zufällig von derselben Instanz bedient wurden; bei mehreren Instanzen fehlte er, obwohl die Änderungen selbst korrekt ankamen. Die Anzeige wird jetzt zwischen den Instanzen abgeglichen — fällt Redis aus, verhält sie sich wie bisher instanzlokal (ADR-0126, neuer Kanal `basetool:livesync:presence`, einstellbar über `APP_LIVESYNC_REDIS_PRESENCE_CHANNEL`).
+
 - **Betriebsmittel des Servers nach einer Messwoche neu zugeschnitten.** Die Datenbanken waren für einen Datenbestand ausgelegt, den es nicht gibt: 2 GB Speicherlimit und ein 512 MB großer Puffer für eine 108 MB kleine Datenbank. Beide Datenbank-Container und ihre Postgres-Einstellungen sind jetzt an den gemessenen Bedarf angepasst — das gibt 768 MB frei, ohne dass irgendwo weniger zur Verfügung steht als benötigt (ADR-0085, #937).
 
 - **Vier Dienste dürfen jetzt kurzzeitig mehr Rechenleistung ziehen.** Die Weboberfläche stand pro Woche rund 25 Minuten still, weil ihre Obergrenze kurze Lastspitzen abschnitt — bei einem Server, der im Mittel zu 3 % ausgelastet ist. Betroffen waren Weboberfläche, Ingest-Gateway, Sitzungsspeicher und der vorgelagerte Webserver; spürbar wird das als geringere Wartezeit beim Seitenaufbau (#937).
+
+### Fixed
+
+- **Ingest-Gateway: Blueprint-Versand aus dem Extractor schlug fehl.** Der Extractor schreibt je Export-Pfad eine andere Herkunftsangabe; die Freigabeliste kannte nur eine davon, wodurch jeder Blueprint-Versand mit „nicht freigegeben" abgewiesen wurde. Beide Schreibweisen sind jetzt dokumentiert, und der Vergleich ignoriert Groß-/Kleinschreibung.
+
+- **Ingest-Gateway: Eine Ablehnung nennt jetzt die Ursache.** Alle vier Prüfungen antworteten mit demselben Satz, sodass aus der Meldung nicht hervorging, welche gegriffen hat. Zusätzlich wird jede abgelehnte Anmeldung nach Fehlerart gezählt — ein 401 war bisher im Betrieb nicht auswertbar.
+
+- **Die Formatierungsprüfung des Frontends schlug auf Windows-Arbeitsplätzen grundlos fehl.** Für TypeScript-Deklarationsdateien fehlte die Zeilenenden-Regel, sodass ein frischer Checkout unter Windows drei Dateien mit CRLF anlegte und Prettier sie beanstandete, obwohl niemand sie angefasst hatte — auf dem Linux-Server blieb der Fehler unsichtbar. `.gitattributes` deckt jetzt auch `*.ts` ab; die Dateiinhalte bleiben unverändert (ADR-0125).
 
 ## [v1.5.30](https://github.com/krt-profit/basetool/releases/tag/v1.5.30) - 2026-08-03
 

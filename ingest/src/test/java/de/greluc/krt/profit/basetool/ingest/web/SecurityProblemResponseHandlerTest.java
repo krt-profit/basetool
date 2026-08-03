@@ -85,6 +85,49 @@ class SecurityProblemResponseHandlerTest {
   }
 
   @Test
+  void unauthenticatedRequestIsCountedUnderItsBoundedBearerErrorCode() throws Exception {
+    // A 401 was undiagnosable: it logs at DEBUG (invisible in prod, by design) and nothing else
+    // distinguished "malformed header" from "bad signature / wrong issuer / expired / failed
+    // audience". That cost real time on 2026-08-03, when a client reporting "you must sign in"
+    // could have meant any of them.
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    handler.commence(request(), response, new InvalidBearerTokenException("expired"));
+
+    assertThat(authFailureCount(MetricNames.AUTH_INVALID_TOKEN)).isEqualTo(1.0d);
+  }
+
+  @Test
+  void aNonOauthAuthenticationFailureCollapsesToTheBoundedOtherLiteral() throws Exception {
+    // The label must never be derived from an arbitrary exception: outside the fixed RFC 6750 set
+    // it collapses to `other`, so the series stays bounded (REQ-OBS-011).
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    handler.commence(
+        request(),
+        response,
+        new org.springframework.security.authentication.BadCredentialsException("nope"));
+
+    assertThat(authFailureCount(MetricNames.AUTH_OTHER)).isEqualTo(1.0d);
+    assertThat(authFailureCount(MetricNames.AUTH_INVALID_TOKEN)).isZero();
+  }
+
+  /**
+   * Reads the bounded auth-failure counter for one reason.
+   *
+   * @param reason the bounded {@code MetricNames.AUTH_*} tag value
+   * @return the counter value, or {@code 0.0} when the series does not exist
+   */
+  private double authFailureCount(String reason) {
+    var counter =
+        meterRegistry
+            .find(MetricNames.INGEST_AUTH_FAILURES)
+            .tag(MetricNames.TAG_REASON, reason)
+            .counter();
+    return counter == null ? 0.0 : counter.count();
+  }
+
+  @Test
   void unauthenticatedRequestKeepsTheBearerChallenge() throws Exception {
     // RFC 6750: the extractor's OAuth client reads WWW-Authenticate to tell "refresh the token"
     // from "you are not allowed". Writing our own body must not cost that header.
