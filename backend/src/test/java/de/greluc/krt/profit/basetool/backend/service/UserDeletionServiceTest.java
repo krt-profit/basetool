@@ -222,8 +222,8 @@ class UserDeletionServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
     when(keycloakService.userExists(userId)).thenReturn(true);
-    when(keycloakService.serviceAccountUserId("basetool-ingest-gateway"))
-        .thenReturn(Optional.of(userId));
+    when(keycloakService.usernameOf(userId))
+        .thenReturn(Optional.of("service-account-basetool-ingest-gateway"));
 
     userDeletionService.deleteUser(userId);
 
@@ -232,17 +232,35 @@ class UserDeletionServiceTest {
 
   @Test
   void deleteUser_stillRefusesAMemberWhoseNameMerelyLooksLikeAServiceAccount() {
-    // The exemption is keyed on the client's own service-account link, never on the username.
-    // Measured against Keycloak 26.7: creating an ordinary user called
-    // `service-account-basetool-ingest-gateway` succeeds (201), so the prefix is a display
-    // convention rather than a reserved namespace. Matching it would let a hand-made account
-    // inherit a machine's exemption and be hard-deleted while it is still a live member.
+    // The exemption is keyed on the name KEYCLOAK reports for that id, matched against the exact
+    // name a configured client's service account must have. Measured against Keycloak 26.7:
+    // `service-account-foo` can be created when no client `foo` exists (201), so the prefix alone
+    // proves nothing; the name of an EXISTING service account is refused (409), so the exact name
+    // of a configured client cannot be held by a hand-made account.
     ingestGatewayProperties.setClientIds(List.of("basetool-ingest-gateway"));
+    // The LOCAL mirror says service-account-…; Keycloak, asked by id, says otherwise. The name is
+    // read from Keycloak precisely so a stale or edited local value cannot stand in for it.
     user.setUsername("service-account-basetool-ingest-gateway");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(keycloakService.userExists(userId)).thenReturn(true);
-    when(keycloakService.serviceAccountUserId("basetool-ingest-gateway"))
-        .thenReturn(Optional.of(UUID.randomUUID()));
+    when(keycloakService.usernameOf(userId)).thenReturn(Optional.of("Redshift"));
+
+    assertThrows(IllegalStateException.class, () -> userDeletionService.deleteUser(userId));
+
+    verify(userRepository, never()).delete(any());
+  }
+
+  @Test
+  void deleteUser_refusesCleanlyWhenTheServiceAccountCheckItselfFails() {
+    // The regression this closes: the first cut asked Keycloak's CLIENTS endpoint, production
+    // answered 403 (the backend's admin client manages users, it does not inspect clients), and
+    // that exception escaped as an unexpected 500 on the deletion. A check that cannot establish
+    // its answer must refuse, not explode.
+    ingestGatewayProperties.setClientIds(List.of("basetool-ingest-gateway"));
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(keycloakService.userExists(userId)).thenReturn(true);
+    when(keycloakService.usernameOf(userId))
+        .thenThrow(new ResourceAccessException("keycloak admin call refused"));
 
     assertThrows(IllegalStateException.class, () -> userDeletionService.deleteUser(userId));
 

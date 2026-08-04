@@ -49,6 +49,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientException;
 
 /**
  * Hard-deletes an {@code app_user} row together with every foreign-key reference that points at it,
@@ -69,6 +70,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Slf4j
 public class UserDeletionService {
+
+  /** Keycloak's generated username for a client's service account: {@code service-account-<id>}. */
+  private static final String SERVICE_ACCOUNT_PREFIX = "service-account-";
 
   private final IngestGatewayProperties ingestGatewayProperties;
   private final UserRepository userRepository;
@@ -386,11 +390,23 @@ public class UserDeletionService {
    *     gateway client
    */
   private boolean isConfiguredGatewayServiceAccount(UUID userId) {
+    Optional<String> username;
+    try {
+      username = keycloakService.usernameOf(userId);
+    } catch (RestClientException unreachable) {
+      // Cannot establish it, so do not claim it. The guard then refuses with its ordinary message
+      // instead of this method's failure escaping as an unexpected 500 — which is exactly what the
+      // first cut did when the clients endpoint answered 403.
+      log.warn("Could not determine whether the row is a gateway service account; refusing");
+      return false;
+    }
     boolean isMachine =
-        ingestGatewayProperties.getClientIds().stream()
-            .map(keycloakService::serviceAccountUserId)
-            .flatMap(Optional::stream)
-            .anyMatch(userId::equals);
+        username
+            .filter(
+                name ->
+                    ingestGatewayProperties.getClientIds().stream()
+                        .anyMatch(clientId -> name.equals(SERVICE_ACCOUNT_PREFIX + clientId)))
+            .isPresent();
     if (isMachine) {
       // WARN, not DEBUG: deleting a row the application swears it never creates is worth a line in
       // the log, and this path should fire once per environment and then never again.
