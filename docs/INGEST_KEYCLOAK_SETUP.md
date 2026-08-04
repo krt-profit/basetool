@@ -536,7 +536,7 @@ docker compose --profile prod up -d --force-recreate ingest backend
    `sum by (outcome) (increase(basetool_ingest_service_account_token_total[15m]))`
    A non-zero `failed` means the secret or the token URI is wrong — check those before anything
    else, because nothing else can work while this fails.
-2. **A real send succeeds.** Run the extractor (v2.8.0 or newer) and send one blueprint export.
+2. **A real send succeeds.** Run the extractor (v2.7.2 or newer) and send one blueprint export.
    Success is the pre-filled basetool page opening.
 3. **The upload is attributed to the member, not the service account.** Open the staged draft in the
    browser and confirm it belongs to the member who sent it. If it belongs to nobody or to the
