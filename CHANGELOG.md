@@ -6,7 +6,9 @@
 
 ### Fixed
 
-- **Das technische Konto des Gateways lässt sich jetzt aus der Mitgliederliste entfernen.** Der Eintrag stand dort als „Nicht in Keycloak", ließ sich aber nicht löschen: die Sicherheitsabfrage vor dem Löschen fand ihn in Keycloak sehr wohl. Für technische Konten gilt sie jetzt nicht mehr — für Mitglieder unverändert.
+- **Das technische Konto des Gateways lässt sich jetzt aus der Mitgliederliste entfernen.** Der Eintrag stand dort als „Nicht in Keycloak", ließ sich aber nicht löschen: die Sicherheitsabfrage vor dem Löschen fand ihn in Keycloak sehr wohl. Für technische Konten gilt sie jetzt nicht mehr — für Mitglieder unverändert. Der erste Anlauf in v1.5.37 endete stattdessen in einem allgemeinen Fehler, weil die Prüfung eine Berechtigung brauchte, die das Basetool in Keycloak nicht hat; sie kommt jetzt ohne aus.
+
+- **Wenn ein Aufruf an Keycloak scheitert, sagt das Basetool das jetzt.** Solche Fehler kamen als „Ein unerwarteter Fehler ist aufgetreten" an — eine Meldung, die weder den betroffenen Dienst nennt noch von einem echten Programmfehler zu unterscheiden ist. Sie werden jetzt als Störung eines fremden Dienstes ausgewiesen.
 
 ## [v1.5.36](https://github.com/krt-profit/basetool/releases/tag/v1.5.36) - 2026-08-04
 

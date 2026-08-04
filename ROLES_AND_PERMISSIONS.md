@@ -163,7 +163,9 @@ convention `cleanup…ForGuest` is structurally enforced by the ArchUnit rule
 > delete guard that normally refuses a row Keycloak still knows exempts the service account of a
 > configured gateway, because for such a row the two Keycloak views disagree by construction — an
 > unfiltered user listing omits service accounts, so the roster sync marks it gone, while a
-> by-id lookup finds it. It grants the gateway exactly one thing —
+> by-id lookup finds it. The exemption is keyed on the name Keycloak reports for that id matching
+> `service-account-<configured clientId>` exactly: usernames are unique per realm, so that name is
+> occupied by the real service account and cannot be held by a hand-made row. It grants the gateway exactly one thing —
 > permission to name a member in `X-Ingest-On-Behalf-Of`, whose *own* authorities then apply for
 > that request. A named authority rather than an empty set on purpose, so a misconfiguration reads
 > as "authenticated as a machine" rather than as "not authenticated".

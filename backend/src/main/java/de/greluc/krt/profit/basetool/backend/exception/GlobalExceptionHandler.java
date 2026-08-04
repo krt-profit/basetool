@@ -58,6 +58,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -979,6 +980,53 @@ public class GlobalExceptionHandler {
             AppExceptionKind.NOT_FOUND.typeSuffix(),
             AppExceptionKind.NOT_FOUND.code());
     return toEntity(pd);
+  }
+
+  // --- upstream HTTP failures ------------------------------------------------------------
+
+  /**
+   * Any failure of an outbound {@code RestClient} / {@code RestTemplate} call, mapped to the same
+   * {@code 502 EXTERNAL_SERVICE_ERROR} an explicit {@link ExternalServiceException} produces.
+   *
+   * <p><strong>Written after one reached a user.</strong> Deleting the ingest gateway's stray
+   * member row called Keycloak's admin API; the backend's admin client is granted user management
+   * but not client inspection, so the call came back {@code 403}. Nothing handled {@link
+   * RestClientException}, so a misconfigured <em>upstream permission</em> surfaced to an admin as
+   * {@code 500 INTERNAL_ERROR} with "an unexpected error occurred" — a message that describes the
+   * one thing it was not. It named neither the dependency nor the cause, and it is
+   * indistinguishable from a genuine bug in this application, which is the wrong place to start
+   * looking.
+   *
+   * <p>{@code 502} rather than {@code 500} because that is what happened: a dependency this
+   * application calls answered badly, or did not answer. That is also true when the upstream status
+   * is a {@code 4xx} — a {@code 401}/{@code 403} from Keycloak means <em>this</em> service
+   * presented unusable credentials or lacks a role, which is a configuration fault on our side of
+   * the boundary, never the caller's, so it must not be relayed as a client error.
+   *
+   * <p>Delegates to {@link #handleAppException} rather than building its own body, so the shape,
+   * the {@code code} and the disclosure policy cannot drift from the explicit path. That policy is
+   * the point here: {@link ErrorDisclosurePolicy#SUPPRESSED} logs the full exception at ERROR with
+   * the correlation id and sends the client only a localized generic detail, so an upstream
+   * response body — which for an identity provider may carry realm names, client ids or token
+   * material — cannot be relayed outward (CWE-209).
+   *
+   * <p>This is a safety net, not a licence. An adapter that knows what its call meant should still
+   * translate the failure itself, with a message worth reading in the log; catching it here only
+   * guarantees that forgetting to do so costs a truthful status rather than a mystery.
+   *
+   * @param ex the failed outbound call — connection, timeout, or any 4xx/5xx from the upstream
+   * @param request servlet request for instance URI + access-log enrichment
+   * @return RFC 7807 problem-detail response with status 502
+   */
+  @ExceptionHandler(RestClientException.class)
+  public ResponseEntity<ProblemDetail> handleRestClientException(
+      RestClientException ex, HttpServletRequest request) {
+    // The message reaches the server log only; SUPPRESSED replaces it for the client. Deliberately
+    // the exception's TYPE and not getMessage(), which for HttpClientErrorException embeds the
+    // upstream response body — that belongs in the logged stack trace, not in a summary line.
+    return handleAppException(
+        new ExternalServiceException("Outbound call failed: " + ex.getClass().getSimpleName(), ex),
+        request);
   }
 
   // --- 500 fallback ---------------------------------------------------------------------
