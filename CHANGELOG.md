@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.34](https://github.com/krt-profit/basetool/releases/tag/v1.5.34) - 2026-08-04
+
 ### Fixed
 
 - **Der Versand aus dem Extractor scheitert nicht mehr an einer falschen Vertrauensstellung.** Das Gateway prüfte das Zertifikat des Anmeldeservers gegen den Truststore des Backends und konnte deshalb gar keine Verbindung aufbauen — sichtbar nur als „An unexpected error occurred.". Es nutzt jetzt die passenden Wurzelzertifikate.
