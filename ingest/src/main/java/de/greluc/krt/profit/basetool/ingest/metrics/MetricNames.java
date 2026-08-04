@@ -175,6 +175,9 @@ public final class MetricNames {
   /** Tag key: the calling client's Keycloak client id, bounded by the configured allowlist. */
   public static final String TAG_CLIENT_ID = "client_id";
 
+  /** Tag: the outcome of an operation; bounded per meter (REQ-OBS-011). */
+  public static final String TAG_OUTCOME = "outcome";
+
   /**
    * Bounded {@code client_id} tag value for a caller whose {@code azp} is not on the allowlist (or
    * absent). Keeps the label set finite while still separating "the known extractor" from
@@ -238,6 +241,27 @@ public final class MetricNames {
 
   /** Bearer error: anything the resource server raised without an RFC 6750 code. */
   public static final String AUTH_OTHER = "other";
+
+  /**
+   * Counter {@code basetool_ingest_service_account_token_total} — tag {@code outcome} ({@link
+   * #SA_TOKEN_MINTED} / {@link #SA_TOKEN_CACHED} / {@link #SA_TOKEN_FAILED}).
+   *
+   * <p>Since ADR-0129 the gateway calls the backend under its OWN identity instead of relaying the
+   * caller's token, so this grant sits on the critical path of every ingest write: if it fails,
+   * nobody can send, and the failure is in a hop no client can see. The cached/minted split also
+   * shows whether the token cache is working — a mint on every request means Keycloak is being asked
+   * for a token per upload.
+   */
+  public static final String INGEST_SERVICE_ACCOUNT_TOKEN = "basetool.ingest.service.account.token";
+
+  /** {@link #INGEST_SERVICE_ACCOUNT_TOKEN} outcome: a fresh token was obtained from Keycloak. */
+  public static final String SA_TOKEN_MINTED = "minted";
+
+  /** {@link #INGEST_SERVICE_ACCOUNT_TOKEN} outcome: the cached token was still good. */
+  public static final String SA_TOKEN_CACHED = "cached";
+
+  /** {@link #INGEST_SERVICE_ACCOUNT_TOKEN} outcome: the grant failed; the ingest write is refused. */
+  public static final String SA_TOKEN_FAILED = "failed";
 
   /**
    * Error code: the caller authenticated successfully but its <em>client software</em> is not
