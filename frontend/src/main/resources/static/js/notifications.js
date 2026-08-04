@@ -107,6 +107,14 @@
                 if (window.krtReauth && window.krtReauth.check(res)) {
                     return null;
                 }
+                // The same for the consent gate, which answers this poll 403 +
+                // X-Terms-Acceptance-Required because csrfRequestInit() marks it as an XHR. Without
+                // this the header is discarded by `res.ok ? … : null` below and the badge simply
+                // freezes at its last value for as long as the gate is closed — no error, no hint
+                // (REQ-SEC-028).
+                if (window.krtTermsGate && window.krtTermsGate.check(res)) {
+                    return null;
+                }
                 return res.ok ? res.json() : null;
             })
             .then(function (data) {
@@ -189,6 +197,9 @@
         fetch('/notifications/recent', csrfRequestInit())
             .then(function (res) {
                 if (window.krtReauth && window.krtReauth.check(res)) {
+                    return [];
+                }
+                if (window.krtTermsGate && window.krtTermsGate.check(res)) {
                     return [];
                 }
                 return res.ok ? res.json() : [];
@@ -389,6 +400,9 @@
         fetch('/notifications/page-items?page=' + page, csrfRequestInit())
             .then(function (res) {
                 if (window.krtReauth && window.krtReauth.check(res)) {
+                    return null;
+                }
+                if (window.krtTermsGate && window.krtTermsGate.check(res)) {
                     return null;
                 }
                 return res.ok ? res.json() : null;
@@ -682,6 +696,29 @@
                 }
                 if (window.krtReauth) {
                     window.krtReauth.redirect(event && event.data ? event.data : null);
+                }
+            });
+            // The consent gate answers a stream that has no accepted Terms of Use with a single
+            // `terms-gate` event naming the consent page, then closes it (REQ-SEC-028). Without this
+            // the stream would just error and reconnect on the jittered timer below — forever, since
+            // consent cannot be given from a background request. Same shape as `reauth`: stop
+            // reconnecting, then navigate.
+            source.addEventListener('terms-gate', function (event) {
+                sseStopped = true;
+                if (sseReconnectTimer !== null) {
+                    window.clearTimeout(sseReconnectTimer);
+                    sseReconnectTimer = null;
+                }
+                try {
+                    source.close();
+                } catch (_error) {
+                    /* already closed */
+                }
+                if (sseSource === source) {
+                    sseSource = null;
+                }
+                if (window.krtTermsGate) {
+                    window.krtTermsGate.redirect(event && event.data ? event.data : null);
                 }
             });
             // #1156: the server retires the OLDEST of this user's streams with a `replaced` event

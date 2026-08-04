@@ -211,15 +211,31 @@
             typeof response.headers.get === 'function'
                 ? response.headers.get('X-Terms-Acceptance-Required')
                 : null;
-        if (!target) {
+        return target ? termsGateRedirect(target) : false;
+    }
+
+    /**
+     * Navigates the window to the consent page, refusing anything that is not a same-origin absolute
+     * path (open-redirect guard, as in reauthRedirect — the value comes from our own server either
+     * way, but a single navigation helper should not depend on that).
+     *
+     * Split out of maybeTermsGate for the SSE handoff: an EventSource can read neither a status nor a
+     * header, so the gate reaches it as a `terms-gate` event and notifications.js has only the URL,
+     * not a Response, to act on.
+     *
+     * @param {string | null | undefined} url the consent-page path the server named
+     * @returns {boolean} true when the browser was sent to the consent page
+     */
+    function termsGateRedirect(url) {
+        if (typeof url !== 'string' || url.charAt(0) !== '/') {
             return false;
         }
-        window.location.assign(target);
+        window.location.assign(url);
         return true;
     }
 
     window.krtReauth = { redirect: reauthRedirect, check: maybeReauthenticate };
-    window.krtTermsGate = { check: maybeTermsGate };
+    window.krtTermsGate = { check: maybeTermsGate, redirect: termsGateRedirect };
 
     // ----------------------------------------------- guest edit token (M1)
 
