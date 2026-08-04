@@ -4,9 +4,13 @@
 
 ### Fixed
 
+- **Ein offener Tab läuft nach einer Änderung der Nutzungsbedingungen nicht mehr endlos ins Leere.** Die Benachrichtigungsverbindung eines Tabs, der beim Wirksamwerden neuer Bedingungen offen war, wurde auf die Zustimmungsseite umgeleitet, scheiterte daran und baute sich sofort neu auf — dauerhaft und unbemerkt. Sie wird jetzt einmal gezielt beendet, und der Tab wechselt auf die Zustimmungsseite (REQ-SEC-028).
+
+- **Die Glocke friert hinter der Zustimmungspflicht nicht mehr stumm ein.** Der Zähler für ungelesene Benachrichtigungen und die Einträge im Aufklappmenü verwarfen die Antwort des Zustimmungs-Gates kommentarlos und zeigten weiter den letzten Stand. Sie leiten jetzt wie jede andere Aktion auf die Zustimmungsseite weiter.
+
 - **P4K-Import (Admin): Die laufende Fortschrittsabfrage erkennt jetzt die Zustimmungsabfrage, statt sie als Erfolg zu lesen.** Wurde während eines Imports eine neue Fassung der Nutzungsbedingungen aktiv, holte die Seite alle 3 Sekunden endlos die Zustimmungsseite, ohne dass sichtbar etwas passierte. Sie wechselt jetzt zur Zustimmungsseite und beendet die Abfrage — wie jede andere Oberfläche (REQ-SEC-028).
 
-- **Benachrichtigungen: Zähler und Glocke führen jetzt zur Zustimmungsseite, statt still leer zu bleiben.** Wurde eine neue Fassung der Nutzungsbedingungen aktiv, während ein Tab offen war, blieb der Zähler auf seinem letzten Stand stehen und die Glocke öffnete sich leer — ohne Hinweis, woran es lag (REQ-SEC-028).
+- **Deutlich weniger Serverlast, solange jemand noch nicht zugestimmt hat.** Das Zwischenergebnis „hat noch nicht zugestimmt" wurde gespeichert, aber nie wiederverwendet, sodass jede einzelne Anfrage einer nicht zugestimmten Sitzung eine zusätzliche Abfrage im Hintergrund auslöste. Es gilt jetzt wie das positive Gegenstück bis zu 60 Sekunden; eine Zustimmung wirkt weiterhin sofort.
 
 - **Deployment: `IRI_MONITORING_ENABLED` wirkt jetzt auch, wenn es in der `.env` steht.** Der Deploy-Dienst liest diese Datei nicht ein, meldete deshalb bei jedem Lauf `IRI_MONITORING_ENABLED != 'true'` und spielte geänderte Monitoring-Konfiguration zwar auf die Platte, lud sie aber nie in das laufende Prometheus — korrigierte Alarmregeln feuerten dadurch weiter in ihrer alten Fassung. Ein explizit gesetzter Wert hat weiterhin Vorrang, und es wird ausschließlich dieser eine Schlüssel gelesen.
 

@@ -91,9 +91,10 @@
      * Two gates can go up mid-session, and both must navigate rather than fail quietly. A poisoned
      * or expired session answers 401 + X-Reauthenticate (REQ-SEC-012). A newly deployed Terms-of-Use
      * wording answers 403 + X-Terms-Acceptance-Required (REQ-SEC-028) — precisely for the tab that
-     * was already open when it deployed, which is when the whole feature first does anything. That
-     * second check was missing: the badge froze at its last value and the dropdown opened empty, on
-     * every tab in that state, with nothing on screen saying why.
+     * was already open when it deployed, which is when the whole feature first does anything. The
+     * consent check used to be missing here, and the symptom was a badge frozen at its last value
+     * and a dropdown that opened empty, with nothing on screen saying why. It lives in one place now
+     * so the three reads cannot drift back apart one at a time.
      *
      * `res.ok` is not the test either. fetch follows redirects transparently, so any
      * redirect-to-HTML answer arrives as a 200 whose body is a whole document — rejecting
@@ -710,6 +711,29 @@
                 }
                 if (window.krtReauth) {
                     window.krtReauth.redirect(event && event.data ? event.data : null);
+                }
+            });
+            // The consent gate answers a stream that has no accepted Terms of Use with a single
+            // `terms-gate` event naming the consent page, then closes it (REQ-SEC-028). Without this
+            // the stream would just error and reconnect on the jittered timer below — forever, since
+            // consent cannot be given from a background request. Same shape as `reauth`: stop
+            // reconnecting, then navigate.
+            source.addEventListener('terms-gate', function (event) {
+                sseStopped = true;
+                if (sseReconnectTimer !== null) {
+                    window.clearTimeout(sseReconnectTimer);
+                    sseReconnectTimer = null;
+                }
+                try {
+                    source.close();
+                } catch (_error) {
+                    /* already closed */
+                }
+                if (sseSource === source) {
+                    sseSource = null;
+                }
+                if (window.krtTermsGate) {
+                    window.krtTermsGate.redirect(event && event.data ? event.data : null);
                 }
             });
             // #1156: the server retires the OLDEST of this user's streams with a `replaced` event

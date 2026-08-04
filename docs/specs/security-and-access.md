@@ -1121,10 +1121,39 @@ through — the web UI and, since the ingest gateway relays the caller's own bea
 (`REQ-INGEST-001`), the desktop extractor. The gateway needs no copy of the rule: it already
 relays a backend 4xx with the backend's own `detail`.
 
-Five invariants that must survive any rewrite:
+**The frontend gate answers in the caller's own idiom — three shapes, not one.** A browser
+navigation gets the `302`. An XHR gets `403` plus `X-Terms-Acceptance-Required`, because a redirect
+fails silently there (`krtFetch` bails on `res.redirected` and the section just stops updating). An
+`EventSource` gets a single `terms-gate` SSE event naming the consent page, then the stream closes,
+because it can read neither a status nor a header — a redirect hands it the consent page as
+`text/html`, the stream errors, and `notifications.js` reconnects on its jittered timer forever.
+Exempting the stream path instead would only move the loop one hop: the relay would reach the
+backend boundary and take the `403` there.
+
+**The `terms-gate` event has two emitters, because the gate has two holes it cannot cover itself.**
+`TermsAcceptanceGateFilter` emits it for a stream it intercepts; `NotificationPageController`'s
+`handleStreamError` emits the same event when the *backend* refuses a stream the frontend gate let
+through. That happens in exactly two windows — the frontend verdict cache still holds a fresh
+`true` from the 60 s before a wording change took effect, and the fail-open path when the status
+read itself failed. Both are narrow, and both would otherwise reconnect forever. The event name and
+the consent path are shared constants (`TermsAcceptanceGateFilter.SSE_GATE_EVENT` / `CONSENT_PATH`)
+so the two emitters and the one client listener cannot drift apart.
+
+**The verdict cache is read back on both sides.** Caching the negative but never honouring it made
+every gated request a blocking backend round trip; during the 2026-08-03 rollout that turned 491
+stream attempts plus 483 consent-page renders into 973 reads of `/api/v1/terms/status`. Honouring it
+is safe because recording consent calls `clearCachedVerdict`, so nobody is held behind a stale "no",
+and a backend failure never caches a negative in the first place (it fails open without writing).
+
+Six invariants that must survive any rewrite:
 
 - **The consent endpoints are never refused.** Refusing `/api/v1/terms/**` makes the block
   permanent for everyone, because no request would be left that could record consent.
+- **No gated answer may be one the caller can only retry.** Every refusal has to carry something
+  the specific client acts on. This is not cosmetic: a background channel that cannot distinguish
+  "you must consent" from "the connection dropped" retries indefinitely, and one open tab is enough
+  to sustain it — measured on 2026-08-03 as 491 stream attempts against 483 consent-page loads in
+  ten minutes.
 - **The terms, the privacy policy and the imprint stay reachable.** A gate that redirects those
   asks a person to agree to what it prevents them from reading.
 - **No cache may outlive a wording change.** An authenticated session lives 30 days (ADR-0088), so
@@ -1144,8 +1173,10 @@ Five invariants that must survive any rewrite:
   its last value with nothing on screen saying why. On a *polling* caller the first failure is worse
   still: if the timer is re-evaluated only after a successful parse, the refusal leaves it armed and
   the page re-fetches and re-renders the consent page every tick for as long as the tab is open.
-  Both shapes were found latent while triaging the 2026-08-03 rollout — the P4K import poll (3 s
-  cadence) and the notification badge / bell reads. Every hand-rolled `fetch` outside `krtFetch`
+  Both shapes were found while triaging the 2026-08-03 rollout, neither of them part of the measured
+  traffic — the P4K import poll (3 s cadence) and the notification badge / bell reads, whose three
+  call sites now share one gate-aware reader so they cannot drift apart again one at a time. Every
+  hand-rolled `fetch` outside `krtFetch`
   therefore sends the marker, offers its response to `krtTermsGate.check` before touching the body,
   rejects `res.redirected` explicitly, and disarms its own timer on any answer that is not the
   payload it asked for.
@@ -1160,11 +1191,11 @@ Five invariants that must survive any rewrite:
   re-fetching the refusal on every tick or freezing on its last value.
 
 **Enforced by:** `TermsAcceptanceAccessFilterTest` (refusal, both exemptions, non-UUID subjects),
-`TermsAcceptanceGateFilterTest` (redirect, the readable-documents exemption, fail-open, cache
-bound), `HandRolledFetchGateContractTest` (the client half of every read that bypasses `krtFetch`:
-the XHR marker, the `krtTermsGate` handoff, no `res.ok` shortcut, self-disarm — pinned against the
-shipped JS),
-`TermsAcceptanceQueryDataTest` + `TermsAcceptanceServiceTest` (append-only history,
+`TermsAcceptanceGateFilterTest` (redirect, the AJAX header, the SSE `terms-gate` handoff and that it
+fires only while the gate is closed, the readable-documents exemption, fail-open, cache bound),
+`HandRolledFetchGateContractTest` (the client half of every read that bypasses `krtFetch`: the XHR
+marker, the `krtTermsGate` handoff, no `res.ok` shortcut, self-disarm — pinned against the shipped
+JS), `TermsAcceptanceQueryDataTest` + `TermsAcceptanceServiceTest` (append-only history,
 version scoping, one-sided cache, sort translation), `TermsAcceptancePageControllerTest`, `TermsVersionParityTest`,
 `AdminTermsPageControllerTest`, `TermsTemplateBundleParityTest` · **Code:** `TermsVersionProvider`,
 `TermsAcceptanceService`, `support.TermsConsentCheck` (the leaf interface that keeps `config` and
