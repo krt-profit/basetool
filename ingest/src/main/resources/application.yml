@@ -74,6 +74,14 @@ app:
     # rather than derived from the request, because Spring compares htu byte-exactly against a URL
     # Tomcat assembles from the proxy's forwarded headers — a mismatch fails only in production.
     public-base-url: ${APP_INGEST_PUBLIC_BASE_URL:}
+    # The gateway's OWN Keycloak identity for the backend hop (ADR-0129). Since the gateway stopped
+    # relaying the caller's token it needs a credential of its own. Empty disables the feature and
+    # the gateway refuses ingest writes with a named error, rather than sending a null token the
+    # backend answers with an opaque 401.
+    service-account:
+      token-uri: ${APP_INGEST_SERVICE_ACCOUNT_TOKEN_URI:}
+      client-id: ${APP_INGEST_SERVICE_ACCOUNT_CLIENT_ID:}
+      client-secret: ${APP_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET:}
     refinery-path: /refinery-orders/create
     blueprint-path: /personal-inventory/blueprints
     # One-time browser handoff lifetime (REQ-INGEST-003). Raised from 5m to 30m: the extractor stages

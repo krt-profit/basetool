@@ -495,6 +495,9 @@ x-backend: &backend-template
     # Enabling it before that rejects every token and breaks the app; set the var back to empty to
     # disable instantly.
     APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${IRI_BACKEND_EXPECTED_AUDIENCES:-}
+    # Which client may act for another member via X-Ingest-On-Behalf-Of (ADR-0129). Must be the
+    # ingest gateway's confidential client id. EMPTY MEANS NOBODY.
+    APP_SECURITY_INGEST_GATEWAY_CLIENT_IDS: ${IRI_INGEST_GATEWAY_CLIENT_IDS:-}
     # Internal admin / user-sync path: direct backend→Keycloak over the isolated
     # net-backend-keycloak network, now TLS because the prod Keycloak serves HTTPS only. Trust is
     # pinned to the shared self-signed cert via the `keycloak-trust` SSL bundle
@@ -871,6 +874,16 @@ x-ingest: &ingest-template
     # real extractor token on deploy. Roll out with IRI_INGEST_CLIENT_AUDIT_ONLY=true, watch
     # basetool_ingest_client_rejected_total stay at zero, then enforce.
     APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS: ${IRI_INGEST_ALLOWED_CLIENT_IDS:-}
+    # ADR-0129. The gateway's own public origin, used ONLY as the DPoP `htu` comparison target.
+    # Spring compares htu byte-exactly against a URL Tomcat assembles from the proxy's forwarded
+    # headers; pinning it here removes the proxy from the comparison. Unset keeps the stock
+    # request-derived target — which is the trap this exists to avoid, so set it in prod.
+    APP_INGEST_PUBLIC_BASE_URL: ${IRI_INGEST_PUBLIC_BASE_URL:-}
+    # The gateway's OWN Keycloak identity for the backend hop (ADR-0129). Empty disables it and the
+    # gateway refuses ingest writes with a named error rather than an opaque 401 from the backend.
+    APP_INGEST_SERVICE_ACCOUNT_TOKEN_URI: ${IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI:-}
+    APP_INGEST_SERVICE_ACCOUNT_CLIENT_ID: ${IRI_INGEST_SERVICE_ACCOUNT_CLIENT_ID:-}
+    APP_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET: ${IRI_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET:-}
     # Must name a scope ONLY the extractor carries AND one that is emitted into the `scope` claim.
     # The shipped `extractor-ingest` scope fails both (it is a default scope on basetool-frontend too
     # AND carries include.in.token.scope=false), so setting it here would reject every caller
