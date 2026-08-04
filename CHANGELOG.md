@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- **Der Versand aus dem Extractor funktioniert jetzt tatsächlich.** Die Korrektur in v1.5.34 griff noch nicht: das Gateway prüfte das Zertifikat des Anmeldeservers zwar nicht mehr gegen den Truststore des Backends, dafür aber gegen den eines intern erreichbaren Anmeldeservers — mit demselben Ergebnis. Es akzeptiert jetzt beide Herkünfte, sodass die Prüfung unabhängig davon aufgeht, welche Adresse konfiguriert ist.
+
+## [v1.5.34](https://github.com/krt-profit/basetool/releases/tag/v1.5.34) - 2026-08-04
+
+### Fixed
+
 - **Der Versand aus dem Extractor scheitert nicht mehr an einer falschen Vertrauensstellung.** Das Gateway prüfte das Zertifikat des Anmeldeservers gegen den Truststore des Backends und konnte deshalb gar keine Verbindung aufbauen — sichtbar nur als „An unexpected error occurred.". Es nutzt jetzt die passenden Wurzelzertifikate.
 
 - **Ein Gateway ohne nutzbare Anmeldung sagt das jetzt.** Statt eines nichtssagenden Serverfehlers kommt eine benannte Meldung mit dem Hinweis, dass es am Server liegt und nicht am eigenen Export.
