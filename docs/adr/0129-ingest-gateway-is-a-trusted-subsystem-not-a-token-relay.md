@@ -117,3 +117,4 @@ a role marking it as the ingest gateway. That is applied by @greluc; production 
 - *Trust an on-behalf-of header from anyone on the internal network.* The header is only as good as
   the authentication behind it; without pinning it to the gateway's service account it is an
   impersonation primitive.
+

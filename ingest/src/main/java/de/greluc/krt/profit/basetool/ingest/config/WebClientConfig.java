@@ -105,8 +105,8 @@ public class WebClientConfig {
    * <p>Separate from {@link #backendWebClient()} for three reasons: it addresses a different host
    * (absolute token URI, so no base URL), it must not carry the backend-relay logging filter — that
    * filter names the call as a backend hop and this one is not — and its response is a handful of
-   * bytes, so it needs no raised in-memory codec limit. It shares the same profile-gated SSL context
-   * because it faces the same Keycloak the resource server already trusts.
+   * bytes, so it needs no raised in-memory codec limit. It shares the same profile-gated SSL
+   * context because it faces the same Keycloak the resource server already trusts.
    *
    * @return a {@link WebClient} for the Keycloak token endpoint
    */

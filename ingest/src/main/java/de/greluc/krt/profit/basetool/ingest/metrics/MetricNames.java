@@ -249,8 +249,8 @@ public final class MetricNames {
    * <p>Since ADR-0129 the gateway calls the backend under its OWN identity instead of relaying the
    * caller's token, so this grant sits on the critical path of every ingest write: if it fails,
    * nobody can send, and the failure is in a hop no client can see. The cached/minted split also
-   * shows whether the token cache is working — a mint on every request means Keycloak is being asked
-   * for a token per upload.
+   * shows whether the token cache is working — a mint on every request means Keycloak is being
+   * asked for a token per upload.
    */
   public static final String INGEST_SERVICE_ACCOUNT_TOKEN = "basetool.ingest.service.account.token";
 
@@ -260,7 +260,9 @@ public final class MetricNames {
   /** {@link #INGEST_SERVICE_ACCOUNT_TOKEN} outcome: the cached token was still good. */
   public static final String SA_TOKEN_CACHED = "cached";
 
-  /** {@link #INGEST_SERVICE_ACCOUNT_TOKEN} outcome: the grant failed; the ingest write is refused. */
+  /**
+   * {@link #INGEST_SERVICE_ACCOUNT_TOKEN} outcome: the grant failed; the ingest write is refused.
+   */
   public static final String SA_TOKEN_FAILED = "failed";
 
   /**

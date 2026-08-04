@@ -251,22 +251,28 @@ public class SecurityConfig {
         .oauth2ResourceServer(
             oauth2 ->
                 oauth2
-                    // Bearer only — NO `dPoP(...)` here, deliberately (REQ-INGEST-012).
+                    // Both schemes, deliberately (ADR-0129, REQ-INGEST-012).
                     //
-                    // Accepting a DPoP-bound access token at this gateway is architecturally wrong,
-                    // and enabling it broke every blueprint send on 2026-08-03. The gateway is a
-                    // RELAY: it forwards the caller's own token onward to the backend
-                    // (BackendImportClient#commonHeaders). A sender-constrained token is bound to
-                    // the CLIENT's key and to the `htu` of THIS endpoint, so the second hop can
-                    // neither carry a proof nor be covered by the first one — the backend receives
-                    // a token issued for DPoP as a plain bearer and refuses it. And even where it
-                    // did not refuse, the binding would end at the gateway, which is exactly where
-                    // it would need to hold.
+                    // `.dPoP(...)` installs its own AuthenticationFilter behind
+                    // `matchesDPoPRequest`, so it COEXISTS with the bearer filter rather than
+                    // replacing it. That is what makes the migration flag-day-free: an extractor
+                    // still sending a plain unbound bearer keeps working while the DPoP-capable
+                    // build rolls out.
                     //
-                    // DPoP is still used, one layer up and invisible here: a realm client policy
-                    // binds the REFRESH token — the long-lived credential the extractor persists to
-                    // disk (REQ-INGEST-007) — while access tokens stay plain bearer and relay
-                    // cleanly.
+                    // Accepting DPoP is now correct because the gateway stopped relaying the
+                    // caller's token. It validates the proof here — the one internet-facing hop,
+                    // where sender-constraining actually pays because the party that validates the
+                    // token is the party that consumes it — and calls the backend under its own
+                    // service-account identity instead (BackendImportClient). Relaying made the two
+                    // mutually exclusive: a DPoP-bound token is rejected outright by a resource
+                    // server presented with it as a bearer, which is what broke every send from
+                    // 2026-08-03.
+                    //
+                    // NOTE the filter-ordering consequence handled further down: UserIdMdcFilter
+                    // and ClientIdentityFilter are anchored on AuthenticationFilter, not on
+                    // BearerTokenAuthenticationFilter, or the REQ-INGEST-011 allowlist is silently
+                    // skipped for every DPoP request.
+                    .dPoP(dpop -> {})
                     .jwt(jwt -> {})
                     .authenticationEntryPoint(securityProblems)
                     .accessDeniedHandler(securityProblems))
@@ -280,14 +286,23 @@ public class SecurityConfig {
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
         // REQ-OBS-001/-002: refine the `userId` MDC field from `anonymous` to the caller's JWT
-        // `sub`. Installed AFTER the bearer-token filter — that is the first point at which the
-        // SecurityContext is populated; the shared servlet filters all run earlier and would only
-        // ever see an empty context. CorrelationIdFilter seeds and clears the key (see its
-        // Javadoc).
+        // `sub`. Installed AFTER the LAST authentication filter in the chain — that is the first
+        // point at which the SecurityContext is populated for EITHER scheme; the shared servlet
+        // filters all run earlier and would only ever see an empty context. CorrelationIdFilter
+        // seeds and clears the key (see its Javadoc).
+        //
+        // Anchored on AuthenticationFilter, NOT on BearerTokenAuthenticationFilter. Since
+        // `.dPoP(...)` above, a DPoP-scheme request is authenticated by a SEPARATE
+        // AuthenticationFilter that `FilterOrderRegistration` places two slots AFTER the bearer
+        // filter. Anchored on the bearer filter, this and the client-identity gate below would run
+        // BEFORE authentication on every DPoP request — against an empty context. The MDC would
+        // stay `anonymous`, and, far worse, ClientIdentityFilter would find no JWT, return early,
+        // and skip the REQ-INGEST-011 allowlist entirely while `.anyRequest().authenticated()`
+        // still passed the request. Fail-open, silent, and invisible to every existing test
+        // (ADR-0129).
         .addFilterAfter(
             new UserIdMdcFilter(loggingProperties),
-            org.springframework.security.oauth2.server.resource.web.authentication
-                .BearerTokenAuthenticationFilter.class)
+            org.springframework.security.web.authentication.AuthenticationFilter.class)
         // REQ-INGEST-011: the client-identity gate (azp allowlist + ingest scope).
         // Installed AFTER UserIdMdcFilter, not merely after the bearer filter, so its WARN lines
         // already carry the acting subject in the `userId` MDC field and never have to repeat it

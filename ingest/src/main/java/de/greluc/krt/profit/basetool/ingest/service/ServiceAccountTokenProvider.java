@@ -47,7 +47,8 @@ import org.springframework.web.reactive.function.client.WebClient;
  * <p><strong>Deliberately unbound.</strong> No DPoP proof is presented here, so the issued token
  * carries no {@code cnf} and crosses to the backend as an ordinary bearer. That is the whole point
  * of the split: the sender-constrained token is validated at the internet-facing hop and stops
- * there, while this second hop uses a credential that belongs to the party actually making the call.
+ * there, while this second hop uses a credential that belongs to the party actually making the
+ * call.
  *
  * <p>The token is a process-wide singleton because it identifies the <em>gateway</em>, not a user —
  * the caller is named separately, in the on-behalf-of header. Caching it per request would ask
@@ -194,7 +195,6 @@ public class ServiceAccountTokenProvider {
         .counter(MetricNames.INGEST_SERVICE_ACCOUNT_TOKEN, MetricNames.TAG_OUTCOME, outcome)
         .increment();
   }
-
 
   /** Signals that the gateway could not obtain an identity for the backend hop. */
   public static class ServiceAccountTokenException extends RuntimeException {

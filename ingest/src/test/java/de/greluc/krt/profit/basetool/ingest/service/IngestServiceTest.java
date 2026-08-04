@@ -85,7 +85,7 @@ class IngestServiceTest {
     when(ingestProperties.getRefineryPath()).thenReturn("/refinery/import");
     when(ingestProperties.getFrontendBaseUrl()).thenReturn("https://frontend.test");
 
-    service.ingestRefinery("sub-1", "bearer", null, mock(RefineryExtractDto.class));
+    service.ingestRefinery("sub-1", null, mock(RefineryExtractDto.class));
 
     assertThat(handoffCounter(HandoffKind.REFINERY)).isEqualTo(1.0d);
   }
@@ -104,7 +104,7 @@ class IngestServiceTest {
         LogCapture.capture(
             IngestService.class,
             Level.INFO,
-            () -> service.ingestRefinery("sub-1", "bearer", null, extract()));
+            () -> service.ingestRefinery("sub-1", null, extract()));
 
     assertThat(events).hasSize(1);
     assertThat(events.getFirst().getFormattedMessage())
@@ -128,9 +128,7 @@ class IngestServiceTest {
 
     List<ILoggingEvent> events =
         LogCapture.capture(
-            IngestService.class,
-            Level.INFO,
-            () -> service.ingestRefinery("sub-1", "bearer", null, forged));
+            IngestService.class, Level.INFO, () -> service.ingestRefinery("sub-1", null, forged));
 
     assertThat(events.getFirst().getFormattedMessage()).doesNotContain("\n");
   }
@@ -148,8 +146,7 @@ class IngestServiceTest {
             IngestService.class,
             Level.INFO,
             () ->
-                service.ingestBlueprint(
-                    "sub-1", "bearer", null, new byte[] {1, 2, 3}, BLUEPRINT_PROVENANCE));
+                service.ingestBlueprint("sub-1", null, new byte[] {1, 2, 3}, BLUEPRINT_PROVENANCE));
 
     assertThat(events).hasSize(1);
     // The provenance triple rides along: this path used to log only the byte count, which left a
@@ -191,7 +188,7 @@ class IngestServiceTest {
     when(ingestProperties.getBlueprintPath()).thenReturn("/blueprint/import");
     when(ingestProperties.getFrontendBaseUrl()).thenReturn("https://frontend.test");
 
-    service.ingestBlueprint("sub-1", "bearer", null, new byte[] {1, 2, 3}, BLUEPRINT_PROVENANCE);
+    service.ingestBlueprint("sub-1", null, new byte[] {1, 2, 3}, BLUEPRINT_PROVENANCE);
 
     assertThat(handoffCounter(HandoffKind.BLUEPRINT)).isEqualTo(1.0d);
   }

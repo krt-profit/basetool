@@ -60,17 +60,13 @@ public class IngestService {
    * Relays a refinery extract to the backend, stages the resulting draft, and returns the handoff.
    *
    * @param sub the authenticated caller's subject (scopes the staged handoff)
-   * @param bearer the caller's raw JWT, forwarded to the backend
    * @param acceptLanguage the caller's resolved locale (sanitized, then relayed; may be {@code
    *     null})
    * @param extract the validated extract payload
    * @return the handoff id, kind and frontend URL for the extractor to open
    */
   public @NotNull IngestResponseDto ingestRefinery(
-      @NotNull String sub,
-      @NotNull String bearer,
-      String acceptLanguage,
-      @NotNull RefineryExtractDto extract) {
+      @NotNull String sub, String acceptLanguage, @NotNull RefineryExtractDto extract) {
     // Per-subject throttle (REQ-INGEST-005): bound how hard one authenticated caller can drive the
     // backend import endpoints. Checked before the backend relay so an over-budget caller is
     // rejected without forwarding.
@@ -79,7 +75,7 @@ public class IngestService {
     // rejected producer never reads as an accepted send in the log.
     provenanceGuard.requireApprovedTool(Provenance.from(extract));
     logAcceptedExtract(extract);
-    String draftJson = backendImportClient.forwardRefineryExtract(bearer, acceptLanguage, extract);
+    String draftJson = backendImportClient.forwardRefineryExtract(sub, acceptLanguage, extract);
     String handoffId = handoffStagingService.stage(sub, HandoffKind.REFINERY, draftJson);
     countHandoff(HandoffKind.REFINERY);
     return response(handoffId, HandoffKind.REFINERY, ingestProperties.getRefineryPath());
@@ -124,7 +120,6 @@ public class IngestService {
    * the handoff.
    *
    * @param sub the authenticated caller's subject (scopes the staged handoff)
-   * @param bearer the caller's raw JWT, forwarded to the backend
    * @param acceptLanguage the caller's resolved locale (sanitized, then relayed; may be {@code
    *     null})
    * @param blueprintJson the blueprint export JSON bytes to forward as the upload
@@ -134,7 +129,6 @@ public class IngestService {
    */
   public @NotNull IngestResponseDto ingestBlueprint(
       @NotNull String sub,
-      @NotNull String bearer,
       String acceptLanguage,
       byte @NotNull [] blueprintJson,
       @NotNull Provenance provenance) {
@@ -155,7 +149,7 @@ public class IngestService {
         LogSafe.text(provenance.tool(), MAX_LOGGED_PROVENANCE),
         LogSafe.text(provenance.toolVersion(), MAX_LOGGED_PROVENANCE));
     String draftJson =
-        backendImportClient.forwardBlueprintPreview(bearer, acceptLanguage, blueprintJson);
+        backendImportClient.forwardBlueprintPreview(sub, acceptLanguage, blueprintJson);
     String handoffId = handoffStagingService.stage(sub, HandoffKind.BLUEPRINT, draftJson);
     countHandoff(HandoffKind.BLUEPRINT);
     return response(handoffId, HandoffKind.BLUEPRINT, ingestProperties.getBlueprintPath());

@@ -31,9 +31,9 @@ import org.springframework.validation.annotation.Validated;
  * relaying the caller's token (ADR-0129, REQ-INGEST-001).
  *
  * <p>Deliberately not validated as required. The gateway must still start when these are unset — an
- * operator who has not yet created the confidential client gets a gateway that refuses ingest writes
- * with a clear error, not a container that crash-loops and takes the health endpoints with it. The
- * emptiness is checked where it is used, once, with a named failure.
+ * operator who has not yet created the confidential client gets a gateway that refuses ingest
+ * writes with a clear error, not a container that crash-loops and takes the health endpoints with
+ * it. The emptiness is checked where it is used, once, with a named failure.
  */
 @Getter
 @Setter
@@ -41,7 +41,9 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "app.ingest.service-account")
 public class ServiceAccountProperties {
 
-  /** Keycloak token endpoint the client-credentials grant is sent to. Empty disables the feature. */
+  /**
+   * Keycloak token endpoint the client-credentials grant is sent to. Empty disables the feature.
+   */
   private String tokenUri = "";
 
   /** The gateway's confidential client id. Empty disables the feature. */
@@ -50,8 +52,8 @@ public class ServiceAccountProperties {
   /**
    * The gateway's client secret.
    *
-   * <p>Never logged and never surfaced in a problem body: it is the credential that lets the gateway
-   * act for any member, so it is the single most valuable secret in this module.
+   * <p>Never logged and never surfaced in a problem body: it is the credential that lets the
+   * gateway act for any member, so it is the single most valuable secret in this module.
    */
   private String clientSecret = "";
 
@@ -59,7 +61,8 @@ public class ServiceAccountProperties {
    * How long before expiry a cached token is replaced.
    *
    * <p>Guards against handing the backend a token that expires in flight. Keycloak's access tokens
-   * are minutes long, so this is a meaningful fraction of the lifetime rather than a rounding error.
+   * are minutes long, so this is a meaningful fraction of the lifetime rather than a rounding
+   * error.
    */
   private Duration refreshSkew = Duration.ofSeconds(30);
 
