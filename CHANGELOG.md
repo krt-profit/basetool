@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.37](https://github.com/krt-profit/basetool/releases/tag/v1.5.37) - 2026-08-04
+
 ### Fixed
 
 - **Das technische Konto des Gateways lässt sich jetzt aus der Mitgliederliste entfernen.** Der Eintrag stand dort als „Nicht in Keycloak", ließ sich aber nicht löschen: die Sicherheitsabfrage vor dem Löschen fand ihn in Keycloak sehr wohl. Für technische Konten gilt sie jetzt nicht mehr — für Mitglieder unverändert.
