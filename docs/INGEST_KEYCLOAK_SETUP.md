@@ -517,6 +517,14 @@ IRI_INGEST_GATEWAY_CLIENT_IDS=basetool-ingest-gateway
 > Write it exactly as the extractor signs it: lower-case scheme and host, **no trailing slash**, and
 > **no port** when it is the scheme default. `https://ingest.profit-base.online` — not
 > `https://ingest.profit-base.online/`, not `…:443`.
+>
+> **The token URI must be the PUBLIC Keycloak host.** The ingest gateway shares no application
+> network with the `keycloak` container — only the monitoring plane — so the internal
+> `https://keycloak:18443` is not reachable from it. Its trust set is chosen to match: it uses the
+> JVM's default anchors (and keeps hostname verification) unless a `keycloak-trust` bundle is
+> configured. An earlier build pinned this client to the **backend's** truststore by mistake, which
+> made every grant fail the TLS handshake and surface as a bare 500 — fixed, but worth knowing if
+> you ever repoint the URI.
 
 Note the last one is on the **backend**, not the gateway: it is the only `azp` the backend will
 accept an `X-Ingest-On-Behalf-Of` header from.
@@ -534,8 +542,12 @@ docker compose --profile prod up -d --force-recreate ingest backend
 1. **The gateway can obtain its own token.** Watch for the counter to show a mint rather than a
    failure:
    `sum by (outcome) (increase(basetool_ingest_service_account_token_total[15m]))`
-   A non-zero `failed` means the secret or the token URI is wrong — check those before anything
-   else, because nothing else can work while this fails.
+   A non-zero `failed` means the gateway cannot obtain its identity — check that before anything
+   else, because nothing else can work while it fails. Since v1.5.34 the sender sees a named
+   `GATEWAY_IDENTITY_UNAVAILABLE` 503 rather than a bare "unexpected error", and the gateway log
+   names the exception class: `WebClientResponseException` is Keycloak refusing (wrong secret or
+   client id), `WebClientRequestException` is not reaching it at all (wrong host, DNS, or TLS
+   trust).
 2. **A real send succeeds.** Run the extractor (v2.7.2 or newer) and send one blueprint export.
    Success is the pre-filled basetool page opening.
 3. **The upload is attributed to the member, not the service account.** Open the staged draft in the

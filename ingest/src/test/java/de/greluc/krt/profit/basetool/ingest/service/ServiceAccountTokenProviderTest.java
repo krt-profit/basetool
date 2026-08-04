@@ -169,7 +169,7 @@ class ServiceAccountTokenProviderTest {
 
     assertThat(provider.isConfigured()).isFalse();
     assertThatThrownBy(provider::currentToken)
-        .isInstanceOf(IllegalStateException.class)
+        .isInstanceOf(ServiceAccountTokenProvider.ServiceAccountTokenException.class)
         .hasMessageContaining("app.ingest.service-account");
     assertThat(keycloak.getRequestCount()).as("nothing is sent").isZero();
   }

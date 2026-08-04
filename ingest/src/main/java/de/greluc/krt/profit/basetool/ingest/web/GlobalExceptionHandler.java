@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.ingest.web;
 import de.greluc.krt.profit.basetool.ingest.logging.LogSafe;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.ratelimit.RateLimitedException;
+import de.greluc.krt.profit.basetool.ingest.service.ServiceAccountTokenProvider;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
@@ -73,6 +74,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   private static final String CODE_BAD_REQUEST = "BAD_REQUEST";
   private static final String CODE_UPSTREAM = "BACKEND_RELAY_FAILED";
   private static final String CODE_INTERNAL = "INTERNAL_ERROR";
+
+  /** The gateway could not obtain its own backend identity (ADR-0129). */
+  private static final String CODE_GATEWAY_IDENTITY = "GATEWAY_IDENTITY_UNAVAILABLE";
+
   private static final String CODE_RATE_LIMITED = "RATE_LIMITED";
 
   /** Hard cap on the backend-supplied detail relayed to the extractor (security audit gap-fill). */
@@ -324,6 +329,45 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "Service unavailable",
             MetricNames.CODE_SERVICE_UNAVAILABLE,
             "The import could not be staged for pickup. Please retry shortly.");
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+        .header(HttpHeaders.RETRY_AFTER, STAGING_RETRY_AFTER_SECONDS)
+        .body(problem);
+  }
+
+  /**
+   * The gateway cannot obtain its own identity for the backend hop → 503 with a named cause.
+   *
+   * <p>Since ADR-0129 this grant sits on the critical path of every upload, and it fails in a hop
+   * no client can see. Left to the catch-all below it surfaced as "An unexpected error occurred." —
+   * which is what a member actually saw on 2026-08-04, with nothing to act on and nothing to tell
+   * an operator where to look. It is a configuration or connectivity fault at the gateway, not
+   * something the caller did, so it gets its own code and a retry hint.
+   *
+   * <p>Covers both shapes — no identity configured, and a grant that failed — because the provider
+   * raises one type for both. To the sender they are the same situation: the gateway cannot act.
+   * The distinction lives in the log and in {@code basetool_ingest_service_account_token_total},
+   * where an operator can use it. Catching {@code IllegalStateException} here instead would have
+   * been broader and worse: any unrelated state fault in the ingest path would report itself as a
+   * login-server problem.
+   *
+   * @param ex the identity failure
+   * @return a 503 problem naming the gateway, not the caller
+   */
+  @ExceptionHandler(ServiceAccountTokenProvider.ServiceAccountTokenException.class)
+  public @NotNull ResponseEntity<ProblemDetail> handleGatewayIdentityUnavailable(
+      @NotNull ServiceAccountTokenProvider.ServiceAccountTokenException ex) {
+    log.error("The gateway has no usable identity for the backend hop", ex);
+    meterRegistry
+        .counter(MetricNames.HTTP_ERROR, MetricNames.TAG_CODE, CODE_GATEWAY_IDENTITY)
+        .increment();
+    ProblemDetail problem =
+        problem(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "Service unavailable",
+            CODE_GATEWAY_IDENTITY,
+            "The basetool gateway is not able to reach the login server right now. This is a"
+                + " server-side problem, not a problem with your export — please try again shortly"
+                + " and report it if it persists.");
     return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
         .header(HttpHeaders.RETRY_AFTER, STAGING_RETRY_AFTER_SECONDS)
         .body(problem);

@@ -113,9 +113,81 @@ public class WebClientConfig {
   @Bean
   public WebClient keycloakWebClient() {
     return WebClient.builder()
-        .clientConnector(new ReactorClientHttpConnector(buildHttpClient()))
+        .clientConnector(new ReactorClientHttpConnector(buildKeycloakHttpClient()))
         .observationRegistry(observationRegistry)
         .build();
+  }
+
+  /**
+   * Builds the Keycloak-facing HTTP client with its OWN trust set.
+   *
+   * <p><strong>It must not reuse {@link #buildHttpClient()}.</strong> That one installs the {@code
+   * backend-trust} bundle as the <em>only</em> trust anchor, which is right for the self-signed
+   * {@code https://backend:11261} and catastrophic here: pinned to the backend's certificate, this
+   * client cannot validate Keycloak's publicly-trusted one, so the TLS handshake fails and the
+   * client-credentials grant dies as a transport error with no HTTP status to explain it. That is
+   * exactly how it failed on 2026-08-04 — every send answered "An unexpected error occurred."
+   *
+   * <p>The trust set mirrors {@link KeycloakTrustSupport}, which the JWKS decoder already uses: pin
+   * to {@code keycloak-trust} when that bundle is configured (an internal, self-signed Keycloak),
+   * and otherwise fall through to the JVM's default anchors with hostname verification left ON,
+   * which is what a publicly-trusted host needs. {@code dev}/{@code test} keep the insecure manager
+   * for the local stack's ephemeral certificate.
+   *
+   * @return the configured reactor-netty HTTP client for the token endpoint
+   */
+  private HttpClient buildKeycloakHttpClient() {
+    try {
+      List<String> profiles = Arrays.asList(environment.getActiveProfiles());
+      SslContext sslContext = null;
+      boolean pinnedTrust = false;
+      if (profiles.contains("dev") || profiles.contains("test")) {
+        sslContext =
+            SslContextBuilder.forClient()
+                .trustManager(InsecureTrustManagerFactory.INSTANCE)
+                .build();
+        pinnedTrust = true;
+      } else {
+        try {
+          SslBundle bundle = sslBundles.getBundle(KeycloakTrustSupport.KEYCLOAK_TRUST_BUNDLE);
+          KeyStore truststore = bundle.getStores().getTrustStore();
+          TrustManagerFactory tmf =
+              TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+          tmf.init(truststore);
+          sslContext = SslContextBuilder.forClient().trustManager(tmf).build();
+        } catch (NoSuchSslBundleException noBundle) {
+          // No pinned bundle: Keycloak is the public, publicly-trusted host. Leave the SSL context
+          // untouched so reactor-netty uses the JVM default anchors AND keeps hostname
+          // verification, which is the whole point of a public certificate.
+          sslContext = null;
+        }
+      }
+      SslContext effective = sslContext;
+      boolean disableHostnameVerification = pinnedTrust;
+      return HttpClient.create()
+          .secure(
+              spec -> {
+                if (effective != null) {
+                  var configured = spec.sslContext(effective);
+                  if (disableHostnameVerification) {
+                    configured.handlerConfigurator(
+                        sslHandler -> {
+                          SSLParameters params = sslHandler.engine().getSSLParameters();
+                          params.setEndpointIdentificationAlgorithm("");
+                          sslHandler.engine().setSSLParameters(params);
+                        });
+                  }
+                }
+              })
+          .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5_000)
+          .responseTimeout(Duration.ofSeconds(10))
+          .doOnConnected(
+              conn ->
+                  conn.addHandlerLast(new ReadTimeoutHandler(10, TimeUnit.SECONDS))
+                      .addHandlerLast(new WriteTimeoutHandler(10, TimeUnit.SECONDS)));
+    } catch (GeneralSecurityException | SSLException e) {
+      throw new IllegalStateException("Failed to build the Keycloak WebClient SSL context", e);
+    }
   }
 
   /**

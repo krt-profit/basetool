@@ -107,14 +107,17 @@ public class ServiceAccountTokenProvider {
    * about to expire.
    *
    * @return the compact JWT to put on the backend hop
-   * @throws IllegalStateException when the gateway has no configured identity
-   * @throws ServiceAccountTokenException when Keycloak refuses or cannot be reached
+   * @throws ServiceAccountTokenException when no identity is configured, or when Keycloak refuses
+   *     or cannot be reached
    */
   public @NotNull String currentToken() {
     if (!isConfigured()) {
-      throw new IllegalStateException(
-          "The ingest gateway has no service-account identity configured "
-              + "(app.ingest.service-account.*); it cannot call the backend.");
+      // Deliberately the SAME type as a failed grant. To the sender both are "the gateway cannot
+      // act"; the distinction that matters to an operator lives in the log and in the metric, not
+      // in the exception type - and a dedicated type keeps the handler from having to catch
+      // IllegalStateException, which would swallow unrelated faults into a misleading 503.
+      throw new ServiceAccountTokenException(
+          "no service-account identity configured (app.ingest.service-account.*)", null);
     }
     String token = cachedToken;
     if (token != null && Instant.now().isBefore(cachedUntil)) {
