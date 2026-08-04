@@ -1145,7 +1145,7 @@ stream attempts plus 483 consent-page renders into 973 reads of `/api/v1/terms/s
 is safe because recording consent calls `clearCachedVerdict`, so nobody is held behind a stale "no",
 and a backend failure never caches a negative in the first place (it fails open without writing).
 
-Five invariants that must survive any rewrite:
+Six invariants that must survive any rewrite:
 
 - **The consent endpoints are never refused.** Refusing `/api/v1/terms/**` makes the block
   permanent for everyone, because no request would be left that could record consent.
@@ -1164,6 +1164,22 @@ Five invariants that must survive any rewrite:
   rejected: it ships a gate that looks armed and is not. The E2E profile is `dev`, so the gate is
   live there and `E2eSupport#acceptTermsIfPrompted` clicks through it on every login rather than
   pre-seeding a row — which keeps the suite exercising the real path.
+- **A background caller identifies itself, checks for the gate, and never reads `res.ok` as
+  success.** Writes get this from `krtFetch`; the reads that bypass it must do it themselves, and
+  both halves are load-bearing. Without the `X-Requested-With` marker the gate answers a `302` that
+  `fetch` follows transparently, so the consent page arrives as a `200 text/html` for which `res.ok`
+  is **true** and the refusal is read as the payload. With the marker but without a
+  `krtTermsGate.check`, the `403` merely falls through the `res.ok` test and the surface freezes on
+  its last value with nothing on screen saying why. On a *polling* caller the first failure is worse
+  still: if the timer is re-evaluated only after a successful parse, the refusal leaves it armed and
+  the page re-fetches and re-renders the consent page every tick for as long as the tab is open.
+  Both shapes were found while triaging the 2026-08-03 rollout, neither of them part of the measured
+  traffic — the P4K import poll (3 s cadence) and the notification badge / bell reads, whose three
+  call sites now share one gate-aware reader so they cannot drift apart again one at a time. Every
+  hand-rolled `fetch` outside `krtFetch`
+  therefore sends the marker, offers its response to `krtTermsGate.check` before touching the body,
+  rejects `res.redirected` explicitly, and disarms its own timer on any answer that is not the
+  payload it asked for.
 
 **Acceptance**
 
@@ -1171,10 +1187,15 @@ Five invariants that must survive any rewrite:
 - [ ] A wording change re-prompts every user, without anyone editing a version number.
 - [ ] Consent history survives re-consent; a double submit adds no second row.
 - [ ] An admin can see who has and has not accepted.
+- [ ] A gated background read navigates to the consent page and disarms its timer, instead of
+  re-fetching the refusal on every tick or freezing on its last value.
 
 **Enforced by:** `TermsAcceptanceAccessFilterTest` (refusal, both exemptions, non-UUID subjects),
 `TermsAcceptanceGateFilterTest` (redirect, the AJAX header, the SSE `terms-gate` handoff and that it
-fires only while the gate is closed, the readable-documents exemption, fail-open, cache bound), `TermsAcceptanceQueryDataTest` + `TermsAcceptanceServiceTest` (append-only history,
+fires only while the gate is closed, the readable-documents exemption, fail-open, cache bound),
+`HandRolledFetchGateContractTest` (the client half of every read that bypasses `krtFetch`: the XHR
+marker, the `krtTermsGate` handoff, no `res.ok` shortcut, self-disarm — pinned against the shipped
+JS), `TermsAcceptanceQueryDataTest` + `TermsAcceptanceServiceTest` (append-only history,
 version scoping, one-sided cache, sort translation), `TermsAcceptancePageControllerTest`, `TermsVersionParityTest`,
 `AdminTermsPageControllerTest`, `TermsTemplateBundleParityTest` · **Code:** `TermsVersionProvider`,
 `TermsAcceptanceService`, `support.TermsConsentCheck` (the leaf interface that keeps `config` and
