@@ -68,6 +68,8 @@ import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /**
@@ -823,6 +825,89 @@ class GlobalExceptionHandlerTest {
     String cid = (String) resp.getBody().getProperties().get("correlationId");
     assertNotNull(cid);
     assertTrue(cid.length() > 0);
+  }
+
+  // ---------------------------------------------------------------------
+  // RestClientException — an upstream call is 502, never an unexplained 500
+  // ---------------------------------------------------------------------
+
+  /**
+   * A 403 from an upstream admin API is a 502, not a 500, and its body stays server-side.
+   *
+   * <p>The case that produced this handler: deleting the ingest gateway's stray member row called
+   * Keycloak's admin API, whose client may manage users but not inspect clients, so the call came
+   * back 403. Nothing handled {@link RestClientException}, so an admin was told "an unexpected
+   * error occurred" — which named neither the dependency nor the cause and is indistinguishable
+   * from a genuine bug in this application.
+   *
+   * <p>Both halves matter. The status must be 502 because a dependency answered badly, even though
+   * the upstream status is a 4xx: a 403 from the identity provider means THIS service lacks a role,
+   * which is never the caller's fault. And the upstream body must not be relayed — for an identity
+   * provider it can carry realm names, client ids or token material (CWE-209).
+   */
+  @Test
+  void handleRestClient_returns502_andDoesNotLeakTheUpstreamBody() {
+    org.springframework.web.client.RestClientException ex =
+        org.springframework.web.client.HttpClientErrorException.create(
+            HttpStatus.FORBIDDEN,
+            "Forbidden",
+            org.springframework.http.HttpHeaders.EMPTY,
+            "{\"error\":\"HTTP 403 Forbidden\",\"realm\":\"iri\"}"
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8),
+            java.nio.charset.StandardCharsets.UTF_8);
+
+    ResponseEntity<ProblemDetail> resp = handler.handleRestClientException(ex, request);
+
+    assertCommon(resp, HttpStatus.BAD_GATEWAY, "EXTERNAL_SERVICE_ERROR");
+    assertTrue(
+        !resp.getBody().getDetail().contains("realm"),
+        "the upstream response body must NOT reach the client-visible detail");
+    assertNotNull(resp.getBody().getProperties().get("correlationId"));
+  }
+
+  /**
+   * Spring actually dispatches an upstream failure here, and not to the {@code Exception} fallback.
+   *
+   * <p>The assertion the other two cannot make: they call the handler directly, so they would still
+   * pass if {@code @ExceptionHandler(Exception.class)} kept winning at runtime and every upstream
+   * failure carried on being an unexplained 500. This drives {@link ExceptionHandlerMethodResolver}
+   * — the same resolution Spring MVC performs — over the real class.
+   */
+  @Test
+  void springResolvesAnUpstreamFailureToTheRestClientHandlerNotTheFallback() {
+    ExceptionHandlerMethodResolver resolver =
+        new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class);
+
+    assertEquals(
+        "handleRestClientException",
+        resolver
+            .resolveMethod(new org.springframework.web.client.ResourceAccessException("x"))
+            .getName());
+    assertEquals(
+        "handleRestClientException",
+        resolver
+            .resolveMethod(
+                org.springframework.web.client.HttpClientErrorException.create(
+                    HttpStatus.FORBIDDEN,
+                    "Forbidden",
+                    org.springframework.http.HttpHeaders.EMPTY,
+                    new byte[0],
+                    java.nio.charset.StandardCharsets.UTF_8))
+            .getName());
+  }
+
+  /** A connection failure takes the same route — there is no status to misread there at all. */
+  @Test
+  void handleRestClient_mapsAConnectionFailureToo() {
+    ResponseEntity<ProblemDetail> resp =
+        handler.handleRestClientException(
+            new org.springframework.web.client.ResourceAccessException("connect timed out"),
+            request);
+
+    assertCommon(resp, HttpStatus.BAD_GATEWAY, "EXTERNAL_SERVICE_ERROR");
+    assertTrue(
+        !resp.getBody().getDetail().contains("connect timed out"),
+        "the transport-level message must NOT reach the client-visible detail");
   }
 
   // ---------------------------------------------------------------------
