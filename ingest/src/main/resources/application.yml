@@ -70,6 +70,10 @@ app:
   ingest:
     backend-base-url: ${BACKEND_URL:https://backend:11261}
     frontend-base-url: ${FRONTEND_URL:https://app.profit-base.online}
+    # The gateway's own public origin, used only as the DPoP `htu` target (ADR-0129). Configured
+    # rather than derived from the request, because Spring compares htu byte-exactly against a URL
+    # Tomcat assembles from the proxy's forwarded headers — a mismatch fails only in production.
+    public-base-url: ${APP_INGEST_PUBLIC_BASE_URL:}
     refinery-path: /refinery-orders/create
     blueprint-path: /personal-inventory/blueprints
     # One-time browser handoff lifetime (REQ-INGEST-003). Raised from 5m to 30m: the extractor stages

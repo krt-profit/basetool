@@ -187,6 +187,8 @@ public class SecurityConfig {
    * @param loggingProperties supplies the MDC key the {@link UserIdMdcFilter} writes the
    *     authenticated subject to
    * @param clientIdentityProperties the configured client-identity gate (REQ-INGEST-011)
+   * @param ingestProperties supplies the gateway's public origin, used as the DPoP {@code htu}
+   *     comparison target so it does not depend on the reverse proxy's forwarded headers
    * @return the configured filter chain
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
@@ -196,7 +198,8 @@ public class SecurityConfig {
       ObjectMapper objectMapper,
       MeterRegistry meterRegistry,
       LoggingProperties loggingProperties,
-      ClientIdentityProperties clientIdentityProperties)
+      ClientIdentityProperties clientIdentityProperties,
+      IngestProperties ingestProperties)
       throws Exception {
     // CSRF stays ENABLED (never disabled) so the gateway carries no weaker posture than the
     // backend. Every real endpoint (/v1/**) is JSON + bearer-token only on a stateless chain with
@@ -272,7 +275,27 @@ public class SecurityConfig {
                     // and ClientIdentityFilter are anchored on AuthenticationFilter, not on
                     // BearerTokenAuthenticationFilter, or the REQ-INGEST-011 allowlist is silently
                     // skipped for every DPoP request.
-                    .dPoP(dpop -> {})
+                    .dPoP(
+                        dpop ->
+                            dpop
+                                // htu comes from configuration, not from the request — see
+                                // PublicUriDpopAuthenticationConverter. Spring compares it with a
+                                // bare String.equals against a URL Tomcat assembles from the
+                                // proxy's forwarded headers, so a proxy that omits
+                                // X-Forwarded-Port breaks every proof in production while every
+                                // test stays green.
+                                .authenticationConverter(
+                                    new PublicUriDpopAuthenticationConverter(
+                                        ingestProperties.getPublicBaseUrl()))
+                                // The stock DPoPAuthenticationEntryPoint answers a bodyless 401
+                                // and bypasses SecurityProblemResponseHandler — so a rejected
+                                // proof would carry no problem body AND increment no
+                                // basetool_ingest_auth_failures_total series. Route it through the
+                                // module's own handler instead, or the most likely failure of this
+                                // whole change is the one we cannot see (REQ-OBS-011).
+                                .authenticationFailureHandler(
+                                    new org.springframework.security.web.authentication
+                                        .AuthenticationEntryPointFailureHandler(securityProblems)))
                     .jwt(jwt -> {})
                     .authenticationEntryPoint(securityProblems)
                     .accessDeniedHandler(securityProblems))
