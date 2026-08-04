@@ -26,13 +26,14 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Binds the authenticated caller's JWT {@code sub} claim, parsed to a {@link java.util.UUID}, to a
+ * Binds the authenticated caller's {@code sub} claim, parsed to a {@link java.util.UUID}, to a
  * controller method parameter — the UUID-typed twin of {@link CurrentUserSub}.
  *
- * <p>Resolved by {@link CurrentUserArgumentResolver}: a missing JWT, a missing/blank subject claim,
- * or a subject that is not a valid UUID each raise {@link
- * org.springframework.security.access.AccessDeniedException} (HTTP 403), reproducing the {@code
- * NotificationController#requireSub} guard this annotation supersedes.
+ * <p>Resolved by {@link CurrentUserArgumentResolver}, which reads the subject rather than the
+ * authentication type — so this also binds for the member an ingest-gateway call acts for, who
+ * carries a subject and no token (ADR-0129). A missing or blank subject and a subject that is not a
+ * valid UUID each raise {@link org.springframework.security.access.AccessDeniedException} (HTTP
+ * 403).
  *
  * <p>Parameters carrying this annotation are hidden from the generated OpenAPI document (registered
  * in {@link de.greluc.krt.profit.basetool.backend.config.OpenApiConfig}).

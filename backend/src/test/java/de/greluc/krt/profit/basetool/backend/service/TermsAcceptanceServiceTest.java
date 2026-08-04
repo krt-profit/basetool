@@ -44,6 +44,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Unit-level behaviour of {@link TermsAcceptanceService} (REQ-SEC-028): the sort translation, the
@@ -190,21 +192,81 @@ class TermsAcceptanceServiceTest {
   }
 
   /**
-   * A race with another instance surfaces as a unique-constraint violation and is absorbed: the row
-   * that matters exists either way, so the caller gets a clean "already accepted" instead of a 500.
+   * A race with another instance is absorbed, and the verdict is <strong>re-read</strong> rather
+   * than assumed.
+   *
+   * <p>The caller still gets a clean "already accepted" instead of a 500. What changed is that the
+   * catch no longer caches: {@code DataIntegrityViolationException} does not say <em>which</em>
+   * constraint fired, and from inside an aborted transaction that cannot be established. A unique
+   * violation does imply a committed row, but the foreign key to {@code app_user} raises the same
+   * exception type with nothing committed at all — and caching that positive would let a subject
+   * with no local row through the consent gate for the process lifetime. One extra {@code exists}
+   * query buys the distinction.
    */
   @Test
-  void absorbsAConcurrentAcceptanceFromAnotherInstance() {
+  void absorbsAConcurrentAcceptanceFromAnotherInstanceAndRereadsTheVerdict() {
     when(termsVersionProvider.getCurrentVersion()).thenReturn(VERSION);
     when(termsAcceptanceRepository.existsByUserIdAndTermsVersion(userId, VERSION))
-        .thenReturn(false);
+        .thenReturn(false, true);
     when(termsAcceptanceRepository.save(any()))
         .thenThrow(new DataIntegrityViolationException("uq_terms_acceptance_user_version"));
 
     assertThat(service.acceptCurrentTerms(userId)).isFalse();
-    // The winner's row satisfies this user, so the gate must let them through from now on.
+    // The winner's row satisfies this user, so the gate lets them through — established by asking
+    // the database, which is why the second stubbed answer is the one that decides.
     assertThat(service.hasAcceptedCurrentTerms(userId)).isTrue();
+    verify(termsAcceptanceRepository, times(2)).existsByUserIdAndTermsVersion(userId, VERSION);
     assertThat(meterRegistry.counter("basetool.terms.acceptances").count()).isEqualTo(0.0);
+  }
+
+  /**
+   * Consent recorded inside a transaction is not cached until that transaction commits.
+   *
+   * <p>The defect this closes: {@code TermsAcceptance} carries an assigned {@code @Id} and no
+   * {@code @Version}, so {@code save()} issues no SQL — the insert, and any constraint violation it
+   * trips, surfaces at <strong>commit</strong>, after the method has returned and after the cache
+   * was written. A caller whose insert failed there was remembered as consenting for the process
+   * lifetime with no row to show for it, and REQ-SEC-028's gate then waved them through until the
+   * next deploy.
+   *
+   * <p>Drives the real {@code TransactionSynchronizationManager} and deliberately never fires
+   * {@code afterCommit}, which is precisely the failed-commit case.
+   */
+  @Test
+  void doesNotCacheConsentUntilTheTransactionCommits() {
+    when(termsVersionProvider.getCurrentVersion()).thenReturn(VERSION);
+    when(termsAcceptanceRepository.existsByUserIdAndTermsVersion(userId, VERSION))
+        .thenReturn(false);
+    TransactionSynchronizationManager.initSynchronization();
+    try {
+      assertThat(service.acceptCurrentTerms(userId)).isTrue();
+
+      // No commit happened, so nothing may be remembered: the next probe must ask the database.
+      assertThat(service.hasAcceptedCurrentTerms(userId)).isFalse();
+      verify(termsAcceptanceRepository, times(2)).existsByUserIdAndTermsVersion(userId, VERSION);
+    } finally {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
+  }
+
+  /** Once the transaction commits, the verdict is remembered and the query stops repeating. */
+  @Test
+  void cachesConsentOnceTheTransactionCommits() {
+    when(termsVersionProvider.getCurrentVersion()).thenReturn(VERSION);
+    when(termsAcceptanceRepository.existsByUserIdAndTermsVersion(userId, VERSION))
+        .thenReturn(false);
+    TransactionSynchronizationManager.initSynchronization();
+    try {
+      assertThat(service.acceptCurrentTerms(userId)).isTrue();
+      TransactionSynchronizationManager.getSynchronizations()
+          .forEach(TransactionSynchronization::afterCommit);
+
+      assertThat(service.hasAcceptedCurrentTerms(userId)).isTrue();
+      // Exactly one: accept()'s own probe. The verdict came from memory, which is the point.
+      verify(termsAcceptanceRepository, times(1)).existsByUserIdAndTermsVersion(userId, VERSION);
+    } finally {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
   }
 
   /**

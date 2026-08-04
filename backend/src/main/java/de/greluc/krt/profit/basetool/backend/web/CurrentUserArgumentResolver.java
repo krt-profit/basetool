@@ -19,12 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.web;
 
+import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import java.security.Principal;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.MethodParameter;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
@@ -32,7 +33,7 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 
 /**
  * Resolves {@link CurrentUserSub}-annotated {@link String} and {@link CurrentUserId}-annotated
- * {@link UUID} controller parameters from the authenticated caller's JWT {@code sub} claim.
+ * {@link UUID} controller parameters from the authenticated caller's subject.
  *
  * <p>This is the single implementation of the {@code requireSub(JwtAuthenticationToken)} guard that
  * six controllers previously hand-rolled (five returning the raw subject, {@code
@@ -41,10 +42,14 @@ import org.springframework.web.method.support.ModelAndViewContainer;
  * JwtAuthenticationToken} method parameters these annotations replace — so no {@link
  * org.springframework.security.core.context.SecurityContextHolder} coupling is introduced.
  *
- * <p>Failure semantics are preserved verbatim: a missing/non-JWT principal, a missing or blank
- * subject, or (for {@link CurrentUserId}) a non-UUID subject each raise {@link
- * AccessDeniedException} with the same messages as before, which the security layer renders as RFC
- * 7807 {@code 403}.
+ * <p>The subject comes from {@link
+ * de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject}, not from a type check, so a
+ * caller that carries a subject without a token — the member an ingest-gateway call acts for,
+ * ADR-0129 — resolves like any other. Demanding a {@code JwtAuthenticationToken} here refused every
+ * such call during argument resolution, one layer past the gate it used to fail at.
+ *
+ * <p>An absent subject and (for {@link CurrentUserId}) a non-UUID subject each raise {@link
+ * AccessDeniedException}, which the security layer renders as RFC 7807 {@code 403}.
  */
 public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolver {
 
@@ -95,7 +100,7 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
   }
 
   /**
-   * Extracts and validates the JWT subject from the current request, applying the null-JWT and
+   * Extracts and validates the caller's subject from the current request, applying the
    * blank-subject guards the controllers shared.
    *
    * @param webRequest the current request
@@ -104,14 +109,12 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
    */
   @NotNull
   private static String requireSubject(@NotNull NativeWebRequest webRequest) {
+    // Asked of AuthenticatedSubject, not of the type. A request the ingest gateway makes on behalf
+    // of a member carries that member's identity with NO token behind it (ADR-0129), so demanding a
+    // JwtAuthenticationToken here threw before the handler body ran — every gateway call 403'd at
+    // argument resolution, one layer past the gate that used to fail it.
     Principal principal = webRequest.getUserPrincipal();
-    if (!(principal instanceof JwtAuthenticationToken auth) || auth.getToken() == null) {
-      throw new AccessDeniedException("Missing JWT.");
-    }
-    String sub = auth.getToken().getSubject();
-    if (sub == null || sub.isBlank()) {
-      throw new AccessDeniedException("JWT does not contain a subject claim.");
-    }
-    return sub;
+    return AuthenticatedSubject.of(principal instanceof Authentication auth ? auth : null)
+        .orElseThrow(() -> new AccessDeniedException("No authenticated subject."));
   }
 }

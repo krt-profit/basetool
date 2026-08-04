@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -31,6 +32,7 @@ import static org.mockito.Mockito.verify;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -47,6 +49,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 /**
  * Unit tests for {@link AuthHelperService} — the sole sanctioned reader of {@link
@@ -113,6 +117,72 @@ class AuthHelperServiceTest {
 
       assertTrue(result.isPresent());
       assertSame(real, result.get());
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // currentUserId() — reads the SUBJECT through the seam, never the principal name
+  // ---------------------------------------------------------------------
+
+  @Nested
+  class CurrentUserIdTests {
+
+    private static final UUID SUB = UUID.fromString("44444444-4444-4444-4444-444444444444");
+
+    /** The ordinary resource-server case: the id comes from the token's {@code sub}. */
+    @Test
+    void readsTheSubjectOfABearerToken() {
+      Jwt token = Jwt.withTokenValue("t").header("alg", "none").subject(SUB.toString()).build();
+      SecurityContextHolder.getContext()
+          .setAuthentication(new JwtAuthenticationToken(token, List.of()));
+
+      assertEquals(Optional.of(SUB), helper.currentUserId());
+    }
+
+    /**
+     * A caller whose {@code getName()} is a UUID but who carries no subject yields empty.
+     *
+     * <p>The behaviour this accessor changed. It used to read {@link Authentication#getName()} and
+     * parse it, so this returned the id; since ADR-0129 it asks {@code AuthenticatedSubject}, which
+     * accepts a JWT subject or an authentication that opts in via {@code SubjectAuthentication} and
+     * nothing else. That narrowing is the point: {@code getName()} is a callsign on such a token,
+     * and REQ-OBS-004 keeps callsigns out of everything this id feeds. Unreachable in production —
+     * the backend is a pure resource server — but this is the accessor with ~53 call sites behind
+     * it, so the contract is pinned rather than assumed.
+     */
+    @Test
+    void yieldsEmptyForAPrincipalNameThatMerelyLooksLikeAnId() {
+      SecurityContextHolder.getContext()
+          .setAuthentication(
+              new UsernamePasswordAuthenticationToken(SUB.toString(), "n/a", List.of()));
+
+      assertTrue(helper.currentUserId().isEmpty());
+    }
+
+    /**
+     * A {@link Jwt} carried as the principal of some other authentication is still read.
+     *
+     * <p>{@code AuthenticatedSubject} keeps that branch specifically for this shape, and nothing
+     * else exercised it.
+     */
+    @Test
+    void readsAJwtCarriedAsThePrincipalOfAnotherAuthentication() {
+      Jwt token = Jwt.withTokenValue("t").header("alg", "none").subject(SUB.toString()).build();
+      SecurityContextHolder.getContext()
+          .setAuthentication(new UsernamePasswordAuthenticationToken(token, "n/a", List.of()));
+
+      assertEquals(Optional.of(SUB), helper.currentUserId());
+    }
+
+    /** An anonymous caller has no id. */
+    @Test
+    void yieldsEmptyForAnAnonymousCaller() {
+      SecurityContextHolder.getContext()
+          .setAuthentication(
+              new AnonymousAuthenticationToken(
+                  "key", "anonymousUser", AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS")));
+
+      assertTrue(helper.currentUserId().isEmpty());
     }
   }
 

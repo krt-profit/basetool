@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.support.ActingMemberAuthorities;
+import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.Permissions;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.support.RefusedSubjectWindow;
@@ -97,6 +99,13 @@ import tools.jackson.databind.ObjectMapper;
 @EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
+
+  /**
+   * Re-arms the consent gate under the {@code test} profile for a single test class.
+   *
+   * <p>Only honoured when the {@code test} profile is active; production is armed regardless.
+   */
+  static final String TERMS_GATE_ARMED_IN_TEST = "app.security.terms.armed-in-test";
 
   /**
    * Cross-origin allowlist for the backend API. Empty by default: the backend is only addressed
@@ -291,13 +300,16 @@ public class SecurityConfig {
    *
    * @param http Spring Security builder
    * @param jwtAuthenticationConverter wired by {@link #jwtAuthenticationConverter}
-   * @param env active environment, used to detect the {@code test} profile so CSRF can be disabled
-   *     for MockMvc tests
+   * @param env active environment, used to detect the {@code test} profile — which disables CSRF
+   *     for MockMvc tests and stands the consent gate down unless {@link #TERMS_GATE_ARMED_IN_TEST}
+   *     re-arms it
    * @param securityProblemResponseHandler renders filter-level 401/403 as RFC&nbsp;7807
    *     problem+json (wired as both the entry point and the access-denied handler)
-   * @param messageSource localizes the {@code PendingApprovalAccessFilter} 403 problem body
+   * @param messageSource localizes the 403 problem bodies of the three refusing filters ({@code
+   *     PendingApprovalAccessFilter}, {@code TermsAcceptanceAccessFilter}, {@code
+   *     ActingMemberFilter})
    * @param problemResponseFactory assembles the RFC&nbsp;7807 problem body for those filters
-   * @param objectMapper serializes that filter's {@code ProblemDetail} to JSON
+   * @param objectMapper serializes those filters' {@code ProblemDetail}s to JSON
    * @param meterRegistry counts the identity-provider-unavailable 503 on {@code
    *     basetool_http_error_total} (REQ-OBS-011)
    * @return the configured security filter chain
@@ -314,7 +326,9 @@ public class SecurityConfig {
       ObjectMapper objectMapper,
       MeterRegistry meterRegistry,
       TermsConsentCheck termsConsentCheck,
-      RefusedSubjectWindow refusedSubjectWindow)
+      RefusedSubjectWindow refusedSubjectWindow,
+      IngestGatewayProperties ingestGatewayProperties,
+      ActingMemberAuthorities actingMemberAuthorities)
       throws Exception {
 
     boolean isTest = java.util.Arrays.asList(env.getActiveProfiles()).contains("test");
@@ -328,7 +342,15 @@ public class SecurityConfig {
     // TermsAcceptanceAccessFilterTest drives the real filter directly instead.
     // NOTE: this carve-out is `test`-only. The E2E profile is NOT `test`, so the gate is live
     // there and E2E users must actually accept.
-    TermsConsentCheck effectiveConsentCheck = isTest ? userId -> true : termsConsentCheck;
+    // ...with one opt-in escape hatch, because the stand-down had a cost that only showed up
+    // later: no test could observe the gate at all, so when the acting-member identity swap
+    // (ADR-0129) made TermsAcceptanceAccessFilter fail OPEN on the ingest path, the whole suite
+    // stayed green. A test class that is specifically about the consent boundary re-arms it for
+    // itself. This cannot weaken production: outside the `test` profile the gate is armed
+    // unconditionally, and the property is read only when `isTest` already holds.
+    boolean armed =
+        !isTest || env.getProperty(TERMS_GATE_ARMED_IN_TEST, Boolean.class, Boolean.FALSE);
+    TermsConsentCheck effectiveConsentCheck = armed ? termsConsentCheck : userId -> true;
 
     if (isTest) {
       // CSRF is intentionally disabled in the `test` Spring profile so MockMvc
@@ -689,15 +711,31 @@ public class SecurityConfig {
         // boundary, not just via the frontend redirect. Placed after the bearer-token filter so the
         // authorities are already assembled. Emits an RFC-7807 problem+json body with a minted
         // correlationId (it runs before CorrelationIdFilter) — RFC-7807 hardening.
+        // ADR-0129: replace the security identity with the member an ingest gateway is acting for,
+        // BEFORE the two person-gates below. They must judge the person who is sending, exactly as
+        // they did while the gateway still relayed that person's token — otherwise consent
+        // (REQ-SEC-028) and approval (REQ-SEC-017) would be evaluated against a service account and
+        // the ingest path would silently stop enforcing either. Runs immediately after the
+        // bearer-token filter, which is the first point at which there IS a caller to check.
+        .addFilterAfter(
+            new ActingMemberFilter(
+                ingestGatewayProperties,
+                actingMemberAuthorities,
+                messageSource,
+                problemResponseFactory,
+                objectMapper,
+                meterRegistry),
+            org.springframework.security.oauth2.server.resource.web.authentication
+                .BearerTokenAuthenticationFilter.class)
         .addFilterAfter(
             new PendingApprovalAccessFilter(
                 messageSource, problemResponseFactory, objectMapper, meterRegistry),
-            org.springframework.security.oauth2.server.resource.web.authentication
-                .BearerTokenAuthenticationFilter.class)
+            ActingMemberFilter.class)
         // REQ-SEC-028: refuse the API until the Terms of Use are accepted. Enforced HERE rather
         // than only in the frontend because the backend is the one place every caller passes
-        // through — the web UI and, since the gateway relays the caller's own bearer
-        // (REQ-INGEST-001), the desktop extractor. Placed AFTER the pending-approval filter so a
+        // through — the web UI and, since ActingMemberFilter above makes the gateway's call carry
+        // the sending member's identity (ADR-0129), the desktop extractor. Placed AFTER the
+        // pending-approval filter so a
         // user who is both pending and unconsented gets the approval message, which is the one
         // they can actually act on.
         .addFilterAfter(

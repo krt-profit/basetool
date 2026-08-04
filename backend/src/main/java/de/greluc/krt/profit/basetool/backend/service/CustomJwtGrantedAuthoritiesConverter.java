@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority;
 import java.time.Duration;
 import java.time.Instant;
@@ -78,6 +79,18 @@ public class CustomJwtGrantedAuthoritiesConverter
     implements Converter<Jwt, Collection<GrantedAuthority>> {
 
   private static final int MAX_SYNC_ATTEMPTS = 3;
+
+  /**
+   * The single authority a machine identity carries (ADR-0129).
+   *
+   * <p>Deliberately a named authority rather than an empty collection: an empty set makes the
+   * caller anonymous to every downstream check, so a misconfiguration would read as "not
+   * authenticated" instead of "authenticated as a machine" — and {@code
+   * .anyRequest().authenticated()} would then refuse it for a reason that points nowhere. It grants
+   * nothing on its own; the gateway's actual access comes from the member it acts for.
+   */
+  public static final String GATEWAY_AUTHORITY = "ROLE_INGEST_GATEWAY";
+
   private static final long RETRY_BACKOFF_MILLIS = 50L;
 
   /**
@@ -94,6 +107,7 @@ public class CustomJwtGrantedAuthoritiesConverter
   private static final long AUTHORITIES_CACHE_MAX_SIZE = 10_000;
 
   private final UserReconciliationService userReconciliationService;
+  private final IngestGatewayProperties ingestGatewayProperties;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final OrgUnitCascadeService orgUnitCascadeService;
 
@@ -169,6 +183,29 @@ public class CustomJwtGrantedAuthoritiesConverter
    * @return the freshly assembled authorities.
    */
   private Collection<GrantedAuthority> assembleAuthorities(@NonNull Jwt jwt) {
+    // A MACHINE IS NOT A MEMBER (ADR-0129). The ingest gateway authenticates as a Keycloak service
+    // account, which at token level is indistinguishable from a person: a real user with a UUID
+    // `sub` and realm roles. Without this the very first call from the gateway ran the whole
+    // registration flow on it — an app_user row, a PENDING stamp, the default personal blueprints,
+    // and an admin notification "Neue Registrierung wartet auf Freigabe" — and then 403'd the
+    // gateway on its own account. It locked itself out on its first authentication (2026-08-04).
+    //
+    // Keyed on `azp` against the SAME allowlist that already governs the far more dangerous
+    // on-behalf-of decision (ActingMemberFilter), so this adds no new trust: `azp` is a claim
+    // inside a Keycloak-signed token, not something a client can set. Empty allowlist means nobody.
+    //
+    // NOT a realm role: mapRolesTracked silently drops names absent from the local catalogue and
+    // falls back to Guest, so the marker would vanish and the row would be created anyway — and
+    // forgetting the grant in a new realm would fail OPEN. NOT a `service-account-` prefix either:
+    // the `sub` is a UUID, and that prefix lives on `preferred_username`, a renameable display
+    // convention.
+    //
+    // The scheduled Keycloak roster sync needs no equivalent carve-out: measured against Keycloak
+    // 26.7, `GET /admin/realms/{realm}/users` omits service-account users entirely, even though the
+    // user demonstrably exists.
+    if (ingestGatewayProperties.isGatewayClient(jwt.getClaimAsString("azp"))) {
+      return List.of(new SimpleGrantedAuthority(GATEWAY_AUTHORITY));
+    }
     ObjectOptimisticLockingFailureException lastLockingFailure = null;
     for (int attempt = 1; attempt <= MAX_SYNC_ATTEMPTS; attempt++) {
       try {
@@ -180,33 +217,7 @@ public class CustomJwtGrantedAuthoritiesConverter
         // ROLE_PENDING_APPROVAL. ROLE_GUEST is deliberately NOT carried: a pending user is routed
         // to
         // the "waiting for approval" surface, not given the guest read surface.
-        if (!user.isApproved()) {
-          return List.of(new SimpleGrantedAuthority("ROLE_PENDING_APPROVAL"));
-        }
-
-        Collection<GrantedAuthority> authorities =
-            user.getRoles().stream()
-                .flatMap(
-                    role -> {
-                      Stream<GrantedAuthority> roleAuth =
-                          Stream.of(
-                              new SimpleGrantedAuthority(
-                                  "ROLE_" + role.getName().toUpperCase().replace(" ", "_")));
-                      Stream<GrantedAuthority> permAuth =
-                          role.getPermissions().stream().map(SimpleGrantedAuthority::new);
-                      return Stream.concat(roleAuth, permAuth);
-                    })
-                .collect(Collectors.toCollection(ArrayList::new));
-
-        // R6.d / Plan D3: source the per-role flags from the user's OrgUnit memberships. Any
-        // membership that carries `is_logistician = true` promotes the caller to the flat
-        // ROLE_LOGISTICIAN authority (same for ROLE_MISSION_MANAGER). The legacy User-level
-        // columns are consulted as a fallback so a user whose memberships have not yet been
-        // backfilled by V95 (impossible today but defensive for the migration window) does not
-        // silently lose access.
-        addMembershipDerivedRoles(user, authorities);
-
-        return authorities;
+        return assembleFor(user);
       } catch (ObjectOptimisticLockingFailureException e) {
         lastLockingFailure = e;
         int attemptsLeft = MAX_SYNC_ATTEMPTS - attempt;
@@ -236,6 +247,54 @@ public class CustomJwtGrantedAuthoritiesConverter
     throw new AuthenticationServiceException(
         "Failed to resolve user authorities after " + MAX_SYNC_ATTEMPTS + " attempts",
         lastLockingFailure);
+  }
+
+  /**
+   * Assembles a member's authorities from the database alone, with no token involved.
+   *
+   * <p>Extracted so the ordinary login path and the ingest gateway's acting-member path share
+   * <em>one</em> implementation (ADR-0129). Two copies would drift, and the way they would drift is
+   * the dangerous one: a member acting through the gateway would silently carry a different
+   * authority set than the same member logging in.
+   *
+   * <p>Nothing here reads the token, which is what makes the acting-member path exact rather than
+   * approximate: approval status, roles, per-role permissions and every org-unit-derived authority
+   * are database reads already.
+   *
+   * @param user the member whose authorities to assemble
+   * @return the authorities, or the lone {@code ROLE_PENDING_APPROVAL} for a non-approved
+   *     registration
+   */
+  public Collection<GrantedAuthority> assembleFor(@NonNull User user) {
+    // Epic #720, Track 1 / REQ-SEC-017: a PENDING (or REJECTED) registration is granted NO
+    // authorities. The ENTIRE assembly below — realm roles, permissions, membership-derived flat
+    // roles, contextual + cascaded authorities — is short-circuited to a single
+    // ROLE_PENDING_APPROVAL. ROLE_GUEST is deliberately NOT carried: a pending user is routed to
+    // the "waiting for approval" surface, not given the guest read surface.
+    if (!user.isApproved()) {
+      return List.of(new SimpleGrantedAuthority("ROLE_PENDING_APPROVAL"));
+    }
+
+    Collection<GrantedAuthority> authorities =
+        user.getRoles().stream()
+            .flatMap(
+                role -> {
+                  Stream<GrantedAuthority> roleAuth =
+                      Stream.of(
+                          new SimpleGrantedAuthority(
+                              "ROLE_" + role.getName().toUpperCase().replace(" ", "_")));
+                  Stream<GrantedAuthority> permAuth =
+                      role.getPermissions().stream().map(SimpleGrantedAuthority::new);
+                  return Stream.concat(roleAuth, permAuth);
+                })
+            .collect(Collectors.toCollection(ArrayList::new));
+
+    // R6.d / Plan D3: source the per-role flags from the user's OrgUnit memberships. Any membership
+    // that carries `is_logistician = true` promotes the caller to the flat ROLE_LOGISTICIAN
+    // authority (same for ROLE_MISSION_MANAGER).
+    addMembershipDerivedRoles(user, authorities);
+
+    return authorities;
   }
 
   /**

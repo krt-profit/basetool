@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -28,10 +29,8 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
@@ -62,13 +61,13 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  * <p>The same ordering also leaves the {@code userId} MDC key unset, and {@code
  * CorrelationIdFilter} is its only writer in the backend. A filter-level 403 (URL-matrix denial)
  * would therefore render as the logback pattern's {@code anonymous} default even though the {@link
- * SecurityContextHolder} already holds the caller's {@link JwtAuthenticationToken} — while a
- * controller-thrown {@code AccessDeniedException} renders the real {@code sub} in a byte-identical
- * line. That makes the value actively misleading, so {@link #delegate} stamps the {@code sub} for
- * the duration of the rejection write using the same own-then-remove discipline as the correlation
- * id. It stays unset when there is no {@link JwtAuthenticationToken}, so a genuine anonymous 401
- * still reads {@code anonymous} truthfully. Only the {@code sub} is stamped, never the callsign or
- * e-mail (REQ-OBS-004).
+ * SecurityContextHolder} already holds the caller's authentication — while a controller-thrown
+ * {@code AccessDeniedException} renders the real {@code sub} in a byte-identical line. That makes
+ * the value actively misleading, so {@link #delegate} stamps the {@code sub} for the duration of
+ * the rejection write using the same own-then-remove discipline as the correlation id. It stays
+ * unset when there is no authenticated subject, so a genuine anonymous 401 still reads {@code
+ * anonymous} truthfully. Only the {@code sub} is stamped, never the callsign or e-mail
+ * (REQ-OBS-004).
  */
 @Slf4j
 @Component
@@ -202,10 +201,14 @@ public class SecurityProblemResponseHandler
   }
 
   /**
-   * Puts the current {@link JwtAuthenticationToken}'s {@code sub} claim into the {@code userId} MDC
-   * key, unless something already populated that key (then the existing value wins, exactly as the
-   * correlation id above) or the caller is not JWT-authenticated (then the key stays unset so the
-   * logback pattern's {@code anonymous} default is the truth rather than a cover-up).
+   * Puts the authenticated caller's subject into the {@code userId} MDC key, unless something
+   * already populated that key (then the existing value wins, exactly as the correlation id above)
+   * or the caller has no readable subject (then the key stays unset so the logback pattern's {@code
+   * anonymous} default is the truth rather than a cover-up).
+   *
+   * <p>A token-less acting member (ADR-0129) has a readable subject and is stamped, so a refusal of
+   * one is attributable; a username/password caller is not, because its name is a callsign that
+   * REQ-OBS-004 keeps out of the log.
    *
    * <p>Deliberately duplicated in {@code PendingApprovalAccessFilter} instead of extracted into the
    * {@code logging} package: {@code logging.CorrelationIdFilter} already depends on {@code
@@ -220,12 +223,12 @@ public class SecurityProblemResponseHandler
     if (existing != null && !existing.isBlank()) {
       return false;
     }
-    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (!(auth instanceof JwtAuthenticationToken jwtAuth)) {
-      return false;
-    }
-    String sub = jwtAuth.getToken().getSubject();
-    if (sub == null || sub.isBlank()) {
+    // Asked of AuthenticatedSubject, not of the type — an acting member (ADR-0129) is a named
+    // caller with no token, and a refusal logged as anonymous is the one line forensics would need.
+    String sub =
+        AuthenticatedSubject.of(SecurityContextHolder.getContext().getAuthentication())
+            .orElse(null);
+    if (sub == null) {
       return false;
     }
     MDC.put(MDC_USER_ID, sub);

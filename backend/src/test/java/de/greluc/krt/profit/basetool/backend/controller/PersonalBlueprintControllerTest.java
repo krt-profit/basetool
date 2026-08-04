@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,11 +41,9 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintUpdateRe
 import de.greluc.krt.profit.basetool.backend.service.BlueprintCraftabilityService;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -56,8 +53,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.multipart.MultipartFile;
 
 /** Unit tests for {@link PersonalBlueprintController}. */
@@ -69,20 +64,8 @@ class PersonalBlueprintControllerTest {
   @Mock private PersonalBlueprintService service;
   @Mock private BlueprintImportService importService;
   @Mock private BlueprintCraftabilityService craftabilityService;
-  @Mock private UserService userService;
-
-  @Mock
-  private de.greluc.krt.profit.basetool.backend.support.ActingSubjectResolver actingSubjectResolver;
 
   @InjectMocks private PersonalBlueprintController controller;
-
-  private JwtAuthenticationToken auth;
-
-  @BeforeEach
-  void setUp() {
-    Jwt jwt = Jwt.withTokenValue("token").header("alg", "none").claim("sub", SUB).build();
-    auth = new JwtAuthenticationToken(jwt);
-  }
 
   private static PersonalBlueprintResponse sample() {
     Instant now = Instant.parse("2026-01-01T00:00:00Z");
@@ -167,13 +150,12 @@ class PersonalBlueprintControllerTest {
   }
 
   @Test
-  void craftability_derivesSubAndUserIdAndRelaysFlag() {
+  void craftability_relaysSubUserIdAndFlag() {
     UUID userId = UUID.randomUUID();
-    when(userService.getUserIdFromJwt(any(Jwt.class))).thenReturn(userId);
     List<BlueprintCraftabilityDto> expected = List.of();
     when(craftabilityService.computeForOwner(SUB, userId, true)).thenReturn(expected);
 
-    List<BlueprintCraftabilityDto> result = controller.craftability(true, SUB, auth);
+    List<BlueprintCraftabilityDto> result = controller.craftability(true, SUB, userId);
 
     assertSame(expected, result);
     verify(craftabilityService).computeForOwner(SUB, userId, true);
@@ -186,15 +168,7 @@ class PersonalBlueprintControllerTest {
     BlueprintImportPreviewDto preview = new BlueprintImportPreviewDto(0, 0, 0, 0, 0, 0, List.of());
     when(importService.previewImport(SUB, file)).thenReturn(preview);
 
-    // The preview endpoint now resolves WHO it acts for, because the ingest gateway may call it on
-    // behalf of a member (ADR-0129). For an ordinary caller that resolves to their own sub.
-    org.springframework.security.oauth2.jwt.Jwt jwt =
-        mock(org.springframework.security.oauth2.jwt.Jwt.class);
-    jakarta.servlet.http.HttpServletRequest request =
-        mock(jakarta.servlet.http.HttpServletRequest.class);
-    when(actingSubjectResolver.resolve(jwt, request)).thenReturn(SUB);
-
-    BlueprintImportPreviewDto result = controller.previewImport(file, jwt, request);
+    BlueprintImportPreviewDto result = controller.previewImport(file, SUB);
 
     assertEquals(0, result.total());
     verify(importService).previewImport(SUB, file);

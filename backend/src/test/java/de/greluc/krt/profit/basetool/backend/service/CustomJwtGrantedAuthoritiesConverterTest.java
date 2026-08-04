@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority;
 import java.time.Instant;
 import java.util.Collection;
@@ -48,6 +49,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -69,12 +71,74 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   @Mock private OrgUnitCascadeService orgUnitCascadeService;
   @Mock private Jwt jwt;
 
+  /**
+   * A real instance, not a mock: the default empty allowlist is the state most of these tests need
+   * — no caller is a gateway, so the machine-identity carve-out never fires and each case exercises
+   * the ordinary member path it was written for (ADR-0129).
+   *
+   * <p>A spy rather than a plain field so the two carve-out tests can set an allowlist on it and
+   * drive the other branch.
+   */
+  @Spy
+  private final IngestGatewayProperties ingestGatewayProperties = new IngestGatewayProperties();
+
   @InjectMocks private CustomJwtGrantedAuthoritiesConverter converter;
 
   private static final UUID USER_ID = UUID.randomUUID();
   private static final UUID BEREICH_ID = UUID.randomUUID();
   private static final UUID DESCENDANT_STAFFEL_ID = UUID.randomUUID();
   private static final UUID DESCENDANT_SK_ID = UUID.randomUUID();
+
+  /**
+   * A configured gateway is a machine: exactly one marker authority, and no registration.
+   *
+   * <p>The carve-out shipped untested, which is how the defect it fixes reached production in the
+   * first place. Both halves are asserted, because each fails differently:
+   *
+   * <ul>
+   *   <li>The authority set is {@code ROLE_INGEST_GATEWAY} and <em>nothing else</em>. A named
+   *       authority rather than an empty set, so a misconfiguration reads as "authenticated as a
+   *       machine" instead of "not authenticated" — and nothing extra, so the gateway's own bearer
+   *       can reach no member surface.
+   *   <li>{@code userReconciliationService} is never touched. That is the actual production
+   *       failure: the gateway's first call created an {@code app_user} row for itself, stamped it
+   *       PENDING, granted the default blueprints, notified the admins, and then 403'd its own
+   *       account. Asserting only the authorities would still pass while all of that happened.
+   * </ul>
+   */
+  @Test
+  void grantsAConfiguredGatewayTheMachineAuthorityAndNeverRegistersIt() {
+    ingestGatewayProperties.setClientIds(List.of("test-ingest-gateway"));
+    when(jwt.getClaimAsString("azp")).thenReturn("test-ingest-gateway");
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    assertEquals(
+        List.of(CustomJwtGrantedAuthoritiesConverter.GATEWAY_AUTHORITY),
+        authorities.stream().map(GrantedAuthority::getAuthority).toList());
+    verifyNoInteractions(userReconciliationService);
+  }
+
+  /**
+   * A caller whose {@code azp} is not on the allowlist takes the ordinary member path.
+   *
+   * <p>The complement of the case above: without it, a carve-out that matched everything would
+   * still pass, and every member would authenticate as a machine with no roles at all.
+   */
+  @Test
+  void leavesANonGatewayCallerOnTheOrdinaryMemberPath() {
+    ingestGatewayProperties.setClientIds(List.of("test-ingest-gateway"));
+    when(jwt.getClaimAsString("azp")).thenReturn("basetool-frontend");
+    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    assertFalse(
+        authorities.stream()
+            .map(GrantedAuthority::getAuthority)
+            .anyMatch(CustomJwtGrantedAuthoritiesConverter.GATEWAY_AUTHORITY::equals));
+    verify(userReconciliationService).syncUser(jwt);
+  }
 
   private User userWithNoRoles() {
     User user = new User();

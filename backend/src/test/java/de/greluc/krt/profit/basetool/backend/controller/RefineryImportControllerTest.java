@@ -32,10 +32,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryImportDraftDto;
 import de.greluc.krt.profit.basetool.backend.service.RefineryImportService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -95,14 +93,11 @@ class RefineryImportControllerTest {
 
   @MockitoBean private RefineryImportService refineryImportService;
 
-  @MockitoBean private UserService userService;
-
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    when(userService.getUserIdFromJwt(any())).thenReturn(UUID.randomUUID());
   }
 
   @Test
@@ -120,9 +115,8 @@ class RefineryImportControllerTest {
         .thenReturn(new RefineryImportDraftDto(null, List.of(), 1, 1, 0));
 
     // When / Then — plain membership suffices, no elevated role required.
-    // The subject is a real UUID: since ADR-0129 the owner is resolved by ActingSubjectResolver,
-    // which is fail-closed on a non-UUID sub exactly as UserService#getUserIdFromJwt always was.
-    // The default `user` subject only ever worked here because userService was mocked away.
+    // The subject must be a real UUID: @CurrentUserId parses it and is fail-closed on anything
+    // else. MockMvc's default `user` subject only ever passed here while the parse was mocked away.
     mockMvc
         .perform(
             post(ENDPOINT)

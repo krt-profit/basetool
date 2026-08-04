@@ -68,9 +68,15 @@ public class BackendImportClient {
    * <p>Since the gateway stopped relaying the caller's token, the backend can no longer read the
    * subject out of the bearer — that bearer now identifies the <em>gateway</em>. The subject
    * travels here instead, and the backend honours it only when the authenticated principal is the
-   * gateway's service account. It carries a subject and nothing else: it cannot grant a role, widen
-   * a scope or select an org unit, which is what keeps a header-borne identity from becoming an
-   * escalation.
+   * gateway's service account.
+   *
+   * <p>It carries a subject and nothing else — but that subject now selects the whole security
+   * identity of the call, not merely an owner field: the backend assembles the named member's own
+   * roles and org-unit scope and evaluates both person-gates against them (ADR-0129, amended
+   * 2026-08-04). What bounds it is therefore not the header's narrowness but the backend's four
+   * guards, chiefly that the named member must still be live. This paragraph used to claim the
+   * header "cannot grant a role, widen a scope or select an org unit"; that stopped being true when
+   * the gateway stopped relaying the caller's token.
    *
    * <p>The backend declares the same literal; the two are kept in step by a parity test, because a
    * rename on one side alone degrades silently into "every ingest write is attributed to nobody"

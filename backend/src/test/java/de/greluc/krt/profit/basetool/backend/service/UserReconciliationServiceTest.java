@@ -125,6 +125,47 @@ class UserReconciliationServiceTest {
   // syncUser(Jwt) — the hot path on every authenticated request
   // ---------------------------------------------------------------
 
+  /**
+   * The roster sync persists the Keycloak {@code enabled} flag (V230, ADR-0129).
+   *
+   * <p>The Admin API always returned it and the sync always dropped it, so deactivating a member
+   * refused them nothing: with a token that is bounded by expiry, but the ingest gateway can
+   * <em>name</em> a subject, and a name does not expire. This is what makes revocation take effect
+   * at the next sync pass instead of never.
+   */
+  @Test
+  void persistsTheKeycloakEnabledFlag() {
+    User existing = new User();
+    existing.setId(USER_ID);
+    existing.setEnabledInKeycloak(true);
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+
+    userReconciliationService.syncUser(
+        new KeycloakUserDto(USER_ID, "alice", "alice@example.com", false, Set.of(), null));
+
+    assertFalse(existing.isEnabledInKeycloak());
+  }
+
+  /**
+   * A missing {@code enabled} field reads as enabled.
+   *
+   * <p>Fail-open on purpose, and the only place in this boundary where that is right: the flag can
+   * only ever refuse, so a realm that stops sending the field would otherwise lock out the entire
+   * member base at the next sync pass.
+   */
+  @Test
+  void treatsAnAbsentEnabledFieldAsEnabled() {
+    User existing = new User();
+    existing.setId(USER_ID);
+    existing.setEnabledInKeycloak(false);
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+
+    userReconciliationService.syncUser(
+        new KeycloakUserDto(USER_ID, "alice", "alice@example.com", null, Set.of(), null));
+
+    assertTrue(existing.isEnabledInKeycloak());
+  }
+
   @Nested
   class SyncJwtUserTests {
 

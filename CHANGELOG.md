@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der Versand aus dem Extractor wird wieder dir zugerechnet — mit deinen Rechten und deiner Zustimmung.** Das Backend prüfte Freigabe, Zustimmung und Rechte am technischen Konto des Gateways statt an der sendenden Person. Für die Dauer eines solchen Aufrufs gilt jetzt wieder deine Identität; ein deaktiviertes Mitglied kann darüber nichts mehr senden.
+
+- **Ein in der Benutzerverwaltung deaktiviertes Mitglied kann über den Extractor nichts mehr senden.** Bisher wirkte eine Deaktivierung dort erst, wenn das Konto tatsächlich gelöscht wurde. Sie greift jetzt beim nächsten Abgleich, eine Reaktivierung entsprechend bei der nächsten Anmeldung.
+
+- **Eine fehlgeschlagene Zustimmung gilt nicht mehr als erteilt.** Die Zustimmung wurde vorgemerkt, bevor sie gespeichert war — schlug das Speichern fehl, galt sie bis zum nächsten Neustart trotzdem als erteilt. Jetzt zählt sie erst, wenn sie wirklich gespeichert ist.
+
+- **Das Gateway erscheint nicht mehr als neues Mitglied.** Sein technisches Konto löste bisher eine Registrierung samt Freigabeanfrage an die Administratoren aus, weil ein solches Konto von einer Person nicht zu unterscheiden war. Es wird jetzt als Maschine erkannt.
+
 ## [v1.5.35](https://github.com/krt-profit/basetool/releases/tag/v1.5.35) - 2026-08-04
 
 ### Fixed

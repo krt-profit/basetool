@@ -166,6 +166,14 @@ public class UserReconciliationService {
 
     boolean changed = false;
 
+    // A token exists only for an enabled account, so a successful authentication is itself proof of
+    // the flag the roster sync mirrors — which makes re-activation take effect at the member's next
+    // login rather than waiting for the next sync pass.
+    if (!user.isEnabledInKeycloak()) {
+      user.setEnabledInKeycloak(true);
+      changed = true;
+    }
+
     if (!Objects.equals(user.getUsername(), username)) {
       user.setUsername(username);
       changed = true;
@@ -283,6 +291,16 @@ public class UserReconciliationService {
 
     if (!user.isInKeycloak()) {
       user.setInKeycloak(true);
+      changed = true;
+    }
+
+    // The Admin API has always returned this; it used to be dropped on the floor. Persisted since
+    // V230 because a named subject does not expire the way a token does (ADR-0129): without it,
+    // deactivating a member in Keycloak left their extractor sending indefinitely. A null `enabled`
+    // is read as TRUE — an absent field must not lock out a member base.
+    boolean enabled = !Boolean.FALSE.equals(dto.enabled());
+    if (user.isEnabledInKeycloak() != enabled) {
+      user.setEnabledInKeycloak(enabled);
       changed = true;
     }
 

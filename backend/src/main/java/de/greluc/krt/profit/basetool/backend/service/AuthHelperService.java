@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.Collection;
 import java.util.Optional;
@@ -167,16 +168,19 @@ public class AuthHelperService {
   }
 
   /**
-   * Returns the UUID of the currently authenticated user, parsed from the JWT {@code sub} claim
-   * surfaced as the {@link Authentication#getName() authentication name}. Empty when the request is
-   * unauthenticated, anonymous, or the principal name is not a UUID (defence-in-depth: a malformed
-   * subject should not crash the caller).
+   * Returns the UUID of the currently authenticated user, read through {@code AuthenticatedSubject}
+   * so a bearer token and the token-less identity an ingest-gateway call installs (ADR-0129) answer
+   * alike. Empty when the request is unauthenticated, anonymous, or the subject is not a UUID
+   * (defence-in-depth: a malformed subject should not crash the caller).
    */
   @NotNull
   public Optional<UUID> currentUserId() {
-    return currentAuthentication()
-        .map(Authentication::getName)
-        .flatMap(AuthHelperService::tryParseUuid);
+    // Through the seam, not through getName(). This method predates the ingest gateway's identity
+    // swap and happened to keep working for it only because the acting member's name equals its
+    // sub — an accident, not a contract. Reading getName() is the idiom that split every consumer
+    // into fail-open and fail-closed when a second authentication type appeared (ADR-0129), and it
+    // is the one that would put a callsign here for a username/password caller (REQ-OBS-004).
+    return AuthenticatedSubject.idOf(currentAuthentication().orElse(null));
   }
 
   /**
@@ -232,13 +236,5 @@ public class AuthHelperService {
   private de.greluc.krt.profit.basetool.backend.service.OwnerScopeService scope() {
     return applicationContext.getBean(
         de.greluc.krt.profit.basetool.backend.service.OwnerScopeService.class);
-  }
-
-  private static Optional<UUID> tryParseUuid(@NotNull String value) {
-    try {
-      return Optional.of(UUID.fromString(value));
-    } catch (IllegalArgumentException ex) {
-      return Optional.empty();
-    }
   }
 }

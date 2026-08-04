@@ -864,6 +864,44 @@ groups:
         annotations:
           summary: "Something other than the ingest gateway is sending an on-behalf-of header"
           description: "The backend refused an X-Ingest-On-Behalf-Of header from a caller whose azp is not on the gateway allowlist, repeatedly. Either app.security.ingest-gateway.client-ids does not match the gateway's actual client id - in which case ingest uploads are also failing - or somebody is probing for an impersonation primitive. Check the gateway's own token first, then the access log for the source."
+
+      # A named subject does not expire the way a token does. That asymmetry is the whole reason
+      # the liveness bound exists (ADR-0129), and this is the counter that says it is holding.
+      # Two very different causes land here, and the runbook step is to tell them apart:
+      #   - an offboarded member whose extractor is still installed and still sending, which is
+      #     benign but should end with uninstalling it; and
+      #   - a caller walking UUIDs to find out which subjects exist, which is not. The refusal is
+      #     byte-identical for both by design, so this metric is the ONLY place they differ.
+      # No `for:` clause as low as the others: a single refusal is meaningful here, but a
+      # decommissioned laptop retrying on a schedule would flap a 0-tolerance rule, so this asks
+      # for a sustained rate instead.
+      - alert: ActingMemberNotLiveRefused
+        expr: >-
+          sum(rate(basetool_on_behalf_of_refused_total{reason="member_not_live"}[15m])) > 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ingest gateway is naming a member the backend will not act for"
+          description: "The backend has been refusing on-behalf-of requests for a member that is either unknown locally or that the last Keycloak roster sync no longer found. Most likely an offboarded member whose desktop extractor is still running - find them via the correlationId in the backend log and have it uninstalled. If the refused subjects VARY, this is somebody enumerating user ids instead, and the source belongs in the access log."
+
+      # Two causes, and the rate tells them apart. The header ships in the extractor and is
+      # documented, so an unauthenticated caller CAN send it - a probe, or a client whose token
+      # expired mid-upload. That is ambient and single-shot. A sustained rate means the filter
+      # cannot see a caller that should be there, i.e. the chain was reordered ahead of it, which
+      # is the class of bug ADR-0129 was written after.
+      # NOT a >0-over-an-hour rule: this reason was briefly reachable from ANY path, and that
+      # version fired for a full hour off one internet probe. The endpoint bound now runs first, so
+      # only the two ingest endpoints can produce it, and a sustained rate is meaningful.
+      - alert: OnBehalfOfWithoutAuthenticatedCaller
+        expr: >-
+          sum(rate(basetool_on_behalf_of_refused_total{reason="no_authenticated_caller"}[15m])) > 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Sustained on-behalf-of traffic at an ingest endpoint with no authenticated caller"
+          description: "ActingMemberFilter has been refusing on-behalf-of requests at an ingest endpoint because the SecurityContext held no authenticated caller, for half an hour. A single occurrence is a probe or an expired token; a sustained rate is not. Check whether ingest uploads are also failing - if they are, suspect the security filter chain being reordered ahead of this filter (compare SecurityConfig's addFilterAfter ordering against ADR-0129) or authentication failing silently. If uploads are fine, this is an unauthenticated caller sending the header, and the access log has the source."
       - alert: TermsConsentRolloutStalled
         expr: |
           (max(basetool_terms_refused_subjects) >= 3)

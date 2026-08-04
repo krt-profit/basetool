@@ -66,21 +66,73 @@ authentication does not get built on a deprecated preview switch.
 
 ### What the trust boundary actually costs
 
-The backend gains a path where identity arrives in a header rather than in the token. That is a real
-change and the reason this is an ADR. Three things bound it:
+**Amended 2026-08-04, with the repository owner's prior approval.** The first cut bounded the header
+as "a subject and nothing else, honoured only on the two import endpoints", and substituted that
+subject at the two call sites. Production showed why that is not enough: the Spring `SecurityContext`
+still held the *gateway*, so `@PreAuthorize`, `@CurrentUserId`, the org-unit scope, the audit trail
+and **both person-gates** judged a service account instead of the person sending. Attribution was
+right and everything else was wrong — and the gates being wrong is the serious part, because consent
+(REQ-SEC-028) and approval (REQ-SEC-017) covered the extractor precisely *because* the gateway used
+to relay that person's token.
 
-- The header is honoured **only** when the authenticated principal is the gateway's service account.
-  Any other caller presenting it is refused, not ignored.
-- It is honoured **only** on the two import endpoints the gateway actually calls.
-- It carries a subject and nothing else. It cannot grant a role, widen a scope, or select an
-  org unit.
+So the header now **selects the acting member as the security identity** for the request, and
+`ActingMemberFilter` replaces the context before either gate runs. It therefore does grant roles and
+select a scope — which the earlier wording forbade — but it grants the member's own, assembled from
+the database, and never more.
 
-That last point is what makes this safe here rather than merely convenient. Both target endpoints —
-`POST /api/v1/refinery-orders/import-extract` and `POST /api/v1/personal-blueprints/import/preview` —
-require only `isAuthenticated()` and resolve their owner from `sub`. They read no realm role, no
-scope, and no org-unit claim; org-unit context comes from DB memberships and a separate request
-header. So there is no claim whose absence could **silently** downgrade a user's permissions, which
-is the failure mode that usually sinks an on-behalf-of design.
+That is exact rather than approximate because **every authority this application grants is already a
+database read**: approval status, roles, per-role permissions, the org-unit membership flags and the
+contextual and cascaded org-unit authorities. The access token contributes none of them directly.
+The same assembler serves both paths, so a member acting through the gateway carries precisely the
+authority set they would carry logging in.
+
+**One bound on that, and it is worth naming.** "Precisely" holds at equal database state, which is
+not the same as at equal time. The login path runs `UserReconciliationService.syncUser(jwt)` before
+assembling, and that call writes the token's realm roles into the row; the acting-member path has no
+token and assembles from whatever the row currently holds. So a role **removed** in Keycloak takes
+effect on the member's next browser login immediately, but on the gateway path only once
+`UserSyncTask` next runs. The liveness guard does not cover this — it refuses an account that is
+gone or disabled, not a role downgrade. The exposure is bounded by the roster-sync interval and is the same
+staleness every other DB-derived authority in this application already carries, but the two paths are
+distinguishable on exactly this axis and nowhere else.
+
+This also amends **ADR-0127**, whose reasoning for the consent gate covering the extractor rests
+on the gateway relaying the caller's bearer. That mechanism is gone; the coverage now comes from
+this identity swap running before the gate.
+
+Four guards bound it, and each closes a way this has gone wrong or could. They produce five
+counted refusal reasons (`basetool_on_behalf_of_refused_total{reason}`), because a named
+subject can fail either by not being a UUID or by not being live; the answer to the caller is
+identical for all five on purpose.
+
+- **Only a configured gateway**, keyed on `azp` through one shared predicate, so the "may act for
+  another member" and "is a machine, not a member" decisions cannot drift apart. Empty allowlist
+  admits nobody.
+- **Only the two import endpoints**, matched as parsed `PathPattern`s on the *decoded* path
+  (REQ-SEC-029). The bound used to live in this document; now it lives in code.
+- **Fail closed on a header with no authenticated caller** — refused, never ignored, so a future
+  change to the authentication filters cannot silently reproduce the ordering bug that produced this
+  amendment.
+- **Liveness — presence *and* `enabled`.** The database did not mirror identity-provider liveness
+  at all: the roster sync fetched `enabled` and dropped it, and the `inKeycloak` flag it did
+  maintain was read by no authority code, so a member removed **or** deactivated in Keycloak kept
+  `ACTIVE` and every role here indefinitely. Harmless while a token is what grants access — the
+  account stops being issued tokens and the last one expires in minutes — and not harmless once a
+  caller can *name* a subject, because a name never expires. So both facts are now persisted and
+  both are refused: an unknown subject is refused rather than created, one the last sync no longer
+  found is refused, and one whose account is disabled is refused (V230). Revocation takes effect at
+  the next sync pass, or immediately at the member's next login, instead of never. That is harmless while a token grants access — the account stops being
+  issued tokens and the last one expires in minutes — and stops being harmless the moment a caller
+  can *name* a subject, because a name never expires. So a subject with no local row is refused
+  rather than created, and one the last sync no longer found is refused outright.
+
+**A machine is not a member.** A Keycloak service account is a full user with a UUID `sub`, so the
+first call from the gateway ran the entire registration flow on it: an `app_user` row, a PENDING
+stamp, the default personal blueprints, an admin notification, and then a 403 on its own account. It
+locked itself out on its first authentication. The authority converter now recognises a configured
+gateway by `azp` and returns a single `ROLE_INGEST_GATEWAY` without touching the registration path.
+The scheduled Keycloak roster sync needs no equivalent carve-out: measured against Keycloak 26.7,
+`GET /admin/realms/{realm}/users` omits service-account users entirely even though the user exists.
 
 ## Consequences
 

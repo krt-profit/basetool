@@ -519,7 +519,9 @@ public final class MetricNames {
 
   /**
    * Counter {@code basetool_on_behalf_of_refused_total} — tag {@code reason} ({@link
-   * #ON_BEHALF_OF_NOT_A_GATEWAY} / {@link #ON_BEHALF_OF_MALFORMED}).
+   * #ON_BEHALF_OF_NOT_A_GATEWAY}, {@link #ON_BEHALF_OF_ENDPOINT_NOT_BOUND}, {@link
+   * #ON_BEHALF_OF_NO_CALLER}, {@link #ON_BEHALF_OF_MALFORMED}, {@link
+   * #ON_BEHALF_OF_MEMBER_NOT_LIVE}).
    *
    * <p>A security signal, not noise. Since ADR-0129 the ingest gateway may name the member it acts
    * for; anyone else presenting that header is refused and counted here. A non-zero {@code
@@ -533,6 +535,36 @@ public final class MetricNames {
 
   /** {@link #ON_BEHALF_OF_REFUSED} reason: the named subject was not a UUID. */
   public static final String ON_BEHALF_OF_MALFORMED = "malformed_subject";
+
+  /**
+   * {@link #ON_BEHALF_OF_REFUSED} reason: the header arrived at an ingest endpoint with no
+   * authenticated caller behind it.
+   *
+   * <p>Two causes, and they need different responses. Ordinarily it is a probe or a client whose
+   * token expired — the header ships in the extractor and is documented, so an unauthenticated
+   * caller can send it. A <em>sustained</em> rate alongside failing uploads means something else:
+   * the filter runs after authentication, so a persistent inability to see a caller points at the
+   * filter ordering having changed underneath it, which is the bug ADR-0129 was written after.
+   *
+   * <p>This was documented as structurally unreachable until the endpoint bound was moved ahead of
+   * the caller check; before that, any unauthenticated request to <em>any</em> path carrying the
+   * header landed here, and the alert on it fired for an hour off a single internet probe.
+   */
+  public static final String ON_BEHALF_OF_NO_CALLER = "no_authenticated_caller";
+
+  /** {@link #ON_BEHALF_OF_REFUSED} reason: the endpoint does not accept an acting member. */
+  public static final String ON_BEHALF_OF_ENDPOINT_NOT_BOUND = "endpoint_not_bound";
+
+  /**
+   * {@link #ON_BEHALF_OF_REFUSED} reason: the named member is unknown here, or the last roster sync
+   * no longer found them in the identity provider.
+   *
+   * <p>The highest-value signal of the five. A named subject never expires the way a token does, so
+   * this counter is what distinguishes "a member was offboarded and their extractor is still
+   * running" from "someone is probing which subjects exist". Both refuse identically to the caller;
+   * only this metric tells them apart.
+   */
+  public static final String ON_BEHALF_OF_MEMBER_NOT_LIVE = "member_not_live";
 
   /**
    * Tag: the Terms-of-Use version a measurement belongs to. Bounded by construction — one process
