@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.36](https://github.com/krt-profit/basetool/releases/tag/v1.5.36) - 2026-08-04
+
 ### Fixed
 
 - **Der Versand aus dem Extractor wird wieder dir zugerechnet — mit deinen Rechten und deiner Zustimmung.** Das Backend prüfte Freigabe, Zustimmung und Rechte am technischen Konto des Gateways statt an der sendenden Person. Für die Dauer eines solchen Aufrufs gilt jetzt wieder deine Identität; ein deaktiviertes Mitglied kann darüber nichts mehr senden.
