@@ -1165,6 +1165,16 @@ force a second consent read per handshake plus a second copy of the `test`-profi
 authentication carve-outs. Detection is keyed on the `Upgrade` header rather than the path, so an
 encoded spelling of `/ws/sync` cannot slip back into the redirect (REQ-SEC-029).
 
+**The rollout signal counts subjects, never requests.** `basetool_terms_refused_subjects` is a gauge
+of the distinct subjects the gate refused in the last 15 minutes, and `TermsConsentRolloutStalled`
+reads it with `max()` — per process, so `sum()` would double-count a subject that hit two instances.
+A refusal *rate* cannot express the thing the alert is for: at 0.01/s one automated caller sustains
+it indefinitely, so a single looping browser tab fired it twice overnight on 2026-08-03 with nobody
+awake. A retrying client, a member reading the terms slowly and one straggler are each **one**
+subject; three distinct people locked out at once is the shape of a broken consent path. The window
+is bounded by construction (entries expire, and a hard cap drops *new* subjects so the gauge can
+only ever under-report) because the feed is an internet-reachable refusal path.
+
 Six invariants that must survive any rewrite:
 
 - **The consent endpoints are never refused.** Refusing `/api/v1/terms/**` makes the block
@@ -1228,7 +1238,8 @@ drift from the client's) · **Code:** `TermsVersionProvider`, `TermsAcceptanceSe
 `support.TermsConsentCheck` (the leaf interface that keeps `config` and `service` acyclic per
 ADR-0047), `support.TermsGateHandoff` (the leaf that does the same for the frontend's `config` →
 `websocket` handoff), `TermsController`, `AdminTermsController` · **Monitoring:**
-`basetool_terms_acceptances_total`, `basetool_terms_accepted_users`, `TermsConsentRolloutStalled`,
+`basetool_terms_acceptances_total`, `basetool_terms_accepted_users`,
+`basetool_terms_refused_subjects`, `TermsConsentRolloutStalled`,
 `basetool_livesync_socket_rejected_total{reason="terms_gate"}` · **Decision:** ADR-0128
 
 ### REQ-SEC-029 — A path-scoped filter matches the DECODED path, never the raw request URI

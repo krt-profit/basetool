@@ -824,17 +824,30 @@ groups:
       # until the first acceptance ever recorded, and an absent series makes the `and` yield nothing
       # — the alert could never fire in exactly the situation it is meant to catch (nobody has
       # managed to accept). See the increase()-cannot-fire trap.
+      # Reads SUBJECTS, not requests. The refusal RATE cannot separate "the membership is locked
+      # out" from "one client is retrying": 0.01/s is one refusal per 100 s, while a single consent
+      # page render costs ~3, so any automated caller sustains the old threshold indefinitely. That
+      # is how this fired twice overnight on 2026-08-03 with nobody awake — one browser tab whose
+      # EventSource had been redirected into a reconnect loop (fixed separately). A looping tab, a
+      # member reading the terms slowly, and a straggler whose extractor keeps retrying are each ONE
+      # subject and can no longer fire it.
+      #
+      # max(), never sum(): the gauge is per process, so a subject refused on two instances would
+      # otherwise count twice. >= 3 distinct people locked out simultaneously is the shape of a
+      # broken consent path; for: 1h beats a deliberate read of a legal document, which the old 30m
+      # did not. Known and accepted fail-quiet: a backend restart inside the 2h window makes
+      # increase() extrapolate a phantom acceptance and suppresses the alert until it clears.
       - alert: TermsConsentRolloutStalled
         expr: |
-          (sum(rate(basetool_http_error_total{code="TERMS_NOT_ACCEPTED"}[15m])) > 0.01)
+          (max(basetool_terms_refused_subjects) >= 3)
           and
-          ((sum(increase(basetool_terms_acceptances_total[1h])) or vector(0)) == 0)
-        for: 30m
+          ((sum(increase(basetool_terms_acceptances_total[2h])) or vector(0)) == 0)
+        for: 1h
         labels:
           severity: warning
         annotations:
-          summary: "Terms-of-Use consent gate refusing users, but nobody is getting through"
-          description: "The consent gate has been refusing callers for 30 minutes while not a single acceptance was recorded in the last hour. Expected right after a terms change only if nobody has logged in; otherwise the consent path is broken and members are locked out of the tool AND the desktop extractor. Check /admin/terms for who is outstanding, and the frontend log for failures on POST /terms/accept."
+          summary: "Terms-of-Use consent gate locking out several members, none getting through"
+          description: "At least three distinct members have been refused by the consent gate for an hour while not a single acceptance was recorded in the last two hours. Expected right after a terms change only if nobody has logged in; otherwise the consent path is broken and those members are locked out of the tool AND the desktop extractor. Check /admin/terms for who is outstanding, and the frontend log for failures on POST /terms/accept."
 
       # Backend oversized-JSON-body rejections (RequestBodySizeLimitFilter) on the capped import
       # endpoints (refinery import-extract). baseline-tune: >0.2/s sustained is a probing/DoS pattern.

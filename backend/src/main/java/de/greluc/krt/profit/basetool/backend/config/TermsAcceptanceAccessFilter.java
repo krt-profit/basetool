@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.support.RefusedSubjectWindow;
 import de.greluc.krt.profit.basetool.backend.support.TermsConsentCheck;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
@@ -118,6 +119,7 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
   private final ProblemResponseFactory problemResponseFactory;
   private final ObjectMapper objectMapper;
   private final MeterRegistry meterRegistry;
+  private final RefusedSubjectWindow refusedSubjects;
 
   @Override
   protected void doFilterInternal(
@@ -179,6 +181,9 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
    */
   private void writeForbidden(HttpServletRequest request, HttpServletResponse response, UUID userId)
       throws IOException {
+    // Counted as a distinct subject, not just as a request. See MetricNames.TERMS_REFUSED_SUBJECTS:
+    // the refusal rate alone cannot separate a locked-out membership from one client retrying.
+    refusedSubjects.record(userId);
     boolean owned = stampUserId(userId);
     try {
       writeForbiddenBody(request, response);

@@ -19,11 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.Permissions;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.support.RefusedSubjectWindow;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.support.TermsConsentCheck;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -255,6 +259,28 @@ public class SecurityConfig {
   }
 
   /**
+   * The sliding window of distinct subjects the consent gate refused, published as the {@code
+   * basetool_terms_refused_subjects} gauge (REQ-SEC-028, REQ-OBS-011).
+   *
+   * <p>15 minutes is chosen against the alert that reads it: long enough that a member who is
+   * refused, reads the terms and takes a while to decide stays counted throughout, short enough
+   * that the series falls back to zero within one scrape window of a rollout completing. The 5 000
+   * cap is roughly two orders of magnitude above the membership — it exists so an
+   * internet-reachable refusal path cannot grow the map without bound, not as a functional limit.
+   *
+   * @param meterRegistry the registry the gauge is published to
+   * @return the window the consent filter records refusals into
+   */
+  @Bean
+  public RefusedSubjectWindow refusedSubjectWindow(MeterRegistry meterRegistry) {
+    RefusedSubjectWindow window = new RefusedSubjectWindow(Duration.ofMinutes(15), 5_000);
+    Gauge.builder(MetricNames.TERMS_REFUSED_SUBJECTS, window, RefusedSubjectWindow::size)
+        .description("Distinct subjects the Terms-of-Use consent gate refused in the last 15 min.")
+        .register(meterRegistry);
+    return window;
+  }
+
+  /**
    * Builds the main {@link SecurityFilterChain}: CSRF policy (profile-dependent), CORS source,
    * security response headers (CSP, X-Frame-Options, Referrer-Policy, Permissions-Policy,
    * X-Content-Type-Options), the request-authorization matrix and JWT resource-server activation.
@@ -287,7 +313,8 @@ public class SecurityConfig {
       ProblemResponseFactory problemResponseFactory,
       ObjectMapper objectMapper,
       MeterRegistry meterRegistry,
-      TermsConsentCheck termsConsentCheck)
+      TermsConsentCheck termsConsentCheck,
+      RefusedSubjectWindow refusedSubjectWindow)
       throws Exception {
 
     boolean isTest = java.util.Arrays.asList(env.getActiveProfiles()).contains("test");
@@ -679,7 +706,8 @@ public class SecurityConfig {
                 messageSource,
                 problemResponseFactory,
                 objectMapper,
-                meterRegistry),
+                meterRegistry,
+                refusedSubjectWindow),
             PendingApprovalAccessFilter.class)
         // REQ-SEC-024: catch an identity-provider-unreachable failure (JWKS fetch timeout / 5xx /
         // Docker-DNS strand) escaping the bearer-token filter as a re-thrown
