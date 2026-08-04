@@ -409,6 +409,15 @@ public final class MetricNames {
    */
   public static final String SOCKET_REJECTED_USER_CAP = "user_cap";
 
+  /**
+   * Socket-rejected reason ({@link #LIVESYNC_SOCKET_REJECTED}): a {@code /ws/sync} socket refused
+   * because its user has not accepted the Terms of Use in force (REQ-SEC-028). Distinct from {@link
+   * #SOCKET_REJECTED_USER_CAP} because it means something entirely different operationally — a
+   * sustained rate here is the shape of a wording rollout stalling, not of abuse, and it is the
+   * only signal that a consent gate is turning users' live sync off.
+   */
+  public static final String SOCKET_REJECTED_TERMS_GATE = "terms_gate";
+
   /** Reason: the backend returned a 4xx problem response. */
   public static final String REASON_BACKEND_4XX = "backend_4xx";
 

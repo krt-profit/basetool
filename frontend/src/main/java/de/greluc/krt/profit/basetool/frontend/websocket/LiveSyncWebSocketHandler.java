@@ -27,6 +27,7 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.time.Duration;
 import java.time.Instant;
@@ -302,6 +303,37 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    */
   static final CloseStatus SOCKET_CAP_EXCEEDED = new CloseStatus(4029, "socket cap exceeded");
 
+  /**
+   * Session-attribute key ({@link String}) holding the consent-page URL for a handshake the
+   * Terms-of-Use gate marked instead of redirecting (REQ-SEC-028). Set by the {@code /ws/sync}
+   * handshake interceptor; its presence means the socket must be refused at connect. Public so the
+   * interceptor can populate it.
+   */
+  public static final String ATTR_TERMS_GATE = "livesync.termsGate";
+
+  /**
+   * Application-defined WebSocket close status ({@code 4003}) for a socket refused because its user
+   * has not accepted the Terms of Use in force (REQ-SEC-028). Mirrors HTTP {@code 403} the way
+   * {@link #SOCKET_CAP_EXCEEDED} mirrors {@code 429} — and specifically the {@code 403} plus {@code
+   * X-Terms-Acceptance-Required} the gate answers an XHR with, since this is the same refusal in
+   * the one idiom a WebSocket can act on.
+   *
+   * <p>The close <em>reason</em> carries the consent-page URL, which is the whole point: without it
+   * the client learns only that the socket died, and a dead socket is something it must retry.
+   * {@code krt-live-sync.js} treats this code as terminal — it stops reconnecting for good and
+   * navigates to the named page — because no amount of reconnecting can produce consent.
+   */
+  static final int TERMS_CONSENT_REQUIRED_CODE = 4003;
+
+  /**
+   * Hard cap on the close reason, in UTF-8 bytes. A close frame's payload is 125 bytes and the code
+   * takes two of them, so a longer reason makes the container reject the close outright — which
+   * would leave the socket open and hand the client back the reconnect loop this refusal exists to
+   * end. Only a pathological context path could approach it; the guard is here so that case
+   * degrades to "closed without a URL" rather than "not closed at all".
+   */
+  private static final int MAX_CLOSE_REASON_BYTES = 123;
+
   private static final String ATTR_USER_ID = "livesync.userId";
 
   /**
@@ -505,13 +537,26 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * Registers a freshly connected multiplexed {@code /ws/sync} socket. It joins no room at connect
    * — its rooms are built by later {@code subscribe} frames — so this only resolves the principal,
    * enforces the per-user socket cap (F2 / #1243), wraps the socket in its backpressure decorator
-   * and seeds an empty subscription set. A socket with no resolvable principal, or one that would
+   * and seeds an empty subscription set. A socket whose user has not accepted the Terms of Use
+   * ({@link #ATTR_TERMS_GATE}, REQ-SEC-028), one with no resolvable principal, or one that would
    * put the user over {@link #MAX_SOCKETS_PER_USER}, is refused.
    *
    * @param session the freshly opened session
    */
   @Override
   public void afterConnectionEstablished(@NotNull WebSocketSession session) throws Exception {
+    String consentUrl = (String) session.getAttributes().get(ATTR_TERMS_GATE);
+    if (consentUrl != null) {
+      // The consent gate let this handshake complete for exactly this moment (REQ-SEC-028): a
+      // refused upgrade is a bare 1006 the client must read as "connection dropped" and retry, so
+      // the refusal is delivered here, where a close CODE and a reason exist. Checked before the
+      // principal resolution and the per-user cap so a gated socket neither takes a slot nor logs
+      // as a cap refusal.
+      log.debug("Live-sync /ws/sync socket refused (Terms of Use not accepted)");
+      socketRejectedCounter(MetricNames.SOCKET_REJECTED_TERMS_GATE).increment();
+      session.close(termsConsentRequired(consentUrl));
+      return;
+    }
     Principal principal = session.getPrincipal();
     String userId = principal == null ? null : resolveUserId(principal);
     if (userId == null) {
@@ -535,6 +580,24 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     session.getAttributes().put(ATTR_SUBSCRIPTIONS, ConcurrentHashMap.<String>newKeySet());
     WebSocketSession decorated = wrap(session);
     session.getAttributes().put(ATTR_DECORATED, decorated);
+  }
+
+  /**
+   * Builds the {@link #TERMS_CONSENT_REQUIRED_CODE} close status for a socket refused by the
+   * consent gate, carrying the consent-page URL as the close reason.
+   *
+   * <p>The URL is dropped when it would not fit a close frame (see {@link #MAX_CLOSE_REASON_BYTES})
+   * rather than truncated: half a path is not a destination, and a client that receives the code
+   * without a reason still stops reconnecting — it just leaves the user to navigate. Losing the
+   * loop matters more than losing the redirect.
+   *
+   * @param consentUrl the context-relative consent-page URL the gate named
+   * @return the close status to refuse the socket with
+   */
+  @NotNull
+  private static CloseStatus termsConsentRequired(@NotNull String consentUrl) {
+    boolean fits = consentUrl.getBytes(StandardCharsets.UTF_8).length <= MAX_CLOSE_REASON_BYTES;
+    return new CloseStatus(TERMS_CONSENT_REQUIRED_CODE, fits ? consentUrl : null);
   }
 
   /**

@@ -933,6 +933,71 @@ class LiveSyncWebSocketHandlerTest {
     assertThat(fanout.publishedTopics).isEmpty();
   }
 
+  // ── Consent gate (REQ-SEC-028): a marked handshake is refused terminally ──────────────────────
+
+  /**
+   * A handshake the consent gate marked is refused with {@code 4003} carrying the consent page.
+   *
+   * <p>All three parts are the contract and each alone is useless. The code is what {@code
+   * krt-live-sync.js} recognises as terminal; without it the close is just a close and the client
+   * reconnects forever, which is the defect. The reason is where the client learns which page can
+   * end the refusal. And the socket must actually be closed — a marked socket left open would relay
+   * peer changes to a user the backend refuses every fragment fetch for.
+   */
+  @Test
+  void consentGate_refusesTheSocketWithATerminalCloseCodeAndTheConsentUrl() throws Exception {
+    FakeSession session = multiplexedSession(oidcUser("user-1", "Alice"));
+    session.attributes.put(LiveSyncWebSocketHandler.ATTR_TERMS_GATE, "/terms/accept");
+
+    handler.afterConnectionEstablished(session);
+
+    assertThat(session.closeStatus).isNotNull();
+    assertThat(session.closeStatus.getCode())
+        .isEqualTo(LiveSyncWebSocketHandler.TERMS_CONSENT_REQUIRED_CODE);
+    assertThat(session.closeStatus.getReason()).isEqualTo("/terms/accept");
+    assertThat(session.open).isFalse();
+    assertThat(socketRejectedCounter(MetricNames.SOCKET_REJECTED_TERMS_GATE)).isEqualTo(1.0);
+  }
+
+  /**
+   * A gated refusal consumes no per-user socket slot.
+   *
+   * <p>The check runs before the cap is acquired, so a tab reconnecting against a closed gate
+   * cannot exhaust the user's own budget and turn a consent prompt into a socket-cap refusal once
+   * they accept. Driven past the cap deliberately: with the checks in the other order this fails.
+   */
+  @Test
+  void consentGate_refusalTakesNoUserSocketSlot() throws Exception {
+    OidcUser bob = oidcUser("user-2", "Bob");
+    for (int i = 0; i < LiveSyncWebSocketHandler.MAX_SOCKETS_PER_USER + 1; i++) {
+      FakeSession gated = multiplexedSession(bob);
+      gated.attributes.put(LiveSyncWebSocketHandler.ATTR_TERMS_GATE, "/terms/accept");
+      handler.afterConnectionEstablished(gated);
+    }
+
+    // Consent recorded: the very next handshake is unmarked and must be accepted, not capped.
+    assertThat(openMultiplexedSession(bob).closeStatus).isNull();
+  }
+
+  /**
+   * A consent URL too long for a close frame is dropped, but the socket is still closed with the
+   * terminal code. Losing the redirect costs the user one navigation; failing the close outright
+   * (which is what an over-long reason does to the container) would hand back the reconnect loop.
+   */
+  @Test
+  void consentGate_dropsAnUnsendableConsentUrlButStillClosesTerminally() throws Exception {
+    FakeSession session = multiplexedSession(oidcUser("user-1", "Alice"));
+    session.attributes.put(
+        LiveSyncWebSocketHandler.ATTR_TERMS_GATE, "/" + "x".repeat(200) + "/terms/accept");
+
+    handler.afterConnectionEstablished(session);
+
+    assertThat(session.closeStatus).isNotNull();
+    assertThat(session.closeStatus.getCode())
+        .isEqualTo(LiveSyncWebSocketHandler.TERMS_CONSENT_REQUIRED_CODE);
+    assertThat(session.closeStatus.getReason()).isNull();
+  }
+
   // ── Abuse bounds (F2 / #1243): per-user socket cap + per-topic publish throttle ───────────────
 
   @Test

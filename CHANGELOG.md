@@ -4,6 +4,8 @@
 
 ### Changed
 
+- **Der Alarm zur Zustimmungseinführung schlägt nur noch an, wenn tatsächlich mehrere Personen ausgesperrt sind.** Bisher zählte er abgelehnte Anfragen statt Personen — ein einzelnes wiederholt anfragendes Programm genügte, um ihn nachts auszulösen, obwohl niemand betroffen war. Er beobachtet jetzt, wie viele **verschiedene** Mitglieder abgelehnt werden, und lässt einer Person auch genug Zeit, die Bedingungen in Ruhe zu lesen.
+
 - **Der Desktop-Extractor sendet wieder und ist dabei besser geschützt als zuvor.** Seit dem 3. August schlug jeder Versand mit „A valid bearer token is required" fehl: das Zugangs-Token war an den Rechner gebunden, wurde aber in einer Form übergeben, die der Server aus Sicherheitsgründen ablehnt. Das Gateway prüft die Bindung jetzt selbst und spricht mit dem Backend unter eigener Kennung weiter — die Bindung wirkt damit genau dort, wo sie zählt, nämlich auf der Strecke aus dem Internet (ADR-0129).
 
 ### Fixed
@@ -15,6 +17,8 @@
 - **P4K-Import (Admin): Die laufende Fortschrittsabfrage erkennt jetzt die Zustimmungsabfrage, statt sie als Erfolg zu lesen.** Wurde während eines Imports eine neue Fassung der Nutzungsbedingungen aktiv, holte die Seite alle 3 Sekunden endlos die Zustimmungsseite, ohne dass sichtbar etwas passierte. Sie wechselt jetzt zur Zustimmungsseite und beendet die Abfrage — wie jede andere Oberfläche (REQ-SEC-028).
 
 - **Deutlich weniger Serverlast, solange jemand noch nicht zugestimmt hat.** Das Zwischenergebnis „hat noch nicht zugestimmt" wurde gespeichert, aber nie wiederverwendet, sodass jede einzelne Anfrage einer nicht zugestimmten Sitzung eine zusätzliche Abfrage im Hintergrund auslöste. Es gilt jetzt wie das positive Gegenstück bis zu 60 Sekunden; eine Zustimmung wirkt weiterhin sofort.
+
+- **Live-Aktualisierung hängt sich nach einer Änderung der Nutzungsbedingungen nicht mehr in endlose Verbindungsversuche.** Ein Tab, dessen Nutzer den geltenden Bedingungen noch nicht zugestimmt hatte, wurde bei der Live-Sync-Verbindung auf die Zustimmungsseite umgeleitet — was eine WebSocket-Verbindung nicht auswerten kann, weshalb sie unbegrenzt alle 30 Sekunden neu aufgebaut wurde. Die Verbindung wird jetzt einmalig endgültig beendet und der Tab wechselt auf die Zustimmungsseite (REQ-SEC-028).
 
 - **Deployment: `IRI_MONITORING_ENABLED` wirkt jetzt auch, wenn es in der `.env` steht.** Der Deploy-Dienst liest diese Datei nicht ein, meldete deshalb bei jedem Lauf `IRI_MONITORING_ENABLED != 'true'` und spielte geänderte Monitoring-Konfiguration zwar auf die Platte, lud sie aber nie in das laufende Prometheus — korrigierte Alarmregeln feuerten dadurch weiter in ihrer alten Fassung. Ein explizit gesetzter Wert hat weiterhin Vorrang, und es wird ausschließlich dieser eine Schlüssel gelesen.
 

@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.support.RefusedSubjectWindow;
 import de.greluc.krt.profit.basetool.backend.support.TermsConsentCheck;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -68,10 +69,12 @@ class TermsAcceptanceAccessFilterTest {
   @Mock private FilterChain filterChain;
 
   private MeterRegistry meterRegistry;
+  private RefusedSubjectWindow refusedSubjects;
   private TermsAcceptanceAccessFilter filter;
 
   @BeforeEach
   void setUp() {
+    refusedSubjects = new RefusedSubjectWindow(java.time.Duration.ofMinutes(15), 5_000);
     StaticMessageSource messages = new StaticMessageSource();
     messages.addMessage("problem.terms_not_accepted.title", java.util.Locale.ENGLISH, "Forbidden");
     messages.addMessage("problem.terms_not_accepted.detail", java.util.Locale.ENGLISH, "Accept.");
@@ -82,7 +85,8 @@ class TermsAcceptanceAccessFilterTest {
             messages,
             new ProblemResponseFactory(new AppProblemProperties()),
             new ObjectMapper(),
-            meterRegistry);
+            meterRegistry,
+            refusedSubjects);
     authenticateWithSubject(USER_ID.toString());
   }
 
@@ -115,6 +119,38 @@ class TermsAcceptanceAccessFilterTest {
     assertThat(response.getHeader("X-Correlation-Id")).isNotBlank();
     assertThat(meterRegistry.counter("basetool.http.error", "code", "TERMS_NOT_ACCEPTED").count())
         .isEqualTo(1.0);
+  }
+
+  /**
+   * A refusal counts the caller as a distinct subject, and repeats do not inflate that count.
+   *
+   * <p>This is the whole point of {@code basetool_terms_refused_subjects}: the refusal
+   * <em>rate</em> cannot separate "the membership is locked out" from "one client is retrying", so
+   * {@code TermsConsentRolloutStalled} used to fire on a single looping browser tab with nobody
+   * awake (2026-08-03). Ten refusals of one subject must read as one.
+   */
+  @Test
+  void countsARefusedCallerOnceHoweverOftenTheyRetry() throws Exception {
+    when(termsConsentCheck.hasAcceptedCurrentTerms(USER_ID)).thenReturn(false);
+
+    for (int i = 0; i < 10; i++) {
+      assertThat(invoke("/api/v1/missions").getStatus()).isEqualTo(403);
+    }
+
+    assertThat(refusedSubjects.size()).isEqualTo(1);
+    assertThat(meterRegistry.counter("basetool.http.error", "code", "TERMS_NOT_ACCEPTED").count())
+        .as("the request counter still sees every refusal")
+        .isEqualTo(10.0);
+  }
+
+  /** A caller who passes the gate is never counted as refused. */
+  @Test
+  void doesNotCountAConsentingCallerAsRefused() throws Exception {
+    when(termsConsentCheck.hasAcceptedCurrentTerms(USER_ID)).thenReturn(true);
+
+    invoke("/api/v1/missions");
+
+    assertThat(refusedSubjects.size()).isZero();
   }
 
   /**
