@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.config;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TermsStatusDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.TermsGateHandoff;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -142,8 +143,47 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
       response.setHeader(TERMS_GATE_HEADER, consentUrl);
       return;
     }
+    if (isWebSocketUpgrade(request)) {
+      // A WebSocket handshake has exactly one useful answer, and it is not the usual one here.
+      // A refused upgrade — 302, 403, anything but 101 — reaches the browser's WebSocket
+      // object as `close` with code 1006 and no reason, which is byte-for-byte what a dropped
+      // connection looks like; the client cannot tell "you must consent" from "the wifi blinked",
+      // so it does the only correct thing for the latter and reconnects. krt-live-sync.js does that
+      // on full-jitter backoff capped at 30 s, for as long as any topic is registered, and consent
+      // can never be given from a background socket: the loop has no exit. That is the same defect
+      // the SSE stream had before REQ-SEC-028's channel handoff, and the same fix does not transfer
+      // — at handshake time there is no channel yet to write an event on.
+      //
+      // So let the upgrade complete and refuse the socket where a close CODE exists: the handshake
+      // is marked here, LiveSyncSyncHandshakeInterceptor copies the mark onto the session, and
+      // LiveSyncWebSocketHandler closes it immediately with 4003 carrying this URL — the shape the
+      // per-user socket cap's 4029 already established. Marking rather than exempting is what keeps
+      // the verdict in one place: the gate's own 60 s-bounded read decides, and the relay only
+      // relays it.
+      log.debug("Consent missing; marking the WebSocket handshake for a terminal refusal");
+      TermsGateHandoff.mark(request, consentUrl);
+      filterChain.doFilter(request, response);
+      return;
+    }
     log.debug("Consent missing; routing {} to the consent page", request.getRequestURI());
     response.sendRedirect(consentUrl);
+  }
+
+  /**
+   * Whether this request is a WebSocket upgrade rather than a navigation or an XHR.
+   *
+   * <p>Keyed on the {@code Upgrade} header, not on the path, for two reasons. It is what actually
+   * identifies the caller's idiom — the reason the answer below has to differ — and the path
+   * alternative would have to be a raw-URI string test (REQ-SEC-029 keeps this filter's exemption
+   * list raw on purpose), which an encoded spelling of {@code /ws/sync} would slip past and land
+   * back in the redirect loop. A browser cannot set custom headers on a handshake, so this can
+   * never collide with the {@code X-Requested-With} branch above.
+   *
+   * @param request the current request
+   * @return {@code true} when the caller is opening a WebSocket
+   */
+  private static boolean isWebSocketUpgrade(@NotNull HttpServletRequest request) {
+    return "websocket".equalsIgnoreCase(request.getHeader(HttpHeaders.UPGRADE));
   }
 
   /**

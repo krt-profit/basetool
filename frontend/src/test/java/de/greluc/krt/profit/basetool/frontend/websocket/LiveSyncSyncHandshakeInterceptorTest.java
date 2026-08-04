@@ -26,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronContext;
+import de.greluc.krt.profit.basetool.frontend.support.TermsGateHandoff;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -52,8 +53,8 @@ import org.springframework.web.socket.WebSocketHandler;
 /**
  * Tests for {@link LiveSyncSyncHandshakeInterceptor}: it always marks the future session
  * multiplexed and proceeds, captures the OAuth2 token snapshot and active-org-unit pin when
- * available, and fails open (still proceeds, no token) when the authorized-client read is empty or
- * throws.
+ * available, relays the consent gate's handoff mark, and fails open (still proceeds, no token) when
+ * the authorized-client read is empty or throws.
  */
 class LiveSyncSyncHandshakeInterceptorTest {
 
@@ -136,6 +137,34 @@ class LiveSyncSyncHandshakeInterceptorTest {
     interceptor.beforeHandshake(request, response, wsHandler, attributes);
 
     assertThat(attributes.get(LiveSyncWebSocketHandler.ATTR_ACTIVE_ORG_UNIT)).isEqualTo(pin);
+  }
+
+  /**
+   * The consent gate's mark is relayed onto the session — and the handshake still proceeds.
+   *
+   * <p>Proceeding is the point: refusing here would produce the same bare {@code 1006} the mark
+   * exists to avoid, and only a socket that actually opens can be closed with a code the client can
+   * read as terminal (REQ-SEC-028).
+   */
+  @Test
+  void relaysTheConsentGateMarkAndStillProceeds() {
+    MockHttpServletRequest servletRequest = new MockHttpServletRequest();
+    TermsGateHandoff.mark(servletRequest, "/terms/accept");
+
+    boolean proceed =
+        interceptor.beforeHandshake(
+            new ServletServerHttpRequest(servletRequest), response, wsHandler, attributes);
+
+    assertThat(proceed).isTrue();
+    assertThat(attributes.get(LiveSyncWebSocketHandler.ATTR_TERMS_GATE)).isEqualTo("/terms/accept");
+  }
+
+  /** An unmarked handshake — the overwhelmingly common case — carries no gate attribute. */
+  @Test
+  void unmarkedHandshakeCarriesNoConsentGateAttribute() {
+    interceptor.beforeHandshake(request, response, wsHandler, attributes);
+
+    assertThat(attributes).doesNotContainKey(LiveSyncWebSocketHandler.ATTR_TERMS_GATE);
   }
 
   @Test

@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TermsStatusDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.TermsGateHandoff;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -329,6 +330,70 @@ class TermsAcceptanceGateFilterTest {
     TermsAcceptanceGateFilter.clearCachedVerdict(request);
 
     assertThat(TermsAcceptanceGateFilter.consentKnownMissing(request)).isFalse();
+  }
+
+  /**
+   * A WebSocket handshake is let through and marked, never redirected.
+   *
+   * <p>The three assertions belong together and each one alone would let the defect back in. A 302
+   * reaches a WebSocket as a bare {@code 1006} — the client cannot tell it from a dropped
+   * connection, so it reconnects, and consent cannot be given from a background socket: the loop
+   * has no exit. Letting the upgrade through without the mark is no better in the other direction —
+   * the socket would simply live on, and nothing would ever tell this tab to go and consent.
+   */
+  @Test
+  void marksAWebSocketHandshakeInsteadOfRedirectingIt() throws Exception {
+    stubStatus(false);
+    MockHttpServletRequest request = webSocketHandshake();
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    filter.doFilter(request, response, filterChain);
+
+    assertThat(response.getRedirectedUrl()).isNull();
+    assertThat(TermsGateHandoff.consentUrl(request)).isEqualTo("/terms/accept");
+    verify(filterChain).doFilter(any(), any());
+  }
+
+  /** A consenting user's handshake carries no mark, so the relay leaves the socket alone. */
+  @Test
+  void leavesAConsentingUsersWebSocketHandshakeUnmarked() throws Exception {
+    stubStatus(true);
+    MockHttpServletRequest request = webSocketHandshake();
+
+    filter.doFilter(request, new MockHttpServletResponse(), filterChain);
+
+    assertThat(TermsGateHandoff.consentUrl(request)).isNull();
+    verify(filterChain).doFilter(any(), any());
+  }
+
+  /**
+   * The handoff is keyed on the upgrade, not on the path: an ordinary navigation to the same path
+   * is still redirected. Guards against a future "skip {@code /ws/**}" shortcut, which would leave
+   * the socket connected and un-refused.
+   */
+  @Test
+  void aPlainRequestToTheSocketPathIsStillRedirected() throws Exception {
+    stubStatus(false);
+
+    MockHttpServletResponse response = invoke("/ws/sync");
+
+    assertThat(response.getRedirectedUrl()).isEqualTo("/terms/accept");
+    verify(filterChain, never()).doFilter(any(), any());
+  }
+
+  /**
+   * Builds a {@code /ws/sync} handshake request — a GET carrying the {@code Upgrade} header the
+   * filter keys on.
+   *
+   * @return the handshake request
+   */
+  private static MockHttpServletRequest webSocketHandshake() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/ws/sync");
+    request.setRequestURI("/ws/sync");
+    request.addHeader("Connection", "Upgrade");
+    request.addHeader("Upgrade", "websocket");
+    request.setSession(new org.springframework.mock.web.MockHttpSession());
+    return request;
   }
 
   /** Stubs the backend consent status. */

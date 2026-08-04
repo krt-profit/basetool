@@ -219,9 +219,10 @@
      * path (open-redirect guard, as in reauthRedirect — the value comes from our own server either
      * way, but a single navigation helper should not depend on that).
      *
-     * Split out of maybeTermsGate for the SSE handoff: an EventSource can read neither a status nor a
-     * header, so the gate reaches it as a `terms-gate` event and notifications.js has only the URL,
-     * not a Response, to act on.
+     * Split out of maybeTermsGate because the gate also reaches clients that never see a
+     * Response. An EventSource can read neither a status nor a header, so the gate arrives as a
+     * `terms-gate` event; a WebSocket can read only the close code and reason, so /ws/sync is
+     * closed with 4003 carrying the consent path. Both hand this helper a bare URL string.
      *
      * @param {string | null | undefined} url the consent-page path the server named
      * @returns {boolean} true when the browser was sent to the consent page
