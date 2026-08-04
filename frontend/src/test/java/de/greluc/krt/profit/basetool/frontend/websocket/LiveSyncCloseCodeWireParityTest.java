@@ -53,14 +53,14 @@ class LiveSyncCloseCodeWireParityTest {
   void clientConsentGateCloseCode_matchesTheServerValue() throws IOException {
     assertThat(declaredCode(CLIENT_TERMS_GATE_CODE, "TERMS_GATE_CLOSE_CODE"))
         .as("krt-live-sync.js vs LiveSyncWebSocketHandler.TERMS_CONSENT_REQUIRED_CODE")
-        .isEqualTo(LiveSyncWebSocketHandler.TERMS_CONSENT_REQUIRED_CODE);
+        .isEqualTo(String.valueOf(LiveSyncWebSocketHandler.TERMS_CONSENT_REQUIRED_CODE));
   }
 
   @Test
   void clientSocketCapCloseCode_matchesTheServerValue() throws IOException {
     assertThat(declaredCode(CLIENT_SOCKET_CAP_CODE, "SOCKET_CAP_CLOSE_CODE"))
         .as("krt-live-sync.js vs LiveSyncWebSocketHandler.SOCKET_CAP_EXCEEDED")
-        .isEqualTo(LiveSyncWebSocketHandler.SOCKET_CAP_EXCEEDED.getCode());
+        .isEqualTo(String.valueOf(LiveSyncWebSocketHandler.SOCKET_CAP_EXCEEDED.getCode()));
   }
 
   /**
@@ -76,19 +76,25 @@ class LiveSyncCloseCodeWireParityTest {
   }
 
   /**
-   * Extracts a close code the client declares.
+   * Extracts a close code the client declares, as the literal text it wrote.
    *
-   * @param pattern the declaration pattern, with the numeric value in group 1
+   * <p>Compared as text against {@code String.valueOf(serverCode)} rather than parsed: the
+   * comparison is exactly as strict either way (the pattern admits four digits and nothing else),
+   * and not parsing keeps the method total — there is no input the caller could supply that makes
+   * it throw. This also matches how the sibling {@link LiveSyncDenyReasonWireParityTest} reads its
+   * mirror point.
+   *
+   * @param pattern the declaration pattern, with the four-digit value in group 1
    * @param constantName the client-side constant name, for the failure message
-   * @return the declared code
+   * @return the declared code as written in the script
    * @throws IOException if the script cannot be read from the classpath
    */
-  private static int declaredCode(Pattern pattern, String constantName) throws IOException {
+  private static String declaredCode(Pattern pattern, String constantName) throws IOException {
     Matcher declaration = pattern.matcher(readResource("/static/js/krt-live-sync.js"));
     assertThat(declaration.find())
         .as("krt-live-sync.js declares %s = <code>", constantName)
         .isTrue();
-    return Integer.parseInt(declaration.group(1));
+    return declaration.group(1);
   }
 
   private static String readResource(String resource) throws IOException {
