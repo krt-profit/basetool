@@ -1175,6 +1175,18 @@ Server-side and cross-replica deliveries bypass the per-topic bucket (trusted / 
 refused socket is closed with an app close code the client backs off on; every bound degrades to a
 bounded re-fetch rate, never data loss.
 
+**Close codes are a contract, and the two in use mean opposite things.** `4029` (socket cap, mirrors
+HTTP `429`) is *transient*: the client jumps straight to the 30 s backoff and keeps probing until
+another tab frees a slot. `4003` (Terms-of-Use consent missing, mirrors HTTP `403` — REQ-SEC-028) is
+*terminal*: the client stops reconnecting permanently and navigates to the consent page named in the
+close reason, because no amount of reconnecting can produce consent. This is the one refusal that
+cannot be delivered by refusing the handshake — a non-`101` answer arrives as a bare `1006` the
+client must read as "connection dropped", so the gate lets the upgrade complete and the handler
+closes the socket at connect instead. A close code the client does not recognise falls through to
+the generic reconnect path, so both numbers are pinned against `krt-live-sync.js` by
+`LiveSyncCloseCodeWireParityTest` — the same mirror-point discipline as the section maps and the
+subscribe-deny `reason`, and for the same reason: drift here fails silently.
+
 **Pill, coalescing and resync follow REQ-FE-010 unchanged**, with one sizing addition (5000
 accounts / ≥200 concurrent, ADR-0094): detail-topic receivers keep the 400 ms jittered coalesce
 window; **every global-room receiver (`orders`, `bank`, `orgunit-bank`, `materialboard`, `inventory`,

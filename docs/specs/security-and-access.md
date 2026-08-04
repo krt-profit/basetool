@@ -1121,14 +1121,16 @@ through — the web UI and, since the ingest gateway relays the caller's own bea
 (`REQ-INGEST-001`), the desktop extractor. The gateway needs no copy of the rule: it already
 relays a backend 4xx with the backend's own `detail`.
 
-**The frontend gate answers in the caller's own idiom — three shapes, not one.** A browser
+**The frontend gate answers in the caller's own idiom — four shapes, not one.** A browser
 navigation gets the `302`. An XHR gets `403` plus `X-Terms-Acceptance-Required`, because a redirect
 fails silently there (`krtFetch` bails on `res.redirected` and the section just stops updating). An
 `EventSource` gets a single `terms-gate` SSE event naming the consent page, then the stream closes,
 because it can read neither a status nor a header — a redirect hands it the consent page as
 `text/html`, the stream errors, and `notifications.js` reconnects on its jittered timer forever.
 Exempting the stream path instead would only move the loop one hop: the relay would reach the
-backend boundary and take the `403` there.
+backend boundary and take the `403` there. And a WebSocket handshake gets no HTTP answer at all
+— it is let through and the socket is then closed with `4003`, because a refused upgrade
+reaches the client as a bare `1006` it can only read as "connection dropped" (see below).
 
 **The `terms-gate` event has two emitters, because the gate has two holes it cannot cover itself.**
 `TermsAcceptanceGateFilter` emits it for a stream it intercepts; `NotificationPageController`'s
@@ -1144,6 +1146,24 @@ every gated request a blocking backend round trip; during the 2026-08-03 rollout
 stream attempts plus 483 consent-page renders into 973 reads of `/api/v1/terms/status`. Honouring it
 is safe because recording consent calls `clearCachedVerdict`, so nobody is held behind a stale "no",
 and a backend failure never caches a negative in the first place (it fails open without writing).
+
+**A WebSocket handshake is answered with a terminal close code, never a redirect.** A refused
+upgrade — `302` to the consent page included — reaches the browser's `WebSocket` as `close` with
+code `1006` and no reason, which is byte-for-byte what a dropped connection looks like. The client
+therefore does the only correct thing for *that* and reconnects; `krt-live-sync.js` does so on
+full-jitter backoff capped at 30 s for as long as any topic is registered, and consent can never be
+given from a background socket, so the loop has no exit. The gate consequently **lets the upgrade
+complete and marks it** (`support.TermsGateHandoff`, a request attribute the handshake interceptor
+copies onto the session), and `LiveSyncWebSocketHandler` closes the socket at connect with **`4003`
+carrying the consent-page URL as the close reason** — the first point at which a close code exists
+at all. `krt-live-sync.js` treats `4003` as terminal: it stops reconnecting permanently and
+navigates. The code mirrors HTTP `403` exactly as the socket cap's `4029` mirrors `429`, and the two
+are guarded against drift by `LiveSyncCloseCodeWireParityTest` because a wrong number falls through
+to the generic reconnect path silently. Marking rather than exempting keeps one owner of the
+verdict: the gate's own 60 s-bounded read decides, and the relay only relays it — an exemption would
+force a second consent read per handshake plus a second copy of the `test`-profile and
+authentication carve-outs. Detection is keyed on the `Upgrade` header rather than the path, so an
+encoded spelling of `/ws/sync` cannot slip back into the redirect (REQ-SEC-029).
 
 Six invariants that must survive any rewrite:
 
@@ -1187,20 +1207,29 @@ Six invariants that must survive any rewrite:
 - [ ] A wording change re-prompts every user, without anyone editing a version number.
 - [ ] Consent history survives re-consent; a double submit adds no second row.
 - [ ] An admin can see who has and has not accepted.
+- [x] No background channel is left with an answer it can only retry: the `/ws/sync` handshake is
+  refused with a terminal close code the client stops reconnecting on.
 - [ ] A gated background read navigates to the consent page and disarms its timer, instead of
   re-fetching the refusal on every tick or freezing on its last value.
 
 **Enforced by:** `TermsAcceptanceAccessFilterTest` (refusal, both exemptions, non-UUID subjects),
 `TermsAcceptanceGateFilterTest` (redirect, the AJAX header, the SSE `terms-gate` handoff and that it
-fires only while the gate is closed, the readable-documents exemption, fail-open, cache bound),
+fires only while the gate is closed, the WebSocket mark and that a plain request to the same
+path is still redirected, the readable-documents exemption, fail-open, cache bound),
 `HandRolledFetchGateContractTest` (the client half of every read that bypasses `krtFetch`: the XHR
 marker, the `krtTermsGate` handoff, no `res.ok` shortcut, self-disarm — pinned against the shipped
 JS), `TermsAcceptanceQueryDataTest` + `TermsAcceptanceServiceTest` (append-only history,
 version scoping, one-sided cache, sort translation), `TermsAcceptancePageControllerTest`, `TermsVersionParityTest`,
-`AdminTermsPageControllerTest`, `TermsTemplateBundleParityTest` · **Code:** `TermsVersionProvider`,
-`TermsAcceptanceService`, `support.TermsConsentCheck` (the leaf interface that keeps `config` and
-`service` acyclic per ADR-0047), `TermsController`, `AdminTermsController` · **Monitoring:**
-`basetool_terms_acceptances_total`, `basetool_terms_accepted_users`, `TermsConsentRolloutStalled`
+`AdminTermsPageControllerTest`, `TermsTemplateBundleParityTest`,
+`LiveSyncSyncHandshakeInterceptorTest` + `LiveSyncWebSocketHandlerTest` +
+`LiveSyncCloseCodeWireParityTest` (the WebSocket handoff: the mark is relayed, the socket is closed
+with `4003` and the consent URL, the refusal costs no per-user socket slot, and the code cannot
+drift from the client's) · **Code:** `TermsVersionProvider`, `TermsAcceptanceService`,
+`support.TermsConsentCheck` (the leaf interface that keeps `config` and `service` acyclic per
+ADR-0047), `support.TermsGateHandoff` (the leaf that does the same for the frontend's `config` →
+`websocket` handoff), `TermsController`, `AdminTermsController` · **Monitoring:**
+`basetool_terms_acceptances_total`, `basetool_terms_accepted_users`, `TermsConsentRolloutStalled`,
+`basetool_livesync_socket_rejected_total{reason="terms_gate"}` · **Decision:** ADR-0128
 
 ### REQ-SEC-029 — A path-scoped filter matches the DECODED path, never the raw request URI
 
