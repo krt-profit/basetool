@@ -45,21 +45,22 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><strong>Both refusals close a hole that only exists once a caller can name a subject instead
  * of presenting its token.</strong> The database does not mirror identity-provider liveness — the
  * roster sync fetches {@code enabled} and never persists it, and the {@code inKeycloak} flag it
- * does maintain is read by no authority code. A member the last roster sync no longer found in
- * Keycloak therefore keeps {@code ACTIVE} and every role here, indefinitely.
+ * does maintain is read by no authority code <em>outside this class</em>. A member removed or
+ * deactivated in Keycloak therefore keeps {@code ACTIVE} and every role here until a sync says
+ * otherwise.
  *
- * <p><strong>Presence, not {@code enabled}.</strong> What is checked is whether the last sync still
- * saw the account, so a <em>deleted</em> member is refused and a merely <em>disabled</em> one is
- * not — the sync fetches {@code enabled} and drops it, so there is nothing here to read. Bounded
- * rather than open-ended: the named subject arrives inside a signature- and {@code exp}-validated
- * token on every request, and a disabled account cannot refresh, so the window is one access-token
- * lifetime. That is exactly the bound the bearer relay this replaced already had, and that design
- * had no liveness check at all. Persisting {@code enabled} would shrink the window further and is
- * worth doing if the gateway's credential is ever considered at risk. While a token is what grants
- * access that is harmless: the account stops being issued tokens and the last one expires in
- * minutes. A named subject never expires, so without these checks the gateway could mint the
- * authorities of a revoked member — and ADR-0129's premise that a named subject cannot escalate
- * beyond what that member "could already do" would stop holding.
+ * <p><strong>Presence and {@code enabled}, checked separately.</strong> {@code inKeycloak} answers
+ * "did the last roster pass still see this account", {@code enabledInKeycloak} answers "was it
+ * active when it did" (V230). Both had to be persisted before they could be read: the sync fetched
+ * {@code enabled} and dropped it, so until V230 a deactivated member was refused nothing at all.
+ * Without a token that gap is harmless — a disabled account cannot refresh, so its last access
+ * token expires in minutes — and it stops being harmless the moment a caller can <em>name</em> a
+ * subject, because a name never expires. Revocation now takes effect at the next sync pass, or
+ * immediately on the member's next login, instead of never. While a token is what grants access
+ * that is harmless: the account stops being issued tokens and the last one expires in minutes. A
+ * named subject never expires, so without these checks the gateway could mint the authorities of a
+ * revoked member — and ADR-0129's premise that a named subject cannot escalate beyond what that
+ * member "could already do" would stop holding.
  */
 @Slf4j
 @Service
@@ -83,6 +84,13 @@ public class DatabaseActingMemberAuthorities implements ActingMemberAuthorities 
     User user = found.get();
     if (!user.isInKeycloak()) {
       log.warn("Refusing to act for a member the last roster sync no longer found in Keycloak");
+      throw new AccessDeniedException("The named member is no longer active.");
+    }
+    if (!user.isEnabledInKeycloak()) {
+      // Separate from the branch above on purpose: "deleted" and "deactivated" have different
+      // remedies, and the log line is the only place the two are distinguishable — the answer to
+      // the caller is byte-identical so the endpoint cannot be used to enumerate subjects.
+      log.warn("Refusing to act for a member whose Keycloak account is disabled");
       throw new AccessDeniedException("The named member is no longer active.");
     }
     // Uncached, unlike the login path, which caches the same assembly per token (#1141). No cache

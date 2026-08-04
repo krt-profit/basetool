@@ -93,9 +93,11 @@ in the order the filter applies them):
    filter-ordering bug;
 2. there is an authenticated caller behind the header at all — refused, never ignored;
 3. that caller is a configured gateway, keyed on `azp`;
-4. the named member is live: known here, and still found by the last roster sync. A named subject
-   never expires the way a token does, so this is the guard without which the header could mint the
-   authorities of a revoked member.
+4. the named member is live: known here, still found by the last roster sync, and not disabled in
+   Keycloak (V230). A named subject never expires the way a token does, so this is the guard without
+   which the header could mint the authorities of a revoked member. Deletion and deactivation are
+   kept apart in the log because they have different remedies, and deliberately indistinguishable in
+   the answer so the endpoint cannot be used to enumerate who is still active.
 
 Guard 4 splits into two counted reasons — a subject that is not a UUID never reaches persistence —
 so `basetool_on_behalf_of_refused_total{reason}` carries **five** values for these four guards. The

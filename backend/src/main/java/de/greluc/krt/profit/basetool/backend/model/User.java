@@ -80,6 +80,18 @@ public class User extends AbstractEntity<UUID> {
   @Column(name = "in_keycloak")
   private boolean inKeycloak = true;
 
+  /**
+   * The Keycloak account's {@code enabled} flag as of the last roster sync (V230, ADR-0129).
+   *
+   * <p>Separate from {@link #inKeycloak}, which records whether the sync still <em>saw</em> the
+   * account at all. Presence and being enabled are different facts with different remedies, and
+   * only the acting-member liveness guard reads either: an ordinary caller needs a token, and a
+   * deleted or disabled account stops being issued one. Defaults to {@code true} so a row created
+   * before its first sync is not locked out by a flag nothing has written yet.
+   */
+  @Column(name = "enabled_in_keycloak", nullable = false)
+  private boolean enabledInKeycloak = true;
+
   @Nullable
   @Column(name = "join_date")
   private LocalDate joinDate;

@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.support.TermsConsentCheck;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +45,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.JpaSort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Records and answers Terms-of-Use consent (REQ-SEC-028).
@@ -86,11 +89,22 @@ public class TermsAcceptanceService implements TermsConsentCheck {
   private final MeterRegistry meterRegistry;
 
   /**
+   * How long a positive verdict may outlive the read that produced it.
+   *
+   * <p>The cache stores only {@code true}, and consent is monotonic within a version, so a stale
+   * entry cannot wrongly refuse anyone — it can only wrongly admit, and only if the entry was wrong
+   * to begin with. A bound in time exists so that "wrong to begin with" is survivable: an unbounded
+   * positive lives for the process lifetime, which for this application means until the next
+   * deploy.
+   */
+  private static final Duration CACHE_TTL = Duration.ofMinutes(30);
+
+  /**
    * Users known to have accepted the version currently in force. Only {@code true} is ever stored
    * (see the class comment); the value type exists solely because the cache API needs one.
    */
   private final Cache<UUID, Boolean> acceptedCache =
-      Caffeine.newBuilder().maximumSize(CACHE_MAX_ENTRIES).build();
+      Caffeine.newBuilder().maximumSize(CACHE_MAX_ENTRIES).expireAfterWrite(CACHE_TTL).build();
 
   /**
    * Registers the rollout gauge. Reported per version so a terms change is visible as a new series
@@ -169,15 +183,51 @@ public class TermsAcceptanceService implements TermsConsentCheck {
     } catch (DataIntegrityViolationException e) {
       // Another instance recorded the same consent between the check and this insert. The row that
       // matters exists either way, so treat it as already-accepted rather than surfacing a 500.
+      // NOT cached here: this transaction is now aborted, and whether the other instance's row is
+      // actually committed is not knowable from inside it. The next request re-reads and caches
+      // the truth at the cost of one `exists` query.
       log.debug("Concurrent terms acceptance for the same user and version; keeping the first");
-      acceptedCache.put(userId, Boolean.TRUE);
       return false;
     }
-    acceptedCache.put(userId, Boolean.TRUE);
+    cacheAfterCommit(userId);
     meterRegistry.counter(MetricNames.TERMS_ACCEPTANCES).increment();
     // No callsign or e-mail (REQ-OBS-004); the sub is already the MDC userId on this request.
     log.info("Terms of Use accepted, version {}", currentVersion());
     return true;
+  }
+
+  /**
+   * Records the positive verdict only once the transaction that justifies it has committed.
+   *
+   * <p>The write used to happen inline, which put it on the failure path as well as the success
+   * path. {@code TermsAcceptance} carries an assigned {@code @Id} and no {@code @Version}, so
+   * {@code save()} issues no SQL of its own — the insert, and therefore any constraint violation it
+   * trips, surfaces at <strong>commit</strong>, after this method has returned. A caller whose
+   * insert failed there was cached as consenting for the process lifetime, with no row to show for
+   * it, and the consent gate (REQ-SEC-028) then waved them through until the next deploy.
+   *
+   * <p>The foreign key to {@code app_user} makes that reachable rather than theoretical: any
+   * subject without a local row trips it. Deferring the write to {@code afterCommit} means a
+   * rolled-back acceptance leaves no trace in memory either, which is the only state in which the
+   * cache and the table cannot disagree.
+   *
+   * <p>Falls back to writing inline when no transaction is active, so the method stays correct if a
+   * future caller invokes it outside one.
+   *
+   * @param userId the user whose consent was just recorded
+   */
+  private void cacheAfterCommit(@NotNull UUID userId) {
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      acceptedCache.put(userId, Boolean.TRUE);
+      return;
+    }
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCommit() {
+            acceptedCache.put(userId, Boolean.TRUE);
+          }
+        });
   }
 
   /**

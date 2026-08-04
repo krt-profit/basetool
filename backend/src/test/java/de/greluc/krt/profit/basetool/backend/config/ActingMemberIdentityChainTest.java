@@ -333,6 +333,41 @@ class ActingMemberIdentityChainTest {
   }
 
   /**
+   * A member <em>deactivated</em> in Keycloak is refused, not only one that was deleted.
+   *
+   * <p>The gap V230 closed. The roster sync always fetched {@code enabled} from the Admin API and
+   * dropped it, so deactivating a member refused them nothing here: with a token that is bounded by
+   * expiry, but the gateway can <em>name</em> a subject, and a name does not expire. This is the
+   * difference between revocation taking minutes and taking forever.
+   *
+   * <p>The refusal is byte-identical to the deleted case — only the log line separates them, which
+   * is deliberate: the endpoint must not become an oracle for which subjects exist, let alone for
+   * which of them are still active.
+   */
+  @Test
+  void refusesAMemberWhoseKeycloakAccountIsDisabled() throws Exception {
+    User member = userRepository.findById(MEMBER).orElseThrow();
+    member.setEnabledInKeycloak(false);
+    userRepository.saveAndFlush(member);
+    termsAcceptanceService.acceptCurrentTerms(MEMBER);
+
+    mockMvc
+        .perform(
+            post(INGEST_PATH)
+                .with(
+                    jwt().jwt(token -> token.subject(GATEWAY).claim("azp", "test-ingest-gateway")))
+                .header(ActingMemberHeader.ON_BEHALF_OF_HEADER, MEMBER.toString())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(EXTRACT))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
+
+    // Still present and still ACTIVE locally: the refusal follows the identity provider's verdict,
+    // not anything this application changed about the row.
+    assertThat(userRepository.findById(MEMBER)).isPresent();
+  }
+
+  /**
    * A member the last roster sync no longer found in Keycloak is refused.
    *
    * <p>The liveness bound, end to end. A named subject never expires the way a token does, so

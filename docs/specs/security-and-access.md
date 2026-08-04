@@ -1193,6 +1193,16 @@ Six invariants that must survive any rewrite:
 - **No cache may outlive a wording change.** An authenticated session lives 30 days (ADR-0088), so
   the frontend verdict is re-read every 60 s; the backend caches only *positive* answers, which are
   monotonic within a process because the version in force is a build artifact.
+- **The positive cache follows the commit, never precedes it.** `TermsAcceptance` carries an
+  assigned `@Id` and no `@Version`, so `save()` issues no SQL of its own — the insert, and any
+  constraint violation it trips, surfaces at *commit*, after the service method has returned. The
+  in-memory "has accepted" verdict was written inline, i.e. on the failure path as well as the
+  success path, so a caller whose insert never committed was remembered as consenting for the
+  process lifetime with no row to show for it, and this gate then waved them through until the next
+  deploy. The foreign key to `app_user` makes that reachable rather than theoretical. The verdict is
+  therefore recorded in an `afterCommit` synchronization, the concurrent-race branch caches nothing
+  at all (from an aborted transaction it cannot be established *which* constraint fired), and the
+  cache carries a TTL so that even a wrong positive cannot outlive it.
 - **A machine cannot consent.** `/api/v1/terms/**` is exempt from the gate — it has to be, or
   nobody could ever accept — so an authenticated non-person could otherwise clear the gate for
   itself and reach every `isAuthenticated()`-only read behind `anyRequest().authenticated()`. That

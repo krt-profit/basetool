@@ -91,8 +91,8 @@ not the same as at equal time. The login path runs `UserReconciliationService.sy
 assembling, and that call writes the token's realm roles into the row; the acting-member path has no
 token and assembles from whatever the row currently holds. So a role **removed** in Keycloak takes
 effect on the member's next browser login immediately, but on the gateway path only once
-`UserSyncTask` next runs. The liveness guard does not cover this — it refuses an account the last
-sync no longer found, not a role downgrade. The exposure is bounded by the roster-sync interval and is the same
+`UserSyncTask` next runs. The liveness guard does not cover this — it refuses an account that is
+gone or disabled, not a role downgrade. The exposure is bounded by the roster-sync interval and is the same
 staleness every other DB-derived authority in this application already carries, but the two paths are
 distinguishable on exactly this axis and nowhere else.
 
@@ -113,14 +113,15 @@ identical for all five on purpose.
 - **Fail closed on a header with no authenticated caller** — refused, never ignored, so a future
   change to the authentication filters cannot silently reproduce the ordering bug that produced this
   amendment.
-- **Liveness — presence, not `enabled`.** The database does not mirror whether an account still
-  exists in Keycloak: the roster sync fetches `enabled` and never persists it, and the `inKeycloak`
-  flag it does maintain is read by no authority code. A member the last sync no longer found keeps
-  `ACTIVE` and every role here, indefinitely. What the guard therefore refuses is a **deleted**
-  member, not a merely **disabled** one; the disabled case stays bounded by one access-token
-  lifetime, because the subject arrives inside a validated token on every request and a disabled
-  account cannot refresh. Persisting `enabled` would shrink that window and is the obvious next
-  step if the gateway credential is ever considered at risk. That is harmless while a token grants access — the account stops being
+- **Liveness — presence *and* `enabled`.** The database did not mirror identity-provider liveness
+  at all: the roster sync fetched `enabled` and dropped it, and the `inKeycloak` flag it did
+  maintain was read by no authority code, so a member removed **or** deactivated in Keycloak kept
+  `ACTIVE` and every role here indefinitely. Harmless while a token is what grants access — the
+  account stops being issued tokens and the last one expires in minutes — and not harmless once a
+  caller can *name* a subject, because a name never expires. So both facts are now persisted and
+  both are refused: an unknown subject is refused rather than created, one the last sync no longer
+  found is refused, and one whose account is disabled is refused (V230). Revocation takes effect at
+  the next sync pass, or immediately at the member's next login, instead of never. That is harmless while a token grants access — the account stops being
   issued tokens and the last one expires in minutes — and stops being harmless the moment a caller
   can *name* a subject, because a name never expires. So a subject with no local row is refused
   rather than created, and one the last sync no longer found is refused outright.
