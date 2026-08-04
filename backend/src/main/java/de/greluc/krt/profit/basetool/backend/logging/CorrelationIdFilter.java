@@ -48,9 +48,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *       LoggingProperties#getCorrelationIdHeader()}) or freshly generated as UUID. The effective id
  *       is echoed back in the response header of the same name so clients/proxies can trace the
  *       same request end-to-end.
- *   <li><b>userId</b> – the JWT {@code sub} claim of the authenticated principal, or {@code
- *       anonymous} for unauthenticated traffic. Intentionally restricted to {@code sub} to avoid
- *       leaking PII (see AGENTS.md: no emails/names/tokens in logs).
+ *   <li><b>userId</b> – the authenticated caller's {@code sub}, read through {@code
+ *       AuthenticatedSubject} so a token-less acting member (ADR-0129) is attributed rather than
+ *       logged as anonymous, or {@code anonymous} for unauthenticated traffic. Intentionally
+ *       restricted to {@code sub}: the principal name is a callsign, and REQ-OBS-004 keeps it out
+ *       of the log entirely.
  * </ul>
  *
  * <p>The MDC is cleared in a {@code finally} block to prevent bleed-through on pooled or virtual

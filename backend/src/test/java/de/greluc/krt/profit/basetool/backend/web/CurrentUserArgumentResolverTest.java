@@ -24,12 +24,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.support.SubjectAuthentication;
 import java.lang.reflect.Method;
 import java.security.Principal;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.context.request.NativeWebRequest;
@@ -68,6 +70,41 @@ class CurrentUserArgumentResolverTest {
       builder.claim("nosub", "present");
     }
     return new JwtAuthenticationToken(builder.build());
+  }
+
+  /**
+   * An authentication that carries a subject with no token behind it.
+   *
+   * <p>What the ingest gateway's identity swap installs (ADR-0129), and the case this test class
+   * was blind to: every one of its other cases uses a JWT or a bare {@code Principal}, so all of
+   * them would still pass if the removed {@code instanceof JwtAuthenticationToken} demand were
+   * reintroduced tomorrow.
+   */
+  private static final class TokenlessSubject extends AbstractAuthenticationToken
+      implements SubjectAuthentication {
+
+    private final String subject;
+
+    TokenlessSubject(String subject) {
+      super(java.util.List.of());
+      this.subject = subject;
+      setAuthenticated(true);
+    }
+
+    @Override
+    public Object getCredentials() {
+      return "";
+    }
+
+    @Override
+    public Object getPrincipal() {
+      return subject;
+    }
+
+    @Override
+    public @org.jetbrains.annotations.NotNull String subject() {
+      return subject;
+    }
   }
 
   private static NativeWebRequest requestWithPrincipal(Principal principal) {
@@ -109,6 +146,30 @@ class CurrentUserArgumentResolverTest {
     NativeWebRequest request = requestWithPrincipal(tokenWithSubject(expected.toString()));
     Object resolved = resolver.resolveArgument(param(1), null, request, null);
     assertThat(resolved).isEqualTo(expected);
+  }
+
+  /**
+   * The acting member resolves for {@code @CurrentUserSub} — a subject, no token.
+   *
+   * <p>The regression test for the finding that every ingest-gateway call was 403'd during argument
+   * resolution. Reintroducing the type demand turns this red, which none of the other cases in this
+   * class would do.
+   */
+  @Test
+  void resolvesATokenlessSubjectForCurrentUserSub() throws Exception {
+    String sub = UUID.randomUUID().toString();
+    NativeWebRequest request = requestWithPrincipal(new TokenlessSubject(sub));
+
+    assertThat(resolver.resolveArgument(param(0), null, request, null)).isEqualTo(sub);
+  }
+
+  /** The same for {@code @CurrentUserId}, which is what both acting endpoints' twin uses. */
+  @Test
+  void resolvesATokenlessSubjectForCurrentUserId() throws Exception {
+    UUID id = UUID.randomUUID();
+    NativeWebRequest request = requestWithPrincipal(new TokenlessSubject(id.toString()));
+
+    assertThat(resolver.resolveArgument(param(1), null, request, null)).isEqualTo(id);
   }
 
   @Test

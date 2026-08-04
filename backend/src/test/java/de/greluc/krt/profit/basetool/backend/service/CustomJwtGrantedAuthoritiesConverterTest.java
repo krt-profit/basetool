@@ -72,9 +72,12 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   @Mock private Jwt jwt;
 
   /**
-   * A real instance, not a mock: its default is the empty allowlist, which is the state every one
-   * of these tests needs — no caller is a gateway, so the machine-identity carve-out never fires
-   * and each case exercises the ordinary member path it was written for (ADR-0129).
+   * A real instance, not a mock: the default empty allowlist is the state most of these tests need
+   * — no caller is a gateway, so the machine-identity carve-out never fires and each case exercises
+   * the ordinary member path it was written for (ADR-0129).
+   *
+   * <p>A spy rather than a plain field so the two carve-out tests can set an allowlist on it and
+   * drive the other branch.
    */
   @Spy
   private final IngestGatewayProperties ingestGatewayProperties = new IngestGatewayProperties();

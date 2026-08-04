@@ -1117,9 +1117,13 @@ as the idempotence guard for a double submit.
 **Enforced in the backend, surfaced in the frontend.** `TermsAcceptanceAccessFilter` refuses
 `/api/**` with `403 TERMS_NOT_ACCEPTED`; `TermsAcceptanceGateFilter` redirects the web UI to
 `/terms/accept`. The backend is the boundary because it is the one place every caller passes
-through — the web UI and, since the ingest gateway relays the caller's own bearer
-(`REQ-INGEST-001`), the desktop extractor. The gateway needs no copy of the rule: it already
-relays a backend 4xx with the backend's own `detail`.
+through — the web UI and the desktop extractor. The extractor is covered because
+`ActingMemberFilter` makes the sending member the security identity of a gateway call before this
+filter runs (ADR-0129); it is **not** covered by bearer relaying, which that ADR removed. The
+distinction is not academic: the first cut of the identity swap left this filter testing for a
+`JwtAuthenticationToken`, the acting member carries none, and the gate returned "no user" — which
+here means *let through*. The gateway needs no copy of the rule: it already relays a backend 4xx
+with the backend's own `detail`.
 
 **The frontend gate answers in the caller's own idiom — four shapes, not one.** A browser
 navigation gets the `302`. An XHR gets `403` plus `X-Terms-Acceptance-Required`, because a redirect
@@ -1191,7 +1195,11 @@ Six invariants that must survive any rewrite:
   monotonic within a process because the version in force is a build artifact.
 - **The gate is armed by default.** It is stood down only under the `test` profile (MockMvc callers
   are synthetic subjects that cannot consent). A property that must be set to switch it on was
-  rejected: it ships a gate that looks armed and is not. The E2E profile is `dev`, so the gate is
+  rejected: it ships a gate that looks armed and is not. The stand-down had a cost that only
+  surfaced later — no test could observe the gate at all, so a fail-open on the ingest path stayed
+  green — so `app.security.terms.armed-in-test` re-arms it for a single test class. It is read
+  **only** when the `test` profile is active and can only arm, never disarm; outside that profile
+  the gate is armed unconditionally and the property is never consulted. The E2E profile is `dev`, so the gate is
   live there and `E2eSupport#acceptTermsIfPrompted` clicks through it on every login rather than
   pre-seeding a row — which keeps the suite exercising the real path.
 - **A background caller identifies itself, checks for the gate, and never reads `res.ok` as

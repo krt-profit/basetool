@@ -25,10 +25,12 @@
 > caller *visible*; they are not native-client attestation, which is not achievable on Windows.
 >
 > **A second gate applies to the person, not the client.** Since `REQ-SEC-028`, a user who has not
-> accepted the Terms of Use is refused with `403 TERMS_NOT_ACCEPTED`, and that applies here too:
-> the gateway relays the caller's own bearer to the backend (`REQ-INGEST-001`), so the backend's
-> consent filter sees an extractor request exactly like a web request. The gateway needs no rule of
-> its own — it already relays a backend 4xx together with the backend's localized `detail`, so the
+> accepted the Terms of Use is refused with `403 TERMS_NOT_ACCEPTED`, and that applies here too —
+> but no longer because the bearer is relayed. Since ADR-0129 the gateway calls under its own
+> identity and `ActingMemberFilter` makes the **sending member** the security identity of that call
+> *before* the consent filter runs, so that filter still sees the person. When the identity swap
+> shipped without that, the gate silently stopped applying to this path. The gateway needs no rule
+> of its own — it already relays a backend 4xx together with the backend's localized `detail`, so the
 > extractor tells the user to sign in to the Basetool in a browser once and accept. Sending resumes
 > on its own afterwards; no re-install and no token refresh. **Operator consequence: any change to
 > the terms wording stops every extractor** until each user has accepted once (ADR-0127).
@@ -84,10 +86,13 @@ same assembler the login path uses, so they are exact rather than approximate.
 **Four guards bound it, and every one fails closed** (the same four ADR-0129 records, listed here
 in the order the filter applies them):
 
-1. the caller is a configured gateway, keyed on `azp`;
-2. the endpoint is one of the two the header is bounded to, matched on the *decoded* path
-   (REQ-SEC-029);
-3. there is an authenticated caller behind the header at all — refused, never ignored;
+1. the endpoint is one of the two the header is bounded to, matched on the *decoded* path
+   (REQ-SEC-029). **Checked first, and that is load-bearing**: the filter sits on the unmatched
+   chain, so while this ran later, any unauthenticated internet request carrying the header was
+   counted under a reason documented as structurally impossible — and alerted on as evidence of a
+   filter-ordering bug;
+2. there is an authenticated caller behind the header at all — refused, never ignored;
+3. that caller is a configured gateway, keyed on `azp`;
 4. the named member is live: known here, and still found by the last roster sync. A named subject
    never expires the way a token does, so this is the guard without which the header could mint the
    authorities of a revoked member.

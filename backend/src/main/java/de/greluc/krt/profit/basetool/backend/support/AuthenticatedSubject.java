@@ -72,11 +72,11 @@ public final class AuthenticatedSubject {
   /**
    * Extracts the acting subject, whether it arrived in a token or was established for a member.
    *
-   * <p>Reads the token's {@code sub} when there is one, and otherwise falls back to {@link
-   * Authentication#getName()}, which every authentication in this application defines as the
-   * subject. Deliberately tolerant of an unauthenticated or absent authentication: callers decide
-   * whether "no subject" means refuse or means anonymous, and those two answers differ per call
-   * site.
+   * <p>Reads the token's {@code sub} when there is one, and otherwise only from an authentication
+   * that opts in via {@link SubjectAuthentication} — never from {@link Authentication#getName()},
+   * which on a username/password token is the member's callsign (REQ-OBS-004). Deliberately
+   * tolerant of an absent authentication: callers decide whether "no subject" means refuse or means
+   * anonymous, and those two answers differ per call site.
    *
    * @param authentication the current authentication, may be {@code null}
    * @return the subject, or empty when there is no authenticated caller

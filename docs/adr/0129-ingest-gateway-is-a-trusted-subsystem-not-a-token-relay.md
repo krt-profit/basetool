@@ -86,6 +86,10 @@ contextual and cascaded org-unit authorities. The access token contributes none 
 The same assembler serves both paths, so a member acting through the gateway carries precisely the
 authority set they would carry logging in.
 
+This also amends **ADR-0127**, whose reasoning for the consent gate covering the extractor rests
+on the gateway relaying the caller's bearer. That mechanism is gone; the coverage now comes from
+this identity swap running before the gate.
+
 Four guards bound it, and each closes a way this has gone wrong or could. They produce five
 counted refusal reasons (`basetool_on_behalf_of_refused_total{reason}`), because a named
 subject can fail either by not being a UUID or by not being live; the answer to the caller is

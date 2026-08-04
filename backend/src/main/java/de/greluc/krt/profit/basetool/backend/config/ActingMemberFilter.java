@@ -84,17 +84,18 @@ import tools.jackson.databind.ObjectMapper;
  * <p><strong>Four guards, each closing a way this could go wrong.</strong>
  *
  * <ol>
- *   <li><b>Only a configured gateway.</b> Keyed on {@code azp} through {@link
- *       IngestGatewayProperties#isGatewayClient(String)} — the same rule the resolver uses, so the
- *       two cannot drift. An empty allowlist admits nobody.
  *   <li><b>Only the two ingest endpoints.</b> Matched as parsed {@link PathPattern}s against the
  *       <em>decoded</em> path (REQ-SEC-029): {@code getRequestURI()} is percent-encoded while MVC
  *       routes on the decoded path, so a {@code startsWith} test would let {@code /%61pi/...}
  *       through. ADR-0129 bounds the header to these two endpoints, and this is where that bound is
- *       enforced rather than assumed.
+ *       enforced rather than assumed. Checked <em>first</em> — see the comment on that check for
+ *       why the order is part of the design and not an accident.
  *   <li><b>Fail closed on a header with no authenticated caller.</b> A present header without a
  *       {@link Jwt} is refused, not ignored — so a future change to the authentication filters
  *       cannot silently reproduce the ordering bug this filter was written after.
+ *   <li><b>Only a configured gateway.</b> Keyed on {@code azp} through {@link
+ *       IngestGatewayProperties#isGatewayClient(String)} — the same rule the {@code azp}
+ *       machine-identity carve-out uses, so the two cannot drift. An empty allowlist admits nobody.
  *   <li><b>Liveness.</b> See {@link #actingAuthorities}.
  * </ol>
  */
@@ -141,11 +142,27 @@ public class ActingMemberFilter extends OncePerRequestFilter {
       return;
     }
 
+    // ENDPOINT BOUND FIRST, and the order is load-bearing rather than cosmetic. This filter sits
+    // on the unmatched chain, so it sees every path; when the caller check came first, ANY
+    // unauthenticated request to ANY path that carried this header was counted as
+    // "no_authenticated_caller" — a reason documented as structurally impossible and alerted on as
+    // evidence of a filter-ordering bug. The header ships in the extractor and is documented
+    // publicly, so a single internet probe produced an hour-long page pointing at the wrong thing.
+    // Checking the bound first confines every reason below to the two endpoints that accept the
+    // header at all.
+    if (!matchesActingPath(request)) {
+      refuse(
+          request,
+          response,
+          "endpoint does not accept an on-behalf-of header",
+          MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
+      return;
+    }
+
     Authentication caller = SecurityContextHolder.getContext().getAuthentication();
     if (!(caller instanceof JwtAuthenticationToken jwtCaller)) {
-      // Guard 3. Never "ignore and continue": that is precisely how the first version failed —
-      // filters running before authentication saw an empty context and silently skipped their
-      // check.
+      // Never "ignore and continue": that is precisely how the first version failed — filters
+      // running before authentication saw an empty context and silently skipped their check.
       refuse(
           request,
           response,
@@ -159,14 +176,6 @@ public class ActingMemberFilter extends OncePerRequestFilter {
           response,
           "caller is not a configured gateway",
           MetricNames.ON_BEHALF_OF_NOT_A_GATEWAY);
-      return;
-    }
-    if (!matchesActingPath(request)) {
-      refuse(
-          request,
-          response,
-          "endpoint does not accept an on-behalf-of header",
-          MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
       return;
     }
 

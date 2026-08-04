@@ -33,7 +33,7 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 
 /**
  * Resolves {@link CurrentUserSub}-annotated {@link String} and {@link CurrentUserId}-annotated
- * {@link UUID} controller parameters from the authenticated caller's JWT {@code sub} claim.
+ * {@link UUID} controller parameters from the authenticated caller's subject.
  *
  * <p>This is the single implementation of the {@code requireSub(JwtAuthenticationToken)} guard that
  * six controllers previously hand-rolled (five returning the raw subject, {@code
@@ -42,10 +42,14 @@ import org.springframework.web.method.support.ModelAndViewContainer;
  * JwtAuthenticationToken} method parameters these annotations replace — so no {@link
  * org.springframework.security.core.context.SecurityContextHolder} coupling is introduced.
  *
- * <p>Failure semantics are preserved verbatim: a missing/non-JWT principal, a missing or blank
- * subject, or (for {@link CurrentUserId}) a non-UUID subject each raise {@link
- * AccessDeniedException} with the same messages as before, which the security layer renders as RFC
- * 7807 {@code 403}.
+ * <p>The subject comes from {@link
+ * de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject}, not from a type check, so a
+ * caller that carries a subject without a token — the member an ingest-gateway call acts for,
+ * ADR-0129 — resolves like any other. Demanding a {@code JwtAuthenticationToken} here refused every
+ * such call during argument resolution, one layer past the gate it used to fail at.
+ *
+ * <p>An absent subject and (for {@link CurrentUserId}) a non-UUID subject each raise {@link
+ * AccessDeniedException}, which the security layer renders as RFC 7807 {@code 403}.
  */
 public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolver {
 
@@ -96,7 +100,7 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
   }
 
   /**
-   * Extracts and validates the JWT subject from the current request, applying the null-JWT and
+   * Extracts and validates the caller's subject from the current request, applying the
    * blank-subject guards the controllers shared.
    *
    * @param webRequest the current request

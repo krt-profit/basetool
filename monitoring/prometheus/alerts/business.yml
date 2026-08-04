@@ -885,19 +885,23 @@ groups:
           summary: "Ingest gateway is naming a member the backend will not act for"
           description: "The backend has been refusing on-behalf-of requests for a member that is either unknown locally or that the last Keycloak roster sync no longer found. Most likely an offboarded member whose desktop extractor is still running - find them via the correlationId in the backend log and have it uninstalled. If the refused subjects VARY, this is somebody enumerating user ids instead, and the source belongs in the access log."
 
-      # Should be structurally unreachable: this filter runs after authentication, so a header can
-      # only arrive without an authenticated caller if the filter ORDER changed underneath it.
-      # That is the exact class of bug ADR-0129 was written after (a gate evaluating an empty
-      # context), so any occurrence at all is a defect rather than traffic.
+      # Two causes, and the rate tells them apart. The header ships in the extractor and is
+      # documented, so an unauthenticated caller CAN send it - a probe, or a client whose token
+      # expired mid-upload. That is ambient and single-shot. A sustained rate means the filter
+      # cannot see a caller that should be there, i.e. the chain was reordered ahead of it, which
+      # is the class of bug ADR-0129 was written after.
+      # NOT a >0-over-an-hour rule: this reason was briefly reachable from ANY path, and that
+      # version fired for a full hour off one internet probe. The endpoint bound now runs first, so
+      # only the two ingest endpoints can produce it, and a sustained rate is meaningful.
       - alert: OnBehalfOfWithoutAuthenticatedCaller
         expr: >-
-          sum(increase(basetool_on_behalf_of_refused_total{reason="no_authenticated_caller"}[1h])) > 0
-        for: 5m
+          sum(rate(basetool_on_behalf_of_refused_total{reason="no_authenticated_caller"}[15m])) > 0
+        for: 30m
         labels:
           severity: warning
         annotations:
-          summary: "on-behalf-of header seen with no authenticated caller - filter ordering suspect"
-          description: "ActingMemberFilter refused a request because the SecurityContext held no authenticated caller. It runs immediately after BearerTokenAuthenticationFilter, so this should be impossible: treat it as evidence that the security filter chain was reordered or that authentication is failing silently ahead of it. Compare SecurityConfig's addFilterAfter ordering against ADR-0129."
+          summary: "Sustained on-behalf-of traffic at an ingest endpoint with no authenticated caller"
+          description: "ActingMemberFilter has been refusing on-behalf-of requests at an ingest endpoint because the SecurityContext held no authenticated caller, for half an hour. A single occurrence is a probe or an expired token; a sustained rate is not. Check whether ingest uploads are also failing - if they are, suspect the security filter chain being reordered ahead of this filter (compare SecurityConfig's addFilterAfter ordering against ADR-0129) or authentication failing silently. If uploads are fine, this is an unauthenticated caller sending the header, and the access log has the source."
       - alert: TermsConsentRolloutStalled
         expr: |
           (max(basetool_terms_refused_subjects) >= 3)

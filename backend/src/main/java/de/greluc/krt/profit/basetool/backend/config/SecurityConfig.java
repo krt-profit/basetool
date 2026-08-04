@@ -300,13 +300,16 @@ public class SecurityConfig {
    *
    * @param http Spring Security builder
    * @param jwtAuthenticationConverter wired by {@link #jwtAuthenticationConverter}
-   * @param env active environment, used to detect the {@code test} profile so CSRF can be disabled
-   *     for MockMvc tests
+   * @param env active environment, used to detect the {@code test} profile — which disables CSRF
+   *     for MockMvc tests and stands the consent gate down unless {@link #TERMS_GATE_ARMED_IN_TEST}
+   *     re-arms it
    * @param securityProblemResponseHandler renders filter-level 401/403 as RFC&nbsp;7807
    *     problem+json (wired as both the entry point and the access-denied handler)
-   * @param messageSource localizes the {@code PendingApprovalAccessFilter} 403 problem body
+   * @param messageSource localizes the 403 problem bodies of the three refusing filters ({@code
+   *     PendingApprovalAccessFilter}, {@code TermsAcceptanceAccessFilter}, {@code
+   *     ActingMemberFilter})
    * @param problemResponseFactory assembles the RFC&nbsp;7807 problem body for those filters
-   * @param objectMapper serializes that filter's {@code ProblemDetail} to JSON
+   * @param objectMapper serializes those filters' {@code ProblemDetail}s to JSON
    * @param meterRegistry counts the identity-provider-unavailable 503 on {@code
    *     basetool_http_error_total} (REQ-OBS-011)
    * @return the configured security filter chain

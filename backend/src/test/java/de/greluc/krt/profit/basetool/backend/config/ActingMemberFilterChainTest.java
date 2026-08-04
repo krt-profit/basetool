@@ -48,7 +48,12 @@ import org.springframework.web.context.WebApplicationContext;
  * an ordering or wiring failure that a filter tested in isolation cannot see: filters running
  * before authentication against an empty context, a gate evaluating the wrong subject, a caller
  * reaching an endpoint the header was never meant for. So these drive {@link FilterChainProxy} as
- * configured, with both person-gates live.
+ * configured, with the approval gate live.
+ *
+ * <p>The consent gate is NOT live here: the {@code test} profile stands it down for the whole
+ * suite, which is exactly how a fail-open on that gate stayed green. {@link
+ * ActingMemberIdentityChainTest} re-arms it for itself and owns that case; this class owns the
+ * refusals.
  *
  * <p>The allowlist is set to a test client id, which is the only thing that distinguishes a gateway
  * from any other caller — matching production, where an empty allowlist admits nobody.
@@ -175,6 +180,57 @@ class ActingMemberFilterChainTest {
     // Counted as "not live" rather than as its own reason: the answer must not distinguish an
     // unknown subject from an offboarded one, or the endpoint becomes an enumeration oracle.
     assertThat(refusals(MetricNames.ON_BEHALF_OF_MEMBER_NOT_LIVE)).isEqualTo(before + 1);
+  }
+
+  /**
+   * An unauthenticated caller sending the header at an unbound endpoint is counted as
+   * <em>endpoint_not_bound</em>, not as <em>no_authenticated_caller</em>.
+   *
+   * <p>This pins the guard ORDER, which is load-bearing. This filter sits on the unmatched chain,
+   * so it sees every path; while the caller check came first, any anonymous internet request that
+   * carried this header — a header shipped in the extractor and documented publicly — was counted
+   * under a reason documented as structurally impossible and alerted on as evidence of a
+   * filter-ordering bug. One probe produced an hour-long page pointing at the wrong thing.
+   */
+  @Test
+  void countsAnAnonymousProbeOnAnUnboundPathAsOutOfBoundsNotAsAMissingCaller() throws Exception {
+    double bound = refusals(MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
+    double caller = refusals(MetricNames.ON_BEHALF_OF_NO_CALLER);
+
+    mockMvc
+        .perform(
+            post(OTHER_PATH)
+                .header(ActingMemberHeader.ON_BEHALF_OF_HEADER, MEMBER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
+
+    assertThat(refusals(MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND)).isEqualTo(bound + 1);
+    assertThat(refusals(MetricNames.ON_BEHALF_OF_NO_CALLER)).isEqualTo(caller);
+  }
+
+  /**
+   * On a bound endpoint, a header with no authenticated caller is still refused and still counted.
+   *
+   * <p>The reason survives the reorder — it is now confined to the two endpoints that accept the
+   * header at all, which is what makes a sustained rate on it meaningful rather than ambient
+   * internet noise.
+   */
+  @Test
+  void stillRefusesAHeaderWithNoAuthenticatedCallerOnABoundPath() throws Exception {
+    double before = refusals(MetricNames.ON_BEHALF_OF_NO_CALLER);
+
+    mockMvc
+        .perform(
+            post(INGEST_PATH)
+                .header(ActingMemberHeader.ON_BEHALF_OF_HEADER, MEMBER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
+
+    assertThat(refusals(MetricNames.ON_BEHALF_OF_NO_CALLER)).isEqualTo(before + 1);
   }
 
   /** A malformed subject never reaches the persistence layer. */

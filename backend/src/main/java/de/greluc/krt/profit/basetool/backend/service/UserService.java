@@ -443,20 +443,60 @@ public class UserService {
   }
 
   /**
-   * Looks up the calling user via the JWT in the current {@link Authentication}. Returns empty for
-   * unauthenticated callers (guests). The single canonical accessor for "who is calling" — other
-   * services delegate here instead of reaching for {@code SecurityContextHolder} (the architectural
-   * seam enforced by ArchUnit).
+   * Looks up the calling user from the current {@link Authentication}. The single canonical
+   * accessor for "who is calling" — other services delegate here instead of reaching for {@code
+   * SecurityContextHolder} (the architectural seam enforced by ArchUnit).
+   *
+   * <p>Reads the subject through {@code AuthenticatedSubject}, so it answers for a bearer token and
+   * for the token-less identity the ingest gateway installs alike (ADR-0129). Empty means "no
+   * caller" — a guest; a caller whose subject is present but malformed is refused rather than
+   * reported as absent.
    *
    * @return the calling user, or empty for unauthenticated requests
+   * @throws org.springframework.security.authentication.AuthenticationServiceException if the
+   *     caller's subject is not a UUID
    */
   public Optional<User> getCurrentUser() {
     // Asked of AuthenticatedSubject, not of the type. This is the canonical "who is calling"
     // accessor, and a Jwt-principal test made it answer "nobody" for an acting member (ADR-0129) —
     // latent today because neither ACTING_PATH reaches it, and an ownership check silently
     // evaluated against no current user the moment a third endpoint joins that list.
-    return AuthenticatedSubject.idOf(authHelperService.rawAuthentication())
-        .flatMap(userRepository::findById);
+    //
+    // NOT idOf(). That would fold "there is no caller" and "the caller's subject is malformed" into
+    // the same empty Optional, and those must stay apart: the first is a guest, the second is a
+    // misconfigured realm. Callers act on the difference — MissionService does
+    // getCurrentUser().ifPresent(mission::setOwner), so a silent empty would persist an OWNERLESS
+    // mission where this used to refuse the request outright.
+    Optional<String> subject = AuthenticatedSubject.of(authHelperService.rawAuthentication());
+    if (subject.isEmpty()) {
+      return Optional.empty();
+    }
+    return userRepository.findById(requireUuidSubject(subject.get()));
+  }
+
+  /**
+   * Parses a subject claim into a member id, refusing anything that is not a UUID.
+   *
+   * <p>The same fail-closed rule {@link #getUserIdFromJwt(Jwt)} applies, reached from the
+   * token-less identity the ingest gateway installs (ADR-0129) as well as from a bearer token.
+   * Deriving an id from a non-UUID subject — via {@code UUID.nameUUIDFromBytes} or otherwise —
+   * would mix up identities across realms, so a deviation is refused rather than mapped.
+   *
+   * @param subject the caller's non-blank subject claim
+   * @return the parsed member id
+   * @throws AuthenticationServiceException if the subject is not a UUID
+   */
+  @NotNull
+  private static UUID requireUuidSubject(@NotNull String subject) {
+    try {
+      return UUID.fromString(subject);
+    } catch (IllegalArgumentException malformed) {
+      // Deliberately without the value: it reaches the log unfiltered otherwise, and a subject from
+      // a deviating realm can be a username (REQ-OBS-004).
+      log.error("Authenticated subject is not a UUID. Refusing to avoid an identity mix-up.");
+      throw new org.springframework.security.authentication.AuthenticationServiceException(
+          "Authenticated subject must be a UUID");
+    }
   }
 
   /**

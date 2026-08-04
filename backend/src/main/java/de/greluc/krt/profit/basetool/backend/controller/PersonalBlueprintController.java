@@ -34,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintUpdateRe
 import de.greluc.krt.profit.basetool.backend.service.BlueprintCraftabilityService;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.web.CurrentUserSub;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
@@ -81,7 +80,6 @@ public class PersonalBlueprintController {
   private final PersonalBlueprintService service;
   private final BlueprintImportService importService;
   private final BlueprintCraftabilityService craftabilityService;
-  private final UserService userService;
 
   /**
    * Lists the caller's owned blueprints (paginated, sortable, optional product-name filter).

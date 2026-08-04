@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryImportDraftDto;
 import de.greluc.krt.profit.basetool.backend.service.RefineryImportService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -53,7 +52,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class RefineryImportController {
 
   private final RefineryImportService refineryImportService;
-  private final UserService userService;
 
   /**
    * Builds a best-effort draft from an uploaded {@code RefineryExtract} (frozen contract v1, plan

@@ -1270,9 +1270,12 @@ under one of five bounded reasons: `not_a_gateway`, `endpoint_not_bound`, `no_au
 `malformed_subject`, `member_not_live` (ADR-0129). The label is bounded by construction — the values
 are constants in `MetricNames`, never caller-supplied. This counter is the **only** place the
 reasons are distinguishable: the HTTP answer is deliberately byte-identical for all five so the
-endpoint cannot be used to enumerate which subjects exist. Two of the five are alerted
-(`ActingMemberNotLiveRefused`, `OnBehalfOfWithoutAuthenticatedCaller`) and all five are on the
-`Basetool operations` dashboard.
+endpoint cannot be used to enumerate which subjects exist. Three of the five are alerted
+(`OnBehalfOfRefusedSpike` on `not_a_gateway`, `ActingMemberNotLiveRefused`,
+`OnBehalfOfWithoutAuthenticatedCaller`) and all five are on the `Basetool operations` dashboard.
+`endpoint_not_bound` is deliberately unalerted: the filter sees every path, so that reason absorbs
+the ambient internet traffic that carries the header, which is also why the endpoint bound is
+checked before the caller.
 
 **Deliberately excluded** (documented so the gap is intentional, not an oversight): notifications
 (no org-wide queue — only per-recipient unread, which is PII-adjacent), org units (no lifecycle

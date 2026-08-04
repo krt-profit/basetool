@@ -34,8 +34,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 /** Unit tests for {@link AdminDefaultBlueprintController}. */
 @ExtendWith(MockitoExtension.class)
@@ -47,11 +45,6 @@ class AdminDefaultBlueprintControllerTest {
   private static DefaultBlueprintResponse sample() {
     return new DefaultBlueprintResponse(
         UUID.randomUUID(), "k", "Name", null, null, "system", Instant.EPOCH, 0L);
-  }
-
-  private static JwtAuthenticationToken auth(String sub) {
-    Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject(sub).build();
-    return new JwtAuthenticationToken(jwt);
   }
 
   @Test

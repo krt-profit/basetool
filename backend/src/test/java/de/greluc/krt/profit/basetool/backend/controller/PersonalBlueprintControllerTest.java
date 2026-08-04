@@ -41,11 +41,9 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintUpdateRe
 import de.greluc.krt.profit.basetool.backend.service.BlueprintCraftabilityService;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintService;
-import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -55,8 +53,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.multipart.MultipartFile;
 
 /** Unit tests for {@link PersonalBlueprintController}. */
@@ -68,17 +64,8 @@ class PersonalBlueprintControllerTest {
   @Mock private PersonalBlueprintService service;
   @Mock private BlueprintImportService importService;
   @Mock private BlueprintCraftabilityService craftabilityService;
-  @Mock private UserService userService;
 
   @InjectMocks private PersonalBlueprintController controller;
-
-  private JwtAuthenticationToken auth;
-
-  @BeforeEach
-  void setUp() {
-    Jwt jwt = Jwt.withTokenValue("token").header("alg", "none").claim("sub", SUB).build();
-    auth = new JwtAuthenticationToken(jwt);
-  }
 
   private static PersonalBlueprintResponse sample() {
     Instant now = Instant.parse("2026-01-01T00:00:00Z");

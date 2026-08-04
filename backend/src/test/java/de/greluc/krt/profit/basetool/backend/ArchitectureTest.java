@@ -286,9 +286,11 @@ class ArchitectureTest {
     // Neither was visible in a test, because both types satisfy every type-agnostic consumer.
     //
     // The type is not the identity. Anything asking "who is calling" asks support.
-    // AuthenticatedSubject, which reads the subject from a JWT principal when there is one and from
-    // getName() otherwise. Only code with a genuine question about the TOKEN (its claims, its
-    // binding) may name the token type — and there is exactly one such place.
+    // AuthenticatedSubject, which reads the subject from a JWT principal when there is one and
+    // otherwise only from an authentication that opts in via SubjectAuthentication — never from
+    // getName(), which is a callsign (REQ-OBS-004). Only code with a genuine question about the
+    // TOKEN (its claims, its binding) may name the token type — and there is exactly one such
+    // place.
     noClasses()
         .that()
         .doNotHaveFullyQualifiedName(AUTHENTICATION_SEAM[0])

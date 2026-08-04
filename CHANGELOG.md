@@ -8,8 +8,6 @@
 
 - **Das Gateway erscheint nicht mehr als neues Mitglied.** Sein technisches Konto löste bisher eine Registrierung samt Freigabeanfrage an die Administratoren aus, weil ein solches Konto von einer Person nicht zu unterscheiden war. Es wird jetzt als Maschine erkannt.
 
-- **Die Zustimmungspflicht galt für den Extractor-Versand nicht.** Sie wurde bei diesen Aufrufen stillschweigend übersprungen, weil die Prüfung die Identitätsform des Gateways nicht erkannte und „keine Person" als „darf durch" auslegte. Sie greift jetzt wieder (REQ-SEC-028).
-
 ## [v1.5.35](https://github.com/krt-profit/basetool/releases/tag/v1.5.35) - 2026-08-04
 
 ### Fixed

@@ -19,12 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -32,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.profit.basetool.backend.service.RefineryImportService;
 import de.greluc.krt.profit.basetool.backend.service.TermsAcceptanceService;
 import de.greluc.krt.profit.basetool.backend.support.ActingMemberHeader;
@@ -41,6 +44,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
@@ -136,6 +140,7 @@ class ActingMemberIdentityChainTest {
   @Autowired private TermsAcceptanceService termsAcceptanceService;
 
   @MockitoBean private RefineryImportService refineryImportService;
+  @MockitoBean private BlueprintImportService blueprintImportService;
 
   private MockMvc mockMvc;
 
@@ -156,6 +161,7 @@ class ActingMemberIdentityChainTest {
     userRepository.saveAndFlush(member);
 
     when(refineryImportService.buildDraft(any(), any())).thenReturn(null);
+    when(blueprintImportService.previewImport(any(), any())).thenReturn(null);
   }
 
   /**
@@ -181,6 +187,32 @@ class ActingMemberIdentityChainTest {
         .andExpect(status().isOk());
 
     verify(refineryImportService).buildDraft(any(), eq(MEMBER));
+  }
+
+  /**
+   * The second bound endpoint carries the identity too — and it binds {@code @CurrentUserSub}.
+   *
+   * <p>ADR-0129 bounds the header to two endpoints, and the test above covers only the
+   * {@code @CurrentUserId} one. They take different branches of the argument resolver, so proving
+   * one proves the shared lookup but not the String-typed binding a reviewer would have to take on
+   * trust. The subject reaching the service is the member's, not the gateway's.
+   */
+  @Test
+  void carriesTheActingMemberToTheBlueprintPreviewEndpointToo() throws Exception {
+    termsAcceptanceService.acceptCurrentTerms(MEMBER);
+
+    mockMvc
+        .perform(
+            multipart("/api/v1/personal-blueprints/import/preview")
+                .file(
+                    new MockMultipartFile(
+                        "file", "bp.json", "application/json", "{}".getBytes(UTF_8)))
+                .with(
+                    jwt().jwt(token -> token.subject(GATEWAY).claim("azp", "test-ingest-gateway")))
+                .header(ActingMemberHeader.ON_BEHALF_OF_HEADER, MEMBER.toString()))
+        .andExpect(status().isOk());
+
+    verify(blueprintImportService).previewImport(eq(MEMBER.toString()), any());
   }
 
   /**

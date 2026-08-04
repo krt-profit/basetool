@@ -203,8 +203,12 @@ public class SecurityProblemResponseHandler
   /**
    * Puts the authenticated caller's subject into the {@code userId} MDC key, unless something
    * already populated that key (then the existing value wins, exactly as the correlation id above)
-   * or the caller is not JWT-authenticated (then the key stays unset so the logback pattern's
-   * {@code anonymous} default is the truth rather than a cover-up).
+   * or the caller has no readable subject (then the key stays unset so the logback pattern's {@code
+   * anonymous} default is the truth rather than a cover-up).
+   *
+   * <p>A token-less acting member (ADR-0129) has a readable subject and is stamped, so a refusal of
+   * one is attributable; a username/password caller is not, because its name is a callsign that
+   * REQ-OBS-004 keeps out of the log.
    *
    * <p>Deliberately duplicated in {@code PendingApprovalAccessFilter} instead of extracted into the
    * {@code logging} package: {@code logging.CorrelationIdFilter} already depends on {@code

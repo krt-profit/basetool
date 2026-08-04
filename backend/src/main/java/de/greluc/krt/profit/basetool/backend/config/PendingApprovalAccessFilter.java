@@ -211,11 +211,13 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
 
   /**
    * Puts the authenticated caller's subject into the {@code userId} MDC key, unless something
-   * already populated that key (the existing value then wins) or the caller is not
-   * JWT-authenticated (the key then stays unset, so the logback pattern's {@code anonymous} default
-   * stays truthful). A pending user always carries a token here — {@link #isBlockedPendingApiCall}
-   * only returns {@code true} for an authenticated principal — but the guards keep the method safe
-   * for the unit tests that drive it with a plain {@code UsernamePasswordAuthenticationToken}.
+   * already populated that key (the existing value then wins) or the caller has no readable subject
+   * (the key then stays unset, so the logback pattern's {@code anonymous} default stays truthful).
+   *
+   * <p>"No readable subject" is not the same as "no token". A pending caller acting through the
+   * ingest gateway carries a subject and no token (ADR-0129) and IS stamped; a username/password
+   * caller is not, because its name is a callsign and REQ-OBS-004 keeps that out of the log. The
+   * distinction lives in {@code AuthenticatedSubject}, not here.
    *
    * <p>Deliberately duplicated in {@code SecurityProblemResponseHandler} instead of extracted into
    * the {@code logging} package: {@code logging.CorrelationIdFilter} already depends on {@code
