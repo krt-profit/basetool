@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.35](https://github.com/krt-profit/basetool/releases/tag/v1.5.35) - 2026-08-04
+
 ### Fixed
 
 - **Der Versand aus dem Extractor funktioniert jetzt tatsächlich.** Die Korrektur in v1.5.34 griff noch nicht: das Gateway prüfte das Zertifikat des Anmeldeservers zwar nicht mehr gegen den Truststore des Backends, dafür aber gegen den eines intern erreichbaren Anmeldeservers — mit demselben Ergebnis. Es akzeptiert jetzt beide Herkünfte, sodass die Prüfung unabhängig davon aufgeht, welche Adresse konfiguriert ist.
