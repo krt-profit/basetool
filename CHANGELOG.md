@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.33](https://github.com/krt-profit/basetool/releases/tag/v1.5.33) - 2026-08-04
+
 ### Changed
 
 - **Der Alarm zur Zustimmungseinführung schlägt nur noch an, wenn tatsächlich mehrere Personen ausgesperrt sind.** Bisher zählte er abgelehnte Anfragen statt Personen — ein einzelnes wiederholt anfragendes Programm genügte, um ihn nachts auszulösen, obwohl niemand betroffen war. Er beobachtet jetzt, wie viele **verschiedene** Mitglieder abgelehnt werden, und lässt einer Person auch genug Zeit, die Bedingungen in Ruhe zu lesen.
