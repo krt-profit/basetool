@@ -200,3 +200,28 @@ tasks {
 tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
   includeConfigs.set(listOf("^runtimeClasspath$"))
 }
+
+// Cross-module parity tests read the OTHER modules' sources directly (they cannot see those classes
+// on the test classpath). Gradle knows nothing about that, so after a change in `ingest` or
+// `frontend` it considers `:backend:test` up-to-date and the parity test simply does not run —
+// which was verified the hard way: renaming the on-behalf-of header in the gateway left the test
+// green until `--rerun-tasks` forced it. A parity test that does not re-run is not a parity test.
+//
+// Declared file by file rather than as whole source trees: this must invalidate on the handful of
+// files the assertions actually read, not on every Java change in two other modules.
+tasks.named<Test>("test") {
+  inputs
+    .files(
+      rootProject.file(
+        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/service/BackendImportClient.java"
+      ),
+      rootProject.file(
+        "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/config/ObservationPrivacyFilter.java"
+      ),
+      rootProject.file(
+        "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/ObservationPrivacyFilter.java"
+      ),
+    )
+    .withPropertyName("crossModuleParitySources")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+}
