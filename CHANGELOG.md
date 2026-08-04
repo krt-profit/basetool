@@ -8,6 +8,8 @@
 
 - **Die Glocke friert hinter der Zustimmungspflicht nicht mehr stumm ein.** Der Zähler für ungelesene Benachrichtigungen und die Einträge im Aufklappmenü verwarfen die Antwort des Zustimmungs-Gates kommentarlos und zeigten weiter den letzten Stand. Sie leiten jetzt wie jede andere Aktion auf die Zustimmungsseite weiter.
 
+- **P4K-Import (Admin): Die laufende Fortschrittsabfrage erkennt jetzt die Zustimmungsabfrage, statt sie als Erfolg zu lesen.** Wurde während eines Imports eine neue Fassung der Nutzungsbedingungen aktiv, holte die Seite alle 3 Sekunden endlos die Zustimmungsseite, ohne dass sichtbar etwas passierte. Sie wechselt jetzt zur Zustimmungsseite und beendet die Abfrage — wie jede andere Oberfläche (REQ-SEC-028).
+
 - **Deutlich weniger Serverlast, solange jemand noch nicht zugestimmt hat.** Das Zwischenergebnis „hat noch nicht zugestimmt" wurde gespeichert, aber nie wiederverwendet, sodass jede einzelne Anfrage einer nicht zugestimmten Sitzung eine zusätzliche Abfrage im Hintergrund auslöste. Es gilt jetzt wie das positive Gegenstück bis zu 60 Sekunden; eine Zustimmung wirkt weiterhin sofort.
 
 - **Live-Aktualisierung hängt sich nach einer Änderung der Nutzungsbedingungen nicht mehr in endlose Verbindungsversuche.** Ein Tab, dessen Nutzer den geltenden Bedingungen noch nicht zugestimmt hatte, wurde bei der Live-Sync-Verbindung auf die Zustimmungsseite umgeleitet — was eine WebSocket-Verbindung nicht auswerten kann, weshalb sie unbegrenzt alle 30 Sekunden neu aufgebaut wurde. Die Verbindung wird jetzt einmalig endgültig beendet und der Tab wechselt auf die Zustimmungsseite (REQ-SEC-028).

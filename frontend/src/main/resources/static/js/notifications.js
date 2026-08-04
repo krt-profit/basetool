@@ -83,6 +83,44 @@
         };
     }
 
+    /**
+     * Reads the JSON payload of one of this module's three hand-rolled GETs, or resolves to
+     * `fallback` when the answer is not that payload. The writes go through krtFetch, which makes
+     * these checks itself; these reads are the ones that have to make them here.
+     *
+     * Two gates can go up mid-session, and both must navigate rather than fail quietly. A poisoned
+     * or expired session answers 401 + X-Reauthenticate (REQ-SEC-012). A newly deployed Terms-of-Use
+     * wording answers 403 + X-Terms-Acceptance-Required (REQ-SEC-028) — precisely for the tab that
+     * was already open when it deployed, which is when the whole feature first does anything. The
+     * consent check used to be missing here, and the symptom was a badge frozen at its last value
+     * and a dropdown that opened empty, with nothing on screen saying why. It lives in one place now
+     * so the three reads cannot drift back apart one at a time.
+     *
+     * `res.ok` is not the test either. fetch follows redirects transparently, so any
+     * redirect-to-HTML answer arrives as a 200 whose body is a whole document — rejecting
+     * `res.redirected` keeps that out of the JSON parse rather than letting a login page or a
+     * consent page be read as a payload.
+     *
+     * @param {Response} res the response to read
+     * @param {any} fallback the value to resolve to when the answer is not the payload
+     * @returns {any} the parsed body, or the fallback
+     */
+    function readJson(res, fallback) {
+        if (window.krtReauth && window.krtReauth.check(res)) {
+            return fallback;
+        }
+        if (window.krtTermsGate && window.krtTermsGate.check(res)) {
+            // The consent page is already loading over this one: stop the badge poll so the
+            // departing page cannot keep asking the endpoint that just refused it.
+            stopPolling();
+            return fallback;
+        }
+        if (res.redirected || !res.ok) {
+            return fallback;
+        }
+        return res.json();
+    }
+
     // ---- unread badge -------------------------------------------------------
 
     function setBadge(count) {
@@ -102,20 +140,9 @@
     function refreshUnreadCount() {
         return fetch('/notifications/unread-count', csrfRequestInit())
             .then(function (res) {
-                // A poisoned/expired session answers 401 + X-Reauthenticate: re-login instead of
-                // silently reporting zero forever (REQ-SEC-012).
-                if (window.krtReauth && window.krtReauth.check(res)) {
-                    return null;
-                }
-                // The same for the consent gate, which answers this poll 403 +
-                // X-Terms-Acceptance-Required because csrfRequestInit() marks it as an XHR. Without
-                // this the header is discarded by `res.ok ? … : null` below and the badge simply
-                // freezes at its last value for as long as the gate is closed — no error, no hint
-                // (REQ-SEC-028).
-                if (window.krtTermsGate && window.krtTermsGate.check(res)) {
-                    return null;
-                }
-                return res.ok ? res.json() : null;
+                // Both gates navigate rather than let the badge silently report its last value
+                // forever (REQ-SEC-012 / REQ-SEC-028) — see readJson.
+                return readJson(res, null);
             })
             .then(function (data) {
                 if (data && data.count != null) {
@@ -196,13 +223,7 @@
         }
         fetch('/notifications/recent', csrfRequestInit())
             .then(function (res) {
-                if (window.krtReauth && window.krtReauth.check(res)) {
-                    return [];
-                }
-                if (window.krtTermsGate && window.krtTermsGate.check(res)) {
-                    return [];
-                }
-                return res.ok ? res.json() : [];
+                return readJson(res, []);
             })
             .then(function (items) {
                 if (!Array.isArray(items) || items.length === 0) {
@@ -399,13 +420,7 @@
         btn.disabled = true;
         fetch('/notifications/page-items?page=' + page, csrfRequestInit())
             .then(function (res) {
-                if (window.krtReauth && window.krtReauth.check(res)) {
-                    return null;
-                }
-                if (window.krtTermsGate && window.krtTermsGate.check(res)) {
-                    return null;
-                }
-                return res.ok ? res.json() : null;
+                return readJson(res, null);
             })
             .then(function (data) {
                 if (!data || !Array.isArray(data.items)) {
