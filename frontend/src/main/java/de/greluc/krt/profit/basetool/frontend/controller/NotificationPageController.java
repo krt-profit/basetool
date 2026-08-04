@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.config.TermsAcceptanceGateFilter;
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationBulkResultDto;
@@ -37,6 +38,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -68,6 +70,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.Disposable;
 
@@ -97,6 +100,9 @@ public class NotificationPageController {
       new ParameterizedTypeReference<>() {};
   private static final long STREAM_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
   private static final String REGISTRATION_ID = "keycloak";
+
+  /** Upper bound on cause-chain traversal in {@link #isTermsGateSignal(Throwable)} (loop guard). */
+  private static final int MAX_CAUSE_DEPTH = 25;
 
   private final BackendApiClient backendApiClient;
   private final MessageSource messageSource;
@@ -264,7 +270,11 @@ public class NotificationPageController {
             .doFinally(signal -> relayConnections.decrementAndGet())
             .subscribe(
                 event -> forward(emitter, event),
-                error -> handleStreamError(emitter, error),
+                error ->
+                    handleStreamError(
+                        emitter,
+                        error,
+                        request.getContextPath() + TermsAcceptanceGateFilter.CONSENT_PATH),
                 emitter::complete);
     emitter.onCompletion(subscription::dispose);
     emitter.onTimeout(
@@ -484,12 +494,23 @@ public class NotificationPageController {
    * @param emitter the browser-facing emitter to terminate
    * @param error the error raised by the backend stream subscription
    */
-  private static void handleStreamError(SseEmitter emitter, Throwable error) {
+  private static void handleStreamError(SseEmitter emitter, Throwable error, String consentUrl) {
     if (ReauthenticationRequiredException.isReauthSignal(error)) {
       log.debug("Notification stream needs re-authentication; signalling the browser to re-login");
       try {
         emitter.send(
             SseEmitter.event().name("reauth").data(ReauthenticationRequiredException.REAUTH_PATH));
+        emitter.complete();
+      } catch (IOException | RuntimeException sendFailure) {
+        emitter.complete();
+      }
+      return;
+    }
+    if (isTermsGateSignal(error)) {
+      log.debug("Notification stream is behind the consent gate; handing the browser off to it");
+      try {
+        emitter.send(
+            SseEmitter.event().name(TermsAcceptanceGateFilter.SSE_GATE_EVENT).data(consentUrl));
         emitter.complete();
       } catch (IOException | RuntimeException sendFailure) {
         emitter.complete();
@@ -503,6 +524,44 @@ public class NotificationPageController {
         "Notification stream dropped ({}); completing cleanly, poll fallback keeps the badge fresh",
         error.getClass().getSimpleName());
     emitter.complete();
+  }
+
+  /**
+   * Reports whether {@code error} — or anything in its cause chain — is the backend refusing this
+   * stream because the caller has not accepted the Terms of Use (REQ-SEC-028).
+   *
+   * <p>The frontend's own {@code TermsAcceptanceGateFilter} normally intercepts a gated stream
+   * before it ever reaches this relay, so this covers the two windows where it cannot: its verdict
+   * cache holds a still-fresh {@code true} from the 60 s before a wording change took effect, or
+   * its status read failed and it deliberately let the request through (the boundary is the
+   * backend, so it fails open). In both cases the refusal arrives here instead — and without this
+   * branch it would complete as a generic drop, which an {@code EventSource} answers by
+   * reconnecting into exactly the loop the gate's SSE handoff exists to prevent.
+   *
+   * <p>Matched on the {@code 403} plus the stable problem {@code code} rather than the status
+   * alone: a plain {@code ACCESS_DENIED} must keep completing cleanly, because navigating the
+   * window would be wrong for it.
+   *
+   * @param error the error raised by the backend stream subscription
+   * @return {@code true} when the backend refused the stream for missing consent
+   */
+  private static boolean isTermsGateSignal(Throwable error) {
+    Throwable current = error;
+    // Depth-capped rather than cycle-detecting, mirroring
+    // ReauthenticationRequiredException.isReauthSignal: a self-referential cause chain must not
+    // spin
+    // a Reactor worker thread.
+    for (int depth = 0; current != null && depth < MAX_CAUSE_DEPTH; depth++) {
+      if (current instanceof WebClientResponseException response
+          && response.getStatusCode() == HttpStatus.FORBIDDEN
+          && response
+              .getResponseBodyAsString(StandardCharsets.UTF_8)
+              .contains(BackendServiceException.CODE_TERMS_NOT_ACCEPTED)) {
+        return true;
+      }
+      current = current.getCause();
+    }
+    return false;
   }
 
   private static void forward(SseEmitter emitter, ServerSentEvent<String> event) {

@@ -28,9 +28,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -60,7 +65,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
 
   /** Where a user without consent is sent. */
-  static final String CONSENT_PATH = "/terms/accept";
+  public static final String CONSENT_PATH = "/terms/accept";
 
   /**
    * Response header carrying the consent-page URL to an AJAX caller, mirroring the {@code
@@ -68,6 +73,13 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
    * the browser when it sees this, instead of stalling a swap or toasting a generic write error.
    */
   static final String TERMS_GATE_HEADER = "X-Terms-Acceptance-Required";
+
+  /**
+   * Name of the one-shot SSE event that hands an {@code EventSource} off to the consent page,
+   * carrying that page's URL as its data. The sibling of the stream's existing {@code reauth}
+   * event; {@code notifications.js} listens for both and stops reconnecting on either.
+   */
+  public static final String SSE_GATE_EVENT = "terms-gate";
 
   /** Session attribute holding the epoch millis at which the cached "accepted" was read. */
   static final String SESSION_CHECKED_AT = "krt.terms.checkedAt";
@@ -98,6 +110,22 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
       return;
     }
     String consentUrl = request.getContextPath() + CONSENT_PATH;
+    if (isEventStream(request)) {
+      // An EventSource can read neither a status code nor a response header, so the X-Terms-
+      // Acceptance-Required contract below is invisible to it and a redirect is actively harmful:
+      // the stream receives the consent page as text/html, fails to parse it, and notifications.js
+      // reconnects on its own jittered timer — indefinitely. Measured in production on 2026-08-03:
+      // 491 stream attempts and 483 consent-page loads in ten minutes, from open tabs alone.
+      //
+      // Exempting the path would only move the loop one hop: the relay would then reach the backend
+      // boundary, take the 403 there, and error just the same. So answer ON the channel, which is
+      // the one thing the client can act on — a single `terms-gate` event carrying the consent URL,
+      // then close. This mirrors the `reauth` handoff the stream already implements for a lost
+      // OAuth2 token (REQ-SEC-012, REQ-NOTIF-010).
+      log.debug("Consent missing; handing the SSE stream off to the consent page");
+      writeTermsGateEvent(response, consentUrl);
+      return;
+    }
     if (isAjax(request)) {
       // A 302 is wrong for an XHR and fails SILENTLY, which is the worst of both worlds: krtFetch's
       // swap sees `res.redirected` and bails with a dev-only warning, so the section simply stops
@@ -129,6 +157,50 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
    */
   private static boolean isAjax(HttpServletRequest request) {
     return "XMLHttpRequest".equals(request.getHeader("X-Requested-With"));
+  }
+
+  /**
+   * Whether this request is an {@code EventSource} subscription rather than a navigation or an XHR.
+   *
+   * <p>Keyed on {@code Accept} alone: every browser stamps {@code text/event-stream} on an {@code
+   * EventSource} handshake, and nothing else in this application sends it. {@code Sec-Fetch-Mode}
+   * would also identify it as background traffic, but not specifically as a stream — and the
+   * distinction matters here, because the answer written below is only parseable by a client that
+   * actually speaks SSE.
+   *
+   * @param request the current request
+   * @return {@code true} when the caller subscribes to an SSE stream
+   */
+  private static boolean isEventStream(@NotNull HttpServletRequest request) {
+    String accept = request.getHeader(HttpHeaders.ACCEPT);
+    return accept != null
+        && accept.toLowerCase(Locale.ROOT).contains(MediaType.TEXT_EVENT_STREAM_VALUE);
+  }
+
+  /**
+   * Answers an SSE subscription with a single {@code terms-gate} event naming the consent page,
+   * then lets the response complete so the stream closes.
+   *
+   * <p>Deliberately a {@code 200}: an {@code EventSource} surfaces any error status as an opaque
+   * {@code onerror} that is indistinguishable from a dropped connection, which is precisely what
+   * makes it reconnect. A well-formed event is the only way to tell the client something it can act
+   * on rather than retry.
+   *
+   * @param response the response to write the event into
+   * @param consentUrl the context-relative consent-page path the client should navigate to
+   * @throws IOException if writing the event fails
+   */
+  private static void writeTermsGateEvent(
+      @NotNull HttpServletResponse response, @NotNull String consentUrl) throws IOException {
+    response.setStatus(HttpServletResponse.SC_OK);
+    response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
+    response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+    // Proxies that buffer would hold the event until the stream closes anyway, but an explicit
+    // no-cache keeps an intermediary from serving this one-shot answer to a later subscription.
+    response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache");
+    PrintWriter writer = response.getWriter();
+    writer.write("event: " + SSE_GATE_EVENT + "\ndata: " + consentUrl + "\n\n");
+    writer.flush();
   }
 
   /**
@@ -217,6 +289,15 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
       if (checkedAt instanceof Long millis && now - millis < RECHECK_MILLIS) {
         return true;
       }
+    }
+    // A fresh negative is honoured too, not just a fresh positive. Storing the verdict but reading
+    // back only one side made every gated request a blocking backend round trip: during the
+    // 2026-08-03 rollout 491 stream attempts produced 491 reads of /api/v1/terms/status, and the
+    // consent-page renders they triggered produced 483 more. The cache is bounded by the same
+    // RECHECK_MILLIS as the positive one, and recording consent calls clearCachedVerdict, so a user
+    // who accepts is never held behind a stale "no".
+    if (consentKnownMissing(request)) {
+      return false;
     }
     boolean accepted;
     try {
