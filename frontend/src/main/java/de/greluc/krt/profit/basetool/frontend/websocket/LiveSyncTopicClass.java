@@ -136,11 +136,20 @@ public enum LiveSyncTopicClass {
    * {@link #capabilityField} the boolean to require rather than a per-resource read. Its {@code
    * topic_class} metric label is {@code orders_queue} (the per-order room's is {@code
    * order_detail}) so the two never read as one accidental duplicate series on the ops dashboard.
+   *
+   * <p>Two sections, one per page that renders the queue's data: {@code queue} for the order list
+   * itself, and {@code demand} for the cross-order material-demand overview {@code
+   * /orders/material-demand} (REQ-ORDERS-034), which folds the same orders into per-org-unit
+   * material totals. They share this room rather than each opening their own because both are
+   * invalidated by exactly the same events — an order created, completed, rejected, or its linked
+   * stock changed — and both are gated on the same {@code canViewJobOrders} capability. Neither
+   * page carries the other's key, so the two seam maps <em>partition</em> this whitelist rather
+   * than each matching it (see {@code LiveSyncSectionMapParityTest}).
    */
   ORDERS_QUEUE(
       "orders",
       false,
-      Set.of("queue"),
+      Set.of("queue", "demand"),
       false,
       "orders_queue",
       "/api/v1/me/capabilities",

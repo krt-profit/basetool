@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverCreat
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderStatusDto;
@@ -46,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderItemHandoverReportS
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemHandoverService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemProductionService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemService;
+import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialDemandService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
@@ -112,6 +114,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class JobOrderController {
   private final JobOrderService jobOrderService;
   private final JobOrderQueryService jobOrderQueryService;
+  private final JobOrderMaterialDemandService jobOrderMaterialDemandService;
   private final OwnerScopeService ownerScopeService;
   private final JobOrderItemService jobOrderItemService;
   private final JobOrderItemBlueprintOwnersService jobOrderItemBlueprintOwnersService;
@@ -641,6 +644,36 @@ public class JobOrderController {
             page, size, sort, Set.of("priority", "createdAt"), "priority");
     Page<JobOrderDto> p = jobOrderQueryService.getAllJobOrders(status, squadronId, pageable);
     return PageResponse.of(p);
+  }
+
+  /**
+   * Cross-order material demand (REQ-ORDERS-034): the material still to be gathered across every
+   * non-terminal ({@code OPEN} / {@code IN_PROGRESS}) job order the caller may see, aggregated into
+   * one row per {@code (responsible org unit, material, quality)} bucket and split by the
+   * <em>responsible</em> (processing) org unit.
+   *
+   * <p>The aggregate sibling of the per-order material view: the order detail answers "what does
+   * this order need", this answers "what does my unit still have to gather in total". Both kinds of
+   * order contribute — a {@code MATERIAL} order through its material lines, an {@code ITEM} order
+   * through its blueprint-derived requirements — and both are counted at their <em>outstanding</em>
+   * amount, so handed-over and already-manufactured shares are excluded.
+   *
+   * <p>Deliberately unpaged: the response is a fold over the caller's whole visible queue, and
+   * paging the underlying orders would silently truncate the sums (ADR-0104). Read-only, so it logs
+   * no audit event.
+   *
+   * @return the aggregated demand, empty when the caller may see no non-terminal order
+   */
+  @GetMapping("/material-demand")
+  @Operation(
+      summary = "Get the cross-order material demand",
+      description =
+          "Returns the material still to be gathered across all open / in-progress job orders"
+              + " visible to the caller, grouped by responsible org unit.")
+  @PreAuthorize("isAuthenticated()")
+  @Transactional(readOnly = true)
+  public MaterialDemandOverviewDto getMaterialDemand() {
+    return jobOrderMaterialDemandService.getMaterialDemandOverview();
   }
 
   /**

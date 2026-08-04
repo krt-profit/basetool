@@ -127,6 +127,55 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   List<JobOrder> findAllActiveWithMaterials();
 
   /**
+   * Scoped, unpaged list of the orders in the given statuses together with <em>both</em> kinds'
+   * material requirement branches — the read behind the cross-order material-demand overview
+   * (REQ-ORDERS-034). It is the scoped sibling of {@link #findAllActiveWithMaterials()}: same
+   * requirement fetch graph, but the caller's visibility scope is pushed into SQL via the shared
+   * {@link ScopeSpecifications#JOB_ORDER_SCOPE_PREDICATE} (including the SK-public escape) instead
+   * of being filtered row-by-row in memory afterwards, so a caller can never see demand from an
+   * order they may not read.
+   *
+   * <p>The graph fetches the {@code MATERIAL} branch ({@code materials}) and the {@code ITEM}
+   * branch ({@code items → materials}) side by side. That does <b>not</b> produce the cartesian
+   * blow-up the lookup query's Javadoc warns about, because the two branches are mutually exclusive
+   * per row: a {@code MATERIAL} order has no item lines and an {@code ITEM} order no material
+   * lines. No handover branch is fetched — the overview reads requirements and linked stock only.
+   *
+   * <p>Deliberately unpaged: the result is folded into one aggregation row per {@code
+   * (responsibleOrgUnit, material, quality)} bucket, so paging the orders would silently truncate
+   * the sums it produces (ADR-0104, no silent caps). The set is naturally bounded by the caller
+   * passing only the non-terminal statuses.
+   *
+   * @param statuses the statuses to keep; never bound empty (the service passes {@code OPEN} +
+   *     {@code IN_PROGRESS}).
+   * @param isAdminAllScope {@code true} iff the caller is an admin without an active pin — disables
+   *     the scope filter entirely.
+   * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
+   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty for
+   *     admins and anonymous callers.
+   * @return the scoped orders with their material requirement branches eagerly loaded, ordered by
+   *     {@code displayId} so a bucket's contributing-order list is stable across requests.
+   */
+  @EntityGraph(
+      attributePaths = {
+        "materials",
+        "materials.material",
+        "items",
+        "items.materials",
+        "items.materials.material",
+        "responsibleOrgUnit"
+      })
+  @Query(
+      "SELECT o FROM JobOrder o WHERE "
+          + ScopeSpecifications.JOB_ORDER_SCOPE_PREDICATE
+          + " AND o.status IN :statuses ORDER BY o.displayId ASC")
+  List<JobOrder> findScopedOrdersWithMaterialRequirements(
+      @Param("statuses") java.util.Collection<JobOrderStatus> statuses,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds);
+
+  /**
    * Scoped, paged job-order list — the single entry point behind the {@code GET /api/v1/orders}
    * list endpoint. Combines three concerns in one query so the service layer never has to fork its
    * query builder:

@@ -41702,6 +41702,103 @@
         }
       }
     },
+    "/api/v1/orders/material-demand" : {
+      "get" : {
+        "tags" : [ "Orders" ],
+        "summary" : "Get the cross-order material demand",
+        "description" : "Returns the material still to be gathered across all open / in-progress job orders visible to the caller, grouped by responsible org unit.",
+        "operationId" : "getMaterialDemand",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MaterialDemandOverviewDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders/lookup" : {
       "get" : {
         "tags" : [ "Orders" ],
@@ -62195,6 +62292,102 @@
           },
           "variantInclusive" : {
             "type" : "boolean"
+          }
+        }
+      },
+      "MaterialDemandGroupDto" : {
+        "type" : "object",
+        "properties" : {
+          "orgUnit" : {
+            "$ref" : "#/components/schemas/SquadronReferenceDto"
+          },
+          "materials" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MaterialDemandRowDto"
+            }
+          }
+        }
+      },
+      "MaterialDemandOrderShareDto" : {
+        "type" : "object",
+        "properties" : {
+          "jobOrderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "displayId" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED" ]
+          },
+          "type" : {
+            "type" : "string",
+            "enum" : [ "MATERIAL", "ITEM" ]
+          },
+          "requiredAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "bookedAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "claimedAmount" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }
+      },
+      "MaterialDemandOverviewDto" : {
+        "type" : "object",
+        "properties" : {
+          "groups" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MaterialDemandGroupDto"
+            }
+          },
+          "orderCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "MaterialDemandRowDto" : {
+        "type" : "object",
+        "properties" : {
+          "material" : {
+            "$ref" : "#/components/schemas/MaterialDto"
+          },
+          "qualityRequirement" : {
+            "type" : "string",
+            "enum" : [ "GOOD", "NONE" ]
+          },
+          "requiredAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "bookedAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "claimedAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "outstandingAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "orders" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MaterialDemandOrderShareDto"
+            }
           }
         }
       },

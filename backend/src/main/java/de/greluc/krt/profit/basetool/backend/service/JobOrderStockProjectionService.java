@@ -211,17 +211,85 @@ public class JobOrderStockProjectionService {
    */
   public Page<JobOrderDto> mapPageWithStock(Page<JobOrder> page) {
     List<JobOrder> orders = page.getContent();
-    Map<UUID, Map<UUID, List<JobOrderMaterialStockRow>>> stockIndex =
-        loadStockIndex(orders.stream().map(JobOrder::getId).toList());
+    OrderLinkedStockIndex stockIndex =
+        loadOrderLinkedStockIndex(orders.stream().map(JobOrder::getId).toList());
     Map<UUID, List<de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto>> claimsByOrder =
         materialClaimService.getClaimBucketsForOrders(
             orders.stream()
                 .filter(JobOrderStockProjectionService::isSpecialCommandResponsible)
                 .toList());
-    StockResolver stockResolver =
-        (orderId, materialId, floor) -> sumStockAtFloor(stockIndex, orderId, materialId, floor);
+    StockResolver stockResolver = stockIndex::stockFor;
     ClaimResolver claimResolver = order -> claimsByOrder.getOrDefault(order.getId(), List.of());
     return page.map(o -> mapToDtoWithStock(o, stockResolver, claimResolver));
+  }
+
+  /**
+   * Loads the order-linked material stock of many orders in <b>one</b> query and hands it back as a
+   * reusable lookup, so any multi-order read can resolve per-bucket stock without firing a {@code
+   * SUM} aggregate per bucket per order (REQ-DATA-003). Extracted from the paged list path so the
+   * cross-order material-demand overview (REQ-ORDERS-034) sums stock through the exact same
+   * batching and floor semantics rather than re-deriving them — a second implementation would drift
+   * from {@code sumAmountByMaterialAndJobOrderAndMinQuality} and make the two views disagree.
+   *
+   * @param orderIds the orders whose linked stock to index; an empty collection yields an index
+   *     that answers {@code 0.0} for everything without touching the database.
+   * @return the batched lookup, never {@code null}.
+   */
+  public OrderLinkedStockIndex loadOrderLinkedStockIndex(Collection<UUID> orderIds) {
+    return new OrderLinkedStockIndex(loadStockIndex(orderIds));
+  }
+
+  /**
+   * Maps an aggregated bucket's quality requirement to the inventory quality floor its linked stock
+   * is summed at: {@code GOOD} sums refining-grade stock ({@value #GOOD_QUALITY_FLOOR}+), {@code
+   * NONE} imposes no floor. Mirrors the MATERIAL requirement's stored {@code minQuality}, so both
+   * order kinds compute collection progress identically.
+   *
+   * @param qualityRequirement the bucket's quality requirement.
+   * @return the minimum quality to sum at, or {@code null} for no floor.
+   */
+  public static Integer qualityFloorFor(
+      de.greluc.krt.profit.basetool.backend.model.QualityRequirement qualityRequirement) {
+    return qualityRequirement == de.greluc.krt.profit.basetool.backend.model.QualityRequirement.GOOD
+        ? GOOD_QUALITY_FLOOR
+        : null;
+  }
+
+  /**
+   * A pre-loaded, order-batched view of job-order-linked material inventory that answers "how much
+   * of material M is linked to order O at or above quality floor Q" purely in memory. Obtained from
+   * {@link #loadOrderLinkedStockIndex(Collection)}; the backing index is never handed out, so the
+   * lookup cannot be mutated after it has been built.
+   */
+  public static final class OrderLinkedStockIndex {
+
+    /** Order id &rarr; material id &rarr; the linked material inventory rows of that bucket. */
+    private final Map<UUID, Map<UUID, List<JobOrderMaterialStockRow>>> rowsByOrderAndMaterial;
+
+    /**
+     * Wraps an already-loaded stock index; private so an instance can only originate from {@link
+     * #loadOrderLinkedStockIndex(Collection)} and always reflects one batched query.
+     *
+     * @param rowsByOrderAndMaterial the loaded index.
+     */
+    private OrderLinkedStockIndex(
+        Map<UUID, Map<UUID, List<JobOrderMaterialStockRow>>> rowsByOrderAndMaterial) {
+      this.rowsByOrderAndMaterial = rowsByOrderAndMaterial;
+    }
+
+    /**
+     * Sums the linked stock of one {@code (order, material)} bucket at a quality floor, reproducing
+     * the {@code COALESCE(SUM(amount), 0.0) WHERE (:floor IS NULL OR quality &gt;= :floor)}
+     * semantics of {@code sumAmountByMaterialAndJobOrderAndMinQuality} in memory.
+     *
+     * @param jobOrderId the order the stock is linked to.
+     * @param materialId the material to sum.
+     * @param qualityFloor the minimum quality, or {@code null} for no floor.
+     * @return the summed amount; {@code 0.0} when the bucket has no matching rows.
+     */
+    public double stockFor(UUID jobOrderId, UUID materialId, Integer qualityFloor) {
+      return sumStockAtFloor(rowsByOrderAndMaterial, jobOrderId, materialId, qualityFloor);
+    }
   }
 
   /**
@@ -247,11 +315,7 @@ public class JobOrderStockProjectionService {
     return jobOrderItemService.aggregateMaterials(jobOrder).stream()
         .map(
             agg -> {
-              Integer minQuality =
-                  agg.qualityRequirement()
-                          == de.greluc.krt.profit.basetool.backend.model.QualityRequirement.GOOD
-                      ? GOOD_QUALITY_FLOOR
-                      : null;
+              Integer minQuality = qualityFloorFor(agg.qualityRequirement());
               double stock =
                   stockResolver.stockFor(jobOrder.getId(), agg.material().id(), minQuality);
               de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto bucket =
