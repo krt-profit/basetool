@@ -1199,9 +1199,9 @@ Six invariants that must survive any rewrite:
   surfaced later — no test could observe the gate at all, so a fail-open on the ingest path stayed
   green — so `app.security.terms.armed-in-test` re-arms it for a single test class. It is read
   **only** when the `test` profile is active and can only arm, never disarm; outside that profile
-  the gate is armed unconditionally and the property is never consulted. The E2E profile is `dev`, so the gate is
-  live there and `E2eSupport#acceptTermsIfPrompted` clicks through it on every login rather than
-  pre-seeding a row — which keeps the suite exercising the real path.
+  the gate is armed unconditionally and the property is never consulted. The E2E profile is `dev`,
+  so the gate is live there and `E2eSupport#acceptTermsIfPrompted` clicks through it on every login
+  rather than pre-seeding a row — which keeps the suite exercising the real path.
 - **A background caller identifies itself, checks for the gate, and never reads `res.ok` as
   success.** Writes get this from `krtFetch`; the reads that bypass it must do it themselves, and
   both halves are load-bearing. Without the `X-Requested-With` marker the gate answers a `302` that
@@ -1290,14 +1290,18 @@ filter runs, so such a test passes against the broken code.
 - [x] The backend body-size cap matches its configured paths as patterns against the decoded path;
   the scope stays exact, so a path merely prefixed with a configured one is still uncapped.
 - [x] API GET responses keep their revalidation headers under an encoded spelling.
+- [x] The acting-member bound is matched on the decoded path: the ingest gateway may name another
+  member only on the two import endpoints, in both directions — an encoded spelling of an unbound
+  path stays refused, and an encoded spelling of a bound one still acts (ADR-0129).
 - [x] Every converted site has a direct filter regression test that fails against the raw idiom.
 
 **Enforced by:** `PendingApprovalAccessFilterTest`, `TermsAcceptanceAccessFilterTest`,
-`IngestPathScopeTest`, `ClientIdentityFilterTest`, `FiltersTest`, `RequestLoggingFilterTest`
-(ingest), `RequestBodySizeLimitFilterTest`, `ApiCacheControlFilterTest` · **Code:**
-`IngestPathScope`, `PendingApprovalAccessFilter`, `TermsAcceptanceAccessFilter`,
-`RequestBodySizeLimitFilter`, `ApiCacheControlFilter`, `RateLimitingFilter` (backend + ingest),
-`PayloadSizeLimitFilter`, `RequestLoggingFilter` (ingest)
+`ActingMemberFilterPathMatchingTest`, `IngestPathScopeTest`, `ClientIdentityFilterTest`,
+`FiltersTest`, `RequestLoggingFilterTest` (ingest), `RequestBodySizeLimitFilterTest`,
+`ApiCacheControlFilterTest` · **Code:** `IngestPathScope`, `PendingApprovalAccessFilter`,
+`TermsAcceptanceAccessFilter`, `ActingMemberFilter`, `RequestBodySizeLimitFilter`,
+`ApiCacheControlFilter`, `RateLimitingFilter` (backend + ingest), `PayloadSizeLimitFilter`,
+`RequestLoggingFilter` (ingest)
 
 ## Out of scope
 

@@ -120,7 +120,14 @@ public class ActingMemberFilter extends OncePerRequestFilter {
   /** App-wide correlation-id response header, matching the neighbouring person-gates. */
   static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
 
-  /** Stable machine-readable code; the frontend and the ingest module branch on it. */
+  /**
+   * Stable machine-readable code for this filter's refusals.
+   *
+   * <p>Stable <em>so that</em> a client could branch on it, not because one does: the ingest module
+   * relays the backend body verbatim and branches on no problem {@code code}, and the frontend
+   * never reaches these two endpoints with the header. Its job today is to keep this filter's
+   * answer the same shape as the two person-gates', so a caller cannot tell the three apart.
+   */
   static final String CODE_ACTING_MEMBER_REFUSED = "ACTING_MEMBER_REFUSED";
 
   private final IngestGatewayProperties gatewayProperties;

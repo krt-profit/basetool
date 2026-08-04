@@ -86,6 +86,16 @@ contextual and cascaded org-unit authorities. The access token contributes none 
 The same assembler serves both paths, so a member acting through the gateway carries precisely the
 authority set they would carry logging in.
 
+**One bound on that, and it is worth naming.** "Precisely" holds at equal database state, which is
+not the same as at equal time. The login path runs `UserReconciliationService.syncUser(jwt)` before
+assembling, and that call writes the token's realm roles into the row; the acting-member path has no
+token and assembles from whatever the row currently holds. So a role **removed** in Keycloak takes
+effect on the member's next browser login immediately, but on the gateway path only once
+`UserSyncTask` next runs. The liveness guard does not cover this — it refuses a disabled or deleted
+*account*, not a role downgrade. The exposure is bounded by the roster-sync interval and is the same
+staleness every other DB-derived authority in this application already carries, but the two paths are
+distinguishable on exactly this axis and nowhere else.
+
 This also amends **ADR-0127**, whose reasoning for the consent gate covering the extractor rests
 on the gateway relaying the caller's bearer. That mechanism is gone; the coverage now comes from
 this identity swap running before the gate.

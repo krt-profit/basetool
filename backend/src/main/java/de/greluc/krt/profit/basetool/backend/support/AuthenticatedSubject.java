@@ -92,7 +92,10 @@ public final class AuthenticatedSubject {
       return Optional.ofNullable(jwt.getSubject()).filter(s -> !s.isBlank());
     }
     if (authentication instanceof SubjectAuthentication subjectAuth) {
-      return Optional.of(subjectAuth.subject()).filter(s -> !s.isBlank());
+      // ofNullable, matching the two branches above, although the interface contract is @NotNull:
+      // an implementation that breaks that contract should yield "no subject" here rather than a
+      // NullPointerException inside a security filter.
+      return Optional.ofNullable(subjectAuth.subject()).filter(s -> !s.isBlank());
     }
     // Everything else has no subject — NOT a fallback to getName(). See the class Javadoc: on an
     // AnonymousAuthenticationToken that name is a placeholder, and on a username/password token it
