@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.logging;
 import de.greluc.krt.profit.basetool.backend.config.LoggingProperties;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,10 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.MDC;
 import org.springframework.core.Ordered;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -57,7 +55,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *
  * <p>The MDC is cleared in a {@code finally} block to prevent bleed-through on pooled or virtual
  * threads. The filter runs after Spring Security (order {@link Ordered#LOWEST_PRECEDENCE} minus a
- * small delta) so that {@link JwtAuthenticationToken} is already populated when the MDC is set. A
+ * small delta) so that the {@code SecurityContext} is already populated when the MDC is set. A
  * secondary lightweight pass at filter start still generates / echoes the correlation id even for
  * unauthenticated requests, ensuring every log line has the same id.
  */
@@ -160,15 +158,13 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
 
   @NotNull
   private static String resolveUserId() {
-    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (auth instanceof JwtAuthenticationToken jwtAuth) {
-      Jwt jwt = jwtAuth.getToken();
-      String sub = jwt.getSubject();
-      if (sub != null && !sub.isBlank()) {
-        return sub;
-      }
-    }
-    return ANONYMOUS;
+    // Asked of AuthenticatedSubject, not of the type. An acting-member request (ADR-0129) is
+    // authenticated as a named person with no token behind it; the old instanceof test logged it as
+    // anonymous while orgUnitId on the very same line resolved correctly, so the log contradicted
+    // itself. A misbehaving gateway is the main threat this design carries, and this is the stream
+    // that would attribute it.
+    return AuthenticatedSubject.of(SecurityContextHolder.getContext().getAuthentication())
+        .orElse(ANONYMOUS);
   }
 
   /**

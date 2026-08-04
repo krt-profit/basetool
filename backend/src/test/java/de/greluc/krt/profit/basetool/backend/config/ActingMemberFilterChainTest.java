@@ -19,11 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.backend.support.ActingSubjectResolver;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.support.ActingMemberHeader;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,8 +63,28 @@ class ActingMemberFilterChainTest {
   private static final String GATEWAY = "55555555-5555-5555-5555-555555555555";
 
   @Autowired private WebApplicationContext context;
+  @Autowired private MeterRegistry meterRegistry;
 
   private MockMvc mockMvc;
+
+  /**
+   * How often this filter has refused for one reason so far.
+   *
+   * <p>Read as a delta around each request rather than as an absolute: the meter registry is a
+   * context-scoped singleton, so counters carry over from every test that ran before this one in
+   * the same context.
+   *
+   * @param reason the bounded {@code MetricNames.ON_BEHALF_OF_*} reason
+   * @return the current count, or {@code 0} when nothing has been counted under it yet
+   */
+  private double refusals(String reason) {
+    Counter counter =
+        meterRegistry
+            .find(MetricNames.ON_BEHALF_OF_REFUSED)
+            .tag(MetricNames.TAG_REASON, reason)
+            .counter();
+    return counter == null ? 0d : counter.count();
+  }
 
   @BeforeEach
   void setUp() {
@@ -77,14 +102,22 @@ class ActingMemberFilterChainTest {
    */
   @Test
   void refusesAnOnBehalfOfHeaderFromAnOrdinaryMember() throws Exception {
+    double before = refusals(MetricNames.ON_BEHALF_OF_NOT_A_GATEWAY);
+
     mockMvc
         .perform(
             post(INGEST_PATH)
                 .with(jwt().jwt(token -> token.subject(GATEWAY).claim("azp", "basetool-frontend")))
-                .header(ActingSubjectResolver.ON_BEHALF_OF_HEADER, MEMBER)
+                .header(ActingMemberHeader.ON_BEHALF_OF_HEADER, MEMBER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
+
+    // Asserted on the code AND the reason, not on the status alone. Three filters in this chain
+    // answer 403 and the request would have been refused downstream anyway (this caller has no
+    // consent row either), so a bare status assertion passes even when THIS guard never ran.
+    assertThat(refusals(MetricNames.ON_BEHALF_OF_NOT_A_GATEWAY)).isEqualTo(before + 1);
   }
 
   /**
@@ -95,15 +128,20 @@ class ActingMemberFilterChainTest {
    */
   @Test
   void refusesTheHeaderOnAnEndpointItIsNotBoundTo() throws Exception {
+    double before = refusals(MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
+
     mockMvc
         .perform(
             post(OTHER_PATH)
                 .with(
                     jwt().jwt(token -> token.subject(GATEWAY).claim("azp", "test-ingest-gateway")))
-                .header(ActingSubjectResolver.ON_BEHALF_OF_HEADER, MEMBER)
+                .header(ActingMemberHeader.ON_BEHALF_OF_HEADER, MEMBER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
+
+    assertThat(refusals(MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND)).isEqualTo(before + 1);
   }
 
   // The percent-encoded-path case is NOT here on purpose: MockMvc normalises the path before any
@@ -121,29 +159,41 @@ class ActingMemberFilterChainTest {
    */
   @Test
   void refusesAMemberWithNoLocalAccount() throws Exception {
+    double before = refusals(MetricNames.ON_BEHALF_OF_MEMBER_NOT_LIVE);
+
     mockMvc
         .perform(
             post(INGEST_PATH)
                 .with(
                     jwt().jwt(token -> token.subject(GATEWAY).claim("azp", "test-ingest-gateway")))
-                .header(ActingSubjectResolver.ON_BEHALF_OF_HEADER, MEMBER)
+                .header(ActingMemberHeader.ON_BEHALF_OF_HEADER, MEMBER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
+
+    // Counted as "not live" rather than as its own reason: the answer must not distinguish an
+    // unknown subject from an offboarded one, or the endpoint becomes an enumeration oracle.
+    assertThat(refusals(MetricNames.ON_BEHALF_OF_MEMBER_NOT_LIVE)).isEqualTo(before + 1);
   }
 
   /** A malformed subject never reaches the persistence layer. */
   @Test
   void refusesAMalformedSubject() throws Exception {
+    double before = refusals(MetricNames.ON_BEHALF_OF_MALFORMED);
+
     mockMvc
         .perform(
             post(INGEST_PATH)
                 .with(
                     jwt().jwt(token -> token.subject(GATEWAY).claim("azp", "test-ingest-gateway")))
-                .header(ActingSubjectResolver.ON_BEHALF_OF_HEADER, "not-a-uuid")
+                .header(ActingMemberHeader.ON_BEHALF_OF_HEADER, "not-a-uuid")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
+
+    assertThat(refusals(MetricNames.ON_BEHALF_OF_MALFORMED)).isEqualTo(before + 1);
   }
 
   /**

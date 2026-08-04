@@ -191,7 +191,7 @@ public class CustomJwtGrantedAuthoritiesConverter
     // gateway on its own account. It locked itself out on its first authentication (2026-08-04).
     //
     // Keyed on `azp` against the SAME allowlist that already governs the far more dangerous
-    // on-behalf-of decision (ActingSubjectResolver), so this adds no new trust: `azp` is a claim
+    // on-behalf-of decision (ActingMemberFilter), so this adds no new trust: `azp` is a claim
     // inside a Keycloak-signed token, not something a client can set. Empty allowlist means nobody.
     //
     // NOT a realm role: mapRolesTracked silently drops names absent from the local catalogue and

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
@@ -450,12 +451,12 @@ public class UserService {
    * @return the calling user, or empty for unauthenticated requests
    */
   public Optional<User> getCurrentUser() {
-    Authentication auth = authHelperService.rawAuthentication();
-    if (auth == null || !auth.isAuthenticated() || !(auth.getPrincipal() instanceof Jwt jwt)) {
-      return Optional.empty();
-    }
-    UUID userId = getUserIdFromJwt(jwt);
-    return userRepository.findById(userId);
+    // Asked of AuthenticatedSubject, not of the type. This is the canonical "who is calling"
+    // accessor, and a Jwt-principal test made it answer "nobody" for an acting member (ADR-0129) —
+    // latent today because neither ACTING_PATH reaches it, and an ownership check silently
+    // evaluated against no current user the moment a third endpoint joins that list.
+    return AuthenticatedSubject.idOf(authHelperService.rawAuthentication())
+        .flatMap(userRepository::findById);
   }
 
   /**

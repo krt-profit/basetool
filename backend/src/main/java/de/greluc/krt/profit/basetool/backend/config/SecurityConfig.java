@@ -101,6 +101,13 @@ import tools.jackson.databind.ObjectMapper;
 public class SecurityConfig {
 
   /**
+   * Re-arms the consent gate under the {@code test} profile for a single test class.
+   *
+   * <p>Only honoured when the {@code test} profile is active; production is armed regardless.
+   */
+  static final String TERMS_GATE_ARMED_IN_TEST = "app.security.terms.armed-in-test";
+
+  /**
    * Cross-origin allowlist for the backend API. Empty by default: the backend is only addressed
    * server-side from the Spring-Boot frontend (Thymeleaf SSR), so no direct browser-to-backend
    * cross-origin traffic is expected, and any such call is rejected with HTTP 403. Override in
@@ -332,7 +339,15 @@ public class SecurityConfig {
     // TermsAcceptanceAccessFilterTest drives the real filter directly instead.
     // NOTE: this carve-out is `test`-only. The E2E profile is NOT `test`, so the gate is live
     // there and E2E users must actually accept.
-    TermsConsentCheck effectiveConsentCheck = isTest ? userId -> true : termsConsentCheck;
+    // ...with one opt-in escape hatch, because the stand-down had a cost that only showed up
+    // later: no test could observe the gate at all, so when the acting-member identity swap
+    // (ADR-0129) made TermsAcceptanceAccessFilter fail OPEN on the ingest path, the whole suite
+    // stayed green. A test class that is specifically about the consent boundary re-arms it for
+    // itself. This cannot weaken production: outside the `test` profile the gate is armed
+    // unconditionally, and the property is read only when `isTest` already holds.
+    boolean armed =
+        !isTest || env.getProperty(TERMS_GATE_ARMED_IN_TEST, Boolean.class, Boolean.FALSE);
+    TermsConsentCheck effectiveConsentCheck = armed ? termsConsentCheck : userId -> true;
 
     if (isTest) {
       // CSRF is intentionally disabled in the `test` Spring profile so MockMvc
@@ -700,7 +715,13 @@ public class SecurityConfig {
         // the ingest path would silently stop enforcing either. Runs immediately after the
         // bearer-token filter, which is the first point at which there IS a caller to check.
         .addFilterAfter(
-            new ActingMemberFilter(ingestGatewayProperties, actingMemberAuthorities, meterRegistry),
+            new ActingMemberFilter(
+                ingestGatewayProperties,
+                actingMemberAuthorities,
+                messageSource,
+                problemResponseFactory,
+                objectMapper,
+                meterRegistry),
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
         .addFilterAfter(

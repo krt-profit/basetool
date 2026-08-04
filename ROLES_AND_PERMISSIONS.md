@@ -149,6 +149,17 @@ convention `cleanup…ForGuest` is structurally enforced by the ArchUnit rule
 > registration onto an existing account (REQ-SEC-026 — for a member who already had an account but
 > registered anew via Discord), or rejects them (`REJECTED`, stays without access). Roles/units are
 > assigned **manually** after approval (Track 1).
+>
+> **`ROLE_INGEST_GATEWAY` ≈ a machine, not a member.** A Keycloak service account is a full user
+> with a UUID `sub`, so the ingest gateway's own token was indistinguishable from a person's and
+> ran the whole registration flow on itself (ADR-0129). A caller whose `azp` is on
+> `app.security.ingest-gateway.client-ids` is now short-circuited to the single authority
+> `ROLE_INGEST_GATEWAY` — no realm roles, no permissions, no OrgUnit roles, no `ROLE_GUEST`, and
+> **no registration**. The authority is a marker, not a grant: nothing in this matrix keys on it,
+> so the gateway's own bearer reaches no member surface. It grants the gateway exactly one thing —
+> permission to name a member in `X-Ingest-On-Behalf-Of`, whose *own* authorities then apply for
+> that request. A named authority rather than an empty set on purpose, so a misconfiguration reads
+> as "authenticated as a machine" rather than as "not authenticated".
 
 ---
 

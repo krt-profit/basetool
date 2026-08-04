@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
@@ -40,7 +41,6 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.server.PathContainer;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
@@ -210,13 +210,12 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Puts the current {@link JwtAuthenticationToken}'s {@code sub} claim into the {@code userId} MDC
-   * key, unless something already populated that key (the existing value then wins) or the caller
-   * is not JWT-authenticated (the key then stays unset, so the logback pattern's {@code anonymous}
-   * default stays truthful). A pending user always carries a token here — {@link
-   * #isBlockedPendingApiCall} only returns {@code true} for an authenticated principal — but the
-   * guards keep the method safe for the unit tests that drive it with a plain {@code
-   * UsernamePasswordAuthenticationToken}.
+   * Puts the authenticated caller's subject into the {@code userId} MDC key, unless something
+   * already populated that key (the existing value then wins) or the caller is not
+   * JWT-authenticated (the key then stays unset, so the logback pattern's {@code anonymous} default
+   * stays truthful). A pending user always carries a token here — {@link #isBlockedPendingApiCall}
+   * only returns {@code true} for an authenticated principal — but the guards keep the method safe
+   * for the unit tests that drive it with a plain {@code UsernamePasswordAuthenticationToken}.
    *
    * <p>Deliberately duplicated in {@code SecurityProblemResponseHandler} instead of extracted into
    * the {@code logging} package: {@code logging.CorrelationIdFilter} already depends on {@code
@@ -231,12 +230,12 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
     if (existing != null && !existing.isBlank()) {
       return false;
     }
-    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (!(auth instanceof JwtAuthenticationToken jwtAuth)) {
-      return false;
-    }
-    String sub = jwtAuth.getToken().getSubject();
-    if (sub == null || sub.isBlank()) {
+    // Asked of AuthenticatedSubject, not of the type — an acting member (ADR-0129) is a named
+    // caller with no token, and a refusal logged as anonymous is the one line forensics would need.
+    String sub =
+        AuthenticatedSubject.of(SecurityContextHolder.getContext().getAuthentication())
+            .orElse(null);
+    if (sub == null) {
       return false;
     }
     MDC.put(MDC_USER_ID, sub);

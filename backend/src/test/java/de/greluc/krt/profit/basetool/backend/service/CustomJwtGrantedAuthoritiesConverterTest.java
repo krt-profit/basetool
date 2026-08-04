@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority;
 import java.time.Instant;
 import java.util.Collection;
@@ -76,9 +77,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
    * and each case exercises the ordinary member path it was written for (ADR-0129).
    */
   @Spy
-  private final de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties
-      ingestGatewayProperties =
-          new de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties();
+  private final IngestGatewayProperties ingestGatewayProperties = new IngestGatewayProperties();
 
   @InjectMocks private CustomJwtGrantedAuthoritiesConverter converter;
 
@@ -86,6 +85,57 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   private static final UUID BEREICH_ID = UUID.randomUUID();
   private static final UUID DESCENDANT_STAFFEL_ID = UUID.randomUUID();
   private static final UUID DESCENDANT_SK_ID = UUID.randomUUID();
+
+  /**
+   * A configured gateway is a machine: exactly one marker authority, and no registration.
+   *
+   * <p>The carve-out shipped untested, which is how the defect it fixes reached production in the
+   * first place. Both halves are asserted, because each fails differently:
+   *
+   * <ul>
+   *   <li>The authority set is {@code ROLE_INGEST_GATEWAY} and <em>nothing else</em>. A named
+   *       authority rather than an empty set, so a misconfiguration reads as "authenticated as a
+   *       machine" instead of "not authenticated" — and nothing extra, so the gateway's own bearer
+   *       can reach no member surface.
+   *   <li>{@code userReconciliationService} is never touched. That is the actual production
+   *       failure: the gateway's first call created an {@code app_user} row for itself, stamped it
+   *       PENDING, granted the default blueprints, notified the admins, and then 403'd its own
+   *       account. Asserting only the authorities would still pass while all of that happened.
+   * </ul>
+   */
+  @Test
+  void grantsAConfiguredGatewayTheMachineAuthorityAndNeverRegistersIt() {
+    ingestGatewayProperties.setClientIds(List.of("test-ingest-gateway"));
+    when(jwt.getClaimAsString("azp")).thenReturn("test-ingest-gateway");
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    assertEquals(
+        List.of(CustomJwtGrantedAuthoritiesConverter.GATEWAY_AUTHORITY),
+        authorities.stream().map(GrantedAuthority::getAuthority).toList());
+    verifyNoInteractions(userReconciliationService);
+  }
+
+  /**
+   * A caller whose {@code azp} is not on the allowlist takes the ordinary member path.
+   *
+   * <p>The complement of the case above: without it, a carve-out that matched everything would
+   * still pass, and every member would authenticate as a machine with no roles at all.
+   */
+  @Test
+  void leavesANonGatewayCallerOnTheOrdinaryMemberPath() {
+    ingestGatewayProperties.setClientIds(List.of("test-ingest-gateway"));
+    when(jwt.getClaimAsString("azp")).thenReturn("basetool-frontend");
+    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
+
+    Collection<GrantedAuthority> authorities = converter.convert(jwt);
+
+    assertFalse(
+        authorities.stream()
+            .map(GrantedAuthority::getAuthority)
+            .anyMatch(CustomJwtGrantedAuthoritiesConverter.GATEWAY_AUTHORITY::equals));
+    verify(userReconciliationService).syncUser(jwt);
+  }
 
   private User userWithNoRoles() {
     User user = new User();

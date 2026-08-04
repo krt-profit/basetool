@@ -116,15 +116,23 @@ class CurrentUserArgumentResolverTest {
     NativeWebRequest request = requestWithPrincipal(null);
     assertThatThrownBy(() -> resolver.resolveArgument(param(0), null, request, null))
         .isInstanceOf(AccessDeniedException.class)
-        .hasMessage("Missing JWT.");
+        .hasMessage("No authenticated subject.");
   }
 
+  /**
+   * A principal that is not a token-backed identity is refused — and specifically NOT read for its
+   * name.
+   *
+   * <p>The name here would be the member's callsign, which REQ-OBS-004 keeps out of logs. Since
+   * ADR-0129 the resolver asks {@code AuthenticatedSubject}, which only accepts a JWT subject or an
+   * authentication that explicitly advertises one; a bare {@code Principal} qualifies as neither.
+   */
   @Test
   void throwsWhenPrincipalIsNotAJwt() throws Exception {
     NativeWebRequest request = requestWithPrincipal(() -> "someName");
     assertThatThrownBy(() -> resolver.resolveArgument(param(0), null, request, null))
         .isInstanceOf(AccessDeniedException.class)
-        .hasMessage("Missing JWT.");
+        .hasMessage("No authenticated subject.");
   }
 
   @Test
@@ -132,7 +140,7 @@ class CurrentUserArgumentResolverTest {
     NativeWebRequest request = requestWithPrincipal(tokenWithSubject(null));
     assertThatThrownBy(() -> resolver.resolveArgument(param(0), null, request, null))
         .isInstanceOf(AccessDeniedException.class)
-        .hasMessage("JWT does not contain a subject claim.");
+        .hasMessage("No authenticated subject.");
   }
 
   @Test
@@ -140,7 +148,7 @@ class CurrentUserArgumentResolverTest {
     NativeWebRequest request = requestWithPrincipal(tokenWithSubject("   "));
     assertThatThrownBy(() -> resolver.resolveArgument(param(0), null, request, null))
         .isInstanceOf(AccessDeniedException.class)
-        .hasMessage("JWT does not contain a subject claim.");
+        .hasMessage("No authenticated subject.");
   }
 
   @Test

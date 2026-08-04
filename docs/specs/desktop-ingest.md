@@ -79,10 +79,24 @@ ADR-0129). `ActingMemberFilter` replaces the request's `SecurityContext` with th
 before either person-gate runs, so approval (REQ-SEC-017), consent (REQ-SEC-028), `@PreAuthorize`,
 the org-unit scope and the audit trail all judge the person sending — as they did while the gateway
 still relayed that person's token. The member's authorities are assembled from the database by the
-same assembler the login path uses, so they are exact rather than approximate. Three refusals bound
-it and all fail closed: a caller that is not a configured gateway, a header with no authenticated
-caller behind it, and a named member who is unknown here or whom the last roster sync no longer
-found in Keycloak — the last one because a named subject never expires the way a token does.
+same assembler the login path uses, so they are exact rather than approximate.
+
+**Four guards bound it, and every one fails closed** (the same four ADR-0129 records, listed here
+in the order the filter applies them):
+
+1. the caller is a configured gateway, keyed on `azp`;
+2. the endpoint is one of the two the header is bounded to, matched on the *decoded* path
+   (REQ-SEC-029);
+3. there is an authenticated caller behind the header at all — refused, never ignored;
+4. the named member is live: known here, and still found by the last roster sync. A named subject
+   never expires the way a token does, so this is the guard without which the header could mint the
+   authorities of a revoked member.
+
+Guard 4 splits into two counted reasons — a subject that is not a UUID never reaches persistence —
+so `basetool_on_behalf_of_refused_total{reason}` carries **five** values for these four guards. The
+refusal *answer* is byte-identical for all of them: an unknown member and an offboarded one must
+look the same from outside, or the endpoint becomes an oracle for which subjects exist. The reason
+lives only in the metric and the log line.
 
 The gateway has
 **no database and no Flyway migration**, serves **no HTML**, holds **no business logic**

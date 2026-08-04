@@ -67,7 +67,7 @@ class OnBehalfOfHeaderParityTest {
 
     assertThat(matcher.group(1))
         .as("a rename on one side alone attributes every ingest write to the service account")
-        .isEqualTo(ActingSubjectResolver.ON_BEHALF_OF_HEADER);
+        .isEqualTo(ActingMemberHeader.ON_BEHALF_OF_HEADER);
   }
 
   /**

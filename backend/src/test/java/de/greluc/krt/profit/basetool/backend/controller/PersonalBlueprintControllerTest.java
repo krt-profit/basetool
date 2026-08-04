@@ -163,13 +163,12 @@ class PersonalBlueprintControllerTest {
   }
 
   @Test
-  void craftability_derivesSubAndUserIdAndRelaysFlag() {
+  void craftability_relaysSubUserIdAndFlag() {
     UUID userId = UUID.randomUUID();
-    when(userService.getUserIdFromJwt(any(Jwt.class))).thenReturn(userId);
     List<BlueprintCraftabilityDto> expected = List.of();
     when(craftabilityService.computeForOwner(SUB, userId, true)).thenReturn(expected);
 
-    List<BlueprintCraftabilityDto> result = controller.craftability(true, SUB, auth);
+    List<BlueprintCraftabilityDto> result = controller.craftability(true, SUB, userId);
 
     assertSame(expected, result);
     verify(craftabilityService).computeForOwner(SUB, userId, true);

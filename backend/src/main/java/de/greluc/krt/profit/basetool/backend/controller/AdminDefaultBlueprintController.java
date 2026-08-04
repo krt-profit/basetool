@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.DefaultBlueprintCreateReq
 import de.greluc.krt.profit.basetool.backend.model.dto.DefaultBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.service.DefaultBlueprintService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserSub;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -33,10 +34,8 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -83,7 +82,7 @@ public class AdminDefaultBlueprintController {
    * Adds a product to the default set and grants it to every existing user.
    *
    * @param request the product key to mark as default
-   * @param authentication the calling admin's JWT (its {@code sub} is stamped as the creator)
+   * @param adminSub the calling admin's subject, stamped as the creator
    * @return the persisted DTO
    */
   @PostMapping
@@ -97,9 +96,8 @@ public class AdminDefaultBlueprintController {
     @ApiResponse(responseCode = "409", description = "Product is already a default.")
   })
   public DefaultBlueprintResponse add(
-      @Valid @RequestBody DefaultBlueprintCreateRequest request,
-      @Nullable JwtAuthenticationToken authentication) {
-    return service.add(request.productKey(), subOf(authentication));
+      @Valid @RequestBody DefaultBlueprintCreateRequest request, @CurrentUserSub String adminSub) {
+    return service.add(request.productKey(), adminSub);
   }
 
   /**
@@ -117,17 +115,5 @@ public class AdminDefaultBlueprintController {
   })
   public void remove(@PathVariable UUID id) {
     service.remove(id);
-  }
-
-  /**
-   * Extracts the calling admin's {@code sub} for the audit trail, tolerating a missing token (the
-   * {@code @PreAuthorize} guard already guarantees an authenticated admin in normal operation).
-   *
-   * @param auth the caller's JWT authentication, possibly {@code null}
-   * @return the subject claim, or {@code null} when unavailable
-   */
-  @Nullable
-  private static String subOf(@Nullable JwtAuthenticationToken auth) {
-    return (auth == null || auth.getToken() == null) ? null : auth.getToken().getSubject();
   }
 }

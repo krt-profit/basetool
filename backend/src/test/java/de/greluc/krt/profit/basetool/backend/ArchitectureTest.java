@@ -71,6 +71,22 @@ class ArchitectureTest {
   private static final String SECURITY_CONTEXT_HOLDER =
       "org.springframework.security.core.context.SecurityContextHolder";
 
+  /** The concrete authentication type that may only be named inside the authentication seam. */
+  private static final String JWT_AUTHENTICATION_TOKEN =
+      "org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken";
+
+  /**
+   * The two classes allowed to name {@link #JWT_AUTHENTICATION_TOKEN}.
+   *
+   * <p>{@code AuthenticatedSubject} is the seam every other consumer asks instead; {@code
+   * ActingMemberFilter} inspects the gateway's <em>own</em> token to read its {@code azp}, which is
+   * a genuine token question and not an identity question.
+   */
+  private static final String[] AUTHENTICATION_SEAM = {
+    "de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject",
+    "de.greluc.krt.profit.basetool.backend.config.ActingMemberFilter"
+  };
+
   private static final String PRE_AUTHORIZE =
       "org.springframework.security.access.prepost.PreAuthorize";
 
@@ -256,6 +272,37 @@ class ArchitectureTest {
             "Controllers must read the principal via @AuthenticationPrincipal / "
                 + "Authentication parameters, or delegate to AuthHelperService — direct "
                 + "SecurityContextHolder access splits the auth contract across the codebase.")
+        .check(CLASSES);
+  }
+
+  @Test
+  void identityMustBeReadThroughTheSeamNotTheAuthenticationType() {
+    // Reasoning: this rule exists because the ingest gateway's identity swap (ADR-0129) introduced
+    // a SECOND authentication type, and every consumer that branched on `instanceof
+    // JwtAuthenticationToken` silently split into two camps. CurrentUserArgumentResolver failed
+    // closed (403 before the handler ran); TermsAcceptanceAccessFilter failed OPEN — it returned
+    // "no user", which in that filter means "let the request through", so the consent gate
+    // (REQ-SEC-028) stopped applying to exactly the path it had just been extended to cover.
+    // Neither was visible in a test, because both types satisfy every type-agnostic consumer.
+    //
+    // The type is not the identity. Anything asking "who is calling" asks support.
+    // AuthenticatedSubject, which reads the subject from a JWT principal when there is one and from
+    // getName() otherwise. Only code with a genuine question about the TOKEN (its claims, its
+    // binding) may name the token type — and there is exactly one such place.
+    noClasses()
+        .that()
+        .doNotHaveFullyQualifiedName(AUTHENTICATION_SEAM[0])
+        .and()
+        .doNotHaveFullyQualifiedName(AUTHENTICATION_SEAM[1])
+        .should()
+        .dependOnClassesThat()
+        .haveFullyQualifiedName(JWT_AUTHENTICATION_TOKEN)
+        .because(
+            "asking for the authentication TYPE instead of the subject splits every consumer into "
+                + "fail-closed and fail-open the moment a second authentication type exists "
+                + "(ADR-0129): the acting member carries no token, so an instanceof test skipped "
+                + "the consent gate and 403'd the argument resolver. Read the subject via "
+                + "support.AuthenticatedSubject; only the authentication seam may name the token.")
         .check(CLASSES);
   }
 

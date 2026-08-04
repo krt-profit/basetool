@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.service.BlueprintCraftabilityServic
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.web.CurrentUserSub;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -52,7 +53,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -253,7 +253,7 @@ public class PersonalBlueprintController {
    * @param includeRefinery whether to fold the caller's {@code OPEN}/{@code IN_PROGRESS} refinery
    *     yield into the {@code *WithRefinery} figures (default {@code false})
    * @param ownerSub the caller's JWT {@code sub} claim
-   * @param auth the caller's JWT authentication
+   * @param userId the caller's subject as a UUID, used to scope stock and refinery yield
    * @return one craftability entry per owned blueprint
    */
   @GetMapping("/craftability")
@@ -269,8 +269,7 @@ public class PersonalBlueprintController {
       @RequestParam(name = "includeRefinery", required = false, defaultValue = "false")
           boolean includeRefinery,
       @CurrentUserSub String ownerSub,
-      JwtAuthenticationToken auth) {
-    UUID userId = userService.getUserIdFromJwt(auth.getToken());
+      @CurrentUserId UUID userId) {
     return craftabilityService.computeForOwner(ownerSub, userId, includeRefinery);
   }
 

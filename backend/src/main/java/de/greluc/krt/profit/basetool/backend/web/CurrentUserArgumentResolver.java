@@ -19,12 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.web;
 
+import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import java.security.Principal;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.MethodParameter;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
@@ -104,14 +105,12 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
    */
   @NotNull
   private static String requireSubject(@NotNull NativeWebRequest webRequest) {
+    // Asked of AuthenticatedSubject, not of the type. A request the ingest gateway makes on behalf
+    // of a member carries that member's identity with NO token behind it (ADR-0129), so demanding a
+    // JwtAuthenticationToken here threw before the handler body ran — every gateway call 403'd at
+    // argument resolution, one layer past the gate that used to fail it.
     Principal principal = webRequest.getUserPrincipal();
-    if (!(principal instanceof JwtAuthenticationToken auth) || auth.getToken() == null) {
-      throw new AccessDeniedException("Missing JWT.");
-    }
-    String sub = auth.getToken().getSubject();
-    if (sub == null || sub.isBlank()) {
-      throw new AccessDeniedException("JWT does not contain a subject claim.");
-    }
-    return sub;
+    return AuthenticatedSubject.of(principal instanceof Authentication auth ? auth : null)
+        .orElseThrow(() -> new AccessDeniedException("No authenticated subject."));
   }
 }

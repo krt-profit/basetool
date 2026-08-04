@@ -24,20 +24,28 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.ActingMemberAuthorities;
-import de.greluc.krt.profit.basetool.backend.support.ActingSubjectResolver;
+import de.greluc.krt.profit.basetool.backend.support.ActingMemberHeader;
+import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
+import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
 import java.util.List;
+import java.util.Locale;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.support.StaticMessageSource;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * The endpoint bound of the acting-member header, driven directly against a raw request URI.
@@ -57,17 +65,40 @@ class ActingMemberFilterPathMatchingTest {
   private static final String MEMBER = "44444444-4444-4444-4444-444444444444";
 
   private final ActingMemberAuthorities authorities = mock(ActingMemberAuthorities.class);
+  private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   private ActingMemberFilter filter() {
     IngestGatewayProperties properties = new IngestGatewayProperties();
     properties.setClientIds(List.of("test-ingest-gateway"));
-    return new ActingMemberFilter(properties, authorities, new SimpleMeterRegistry());
+    StaticMessageSource messages = new StaticMessageSource();
+    messages.addMessage("problem.acting_member_refused.title", Locale.ENGLISH, "Forbidden");
+    messages.addMessage("problem.acting_member_refused.detail", Locale.ENGLISH, "Refused.");
+    return new ActingMemberFilter(
+        properties,
+        authorities,
+        messages,
+        new ProblemResponseFactory(new AppProblemProperties()),
+        new ObjectMapper(),
+        meterRegistry);
+  }
+
+  /**
+   * The refusal reason this filter counted, or {@code null} when it counted none.
+   *
+   * @return the single {@code reason} tag observed on the refusal counter
+   */
+  private String refusalReason() {
+    return meterRegistry.find(MetricNames.ON_BEHALF_OF_REFUSED).counters().stream()
+        .filter(counter -> counter.count() > 0)
+        .map(counter -> counter.getId().getTag(MetricNames.TAG_REASON))
+        .findFirst()
+        .orElse(null);
   }
 
   private static MockHttpServletRequest gatewayRequest(String rawUri) {
     MockHttpServletRequest request = new MockHttpServletRequest("POST", rawUri);
     request.setRequestURI(rawUri);
-    request.addHeader(ActingSubjectResolver.ON_BEHALF_OF_HEADER, MEMBER);
+    request.addHeader(ActingMemberHeader.ON_BEHALF_OF_HEADER, MEMBER);
     Jwt token =
         Jwt.withTokenValue("t")
             .header("alg", "none")
@@ -92,6 +123,10 @@ class ActingMemberFilterPathMatchingTest {
 
     filter().doFilter(gatewayRequest("/%61pi/v1/missions"), response, chain);
 
+    // Asserted by REASON, not by status alone: every guard in this filter answers 403, so a status
+    // assertion passes even when a different guard fired for a different reason. The reason tag is
+    // the only thing that says WHICH bound held.
+    assertThat(refusalReason()).isEqualTo(MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
     assertThat(response.getStatus()).isEqualTo(403);
     verify(chain, never()).doFilter(any(), any());
     verify(authorities, never()).authoritiesFor(any());
@@ -104,9 +139,14 @@ class ActingMemberFilterPathMatchingTest {
   void stillActsOnAnEncodedSpellingOfAnActingPath() throws Exception {
     MockHttpServletResponse response = new MockHttpServletResponse();
     FilterChain chain = mock(FilterChain.class);
+    // Stubbed rather than left to Mockito's null: the filter puts this straight into the
+    // authentication it installs, so an unstubbed null would test a state that cannot occur.
+    when(authorities.authoritiesFor(any())).thenReturn(List.of());
 
     filter().doFilter(gatewayRequest("/api/v1/%72efinery-orders/import-extract"), response, chain);
 
     verify(authorities).authoritiesFor(any());
+    verify(chain).doFilter(any(), any());
+    assertThat(refusalReason()).isNull();
   }
 }

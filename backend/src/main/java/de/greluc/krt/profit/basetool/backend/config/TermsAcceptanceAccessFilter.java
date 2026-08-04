@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.support.RefusedSubjectWindow;
 import de.greluc.krt.profit.basetool.backend.support.TermsConsentCheck;
@@ -42,7 +43,6 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.server.PathContainer;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
@@ -154,18 +154,16 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
     if (!API_SCOPE.matches(path) || EXEMPT_PATHS.stream().anyMatch(p -> p.matches(path))) {
       return null;
     }
+    // Asked of AuthenticatedSubject, not of the type — and this one failed OPEN. A request the
+    // ingest gateway makes on behalf of a member carries no token (ADR-0129), so the old
+    // `instanceof JwtAuthenticationToken` test found none and returned null, which here means "let
+    // through". The consent gate silently stopped applying to the one path REQ-SEC-028 was extended
+    // to cover. A type check that waves callers through is the worst kind to get wrong.
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (!(auth instanceof JwtAuthenticationToken jwtAuth) || !auth.isAuthenticated()) {
-      return null;
-    }
-    String subject = jwtAuth.getToken().getSubject();
-    if (subject == null || subject.isBlank()) {
-      return null;
-    }
-    UUID userId;
-    try {
-      userId = UUID.fromString(subject);
-    } catch (IllegalArgumentException e) {
+    UUID userId = AuthenticatedSubject.idOf(auth).orElse(null);
+    if (userId == null) {
+      // No subject, or a subject that is not a member id — a service account or a malformed token.
+      // Neither is a person who can accept anything; the audience and scope checks govern them.
       return null;
     }
     return termsConsentCheck.hasAcceptedCurrentTerms(userId) ? null : userId;

@@ -2574,6 +2574,55 @@
           }
         }
       ]
+    },
+    {
+      "id": 49,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 168
+      },
+      "type": "timeseries",
+      "title": "Acting-member refusals/hour by reason",
+      "description": "Every refusal of an X-Ingest-On-Behalf-Of header, split by why (ADR-0129). The response body is byte-identical for all five reasons on purpose, so that a caller cannot use this endpoint to find out which subjects exist - which makes this panel the only place they are distinguishable. Read the reasons differently: member_not_live is usually an offboarded member whose extractor is still installed, but VARYING subjects mean somebody is enumerating user ids; not_a_gateway means either the allowlist does not match the gateway's client id (uploads are failing too) or somebody is probing for an impersonation primitive; no_authenticated_caller should be structurally impossible and indicates the security filter chain was reordered.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (reason) (rate(basetool_on_behalf_of_refused_total[1h])) * 3600",
+          "refId": "A",
+          "legendFormat": "{{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
     }
   ]
 }

@@ -27,7 +27,7 @@ import org.springframework.validation.annotation.Validated;
 
 /**
  * Which Keycloak clients may act for another member via {@link
- * ActingSubjectResolver#ON_BEHALF_OF_HEADER} (ADR-0129).
+ * ActingMemberHeader#ON_BEHALF_OF_HEADER} (ADR-0129).
  *
  * <p>Matched on the token's {@code azp}, so only a token minted for one of these clients qualifies
  * — possessing a user's token is not enough, and neither is holding any role.

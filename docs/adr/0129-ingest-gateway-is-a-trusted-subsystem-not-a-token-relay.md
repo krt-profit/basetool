@@ -86,7 +86,10 @@ contextual and cascaded org-unit authorities. The access token contributes none 
 The same assembler serves both paths, so a member acting through the gateway carries precisely the
 authority set they would carry logging in.
 
-Four guards bound it, and each closes a way this has gone wrong or could:
+Four guards bound it, and each closes a way this has gone wrong or could. They produce five
+counted refusal reasons (`basetool_on_behalf_of_refused_total{reason}`), because a named
+subject can fail either by not being a UUID or by not being live; the answer to the caller is
+identical for all five on purpose.
 
 - **Only a configured gateway**, keyed on `azp` through one shared predicate, so the "may act for
   another member" and "is a machine, not a member" decisions cannot drift apart. Empty allowlist

@@ -21,8 +21,10 @@ package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.ActingMemberAuthorities;
-import de.greluc.krt.profit.basetool.backend.support.ActingSubjectResolver;
+import de.greluc.krt.profit.basetool.backend.support.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
+import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.support.SubjectAuthentication;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -31,11 +33,15 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.server.PathContainer;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
@@ -48,6 +54,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Makes the <em>acting member</em> the security identity of an ingest-gateway request (ADR-0129).
@@ -57,12 +64,22 @@ import org.springframework.web.util.pattern.PathPatternParser;
  * parameter only — which fixed attribution and nothing else. Everything that reads the {@link
  * SecurityContext} still saw the gateway: {@code @PreAuthorize}, {@code @CurrentUserId}, the
  * org-unit scope, the audit trail, and both person-gates. The gates in particular are the reason
- * this filter exists rather than a wider {@code ActingSubjectResolver}: consent (REQ-SEC-028) and
- * approval (REQ-SEC-017) must be evaluated against the person who is sending, exactly as they were
- * while the gateway still relayed that person's token.
+ * this filter exists rather than a per-call-site resolver: consent (REQ-SEC-028) and approval
+ * (REQ-SEC-017) must be evaluated against the person who is sending, exactly as they were while the
+ * gateway still relayed that person's token.
  *
- * <p>So the context is replaced instead. Everything downstream then sees the member without knowing
- * this filter exists, and the per-call-site substitution is gone.
+ * <p>So the context is replaced instead, and the per-call-site substitution is gone.
+ *
+ * <p><strong>That only works because identity is read through one seam.</strong> The claim
+ * "everything downstream sees the member" was false when this filter first shipped: a large share
+ * of the consumers branched on the authentication <em>type</em> rather than on the subject, and the
+ * acting member — which deliberately carries no token — split them into two camps. {@code
+ * CurrentUserArgumentResolver} failed closed and 403'd every gateway call at argument resolution;
+ * {@code TermsAcceptanceAccessFilter} failed <em>open</em> and skipped the consent gate entirely.
+ * Every consumer now asks {@link
+ * de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject}, and {@code ArchitectureTest
+ * #identityMustBeReadThroughTheSeamNotTheAuthenticationType} keeps it that way, so the next
+ * authentication type cannot reopen the same split.
  *
  * <p><strong>Four guards, each closing a way this could go wrong.</strong>
  *
@@ -99,8 +116,17 @@ public class ActingMemberFilter extends OncePerRequestFilter {
           PATH_PARSER.parse("/api/v1/refinery-orders/import-extract"),
           PATH_PARSER.parse("/api/v1/personal-blueprints/import/preview"));
 
+  /** App-wide correlation-id response header, matching the neighbouring person-gates. */
+  static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
+
+  /** Stable machine-readable code; the frontend and the ingest module branch on it. */
+  static final String CODE_ACTING_MEMBER_REFUSED = "ACTING_MEMBER_REFUSED";
+
   private final IngestGatewayProperties gatewayProperties;
   private final ActingMemberAuthorities actingMemberAuthorities;
+  private final MessageSource messageSource;
+  private final ProblemResponseFactory problemResponseFactory;
+  private final ObjectMapper objectMapper;
   private final MeterRegistry meterRegistry;
 
   @Override
@@ -109,7 +135,7 @@ public class ActingMemberFilter extends OncePerRequestFilter {
       @NotNull HttpServletResponse response,
       @NotNull FilterChain filterChain)
       throws ServletException, IOException {
-    String onBehalfOf = request.getHeader(ActingSubjectResolver.ON_BEHALF_OF_HEADER);
+    String onBehalfOf = request.getHeader(ActingMemberHeader.ON_BEHALF_OF_HEADER);
     if (onBehalfOf == null || onBehalfOf.isBlank()) {
       filterChain.doFilter(request, response);
       return;
@@ -120,16 +146,27 @@ public class ActingMemberFilter extends OncePerRequestFilter {
       // Guard 3. Never "ignore and continue": that is precisely how the first version failed —
       // filters running before authentication saw an empty context and silently skipped their
       // check.
-      refuse(response, "an on-behalf-of header requires an authenticated caller", null);
+      refuse(
+          request,
+          response,
+          "an on-behalf-of header requires an authenticated caller",
+          MetricNames.ON_BEHALF_OF_NO_CALLER);
       return;
     }
     if (!gatewayProperties.isGatewayClient(jwtCaller.getToken().getClaimAsString("azp"))) {
       refuse(
-          response, "caller is not a configured gateway", MetricNames.ON_BEHALF_OF_NOT_A_GATEWAY);
+          request,
+          response,
+          "caller is not a configured gateway",
+          MetricNames.ON_BEHALF_OF_NOT_A_GATEWAY);
       return;
     }
     if (!matchesActingPath(request)) {
-      refuse(response, "endpoint does not accept an on-behalf-of header", null);
+      refuse(
+          request,
+          response,
+          "endpoint does not accept an on-behalf-of header",
+          MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND);
       return;
     }
 
@@ -137,7 +174,7 @@ public class ActingMemberFilter extends OncePerRequestFilter {
     try {
       member = UUID.fromString(onBehalfOf);
     } catch (IllegalArgumentException malformed) {
-      refuse(response, "named subject is not a UUID", MetricNames.ON_BEHALF_OF_MALFORMED);
+      refuse(request, response, "named subject is not a UUID", MetricNames.ON_BEHALF_OF_MALFORMED);
       return;
     }
 
@@ -145,11 +182,15 @@ public class ActingMemberFilter extends OncePerRequestFilter {
     try {
       authorities = actingMemberAuthorities.authoritiesFor(member);
     } catch (AccessDeniedException notLive) {
-      // Unknown here, or no longer in the identity provider. Both fail closed; the distinction is
-      // in
-      // that class's log line, not in the answer, which must not tell a caller which subjects
-      // exist.
-      refuse(response, "named member is not usable", null);
+      // Unknown here, or no longer in the identity provider. Both fail closed, and the answer is
+      // byte-identical to every other refusal so it cannot be used to enumerate subjects. The
+      // distinction lives in that class's log line and in this counter -- see
+      // MetricNames.ON_BEHALF_OF_MEMBER_NOT_LIVE for why this one is worth alerting on.
+      refuse(
+          request,
+          response,
+          "named member is not usable",
+          MetricNames.ON_BEHALF_OF_MEMBER_NOT_LIVE);
       return;
     }
 
@@ -186,38 +227,76 @@ public class ActingMemberFilter extends OncePerRequestFilter {
    * the bearer-token filter, which is <em>before</em> {@code ExceptionTranslationFilter} — so a
    * thrown {@code AccessDeniedException} escapes the chain untranslated and reaches the client as a
    * 500 instead of a 403. That was not theory: the real-chain test caught it, where a filter tested
-   * in isolation would have passed. The neighbouring person-gates write their own bodies for the
-   * same reason.
+   * in isolation would have passed.
    *
+   * <p>The neighbouring person-gates write their own bodies for the same reason, and this writes
+   * the same shape they do — a full RFC 7807 document with a stable {@code code}, a localized title
+   * and detail, and a correlation id in both the body and the header. A client cannot tell the
+   * three refusing filters apart by the shape of the answer, and the ingest module's error mapping
+   * does not need a special case for this one.
+   *
+   * <p><strong>Every reason produces a byte-identical body.</strong> The reason is carried by the
+   * metric and the log line, never by the response: an unknown member and an offboarded one must
+   * look the same from outside, or this endpoint becomes an oracle for which subjects exist.
+   *
+   * @param request the refused request, for the problem {@code instance} and the caller's locale
    * @param response the response to write into
    * @param detail the developer-facing reason; deliberately terse and free of caller-supplied text
-   * @param metricReason the bounded {@code MetricNames.ON_BEHALF_OF_*} reason, or {@code null} when
-   *     this refusal is not one of the two counted security signals
-   * @throws IOException if writing fails
+   * @param metricReason the bounded {@code MetricNames.ON_BEHALF_OF_*} reason for this refusal
+   * @throws IOException if serialization or writing fails
    */
-  private void refuse(@NotNull HttpServletResponse response, String detail, String metricReason)
+  private void refuse(
+      @NotNull HttpServletRequest request,
+      @NotNull HttpServletResponse response,
+      String detail,
+      @NotNull String metricReason)
       throws IOException {
-    log.warn("Refused an on-behalf-of request: {}", detail);
-    if (metricReason != null) {
-      meterRegistry
-          .counter(MetricNames.ON_BEHALF_OF_REFUSED, MetricNames.TAG_REASON, metricReason)
-          .increment();
-    }
+    String correlationId = UUID.randomUUID().toString();
+    log.warn("Refused an on-behalf-of request: {} [correlationId={}]", detail, correlationId);
+    meterRegistry
+        .counter(MetricNames.ON_BEHALF_OF_REFUSED, MetricNames.TAG_REASON, metricReason)
+        .increment();
+
+    // LocaleContextHolder is not populated this early in the filter chain, so the request's own
+    // Accept-Language is the authoritative source -- same reasoning as the neighbouring gates.
+    Locale locale = request.getLocale();
+    String title =
+        messageSource.getMessage("problem.acting_member_refused.title", null, "Forbidden", locale);
+    String message =
+        messageSource.getMessage(
+            "problem.acting_member_refused.detail",
+            null,
+            "The import could not be attributed to a valid member.",
+            locale);
+
     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-    response.getWriter().write("{\"status\":403,\"code\":\"ACTING_MEMBER_REFUSED\"}");
-    response.getWriter().flush();
+    response.setHeader(CORRELATION_ID_HEADER, correlationId);
+    ProblemDetail problem =
+        problemResponseFactory.problem(
+            HttpStatus.FORBIDDEN,
+            title,
+            message,
+            request.getRequestURI(),
+            "acting-member-refused",
+            CODE_ACTING_MEMBER_REFUSED,
+            correlationId);
+    response.getOutputStream().write(objectMapper.writeValueAsBytes(problem));
   }
 
   /**
    * The authentication that stands in for the acting member.
    *
    * <p>Not a {@link JwtAuthenticationToken}: there is no token for this member, and manufacturing
-   * one would put a forged {@link Jwt} into a context where anything may read its claims. Carrying
-   * the subject as the principal keeps {@code getName()} equal to the {@code sub}, which is what
-   * every identity consumer in this application actually reads.
+   * one would put a forged {@link Jwt} into a context where anything may read its claims.
+   *
+   * <p>It advertises the subject through {@link SubjectAuthentication} rather than relying on
+   * {@code getName()}. The seam cannot read names generically — for a username/password caller the
+   * name is a callsign, which REQ-OBS-004 keeps out of logs — so this type states explicitly that
+   * its name is an OIDC {@code sub}.
    */
-  static final class ActingMemberAuthentication extends AbstractAuthenticationToken {
+  static final class ActingMemberAuthentication extends AbstractAuthenticationToken
+      implements SubjectAuthentication {
 
     private final UUID member;
 
@@ -245,6 +324,11 @@ public class ActingMemberFilter extends OncePerRequestFilter {
 
     @Override
     public String getName() {
+      return member.toString();
+    }
+
+    @Override
+    public @NotNull String subject() {
       return member.toString();
     }
   }

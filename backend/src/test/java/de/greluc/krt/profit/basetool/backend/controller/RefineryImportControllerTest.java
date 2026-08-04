@@ -120,7 +120,8 @@ class RefineryImportControllerTest {
         .thenReturn(new RefineryImportDraftDto(null, List.of(), 1, 1, 0));
 
     // When / Then — plain membership suffices, no elevated role required.
-    // The subject is a real UUID: since ADR-0129 the owner is resolved by ActingSubjectResolver,
+    // The subject is a real UUID: since ADR-0129 the owner comes from the SecurityContext, which
+    // ActingMemberFilter has already swapped to the acting member,
     // which is fail-closed on a non-UUID sub exactly as UserService#getUserIdFromJwt always was.
     // The default `user` subject only ever worked here because userService was mocked away.
     mockMvc

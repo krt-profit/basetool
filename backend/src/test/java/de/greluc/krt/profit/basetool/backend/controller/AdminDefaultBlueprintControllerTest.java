@@ -66,18 +66,9 @@ class AdminDefaultBlueprintControllerTest {
   void add_passesProductKeyAndAdminSub() {
     when(service.add("k", "admin-sub")).thenReturn(sample());
 
-    controller.add(new DefaultBlueprintCreateRequest("k"), auth("admin-sub"));
+    controller.add(new DefaultBlueprintCreateRequest("k"), "admin-sub");
 
     verify(service).add("k", "admin-sub");
-  }
-
-  @Test
-  void add_toleratesMissingAuthentication() {
-    when(service.add("k", null)).thenReturn(sample());
-
-    controller.add(new DefaultBlueprintCreateRequest("k"), null);
-
-    verify(service).add("k", null);
   }
 
   @Test

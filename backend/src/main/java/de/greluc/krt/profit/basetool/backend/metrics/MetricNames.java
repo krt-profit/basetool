@@ -535,6 +535,29 @@ public final class MetricNames {
   public static final String ON_BEHALF_OF_MALFORMED = "malformed_subject";
 
   /**
+   * {@link #ON_BEHALF_OF_REFUSED} reason: the header arrived with no authenticated caller behind
+   * it.
+   *
+   * <p>Should be unreachable — the filter runs after authentication. A non-zero rate means the
+   * filter ordering has changed underneath it, which is the exact bug ADR-0129 was written after.
+   */
+  public static final String ON_BEHALF_OF_NO_CALLER = "no_authenticated_caller";
+
+  /** {@link #ON_BEHALF_OF_REFUSED} reason: the endpoint does not accept an acting member. */
+  public static final String ON_BEHALF_OF_ENDPOINT_NOT_BOUND = "endpoint_not_bound";
+
+  /**
+   * {@link #ON_BEHALF_OF_REFUSED} reason: the named member is unknown here, or the last roster sync
+   * no longer found them in the identity provider.
+   *
+   * <p>The highest-value signal of the five. A named subject never expires the way a token does, so
+   * this counter is what distinguishes "a member was offboarded and their extractor is still
+   * running" from "someone is probing which subjects exist". Both refuse identically to the caller;
+   * only this metric tells them apart.
+   */
+  public static final String ON_BEHALF_OF_MEMBER_NOT_LIVE = "member_not_live";
+
+  /**
    * Tag: the Terms-of-Use version a measurement belongs to. Bounded by construction — one process
    * serves exactly one version, because the value is a build artifact (REQ-OBS-011).
    */
