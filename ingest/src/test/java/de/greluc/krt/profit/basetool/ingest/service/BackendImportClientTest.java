@@ -47,14 +47,27 @@ class BackendImportClientTest {
   private MockWebServer backend;
   private BackendImportClient client;
 
+  /**
+   * Stands in for the gateway's own identity. The relay no longer forwards the caller's token
+   * (ADR-0129), so every outbound call now needs one — a fixed value keeps the assertions readable
+   * and makes a leaked CALLER token immediately visible as "not this string".
+   */
+  private final ServiceAccountTokenProvider serviceAccountTokenProvider =
+      org.mockito.Mockito.mock(ServiceAccountTokenProvider.class);
+
   @BeforeEach
   void setUp() throws Exception {
+    org.mockito.Mockito.when(serviceAccountTokenProvider.currentToken())
+        .thenReturn("gateway-token");
     backend = new MockWebServer();
     backend.start();
     WebClient webClient = WebClient.builder().baseUrl(backend.url("/").toString()).build();
     client =
         new BackendImportClient(
-            webClient, CircuitBreakerRegistry.ofDefaults(), TestLoggingProperties.defaults());
+            webClient,
+            serviceAccountTokenProvider,
+            CircuitBreakerRegistry.ofDefaults(),
+            TestLoggingProperties.defaults());
   }
 
   @AfterEach
@@ -86,7 +99,7 @@ class BackendImportClientTest {
   }
 
   @Test
-  void shouldForwardRefineryExtractWithBearerAndHeaders() throws Exception {
+  void shouldCallTheBackendAsTheGatewayNamingTheCaller() throws Exception {
     // Given
     backend.enqueue(
         new MockResponse()
@@ -96,14 +109,15 @@ class BackendImportClientTest {
 
     // When
     MDC.put("correlationId", "cid-9");
-    String body = client.forwardRefineryExtract("tok-123", "de", sampleExtract());
+    String body = client.forwardRefineryExtract("caller-sub", "de", sampleExtract());
 
     // Then
     assertThat(body).isEqualTo("{\"goodsMatched\":1}");
     RecordedRequest request = backend.takeRequest();
     assertThat(request.getMethod()).isEqualTo("POST");
     assertThat(request.getPath()).isEqualTo("/api/v1/refinery-orders/import-extract");
-    assertThat(request.getHeader("Authorization")).isEqualTo("Bearer tok-123");
+    assertThat(request.getHeader("Authorization")).isEqualTo("Bearer gateway-token");
+    assertThat(request.getHeader(BackendImportClient.ON_BEHALF_OF_HEADER)).isEqualTo("caller-sub");
     assertThat(request.getHeader("Accept-Language")).isEqualTo("de");
     assertThat(request.getHeader("X-Correlation-Id")).isEqualTo("cid-9");
     assertThat(request.getHeader("Content-Type")).contains("application/json");
@@ -121,11 +135,12 @@ class BackendImportClientTest {
             .setBody("{}"));
 
     // When
-    client.forwardRefineryExtract("tok-123", "   ", sampleExtract());
+    client.forwardRefineryExtract("caller-sub", "   ", sampleExtract());
 
     // Then
     RecordedRequest request = backend.takeRequest();
-    assertThat(request.getHeader("Authorization")).isEqualTo("Bearer tok-123");
+    assertThat(request.getHeader("Authorization")).isEqualTo("Bearer gateway-token");
+    assertThat(request.getHeader(BackendImportClient.ON_BEHALF_OF_HEADER)).isEqualTo("caller-sub");
     assertThat(request.getHeader("Accept-Language")).isNull();
     assertThat(request.getHeader("X-Correlation-Id")).isNull();
   }
@@ -141,7 +156,7 @@ class BackendImportClientTest {
 
     // When
     MDC.put("correlationId", "cid-3");
-    client.forwardBlueprintPreview("tok-abc", "en", "{}".getBytes(StandardCharsets.UTF_8));
+    client.forwardBlueprintPreview("caller-sub", "en", "{}".getBytes(StandardCharsets.UTF_8));
 
     // Then
     RecordedRequest request = backend.takeRequest();
@@ -164,7 +179,7 @@ class BackendImportClientTest {
     MDC.put("correlationId", "sanitised-id");
 
     // When
-    client.forwardRefineryExtract("tok-123", "de", sampleExtract());
+    client.forwardRefineryExtract("caller-sub", "de", sampleExtract());
 
     // Then: exactly the MDC value, and only one such header on the wire.
     RecordedRequest request = backend.takeRequest();
@@ -182,7 +197,7 @@ class BackendImportClientTest {
             .setBody("{}"));
 
     // When
-    client.forwardRefineryExtract("tok-123", "de\r\nX-Injected: evil", sampleExtract());
+    client.forwardRefineryExtract("caller-sub", "de\r\nX-Injected: evil", sampleExtract());
 
     // Then: the locale is dropped entirely and no smuggled header exists.
     RecordedRequest request = backend.takeRequest();
@@ -201,7 +216,7 @@ class BackendImportClientTest {
             .setBody("{}"));
 
     // When
-    client.forwardRefineryExtract("tok-123", "de,".repeat(200), sampleExtract());
+    client.forwardRefineryExtract("caller-sub", "de,".repeat(200), sampleExtract());
 
     // Then
     RecordedRequest request = backend.takeRequest();
@@ -219,7 +234,7 @@ class BackendImportClientTest {
             .setBody("{}"));
 
     // When
-    client.forwardRefineryExtract("tok-123", "de-DE,de;q=0.9,en;q=0.8,*;q=0.5", sampleExtract());
+    client.forwardRefineryExtract("caller-sub", "de-DE,de;q=0.9,en;q=0.8,*;q=0.5", sampleExtract());
 
     // Then
     RecordedRequest request = backend.takeRequest();
@@ -237,14 +252,15 @@ class BackendImportClientTest {
     byte[] json = "{\"blueprints\":[]}".getBytes(StandardCharsets.UTF_8);
 
     // When
-    String body = client.forwardBlueprintPreview("tok-abc", null, json);
+    String body = client.forwardBlueprintPreview("caller-sub", null, json);
 
     // Then
     assertThat(body).isEqualTo("{\"total\":3}");
     RecordedRequest request = backend.takeRequest();
     assertThat(request.getMethod()).isEqualTo("POST");
     assertThat(request.getPath()).isEqualTo("/api/v1/personal-blueprints/import/preview");
-    assertThat(request.getHeader("Authorization")).isEqualTo("Bearer tok-abc");
+    assertThat(request.getHeader("Authorization")).isEqualTo("Bearer gateway-token");
+    assertThat(request.getHeader(BackendImportClient.ON_BEHALF_OF_HEADER)).isEqualTo("caller-sub");
     assertThat(request.getHeader("Content-Type")).contains("multipart/form-data");
     String sent = request.getBody().readUtf8();
     assertThat(sent).contains("name=\"file\"").contains("blueprints");

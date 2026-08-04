@@ -150,6 +150,14 @@ logging:
     # not inflate logback_events_total{level="error"} and falsely trip the LogbackErrorSpike alert.
     io.opentelemetry.exporter: WARN
 app:
+  security:
+    # Which Keycloak clients may act for another member via X-Ingest-On-Behalf-Of (ADR-0129).
+    # Matched on the token's azp, so possessing a user's token is not enough and neither is holding
+    # any role. EMPTY MEANS NOBODY: an un-provisioned deployment refuses every on-behalf-of header
+    # rather than trusting one, so the code can ship before the realm change without opening the
+    # boundary.
+    ingest-gateway:
+      client-ids: ${APP_SECURITY_INGEST_GATEWAY_CLIENT_IDS:}
   logging:
     correlation-id-header: X-Correlation-Id
     correlation-id-mdc-key: correlationId

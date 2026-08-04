@@ -53,6 +53,17 @@ public class IngestProperties {
   @NotBlank @URL private String frontendBaseUrl;
 
   /**
+   * The gateway's own externally reachable origin, e.g. {@code https://ingest.profit-base.online}.
+   *
+   * <p>Used only to build the DPoP {@code htu} comparison target, so the comparison does not depend
+   * on the reverse proxy's forwarded headers (ADR-0129, {@link
+   * PublicUriDpopAuthenticationConverter}). Scheme and host, plus the port only when it is not the
+   * scheme default — exactly the shape the extractor signs. Blank keeps Spring's stock
+   * request-derived target, so an unconfigured deployment behaves as before rather than half-way.
+   */
+  private String publicBaseUrl = "";
+
+  /**
    * Frontend path that renders the pre-filled refinery create form; the handoff id is appended as
    * {@code ?handoff=<id>} (REQ-INGEST-004).
    */

@@ -837,6 +837,33 @@ groups:
       # broken consent path; for: 1h beats a deliberate read of a legal document, which the old 30m
       # did not. Known and accepted fail-quiet: a backend restart inside the 2h window makes
       # increase() extrapolate a phantom acceptance and suppresses the alert until it clears.
+
+      # The gateway calls the backend under its own identity since ADR-0129, so this
+      # client-credentials grant sits on the critical path of EVERY ingest upload. If it fails,
+      # nobody can send, and the failure is in a hop no client can see or report — the extractor
+      # only ever shows the gateway's 5xx. Any sustained failure is therefore worth waking up for.
+      - alert: IngestServiceAccountTokenFailing
+        expr: >-
+          sum(rate(basetool_ingest_service_account_token_total{outcome="failed"}[10m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ingest gateway cannot obtain its own backend token"
+          description: "The ingest gateway's client-credentials grant against Keycloak has been failing for 10 minutes. Every upload from the desktop extractor is refused for as long as this lasts, and the extractor cannot tell the user why. Check the gateway's app.ingest.service-account.* configuration, the client secret, and whether Keycloak is reachable from the gateway."
+
+      # An impersonation attempt, or a misconfigured gateway client id - and the two are worth
+      # telling apart quickly. The on-behalf-of header is the only way any caller can act as
+      # somebody else in this application, so a non-zero rate is never routine.
+      - alert: OnBehalfOfRefusedSpike
+        expr: >-
+          sum(rate(basetool_on_behalf_of_refused_total{reason="not_a_gateway"}[15m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Something other than the ingest gateway is sending an on-behalf-of header"
+          description: "The backend refused an X-Ingest-On-Behalf-Of header from a caller whose azp is not on the gateway allowlist, repeatedly. Either app.security.ingest-gateway.client-ids does not match the gateway's actual client id - in which case ingest uploads are also failing - or somebody is probing for an impersonation primitive. Check the gateway's own token first, then the access log for the source."
       - alert: TermsConsentRolloutStalled
         expr: |
           (max(basetool_terms_refused_subjects) >= 3)

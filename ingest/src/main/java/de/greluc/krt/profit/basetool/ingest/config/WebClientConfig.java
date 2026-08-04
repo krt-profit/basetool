@@ -100,6 +100,25 @@ public class WebClientConfig {
   }
 
   /**
+   * The client used for the gateway's own client-credentials grant against Keycloak (ADR-0129).
+   *
+   * <p>Separate from {@link #backendWebClient()} for three reasons: it addresses a different host
+   * (absolute token URI, so no base URL), it must not carry the backend-relay logging filter — that
+   * filter names the call as a backend hop and this one is not — and its response is a handful of
+   * bytes, so it needs no raised in-memory codec limit. It shares the same profile-gated SSL
+   * context because it faces the same Keycloak the resource server already trusts.
+   *
+   * @return a {@link WebClient} for the Keycloak token endpoint
+   */
+  @Bean
+  public WebClient keycloakWebClient() {
+    return WebClient.builder()
+        .clientConnector(new ReactorClientHttpConnector(buildHttpClient()))
+        .observationRegistry(observationRegistry)
+        .build();
+  }
+
+  /**
    * Builds the Netty {@link HttpClient} with the profile-gated SSL context and the connect/read/
    * write/response timeouts.
    *

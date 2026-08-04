@@ -39,11 +39,16 @@ import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Relays an ingest call to the backend's existing import endpoints, carrying the caller's own
- * bearer token (the gateway never mints or elevates a token — it forwards the one it validated)
- * plus the {@code Accept-Language} and {@code X-Correlation-Id} headers (REQ-INGEST-001,
- * REQ-OBS-*). The backend does all matching and persists nothing (REQ-REFINERY-002); the gateway
+ * Relays an ingest call to the backend's existing import endpoints under the <em>gateway's own</em>
+ * identity, naming the member it acts for in {@link #ON_BEHALF_OF_HEADER} (ADR-0129,
+ * REQ-INGEST-001), plus the {@code Accept-Language} and {@code X-Correlation-Id} headers
+ * (REQ-OBS-*). The backend does all matching and persists nothing (REQ-REFINERY-002); the gateway
  * only returns the draft JSON verbatim.
+ *
+ * <p>It used to forward the caller's own token instead. That made sender-constrained tokens
+ * impossible — a DPoP-bound token is rejected outright by a resource server on the second hop,
+ * which is what broke every send from 2026-08-03 — and it is why the caller's token no longer
+ * travels through this class at all.
  *
  * <p>Each call runs through a Resilience4j circuit breaker (instance {@code backend}) so a backend
  * outage trips open quickly instead of piling up blocked threads. The breaker is configured to
@@ -56,6 +61,22 @@ public class BackendImportClient {
 
   private static final String REFINERY_PATH = "/api/v1/refinery-orders/import-extract";
   private static final String BLUEPRINT_PREVIEW_PATH = "/api/v1/personal-blueprints/import/preview";
+
+  /**
+   * Names the member the gateway is acting for on the backend hop (ADR-0129, REQ-INGEST-001).
+   *
+   * <p>Since the gateway stopped relaying the caller's token, the backend can no longer read the
+   * subject out of the bearer — that bearer now identifies the <em>gateway</em>. The subject
+   * travels here instead, and the backend honours it only when the authenticated principal is the
+   * gateway's service account. It carries a subject and nothing else: it cannot grant a role, widen
+   * a scope or select an org unit, which is what keeps a header-borne identity from becoming an
+   * escalation.
+   *
+   * <p>The backend declares the same literal; the two are kept in step by a parity test, because a
+   * rename on one side alone degrades silently into "every ingest write is attributed to nobody"
+   * rather than failing loudly.
+   */
+  public static final String ON_BEHALF_OF_HEADER = "X-Ingest-On-Behalf-Of";
 
   /**
    * Upper bound on a relayed {@code Accept-Language}. A real header is a handful of language
@@ -74,6 +95,7 @@ public class BackendImportClient {
   private static final Pattern ACCEPT_LANGUAGE_PATTERN = Pattern.compile("[A-Za-z0-9*,;=. _-]+");
 
   private final WebClient backendWebClient;
+  private final ServiceAccountTokenProvider serviceAccountTokenProvider;
   private final CircuitBreaker circuitBreaker;
   private final String correlationIdHeader;
   private final String correlationIdMdcKey;
@@ -84,14 +106,17 @@ public class BackendImportClient {
    * relay uses the same header the gateway accepts inbound (REQ-OBS-002).
    *
    * @param backendWebClient the backend-facing client from {@code WebClientConfig}
+   * @param serviceAccountTokenProvider supplies the gateway's own token for the backend hop
    * @param circuitBreakerRegistry the auto-configured Resilience4j registry
    * @param loggingProperties supplies the correlation-id header name
    */
   public BackendImportClient(
       WebClient backendWebClient,
+      ServiceAccountTokenProvider serviceAccountTokenProvider,
       CircuitBreakerRegistry circuitBreakerRegistry,
       LoggingProperties loggingProperties) {
     this.backendWebClient = backendWebClient;
+    this.serviceAccountTokenProvider = serviceAccountTokenProvider;
     this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("backend");
     this.correlationIdHeader = loggingProperties.correlationIdHeader();
     this.correlationIdMdcKey = loggingProperties.correlationIdMdcKey();
@@ -114,18 +139,19 @@ public class BackendImportClient {
    * Forwards a {@link RefineryExtractDto} as JSON to the backend refinery import endpoint and
    * returns the resulting draft JSON verbatim.
    *
-   * @param bearer the caller's raw JWT (forwarded as {@code Authorization: Bearer})
+   * @param callerSub the authenticated caller the gateway acts for; relayed in {@link
+   *     #ON_BEHALF_OF_HEADER}, never as a bearer
    * @param acceptLanguage the caller's locale, sanitized before it is relayed for localized backend
    *     problems
    * @param extract the validated extract payload
    * @return the backend's draft response body as JSON text
    */
   public @NotNull String forwardRefineryExtract(
-      @NotNull String bearer, String acceptLanguage, @NotNull RefineryExtractDto extract) {
+      @NotNull String callerSub, String acceptLanguage, @NotNull RefineryExtractDto extract) {
     return backendWebClient
         .post()
         .uri(REFINERY_PATH)
-        .headers(commonHeaders(bearer, acceptLanguage))
+        .headers(commonHeaders(callerSub, acceptLanguage))
         .contentType(MediaType.APPLICATION_JSON)
         .bodyValue(extract)
         .retrieve()
@@ -139,14 +165,15 @@ public class BackendImportClient {
    * preview endpoint as a single {@code file} part (so the backend stays unchanged — it parses the
    * upload exactly as a manual file import would), and returns the preview JSON verbatim.
    *
-   * @param bearer the caller's raw JWT (forwarded as {@code Authorization: Bearer})
+   * @param callerSub the authenticated caller the gateway acts for; relayed in {@link
+   *     #ON_BEHALF_OF_HEADER}, never as a bearer
    * @param acceptLanguage the caller's locale, sanitized before it is relayed for localized backend
    *     problems
    * @param blueprintJson the blueprint export JSON bytes to upload as the {@code file} part
    * @return the backend's preview response body as JSON text
    */
   public @NotNull String forwardBlueprintPreview(
-      @NotNull String bearer, String acceptLanguage, byte @NotNull [] blueprintJson) {
+      @NotNull String callerSub, String acceptLanguage, byte @NotNull [] blueprintJson) {
     MultipartBodyBuilder builder = new MultipartBodyBuilder();
     builder
         .part("file", new ByteArrayResource(blueprintJson))
@@ -155,7 +182,7 @@ public class BackendImportClient {
     return backendWebClient
         .post()
         .uri(BLUEPRINT_PREVIEW_PATH)
-        .headers(commonHeaders(bearer, acceptLanguage))
+        .headers(commonHeaders(callerSub, acceptLanguage))
         .contentType(MediaType.MULTIPART_FORM_DATA)
         .body(BodyInserters.fromMultipartData(builder.build()))
         .retrieve()
@@ -165,8 +192,8 @@ public class BackendImportClient {
   }
 
   /**
-   * Builds the common outbound header customizer: the forwarded bearer plus the sanitized
-   * locale/correlation relays. Never logs the token (REQ-OBS-*).
+   * Builds the common outbound header customizer: the gateway's own bearer and the caller it acts
+   * for, plus the sanitized locale/correlation relays. Never logs either token (REQ-OBS-*).
    *
    * <p><b>Neither relayed header may come from the request unchanged.</b> The gateway is the only
    * internet-facing module, so anything it copies onto an internal call carries hostile input
@@ -182,16 +209,22 @@ public class BackendImportClient {
    * the two modules' lines for one request could not be joined, precisely in the case worth tracing
    * (REQ-OBS-002).
    *
-   * @param bearer the caller's raw JWT
+   * @param callerSub the authenticated caller the gateway is acting for
    * @param acceptLanguage the client-supplied locale, sanitized here; {@code null} omits the header
    * @return a header consumer applied to the outbound request
    */
   private @NotNull Consumer<HttpHeaders> commonHeaders(
-      @NotNull String bearer, String acceptLanguage) {
+      @NotNull String callerSub, String acceptLanguage) {
     String safeLanguage = sanitizedAcceptLanguage(acceptLanguage);
     String correlationId = MDC.get(correlationIdMdcKey);
+    // Resolved here, once per relay, rather than captured earlier: the provider hands back a cached
+    // token until shortly before expiry, so this is a field read in the common case and a grant
+    // only
+    // when the cache is cold.
+    String gatewayToken = serviceAccountTokenProvider.currentToken();
     return headers -> {
-      headers.setBearerAuth(bearer);
+      headers.setBearerAuth(gatewayToken);
+      headers.set(ON_BEHALF_OF_HEADER, callerSub);
       if (safeLanguage != null) {
         headers.set(HttpHeaders.ACCEPT_LANGUAGE, safeLanguage);
       }

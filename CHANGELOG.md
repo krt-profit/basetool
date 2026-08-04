@@ -6,6 +6,8 @@
 
 - **Der Alarm zur Zustimmungseinführung schlägt nur noch an, wenn tatsächlich mehrere Personen ausgesperrt sind.** Bisher zählte er abgelehnte Anfragen statt Personen — ein einzelnes wiederholt anfragendes Programm genügte, um ihn nachts auszulösen, obwohl niemand betroffen war. Er beobachtet jetzt, wie viele **verschiedene** Mitglieder abgelehnt werden, und lässt einer Person auch genug Zeit, die Bedingungen in Ruhe zu lesen.
 
+- **Der Desktop-Extractor sendet wieder und ist dabei besser geschützt als zuvor.** Seit dem 3. August schlug jeder Versand mit „A valid bearer token is required" fehl: das Zugangs-Token war an den Rechner gebunden, wurde aber in einer Form übergeben, die der Server aus Sicherheitsgründen ablehnt. Das Gateway prüft die Bindung jetzt selbst und spricht mit dem Backend unter eigener Kennung weiter — die Bindung wirkt damit genau dort, wo sie zählt, nämlich auf der Strecke aus dem Internet (ADR-0129).
+
 ### Fixed
 
 - **Ein offener Tab läuft nach einer Änderung der Nutzungsbedingungen nicht mehr endlos ins Leere.** Die Benachrichtigungsverbindung eines Tabs, der beim Wirksamwerden neuer Bedingungen offen war, wurde auf die Zustimmungsseite umgeleitet, scheiterte daran und baute sich sofort neu auf — dauerhaft und unbemerkt. Sie wird jetzt einmal gezielt beendet, und der Tab wechselt auf die Zustimmungsseite (REQ-SEC-028).

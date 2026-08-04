@@ -399,10 +399,15 @@ Only when both hold, set `IRI_INGEST_CLIENT_AUDIT_ONLY=false` and restart. The
 
 ## Step 8 — DPoP: bind the REFRESH token only (REQ-INGEST-012)
 
-DPoP protects the credential the extractor writes to disk — its **refresh token**. Access tokens
-stay plain bearer, because the gateway relays them onward to the backend and a sender-constrained
-token cannot survive that second hop (the reasoning is in `REQ-INGEST-012`; getting this wrong broke
-every blueprint send on 2026-08-03).
+> **Superseded in part by step 9 (ADR-0129).** This step still applies — the refresh token on disk
+> is the credential most worth binding — but its "access tokens stay plain bearer" premise is no
+> longer true. Since step 9 the gateway validates the access token's proof itself, so the access
+> token is bound as well. Read step 9 before acting on this one.
+
+DPoP protects the credential the extractor writes to disk — its **refresh token**. It also binds the
+access token, which the gateway now validates at the internet-facing hop (step 9). Getting the
+combination wrong broke every blueprint send from 2026-08-03: the token was bound and then presented
+as a plain bearer, which a resource server refuses outright.
 
 Since Keycloak 26.4 DPoP needs **no feature flag** and **no per-client switch** to work — it binds
 whenever a client sends a proof. What you configure here is that it binds the refresh token *only*.
@@ -443,8 +448,119 @@ machine whose clock drifts beyond that fails authentication with no obvious caus
 detects and names this case, but if you see unexplained auth failures on one machine, check its clock
 first.
 
+## Step 9 — The gateway becomes a trusted subsystem (ADR-0129, REQ-INGEST-001/-012)
+
+**Why this exists.** Until now the gateway forwarded the caller's own token to the backend. That
+made sender-constrained tokens impossible: a DPoP-bound token presented as a plain bearer is
+rejected outright by Spring Security 7.1, which is what broke every send from 2026-08-03. The
+gateway now validates the extractor's proof itself and calls the backend under its **own** identity,
+naming the member it acts for.
+
+**Everything below is fail-closed.** With none of it applied, the deployed code behaves exactly as
+before: the backend refuses every on-behalf-of header, and the gateway keeps accepting plain
+bearers. So the code can ship first and this can be applied afterwards — but **the extractor will
+not send until all four values are set**.
+
+**Order matters:** create the client (9a), then set all four env values together (9b), then restart
+(9c), then verify (9d). Setting the gateway's credentials without the backend allowlist gives you a
+gateway that authenticates and a backend that refuses it.
+
+### 9a — New confidential client `basetool-ingest-gateway`
+
+Realm → Clients → Create client.
+
+|  Admin Console field   |                    Value                    |
+|------------------------|---------------------------------------------|
+| Client type            | `OpenID Connect`                            |
+| Client ID              | `basetool-ingest-gateway`                   |
+| Name                   | `Basetool Ingest Gateway`                   |
+| Client authentication  | **On** (this is what makes it confidential) |
+| Authorization          | Off                                         |
+| Standard flow          | **Off**                                     |
+| Direct access grants   | **Off**                                     |
+| Implicit flow          | Off                                         |
+| Service accounts roles | **On**                                      |
+| Valid redirect URIs    | *(leave empty — no browser flow)*           |
+| Web origins            | *(leave empty)*                             |
+
+Every flow except service accounts is off on purpose: this client never represents a person and
+never sees a browser. It exists solely to obtain a client-credentials token for one internal hop.
+
+Then Clients → `basetool-ingest-gateway` → **Credentials** → copy the **Client secret**. You will
+need it in 9b.
+
+> **Treat this secret like the database password.** It is the credential that lets the gateway act
+> for *any* member. It goes only into the prod `.env`, never into the repository, never into a
+> screenshot, and never into a chat message.
+
+**No role assignment is needed.** The backend authorises this caller by its `azp`, not by a role,
+and the two endpoints it reaches require only `isAuthenticated()`.
+
+### 9b — Four values in the prod `.env`
+
+All four, together. Each is inert on its own.
+
+```
+IRI_INGEST_PUBLIC_BASE_URL=https://ingest.profit-base.online
+IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI=https://keycloak.profit-base.online/realms/iri/protocol/openid-connect/token
+IRI_INGEST_SERVICE_ACCOUNT_CLIENT_ID=basetool-ingest-gateway
+IRI_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET=<the secret from 9a>
+IRI_INGEST_GATEWAY_CLIENT_IDS=basetool-ingest-gateway
+```
+
+> **`IRI_INGEST_PUBLIC_BASE_URL` is the one that will bite you.** It is the DPoP `htu` comparison
+> target. Spring compares `htu` with a bare `String.equals` against a URL Tomcat assembles from the
+> reverse proxy's forwarded headers — so if nginx-proxy-manager omits `X-Forwarded-Port`, the server
+> expects `…:11262/v1/…` while the extractor signed the public URL, and **every** send fails with
+> `invalid_dpop_proof`. Setting this pins the origin to a value that is identical everywhere.
+>
+> Write it exactly as the extractor signs it: lower-case scheme and host, **no trailing slash**, and
+> **no port** when it is the scheme default. `https://ingest.profit-base.online` — not
+> `https://ingest.profit-base.online/`, not `…:443`.
+
+Note the last one is on the **backend**, not the gateway: it is the only `azp` the backend will
+accept an `X-Ingest-On-Behalf-Of` header from.
+
+### 9c — Restart
+
+Both services read these at startup:
+
+```bash
+docker compose --profile prod up -d --force-recreate ingest backend
+```
+
+### 9d — Verify, in this order
+
+1. **The gateway can obtain its own token.** Watch for the counter to show a mint rather than a
+   failure:
+   `sum by (outcome) (increase(basetool_ingest_service_account_token_total[15m]))`
+   A non-zero `failed` means the secret or the token URI is wrong — check those before anything
+   else, because nothing else can work while this fails.
+2. **A real send succeeds.** Run the extractor (v2.7.2 or newer) and send one blueprint export.
+   Success is the pre-filled basetool page opening.
+3. **The upload is attributed to the member, not the service account.** Open the staged draft in the
+   browser and confirm it belongs to the member who sent it. If it belongs to nobody or to the
+   service account, `IRI_INGEST_GATEWAY_CLIENT_IDS` does not match the client id from 9a.
+4. **Nothing is being refused.** `basetool_on_behalf_of_refused_total{reason="not_a_gateway"}` must
+   stay at zero. A non-zero value here means the same mismatch as (3), or somebody else is sending
+   the header.
+5. **No proof failures.** `basetool_ingest_auth_failures_total{reason="invalid_dpop_proof"}` stays
+   at zero. A non-zero value is almost certainly the `htu` mismatch from 9b — compare the value you
+   set against what the extractor signs.
+
+### 9e — What an older extractor does
+
+Nothing changes for it. The gateway keeps accepting plain unbound bearers alongside DPoP, so a
+pre-2.7 client keeps working and there is no flag day. **A 2.7.0–2.7.1 client stays broken** — that
+is the defect being fixed, and those installs must update.
+
 ## Rollback
 
+- **Step 9:** unset the five values from 9b and restart. The backend stops honouring the
+  on-behalf-of header and the gateway stops trying to obtain its own token — ingest writes then fail
+  with a named configuration error rather than misbehaving. The Keycloak client can be left in
+  place; it issues tokens nobody consumes. Note this does **not** restore sends for a 2.7.x
+  extractor, which was already broken before this change.
 - **Step 6:** unset `IRI_BACKEND_EXPECTED_AUDIENCES` and restart the backend — the
   validator becomes inert (the decoder bean is no longer created); all previously-valid
   tokens are accepted again. This is the fast rollback if anything 401s after step 6.

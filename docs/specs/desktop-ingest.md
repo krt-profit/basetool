@@ -60,10 +60,21 @@ not a new write path.
 
 A new standalone service (the `ingest` gateway) is the only new internet-reachable
 surface. It exposes **exactly two** endpoints, one per existing import draft:
-refinery-extract and blueprint-preview. Each endpoint validates the caller's JWT, forwards
-the **same bearer** to the corresponding internal backend import endpoint
+refinery-extract and blueprint-preview. Each endpoint validates the caller's JWT and calls
+the corresponding internal backend import endpoint **under the gateway's own service-account
+identity**, naming the member it acts for in `X-Ingest-On-Behalf-Of` (ADR-0129)
 (`POST /api/v1/refinery-orders/import-extract`, `POST /api/v1/personal-blueprints/import/preview`),
-stages the returned draft for browser pickup, and returns a handoff id. The gateway has
+stages the returned draft for browser pickup, and returns a handoff id.
+
+The gateway **used to relay the caller's own bearer**. That made sender-constrained tokens
+impossible: a DPoP-bound token is rejected outright by a resource server presented with it as a
+bearer, so binding and relaying were mutually exclusive, and attempting both broke every send from
+2026-08-03. The caller's token now stops at the gateway and does not travel through its service
+layer at all. The backend honours the on-behalf-of header only for a caller whose `azp` is on its
+configured gateway allowlist, and the header carries a subject and nothing else — it cannot grant a
+role, widen a scope or select an org unit.
+
+The gateway has
 **no database and no Flyway migration**, serves **no HTML**, holds **no business logic**
 (matching/validation stay backend-side, ADR-0008), and persists **nothing** durable of its
 own. The backend remains internet-unreachable — the gateway reaches it over the internal
@@ -509,24 +520,42 @@ audit-only, log sanitisation, no echo-back) · **Code:** `ClientIdentityFilter`,
 `ClientNotAllowedException`, `MetricNames` · **Monitoring:** `basetool_ingest_client_total{client_id}`,
 `basetool_ingest_client_rejected_total{reason}`, alert `IngestUnknownClient`
 
-### REQ-INGEST-012 — DPoP binds the REFRESH token, never the access token
+### REQ-INGEST-012 — DPoP is validated at the gateway, and never relayed
 
-The extractor persists its refresh token on the user's machine (`REQ-INGEST-007`). That is the
-credential worth sender-constraining: it is long-lived and it sits on disk, whereas an access token
-lives five minutes in memory. DPoP (RFC 9449) is therefore applied to the **refresh token only**.
+The extractor presents its access token to the gateway under the **`DPoP` scheme with a proof**, and
+the gateway validates that proof itself (Spring Security `.dPoP()`). Sender-constraining pays here
+because the party that validates the proof is the party that consumes the token, and this is the
+only internet-facing hop. The refresh token stays bound too (`REQ-INGEST-007`): it is long-lived and
+sits on disk, which is the credential most worth protecting.
 
-The extractor holds a key, sends a DPoP proof to Keycloak's **token endpoint**, and Keycloak binds
-the refresh token to that key. **Access tokens stay plain bearer.** The gateway is a plain bearer
-resource server and must **not** enable Spring Security's `dPoP(...)` configurer.
+**The scheme follows the server, never the client's preference.** A key accompanies the request only
+when Keycloak actually bound the token (`token_type: DPoP`). Presenting an *unbound* token under the
+`DPoP` scheme is an equally hard `401` — Spring's `JwkThumbprintValidator` requires `cnf.jkt` and
+answers "jkt claim is required". The gateway keeps `.jwt()` alongside `.dPoP()`, so both schemes are
+accepted and the client rollout needs no flag day.
 
-**Why binding the access token cannot work here — learned the hard way.** The first implementation
-bound both tokens and enabled DPoP validation at the gateway. It passed a dedicated protocol test
-and then broke every blueprint send in production on 2026-08-03. The reason is architectural, not a
-bug: **this gateway is a relay** (`REQ-INGEST-001` — it forwards the caller's own bearer to the
-backend). A sender-constrained token is bound to the *client's* key and, through `htu`, to the
-*gateway's* URL. The second hop can neither carry a proof nor be covered by the first one, so the
-backend receives a token issued for DPoP as a plain bearer and refuses it — surfacing to the user as
-the backend's opaque "you must sign in", three layers away from the cause.
+**`htu` is pinned to configuration, not derived from the request.** Spring compares it with a bare
+`String.equals` against `HttpServletRequest#getRequestURL()`, which Tomcat assembles from scheme,
+host and port — all rewritten by `RemoteIpValve` from the reverse proxy's forwarded headers. A proxy
+that omits `X-Forwarded-Port` leaves the internal port in the server's value while the client signed
+the public one, and every proof fails. No test can catch that: without a proxy both sides trivially
+agree. `app.ingest.public-base-url` therefore supplies the origin, and only the origin — the path
+still comes from the request, so a proof stays bound to its endpoint.
+
+**Proof failures must be visible.** The stock `DPoPAuthenticationEntryPoint` answers a bodyless
+`401` and bypasses the module's problem handler, so a rejected proof would carry no problem body and
+increment no `basetool_ingest_auth_failures_total` series. The failure handler is replaced, or the
+most likely failure of this design is the one nobody can see.
+
+**Why the earlier "never bind the access token" rule was wrong, and why it looked right.** The first
+implementation bound both tokens and enabled DPoP at the gateway; it broke every blueprint send on
+2026-08-03. The diagnosis at the time — that a bound token cannot survive the relay's second hop —
+was **correct about the relay and wrong about the conclusion**. The fix chosen then was to keep
+relaying and present the bound token as a plain bearer, which cannot work either: Spring Security
+7.1's `BearerTokenAuthenticationFilter` authenticates such a token and *then* throws `invalid_token`
+because RFC 9449 §7.1 forbids it, a check that lives in the filter and fires even with no DPoP
+support configured. The real answer was to stop relaying (ADR-0129), which this requirement now
+describes.
 
 And even where the backend did accept it, the arrangement would be pointless: the gateway would hold
 a token that anyone who lifted it from there could replay onward as a bearer. **The binding would end

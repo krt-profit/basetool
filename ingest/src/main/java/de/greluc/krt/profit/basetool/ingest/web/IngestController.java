@@ -171,8 +171,7 @@ public class IngestController {
           @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage,
       @Valid @RequestBody @NotNull RefineryExtractDto extract) {
-    return ingestService.ingestRefinery(
-        jwt.getSubject(), jwt.getTokenValue(), acceptLanguage, extract);
+    return ingestService.ingestRefinery(jwt.getSubject(), acceptLanguage, extract);
   }
 
   /**
@@ -272,6 +271,6 @@ public class IngestController {
     // path has (REQ-INGEST-011). The export carries `tool`/`toolVersion`/`schemaVersion` itself, so
     // this needs no extra header and no extractor change.
     return ingestService.ingestBlueprint(
-        jwt.getSubject(), jwt.getTokenValue(), acceptLanguage, bytes, Provenance.from(export));
+        jwt.getSubject(), acceptLanguage, bytes, Provenance.from(export));
   }
 }

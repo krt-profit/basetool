@@ -322,6 +322,9 @@ public final class MetricNames {
   /** Tag key: the bank ledger-integrity violation category. */
   public static final String TAG_CATEGORY = "category";
 
+  /** Tag: why an operation was refused; bounded per meter (REQ-OBS-011). */
+  public static final String TAG_REASON = "reason";
+
   /** Tag key: a bounded lifecycle status enum value. */
   public static final String TAG_STATUS = "status";
 
@@ -513,6 +516,23 @@ public final class MetricNames {
    * {@code max()}, never {@code sum()}, or a subject refused on two instances counts twice.
    */
   public static final String TERMS_REFUSED_SUBJECTS = "basetool.terms.refused.subjects";
+
+  /**
+   * Counter {@code basetool_on_behalf_of_refused_total} — tag {@code reason} ({@link
+   * #ON_BEHALF_OF_NOT_A_GATEWAY} / {@link #ON_BEHALF_OF_MALFORMED}).
+   *
+   * <p>A security signal, not noise. Since ADR-0129 the ingest gateway may name the member it acts
+   * for; anyone else presenting that header is refused and counted here. A non-zero {@code
+   * not_a_gateway} rate is either a misconfigured gateway client id or somebody probing for an
+   * impersonation primitive, and the two are worth telling apart quickly.
+   */
+  public static final String ON_BEHALF_OF_REFUSED = "basetool.on.behalf.of.refused";
+
+  /** {@link #ON_BEHALF_OF_REFUSED} reason: the caller's {@code azp} is not an approved gateway. */
+  public static final String ON_BEHALF_OF_NOT_A_GATEWAY = "not_a_gateway";
+
+  /** {@link #ON_BEHALF_OF_REFUSED} reason: the named subject was not a UUID. */
+  public static final String ON_BEHALF_OF_MALFORMED = "malformed_subject";
 
   /**
    * Tag: the Terms-of-Use version a measurement belongs to. Bounded by construction — one process
