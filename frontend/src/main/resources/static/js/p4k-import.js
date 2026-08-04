@@ -13,6 +13,10 @@
  * The page never blocks on the heavy import: it only enqueues and polls. CSP-safe (no inline
  * handlers; wiring via addEventListener + delegation). Strings from window.krtP4kImportI18n;
  * the jobs base URL from window.krtP4kImportEndpoints.
+ *
+ * Every call to the jobs proxy goes through readJson(), which is this module's single "is this
+ * actually job data?" test. `resp.ok` is NOT that test — see readJson for why, and why getting it
+ * wrong mattered more here than on any click-driven surface.
  */
 (function () {
     'use strict';
@@ -31,6 +35,11 @@
     let lastJobs = [];
     let applyTargetId = null;
     let pollTimer = null;
+
+    // Set once a gate (re-authentication or the Terms-of-Use consent gate) has taken the page over.
+    // From then on every handler falls silent: the browser is already navigating away, so an error
+    // toast would be both unreadable and wrong about what happened.
+    let gated = false;
 
     function $(id) {
         return document.getElementById(id);
@@ -69,6 +78,61 @@
             headers[header] = token;
         }
         return headers;
+    }
+
+    /**
+     * The headers every call to the jobs proxy carries.
+     *
+     * X-Requested-With is not decoration: the frontend gates answer an XHR and a browser navigation
+     * differently. The Terms-of-Use consent gate replies `403` + `X-Terms-Acceptance-Required` to a
+     * marked request and a `302` to an unmarked one (REQ-SEC-028), and a lost OAuth2 session behaves
+     * the same way with `401` + `X-Reauthenticate` (REQ-SEC-012). Without the marker these calls get
+     * the redirect branch, fetch follows it, and the consent page arrives as a `200 text/html` that
+     * looks like a successful answer.
+     *
+     * @returns {Record<string, string>} a fresh header object, safe for csrfHeaders to extend
+     */
+    function ajaxHeaders() {
+        return { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+    }
+
+    /**
+     * Reads a jobs-proxy answer as JSON, or resolves to null when the answer is not job data.
+     *
+     * `resp.ok` is the wrong test on principle, not just for one gate: fetch follows redirects
+     * transparently, so any redirect-to-HTML answer — the consent gate, an expired-session login
+     * bounce, an error-handler redirect — arrives as a 200 whose body is a whole document, with
+     * `resp.ok` true. For the 3 s poll this was worse than a silent failure: pollControl only runs
+     * after a successful parse, so a gated answer left the interval armed forever and the page went
+     * on fetching and re-parsing the consent page every tick, indefinitely.
+     *
+     * So the two gate contracts are honoured first, exactly as every krtFetch-driven surface does —
+     * both navigate the browser — and anything redirected or not OK is then rejected outright. An
+     * unparseable 200 resolves to null as well rather than rejecting, so the callers' "not job data"
+     * path (which disarms the poll) sees it instead of the transient-error catch (which does not).
+     *
+     * @param {Response} resp the jobs-proxy response
+     * @returns {Promise<any> | null} the parsed body, or null when the answer is not job data
+     */
+    function readJson(resp) {
+        if (window.krtReauth && window.krtReauth.check(resp)) return gateTookOver();
+        if (window.krtTermsGate && window.krtTermsGate.check(resp)) return gateTookOver();
+        if (resp.redirected || !resp.ok) return null;
+        return resp.json().catch(function () {
+            return null;
+        });
+    }
+
+    /**
+     * Records that a gate is navigating the page away and disarms the poll, so the departing page
+     * cannot keep re-requesting the resource that just refused it.
+     *
+     * @returns {null} always null, so readJson's callers take their "not job data" path
+     */
+    function gateTookOver() {
+        gated = true;
+        stopPolling();
+        return null;
     }
 
     function toastError() {
@@ -142,16 +206,14 @@
         fetch(jobsUrl(), {
             method: 'POST',
             credentials: 'same-origin',
-            headers: csrfHeaders({ Accept: 'application/json' }),
+            headers: csrfHeaders(ajaxHeaders()),
             body: fd,
         })
-            .then(function (resp) {
-                return resp.ok ? resp.json() : null;
-            })
+            .then(readJson)
             .then(function (job) {
                 if (!job) {
                     if (uploadBtn) uploadBtn.disabled = false;
-                    toastError();
+                    if (!gated) toastError();
                     return;
                 }
                 toastOk(i18n().toastUploaded || 'Catalog uploaded.');
@@ -170,19 +232,26 @@
         fetch(jobsUrl(), {
             method: 'GET',
             credentials: 'same-origin',
-            headers: { Accept: 'application/json' },
+            headers: ajaxHeaders(),
         })
-            .then(function (resp) {
-                return resp.ok ? resp.json() : null;
-            })
+            .then(readJson)
             .then(function (jobs) {
-                if (!Array.isArray(jobs)) return;
+                if (!Array.isArray(jobs)) {
+                    // The answer was not job data: a gate took the page over, a redirect was
+                    // followed, the status was an error, or the body did not parse. Disarm the
+                    // timer — pollControl below is reached only on the success path, so this is the
+                    // one place a refused poll can stop itself. Leaving it armed is what turned a
+                    // single gated answer into an endless 3 s loop against the consent page.
+                    stopPolling();
+                    return;
+                }
                 lastJobs = jobs;
                 renderJobs(jobs);
                 pollControl(jobs);
             })
             .catch(function () {
-                /* transient; the next poll (or a manual action) retries */
+                // Network-level failure only (a refused or unparseable answer resolves to null
+                // above): genuinely transient, so an armed poll keeps retrying on the next tick.
             });
     }
 
@@ -194,7 +263,17 @@
         const anyActive = jobs.some(isActive);
         if (anyActive && !pollTimer) {
             pollTimer = window.setInterval(loadJobs, 3000);
-        } else if (!anyActive && pollTimer) {
+        } else if (!anyActive) {
+            stopPolling();
+        }
+    }
+
+    /**
+     * Disarms the poll timer, idempotently. Every "this answer was not job data" path funnels here,
+     * so the timer can never outlive the condition that armed it.
+     */
+    function stopPolling() {
+        if (pollTimer) {
             window.clearInterval(pollTimer);
             pollTimer = null;
         }
@@ -446,15 +525,13 @@
         fetch(url, {
             method: 'POST',
             credentials: 'same-origin',
-            headers: csrfHeaders({ Accept: 'application/json' }),
+            headers: csrfHeaders(ajaxHeaders()),
         })
-            .then(function (resp) {
-                return resp.ok ? resp.json() : null;
-            })
+            .then(readJson)
             .then(function (job) {
                 if (applyConfirmBtn) applyConfirmBtn.disabled = false;
                 if (!job) {
-                    toastError();
+                    if (!gated) toastError();
                     return;
                 }
                 toastOk(i18n().toastApplyStarted || 'Apply started.');

@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **P4K-Import (Admin): Die laufende Fortschrittsabfrage erkennt jetzt die Zustimmungsabfrage, statt sie als Erfolg zu lesen.** Wurde während eines Imports eine neue Fassung der Nutzungsbedingungen aktiv, holte die Seite alle 3 Sekunden endlos die Zustimmungsseite, ohne dass sichtbar etwas passierte. Sie wechselt jetzt zur Zustimmungsseite und beendet die Abfrage — wie jede andere Oberfläche (REQ-SEC-028).
+
 - **Deployment: `IRI_MONITORING_ENABLED` wirkt jetzt auch, wenn es in der `.env` steht.** Der Deploy-Dienst liest diese Datei nicht ein, meldete deshalb bei jedem Lauf `IRI_MONITORING_ENABLED != 'true'` und spielte geänderte Monitoring-Konfiguration zwar auf die Platte, lud sie aber nie in das laufende Prometheus — korrigierte Alarmregeln feuerten dadurch weiter in ihrer alten Fassung. Ein explizit gesetzter Wert hat weiterhin Vorrang, und es wird ausschließlich dieser eine Schlüssel gelesen.
 
 ## [v1.5.32](https://github.com/krt-profit/basetool/releases/tag/v1.5.32) - 2026-08-03
