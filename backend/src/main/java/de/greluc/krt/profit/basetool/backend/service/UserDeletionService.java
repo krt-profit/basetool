@@ -37,9 +37,11 @@ import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -68,6 +70,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class UserDeletionService {
 
+  private final IngestGatewayProperties ingestGatewayProperties;
   private final UserRepository userRepository;
   private final InventoryItemRepository inventoryItemRepository;
   private final ShipRepository shipRepository;
@@ -157,7 +160,9 @@ public class UserDeletionService {
    * @throws IllegalStateException when the user is still present in Keycloak — checked both against
    *     the stored {@code in_keycloak} flag and, because that flag is only a cached mirror a
    *     swallowed sync error can leave stale, against Keycloak itself — or when no other admin
-   *     exists to receive the reassigned owner references
+   *     exists to receive the reassigned owner references. The second check exempts the service
+   *     account of a configured ingest gateway, for which the two views disagree by construction
+   *     (see {@link #isConfiguredGatewayServiceAccount})
    * @throws org.springframework.web.client.RestClientException when Keycloak cannot be reached for
    *     that check; the deletion is refused rather than performed on an unverified assumption
    */
@@ -178,7 +183,7 @@ public class UserDeletionService {
     // against Keycloak itself. Fail-closed by construction: userExists only reports absence on a
     // clean 404 and otherwise propagates, so an unreachable Keycloak aborts the deletion instead of
     // letting it proceed on a stale flag.
-    if (keycloakService.userExists(userId)) {
+    if (keycloakService.userExists(userId) && !isConfiguredGatewayServiceAccount(userId)) {
       throw new IllegalStateException(
           "Cannot delete user that is still in Keycloak (stored flag was stale)");
     }
@@ -350,5 +355,50 @@ public class UserDeletionService {
         ruleSelectorsDeleted,
         evaluationsDeleted,
         admin.getId());
+  }
+
+  /**
+   * Whether this row belongs to the service account of a configured ingest gateway.
+   *
+   * <p>The single exemption from the stale-flag re-check above, and it exists because the two
+   * checks genuinely disagree for exactly this kind of row. An unfiltered {@code GET /users} omits
+   * service accounts, so the roster sync never sees one and {@code markMissingUsers} sets {@code
+   * in_keycloak = false}; {@link KeycloakService#userExists} asks by id and finds it. The member
+   * list therefore shows such a row as "not in Keycloak" while the delete refuses it as still
+   * present — which is precisely the state production is in, because the gateway's first call ran
+   * the registration flow on itself before the machine-identity carve-out existed (ADR-0129).
+   *
+   * <p>The re-check is there to stop an admin hard-deleting a real member on a stale flag, which
+   * would destroy their Lager, hangar and personal data. A machine has none of that: the row holds
+   * nothing, grants nothing (the authority converter short-circuits on {@code azp} before ever
+   * reading it), and should never have existed. So the protection is not weakened here, it is
+   * simply not applicable.
+   *
+   * <p><strong>Keyed on the client's own service-account link, not on the username.</strong> {@code
+   * service-account-<clientId>} is a display convention, not a reserved namespace — an ordinary
+   * user can be created with that exact name — so matching the prefix would let a hand-made account
+   * inherit this exemption. Asking Keycloak which user backs a configured gateway client cannot be
+   * spoofed that way, and it reuses the same allowlist that already decides which clients may act
+   * for a member, so the two cannot drift apart.
+   *
+   * @param userId the row being deleted
+   * @return {@code true} when Keycloak reports this user as the service account of a configured
+   *     gateway client
+   */
+  private boolean isConfiguredGatewayServiceAccount(UUID userId) {
+    boolean isMachine =
+        ingestGatewayProperties.getClientIds().stream()
+            .map(keycloakService::serviceAccountUserId)
+            .flatMap(Optional::stream)
+            .anyMatch(userId::equals);
+    if (isMachine) {
+      // WARN, not DEBUG: deleting a row the application swears it never creates is worth a line in
+      // the log, and this path should fire once per environment and then never again.
+      log.warn(
+          "Deleting the stray app_user row of a configured ingest gateway's service account; "
+              + "the stale in_keycloak flag is expected here because an unfiltered user listing "
+              + "omits service accounts");
+    }
+    return isMachine;
   }
 }
