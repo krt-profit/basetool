@@ -358,8 +358,8 @@ interface KrtTermsGateApi {
     /** Navigates to the consent page and returns true when the response demanded consent. */
     check(response: Response): boolean;
     /**
-     * Navigates the window to a same-origin consent path. Used by the SSE handoff, where the gate
-     * arrives as a `terms-gate` event rather than a response header an `EventSource` cannot read.
+     * Navigates the window to a same-origin consent path. Used where the gate reaches a client
+     * that never sees a Response: the `terms-gate` SSE event, and the `/ws/sync` close reason.
      */
     redirect(url?: string | null): boolean;
 }

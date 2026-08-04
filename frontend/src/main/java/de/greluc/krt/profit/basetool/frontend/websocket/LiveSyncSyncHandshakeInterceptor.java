@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.websocket;
 
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronContext;
+import de.greluc.krt.profit.basetool.frontend.support.TermsGateHandoff;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -60,6 +61,12 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
  *       message thread that has no {@code SecurityContext}.
  * </ul>
  *
+ * <p>It also carries one verdict rather than capturing it: the consent gate marks a handshake from
+ * a user without accepted Terms of Use instead of redirecting it (a redirect is invisible to a
+ * WebSocket, which sees only {@code 1006} and reconnects forever), and {@link #relayTermsGate} puts
+ * that mark on the session so the handler can close the socket with a terminal code — REQ-SEC-028's
+ * fourth answer shape, after the navigation redirect, the XHR header and the SSE event.
+ *
  * <p>Both are stashed in the future session's attributes for {@code LiveSyncSubscriptionAuthorizer}
  * to replay as explicit headers. The captured token lives in memory for the socket's lifetime and
  * is never logged; when it expires, subscribe probes 401 and {@linkplain
@@ -96,6 +103,7 @@ public class LiveSyncSyncHandshakeInterceptor implements HandshakeInterceptor {
       @NotNull WebSocketHandler wsHandler,
       @NotNull Map<String, Object> attributes) {
     attributes.put(LiveSyncWebSocketHandler.ATTR_MULTIPLEXED, Boolean.TRUE);
+    relayTermsGate(request, attributes);
     UUID activeOrgUnit = ActiveSquadronContext.get();
     if (activeOrgUnit != null) {
       attributes.put(LiveSyncWebSocketHandler.ATTR_ACTIVE_ORG_UNIT, activeOrgUnit);
@@ -129,6 +137,30 @@ public class LiveSyncSyncHandshakeInterceptor implements HandshakeInterceptor {
       log.debug("Live-sync /ws/sync token capture failed; subscribes will fail open", e);
     }
     return true;
+  }
+
+  /**
+   * Copies the consent gate's mark from the handshake request onto the future session, when {@code
+   * TermsAcceptanceGateFilter} let this upgrade through only so it could be refused on the socket
+   * (REQ-SEC-028).
+   *
+   * <p>The handshake still proceeds — refusing it here would produce the very {@code 1006} the mark
+   * exists to avoid. {@link LiveSyncWebSocketHandler#afterConnectionEstablished} is where the
+   * socket is closed with the terminal code, because that is the first point at which a close code
+   * exists at all.
+   *
+   * @param request the handshake request, carrying the gate's mark as a request attribute
+   * @param attributes the future WebSocket-session attributes
+   */
+  private static void relayTermsGate(
+      @NotNull ServerHttpRequest request, @NotNull Map<String, Object> attributes) {
+    if (!(request instanceof ServletServerHttpRequest servletRequest)) {
+      return;
+    }
+    String consentUrl = TermsGateHandoff.consentUrl(servletRequest.getServletRequest());
+    if (consentUrl != null) {
+      attributes.put(LiveSyncWebSocketHandler.ATTR_TERMS_GATE, consentUrl);
+    }
   }
 
   /**

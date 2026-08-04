@@ -60,6 +60,14 @@
         // is beyond the generous multi-tab cap; don't hammer — back off to the max interval and let
         // it recover quietly once another tab closes and frees a slot.
         const SOCKET_CAP_CLOSE_CODE = 4029;
+        // Server close code for a socket refused by the Terms-of-Use consent gate (REQ-SEC-028,
+        // mirrors HTTP 403 the way 4029 mirrors 429). Unlike every other close this module sees,
+        // this one is TERMINAL: consent cannot be given from a background socket, so reconnecting
+        // can only repeat the refusal. Before the code existed the gate answered the handshake with
+        // a 302, which reaches a WebSocket as a bare 1006 — indistinguishable from a dropped
+        // connection — and this client retried it at the 30 s cap for as long as the tab stayed
+        // open. The close reason carries the consent page to navigate to.
+        const TERMS_GATE_CLOSE_CODE = 4003;
         // `reason` on a server `denied` control frame marking a fail-CLOSED refusal: the server
         // could not tell whether the caller may read the room (backend blip, lapsed token snapshot,
         // saturated auth executor) and refused rather than guessed. Unlike an authorization refusal
@@ -75,6 +83,11 @@
         let ws = null;
         let reconnectDelay = RECONNECT_BASE_MS;
         let reconnectTimer = null;
+        // Set once the server has refused this tab terminally (today only the consent gate). Nothing
+        // clears it: it must survive a later subscribe() or sendChanged() from page code that knows
+        // nothing about the refusal, since those call ensureSocket() and would otherwise restart the
+        // very loop the terminal code exists to end.
+        let stopped = false;
 
         function socketUrl() {
             const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -98,6 +111,9 @@
         }
 
         function ensureSocket() {
+            if (stopped) {
+                return;
+            }
             if (
                 ws &&
                 (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)
@@ -195,6 +211,23 @@
 
         function onClose(ev) {
             ws = null;
+            // The consent gate refused this tab (REQ-SEC-028). Terminal — stop for good, then send
+            // the browser to the consent page named in the close reason, which is the only place
+            // the refusal can actually be resolved. krtTermsGate.redirect applies the same
+            // same-origin guard every other gate navigation in the app goes through; without it
+            // (or without a reason, on a context path too long for a close frame) the tab simply
+            // stays put with live sync off, which is still strictly better than the old loop.
+            if (ev && ev.code === TERMS_GATE_CLOSE_CODE) {
+                stopped = true;
+                if (reconnectTimer) {
+                    window.clearTimeout(reconnectTimer);
+                    reconnectTimer = null;
+                }
+                if (window.krtTermsGate) {
+                    window.krtTermsGate.redirect(ev.reason);
+                }
+                return;
+            }
             // A per-user socket-cap refusal (F2/#1243): skip the fast retry ramp and go straight to
             // the max backoff so this over-cap tab probes only occasionally for a freed slot.
             if (ev && ev.code === SOCKET_CAP_CLOSE_CODE) {
@@ -246,7 +279,9 @@
                 };
             },
             sendChanged: function (topic, sections) {
-                if (!topic) {
+                // A terminally refused socket will never reopen, so buffering the publish would
+                // only grow a queue that can never flush; the local mutation itself is unaffected.
+                if (!topic || stopped) {
                     return;
                 }
                 const secs = Array.isArray(sections) ? sections : [sections];
