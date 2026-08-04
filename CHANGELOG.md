@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Der Alarm zur Zustimmungseinführung schlägt nur noch an, wenn tatsächlich mehrere Personen ausgesperrt sind.** Bisher zählte er abgelehnte Anfragen statt Personen — ein einzelnes wiederholt anfragendes Programm genügte, um ihn nachts auszulösen, obwohl niemand betroffen war. Er beobachtet jetzt, wie viele **verschiedene** Mitglieder abgelehnt werden, und lässt einer Person auch genug Zeit, die Bedingungen in Ruhe zu lesen.
+
 ### Fixed
 
 - **Deployment: `IRI_MONITORING_ENABLED` wirkt jetzt auch, wenn es in der `.env` steht.** Der Deploy-Dienst liest diese Datei nicht ein, meldete deshalb bei jedem Lauf `IRI_MONITORING_ENABLED != 'true'` und spielte geänderte Monitoring-Konfiguration zwar auf die Platte, lud sie aber nie in das laufende Prometheus — korrigierte Alarmregeln feuerten dadurch weiter in ihrer alten Fassung. Ein explizit gesetzter Wert hat weiterhin Vorrang, und es wird ausschließlich dieser eine Schlüssel gelesen.

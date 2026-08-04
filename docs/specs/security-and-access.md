@@ -1121,7 +1121,17 @@ through — the web UI and, since the ingest gateway relays the caller's own bea
 (`REQ-INGEST-001`), the desktop extractor. The gateway needs no copy of the rule: it already
 relays a backend 4xx with the backend's own `detail`.
 
-Four invariants that must survive any rewrite:
+**The rollout signal counts subjects, never requests.** `basetool_terms_refused_subjects` is a gauge
+of the distinct subjects the gate refused in the last 15 minutes, and `TermsConsentRolloutStalled`
+reads it with `max()` — per process, so `sum()` would double-count a subject that hit two instances.
+A refusal *rate* cannot express the thing the alert is for: at 0.01/s one automated caller sustains
+it indefinitely, so a single looping browser tab fired it twice overnight on 2026-08-03 with nobody
+awake. A retrying client, a member reading the terms slowly and one straggler are each **one**
+subject; three distinct people locked out at once is the shape of a broken consent path. The window
+is bounded by construction (entries expire, and a hard cap drops *new* subjects so the gauge can
+only ever under-report) because the feed is an internet-reachable refusal path.
+
+Five invariants that must survive any rewrite:
 
 - **The consent endpoints are never refused.** Refusing `/api/v1/terms/**` makes the block
   permanent for everyone, because no request would be left that could record consent.
@@ -1150,7 +1160,8 @@ version scoping, one-sided cache, sort translation), `TermsAcceptancePageControl
 `AdminTermsPageControllerTest`, `TermsTemplateBundleParityTest` · **Code:** `TermsVersionProvider`,
 `TermsAcceptanceService`, `support.TermsConsentCheck` (the leaf interface that keeps `config` and
 `service` acyclic per ADR-0047), `TermsController`, `AdminTermsController` · **Monitoring:**
-`basetool_terms_acceptances_total`, `basetool_terms_accepted_users`, `TermsConsentRolloutStalled`
+`basetool_terms_acceptances_total`, `basetool_terms_accepted_users`,
+`basetool_terms_refused_subjects`, `TermsConsentRolloutStalled`
 
 ### REQ-SEC-029 — A path-scoped filter matches the DECODED path, never the raw request URI
 

@@ -84,8 +84,11 @@ bypassing it with fixture data.
   ADR-0088); the backend caches only *positive* answers, which are monotonic within a process
   because the version is a build artifact. A cached negative would keep blocking a user who
   accepted on another instance.
-- `TermsConsentRolloutStalled` fires when the gate refuses callers while nobody gets through — the
-  shape a broken consent path has from the outside. A flat acceptance gauge alone proves nothing.
+- `TermsConsentRolloutStalled` fires when the gate refuses **several distinct subjects** while
+  nobody gets through — the shape a broken consent path has from the outside. A flat acceptance
+  gauge alone proves nothing, and neither does a refusal *rate*: one automated client sustains any
+  rate threshold indefinitely, which is how the first version of this alert fired overnight against
+  a single looping browser tab (2026-08-03). The signal is `basetool_terms_refused_subjects`.
 
 ## Rejected alternatives
 

@@ -501,6 +501,20 @@ public final class MetricNames {
   public static final String TERMS_ACCEPTED_USERS = "basetool.terms.accepted.users";
 
   /**
+   * Gauge: how many <em>distinct</em> subjects the consent gate refused in the last 15 minutes
+   * (REQ-SEC-028). The counterpart to {@link #TERMS_ACCEPTED_USERS} — together they answer "how
+   * many are still outstanding, and is anyone getting through".
+   *
+   * <p>Deliberately subjects rather than requests. The refusal <em>rate</em> ({@link
+   * #HTTP_ERROR}{@code {code="TERMS_NOT_ACCEPTED"}}) cannot tell one retrying client from a
+   * locked-out membership: a single looping tab sustains an arbitrary rate forever, which is how it
+   * fired {@code TermsConsentRolloutStalled} twice overnight on 2026-08-03 with nobody awake.
+   * Untagged, so the series stays a single bounded number (REQ-OBS-011). Per process — read it with
+   * {@code max()}, never {@code sum()}, or a subject refused on two instances counts twice.
+   */
+  public static final String TERMS_REFUSED_SUBJECTS = "basetool.terms.refused.subjects";
+
+  /**
    * Tag: the Terms-of-Use version a measurement belongs to. Bounded by construction — one process
    * serves exactly one version, because the value is a build artifact (REQ-OBS-011).
    */
