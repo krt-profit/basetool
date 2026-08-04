@@ -159,7 +159,11 @@ convention `cleanup…ForGuest` is structurally enforced by the ArchUnit rule
 > so the gateway's own bearer reaches no member surface. What fences it there is the consent gate,
 > which it can never clear — recording consent is refused for this authority outright, so the
 > invariant holds even in an environment that still carries the stray `app_user` row the gateway
-> created for itself before the carve-out existed. It grants the gateway exactly one thing —
+> created for itself before the carve-out existed. That row can be removed in the member list: the
+> delete guard that normally refuses a row Keycloak still knows exempts the service account of a
+> configured gateway, because for such a row the two Keycloak views disagree by construction — an
+> unfiltered user listing omits service accounts, so the roster sync marks it gone, while a
+> by-id lookup finds it. It grants the gateway exactly one thing —
 > permission to name a member in `X-Ingest-On-Behalf-Of`, whose *own* authorities then apply for
 > that request. A named authority rather than an empty set on purpose, so a misconfiguration reads
 > as "authenticated as a machine" rather than as "not authenticated".

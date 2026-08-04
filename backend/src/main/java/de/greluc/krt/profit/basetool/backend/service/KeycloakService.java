@@ -675,6 +675,74 @@ public class KeycloakService {
   }
 
   /**
+   * Resolves the Keycloak user id that backs a client's service account, if it has one.
+   *
+   * <p><strong>Why this and not the username.</strong> A service-account user is not identifiable
+   * from {@code GET /users/{id}}: measured against Keycloak 26.7, that response carries no {@code
+   * serviceAccountClientId} — not even with {@code briefRepresentation=false} — so the only hint in
+   * it is the {@code service-account-<clientId>} username. That hint is not trustworthy: creating
+   * an ordinary user with exactly that username succeeds ({@code 201}), so the prefix is a display
+   * convention rather than a reserved namespace, and treating it as one would let a hand-made
+   * account inherit a machine's exemptions.
+   *
+   * <p>Asking the client instead is authoritative, because the answer comes from the client's own
+   * service-account link rather than from a name.
+   *
+   * <p>Related quirk, since it is what makes this method necessary: an unfiltered {@code GET
+   * /users} omits service accounts entirely (a targeted {@code ?username=…&exact=true} does find
+   * them), so the roster sync never sees one and {@code markMissingUsers} flags any local row for
+   * one as gone. That is why such a row reads "not in Keycloak" while {@link #userExists} — which
+   * asks by id — says the opposite.
+   *
+   * @param clientId the OIDC client id (the {@code azp} value), not the client's UUID
+   * @return the service-account user's id, or empty when the client is unknown or has no service
+   *     account
+   * @throws ExternalServiceException when the admin URL is unconfigured
+   */
+  @NotNull
+  public Optional<UUID> serviceAccountUserId(@NotNull String clientId) {
+    requireAdminUrl();
+    try {
+      List<Map<String, Object>> clients =
+          adminClient()
+              .get()
+              .uri(
+                  uriBuilder ->
+                      uriBuilder
+                          .path("/admin/realms/{realm}/clients")
+                          .queryParam("clientId", clientId)
+                          .build(properties.getRealm()))
+              .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + getAccessToken())
+              .retrieve()
+              .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+      if (clients == null || clients.isEmpty()) {
+        return Optional.empty();
+      }
+      Object uuid = clients.getFirst().get("id");
+      if (uuid == null) {
+        return Optional.empty();
+      }
+      Map<String, Object> serviceAccount =
+          adminClient()
+              .get()
+              .uri(
+                  "/admin/realms/{realm}/clients/{id}/service-account-user",
+                  properties.getRealm(),
+                  uuid.toString())
+              .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + getAccessToken())
+              .retrieve()
+              .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+      if (serviceAccount == null || serviceAccount.get("id") == null) {
+        return Optional.empty();
+      }
+      return Optional.of(UUID.fromString(serviceAccount.get("id").toString()));
+    } catch (HttpClientErrorException.NotFound absent) {
+      // No client, or a client without service accounts enabled. Either way: not a machine we know.
+      return Optional.empty();
+    }
+  }
+
+  /**
    * Hard-deletes a Keycloak user via {@code DELETE /users/{id}}, requiring the {@code manage-users}
    * realm-management role. Idempotent: a {@code 404} (the user is already gone) is treated as
    * success. Used by the account-linking flow to dispose of the throwaway Discord-registered user

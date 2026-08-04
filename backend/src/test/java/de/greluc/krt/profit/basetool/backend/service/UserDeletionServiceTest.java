@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.*;
+import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -41,6 +42,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.client.ResourceAccessException;
@@ -85,6 +87,14 @@ class UserDeletionServiceTest {
   private ObjectProvider<OrgUnitBankResponsibilityService> orgUnitBankResponsibilityServiceProvider;
 
   @Mock private OrgUnitBankResponsibilityService orgUnitBankResponsibilityService;
+
+  /**
+   * A real instance, not a mock: its default is the empty allowlist, which is the state every
+   * pre-existing case here needs — no row is a gateway service account, so the machine-identity
+   * exemption never fires and each case exercises the member path it was written for (ADR-0129).
+   */
+  @Spy
+  private final IngestGatewayProperties ingestGatewayProperties = new IngestGatewayProperties();
 
   @InjectMocks private UserDeletionService userDeletionService;
 
@@ -199,6 +209,44 @@ class UserDeletionServiceTest {
     verify(inventoryItemRepository, never()).deleteByUserId(any());
     verify(shipRepository, never()).deleteByOwnerId(any());
     verify(personalBlueprintRepository, never()).deleteAllByOwnerSub(any());
+  }
+
+  @Test
+  void deleteUser_removesTheStrayRowOfAConfiguredGatewayServiceAccount() {
+    // The one row for which the two Keycloak views disagree by construction: an unfiltered
+    // GET /users omits service accounts, so the roster sync marks it gone, while userExists asks
+    // by id and finds it. Production is in exactly this state - the gateway's first call ran the
+    // registration flow on itself before the machine-identity carve-out existed (ADR-0129) - and
+    // without this exemption the row can never be deleted through the admin UI.
+    ingestGatewayProperties.setClientIds(List.of("basetool-ingest-gateway"));
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
+    when(keycloakService.userExists(userId)).thenReturn(true);
+    when(keycloakService.serviceAccountUserId("basetool-ingest-gateway"))
+        .thenReturn(Optional.of(userId));
+
+    userDeletionService.deleteUser(userId);
+
+    verify(userRepository).delete(user);
+  }
+
+  @Test
+  void deleteUser_stillRefusesAMemberWhoseNameMerelyLooksLikeAServiceAccount() {
+    // The exemption is keyed on the client's own service-account link, never on the username.
+    // Measured against Keycloak 26.7: creating an ordinary user called
+    // `service-account-basetool-ingest-gateway` succeeds (201), so the prefix is a display
+    // convention rather than a reserved namespace. Matching it would let a hand-made account
+    // inherit a machine's exemption and be hard-deleted while it is still a live member.
+    ingestGatewayProperties.setClientIds(List.of("basetool-ingest-gateway"));
+    user.setUsername("service-account-basetool-ingest-gateway");
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(keycloakService.userExists(userId)).thenReturn(true);
+    when(keycloakService.serviceAccountUserId("basetool-ingest-gateway"))
+        .thenReturn(Optional.of(UUID.randomUUID()));
+
+    assertThrows(IllegalStateException.class, () -> userDeletionService.deleteUser(userId));
+
+    verify(userRepository, never()).delete(any());
   }
 
   @Test
