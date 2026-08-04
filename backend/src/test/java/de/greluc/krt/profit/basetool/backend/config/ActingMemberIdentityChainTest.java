@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
+import de.greluc.krt.profit.basetool.backend.service.CustomJwtGrantedAuthoritiesConverter;
 import de.greluc.krt.profit.basetool.backend.service.RefineryImportService;
 import de.greluc.krt.profit.basetool.backend.service.TermsAcceptanceService;
 import de.greluc.krt.profit.basetool.backend.support.ActingMemberHeader;
@@ -45,6 +46,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
@@ -213,6 +215,65 @@ class ActingMemberIdentityChainTest {
         .andExpect(status().isOk());
 
     verify(blueprintImportService).previewImport(eq(MEMBER.toString()), any());
+  }
+
+  /**
+   * The gateway cannot record consent for itself, even where an {@code app_user} row exists for it.
+   *
+   * <p>Closes the one escalation the machine identity still carried. {@code /api/v1/terms/**} is
+   * exempt from the consent gate — it must be, or nobody could ever accept — and the gateway is an
+   * authenticated caller, so with a row for its own {@code sub} it could consent, clear the gate,
+   * and reach every {@code isAuthenticated()}-only read behind {@code
+   * anyRequest().authenticated()}. Production carries exactly such a row: the gateway's first call
+   * ran the registration flow on itself before the machine-identity carve-out existed.
+   *
+   * <p>Asserted here rather than left to the row's manual removal, because that removal is a
+   * per-environment step that can be forgotten — and a cleanup migration would risk aborting a
+   * deploy on one of the many non-cascading foreign keys into {@code app_user}.
+   */
+  @Test
+  void refusesToRecordConsentForTheGatewayItself() throws Exception {
+    // The stray row, reproduced. Without it the insert would fail on the app_user foreign key and
+    // the test would go red for a reason that has nothing to do with the guard - which is exactly
+    // the false confidence to avoid, because production HAS this row.
+    User strayGatewayRow = new User();
+    strayGatewayRow.setId(UUID.fromString(GATEWAY));
+    strayGatewayRow.setUsername("service-account-test-ingest-gateway");
+    strayGatewayRow.setApprovalStatus(ApprovalStatus.PENDING);
+    userRepository.saveAndFlush(strayGatewayRow);
+
+    mockMvc
+        .perform(
+            post("/api/v1/terms/acceptance")
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(GATEWAY).claim("azp", "test-ingest-gateway"))
+                        .authorities(
+                            new SimpleGrantedAuthority(
+                                CustomJwtGrantedAuthoritiesConverter.GATEWAY_AUTHORITY))))
+        .andExpect(status().isForbidden());
+
+    assertThat(termsAcceptanceService.hasAcceptedCurrentTerms(UUID.fromString(GATEWAY))).isFalse();
+  }
+
+  /**
+   * A member still records consent through the same endpoint.
+   *
+   * <p>The complement: a guard that refused everyone would also close the escalation, and would
+   * lock every member out of the tool permanently.
+   */
+  @Test
+  void stillLetsAMemberRecordConsent() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/terms/acceptance")
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(MEMBER.toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
+        .andExpect(status().isOk());
+
+    assertThat(termsAcceptanceService.hasAcceptedCurrentTerms(MEMBER)).isTrue();
   }
 
   /**

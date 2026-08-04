@@ -1193,6 +1193,15 @@ Six invariants that must survive any rewrite:
 - **No cache may outlive a wording change.** An authenticated session lives 30 days (ADR-0088), so
   the frontend verdict is re-read every 60 s; the backend caches only *positive* answers, which are
   monotonic within a process because the version in force is a build artifact.
+- **A machine cannot consent.** `/api/v1/terms/**` is exempt from the gate — it has to be, or
+  nobody could ever accept — so an authenticated non-person could otherwise clear the gate for
+  itself and reach every `isAuthenticated()`-only read behind `anyRequest().authenticated()`. That
+  is not hypothetical: the ingest gateway's own `app_user` row exists in production, created by the
+  registration flow on its first call before the machine-identity carve-out (ADR-0129), and the
+  `terms_acceptance` foreign key would have been satisfied by it. Recording consent is therefore
+  refused for `ROLE_INGEST_GATEWAY` outright, which closes it in the mechanism rather than by
+  deleting one row per environment — a cleanup migration would additionally risk aborting a deploy
+  on one of the many non-cascading foreign keys into `app_user`.
 - **The gate is armed by default.** It is stood down only under the `test` profile (MockMvc callers
   are synthetic subjects that cannot consent). A property that must be set to switch it on was
   rejected: it ships a gate that looks armed and is not. The stand-down had a cost that only

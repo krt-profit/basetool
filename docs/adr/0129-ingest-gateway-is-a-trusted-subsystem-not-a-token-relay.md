@@ -91,8 +91,8 @@ not the same as at equal time. The login path runs `UserReconciliationService.sy
 assembling, and that call writes the token's realm roles into the row; the acting-member path has no
 token and assembles from whatever the row currently holds. So a role **removed** in Keycloak takes
 effect on the member's next browser login immediately, but on the gateway path only once
-`UserSyncTask` next runs. The liveness guard does not cover this — it refuses a disabled or deleted
-*account*, not a role downgrade. The exposure is bounded by the roster-sync interval and is the same
+`UserSyncTask` next runs. The liveness guard does not cover this — it refuses an account the last
+sync no longer found, not a role downgrade. The exposure is bounded by the roster-sync interval and is the same
 staleness every other DB-derived authority in this application already carries, but the two paths are
 distinguishable on exactly this axis and nowhere else.
 
@@ -113,10 +113,14 @@ identical for all five on purpose.
 - **Fail closed on a header with no authenticated caller** — refused, never ignored, so a future
   change to the authentication filters cannot silently reproduce the ordering bug that produced this
   amendment.
-- **Liveness.** The database does not mirror whether an account still exists in Keycloak: the roster
-  sync fetches `enabled` and never persists it, and the `inKeycloak` flag it does maintain is read by
-  no authority code. A member disabled or deleted in the identity provider keeps `ACTIVE` and every
-  role here, indefinitely. That is harmless while a token grants access — the account stops being
+- **Liveness — presence, not `enabled`.** The database does not mirror whether an account still
+  exists in Keycloak: the roster sync fetches `enabled` and never persists it, and the `inKeycloak`
+  flag it does maintain is read by no authority code. A member the last sync no longer found keeps
+  `ACTIVE` and every role here, indefinitely. What the guard therefore refuses is a **deleted**
+  member, not a merely **disabled** one; the disabled case stays bounded by one access-token
+  lifetime, because the subject arrives inside a validated token on every request and a disabled
+  account cannot refresh. Persisting `enabled` would shrink that window and is the obvious next
+  step if the gateway credential is ever considered at risk. That is harmless while a token grants access — the account stops being
   issued tokens and the last one expires in minutes — and stops being harmless the moment a caller
   can *name* a subject, because a name never expires. So a subject with no local row is refused
   rather than created, and one the last sync no longer found is refused outright.

@@ -45,12 +45,21 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><strong>Both refusals close a hole that only exists once a caller can name a subject instead
  * of presenting its token.</strong> The database does not mirror identity-provider liveness — the
  * roster sync fetches {@code enabled} and never persists it, and the {@code inKeycloak} flag it
- * does maintain is read by no authority code. A member disabled or deleted in Keycloak therefore
- * keeps {@code ACTIVE} and every role here, indefinitely. While a token is what grants access that
- * is harmless: the account stops being issued tokens and the last one expires in minutes. A named
- * subject never expires, so without these checks the gateway could mint the authorities of a
- * revoked member — and ADR-0129's premise that a named subject cannot escalate beyond what that
- * member "could already do" would stop holding.
+ * does maintain is read by no authority code. A member the last roster sync no longer found in
+ * Keycloak therefore keeps {@code ACTIVE} and every role here, indefinitely.
+ *
+ * <p><strong>Presence, not {@code enabled}.</strong> What is checked is whether the last sync still
+ * saw the account, so a <em>deleted</em> member is refused and a merely <em>disabled</em> one is
+ * not — the sync fetches {@code enabled} and drops it, so there is nothing here to read. Bounded
+ * rather than open-ended: the named subject arrives inside a signature- and {@code exp}-validated
+ * token on every request, and a disabled account cannot refresh, so the window is one access-token
+ * lifetime. That is exactly the bound the bearer relay this replaced already had, and that design
+ * had no liveness check at all. Persisting {@code enabled} would shrink the window further and is
+ * worth doing if the gateway's credential is ever considered at risk. While a token is what grants
+ * access that is harmless: the account stops being issued tokens and the last one expires in
+ * minutes. A named subject never expires, so without these checks the gateway could mint the
+ * authorities of a revoked member — and ADR-0129's premise that a named subject cannot escalate
+ * beyond what that member "could already do" would stop holding.
  */
 @Slf4j
 @Service
