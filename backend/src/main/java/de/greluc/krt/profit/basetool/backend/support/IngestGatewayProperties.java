@@ -44,4 +44,18 @@ public class IngestGatewayProperties {
 
   /** The {@code azp} values allowed to act for another member. Empty disables the mechanism. */
   private List<String> clientIds = List.of();
+
+  /**
+   * Whether {@code azp} names a configured ingest gateway.
+   *
+   * <p>The single place the rule lives, so the two decisions that depend on it — "may act for
+   * another member" and "is a machine, not a member" — cannot drift apart. A blank or absent {@code
+   * azp} is never a gateway, and neither is anything when the list is empty.
+   *
+   * @param azp the authorized-party claim from the caller's token, may be {@code null}
+   * @return {@code true} when this caller is a configured gateway
+   */
+  public boolean isGatewayClient(String azp) {
+    return azp != null && !azp.isBlank() && clientIds.contains(azp);
+  }
 }

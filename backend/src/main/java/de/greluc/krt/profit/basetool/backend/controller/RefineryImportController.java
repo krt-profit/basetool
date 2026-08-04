@@ -23,18 +23,16 @@ import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryImportDraftDto;
 import de.greluc.krt.profit.basetool.backend.service.RefineryImportService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
-import de.greluc.krt.profit.basetool.backend.support.ActingSubjectResolver;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -56,7 +54,6 @@ public class RefineryImportController {
 
   private final RefineryImportService refineryImportService;
   private final UserService userService;
-  private final ActingSubjectResolver actingSubjectResolver;
 
   /**
    * Builds a best-effort draft from an uploaded {@code RefineryExtract} (frozen contract v1, plan
@@ -64,7 +61,7 @@ public class RefineryImportController {
    * reject with 400 problem+json; content-level problems (unmatched names, skipped or un-quoted
    * rows, checksum mismatches) always return 200 with a draft plus issues.
    *
-   * @param jwt the caller's token; the draft's owner defaults to the uploading user
+   * @param owner the acting member; for an ingest-gateway call this is the member it acts for
    * @param extract the validated extract payload
    * @return the draft order with issues and match counters — never persisted
    */
@@ -82,15 +79,12 @@ public class RefineryImportController {
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated.")
   })
   public RefineryImportDraftDto importExtract(
-      @AuthenticationPrincipal Jwt jwt,
-      HttpServletRequest request,
-      @RequestBody @Valid @NotNull RefineryExtractDto extract) {
-    // Resolved explicitly rather than through @CurrentUserId, because this is one of exactly two
-    // endpoints where the caller may be the ingest gateway acting for a member (ADR-0129). Keeping
-    // it at the call site means the trust boundary is visible where it applies, instead of living
-    // in
-    // an argument resolver that would silently widen it to every endpoint in the application.
-    return refineryImportService.buildDraft(
-        extract, actingSubjectResolver.resolveUserId(jwt, request));
+      @CurrentUserId UUID owner, @RequestBody @Valid @NotNull RefineryExtractDto extract) {
+    // Plain @CurrentUserId again. When the ingest gateway calls this, ActingMemberFilter has
+    // already
+    // replaced the security identity with the member it acts for (ADR-0129), so there is nothing
+    // special to do here — which is exactly the point of doing it in the filter rather than at the
+    // call site: EVERY identity consumer sees the member, not just the two that were remembered.
+    return refineryImportService.buildDraft(extract, owner);
   }
 }

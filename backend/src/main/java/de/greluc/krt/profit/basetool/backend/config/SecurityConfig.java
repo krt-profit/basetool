@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.support.ActingMemberAuthorities;
+import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.Permissions;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.support.RefusedSubjectWindow;
@@ -314,7 +316,9 @@ public class SecurityConfig {
       ObjectMapper objectMapper,
       MeterRegistry meterRegistry,
       TermsConsentCheck termsConsentCheck,
-      RefusedSubjectWindow refusedSubjectWindow)
+      RefusedSubjectWindow refusedSubjectWindow,
+      IngestGatewayProperties ingestGatewayProperties,
+      ActingMemberAuthorities actingMemberAuthorities)
       throws Exception {
 
     boolean isTest = java.util.Arrays.asList(env.getActiveProfiles()).contains("test");
@@ -689,15 +693,25 @@ public class SecurityConfig {
         // boundary, not just via the frontend redirect. Placed after the bearer-token filter so the
         // authorities are already assembled. Emits an RFC-7807 problem+json body with a minted
         // correlationId (it runs before CorrelationIdFilter) — RFC-7807 hardening.
+        // ADR-0129: replace the security identity with the member an ingest gateway is acting for,
+        // BEFORE the two person-gates below. They must judge the person who is sending, exactly as
+        // they did while the gateway still relayed that person's token — otherwise consent
+        // (REQ-SEC-028) and approval (REQ-SEC-017) would be evaluated against a service account and
+        // the ingest path would silently stop enforcing either. Runs immediately after the
+        // bearer-token filter, which is the first point at which there IS a caller to check.
+        .addFilterAfter(
+            new ActingMemberFilter(ingestGatewayProperties, actingMemberAuthorities, meterRegistry),
+            org.springframework.security.oauth2.server.resource.web.authentication
+                .BearerTokenAuthenticationFilter.class)
         .addFilterAfter(
             new PendingApprovalAccessFilter(
                 messageSource, problemResponseFactory, objectMapper, meterRegistry),
-            org.springframework.security.oauth2.server.resource.web.authentication
-                .BearerTokenAuthenticationFilter.class)
+            ActingMemberFilter.class)
         // REQ-SEC-028: refuse the API until the Terms of Use are accepted. Enforced HERE rather
         // than only in the frontend because the backend is the one place every caller passes
-        // through — the web UI and, since the gateway relays the caller's own bearer
-        // (REQ-INGEST-001), the desktop extractor. Placed AFTER the pending-approval filter so a
+        // through — the web UI and, since ActingMemberFilter above makes the gateway's call carry
+        // the sending member's identity (ADR-0129), the desktop extractor. Placed AFTER the
+        // pending-approval filter so a
         // user who is both pending and unconsented gets the approval message, which is the one
         // they can actually act on.
         .addFilterAfter(

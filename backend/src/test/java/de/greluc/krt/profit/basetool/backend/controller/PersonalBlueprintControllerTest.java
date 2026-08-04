@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -70,9 +69,6 @@ class PersonalBlueprintControllerTest {
   @Mock private BlueprintImportService importService;
   @Mock private BlueprintCraftabilityService craftabilityService;
   @Mock private UserService userService;
-
-  @Mock
-  private de.greluc.krt.profit.basetool.backend.support.ActingSubjectResolver actingSubjectResolver;
 
   @InjectMocks private PersonalBlueprintController controller;
 
@@ -186,15 +182,7 @@ class PersonalBlueprintControllerTest {
     BlueprintImportPreviewDto preview = new BlueprintImportPreviewDto(0, 0, 0, 0, 0, 0, List.of());
     when(importService.previewImport(SUB, file)).thenReturn(preview);
 
-    // The preview endpoint now resolves WHO it acts for, because the ingest gateway may call it on
-    // behalf of a member (ADR-0129). For an ordinary caller that resolves to their own sub.
-    org.springframework.security.oauth2.jwt.Jwt jwt =
-        mock(org.springframework.security.oauth2.jwt.Jwt.class);
-    jakarta.servlet.http.HttpServletRequest request =
-        mock(jakarta.servlet.http.HttpServletRequest.class);
-    when(actingSubjectResolver.resolve(jwt, request)).thenReturn(SUB);
-
-    BlueprintImportPreviewDto result = controller.previewImport(file, jwt, request);
+    BlueprintImportPreviewDto result = controller.previewImport(file, SUB);
 
     assertEquals(0, result.total());
     verify(importService).previewImport(SUB, file);

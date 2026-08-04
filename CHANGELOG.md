@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der Versand aus dem Extractor wird wieder dir zugerechnet — mit deinen Rechten und deiner Zustimmung.** Nach der Umstellung auf das Gateway prüfte das Backend Freigabe, Zustimmung, Rechte und Sichtbarkeitsbereich am technischen Konto des Gateways statt an der Person, die sendet. Für die Dauer eines solchen Aufrufs gilt jetzt wieder deine Identität. Ein Mitglied, das in der Benutzerverwaltung deaktiviert wurde, kann darüber nichts mehr senden.
+
+- **Das Gateway erscheint nicht mehr als neues Mitglied.** Sein technisches Konto löste bisher eine Registrierung samt Freigabeanfrage an die Administratoren aus, weil ein solches Konto von einer Person nicht zu unterscheiden war. Es wird jetzt als Maschine erkannt.
+
 ## [v1.5.35](https://github.com/krt-profit/basetool/releases/tag/v1.5.35) - 2026-08-04
 
 ### Fixed

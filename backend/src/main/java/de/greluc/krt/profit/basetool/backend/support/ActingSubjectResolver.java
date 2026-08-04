@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.support;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.List;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -67,7 +66,7 @@ public class ActingSubjectResolver {
    */
   public static final String ON_BEHALF_OF_HEADER = "X-Ingest-On-Behalf-Of";
 
-  private final List<String> allowedGatewayClientIds;
+  private final IngestGatewayProperties properties;
   private final MeterRegistry meterRegistry;
 
   /**
@@ -78,7 +77,7 @@ public class ActingSubjectResolver {
    */
   public ActingSubjectResolver(
       @NotNull IngestGatewayProperties properties, @NotNull MeterRegistry meterRegistry) {
-    this.allowedGatewayClientIds = List.copyOf(properties.getClientIds());
+    this.properties = properties;
     this.meterRegistry = meterRegistry;
   }
 
@@ -96,8 +95,7 @@ public class ActingSubjectResolver {
     if (onBehalfOf == null || onBehalfOf.isBlank()) {
       return jwt.getSubject();
     }
-    String azp = jwt.getClaimAsString("azp");
-    if (azp == null || !allowedGatewayClientIds.contains(azp)) {
+    if (!properties.isGatewayClient(jwt.getClaimAsString("azp"))) {
       // The client id, not the subject: naming who tried is the point, and azp is a bounded
       // registered value rather than a person (REQ-OBS-004).
       log.warn("Refused an on-behalf-of header from a caller that is not an ingest gateway");

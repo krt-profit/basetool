@@ -48,6 +48,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -68,6 +69,16 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private OrgUnitCascadeService orgUnitCascadeService;
   @Mock private Jwt jwt;
+
+  /**
+   * A real instance, not a mock: its default is the empty allowlist, which is the state every one
+   * of these tests needs — no caller is a gateway, so the machine-identity carve-out never fires
+   * and each case exercises the ordinary member path it was written for (ADR-0129).
+   */
+  @Spy
+  private final de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties
+      ingestGatewayProperties =
+          new de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties();
 
   @InjectMocks private CustomJwtGrantedAuthoritiesConverter converter;
 

@@ -71,8 +71,18 @@ impossible: a DPoP-bound token is rejected outright by a resource server present
 bearer, so binding and relaying were mutually exclusive, and attempting both broke every send from
 2026-08-03. The caller's token now stops at the gateway and does not travel through its service
 layer at all. The backend honours the on-behalf-of header only for a caller whose `azp` is on its
-configured gateway allowlist, and the header carries a subject and nothing else — it cannot grant a
-role, widen a scope or select an org unit.
+configured gateway allowlist, and only on these two endpoints, enforced as parsed `PathPattern`s on
+the decoded path (REQ-SEC-029) rather than by convention.
+
+**The header selects the security identity, not merely the owner field** (amended 2026-08-04,
+ADR-0129). `ActingMemberFilter` replaces the request's `SecurityContext` with the acting member
+before either person-gate runs, so approval (REQ-SEC-017), consent (REQ-SEC-028), `@PreAuthorize`,
+the org-unit scope and the audit trail all judge the person sending — as they did while the gateway
+still relayed that person's token. The member's authorities are assembled from the database by the
+same assembler the login path uses, so they are exact rather than approximate. Three refusals bound
+it and all fail closed: a caller that is not a configured gateway, a header with no authenticated
+caller behind it, and a named member who is unknown here or whom the last roster sync no longer
+found in Keycloak — the last one because a named subject never expires the way a token does.
 
 The gateway has
 **no database and no Flyway migration**, serves **no HTML**, holds **no business logic**
