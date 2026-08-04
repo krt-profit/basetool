@@ -28,13 +28,17 @@ import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLParameters;
+import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ssl.NoSuchSslBundleException;
 import org.springframework.boot.ssl.SslBundle;
@@ -139,44 +143,29 @@ public class WebClientConfig {
   private HttpClient buildKeycloakHttpClient() {
     try {
       List<String> profiles = Arrays.asList(environment.getActiveProfiles());
-      SslContext sslContext = null;
-      boolean pinnedTrust = false;
+      SslContext sslContext;
+      boolean disableHostnameVerification = false;
       if (profiles.contains("dev") || profiles.contains("test")) {
         sslContext =
             SslContextBuilder.forClient()
                 .trustManager(InsecureTrustManagerFactory.INSTANCE)
                 .build();
-        pinnedTrust = true;
+        disableHostnameVerification = true;
       } else {
-        try {
-          SslBundle bundle = sslBundles.getBundle(KeycloakTrustSupport.KEYCLOAK_TRUST_BUNDLE);
-          KeyStore truststore = bundle.getStores().getTrustStore();
-          TrustManagerFactory tmf =
-              TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-          tmf.init(truststore);
-          sslContext = SslContextBuilder.forClient().trustManager(tmf).build();
-        } catch (NoSuchSslBundleException noBundle) {
-          // No pinned bundle: Keycloak is the public, publicly-trusted host. Leave the SSL context
-          // untouched so reactor-netty uses the JVM default anchors AND keeps hostname
-          // verification, which is the whole point of a public certificate.
-          sslContext = null;
-        }
+        sslContext = SslContextBuilder.forClient().trustManager(keycloakTrustManager()).build();
       }
-      SslContext effective = sslContext;
-      boolean disableHostnameVerification = pinnedTrust;
+      boolean noHostnameCheck = disableHostnameVerification;
       return HttpClient.create()
           .secure(
               spec -> {
-                if (effective != null) {
-                  var configured = spec.sslContext(effective);
-                  if (disableHostnameVerification) {
-                    configured.handlerConfigurator(
-                        sslHandler -> {
-                          SSLParameters params = sslHandler.engine().getSSLParameters();
-                          params.setEndpointIdentificationAlgorithm("");
-                          sslHandler.engine().setSSLParameters(params);
-                        });
-                  }
+                var configured = spec.sslContext(sslContext);
+                if (noHostnameCheck) {
+                  configured.handlerConfigurator(
+                      sslHandler -> {
+                        SSLParameters params = sslHandler.engine().getSSLParameters();
+                        params.setEndpointIdentificationAlgorithm("");
+                        sslHandler.engine().setSSLParameters(params);
+                      });
                 }
               })
           .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5_000)
@@ -188,6 +177,105 @@ public class WebClientConfig {
     } catch (GeneralSecurityException | SSLException e) {
       throw new IllegalStateException("Failed to build the Keycloak WebClient SSL context", e);
     }
+  }
+
+  /**
+   * Trust manager for the token endpoint: the JVM's default anchors <em>plus</em> the pinned {@code
+   * keycloak-trust} bundle when one is configured.
+   *
+   * <p><strong>Additive on purpose, and this is the whole fix.</strong> Choosing one or the other
+   * gets it wrong whichever way you choose, because the right answer depends on where the token URI
+   * points — the public host needs the public CAs, an internal one needs the pinned certificate —
+   * and nothing in the SSL configuration knows which was configured. Both previous attempts picked
+   * a single anchor and broke the other case: first the backend's truststore, then the pinned
+   * Keycloak one, each failing against the public certificate with {@code PKIX path building
+   * failed}.
+   *
+   * <p>Trusting both is not a weakening: the pinned certificate is one the operator deliberately
+   * placed in the bundle, and the default anchors are what every other publicly-trusted call in the
+   * JVM already uses. Hostname verification stays on either way.
+   *
+   * @return a trust manager accepting both anchor sets
+   * @throws GeneralSecurityException if neither trust manager can be initialised
+   */
+  private X509TrustManager keycloakTrustManager() throws GeneralSecurityException {
+    X509TrustManager defaults = x509From(null);
+    X509TrustManager pinned = null;
+    try {
+      SslBundle bundle = sslBundles.getBundle(KeycloakTrustSupport.KEYCLOAK_TRUST_BUNDLE);
+      pinned = x509From(bundle.getStores().getTrustStore());
+    } catch (NoSuchSslBundleException noBundle) {
+      // No internal Keycloak configured; the defaults alone are the whole trust set.
+    }
+    return pinned == null ? defaults : additiveTrustManager(defaults, pinned);
+  }
+
+  /**
+   * Accepts a chain that <em>either</em> anchor set validates.
+   *
+   * <p>Package-private so a test can drive it with two throwaway anchor sets and assert the
+   * property that both shipped bugs violated: adding one anchor set must never remove the other.
+   *
+   * @param defaults the JVM's default anchors
+   * @param pinnedAnchors the operator-pinned anchors
+   * @return a trust manager accepting either
+   */
+  static X509TrustManager additiveTrustManager(
+      X509TrustManager defaults, X509TrustManager pinnedAnchors) {
+    return new X509TrustManager() {
+      @Override
+      public void checkClientTrusted(X509Certificate[] chain, String authType)
+          throws CertificateException {
+        defaults.checkClientTrusted(chain, authType);
+      }
+
+      @Override
+      public void checkServerTrusted(X509Certificate[] chain, String authType)
+          throws CertificateException {
+        try {
+          defaults.checkServerTrusted(chain, authType);
+        } catch (CertificateException publicChainRejected) {
+          try {
+            pinnedAnchors.checkServerTrusted(chain, authType);
+          } catch (CertificateException pinnedRejected) {
+            // Surface the PUBLIC failure: it is the one that names a real CA problem, and the
+            // pinned rejection is expected noise whenever the host is the public one.
+            publicChainRejected.addSuppressed(pinnedRejected);
+            throw publicChainRejected;
+          }
+        }
+      }
+
+      @Override
+      public X509Certificate[] getAcceptedIssuers() {
+        X509Certificate[] a = defaults.getAcceptedIssuers();
+        X509Certificate[] b = pinnedAnchors.getAcceptedIssuers();
+        X509Certificate[] all = new X509Certificate[a.length + b.length];
+        System.arraycopy(a, 0, all, 0, a.length);
+        System.arraycopy(b, 0, all, a.length, b.length);
+        return all;
+      }
+    };
+  }
+
+  /**
+   * Builds an {@link X509TrustManager} over a truststore, or over the JVM defaults when {@code
+   * null}.
+   *
+   * @param truststore the store to trust, or {@code null} for the JVM's {@code cacerts}
+   * @return the first X.509 trust manager the factory produced
+   * @throws GeneralSecurityException if the factory yields no X.509 trust manager
+   */
+  private static X509TrustManager x509From(KeyStore truststore) throws GeneralSecurityException {
+    TrustManagerFactory factory =
+        TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+    factory.init(truststore);
+    for (TrustManager manager : factory.getTrustManagers()) {
+      if (manager instanceof X509TrustManager x509) {
+        return x509;
+      }
+    }
+    throw new GeneralSecurityException("No X509TrustManager available");
   }
 
   /**
