@@ -65,9 +65,24 @@ on:
 
 # Releases are idempotent (image tags are immutable per digest), so we do not
 # cancel an in-flight release if a new push lands — that would leave a tag
-# half-promoted. Different refs run in parallel; the same ref serialises.
+# half-promoted.
+#
+# Keyed on the COMMIT, not the ref. A release produces two refs for one commit —
+# the release commit on `main`, then the `v*` tag — and both trigger this
+# workflow. Under a ref key those landed in different groups and ran in
+# PARALLEL: two full pipelines building and pushing to the same GHCR packages
+# from the same source, roughly a minute apart. Both runs are wanted (the main
+# push produces `:edge` / `:sha-…`, the tag push the semver tags), but they must
+# not run at the same time.
+#
+# v1.5.36 is what this cost: three concurrent runs against the same packages
+# produced two registry-side failures on `basetool-ingest` within nine minutes —
+# `error writing layer blob: not_found` on a push, and a `403` from ghcr.io's
+# token endpoint for a `pull` scope in a job whose own push had just succeeded.
+# The tag run died between tagging and signing, which is the worst place for it:
+# `:1.5.36` existed, unsigned, and `deploy.sh` verifies signatures fail-closed.
 concurrency:
-  group: release-images-${{ github.ref }}
+  group: release-images-${{ github.sha }}
   cancel-in-progress: false
 
 permissions:
@@ -371,14 +386,26 @@ jobs:
         working-directory: /tmp/digests/${{ matrix.module }}
         run: |
           set -eu
-          # Intentional word-splitting: each $(...) must expand into MULTIPLE
-          # separate CLI arguments — `-t tagA -t tagB ...` from the jq output
-          # and N `image@sha256:...` source refs from the printf. Quoting would
-          # collapse each into a single argument and break the manifest merge.
-          # shellcheck disable=SC2046
-          docker buildx imagetools create \
-            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@sha256:%s ' *)
+          # Retried because the failure mode is transient and the operation is
+          # idempotent: re-tagging the same source digests yields the same index.
+          # GHCR answers a contended push with `error writing layer blob:
+          # not_found` (seen on run 30930709770), which a second attempt clears.
+          for attempt in 1 2 3; do
+            # Intentional word-splitting: each $(...) must expand into MULTIPLE
+            # separate CLI arguments — `-t tagA -t tagB ...` from the jq output
+            # and N `image@sha256:...` source refs from the printf. Quoting would
+            # collapse each into a single argument and break the manifest merge.
+            # shellcheck disable=SC2046
+            if docker buildx imagetools create \
+              $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+              $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@sha256:%s ' *); then
+              exit 0
+            fi
+            echo "::warning::manifest merge attempt ${attempt} failed for ${{ matrix.module }}; retrying"
+            sleep $((attempt * 10))
+          done
+          echo "::error::could not create the merged manifest for ${{ matrix.module }}" >&2
+          exit 1
 
       # Resolve the manifest digest of the newly-tagged index. Cosign signs
       # by digest (not tag) so that a later `:stable` promotion sees the
@@ -386,6 +413,7 @@ jobs:
       - name: Inspect merged manifest
         id: inspect
         run: |
+          # Note `-e` is on regardless — GitHub runs `run:` blocks as `bash -e`.
           set -eu
           # Read the digest via the Go-template field directly (as promote.yml
           # does) rather than `{{json .Manifest}} | jq -r '.digest'`: a newer
@@ -394,9 +422,26 @@ jobs:
           # empty string — which then made the sign step choke on a `…@`
           # reference with no digest. Fail loudly on an empty digest so a future
           # regression of the same shape is caught here, not at `cosign sign`.
-          digest=$(docker buildx imagetools inspect \
-            "${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}:${{ steps.meta.outputs.version }}" \
-            --format '{{.Manifest.Digest}}')
+          # Retried for the same reason as the merge above, and this is the step
+          # that actually bit: run 30931003203 got `403 Forbidden` from
+          # ghcr.io/token for a `pull` scope moments after the very same
+          # credentials had pushed successfully. A read is idempotent, so a
+          # retry costs nothing and turns a registry blip into a short delay —
+          # instead of a release whose image is tagged but never signed.
+          digest=""
+          for attempt in 1 2 3; do
+            # `if cmd; then` rather than `cmd && ...`: GitHub runs `run:` blocks under
+            # `bash -e`, and an AND-OR list whose FIRST command fails still trips
+            # errexit — which would abort the step on attempt 1 and make the retry
+            # decorative.
+            if digest=$(docker buildx imagetools inspect \
+              "${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}:${{ steps.meta.outputs.version }}" \
+              --format '{{.Manifest.Digest}}'); then
+              [ -n "$digest" ] && break
+            fi
+            echo "::warning::digest lookup attempt ${attempt} failed for ${{ matrix.module }}; retrying"
+            sleep $((attempt * 10))
+          done
           if [ -z "$digest" ]; then
             echo "::error::could not resolve merged manifest digest for ${{ matrix.module }}" >&2
             exit 1
