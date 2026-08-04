@@ -357,6 +357,11 @@ interface KrtReauthApi {
 interface KrtTermsGateApi {
     /** Navigates to the consent page and returns true when the response demanded consent. */
     check(response: Response): boolean;
+    /**
+     * Navigates the window to a same-origin consent path. Used by the SSE handoff, where the gate
+     * arrives as a `terms-gate` event rather than a response header an `EventSource` cannot read.
+     */
+    redirect(url?: string | null): boolean;
 }
 
 /**

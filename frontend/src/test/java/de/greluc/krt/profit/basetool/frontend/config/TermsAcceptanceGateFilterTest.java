@@ -115,6 +115,100 @@ class TermsAcceptanceGateFilterTest {
     verify(filterChain, never()).doFilter(any(), any());
   }
 
+  /**
+   * An SSE subscription is handed off on the channel, never redirected and never failed.
+   *
+   * <p>An {@code EventSource} can read neither a status nor a header, so both of the branches above
+   * are invisible to it: a 302 delivers the consent page as {@code text/html}, the stream fails to
+   * parse it, and {@code notifications.js} reconnects on its own jittered timer indefinitely —
+   * measured in production on 2026-08-03 as 491 stream attempts against 483 consent-page loads in
+   * ten minutes, from open tabs alone. A single well-formed {@code terms-gate} event is the only
+   * answer the client can act on instead of retrying, so this pins the status, the content type and
+   * the event framing together; any one of them wrong puts the loop back.
+   */
+  @Test
+  void handsAnSseStreamOffOnTheChannelInsteadOfLettingItRetry() throws Exception {
+    stubStatus(false);
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/notifications/stream");
+    request.setRequestURI("/notifications/stream");
+    request.addHeader("Accept", "text/event-stream");
+    request.setSession(new org.springframework.mock.web.MockHttpSession());
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    filter.doFilter(request, response, filterChain);
+
+    assertThat(response.getStatus()).isEqualTo(200);
+    assertThat(response.getContentType()).contains("text/event-stream");
+    assertThat(response.getContentAsString())
+        .isEqualTo("event: terms-gate\ndata: /terms/accept\n\n");
+    assertThat(response.getRedirectedUrl()).isNull();
+    verify(filterChain, never()).doFilter(any(), any());
+  }
+
+  /**
+   * A consenting user's stream is relayed as usual — the handoff only fires while the gate is
+   * closed.
+   */
+  @Test
+  void leavesAConsentingUsersSseStreamAlone() throws Exception {
+    stubStatus(true);
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/notifications/stream");
+    request.setRequestURI("/notifications/stream");
+    request.addHeader("Accept", "text/event-stream");
+    request.setSession(new org.springframework.mock.web.MockHttpSession());
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    filter.doFilter(request, response, filterChain);
+
+    assertThat(response.getContentAsString()).isEmpty();
+    verify(filterChain).doFilter(any(), any());
+  }
+
+  /**
+   * A fresh negative verdict is reused, so a gated session does not re-read the backend per
+   * request.
+   *
+   * <p>Storing the verdict but reading back only the positive side turned every gated request into
+   * a blocking backend round trip. Measured during the 2026-08-03 rollout: 491 stream attempts
+   * drove 491 reads of {@code /api/v1/terms/status}, and the consent-page renders they triggered
+   * drove 483 more — 973 against a population of one looping tab. That amplification is what made a
+   * client-side reconnect loop expensive on the server, so it is pinned here rather than left to
+   * the loop fix.
+   */
+  @Test
+  void reusesAFreshNegativeVerdictInsteadOfReReadingTheBackend() throws Exception {
+    stubStatus(false);
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/missions");
+    request.setRequestURI("/missions");
+    request.setSession(new org.springframework.mock.web.MockHttpSession());
+
+    filter.doFilter(request, new MockHttpServletResponse(), filterChain);
+    filter.doFilter(request, new MockHttpServletResponse(), filterChain);
+    filter.doFilter(request, new MockHttpServletResponse(), filterChain);
+
+    verify(backendApiClient, org.mockito.Mockito.times(1))
+        .get(eq("/api/v1/terms/status"), eq(TermsStatusDto.class));
+    verify(filterChain, never()).doFilter(any(), any());
+  }
+
+  /**
+   * Clearing the verdict after consent must beat the negative cache, or accepting would not help.
+   */
+  @Test
+  void clearingTheVerdictLetsAnAcceptingUserThroughImmediately() throws Exception {
+    stubStatus(false);
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/missions");
+    request.setRequestURI("/missions");
+    request.setSession(new org.springframework.mock.web.MockHttpSession());
+    filter.doFilter(request, new MockHttpServletResponse(), filterChain);
+
+    TermsAcceptanceGateFilter.clearCachedVerdict(request);
+    stubStatus(true);
+    filter.doFilter(request, new MockHttpServletResponse(), filterChain);
+
+    verify(filterChain).doFilter(any(), any());
+  }
+
   /** A consenting user passes through. */
   @Test
   void letsAConsentingUserThrough() throws Exception {
