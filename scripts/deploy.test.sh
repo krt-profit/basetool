@@ -889,6 +889,46 @@ scenario_monitoring_reconcile_disabled_when_running() {
 }
 
 # ---------------------------------------------------------------------------
+# Scenario 12d: the flag set where an operator naturally puts it — the compose
+# `.env` — must actually take effect. `iri-deploy.service` declares no
+# `EnvironmentFile=`, so before this it did not: the value read `true` on disk
+# while every tick logged "IRI_MONITORING_ENABLED != 'true'" and monitoring config
+# was rsynced but never reloaded into the running Prometheus. That cost two
+# incidents (2026-07-13, 2026-08-03) in which fixed alert rules kept firing their
+# old version. Also pins that only THIS key is read — sourcing `.env` would pull
+# every production secret into the deploy process's environment.
+# ---------------------------------------------------------------------------
+scenario_monitoring_flag_read_from_env_file() {
+  echo "Scenario: IRI_MONITORING_ENABLED in the compose .env enables the reconcile"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "${MARKER}"
+  # Appended, not written: setup_host already put IRI_KEYSTORE_HOST_PATH there and deploy.sh needs
+  # it. Quoted value on purpose — an operator writes either form, and both must work.
+  printf 'SOME_SECRET=must-not-leak\nIRI_MONITORING_ENABLED="true"\n' >> "${T_COMPOSE_DIR}/.env"
+  # A host whose iri-monitoring project is running necessarily HAS the monitoring compose file —
+  # deploy.sh only writes the armed gauge after checking for it, so leaving it out models a state
+  # that cannot occur and silently skips the very assertion this scenario exists for.
+  echo "# dummy monitoring compose file — the docker CLI is stubbed" \
+    > "${T_COMPOSE_DIR}/docker-compose.monitoring.yml"
+  mapfile -t fake < <(converged_env)
+  # Deliberately NOT passing IRI_MONITORING_ENABLED: the .env is the only source.
+  run_deploy -- "${fake[@]}" "FAKE_MON_PS=prometheus" || rc=$?
+  assert_exit 0 "$rc" "the tick still exits 0"
+  assert_excludes "iri-monitoring is RUNNING but IRI_MONITORING_ENABLED != 'true'" \
+    "the gated-off WARN is gone once the flag is read from .env"
+  if grep -q '^basetool_monitoring_reconcile_disabled{component="deploy"} 0' \
+       "${T_STATE_DIR}/textfile/monitoring-reconcile.prom" 2>/dev/null; then
+    record 1 "the reconcile-disabled gauge is 0 (reconcile is armed)"
+  else
+    record 0 "the reconcile-disabled gauge is 0 (reconcile is armed)"
+  fi
+  assert_excludes "must-not-leak" "no other .env value is pulled into the deploy environment"
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
 # Scenario 13: a normal promotion (marker differs) must cosign-verify every
 # resolved digest against the release-images signature BEFORE it pulls or applies
 # (REQ-OPS-015), and only then proceed.
@@ -1059,6 +1099,7 @@ scenario_monitoring_reload_no_drift
 scenario_monitoring_reload_self_heals_on_noop
 scenario_monitoring_compose_def_applied_on_noop
 scenario_monitoring_reconcile_disabled_when_running
+scenario_monitoring_flag_read_from_env_file
 scenario_signature_verified_on_apply
 scenario_signature_failure_aborts
 scenario_break_glass_skips_verify
