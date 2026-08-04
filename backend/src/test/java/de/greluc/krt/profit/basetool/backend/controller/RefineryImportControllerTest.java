@@ -61,6 +61,9 @@ class RefineryImportControllerTest {
 
   private static final String ENDPOINT = "/api/v1/refinery-orders/import-extract";
 
+  /** A realistic member subject: the backend resolves every owner as a UUID (ADR-0129). */
+  private static final String MEMBER_SUB = "33333333-3333-3333-3333-333333333333";
+
   private static final String VALID_BODY =
       """
       {
@@ -116,11 +119,17 @@ class RefineryImportControllerTest {
     when(refineryImportService.buildDraft(any(), any()))
         .thenReturn(new RefineryImportDraftDto(null, List.of(), 1, 1, 0));
 
-    // When / Then — plain membership suffices, no elevated role required
+    // When / Then — plain membership suffices, no elevated role required.
+    // The subject is a real UUID: since ADR-0129 the owner is resolved by ActingSubjectResolver,
+    // which is fail-closed on a non-UUID sub exactly as UserService#getUserIdFromJwt always was.
+    // The default `user` subject only ever worked here because userService was mocked away.
     mockMvc
         .perform(
             post(ENDPOINT)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(MEMBER_SUB))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(VALID_BODY))
@@ -140,7 +149,10 @@ class RefineryImportControllerTest {
     mockMvc
         .perform(
             post(ENDPOINT)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(MEMBER_SUB))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(VALID_BODY.replace("\"schemaVersion\": 1", "\"schemaVersion\": 2")))
@@ -159,7 +171,10 @@ class RefineryImportControllerTest {
     mockMvc
         .perform(
             post(ENDPOINT)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(MEMBER_SUB))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(VALID_BODY.replace("SETUP", "PROCESSING")))
@@ -176,7 +191,10 @@ class RefineryImportControllerTest {
     mockMvc
         .perform(
             post(ENDPOINT)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(MEMBER_SUB))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(emptyOrders))
@@ -193,7 +211,10 @@ class RefineryImportControllerTest {
     mockMvc
         .perform(
             post(ENDPOINT)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(MEMBER_SUB))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(nullElement))
@@ -212,7 +233,10 @@ class RefineryImportControllerTest {
     mockMvc
         .perform(
             post(ENDPOINT)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(MEMBER_SUB))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
@@ -235,7 +259,10 @@ class RefineryImportControllerTest {
     mockMvc
         .perform(
             post(ENDPOINT)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(MEMBER_SUB))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(sixOrders))
@@ -251,7 +278,10 @@ class RefineryImportControllerTest {
     mockMvc
         .perform(
             post(ENDPOINT)
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(MEMBER_SUB))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))

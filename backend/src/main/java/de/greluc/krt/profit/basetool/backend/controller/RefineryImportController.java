@@ -23,9 +23,11 @@ import de.greluc.krt.profit.basetool.backend.model.dto.RefineryExtractDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryImportDraftDto;
 import de.greluc.krt.profit.basetool.backend.service.RefineryImportService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.support.ActingSubjectResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -54,6 +56,7 @@ public class RefineryImportController {
 
   private final RefineryImportService refineryImportService;
   private final UserService userService;
+  private final ActingSubjectResolver actingSubjectResolver;
 
   /**
    * Builds a best-effort draft from an uploaded {@code RefineryExtract} (frozen contract v1, plan
@@ -79,7 +82,15 @@ public class RefineryImportController {
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated.")
   })
   public RefineryImportDraftDto importExtract(
-      @AuthenticationPrincipal Jwt jwt, @RequestBody @Valid @NotNull RefineryExtractDto extract) {
-    return refineryImportService.buildDraft(extract, userService.getUserIdFromJwt(jwt));
+      @AuthenticationPrincipal Jwt jwt,
+      HttpServletRequest request,
+      @RequestBody @Valid @NotNull RefineryExtractDto extract) {
+    // Resolved explicitly rather than through @CurrentUserId, because this is one of exactly two
+    // endpoints where the caller may be the ingest gateway acting for a member (ADR-0129). Keeping
+    // it at the call site means the trust boundary is visible where it applies, instead of living
+    // in
+    // an argument resolver that would silently widen it to every endpoint in the application.
+    return refineryImportService.buildDraft(
+        extract, actingSubjectResolver.resolveUserId(jwt, request));
   }
 }

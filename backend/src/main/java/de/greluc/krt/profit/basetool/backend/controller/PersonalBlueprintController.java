@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.service.BlueprintCraftabilityServic
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.profit.basetool.backend.service.PersonalBlueprintService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
+import de.greluc.krt.profit.basetool.backend.support.ActingSubjectResolver;
 import de.greluc.krt.profit.basetool.backend.web.CurrentUserSub;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,6 +43,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -52,6 +54,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -80,6 +84,7 @@ public class PersonalBlueprintController {
 
   private final PersonalBlueprintService service;
   private final BlueprintImportService importService;
+  private final ActingSubjectResolver actingSubjectResolver;
   private final BlueprintCraftabilityService craftabilityService;
   private final UserService userService;
 
@@ -280,7 +285,8 @@ public class PersonalBlueprintController {
    * returns per-name resolution rows for the caller to review. Nothing is persisted.
    *
    * @param file the uploaded blueprint export JSON
-   * @param ownerSub the caller's JWT {@code sub} claim
+   * @param jwt the authenticated caller; the ingest gateway may act for another member
+   * @param request the current request, read for the on-behalf-of header (ADR-0129)
    * @return the per-name preview with status counts
    */
   @PostMapping(value = "/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -291,8 +297,13 @@ public class PersonalBlueprintController {
     @ApiResponse(responseCode = "401", description = "Authentication required.")
   })
   public BlueprintImportPreviewDto previewImport(
-      @RequestParam("file") @NotNull MultipartFile file, @CurrentUserSub String ownerSub) {
-    return importService.previewImport(ownerSub, file);
+      @RequestParam("file") @NotNull MultipartFile file,
+      @AuthenticationPrincipal Jwt jwt,
+      HttpServletRequest request) {
+    // Not @CurrentUserSub: this is one of exactly two endpoints the ingest gateway may call on
+    // behalf of a member (ADR-0129), and the widening belongs at the call site rather than inside
+    // the shared resolver.
+    return importService.previewImport(actingSubjectResolver.resolve(jwt, request), file);
   }
 
   /**
