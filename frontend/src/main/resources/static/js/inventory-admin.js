@@ -24,8 +24,9 @@
  *
  * Covers: the note modal (open/close/counter/save/remove with the krtCsrf retry-on-403 and
  * syncVersion DOM writeback), the multi-select filter widgets with the AJAX table re-swap
- * (filterInventory replaces #tableContainer via outerHTML), material-group / stack tree
- * expansion with localStorage persistence plus lazy stack-entry loading and pagination,
+ * (filterInventory replaces #tableContainer via outerHTML) inside their collapsible panel
+ * (REQ-INV-037), material-group / stack tree expansion with localStorage persistence plus
+ * lazy stack-entry loading and pagination,
  * the book-out (DISCARD/SELL) and Umbuchen (TRANSFER) modals writing through
  * window.krtFetch, the admin delete-all flow, the Variante-C allocation chips (add / edit /
  * remove of a job-order or mission quantity slice via the per-allocation endpoints, REQ-INV-027),
@@ -285,6 +286,83 @@ function restoreAdminInventoryFilters() {
     return changed;
 }
 
+// ===================== Filter panel collapse (REQ-INV-037) =====================================
+// Twin of the "Mein Lager" panel. The filter widgets are a full row above the table and wrap onto
+// lines of their own, which pushes the table down. The panel collapses out of the flow; the
+// preference is per browser and lives in the SAME localStorage object as the filter values, under a
+// top-level slot. Top-level, not per view, because it describes the page's chrome rather than one
+// view's selection — switching Material <-> Items must not silently re-open a panel the user closed.
+//
+// persistAdminInventoryFilters() re-reads the whole object and replaces only its view slot, so the
+// two writers never clobber each other.
+const ADMIN_INVENTORY_FILTER_PANEL_KEY = 'panelCollapsed';
+
+// Number of dimensions currently narrowing the table. Derived from the very snapshot the
+// persistence layer stores, so a filter dimension added there is counted here automatically
+// instead of silently missing from the badge. A multi-select is null in that snapshot when zero
+// OR all of its boxes are ticked — both mean "no filter" on this page — so "all ticked"
+// correctly counts as nothing. The shared Lager has no personal-entry flags (they are a "Mein
+// Lager" dimension), so its snapshot carries none either.
+function countActiveAdminInventoryFilters() {
+    const snapshot = snapshotAdminInventoryFilters();
+    let active = 0;
+    ['materials', 'gameItems', 'jobOrders', 'missions'].forEach(function (dimension) {
+        if (Array.isArray(snapshot[dimension]) && snapshot[dimension].length > 0) active++;
+    });
+    if (typeof snapshot.minQuality === 'string' && snapshot.minQuality !== '') active++;
+    return active;
+}
+
+// Re-renders the count chip on the toggle. Called from filterInventory, which every filter change —
+// including the reset button — funnels through, so the chip cannot fall behind the widgets.
+function updateAdminFilterCountBadge() {
+    const badge = document.getElementById('globalFilterCount');
+    if (!badge) return;
+    const active = countActiveAdminInventoryFilters();
+    badge.hidden = active === 0;
+    const value = document.getElementById('globalFilterCountValue');
+    if (value) value.textContent = String(active);
+    // The bare digit reads out as "Filter 3". The visually-hidden twin spells it out instead,
+    // rather than putting the count into a dynamic aria-label — that would shadow the visible
+    // "Filter" text and break voice control's "click Filter".
+    const label = document.getElementById('globalFilterCountLabel');
+    if (!label) return;
+    const template = badge.getAttribute('data-label') || '';
+    label.textContent = active === 0 ? '' : template.replace('{0}', String(active));
+}
+
+function setAdminFilterPanelCollapsed(collapsed) {
+    const toggle = document.getElementById('globalFilterToggle');
+    const panel = document.getElementById('globalFilterPanel');
+    if (!toggle || !panel) return;
+    panel.hidden = collapsed;
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+}
+
+function toggleAdminFilterPanel() {
+    const panel = document.getElementById('globalFilterPanel');
+    if (!panel) return;
+    const collapsed = !panel.hidden;
+    setAdminFilterPanelCollapsed(collapsed);
+    const stored = readAdminInventoryFilterPref() || {};
+    stored[ADMIN_INVENTORY_FILTER_PANEL_KEY] = collapsed;
+    writeAdminInventoryFilterPref(stored);
+}
+
+// Applies the stored collapse preference on load. With no preference stored yet the panel
+// collapses only when nothing is filtered: opening a narrowed table with its filter row out of
+// sight would leave the user hunting for the reason, which is exactly the trap the count chip
+// exists to close.
+function initAdminFilterPanel() {
+    if (!document.getElementById('globalFilterToggle')) return;
+    updateAdminFilterCountBadge();
+    const stored = readAdminInventoryFilterPref();
+    const saved = stored ? stored[ADMIN_INVENTORY_FILTER_PANEL_KEY] : undefined;
+    setAdminFilterPanelCollapsed(
+        typeof saved === 'boolean' ? saved : countActiveAdminInventoryFilters() === 0,
+    );
+}
+
 function filterInventory() {
     // REQ-INV-030: the rebuilt fragment URL is derived from the page's own filter state PLUS the
     // active view, so a filter change, a modal write and a live-sync peer refresh all re-render
@@ -294,6 +372,9 @@ function filterInventory() {
     // Persist the current filter selection per browser (REQ-UI-017) — every filter change,
     // including the reset button, funnels through here, so the snapshot is always current.
     persistAdminInventoryFilters();
+    // Same funnel, same reason: the count on the (possibly collapsed) toggle must track the
+    // widgets, or a collapsed panel starts hiding an active filter.
+    updateAdminFilterCountBadge();
     const itemsView = lagerIsItemsView();
     const activeMats = collectChecked('matCheck');
     const activeGameItems = collectChecked('gameItemCheck');
@@ -483,6 +564,10 @@ document.addEventListener('DOMContentLoaded', function () {
     if (document.getElementsByClassName('missionCheck').length > 0) {
         updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     }
+    // After the restore, never before it: the first-visit default ("collapsed only when nothing is
+    // filtered") and the count chip both read the widgets, so they must see the restored selection
+    // rather than the bare server-rendered one.
+    initAdminFilterPanel();
     if (filtersRestored) filterInventory();
 });
 
@@ -1608,6 +1693,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     });
     window.krtEvents.on('change', 'inv-admin-filter', filterInventory);
     window.krtEvents.on('click', 'inv-admin-reset-filter', resetInventoryFilter);
+    window.krtEvents.on('click', 'inv-admin-toggle-filters', toggleAdminFilterPanel);
     window.krtEvents.on('click', 'inv-admin-toggle-group', function (el) {
         toggleGroup(el);
     });

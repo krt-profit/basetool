@@ -34,13 +34,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Browser flow for the collapsible "Mein Lager" filter panel (REQ-INV-037).
+ * Browser flow for the collapsible Lager filter panels (REQ-INV-037) — "Mein Lager" and the shared
+ * "Globales Lager", which run the same panel off two page-local scripts and two separate storage
+ * keys.
  *
  * <p>The collapse exists entirely in the browser: the server always renders the panel expanded so a
- * client without JavaScript keeps its filters, and {@code inventory-my.js} applies the stored
- * preference on load. Everything worth guarding is therefore invisible to a MockMvc test — the
- * rendering contract is pinned by {@code InventoryPageControllerMvcTest}, the behaviour by this
- * test.
+ * client without JavaScript keeps its filters, and {@code inventory-my.js} / {@code
+ * inventory-admin.js} apply the stored preference on load. Everything worth guarding is therefore
+ * invisible to a MockMvc test — the rendering contract is pinned by {@code
+ * InventoryPageControllerMvcTest}, the behaviour by this test.
  *
  * <p>Two failure modes motivate it. A broken {@code data-trigger} wiring turns the toggle into a
  * dead button that still looks right in the rendered HTML. And a collapse that forgets to surface
@@ -174,6 +176,67 @@ class InventoryFilterPanelCollapseE2eTest {
         assertThat(page.locator("#myFilterCountValue")).hasText("1");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "inventory-filter-count-chip");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * The same lifecycle on the shared "Globales Lager". It is a separate page module with its own
+   * storage key, so nothing about a working "Mein Lager" panel proves this one is wired: an
+   * unregistered {@code data-trigger} or a preference written under the wrong key both leave the
+   * markup asserted by the MockMvc test perfectly intact.
+   *
+   * <p>The chip is checked in the same context at the end, after the collapse legs, so the
+   * "unfiltered first visit starts collapsed" leg still sees an untouched Lager. The
+   * minimum-quality select drives it because it needs no seeded stock — it renders on every Lager,
+   * empty or not.
+   */
+  @Test
+  void globalFilterPanelCollapsesRemembersTheChoiceAndCountsActiveFilters() {
+    String baseUrl = STACK.baseUrl();
+    Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);
+    try (BrowserContext context =
+        browser.newContext(
+            new Browser.NewContextOptions()
+                .setIgnoreHTTPSErrors(true)
+                .setStorageStatePath(storageState))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, baseUrl + "/inventory/all");
+        page.waitForLoadState();
+
+        // Fresh context => no stored preference, and an untouched Lager has no active filter, so
+        // the default applies: collapsed, with no chip rather than a zero.
+        assertThat(page.locator("[data-testid='lager-filter-toggle']"))
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
+        assertThat(page.locator("#globalFilterPanel")).isHidden();
+        assertThat(page.locator("[data-testid='lager-filter-count']")).isHidden();
+
+        page.locator("[data-testid='lager-filter-toggle']").click();
+        assertThat(page.locator("#globalFilterPanel")).isVisible();
+        assertThat(page.locator("[data-testid='lager-filter-toggle']"))
+            .hasAttribute("aria-expanded", "true");
+
+        // The collapsed leg is the one that carries the weight: the server always ships the panel
+        // expanded, so only a collapse surviving a reload proves the preference was persisted.
+        page.locator("[data-testid='lager-filter-toggle']").click();
+        assertThat(page.locator("#globalFilterPanel")).isHidden();
+        page.reload();
+        page.waitForLoadState();
+        assertThat(page.locator("[data-testid='lager-filter-toggle']"))
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
+        assertThat(page.locator("#globalFilterPanel")).isHidden();
+
+        page.locator("[data-testid='lager-filter-toggle']").click();
+        assertThat(page.locator("#globalFilterPanel")).isVisible();
+        page.locator("#minQuality").selectOption("500");
+
+        assertThat(page.locator("[data-testid='lager-filter-count']"))
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
+        assertThat(page.locator("#globalFilterCountValue")).hasText("1");
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "inventory-global-filter-panel-collapse");
         throw failure;
       }
     }

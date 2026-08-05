@@ -261,6 +261,51 @@ class InventoryPageControllerMvcTest {
                             "id=\"bulkCheckoutBar\""))));
   }
 
+  /**
+   * REQ-INV-037 on the shared "Globales Lager", pinning the same four guarantees as its "Mein
+   * Lager" twin above — the delegated {@code data-trigger} plus the {@code aria-expanded}/{@code
+   * aria-controls} pair, the panel rendered EXPANDED so a client without JavaScript keeps its
+   * filters, the filter form INSIDE the panel, and the raw {@code {0}} placeholder the script
+   * substitutes client-side.
+   *
+   * <p>The source-order assertion is what catches the specific way this page can regress: its two
+   * filter forms used to sit in a wrapper INSIDE the action bar, so a panel opened around the
+   * wrapper rather than around the forms would still render every attribute asserted here while
+   * collapsing nothing at all.
+   *
+   * @param path the Lager view under test — the two views render two different filter forms
+   * @throws Exception if the request fails
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"/inventory/all", "/inventory/all?view=items"})
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewAllInventory_rendersTheFilterRowInsideACollapsiblePanel(String path) throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get(path))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-trigger=\"inv-admin-toggle-filters\"")))
+        .andExpect(content().string(containsString("aria-controls=\"globalFilterPanel\"")))
+        .andExpect(content().string(containsString("aria-expanded=\"true\"")))
+        .andExpect(
+            content()
+                .string(
+                    containsString("<div class=\"inv-filter-panel\" id=\"globalFilterPanel\">")))
+        .andExpect(content().string(containsString("data-label=\"Aktive Filter: {0}\"")))
+        .andExpect(
+            content()
+                .string(
+                    stringContainsInOrder(
+                        List.of(
+                            "id=\"globalFilterToggle\"",
+                            "id=\"globalFilterPanel\"",
+                            "global-inventory-filter",
+                            "id=\"tableContainer\""))));
+  }
+
   // REQ-INV-034: the "Alle markieren" (select-all) button renders in the bulk bar BEFORE the
   // "Markierte ausbuchen" button, carries the select-all trigger + both toggle labels, and the
   // entry-ids proxy is wired for the JS to fetch the full filtered id set.
