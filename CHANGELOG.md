@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.39](https://github.com/krt-profit/basetool/releases/tag/v1.5.39) - 2026-08-05
+
 ### Added
 
 - **Neue Seite „Materialbedarf" in der Auftragsverwaltung.** Sie zeigt, wie viel von jedem Material über alle offenen und in Bearbeitung befindlichen Aufträge hinweg noch zu beschaffen ist — getrennt nach bearbeitender Einheit, mit Bedarf, bereits zugeordnetem Bestand, Eintragungen und der verbleibenden Lücke. Material- und Item-Aufträge zählen beide mit; jede Zeile lässt sich zu den Aufträgen aufklappen, aus denen sie sich zusammensetzt.
