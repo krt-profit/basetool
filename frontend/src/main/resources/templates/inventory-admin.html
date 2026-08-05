@@ -10,7 +10,53 @@
             margin-bottom: 1rem;
             flex-wrap: wrap;
         }
-        
+
+        /* Collapsible filter panel (REQ-INV-037), the twin of the "Mein Lager" panel: the filter
+           widgets are a full row of multi-selects that wraps onto lines of its own, pushing the
+           table down. Collapsing takes the panel out of the flow entirely, so the bar above the
+           table stays scannable. */
+        .inv-filter-toggle {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        /* Chevron points right when collapsed and rotates down when the panel is open — the same
+           idiom as the bank panels, so the affordance reads identically across the app. */
+        .inv-filter-chevron {
+            transition: transform 0.15s ease;
+        }
+        [aria-expanded='true'] .inv-filter-chevron {
+            transform: rotate(90deg);
+        }
+        /* The active-filter count is what keeps a collapsed panel honest: it says how many
+           dimensions are narrowing the table, so a short table is never left unexplained. The
+           explicit [hidden] rule is required — .chip sets display:inline-flex, which would
+           otherwise beat the user-agent [hidden] { display: none }. */
+        .inv-filter-count[hidden] {
+            display: none;
+        }
+        .inv-filter-panel {
+            margin-top: 0.75rem;
+        }
+
+        @media (max-width: 768px) {
+            .global-inventory-filter {
+                flex-direction: column;
+                align-items: stretch !important;
+            }
+            .global-inventory-filter > div { width: 100%; }
+            .multi-select-container { width: 100%; }
+            /* Stacked, the auto-margin would strand the toggle on a line of its own; match the
+               full-width treatment the other action-bar buttons already get at this width. */
+            .inv-filter-toggle {
+                margin-left: 0;
+                width: 100%;
+                justify-content: center;
+                min-height: 44px;
+            }
+        }
+
         .modal {
             display: none;
             position: fixed;
@@ -149,11 +195,33 @@
                     th:text="#{inventory.deleteAll.btn}"
                     th:data-error-failed="#{inventory.deleteAll.error.failed}"
                     th:data-success="#{inventory.deleteAll.success}">Globales Lager leeren</button>
-            
-            <div class="krtm-margin-left-auto-display-flex-gap-1rem-align-2424">
-                <form th:if="${view != 'items'}" th:action="@{/inventory/all}" method="get" id="globalFilterForm" class="no-track krtm-margin-0-display-flex-gap-1rem-align-items-c-5700">
+
+            <!-- Filter toggle (REQ-INV-037): the panel below holds the whole filter row, which
+                 wraps onto lines of its own and pushes the table down. The button collapses it,
+                 and carries the number of active filters so a collapsed panel can never hide WHY
+                 the table is narrowed — that count is the only thing standing between "tidy" and
+                 "silently filtered".
+
+                 Rendered EXPANDED and collapsed by script on load: `hidden` is the collapse
+                 mechanism, so without JavaScript the filters stay reachable and usable. -->
+            <button type="button" class="btn btn-ghost inv-filter-toggle" id="globalFilterToggle"
+                    data-trigger="inv-admin-toggle-filters" data-testid="lager-filter-toggle"
+                    aria-expanded="true" aria-controls="globalFilterPanel">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-filter"/></svg>
+                <span th:text="#{inventory.filter.toggle}">Filter</span>
+                <span class="chip chip--primary inv-filter-count" id="globalFilterCount" hidden
+                      th:data-label="#{inventory.filter.activeCount}" data-testid="lager-filter-count">
+                    <span id="globalFilterCountValue" aria-hidden="true">0</span>
+                    <span id="globalFilterCountLabel" class="visually-hidden"></span>
+                </span>
+                <svg class="krt-icon inv-filter-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+            </button>
+        </div>
+
+        <div class="inv-filter-panel" id="globalFilterPanel">
+                <form th:if="${view != 'items'}" th:action="@{/inventory/all}" method="get" id="globalFilterForm" class="global-inventory-filter no-track krtm-margin-0-display-flex-gap-1rem-align-items-c-5700">
                     <div class="flex-gap-sm">
-                        <label class="form-label-xs">Material:</label>
+                        <label class="form-label-xs" th:text="#{inventory.filter.material}">Material:</label>
                         <div class="multi-select-container" id="materialFilterContainer">
                             <div class="multi-select-header" data-trigger="inv-admin-toggle-multi" data-multi-target="materialOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="materialHeader">
                                 <span class="selected-text" id="materialSelectedText" th:text="#{filter.all}">Alle</span>
@@ -171,7 +239,7 @@
                         </div>
                     </div>
                     <div class="flex-gap-sm">
-                        <label for="minQuality" class="form-label-xs">Qualität &ge;:</label>
+                        <label for="minQuality" class="form-label-xs" th:text="#{inventory.filter.minQuality}">Qualität &ge;:</label>
                         <select id="minQuality" name="minQuality" class="krtm-padding-0-375rem-2-5rem-0-375rem-0-75rem-min-caea" data-trigger="inv-admin-filter">
                             <option value="" th:text="#{filter.all}">-- Alle --</option>
                             <option th:each="q : ${#numbers.sequence(100, 1000, 100)}" th:value="${q}" th:text="${q}" th:selected="${selectedMinQuality != null and selectedMinQuality == q}"></option>
@@ -221,7 +289,7 @@
                      for item rows. All element ids are item-prefixed so the template source keeps
                      ids unique (HTMLHint id-unique); the checkbox classes are shared with the
                      material form \u2014 only one form renders per view. -->
-                <form th:if="${view == 'items'}" th:action="@{/inventory/all}" method="get" id="globalItemsFilterForm" class="no-track krtm-margin-0-display-flex-gap-1rem-align-items-c-5700">
+                <form th:if="${view == 'items'}" th:action="@{/inventory/all}" method="get" id="globalItemsFilterForm" class="global-inventory-filter no-track krtm-margin-0-display-flex-gap-1rem-align-items-c-5700">
                     <input type="hidden" name="view" value="items">
                     <div class="flex-gap-sm">
                         <label class="form-label-xs" th:text="#{inventory.items.filter.gameItem}">Item:</label>
@@ -261,7 +329,6 @@
                     </div>
                     <button type="button" class="btn btn-ghost" data-trigger="inv-admin-reset-filter" th:text="#{inventory.filter.reset}">Filter zur\u00fccksetzen</button>
                 </form>
-            </div>
         </div>
 
         <div class="overflow-x-auto" id="tableContainer" th:fragment="inventoryTableFragment">

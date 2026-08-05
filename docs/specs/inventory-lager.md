@@ -854,13 +854,20 @@ Ort / Nutzer / OrgUnit-Pool, or the personal marker.
 `InventoryWriteController#bulkRebook`, `templates/inventory-my.html`,
 `static/js/inventory-my.js` · **Issues:** — · **ADR:** ADR-0124
 
-### REQ-INV-037 — The "Mein Lager" filter row collapses, and says so when it hides an active filter
+### REQ-INV-037 — The Lager filter row collapses, and says so when it hides an active filter
 
-The filter widgets on `/inventory/my` are a full row of multi-selects and checkboxes that wraps
-onto lines of its own, pushing the bulk bar and the table down and leaving the band above the table
-hard to scan. The row therefore lives in a **collapsible panel** below the action bar, toggled by a
-**Filter** button in that bar. Both views (Material and Items) get it; only the active view's form
-exists in the DOM (REQ-INV-030), so one panel serves both.
+The filter widgets on `/inventory/my` and on `/inventory/all` are a full row of multi-selects and
+checkboxes that wraps onto lines of its own, pushing the bulk bar and the table down and leaving the
+band above the table hard to scan. The row therefore lives in a **collapsible panel** below the
+action bar, toggled by a **Filter** button in that bar. Both views (Material and Items) get it; only
+the active view's form exists in the DOM (REQ-INV-030), so one panel serves both.
+
+**Both Lager pages carry the same panel**, with page-local ids and storage keys: "Mein Lager"
+(`myFilterToggle` / `myFilterPanel`, stored in `inventory_my_filters`) and the shared "Globales
+Lager" (`globalFilterToggle` / `globalFilterPanel`, stored in `inventory_admin_filters`). The two
+preferences are deliberately independent — they describe two different pages' chrome. The shared
+Lager has no personal-entry flags (those are a "Mein Lager" dimension), so its count never includes
+them; everything else below holds verbatim on both.
 
 - **A collapsed panel must never hide the fact that the table is filtered.** The toggle carries a
   chip with the number of filter dimensions currently narrowing the view, shown whenever that number
@@ -878,10 +885,11 @@ exists in the DOM (REQ-INV-030), so one panel serves both.
   (REQ-UI-017) is never presented as an unexplained short table. Once the user toggles it, their
   choice wins on every later visit.
 - **The preference is per browser and not per view.** It is stored in the top level of the same
-  `inventory_my_filters` object REQ-UI-017 uses, beside — not inside — the two per-view filter
-  slots, because it describes the page's chrome rather than one view's selection: switching
-  Material ↔ Items must not re-open a panel the user closed. Storage access stays guarded, so a
-  privacy mode that denies it degrades to the default instead of breaking the page.
+  per-page object REQ-UI-017 uses (`inventory_my_filters` / `inventory_admin_filters`), beside — not
+  inside — the two per-view filter slots, because it describes the page's chrome rather than one
+  view's selection: switching Material ↔ Items must not re-open a panel the user closed. Storage
+  access stays guarded, so a privacy mode that denies it degrades to the default instead of breaking
+  the page.
 - **Accessible by construction.** The toggle is a real `<button>` carrying `aria-expanded` and
   `aria-controls`, and the chip pairs its digit with a visually-hidden "Aktive Filter: N". The count
   is *not* pushed into a dynamic `aria-label` on the button — that would shadow the visible "Filter"
@@ -889,9 +897,10 @@ exists in the DOM (REQ-INV-030), so one panel serves both.
 
 **Acceptance criteria**
 
-- [ ] Both `/inventory/my` and `/inventory/my?view=items` render the toggle, and the filter form
-  sits inside the panel, between the toggle and the bulk bar.
-- [ ] The panel is served expanded (`hidden` absent) on both views.
+- [ ] All four of `/inventory/my`, `/inventory/my?view=items`, `/inventory/all` and
+  `/inventory/all?view=items` render the toggle, and the filter form sits inside the panel, between
+  the toggle and the table (on "Mein Lager": between the toggle and the bulk bar).
+- [ ] The panel is served expanded (`hidden` absent) on every one of those views.
 - [ ] Collapsing, then reloading, keeps the panel collapsed; the same holds after switching between
   the Material and the Items view.
 - [ ] With no stored preference, an unfiltered Lager opens collapsed and a filtered one opens
@@ -902,10 +911,14 @@ exists in the DOM (REQ-INV-030), so one panel serves both.
 - [ ] Toggling the panel performs no navigation and no fetch — the table below is untouched.
 
 **Enforced by:** `InventoryPageControllerMvcTest`
-(`viewMyInventory_rendersTheFilterRowInsideACollapsiblePanel`) · **Code:**
+(`viewMyInventory_rendersTheFilterRowInsideACollapsiblePanel`,
+`viewAllInventory_rendersTheFilterRowInsideACollapsiblePanel`),
+`InventoryFilterPanelCollapseE2eTest` · **Code:**
 `templates/inventory-my.html`, `static/js/inventory-my.js`
 (`toggleMyFilterPanel` / `initMyFilterPanel` / `countActiveMyInventoryFilters` /
-`updateMyFilterCountBadge`) · **Issues:** — · **ADR:** — (extends REQ-UI-017 / ADR-0120)
+`updateMyFilterCountBadge`), `templates/inventory-admin.html`, `static/js/inventory-admin.js`
+(`toggleAdminFilterPanel` / `initAdminFilterPanel` / `countActiveAdminInventoryFilters` /
+`updateAdminFilterCountBadge`) · **Issues:** — · **ADR:** — (extends REQ-UI-017 / ADR-0120)
 
 ## Out of scope
 
