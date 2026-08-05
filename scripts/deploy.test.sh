@@ -192,6 +192,25 @@ FAKE
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'cosign %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
+# FAKE_COSIGN_FAIL_TIMES models a *transient* registry/Sigstore error: the first
+# N invocations for a given ref fail on stderr, every later one succeeds. Counted
+# per ref (arg 2 of `cosign verify <ref> …`) so a multi-image tick exercises the
+# retry once per image instead of spending the whole budget on the first.
+if [[ -n "${FAKE_COSIGN_FAIL_TIMES:-}" ]]; then
+  counter="${FAKE_DOCKER_LOG}.attempts.$(printf '%s' "${2:-ref}" | tr -c 'A-Za-z0-9' '_')"
+  n=0
+  [[ -f "${counter}" ]] && n="$(cat "${counter}")"
+  n=$(( n + 1 ))
+  printf '%s' "${n}" > "${counter}"
+  if (( n <= FAKE_COSIGN_FAIL_TIMES )); then
+    echo "Error: fetching signature: TRANSIENT registry error (attempt ${n})" >&2
+    exit 1
+  fi
+fi
+if [[ "${FAKE_COSIGN_RC:-0}" != "0" ]]; then
+  # A real mismatch also explains itself on stderr; the abort must quote it.
+  echo "Error: no matching signatures" >&2
+fi
 exit "${FAKE_COSIGN_RC:-0}"
 FAKE
   chmod +x "${T_FAKE_BIN}/cosign"
@@ -964,6 +983,8 @@ scenario_signature_failure_aborts() {
   run_deploy -- "${fake[@]}" "FAKE_COSIGN_RC=1" || rc=$?
   assert_exit 1 "$rc" "an untrusted digest fails the deploy"
   assert_contains "cosign signature verification failed" "the security abort is reported"
+  assert_contains "last cosign error: Error: no matching signatures" \
+    "the abort quotes cosign's own reason instead of only that it failed"
   assert_no_docker " pull " "nothing is pulled from an untrusted target"
   assert_no_docker " up " "the stack is not recreated on an untrusted target"
   if grep -q 'basetool_deploy_last_failure_timestamp [1-9]' \
@@ -972,6 +993,30 @@ scenario_signature_failure_aborts() {
   else
     record 0 "a deploy-failure metric is written for the verification failure"
   fi
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 14b: a *transient* verification error (a registry / Sigstore blip) is
+# retried, not escalated. This is the 2026-08-05 DeployFailed page: one GHCR
+# hiccup aborted the tick as a critical SECURITY alarm — "refusing to deploy an
+# unverified/untrusted image" — while the very same digest verified cleanly by
+# hand minutes later, and the same tick had also failed to resolve
+# keycloak-spi:stable. A blip must cost a retry, not an out-of-hours page.
+# ---------------------------------------------------------------------------
+scenario_transient_verify_failure_retries() {
+  echo "Scenario: a transient cosign failure is retried, not escalated"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "FAKE_COSIGN_FAIL_TIMES=1" "IRI_COSIGN_VERIFY_DELAY=0" || rc=$?
+  assert_exit 0 "$rc" "a single transient verify failure does not fail the deploy"
+  assert_contains "verify attempt 1/3 failed" "the failed attempt is logged"
+  assert_contains "TRANSIENT registry error" "cosign's stderr reaches the operator log"
+  assert_contains "backend: signature OK" "the retry succeeds and the gate passes"
+  assert_docker " up -d" "the stack is applied after the retry"
   rm -rf "${tmp}"
 }
 
@@ -1102,6 +1147,7 @@ scenario_monitoring_reconcile_disabled_when_running
 scenario_monitoring_flag_read_from_env_file
 scenario_signature_verified_on_apply
 scenario_signature_failure_aborts
+scenario_transient_verify_failure_retries
 scenario_break_glass_skips_verify
 # ---------------------------------------------------------------------------
 # Scenario 19: --check-only over a CONVERGED stack still runs the signature
