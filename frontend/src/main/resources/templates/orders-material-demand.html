@@ -32,6 +32,93 @@
            th:text="#{orders.demand.back}">Zurück zur Auftragsverwaltung</a>
     </div>
 
+    <!-- Filter surface. It sits OUTSIDE the swapped results fragment on purpose: a live-sync
+         refresh must never yank the panel out from under an open dropdown, and the controls are a
+         stable surface rather than data. The consequence is handled in the JS: the material list is
+         rendered from the data present at page load, and a material that only appears after a swap
+         is simply never in the exclusion set, so it stays visible rather than being silently
+         filtered away. -->
+    <div class="demand-actions-bar">
+        <button type="button" class="btn btn-ghost demand-filter-toggle" id="demandFilterToggle"
+                data-trigger="demand-toggle-filters" data-testid="demand-filter-toggle"
+                aria-expanded="true" aria-controls="demandFilterPanel">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-filter"/></svg>
+            <span th:text="#{orders.demand.filter.toggle}">Filter</span>
+            <span class="chip chip--primary demand-filter-count" id="demandFilterCount" hidden
+                  th:data-label="#{orders.demand.filter.activeCount}" data-testid="demand-filter-count">
+                <span id="demandFilterCountValue" aria-hidden="true">0</span>
+                <span id="demandFilterCountLabel" class="visually-hidden"></span>
+            </span>
+            <svg class="krt-icon demand-filter-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+        </button>
+    </div>
+
+    <div class="demand-filter-panel" id="demandFilterPanel">
+        <div class="demand-filter-form">
+            <div class="demand-filter-field">
+                <span class="demand-filter-label" th:text="#{orders.demand.col.material}">Material</span>
+                <div class="multi-select-container" id="demandMaterialContainer">
+                    <div class="multi-select-header" data-trigger="demand-toggle-multi"
+                         data-multi-target="demandMaterialOptions" id="demandMaterialHeader"
+                         th:data-all="#{filter.all}" th:data-selected="#{filter.selected}">
+                        <span class="selected-text" id="demandMaterialSelectedText" th:text="#{filter.all}">Alle</span>
+                    </div>
+                    <div class="multi-select-options" id="demandMaterialOptions">
+                        <div class="demand-material-search">
+                            <input type="search" id="demandMaterialSearch" class="demand-search-input"
+                                   data-trigger="demand-material-search" autocomplete="off"
+                                   th:placeholder="#{filter.material.placeholder}"
+                                   th:aria-label="#{filter.material.placeholder}"
+                                   data-testid="demand-material-search">
+                        </div>
+                        <label class="multi-select-option demand-material-all">
+                            <span th:text="#{filter.all}">Alle</span>
+                            <input type="checkbox" id="demandMatAll" value="ALL" checked
+                                   data-trigger="demand-toggle-material-all">
+                        </label>
+                        <label class="multi-select-option demand-material-option"
+                               th:each="mat : ${materialOptions}"
+                               th:data-material-name="${mat.name()}">
+                            <span th:text="${mat.name()}">Titanium</span>
+                            <input type="checkbox" class="demandMatCheck" th:value="${mat.id()}" checked
+                                   data-trigger="demand-update-material-state">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <fieldset class="demand-filter-field demand-filter-qualities">
+                <legend class="demand-filter-label" th:text="#{orders.demand.col.quality}">Qualit&auml;t</legend>
+                <!-- The two checks share one row so this field is exactly as tall as the material
+                     field beside it; a two-line fieldset would ragged-align the whole filter row. -->
+                <div class="demand-filter-checks">
+                    <label class="demand-filter-check">
+                        <input type="checkbox" class="demandQualCheck" value="GOOD" checked
+                               data-trigger="demand-update-quality" data-testid="demand-quality-good">
+                        <span th:text="#{orders.detail.quality.good}">Gut (650+)</span>
+                    </label>
+                    <label class="demand-filter-check">
+                        <input type="checkbox" class="demandQualCheck" value="NONE" checked
+                               data-trigger="demand-update-quality" data-testid="demand-quality-none">
+                        <span th:text="#{orders.detail.quality.none}">Keine</span>
+                    </label>
+                </div>
+            </fieldset>
+
+            <div class="demand-filter-field">
+                <label class="demand-filter-check">
+                    <input type="checkbox" id="demandHideCovered"
+                           data-trigger="demand-toggle-hide-covered" data-testid="demand-hide-covered">
+                    <span th:text="#{orders.demand.filter.hideCovered}">Gedeckte ausblenden</span>
+                </label>
+            </div>
+
+            <button type="button" class="btn btn-ghost demand-filter-reset"
+                    data-trigger="demand-reset-filters" data-testid="demand-filter-reset"
+                    th:text="#{orders.demand.filter.reset}">Filter zur&uuml;cksetzen</button>
+        </div>
+    </div>
+
     <div id="orders-material-demand-results">
         <th:block th:fragment="demandResults">
         <div th:if="${demand == null or demand.groups() == null or demand.groups().isEmpty()}" class="hud-box mt-2">
@@ -41,8 +128,6 @@
         </div>
 
         <th:block th:unless="${demand == null or demand.groups() == null or demand.groups().isEmpty()}">
-            <p class="text-muted demand-basis"
-               th:text="#{orders.demand.basis(${demand.orderCount()})}">Basis: 12 Aufträge</p>
 
             <section class="hud-box mt-2 demand-group" th:each="group : ${demand.groups()}"
                      data-testid="demand-group">
@@ -67,13 +152,46 @@
                             <col class="w-1">
                         </colgroup>
                         <thead>
+                        <!-- Sortable columns. Quality deliberately is not one: it is a two-value
+                             bucket the filter panel already narrows. One sort selection drives
+                             EVERY group table so the units stay comparable side by side. -->
                         <tr>
-                            <th th:text="#{orders.demand.col.material}">Material</th>
-                            <th th:text="#{orders.demand.col.quality}" class="nowrap">Qualität</th>
-                            <th th:text="#{orders.demand.col.required}" class="nowrap">Bedarf</th>
-                            <th th:text="#{orders.demand.col.booked}" class="nowrap">Bestand</th>
-                            <th th:text="#{orders.demand.col.claimed}" class="nowrap">Eintragungen</th>
-                            <th th:text="#{orders.demand.col.outstanding}" class="nowrap">Offen</th>
+                            <th class="demand-sortable" data-sort-col="material" aria-sort="none">
+                                <button type="button" class="demand-sort-btn" data-trigger="demand-sort"
+                                        data-sort-key="material" data-testid="demand-sort-material">
+                                    <span th:text="#{orders.demand.col.material}">Material</span>
+                                    <span class="demand-sort-indicator" aria-hidden="true"></span>
+                                </button>
+                            </th>
+                            <th th:text="#{orders.demand.col.quality}" class="nowrap">Qualit&auml;t</th>
+                            <th class="nowrap demand-sortable" data-sort-col="required" aria-sort="none">
+                                <button type="button" class="demand-sort-btn" data-trigger="demand-sort"
+                                        data-sort-key="required" data-testid="demand-sort-required">
+                                    <span th:text="#{orders.demand.col.required}">Bedarf</span>
+                                    <span class="demand-sort-indicator" aria-hidden="true"></span>
+                                </button>
+                            </th>
+                            <th class="nowrap demand-sortable" data-sort-col="booked" aria-sort="none">
+                                <button type="button" class="demand-sort-btn" data-trigger="demand-sort"
+                                        data-sort-key="booked" data-testid="demand-sort-booked">
+                                    <span th:text="#{orders.demand.col.booked}">Bestand</span>
+                                    <span class="demand-sort-indicator" aria-hidden="true"></span>
+                                </button>
+                            </th>
+                            <th class="nowrap demand-sortable" data-sort-col="claimed" aria-sort="none">
+                                <button type="button" class="demand-sort-btn" data-trigger="demand-sort"
+                                        data-sort-key="claimed" data-testid="demand-sort-claimed">
+                                    <span th:text="#{orders.demand.col.claimed}">Eintragungen</span>
+                                    <span class="demand-sort-indicator" aria-hidden="true"></span>
+                                </button>
+                            </th>
+                            <th class="nowrap demand-sortable" data-sort-col="outstanding" aria-sort="none">
+                                <button type="button" class="demand-sort-btn" data-trigger="demand-sort"
+                                        data-sort-key="outstanding" data-testid="demand-sort-outstanding">
+                                    <span th:text="#{orders.demand.col.outstanding}">Offen</span>
+                                    <span class="demand-sort-indicator" aria-hidden="true"></span>
+                                </button>
+                            </th>
                         </tr>
                         </thead>
                         <tbody>
@@ -85,7 +203,16 @@
                              the org-unit id keeps it unique across groups. -->
                         <th:block th:each="row : ${group.materials()}"
                                   th:with="bucketKey=${(group.orgUnit() != null ? group.orgUnit().id() : 'none') + '|' + row.material().id() + '|' + row.qualityRequirement()}">
-                            <tr data-testid="demand-row" th:data-bucket-key="${bucketKey}">
+                            <!-- Sort/filter keys ride as data attributes: the JS must never parse
+                                 the LOCALISED cell text (1000,000 SCU) back into a number. -->
+                            <tr data-testid="demand-row" th:data-bucket-key="${bucketKey}"
+                                th:data-material-id="${row.material().id()}"
+                                th:data-material-name="${row.material().name()}"
+                                th:data-quality="${row.qualityRequirement()}"
+                                th:data-required="${row.requiredAmount()}"
+                                th:data-booked="${row.bookedAmount()}"
+                                th:data-claimed="${row.claimedAmount()}"
+                                th:data-outstanding="${row.outstandingAmount()}">
                                 <td>
                                     <button type="button" class="btn btn-ghost demand-orders-toggle"
                                             data-trigger="demand-toggle-orders"
@@ -171,6 +298,13 @@
                     </table>
                 </div>
             </section>
+
+            <!-- Shown by the JS when every row is filtered out, so a blank page is never left
+                 unexplained. Server-rendered hidden: without JS nothing is ever filtered. -->
+            <p class="text-muted demand-no-match" id="demandNoMatch" hidden
+               data-testid="demand-no-match" th:text="#{orders.demand.filter.noMatch}">
+                Keine Materialien entsprechen den gew&auml;hlten Filtern.
+            </p>
         </th:block>
         </th:block>
     </div>

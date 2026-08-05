@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Der Materialbedarf lässt sich jetzt filtern und sortieren.** Hinter einem **Filter**-Knopf (einklappbar wie im Lager) lässt sich nach Material — mit Suchfeld — und Qualitätsstufe eingrenzen, und bereits gedeckte Materialien lassen sich ausblenden. Die Spalten Material, Bedarf, Bestand, Eintragungen und Offen sind per Klick auf die Überschrift sortierbar. Die Zeile „Basis: N Aufträge" entfällt.
+
 ## [v1.5.39](https://github.com/krt-profit/basetool/releases/tag/v1.5.39) - 2026-08-05
 
 ### Added

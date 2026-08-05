@@ -27,15 +27,11 @@ import java.util.List;
  * see, split by responsible org unit.
  *
  * <p>Wrapped in a record rather than returned as a bare {@code List} so the projection can grow
- * page-level context (a generation timestamp, a counted-orders figure) without breaking the
- * response shape — and so the JSON body is an object, per the API conventions.
+ * page-level context (a generation timestamp, a freshness marker) without breaking the response
+ * shape — and so the JSON body is an object, per the API conventions.
  *
  * @param groups one group per responsible org unit that has outstanding demand, ordered by the
  *     unit's shorthand; empty when the caller may see no non-terminal order, which the page renders
  *     as its empty state rather than as an error
- * @param orderCount how many non-terminal orders the aggregation considered, so the page can state
- *     the basis of its figures instead of leaving the user to guess how much was aggregated. This
- *     counts every order in scope, including one whose requirements are fully covered or empty and
- *     which therefore contributed no visible row
  */
-public record MaterialDemandOverviewDto(List<MaterialDemandGroupDto> groups, int orderCount) {}
+public record MaterialDemandOverviewDto(List<MaterialDemandGroupDto> groups) {}

@@ -122,7 +122,7 @@ public class JobOrderMaterialDemandService {
     // profit-eligible
     // org unit is not part of the order workflow and must not see its aggregated demand either.
     if (!ownerScopeService.canViewJobOrders()) {
-      return new MaterialDemandOverviewDto(List.of(), 0);
+      return new MaterialDemandOverviewDto(List.of());
     }
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     List<JobOrder> orders =
@@ -132,7 +132,7 @@ public class JobOrderMaterialDemandService {
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds());
     if (orders.isEmpty()) {
-      return new MaterialDemandOverviewDto(List.of(), 0);
+      return new MaterialDemandOverviewDto(List.of());
     }
 
     OrderLinkedStockIndex stockIndex =
@@ -170,7 +170,7 @@ public class JobOrderMaterialDemandService {
         "Aggregated material demand across {} order(s) into {} org-unit group(s)",
         orders.size(),
         groupDtos.size());
-    return new MaterialDemandOverviewDto(groupDtos, orders.size());
+    return new MaterialDemandOverviewDto(groupDtos);
   }
 
   /**

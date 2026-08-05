@@ -19,12 +19,20 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDemandGroupDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDemandOverviewDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDemandRowDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -52,7 +60,7 @@ public class JobOrderMaterialDemandPageController {
    * state instead of a full-page error.
    */
   private static final MaterialDemandOverviewDto EMPTY_OVERVIEW =
-      new MaterialDemandOverviewDto(List.of(), 0);
+      new MaterialDemandOverviewDto(List.of());
 
   /** Loads the aggregated demand from the backend. */
   private final BackendApiClient backendApiClient;
@@ -91,9 +99,40 @@ public class JobOrderMaterialDemandPageController {
     }
 
     model.addAttribute("demand", demand);
+    model.addAttribute("materialOptions", materialOptions(demand));
     if ("results".equals(fragment)) {
       return "orders-material-demand :: demandResults";
     }
     return "orders-material-demand";
+  }
+
+  /**
+   * Collects the distinct materials the overview actually shows, so the filter panel's multi-select
+   * can be rendered server-side rather than assembled from the DOM. Sorted by name
+   * (case-insensitively) because the panel lists materials alphabetically, independently of the
+   * tables' SCU-first ordering.
+   *
+   * <p>A material appearing in several org-unit groups, or in both quality buckets, yields exactly
+   * one option — the filter narrows by material, not by bucket.
+   *
+   * @param demand the overview being rendered; never {@code null}.
+   * @return the distinct materials, name-ordered; empty when nothing is shown.
+   */
+  @NotNull
+  private static List<MaterialDto> materialOptions(@NotNull MaterialDemandOverviewDto demand) {
+    Map<UUID, MaterialDto> byId = new LinkedHashMap<>();
+    for (MaterialDemandGroupDto group : demand.groups()) {
+      for (MaterialDemandRowDto row : group.materials()) {
+        if (row.material() != null && row.material().id() != null) {
+          byId.putIfAbsent(row.material().id(), row.material());
+        }
+      }
+    }
+    return byId.values().stream()
+        .sorted(
+            Comparator.comparing(
+                material -> material.name() == null ? "" : material.name(),
+                String.CASE_INSENSITIVE_ORDER))
+        .toList();
   }
 }

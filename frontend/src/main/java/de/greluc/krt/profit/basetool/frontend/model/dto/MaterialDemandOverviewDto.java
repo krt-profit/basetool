@@ -27,7 +27,5 @@ import java.util.List;
  *
  * @param groups one group per responsible org unit with outstanding demand; empty when the caller
  *     may see no non-terminal order, which the page renders as its empty state
- * @param orderCount how many non-terminal orders the aggregation considered, shown so the user can
- *     see the basis of the numbers; includes orders that contributed no visible row
  */
-public record MaterialDemandOverviewDto(List<MaterialDemandGroupDto> groups, int orderCount) {}
+public record MaterialDemandOverviewDto(List<MaterialDemandGroupDto> groups) {}

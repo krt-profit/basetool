@@ -215,7 +215,6 @@ class JobOrderMaterialDemandServiceTest {
 
     MaterialDemandOverviewDto overview = service.getMaterialDemandOverview();
 
-    assertThat(overview.orderCount()).isEqualTo(2);
     assertThat(overview.groups()).hasSize(1);
     MaterialDemandGroupDto group = overview.groups().get(0);
     assertThat(group.orgUnit().shorthand()).isEqualTo("IRI");
@@ -270,7 +269,6 @@ class JobOrderMaterialDemandServiceTest {
     MaterialDemandOverviewDto overview = service.getMaterialDemandOverview();
 
     assertThat(overview.groups()).isEmpty();
-    assertThat(overview.orderCount()).isZero();
     @SuppressWarnings("unchecked")
     ArgumentCaptor<java.util.Collection<JobOrderStatus>> statuses =
         ArgumentCaptor.forClass(java.util.Collection.class);
@@ -290,7 +288,6 @@ class JobOrderMaterialDemandServiceTest {
     MaterialDemandOverviewDto overview = service.getMaterialDemandOverview();
 
     assertThat(overview.groups()).isEmpty();
-    assertThat(overview.orderCount()).isZero();
     verifyNoInteractions(jobOrderRepository);
     verify(jobOrderStockProjectionService, never()).loadOrderLinkedStockIndex(any());
   }
