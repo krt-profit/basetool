@@ -36,8 +36,13 @@
         .inv-filter-count[hidden] {
             display: none;
         }
+        /* The bottom margin is not cosmetic symmetry: the panel abuts #tableContainer directly on
+           this page (no bulk bar in between, unlike "Mein Lager"), and the gap the filter row used
+           to get from .actions-bar's margin-bottom left with it when the forms moved out of the
+           bar. Without this the reset button sits flush against the table header. */
         .inv-filter-panel {
             margin-top: 0.75rem;
+            margin-bottom: 1rem;
         }
 
         @media (max-width: 768px) {
