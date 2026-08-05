@@ -3359,6 +3359,64 @@ input[type='radio']:focus {
     font-weight: var(--fw-bold);
 }
 
+/* Cross-order material-demand overview (REQ-ORDERS-034). One section per
+   responsible org unit, each a HUD box whose heading pairs the unit badge with
+   its full name. The lead + basis lines are muted so the tables stay the focus. */
+.demand-lead,
+.demand-basis {
+    margin-top: var(--space-1);
+    font-family: Lato, sans-serif;
+    font-size: var(--fs-xs);
+}
+
+.demand-group-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+    font-size: var(--fs-h3);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* The material cell doubles as the drill-down toggle, so it must read as a row
+   label rather than a button: no chrome, left-aligned, full-width hit area (the
+   44px min-height keeps it tappable on the mobile device class). */
+.demand-orders-toggle {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    width: 100%;
+    min-height: 44px;
+    padding-left: 0;
+    text-align: left;
+}
+
+.demand-orders-toggle .toggle-icon {
+    color: var(--color-primary);
+    font-size: 0.7rem;
+}
+
+/* Nested contributing-order table: visually subordinate to the bucket row it
+   expands from, hence the transparent ground and the primary-tinted inset rule. */
+.demand-orders-table {
+    margin: 0;
+    background: transparent;
+    border: none;
+    border-left: 2px solid var(--color-primary);
+}
+
+/* The gathering gap is the number the page exists for, so it carries weight;
+   a fully covered bucket drops to the success colour instead. */
+.demand-outstanding {
+    font-weight: var(--fw-bold);
+}
+
+.demand-covered {
+    color: var(--color-success);
+    font-weight: var(--fw-regular);
+}
+
 /* Quality chip for an item order's aggregated-materials panel — one row per
    (material, quality). GOOD (700+) reads as the Profit green; NONE ("Keine")
    takes the muted grey so "no quality floor" never competes for attention. */

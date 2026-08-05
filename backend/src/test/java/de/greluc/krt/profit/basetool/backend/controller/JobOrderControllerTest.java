@@ -40,7 +40,10 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemBlueprintOwne
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandGroupDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
@@ -48,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverReportServi
 import de.greluc.krt.profit.basetool.backend.service.JobOrderHandoverService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemBlueprintOwnersService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderItemProductionService;
+import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialDemandService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
@@ -106,6 +110,7 @@ class JobOrderControllerTest {
 
   @Mock private JobOrderService jobOrderService;
   @Mock private JobOrderQueryService jobOrderQueryService;
+  @Mock private JobOrderMaterialDemandService jobOrderMaterialDemandService;
   @Mock private JobOrderItemBlueprintOwnersService jobOrderItemBlueprintOwnersService;
   @Mock private JobOrderHandoverService jobOrderHandoverService;
   @Mock private JobOrderItemProductionService jobOrderItemProductionService;
@@ -265,6 +270,27 @@ class JobOrderControllerTest {
     assertThat(result.content()).containsExactly(dto);
     verify(jobOrderQueryService)
         .getAllJobOrders(eq(List.of(JobOrderStatus.OPEN)), eq(squadronIds), any(Pageable.class));
+  }
+
+  // ── GET /api/v1/orders/material-demand ───────────────────────────────
+
+  @Test
+  // covers REQ-ORDERS-034
+  void getMaterialDemand_returnsTheAggregatedOverviewUnchanged() {
+    MaterialDemandOverviewDto overview =
+        new MaterialDemandOverviewDto(
+            List.of(
+                new MaterialDemandGroupDto(
+                    new SquadronReferenceDto(UUID.randomUUID(), "Iridium", "IRI"), List.of())),
+            3);
+    when(jobOrderMaterialDemandService.getMaterialDemandOverview()).thenReturn(overview);
+
+    MaterialDemandOverviewDto result = controller.getMaterialDemand();
+
+    // The endpoint is a thin pass-through: the scope gate and the aggregation both live in the
+    // service, so the controller must neither filter nor reshape the projection.
+    assertThat(result).isSameAs(overview);
+    verify(jobOrderMaterialDemandService).getMaterialDemandOverview();
   }
 
   // ── GET /api/v1/orders/lookup ────────────────────────────────────────

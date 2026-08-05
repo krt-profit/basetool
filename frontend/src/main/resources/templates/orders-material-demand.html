@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+    <title th:text="#{orders.demand.title} + ' - ' + ${appTitle}">Materialbedarf - Profit Basetool</title>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/krt.webp}" alt="Logo" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box flex-between krtm-flex-wrap-wrap-gap-1rem-659b">
+        <div>
+            <h1 th:text="#{orders.demand.title}" class="krtm-letter-spacing-0-08em-0157">Materialbedarf</h1>
+            <p class="text-muted demand-lead" th:text="#{orders.demand.lead}">
+                Offener Materialbedarf über alle laufenden Aufträge, nach bearbeitender Einheit.
+            </p>
+        </div>
+        <a th:href="@{/orders}" class="btn btn-ghost krtm-min-height-44px-display-inline-flex-align-it-37c8"
+           th:text="#{orders.demand.back}">Zurück zur Auftragsverwaltung</a>
+    </div>
+
+    <div id="orders-material-demand-results">
+        <th:block th:fragment="demandResults">
+        <div th:if="${demand == null or demand.groups() == null or demand.groups().isEmpty()}" class="hud-box mt-2">
+            <p class="text-muted" th:text="#{orders.demand.empty}">
+                Es gibt derzeit keine offenen oder in Bearbeitung befindlichen Aufträge mit Materialbedarf.
+            </p>
+        </div>
+
+        <th:block th:unless="${demand == null or demand.groups() == null or demand.groups().isEmpty()}">
+            <p class="text-muted demand-basis"
+               th:text="#{orders.demand.basis(${demand.orderCount()})}">Basis: 12 Aufträge</p>
+
+            <section class="hud-box mt-2 demand-group" th:each="group : ${demand.groups()}"
+                     data-testid="demand-group">
+                <h2 class="demand-group-title">
+                    <span th:if="${group.orgUnit() != null}" class="squadron-badge"
+                          th:title="${group.orgUnit().name()}"
+                          th:text="${group.orgUnit().shorthand()}">IRI</span>
+                    <span th:if="${group.orgUnit() == null}" class="squadron-badge squadron-badge-muted"
+                          th:title="#{orders.demand.group.unassigned}">—</span>
+                    <span th:if="${group.orgUnit() != null}" th:text="${group.orgUnit().name()}">Iridium</span>
+                    <span th:if="${group.orgUnit() == null}" th:text="#{orders.demand.group.unassigned}">Ohne bearbeitende Einheit</span>
+                </h2>
+
+                <div class="table-responsive">
+                    <table class="data-table demand-table">
+                        <colgroup>
+                            <col class="w-full">
+                            <col class="w-1">
+                            <col class="w-1">
+                            <col class="w-1">
+                            <col class="w-1">
+                            <col class="w-1">
+                        </colgroup>
+                        <thead>
+                        <tr>
+                            <th th:text="#{orders.demand.col.material}">Material</th>
+                            <th th:text="#{orders.demand.col.quality}" class="nowrap">Qualität</th>
+                            <th th:text="#{orders.demand.col.required}" class="nowrap">Bedarf</th>
+                            <th th:text="#{orders.demand.col.booked}" class="nowrap">Bestand</th>
+                            <th th:text="#{orders.demand.col.claimed}" class="nowrap">Eintragungen</th>
+                            <th th:text="#{orders.demand.col.outstanding}" class="nowrap">Offen</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <!-- Two rows per bucket: the aggregated figures, plus a drill-down row listing
+                             the contributing orders. The drill-down starts collapsed and its expanded
+                             state is persisted per browser in localStorage by orders-material-demand.js
+                             (the REQ-ORDERS-027 idiom), re-applied on load and after every fragment
+                             swap. The bucket key is material+quality, which is unique within a group;
+                             the org-unit id keeps it unique across groups. -->
+                        <th:block th:each="row : ${group.materials()}"
+                                  th:with="bucketKey=${(group.orgUnit() != null ? group.orgUnit().id() : 'none') + '|' + row.material().id() + '|' + row.qualityRequirement()}">
+                            <tr data-testid="demand-row" th:data-bucket-key="${bucketKey}">
+                                <td>
+                                    <button type="button" class="btn btn-ghost demand-orders-toggle"
+                                            data-trigger="demand-toggle-orders"
+                                            th:data-bucket-key="${bucketKey}"
+                                            aria-expanded="false"
+                                            th:aria-label="#{orders.demand.orders.toggle}">
+                                        <span class="toggle-icon" aria-hidden="true">&#9654;</span>
+                                        <span th:text="${row.material().name()}" th:title="${row.material().name()}">Titanium</span>
+                                        <span class="text-muted"
+                                              th:text="'(' + ${row.orders() != null ? row.orders().size() : 0} + ')'">(0)</span>
+                                    </button>
+                                </td>
+                                <td class="nowrap">
+                                    <span th:if="${row.qualityRequirement() == 'GOOD'}" class="quality-badge quality-good"
+                                          th:text="#{orders.detail.quality.good}">Gut (650+)</span>
+                                    <span th:unless="${row.qualityRequirement() == 'GOOD'}" class="quality-badge quality-none"
+                                          th:text="#{orders.detail.quality.none}">Keine</span>
+                                </td>
+                                <td class="nowrap" data-testid="demand-required">
+                                    <th:block th:replace="~{fragments/material-amount :: amount(${row.requiredAmount()}, ${row.material().quantityType()})}" />
+                                </td>
+                                <td class="nowrap" data-testid="demand-booked">
+                                    <th:block th:replace="~{fragments/material-amount :: amount(${row.bookedAmount()}, ${row.material().quantityType()})}" />
+                                </td>
+                                <td class="nowrap" data-testid="demand-claimed">
+                                    <th:block th:replace="~{fragments/material-amount :: amount(${row.claimedAmount()}, ${row.material().quantityType()})}" />
+                                </td>
+                                <td class="nowrap demand-outstanding" data-testid="demand-outstanding"
+                                    th:classappend="${row.outstandingAmount() != null and row.outstandingAmount() <= 0} ? 'demand-covered' : ''">
+                                    <th:block th:replace="~{fragments/material-amount :: amount(${row.outstandingAmount()}, ${row.material().quantityType()})}" />
+                                </td>
+                            </tr>
+                            <tr class="demand-orders-row krtm-display-none-5790" th:data-bucket-orders="${bucketKey}">
+                                <td colspan="6" class="p-0">
+                                    <div class="table-responsive">
+                                        <table class="data-table demand-orders-table">
+                                            <colgroup>
+                                                <col class="w-1">
+                                                <col class="w-1">
+                                                <col class="w-1">
+                                                <col class="w-1">
+                                                <col class="w-full">
+                                            </colgroup>
+                                            <thead>
+                                            <tr>
+                                                <th th:text="#{orders.demand.orders.col.order}">Auftrag</th>
+                                                <th th:text="#{orders.demand.orders.col.status}">Status</th>
+                                                <th th:text="#{orders.demand.col.required}">Bedarf</th>
+                                                <th th:text="#{orders.demand.col.booked}">Bestand</th>
+                                                <th th:text="#{orders.demand.col.claimed}">Eintragungen</th>
+                                            </tr>
+                                            </thead>
+                                            <tbody>
+                                            <tr th:each="share : ${row.orders()}" data-testid="demand-order-share">
+                                                <td class="nowrap">
+                                                    <a th:href="@{/orders/{id}(id=${share.jobOrderId()})}"
+                                                       th:text="'#' + ${share.displayId()}">#42</a>
+                                                    <span class="order-kind-badge"
+                                                          th:classappend="${share.type() == 'ITEM'} ? 'order-kind-item' : 'order-kind-material'"
+                                                          th:text="${share.type() == 'ITEM'} ? #{orders.kind.item} : #{orders.kind.material}">Material</span>
+                                                </td>
+                                                <td class="nowrap">
+                                                    <span th:text="#{__${'status.' + share.status()}__}"
+                                                          th:class="'status-badge status-' + ${#strings.toLowerCase(share.status())}">Offen</span>
+                                                </td>
+                                                <td class="nowrap">
+                                                    <th:block th:replace="~{fragments/material-amount :: amount(${share.requiredAmount()}, ${row.material().quantityType()})}" />
+                                                </td>
+                                                <td class="nowrap">
+                                                    <th:block th:replace="~{fragments/material-amount :: amount(${share.bookedAmount()}, ${row.material().quantityType()})}" />
+                                                </td>
+                                                <td class="nowrap">
+                                                    <th:block th:replace="~{fragments/material-amount :: amount(${share.claimedAmount()}, ${row.material().quantityType()})}" />
+                                                </td>
+                                            </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+                        </th:block>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </th:block>
+        </th:block>
+    </div>
+</main>
+
+
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    // Thymeleaf-interpolated strings only; the imperative logic lives in the
+    // orders-material-demand.js page module loaded immediately after this bootstrap (ADR-0069).
+    /*<![CDATA[*/
+    const KRT_DEMAND_SECTION_REFRESH_ERROR = /*[[#{orders.demand.section.refresh.error}]]*/ 'Aktualisierung fehlgeschlagen.';
+    const KRT_DEMAND_LIVESYNC_UPDATES = /*[[#{orders.demand.livesync.updates}]]*/ 'Neue Daten verfügbar';
+    /*]]>*/
+</script>
+<script th:src="@{/js/orders-material-demand.js}" th:attr="nonce=${cspNonce}"></script>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+</body>
+</html>

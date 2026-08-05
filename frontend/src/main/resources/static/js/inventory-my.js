@@ -1006,14 +1006,24 @@ window.krtNotifyInventoryChanged = broadcastInventoryChanged;
 // whose container the page does not render is a harmless no-op.
 function broadcastOrdersChanged(orderIds) {
     if (!window.krtLiveSync || typeof window.krtLiveSync.sendChanged !== 'function') return;
+    let touchedAnyOrder = false;
     (orderIds || []).forEach(function (orderId) {
-        if (orderId)
+        if (orderId) {
+            touchedAnyOrder = true;
             window.krtLiveSync.sendChanged('order:' + orderId, [
                 'materials',
                 'aggregated',
                 'item-stock',
             ]);
+        }
     });
+    // The cross-order material-demand overview (REQ-ORDERS-034) reads the same earmarked stock as
+    // the per-order material list, so a write that changes an order's linked stock also changes the
+    // aggregated `Bestand` column. It lives in the global `orders` room, hence one extra publish
+    // rather than one per order.
+    if (touchedAnyOrder) {
+        window.krtLiveSync.sendChanged('orders', ['demand']);
+    }
 }
 function broadcastBoardChanged() {
     if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {

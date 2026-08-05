@@ -365,6 +365,12 @@ declare const KRT_ORDERS_LIVESYNC_UPDATES: string;
 /** Injected by the page bootstrap (declared in orders-index.html). */
 declare const KRT_ORDERS_SECTION_REFRESH_ERROR: string;
 
+// --- consumed by: orders-material-demand.js
+/** Injected by the page bootstrap (declared in orders-material-demand.html). */
+declare const KRT_DEMAND_LIVESYNC_UPDATES: string;
+/** Injected by the page bootstrap (declared in orders-material-demand.html). */
+declare const KRT_DEMAND_SECTION_REFRESH_ERROR: string;
+
 // --- consumed by: org-chart.js
 /** Injected by the page bootstrap (declared in org-chart.html). */
 declare const OC_I18N: KrtI18nDict;

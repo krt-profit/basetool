@@ -74,11 +74,62 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
-  void ordersQueueSeamMap_matchesTheOrdersQueueTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/orders-index.js", "ORDERS_SECTIONS");
-    assertThat(jsKeys)
-        .as("ORDERS_SECTIONS keys in orders-index.js vs LiveSyncTopicClass.ORDERS_QUEUE whitelist")
-        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.ORDERS_QUEUE.allowedSections());
+  void ordersQueueSeamMaps_partitionTheOrdersQueueTopicWhitelist() throws IOException {
+    // REQ-ORDERS-034: the global `orders` room is shared by TWO pages that each render a different
+    // fold of the same queue — the order list (`queue`) and the cross-order material-demand
+    // overview (`demand`) — so neither seam map matches the whole whitelist on its own (the
+    // org-structure precedent). Assert both are subsets AND that their union is exactly the
+    // whitelist: the union check is what catches an orphaned registry key no page ever renders,
+    // which a pair of subset assertions alone would let through.
+    Set<String> queueKeys = seamMapKeys("/static/js/orders-index.js", "ORDERS_SECTIONS");
+    Set<String> demandKeys = seamMapKeys("/static/js/orders-material-demand.js", "DEMAND_SECTIONS");
+    Set<String> whitelist = LiveSyncTopicClass.ORDERS_QUEUE.allowedSections();
+
+    assertThat(queueKeys)
+        .as("ORDERS_SECTIONS keys in orders-index.js vs the ORDERS_QUEUE whitelist")
+        .isSubsetOf(whitelist);
+    assertThat(demandKeys)
+        .as("DEMAND_SECTIONS keys in orders-material-demand.js vs the ORDERS_QUEUE whitelist")
+        .isSubsetOf(whitelist);
+
+    Set<String> union = new LinkedHashSet<>(queueKeys);
+    union.addAll(demandKeys);
+    assertThat(union)
+        .as("every ORDERS_QUEUE section is rendered by exactly one of the two pages")
+        .containsExactlyInAnyOrderElementsOf(whitelist);
+  }
+
+  @Test
+  void orderDetailCrossPublish_keepsTheDemandOverviewInSync() throws IOException {
+    // REQ-ORDERS-034: an order's status change adds or removes its whole material contribution to
+    // the demand overview, so the detail page's cross-publish into the `orders` room must carry
+    // `demand` alongside `queue`. The relay drops an unknown key silently, and a missing key leaves
+    // exactly those peers stale with no error (the REQ-FE-010 defect class), so pin both here.
+    String js = readResource("/static/js/orders-detail.js");
+    assertSendChangedKeysWhitelisted(
+        js, "'orders'", LiveSyncTopicClass.ORDERS_QUEUE.allowedSections());
+    assertThat(js)
+        .as("the order detail must poke both folds of the orders room on a queue-visible mutation")
+        .contains("sendChanged('orders', ['queue', 'demand'])");
+  }
+
+  @Test
+  void inventoryPages_pokeTheDemandOverviewWhenOrderLinkedStockChanges() throws IOException {
+    // REQ-ORDERS-034: the demand overview's `Bestand` column is the order-linked inventory, so an
+    // inventory write that touches an earmarked row must poke `orders`/`demand` as well as the
+    // per-order rooms it already publishes to. Without it a peer's gathering list keeps showing
+    // stock that has already been booked elsewhere.
+    for (String module :
+        new String[] {"/static/js/inventory-my.js", "/static/js/inventory-admin.js"}) {
+      String js = readResource(module);
+      assertSendChangedKeysWhitelisted(
+          js, "'orders'", LiveSyncTopicClass.ORDERS_QUEUE.allowedSections());
+      assertThat(js)
+          .as(
+              "%s must poke the cross-order demand overview after an order-linked stock write",
+              module)
+          .contains("sendChanged('orders', ['demand'])");
+    }
   }
 
   @Test

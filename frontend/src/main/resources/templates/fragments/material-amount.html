@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--
+  Unit-aware material-amount fragment: renders a quantity in the unit its material
+  can actually express — whole units for a PIECE material, three decimals for SCU
+  (REQ-ORDERS-001/002) — so a summed PIECE count never surfaces as a fraction.
+
+  It lives in its OWN file rather than inside the page that uses it: a th:fragment
+  declared at the top level of a page template is still rendered as part of that
+  page, so an in-page definition emitted a stray "0.000 SCU" (its parameters unbound)
+  after the closing </main> on every full-page render. A fragments file is only ever
+  included, never rendered as a view, so the definition cannot leak into the output.
+-->
+<th:block th:fragment="amount(value, quantityType)" th:switch="${quantityType}">
+    <span th:case="'PIECE'" th:text="|${value != null ? #numbers.formatInteger(value, 1) : '0'} #{material.quantity.piece}|">0 Stück</span>
+    <span th:case="*" th:text="|${value != null ? #numbers.formatDecimal(value, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">0.000 SCU</span>
+</th:block>
+</body>
+</html>

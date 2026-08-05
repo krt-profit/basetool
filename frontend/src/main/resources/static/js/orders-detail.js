@@ -139,9 +139,12 @@ const ORDER_SECTIONS = {
 // sanctioned cross-topic case): the detail page subscribes to order:{id}, not to `orders`, yet every
 // queue viewer must still see the change. A non-profit requester is refused the room server-side, so
 // the key reaches only viewers who may read the queue.
+// `demand` rides along because the cross-order material-demand overview (REQ-ORDERS-034) is a fold
+// of exactly these orders: a status change into or out of OPEN/IN_PROGRESS adds or removes an
+// order's whole material contribution, and an edit changes the amounts it contributes.
 function _publishOrdersQueue() {
     if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-        window.krtLiveSync.sendChanged('orders', ['queue']);
+        window.krtLiveSync.sendChanged('orders', ['queue', 'demand']);
     }
 }
 
