@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die Nutzungsbedingungen benennen das Fan-Projekt jetzt ausdrücklich.** § 9 hält fest, dass das Basetool ein inoffizielles, nicht kommerzielles Fan-Projekt ohne Unterstützung von Cloud Imperium ist und Material aus dem offiziellen Star-Citizen-Fankit nur nach dessen Bedingungen nutzt. Da sich der Wortlaut ändert, wird die Zustimmung beim nächsten Login erneut abgefragt.
+
 ## [v1.5.41](https://github.com/krt-profit/basetool/releases/tag/v1.5.41) - 2026-08-05
 
 ### Changed

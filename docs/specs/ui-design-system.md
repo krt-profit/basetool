@@ -470,7 +470,13 @@ Binding details:
   is visible without a login. Gating `/` behind authentication would forfeit this placement and
   require moving the band back to an always-visible navigation area.
 - A mention in the Nutzungsbedingungen or Impressum is a welcome *addition* but never a
-  **substitute** — a legal subpage is neither of the two sanctioned surfaces.
+  **substitute** — a legal subpage is neither of the two sanctioned surfaces. Terms section 9
+  carries that addition: `terms.p_9_4` (unofficial, non-commercial, unendorsed fan project) and
+  `terms.p_9_5` (Fan Kit material used under the Fankit Agreement, Fan Style Guide and the RSI
+  Terms of Service, UGC section). The trademark line rendered there reuses the **same**
+  `fankit.trademark` message rather than a `terms.*` copy, so the prescribed wording exists once
+  and cannot drift between the two surfaces — and, by design, stays out of the `terms.*` content
+  digest, so fixing an attribution never re-prompts every user for consent (REQ-SEC-028).
 
 **Acceptance**
 

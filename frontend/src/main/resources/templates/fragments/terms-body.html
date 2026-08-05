@@ -56,6 +56,16 @@
     <p th:text="#{terms.p_9_1}">Der Quellcode steht unter der veröffentlichten Lizenz.</p>
     <p th:text="#{terms.p_9_2}">Marken und Logos der Organisationen.</p>
     <p th:text="#{terms.p_9_3}">Star-Citizen-bezogene Marken.</p>
+    <p th:text="#{terms.p_9_4}">Inoffizielles, nicht kommerzielles Fan-Projekt.</p>
+    <p th:text="#{terms.p_9_5}">Verwendung von Material aus dem Star-Citizen-Fankit.</p>
+    <!--
+      The CIG trademark notice is prescribed wording, not a clause we author, so it reuses the
+      single `fankit.trademark` message the compliance band renders (REQ-UI-018) instead of a
+      second `terms.*` copy that could drift from it. Consequence by design: it stays out of the
+      `terms.*` content digest, so correcting an attribution never re-prompts every user for
+      consent (REQ-SEC-028).
+    -->
+    <p th:text="#{fankit.trademark}">Star Citizen®, Roberts Space Industries® and Cloud Imperium ® are registered trademarks of Cloud Imperium Rights LLC</p>
 
     <h2 th:text="#{terms.h1_10}">10. Haftung</h2>
     <p th:text="#{terms.p_10_1}">Bereitstellung ohne Gewährleistung ("as is").</p>
