@@ -281,6 +281,20 @@ class JobOrderMaterialDemandRenderTest {
 
     assertThat(html).as("no group sections").doesNotContain("data-testid=\"demand-group\"");
     assertThat(html).as("empty state copy").contains("keine offenen oder in Bearbeitung");
+    // Regression guard: the unit-aware amount fragment must live in its own fragments file. While
+    // it
+    // was declared at the top level of THIS page template, Thymeleaf rendered the declaration
+    // itself
+    // on every full-page render, emitting a stray "0.000 SCU" (its parameters unbound, so the null
+    // fallback) after the closing </main> — visible in the browser on every view of the page,
+    // including this empty one. An empty overview renders no amount at all, so the unbound fallback
+    // appearing here means the definition has moved back into the page. Matched literally: the
+    // shared head/footer fragments legitimately mention "SCU" in comments and the krtScuI18n
+    // bootstrap, so a bare "SCU" check would pass vacuously.
+    assertThat(html)
+        .as("no stray unbound amount leaked from the fragment declaration")
+        .doesNotContain("0.000 SCU")
+        .doesNotContain("0,000 SCU");
   }
 
   @Test

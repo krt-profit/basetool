@@ -125,13 +125,16 @@ claims-vs-gap separation, PIECE rounding), `JobOrderControllerTest`
 (render, drill-down, empty state, fragment seam, backend-failure degradation),
 `LiveSyncSectionMapParityTest` (`ordersQueueSeamMaps_partitionTheOrdersQueueTopicWhitelist`,
 `orderDetailCrossPublish_keepsTheDemandOverviewInSync`,
-`inventoryPages_pokeTheDemandOverviewWhenOrderLinkedStockChanges`) ·
+`inventoryPages_pokeTheDemandOverviewWhenOrderLinkedStockChanges`),
+`JobOrderMaterialDemandE2eTest` (browser: the two-order fold, the drill-down toggle and its
+localStorage restore across a reload, the nav entry) ·
 **Code:** `JobOrderMaterialDemandService`, `JobOrderController` `GET
 /api/v1/orders/material-demand`, `JobOrderRepository.findScopedOrdersWithMaterialRequirements`,
 `JobOrderStockProjectionService.loadOrderLinkedStockIndex` / `qualityFloorFor`,
 `MaterialDemandOverviewDto` / `MaterialDemandGroupDto` / `MaterialDemandRowDto` /
 `MaterialDemandOrderShareDto`, `JobOrderMaterialDemandPageController`,
-`templates/orders-material-demand.html`, `static/js/orders-material-demand.js`,
+`templates/orders-material-demand.html`, `templates/fragments/material-amount.html`,
+`static/js/orders-material-demand.js`,
 `fragments/sidebar.html`, `LiveSyncTopicClass.ORDERS_QUEUE` · **Issues:** #1522
 
 ## Out of scope

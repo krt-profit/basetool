@@ -105,17 +105,17 @@
                                           th:text="#{orders.detail.quality.none}">Keine</span>
                                 </td>
                                 <td class="nowrap" data-testid="demand-required">
-                                    <th:block th:replace="~{orders-material-demand :: amount(${row.requiredAmount()}, ${row.material().quantityType()})}" />
+                                    <th:block th:replace="~{fragments/material-amount :: amount(${row.requiredAmount()}, ${row.material().quantityType()})}" />
                                 </td>
                                 <td class="nowrap" data-testid="demand-booked">
-                                    <th:block th:replace="~{orders-material-demand :: amount(${row.bookedAmount()}, ${row.material().quantityType()})}" />
+                                    <th:block th:replace="~{fragments/material-amount :: amount(${row.bookedAmount()}, ${row.material().quantityType()})}" />
                                 </td>
                                 <td class="nowrap" data-testid="demand-claimed">
-                                    <th:block th:replace="~{orders-material-demand :: amount(${row.claimedAmount()}, ${row.material().quantityType()})}" />
+                                    <th:block th:replace="~{fragments/material-amount :: amount(${row.claimedAmount()}, ${row.material().quantityType()})}" />
                                 </td>
                                 <td class="nowrap demand-outstanding" data-testid="demand-outstanding"
                                     th:classappend="${row.outstandingAmount() != null and row.outstandingAmount() <= 0} ? 'demand-covered' : ''">
-                                    <th:block th:replace="~{orders-material-demand :: amount(${row.outstandingAmount()}, ${row.material().quantityType()})}" />
+                                    <th:block th:replace="~{fragments/material-amount :: amount(${row.outstandingAmount()}, ${row.material().quantityType()})}" />
                                 </td>
                             </tr>
                             <tr class="demand-orders-row krtm-display-none-5790" th:data-bucket-orders="${bucketKey}">
@@ -152,13 +152,13 @@
                                                           th:class="'status-badge status-' + ${#strings.toLowerCase(share.status())}">Offen</span>
                                                 </td>
                                                 <td class="nowrap">
-                                                    <th:block th:replace="~{orders-material-demand :: amount(${share.requiredAmount()}, ${row.material().quantityType()})}" />
+                                                    <th:block th:replace="~{fragments/material-amount :: amount(${share.requiredAmount()}, ${row.material().quantityType()})}" />
                                                 </td>
                                                 <td class="nowrap">
-                                                    <th:block th:replace="~{orders-material-demand :: amount(${share.bookedAmount()}, ${row.material().quantityType()})}" />
+                                                    <th:block th:replace="~{fragments/material-amount :: amount(${share.bookedAmount()}, ${row.material().quantityType()})}" />
                                                 </td>
                                                 <td class="nowrap">
-                                                    <th:block th:replace="~{orders-material-demand :: amount(${share.claimedAmount()}, ${row.material().quantityType()})}" />
+                                                    <th:block th:replace="~{fragments/material-amount :: amount(${share.claimedAmount()}, ${row.material().quantityType()})}" />
                                                 </td>
                                             </tr>
                                             </tbody>
@@ -176,12 +176,6 @@
     </div>
 </main>
 
-<!-- Unit-aware amount rendering, shared by the aggregate rows and the drill-down so a PIECE material
-     never shows a fractional count and an SCU amount always shows its three decimals. -->
-<th:block th:fragment="amount(value, quantityType)" th:switch="${quantityType}">
-    <span th:case="'PIECE'" th:text="|${value != null ? #numbers.formatInteger(value, 1) : '0'} #{material.quantity.piece}|">0 Stück</span>
-    <span th:case="*" th:text="|${value != null ? #numbers.formatDecimal(value, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|">0.000 SCU</span>
-</th:block>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     // Thymeleaf-interpolated strings only; the imperative logic lives in the
