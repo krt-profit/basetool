@@ -223,14 +223,26 @@ class InventorySharedLagerLiveSyncE2eTest {
   }
 
   /**
-   * Hides the {@code position:fixed} footer, which can intercept the trusted click on some engines
-   * (the WebKit/Firefox footer-overlap flake the other inventory e2es also guard against).
+   * Takes the {@code position:fixed} footer out of hit-testing, so it cannot intercept the trusted
+   * click on some engines (the WebKit/Firefox footer-overlap flake the other inventory e2es also
+   * guard against).
+   *
+   * <p>Deliberately {@code pointer-events: none} rather than the {@code display: none} the sibling
+   * suites use: hiding the footer makes {@code sidebar.js} re-measure it and publish {@code
+   * --krt-footer-height: 0px}, which shrinks {@code main}'s {@code padding-bottom} by the footer's
+   * full height, shortens the document and makes the browser clamp the scroll position. The
+   * allocation popover is {@code position: fixed} and re-anchors to its trigger on every scroll, so
+   * that clamp decides where it lands — and by how much depends on how tall the footer happens to
+   * be. When the Fan Kit band moved off the footer (#1529) the footer lost 52px, the clamp changed,
+   * and this test started failing with "element is outside of the viewport" while the rendered page
+   * was perfectly fine. Removing only the hit-testing keeps the layout byte-identical, so the test
+   * no longer depends on the footer's height at all.
    *
    * @param page the active page
    */
   private static void dropFooter(Page page) {
     page.evaluate(
         "() => { const f = document.querySelector('.krt-footer');"
-            + " if (f) { f.style.display = 'none'; } }");
+            + " if (f) { f.style.pointerEvents = 'none'; } }");
   }
 }
