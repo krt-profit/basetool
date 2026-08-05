@@ -3362,8 +3362,7 @@ input[type='radio']:focus {
 /* Cross-order material-demand overview (REQ-ORDERS-034). One section per
    responsible org unit, each a HUD box whose heading pairs the unit badge with
    its full name. The lead + basis lines are muted so the tables stay the focus. */
-.demand-lead,
-.demand-basis {
+.demand-lead {
     margin-top: var(--space-1);
     font-family: Lato, sans-serif;
     font-size: var(--fs-xs);
@@ -3415,6 +3414,159 @@ input[type='radio']:focus {
 .demand-covered {
     color: var(--color-success);
     font-weight: var(--fw-regular);
+}
+
+/* Filter surface of the Materialbedarf page (REQ-ORDERS-034). Mirrors the Lager's
+   collapsible filter row (REQ-INV-037): a toggle in an action bar, the panel a
+   sibling below it, collapsed via the `hidden` attribute so a JS-less client keeps
+   its filters. The classes are page-scoped rather than shared, per ADR-0120. */
+.demand-actions-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--space-3);
+}
+
+.demand-filter-toggle {
+    display: inline-flex;
+    gap: var(--space-2);
+    align-items: center;
+    min-height: 44px;
+}
+
+.demand-filter-chevron {
+    transition: transform 0.15s ease;
+}
+
+[aria-expanded='true'] .demand-filter-chevron {
+    transform: rotate(90deg);
+}
+
+/* Required: .chip sets display:inline-flex, which beats the UA [hidden] rule. */
+.demand-filter-count[hidden] {
+    display: none;
+}
+
+.demand-filter-panel {
+    margin-top: var(--space-2);
+    margin-bottom: var(--space-3);
+}
+
+.demand-filter-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: flex-end;
+}
+
+.demand-filter-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+}
+
+.demand-filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+/* The quality group is a fieldset for the grouping semantics only, not the chrome. */
+.demand-filter-qualities {
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.demand-filter-label {
+    color: var(--color-gray-1);
+    font-family: Lato, sans-serif;
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.demand-filter-check {
+    display: inline-flex;
+    gap: var(--space-2);
+    align-items: center;
+    min-height: 44px;
+    font-family: Lato, sans-serif;
+    cursor: pointer;
+}
+
+/* Search box pinned inside the scrolling option list so it stays reachable. */
+.demand-material-search {
+    position: sticky;
+    top: 0;
+    padding: var(--space-2);
+    background: var(--color-black);
+}
+
+.demand-search-input {
+    width: 100%;
+    min-height: 36px;
+    padding: 0.25rem var(--space-2);
+    background: var(--color-black);
+    border: 1px solid var(--color-gray-3);
+    color: var(--color-white);
+    font-family: Lato, sans-serif;
+}
+
+.demand-material-option[hidden] {
+    display: none;
+}
+
+/* Sortable headers: the whole cell is the hit area, so the button is bare. */
+.demand-sort-btn {
+    display: inline-flex;
+    gap: var(--space-2);
+    align-items: center;
+    width: 100%;
+    padding: 0;
+    background: none;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-align: left;
+    text-transform: inherit;
+    cursor: pointer;
+}
+
+.demand-sort-indicator {
+    color: var(--color-primary);
+    font-size: 0.7rem;
+}
+
+.demand-sortable[aria-sort='none'] .demand-sort-indicator {
+    color: var(--color-gray-2);
+}
+
+.demand-no-match {
+    margin-top: var(--space-3);
+    font-family: Lato, sans-serif;
+}
+
+@media (width <= 768px) {
+    .demand-filter-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .demand-filter-form .multi-select-container {
+        width: 100%;
+    }
+
+    .demand-actions-bar {
+        justify-content: stretch;
+    }
+
+    .demand-filter-toggle {
+        justify-content: center;
+        width: 100%;
+    }
 }
 
 /* Quality chip for an item order's aggregated-materials panel — one row per

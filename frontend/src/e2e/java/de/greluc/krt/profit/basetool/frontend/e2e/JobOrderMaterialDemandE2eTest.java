@@ -20,12 +20,14 @@
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import java.util.List;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -60,6 +62,12 @@ class JobOrderMaterialDemandE2eTest {
   /** Unique to this suite so a shared stack's other orders cannot collide with the assertions. */
   private static final String MATERIAL_NAME = "E2E Demand Ore";
 
+  /**
+   * A second material whose demand is fully covered by linked stock, so its row has an outstanding
+   * amount of 0 — the row the "hide covered" filter must remove and the uncovered one must survive.
+   */
+  private static final String COVERED_MATERIAL_NAME = "E2E Demand Covered";
+
   private static Playwright playwright;
   private static Browser browser;
 
@@ -77,6 +85,17 @@ class JobOrderMaterialDemandE2eTest {
       String materialId = seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, MATERIAL_NAME);
       seeder.createJobOrder(USERNAME, PASSWORD, IRIDIUM_ID, "E2E demand A", materialId, 650, 40);
       seeder.createJobOrder(USERNAME, PASSWORD, IRIDIUM_ID, "E2E demand B", materialId, 650, 60);
+
+      // A second, fully covered bucket: 25 required with 25 linked in stock, so its outstanding
+      // amount is 0 and the hide-covered filter has something to remove.
+      String coveredMaterialId =
+          seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, COVERED_MATERIAL_NAME);
+      String locationId = seeder.createLocation(USERNAME, PASSWORD, "E2E Demand Location");
+      String coveredOrderId =
+          seeder.createJobOrder(
+              USERNAME, PASSWORD, IRIDIUM_ID, "E2E demand covered", coveredMaterialId, 650, 25);
+      seeder.createInventoryItemForJobOrder(
+          USERNAME, PASSWORD, coveredMaterialId, locationId, coveredOrderId, 750, 25);
     }
   }
 
@@ -206,5 +225,178 @@ class JobOrderMaterialDemandE2eTest {
         throw failure;
       }
     }
+  }
+
+  /**
+   * The filter panel collapses, remembers the choice across a reload, and the toggle carries the
+   * active-filter count — the Lager idiom (REQ-INV-037) this page mirrors.
+   */
+  @Test
+  void filterPanelCollapsesRemembersTheChoiceAndCountsActiveFilters() {
+    try (BrowserContext context = newContext()) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, STACK.baseUrl() + "/orders/material-demand");
+        Locator toggle = page.locator("[data-testid='demand-filter-toggle']");
+        Locator panel = page.locator("#demandFilterPanel");
+        Locator count = page.locator("[data-testid='demand-filter-count']");
+
+        // Nothing is filtered on a first visit, so the panel starts collapsed and the chip is off.
+        assertThat(panel).isHidden();
+        assertThat(toggle).hasAttribute("aria-expanded", "false");
+        assertThat(count).isHidden();
+
+        toggle.click();
+        assertThat(panel).isVisible();
+        page.locator("[data-testid='demand-hide-covered']").check();
+        assertThat(count).isVisible();
+        assertThat(count).containsText("1");
+
+        // The explicit open choice AND the active filter both survive a reload.
+        E2eSupport.navigate(page, STACK.baseUrl() + "/orders/material-demand");
+        assertThat(page.locator("#demandFilterPanel")).isVisible();
+        assertThat(page.locator("[data-testid='demand-hide-covered']")).isChecked();
+        assertThat(page.locator("[data-testid='demand-filter-count']")).containsText("1");
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "material-demand-filter-panel");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * "Gedeckte ausblenden" removes exactly the bucket whose stock already covers its demand and
+   * leaves the uncovered one, then reverts cleanly.
+   */
+  @Test
+  void hideCoveredRemovesOnlyTheFullyStockedRow() {
+    try (BrowserContext context = newContext()) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, STACK.baseUrl() + "/orders/material-demand");
+        Locator covered = demandRowFor(page, COVERED_MATERIAL_NAME);
+        Locator uncovered = demandRow(page);
+        assertThat(covered).isVisible();
+        assertThat(uncovered).isVisible();
+
+        page.locator("[data-testid='demand-filter-toggle']").click();
+        page.locator("[data-testid='demand-hide-covered']").check();
+
+        assertThat(covered).isHidden();
+        assertThat(uncovered).isVisible();
+
+        page.locator("[data-testid='demand-hide-covered']").uncheck();
+        assertThat(covered).isVisible();
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "material-demand-hide-covered");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * Unchecking a material in the multi-select hides its rows; the in-dropdown search narrows the
+   * option list without changing what the table shows.
+   */
+  @Test
+  void materialFilterHidesDeselectedMaterialsAndTheSearchNarrowsTheOptions() {
+    try (BrowserContext context = newContext()) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, STACK.baseUrl() + "/orders/material-demand");
+        page.locator("[data-testid='demand-filter-toggle']").click();
+        page.locator("#demandMaterialHeader").click();
+
+        Locator coveredOption =
+            page.locator(".demand-material-option")
+                .filter(new Locator.FilterOptions().setHasText(COVERED_MATERIAL_NAME));
+        Locator oreOption =
+            page.locator(".demand-material-option")
+                .filter(new Locator.FilterOptions().setHasText(MATERIAL_NAME))
+                .first();
+
+        // The search is presentation only: it hides options, never rows.
+        page.locator("[data-testid='demand-material-search']").fill(COVERED_MATERIAL_NAME);
+        assertThat(coveredOption).isVisible();
+        assertThat(oreOption).isHidden();
+        assertThat(demandRow(page)).isVisible();
+
+        coveredOption.locator("input[type='checkbox']").uncheck();
+        assertThat(demandRowFor(page, COVERED_MATERIAL_NAME)).isHidden();
+        assertThat(demandRow(page)).isVisible();
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "material-demand-material-filter");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * Clicking the "Offen" header sorts every group table by the outstanding amount and reverses on a
+   * second click. Asserted on the RELATIVE order of this suite's own two rows, so a shared stack's
+   * other seeded materials cannot break it.
+   */
+  @Test
+  void clickingAColumnHeaderSortsAndReversesTheGroupTables() {
+    try (BrowserContext context = newContext()) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, STACK.baseUrl() + "/orders/material-demand");
+        Locator sortOutstanding = page.locator("[data-testid='demand-sort-outstanding']").first();
+
+        sortOutstanding.click();
+        assertThat(page.locator("th[data-sort-col='outstanding']").first())
+            .hasAttribute("aria-sort", "ascending");
+        // Ascending: the covered bucket (0) comes before the outstanding one (100).
+        assertTrue(
+            rowIndexOf(page, COVERED_MATERIAL_NAME) < rowIndexOf(page, MATERIAL_NAME),
+            "covered row sorts before the outstanding row ascending");
+
+        sortOutstanding.click();
+        assertThat(page.locator("th[data-sort-col='outstanding']").first())
+            .hasAttribute("aria-sort", "descending");
+        assertTrue(
+            rowIndexOf(page, MATERIAL_NAME) < rowIndexOf(page, COVERED_MATERIAL_NAME),
+            "outstanding row sorts first descending");
+
+        // A third click returns to the server's own order.
+        sortOutstanding.click();
+        assertThat(page.locator("th[data-sort-col='outstanding']").first())
+            .hasAttribute("aria-sort", "none");
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "material-demand-sort");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * Locates a bucket row by material name.
+   *
+   * @param page the page showing the demand overview.
+   * @param materialName the material to look for.
+   * @return the locator of the matching row.
+   */
+  private static Locator demandRowFor(Page page, String materialName) {
+    return page.locator("tr[data-material-name='" + materialName + "']").first();
+  }
+
+  /**
+   * The position of a material's row among the visible bucket rows of its group, used to assert a
+   * relative sort order without depending on what else the stack contains.
+   *
+   * @param page the page showing the demand overview.
+   * @param materialName the material to locate.
+   * @return the zero-based index, or -1 when the row is absent.
+   */
+  private static int rowIndexOf(Page page, String materialName) {
+    List<Locator> rows =
+        page.locator("section[data-testid='demand-group'] tr[data-testid='demand-row']").all();
+    for (int index = 0; index < rows.size(); index++) {
+      if (materialName.equals(rows.get(index).getAttribute("data-material-name"))) {
+        return index;
+      }
+    }
+    return -1;
   }
 }

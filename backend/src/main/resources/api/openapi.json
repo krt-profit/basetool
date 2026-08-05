@@ -62350,10 +62350,6 @@
             "items" : {
               "$ref" : "#/components/schemas/MaterialDemandGroupDto"
             }
-          },
-          "orderCount" : {
-            "type" : "integer",
-            "format" : "int32"
           }
         }
       },

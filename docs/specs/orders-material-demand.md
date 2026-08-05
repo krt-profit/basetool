@@ -77,9 +77,43 @@ live-sync refresh never closes what the user opened.
 is pushed into SQL through the shared `ScopeSpecifications.JOB_ORDER_SCOPE_PREDICATE` — including the
 SK-public escape — rather than filtered row-by-row afterwards, and the viewer-side profit gate
 (`canViewJobOrders`) is applied first, so a caller outside the order workflow gets the empty state
-rather than a partial aggregate. The nav entry is gated on the same capability as the order queue.
+rather than a partial aggregate. The nav entry is gated on the same capability as the order queue. The page states no
+order count: the figure said nothing the rows do not, and the projection carries no such field.
 The endpoint is deliberately **unpaged**: the response is a fold over the caller's whole visible
 queue, and paging the underlying orders would silently truncate the sums (ADR-0104, no silent caps).
+
+**Filtering and sorting.** Both are pure client-side presentation over the already-rendered rows —
+the page is one unpaged fold (ADR-0104), so narrowing it needs no round trip. The controls live in a
+**collapsible filter panel** behind a *Filter* button, the idiom the Lager uses (REQ-INV-037): the
+panel does not displace the tables, the button carries the count of active filter dimensions so a
+shortened table is never unexplained, and the panel is rendered **expanded** server-side and
+collapsed by the client, so a JS-less caller keeps every row. Three filters:
+
+- **Material** — a multi-select of the materials the page actually shows, with an in-dropdown text
+  search. The search is presentation only: hiding an option never changes what the table shows.
+- **Quality** — the `GOOD` / `NONE` buckets.
+- **Hide covered** — hides every row whose `Offen` is 0. Defined on **stock**, not on claims: a
+  bucket that is only *claimed* still has to be gathered and MUST stay visible, the same reason
+  `Offen` itself ignores `Eintragungen`.
+
+The selections are persisted as **exclusions** rather than selections. The option list is built from
+the data present at page load, so a material that only appears after a live-sync swap has no
+checkbox; keyed on exclusions it is simply not excluded and stays visible, where a stored selection
+list would silently hide it.
+
+The **Material**, **Bedarf**, **Bestand**, **Eintragungen** and **Offen** column headers sort: first
+click ascending, second descending, third back to the server's own order, with `aria-sort` and a
+direction indicator on the active column. One selection drives **every** group table so the units
+stay comparable side by side, and each bucket's two rows — the figures and its drill-down — move as
+a pair. Sorting reads the raw values from `data-*` attributes, never the rendered cell text, which
+is localised (`1000,000 SCU`) and would sort as a string. Quality is not sortable: it is a two-value
+bucket the filter already narrows.
+
+Filter and sort state persists per browser in one JSON object under `orders_demand_filters`
+(REQ-UI-017 / ADR-0120), alongside the drill-down's own `orders_demand_expanded`, and — like the
+drill-down — is re-applied after every live-sync fragment swap, which otherwise restores the
+server-rendered unfiltered, unsorted order. A group left with no visible row is hidden rather than
+shown as an empty table, and an all-filtered page states that no material matches.
 
 **Read-only.** The page offers no mutation, so it logs **no** audit event (REQ-AUDIT-001 covers
 state-mutating activity) and holds no write seam. Booking stock in stays in the Lager and the
@@ -118,6 +152,19 @@ one batched index, and the claims through the batched per-order claim lookup (RE
 - [ ] Every label comes from the DE + EN message bundles under `orders.demand.*` / `nav.orders.*`.
 - [ ] The `orders-index.js` and `orders-material-demand.js` seam maps together cover exactly the
   `ORDERS_QUEUE` whitelist, and the order-detail / inventory cross-publishes carry `demand`.
+- [ ] The filter panel sits behind a *Filter* button, does not displace the tables, shows the active
+  filter count, and is rendered expanded server-side; with no stored choice it starts collapsed only
+  when nothing is filtered.
+- [ ] The material multi-select lists each distinct material exactly once across groups and quality
+  buckets; its text search narrows the options without changing the table.
+- [ ] "Hide covered" removes exactly the rows whose `Offen` is 0; a bucket covered only by
+  `Eintragungen` stays visible.
+- [ ] Clicking a sortable header sorts every group table, the second click reverses, the third
+  restores the server order, and the drill-down stays attached to its material row.
+- [ ] Amounts sort by value, not by their formatted text.
+- [ ] A group with no visible row is hidden; an all-filtered page states that nothing matches.
+- [ ] Filter and sort state survives a reload and a live-sync fragment swap.
+- [ ] The page shows no order count and neither DTO carries one.
 
 **Enforced by:** `JobOrderMaterialDemandServiceTest` (aggregation, grouping, scope + status gate,
 claims-vs-gap separation, PIECE rounding), `JobOrderControllerTest`
@@ -127,7 +174,8 @@ claims-vs-gap separation, PIECE rounding), `JobOrderControllerTest`
 `orderDetailCrossPublish_keepsTheDemandOverviewInSync`,
 `inventoryPages_pokeTheDemandOverviewWhenOrderLinkedStockChanges`),
 `JobOrderMaterialDemandE2eTest` (browser: the two-order fold, the drill-down toggle and its
-localStorage restore across a reload, the nav entry) ·
+localStorage restore across a reload, the nav entry, the collapsible panel + active-filter
+count, hide-covered, the material filter and its search, and the sort cycle) ·
 **Code:** `JobOrderMaterialDemandService`, `JobOrderController` `GET
 /api/v1/orders/material-demand`, `JobOrderRepository.findScopedOrdersWithMaterialRequirements`,
 `JobOrderStockProjectionService.loadOrderLinkedStockIndex` / `qualityFloorFor`,
@@ -147,9 +195,11 @@ localStorage restore across a reload, the nav entry) ·
 - **Widening visibility.** The page can only ever show orders the caller may already see; it layers
   no new access path on top of the scope in
   [`org-unit-tenancy.md`](org-unit-tenancy.md) / [`security-and-access.md`](security-and-access.md).
-- **Filters.** The page shows the caller's whole visible non-terminal queue. The order list's status
-  and multi-squadron filters (REQ-ORDERS-027) are not mirrored here — the grouping by responsible unit
-  already answers "whose demand is this", and a status filter would contradict the page's definition.
+- **Server-side filtering, paging or sorting.** The page's filters and column sorting are
+  client-side presentation over the single unpaged fold; none of them reaches the backend.
+- **The order list's status and squadron filters** (REQ-ORDERS-027) are still not mirrored here: the
+  grouping by responsible unit already answers "whose demand is this", and a status filter would
+  contradict the page's definition of non-terminal orders.
 - **The per-order material views.** The overview list column (REQ-ORDERS-017) and the order detail's
   material / aggregated tables are unchanged; this spec adds a second, aggregate reader of the same
   figures.

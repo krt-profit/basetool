@@ -154,8 +154,7 @@ class JobOrderMaterialDemandRenderTest {
         new MaterialDemandOverviewDto(
             List.of(
                 new MaterialDemandGroupDto(
-                    new SquadronReferenceDto(UUID.randomUUID(), "Iridium", "IRI"), List.of(row))),
-            1);
+                    new SquadronReferenceDto(UUID.randomUUID(), "Iridium", "IRI"), List.of(row))));
     when(backendApiClient.get(contains("/material-demand"), anyClass())).thenReturn(overview);
 
     String html =
@@ -204,8 +203,7 @@ class JobOrderMaterialDemandRenderTest {
                 List.of(
                     new MaterialDemandGroupDto(
                         new SquadronReferenceDto(UUID.randomUUID(), "Iridium", "IRI"),
-                        List.of(row))),
-                1));
+                        List.of(row)))));
 
     String html =
         mockMvc
@@ -243,8 +241,7 @@ class JobOrderMaterialDemandRenderTest {
                                 4.0,
                                 0.0,
                                 8.0,
-                                List.of())))),
-                1));
+                                List.of()))))));
 
     String html =
         mockMvc
@@ -266,7 +263,7 @@ class JobOrderMaterialDemandRenderTest {
   void demandPage_noVisibleOrders_rendersEmptyState() throws Exception {
     UUID userId = UUID.randomUUID();
     when(backendApiClient.get(contains("/material-demand"), anyClass()))
-        .thenReturn(new MaterialDemandOverviewDto(List.of(), 0));
+        .thenReturn(new MaterialDemandOverviewDto(List.of()));
 
     String html =
         mockMvc
@@ -312,10 +309,96 @@ class JobOrderMaterialDemandRenderTest {
   }
 
   @Test
+  // covers REQ-ORDERS-034
+  void demandPage_rendersTheCollapsibleFilterPanelAndSortableHeaders() throws Exception {
+    UUID userId = UUID.randomUUID();
+    MaterialDto titanium = material("Titanium", "SCU");
+    when(backendApiClient.get(contains("/material-demand"), anyClass()))
+        .thenReturn(
+            new MaterialDemandOverviewDto(
+                List.of(
+                    new MaterialDemandGroupDto(
+                        new SquadronReferenceDto(UUID.randomUUID(), "Iridium", "IRI"),
+                        List.of(
+                            new MaterialDemandRowDto(
+                                titanium, "GOOD", 10.0, 0.0, 0.0, 10.0, List.of()))))));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/material-demand")
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // The panel is rendered EXPANDED server-side and collapsed by the JS, so a client without JS
+    // keeps its filters (the Lager idiom, REQ-INV-037).
+    assertThat(html).as("filter toggle").contains("data-testid=\"demand-filter-toggle\"");
+    assertThat(html)
+        .as("toggle controls the panel")
+        .contains("aria-controls=\"demandFilterPanel\"");
+    assertThat(html).as("panel starts expanded server-side").contains("aria-expanded=\"true\"");
+    assertThat(html)
+        .as("active-filter chip template")
+        .contains("data-label=\"Aktive Filter: {0}\"");
+    assertThat(html).as("material multi-select").contains("id=\"demandMaterialOptions\"");
+    assertThat(html).as("in-dropdown search").contains("data-testid=\"demand-material-search\"");
+    assertThat(html).as("quality filters").contains("data-testid=\"demand-quality-good\"");
+    assertThat(html).as("hide-covered toggle").contains("data-testid=\"demand-hide-covered\"");
+
+    // Sorting reads these attributes; the JS must never parse the localised cell text.
+    assertThat(html).as("sortable outstanding header").contains("data-sort-key=\"outstanding\"");
+    assertThat(html).as("unsorted by default").contains("aria-sort=\"none\"");
+    assertThat(html).as("numeric sort key on the row").contains("data-outstanding=\"10.0\"");
+    assertThat(html).as("material sort key on the row").contains("data-material-name=\"Titanium\"");
+  }
+
+  @Test
+  // covers REQ-ORDERS-034
+  void demandPage_materialFilterListsEachMaterialOnce() throws Exception {
+    UUID userId = UUID.randomUUID();
+    MaterialDto titanium = material("Titanium", "SCU");
+    // The same material in two quality buckets AND in two org-unit groups must still yield exactly
+    // one filter option - the filter narrows by material, not by bucket.
+    MaterialDemandRowDto good =
+        new MaterialDemandRowDto(titanium, "GOOD", 10.0, 0.0, 0.0, 10.0, List.of());
+    MaterialDemandRowDto none =
+        new MaterialDemandRowDto(titanium, "NONE", 5.0, 0.0, 0.0, 5.0, List.of());
+    when(backendApiClient.get(contains("/material-demand"), anyClass()))
+        .thenReturn(
+            new MaterialDemandOverviewDto(
+                List.of(
+                    new MaterialDemandGroupDto(
+                        new SquadronReferenceDto(UUID.randomUUID(), "Iridium", "IRI"),
+                        List.of(good, none)),
+                    new MaterialDemandGroupDto(
+                        new SquadronReferenceDto(UUID.randomUUID(), "Nova", "NOV"),
+                        List.of(good)))));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/material-demand")
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html.split("demand-material-option", -1).length - 1)
+        .as("one filter option per distinct material, across groups and quality buckets")
+        .isEqualTo(1);
+  }
+
+  @Test
   void demandPage_fragmentRequest_returnsOnlyTheResultsFragment() throws Exception {
     UUID userId = UUID.randomUUID();
     when(backendApiClient.get(contains("/material-demand"), anyClass()))
-        .thenReturn(new MaterialDemandOverviewDto(List.of(), 0));
+        .thenReturn(new MaterialDemandOverviewDto(List.of()));
 
     String html =
         mockMvc
