@@ -209,6 +209,16 @@ class InventorySharedLagerLiveSyncE2eTest {
         page.locator(
             "div.assoc-split[data-entry-id='" + itemId + "'][data-assoc-field='JOB_ORDER']");
     dropFooter(page);
+    // Centre the trigger BEFORE opening the popover, and never let the scroll position decide the
+    // rest. The popover is `position: fixed` and re-anchors to its trigger on every scroll
+    // (assocPositionPop / assocRepositionOpenPop), so Playwright's own scroll-into-view moves the
+    // very element it is trying to reach — a chase that ends in "element is outside of the
+    // viewport" after 60 retries even though the rendered page is correct. Anchored mid-viewport
+    // there is room below, the popover drops downward instead of flipping up, and every later
+    // target (combobox, option, amount, Speichern) is already on screen, so Playwright never
+    // scrolls again. The expanded leaf sits near the bottom of the tree, which is why this was
+    // load-bearing without anyone noticing until the footer's height changed (#1529).
+    split.evaluate("el => el.scrollIntoView({ block: 'center', behavior: 'instant' })");
     split
         .locator("button[data-trigger='inv-admin-assoc-add-open']")
         .click(new Locator.ClickOptions().setTimeout(20_000));
