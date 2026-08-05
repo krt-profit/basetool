@@ -2019,16 +2019,29 @@ function assocPositionPop(pop) {
     if (!wrap) return;
     const rect = wrap.getBoundingClientRect();
     const gap = 5;
+    const popHeight = pop.offsetHeight;
     const below = window.innerHeight - rect.bottom;
     const above = rect.top;
-    const flipUp = below < pop.offsetHeight + gap && above > below;
+    // Flip up only when the popover ACTUALLY fits above. The old test was `above > below` —
+    // "more room above" — which happily flips a popover taller than the space above it and
+    // leaves its upper end (in pick mode: the combobox) hanging over the viewport top. A
+    // `position: fixed` box cannot be scrolled into view, so that part is unreachable, not
+    // merely clipped (REQ-UI-011).
+    const flipUp = below < popHeight + gap && above >= popHeight + gap;
+    // Highest top the popover can take and still end fully inside the viewport. The max() keeps
+    // it sane when the popover is taller than the viewport itself — it then starts at the edge.
+    const maxTop = Math.max(gap, window.innerHeight - popHeight - gap);
+    const wantedTop = flipUp ? rect.top - gap - popHeight : rect.bottom + gap;
+    const top = Math.max(gap, Math.min(wantedTop, maxTop));
     pop.style.left = rect.left + 'px';
     if (flipUp) {
+        // Bottom-anchored (derived from the clamped top) so a later switch to the taller/shorter
+        // amount section keeps the popover's lower edge glued to the trigger.
         pop.style.top = 'auto';
-        pop.style.bottom = window.innerHeight - rect.top + gap + 'px';
+        pop.style.bottom = window.innerHeight - top - popHeight + 'px';
     } else {
         pop.style.bottom = 'auto';
-        pop.style.top = rect.bottom + gap + 'px';
+        pop.style.top = top + 'px';
     }
 }
 

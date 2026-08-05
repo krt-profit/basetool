@@ -312,6 +312,17 @@ when there is less room below it than the popover needs and more room above — 
 scrolled into view, so a trigger low in the viewport would otherwise drop its amount input +
 Speichern below the fold, unreachable.
 
+**"Roomier side" is not enough — the popup must fit, and the result is clamped.** Flipping on
+`above > below` alone still flips a popover that is taller than the space above it, leaving its
+upper end (in pick mode: the combobox) over the viewport top, where a fixed box cannot be scrolled
+to. The flip therefore requires the popup to *actually fit* on the chosen side, and the final
+placement is **clamped into the viewport** so it is fully visible even when neither side has room.
+Beyond reachability this makes the placement independent of the page's exact scroll offset — an
+unclamped placement is a function of where the document happens to sit, which is why a 52px change
+in footer height (the Fan Kit band moving off the footer, #1529) was enough to break
+`InventorySharedLagerLiveSyncE2eTest` with "element is outside of the viewport" on all three
+engines while the rendered page looked correct.
+
 Not being clipped from the outside is only half of it: a popup must also **contain its own
 controls**. The allocation popover is a fixed 260px box, and its amount editor
 (`.assoc-pop__menge`) holds an input plus Speichern plus — in edit mode — Entfernen. Two uppercase
