@@ -101,6 +101,12 @@
         <p th:if="${#lists.isEmpty(upcomingMissions)}" th:text="#{home.upcoming.empty}">Keine Einsätze in den nächsten 7 Tagen.</p>
     </section>
 
+    <!-- Star Citizen Fan Kit compliance band, moved off the global footer (REQ-UI-018).
+         Section 2b of the Fan Kit Guidelines sanctions the home page as a placement, so
+         this is the one surface that must always carry it — never drop the include
+         without putting the band back on an always-visible navigation area. -->
+    <th:block th:replace="~{fragments/fankit :: band}" />
+
 </main>
 <script th:src="@{/js/index.js}" th:attr="nonce=${cspNonce}"></script>
 </body>
