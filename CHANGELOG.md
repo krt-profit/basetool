@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Ein kurzer Aussetzer der Container-Registry löst keinen Sicherheitsalarm mehr aus.** Die Signaturprüfung vor dem Deploy wird jetzt bis zu dreimal wiederholt und schreibt die tatsächliche Fehlermeldung ins Log, statt sie zu verwerfen. Bisher war ein Netzwerk-Schluckauf nicht von einem manipulierten Image zu unterscheiden und brach den Deploy als kritischen Alarm ab. Neue Schalter: `IRI_COSIGN_VERIFY_ATTEMPTS` (Standard 3) und `IRI_COSIGN_VERIFY_DELAY` (Standard 5 s).
+
 ## [v1.5.41](https://github.com/krt-profit/basetool/releases/tag/v1.5.41) - 2026-08-05
 
 ### Changed

@@ -172,6 +172,20 @@ COSIGN_VERIFY="${IRI_COSIGN_VERIFY:-true}"
 COSIGN_REPO="${IRI_COSIGN_REPO:-krt-profit/basetool}"
 COSIGN_IDENTITY_REGEXP="${IRI_COSIGN_IDENTITY_REGEXP:-https://github.com/${COSIGN_REPO}/\\.github/workflows/release-images\\.yml@refs/(heads/main|tags/v.+)}"
 COSIGN_OIDC_ISSUER="${IRI_COSIGN_OIDC_ISSUER:-https://token.actions.githubusercontent.com}"
+# Verification is a network round-trip — it fetches the signature layer from GHCR
+# and reaches the Sigstore roots — so it fails transiently for exactly the reasons
+# release-images.yml already wraps `cosign sign` in a 5-attempt retry for. Without
+# a retry here, a one-second registry blip is indistinguishable from a :stable tag
+# moved to an untrusted digest and aborts the tick as a critical SECURITY alarm.
+# That is the 2026-08-05 DeployFailed page: the identical digest verified cleanly
+# by hand minutes later, and the very same tick also failed to resolve
+# keycloak-spi:stable — one GHCR hiccup, two symptoms. Retrying costs at most
+# DELAY+2*DELAY seconds on a genuinely bad signature, which still aborts.
+COSIGN_VERIFY_ATTEMPTS="${IRI_COSIGN_VERIFY_ATTEMPTS:-3}"
+COSIGN_VERIFY_DELAY="${IRI_COSIGN_VERIFY_DELAY:-5}"
+# stderr of the last failed `cosign verify`, so the abort can say *why* it failed
+# instead of only that it did. Declared here because `set -u` is in force.
+VERIFY_LAST_ERROR=""
 
 PROFILE=prod
 TARGET_TAG=stable
@@ -244,6 +258,9 @@ Environment overrides (all optional, sensible defaults shown):
   IRI_COSIGN_REPO=krt-profit/basetool   (repo whose release-images.yml identity signs)
   IRI_COSIGN_IDENTITY_REGEXP=...        (override the trusted signer identity regexp)
   IRI_COSIGN_OIDC_ISSUER=https://token.actions.githubusercontent.com
+  IRI_COSIGN_VERIFY_ATTEMPTS=3   (verify retries; a registry/Sigstore blip must
+                                  not read as an untrusted image)
+  IRI_COSIGN_VERIFY_DELAY=5      (first retry delay in seconds, then doubling)
   DOCKER_CONFIG=/var/lib/iri/.docker   (where `docker login` writes its
                                         credentials.json; defaults to a
                                         per-script location under STATE_DIR
@@ -624,10 +641,28 @@ verify_signature() {
     log "WARNING: signature verification DISABLED (IRI_COSIGN_VERIFY=false) — NOT verifying ${ref}"
     return 0
   fi
-  cosign verify "${ref}" \
-    --certificate-identity-regexp "${COSIGN_IDENTITY_REGEXP}" \
-    --certificate-oidc-issuer "${COSIGN_OIDC_ISSUER}" \
-    >/dev/null 2>&1
+  local attempt delay err rc
+  delay="${COSIGN_VERIFY_DELAY}"
+  VERIFY_LAST_ERROR=""
+  for (( attempt = 1; attempt <= COSIGN_VERIFY_ATTEMPTS; attempt++ )); do
+    rc=0
+    # `2>&1 >/dev/null` keeps stderr (the reason) and drops stdout (the payload
+    # JSON). The old code discarded both, which is why a transient registry error
+    # and a forged image produced byte-identical operator-facing output.
+    err="$(cosign verify "${ref}" \
+      --certificate-identity-regexp "${COSIGN_IDENTITY_REGEXP}" \
+      --certificate-oidc-issuer "${COSIGN_OIDC_ISSUER}" 2>&1 >/dev/null)" || rc=$?
+    if (( rc == 0 )); then
+      return 0
+    fi
+    VERIFY_LAST_ERROR="${err//$'\n'/ }"
+    if (( attempt < COSIGN_VERIFY_ATTEMPTS )); then
+      log "  ${ref}: verify attempt ${attempt}/${COSIGN_VERIFY_ATTEMPTS} failed (rc=${rc}), retrying in ${delay}s — ${VERIFY_LAST_ERROR}"
+      sleep "${delay}"
+      delay=$(( delay * 2 ))
+    fi
+  done
+  return 1
 }
 
 # Verify a resolved digest or abort the whole deploy. A verification failure is a
@@ -641,7 +676,7 @@ verify_digest_or_die() {
     return 0
   fi
   write_deploy_metric failure
-  fail "SECURITY: cosign signature verification failed for ${label} (${ref}) — refusing to deploy an unverified/untrusted image (expected identity: ${COSIGN_IDENTITY_REGEXP})"
+  fail "SECURITY: cosign signature verification failed for ${label} (${ref}) after ${COSIGN_VERIFY_ATTEMPTS} attempts — refusing to deploy an unverified/untrusted image (expected identity: ${COSIGN_IDENTITY_REGEXP}); last cosign error: ${VERIFY_LAST_ERROR:-<none>}"
 }
 
 # The --check-only variant of the verify: report per-artifact OK/FAIL and return
@@ -655,7 +690,7 @@ check_only_verify_one() {
     log "  ${label}: signature OK"
     return 0
   fi
-  log "  ${label}: SIGNATURE VERIFICATION FAILED (${ref})"
+  log "  ${label}: SIGNATURE VERIFICATION FAILED (${ref}) — last cosign error: ${VERIFY_LAST_ERROR:-<none>}"
   return 1
 }
 
