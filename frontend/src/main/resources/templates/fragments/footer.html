@@ -16,27 +16,19 @@
 <th:block th:fragment="footer">
     <footer class="krt-footer">
         <!--
-          Star Citizen Fan Kit compliance band (Fan Kit Guidelines, sections 2
-          and 2b). Two required elements live here:
-            * the "Made By The Community" logo, which identifies the app as a
-              Star Citizen fan project, and
-            * the mandatory CIG trademark notice attributing the marks.
-          The guidelines require the notice to sit "on a navigation area that is
-          always visible regardless of scrolling" — this footer is
-          `position: fixed; bottom: 0`, so it qualifies and the notice therefore
-          appears on every page. The white-artwork logo variant is used
-          unmodified (no recolour, outline, distortion or effect, per section 3)
-          on the dark footer; the notice text is >=10pt and high-contrast to
-          meet the "legible font size and color" rule (section 2b).
+          The Star Citizen Fan Kit compliance band ("Made By The Community" logo
+          + CIG trademark notice) used to sit here as a full-width first row.
+          It now lives on the home page (`index.html`, `fragments/fankit ::
+          band`) instead: the Fan Kit Guidelines (section 2b) accept the notice
+          "on the home page, on a navigation area that is always visible
+          regardless of scrolling, or both", so home-page placement is an
+          equally sanctioned variant. Moving it there drops a whole 3.25rem row
+          from this fixed footer on every page — the reason for the move, since
+          the footer overlays content on small screens (REQ-UI-018).
+
+          Do NOT re-add the band here without also keeping it on the home page:
+          the notice must remain on at least one of the two sanctioned surfaces.
         -->
-        <div class="krt-footer-fankit">
-            <img class="krt-footer-fankit-logo"
-                 th:src="@{/images/made-by-the-community.png}"
-                 th:alt="#{footer.fankit.logo.alt}" alt="Made By The Community"
-                 width="36" height="36"
-                 loading="lazy" decoding="async">
-            <span class="krt-footer-trademark" th:text="#{footer.fankit.trademark}">Star Citizen®, Roberts Space Industries® and Cloud Imperium ® are registered trademarks of Cloud Imperium Rights LLC</span>
-        </div>
         <div class="krt-footer-links">
             <a th:href="@{/impressum}" th:text="#{nav.impressum}">Impressum</a>
             <a th:href="@{/privacy}" th:text="#{nav.privacy}">Datenschutz</a>

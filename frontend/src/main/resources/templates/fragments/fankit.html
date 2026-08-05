@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--
+  Star Citizen Fan Kit compliance band (Fan Kit Guidelines, sections 2 and 2b).
+  Two required elements are deliberately kept in ONE fragment so neither can be
+  moved or removed without the other:
+    * the "Made By The Community" logo, which identifies the app as a Star
+      Citizen fan project, and
+    * the mandatory CIG trademark notice attributing the marks — section 2
+      requires the notice whenever that logo is used.
+
+  Placement: section 2b accepts the notice "on the home page, on a navigation
+  area that is always visible regardless of scrolling, or both". The band used
+  to live in the fixed footer (variant 2) and now sits at the end of the home
+  page's <main> (variant 1, `index.html`) so the footer stops spending a whole
+  row on it — see REQ-UI-018. `/` is permitAll, so the band stays reachable
+  without a login.
+
+  The white-artwork logo variant is used unmodified (no recolour, outline,
+  distortion or effect, per section 3); the notice text is >=10pt and
+  high-contrast to meet the "legible font size and color" rule (section 2b).
+-->
+<th:block th:fragment="band">
+    <aside class="krt-fankit-band">
+        <img class="krt-fankit-logo"
+             th:src="@{/images/made-by-the-community.png}"
+             th:alt="#{fankit.logo.alt}" alt="Made By The Community"
+             width="36" height="36"
+             loading="lazy" decoding="async">
+        <span class="krt-fankit-trademark" th:text="#{fankit.trademark}">Star Citizen®, Roberts Space Industries® and Cloud Imperium ® are registered trademarks of Cloud Imperium Rights LLC</span>
+    </aside>
+</th:block>
+</body>
+</html>

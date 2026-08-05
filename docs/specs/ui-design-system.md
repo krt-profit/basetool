@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-08-05.
 > **Owner area:** UI · **Related ADRs:** none yet · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)).
@@ -441,6 +441,47 @@ member selection of the personal-inventory/blueprints admin pages.
 `FilterPersistenceE2eTest` (representative sweep surfaces) · code review against ADR-0120 ·
 **Code:** the per-page JS modules listed in ADR-0120 · **Related:** REQ-UI-016, REQ-ORDERS-027,
 ADR-0120.
+
+### REQ-UI-018 — Star Citizen Fan Kit compliance band lives on the home page
+
+The app is a Star Citizen fan project and uses Fan Kit assets, so the **Fan Kit Guidelines**
+(section 2/2b) oblige it to show two coupled elements: the **"Made By The Community" logo** and the
+**required CIG trademark notice**. Section 2b accepts three placements on a website — the home page,
+an always-visible navigation area, or both. The Basetool uses the **home page**: the band renders at
+the end of `index.html`'s `<main>`.
+
+It deliberately no longer sits in the global footer. As a full-width first row it cost every page a
+3.25 rem band of a `position: fixed` footer that overlays content, which is worst on the phone/small
+device classes of REQ-UI-009. Scrolling with the home page costs no viewport height at all.
+
+Binding details:
+
+- **The logo and the notice ship as one fragment** (`fragments/fankit.html`) and are included
+  together. Section 2 requires the notice wherever that logo appears, so neither element may be
+  rendered, moved or removed on its own.
+- **The notice is prescribed legal wording, not UI copy.** It stays verbatim English in *every*
+  locale bundle (`fankit.trademark`) — translating it breaks compliance while passing key-parity
+  checks.
+- **Legibility (section 2b):** at least 10 pt and high-contrast. `--fs-sm` (0.9 rem ≈ 10.8 pt) on
+  `--color-gray-1` is the floor; the finer `--fs-xs` (≈ 9.6 pt) is not permitted for this text.
+- **The artwork is used unmodified** (section 3): no recolour, flip, distortion, outline, drop
+  shadow, pattern or effect on the white-artwork variant.
+- **The home page stays publicly reachable** (`/` is permitAll in `SecurityConfig`), so the notice
+  is visible without a login. Gating `/` behind authentication would forfeit this placement and
+  require moving the band back to an always-visible navigation area.
+- A mention in the Nutzungsbedingungen or Impressum is a welcome *addition* but never a
+  **substitute** — a legal subpage is neither of the two sanctioned surfaces.
+
+**Acceptance**
+
+- [ ] An anonymous `GET /` renders both the Made-By-The-Community artwork and the trademark notice.
+- [ ] `fankit.trademark` is byte-identical in the DE, EN and default bundles.
+- [ ] The notice renders at ≥ 10 pt with an AA-clearing contrast on its surface.
+- [ ] No page carries the logo without the notice.
+
+**Enforced by:** `FanKitComplianceMvcTest` · design review against the Fan Kit Guidelines ·
+**Code:** `fragments/fankit.html`, `index.html`, `.krt-fankit-*` in `styles.css`,
+`fankit.*` in the three message bundles · **Related:** REQ-UI-009.
 
 ## Out of scope
 
