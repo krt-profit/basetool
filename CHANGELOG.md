@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.41](https://github.com/krt-profit/basetool/releases/tag/v1.5.41) - 2026-08-05
+
 ### Changed
 
 - **Der Footer ist auf jeder Seite eine Zeile flacher.** Das „Made By The Community"-Logo samt Markenhinweis von Cloud Imperium steht jetzt am Ende der Startseite statt im fest eingeblendeten Footer — beides sind laut Star-Citizen-Fankit zulässige Platzierungen. Das gibt vor allem auf Handy und Tablet spürbar Platz zurück.
