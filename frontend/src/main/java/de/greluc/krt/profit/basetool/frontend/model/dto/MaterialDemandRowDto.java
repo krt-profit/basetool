@@ -43,7 +43,7 @@ import java.util.List;
  */
 public record MaterialDemandRowDto(
     MaterialDto material,
-    String qualityRequirement,
+    @BackendEnumAsString String qualityRequirement,
     Double requiredAmount,
     Double bookedAmount,
     Double claimedAmount,

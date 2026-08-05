@@ -38,8 +38,8 @@ import java.util.UUID;
 public record MaterialDemandOrderShareDto(
     UUID jobOrderId,
     Integer displayId,
-    String status,
-    String type,
+    @BackendEnumAsString String status,
+    @BackendEnumAsString String type,
     Double requiredAmount,
     Double bookedAmount,
     Double claimedAmount) {}
