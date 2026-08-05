@@ -6,6 +6,12 @@
 
 - **Neue Seite „Materialbedarf" in der Auftragsverwaltung.** Sie zeigt, wie viel von jedem Material über alle offenen und in Bearbeitung befindlichen Aufträge hinweg noch zu beschaffen ist — getrennt nach bearbeitender Einheit, mit Bedarf, bereits zugeordnetem Bestand, Eintragungen und der verbleibenden Lücke. Material- und Item-Aufträge zählen beide mit; jede Zeile lässt sich zu den Aufträgen aufklappen, aus denen sie sich zusammensetzt.
 
+### Changed
+
+- **Die Filterzeile im globalen Lager lässt sich jetzt einklappen — wie in „Mein Lager".** Sie steht hinter einem **Filter**-Knopf in der Aktionsleiste und schiebt die Tabelle nicht mehr nach unten. Ist etwas gefiltert, zeigt der Knopf die Anzahl der aktiven Filter, damit eine kurze Tabelle nie unerklärt bleibt. Die Einstellung merkt sich der Browser; ohne gespeicherte Wahl startet das Panel nur dann zugeklappt, wenn nichts gefiltert ist.
+
+- **Die Beschriftungen „Material" und „Qualität ≥" im globalen Lager sind jetzt übersetzt.** Sie standen fest auf Deutsch und blieben auch in der englischen Oberfläche stehen.
+
 ## [v1.5.38](https://github.com/krt-profit/basetool/releases/tag/v1.5.38) - 2026-08-04
 
 ## [v1.5.37](https://github.com/krt-profit/basetool/releases/tag/v1.5.37) - 2026-08-04
