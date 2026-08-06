@@ -65,7 +65,7 @@ bad-digest backoff) and **before** the first `pull` / `docker create` / `docker 
   deploys — mitigated by the documented break-glass override.
 - The host cosign is coupled to the CI's signing cosign by **major version**: cosign 2.x cannot
   verify 3.x keyless signatures, and the CI signs with 3.x (`cosign-installer@v4.1.2` → 3.0.6). The
-  host must stay on cosign ≥ the CI's version (currently 3.1.2); the runbook pins this and documents
+  host must stay on cosign ≥ the CI's version (currently 3.1.3); the runbook pins this and documents
   the update path. A host stuck on 2.x would fail the fail-closed gate on every deploy.
 - Steady state is unaffected: verification runs only on an actual apply, never on the ~every-tick
   idempotence no-op, so the timer's steady-state cost is unchanged.

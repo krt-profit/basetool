@@ -14,6 +14,10 @@
 
 - **Ein kurzer Aussetzer der Container-Registry löst keinen Sicherheitsalarm mehr aus.** Die Signaturprüfung vor dem Deploy wird jetzt bis zu dreimal wiederholt und schreibt die tatsächliche Fehlermeldung ins Log, statt sie zu verwerfen. Bisher war ein Netzwerk-Schluckauf nicht von einem manipulierten Image zu unterscheiden und brach den Deploy als kritischen Alarm ab. Neue Schalter: `IRI_COSIGN_VERIFY_ATTEMPTS` (Standard 3) und `IRI_COSIGN_VERIFY_DELAY` (Standard 5 s).
 
+### Security
+
+- **Die Signaturprüfung vor dem Deploy läuft künftig mit cosign 3.1.3.** Das Update schließt eine Schwachstelle (GHSA-fx35-mq7g-6g98), bei der cosign die Prüfung der Signatur-Identität stillschweigend übergehen konnte. Unsere Prüfung der Container-Images war davon nicht betroffen — die Lücke greift nur bei der Prüfung einzelner Dateien (`verify-blob`). Reine Runbook-Änderung, keine Code-Änderung; das Programm auf dem Server wird beim nächsten Wartungsfenster ausgetauscht.
+
 ## [v1.5.41](https://github.com/krt-profit/basetool/releases/tag/v1.5.41) - 2026-08-05
 
 ### Changed
