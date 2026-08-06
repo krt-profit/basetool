@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Keycloak auf 26.7.1 angehoben (Sicherheitsupdate).** Das Patch-Release schließt fünf Schwachstellen im Anmeldedienst — unter anderem eine Umgehung der Signaturprüfung bei verschlüsselten OIDC-Request-Objects, eine Rechte-Eskalation über die Client-Verwaltung und drei Lücken in der feingranularen Rechteverwaltung. Keine Funktions- oder Konfigurationsänderung: Das gepinnte Container-Image (`quay.io/keycloak/keycloak:26.7`-Digest, weiterhin JDK 21) und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit. **Deploy-Hinweis:** Der Keycloak-Container muss dafür neu gestartet werden.
+
 ### Fixed
 
 - **Das „+ Zuordnen"-Popover im Lager bleibt immer vollständig im Bild.** Klappte es nach oben auf, obwohl darüber zu wenig Platz war, ragte sein oberer Teil — im Auswahlmodus die Auftragsliste — aus dem sichtbaren Bereich und war nicht erreichbar, weil sich ein fest positioniertes Element nicht heranscrollen lässt. Es klappt jetzt nur noch nach oben, wenn es dort auch hineinpasst, und wird andernfalls in den sichtbaren Bereich gerückt.

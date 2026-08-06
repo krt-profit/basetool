@@ -63,7 +63,7 @@ node = "24.18.1"
 # federation + first-login gate, epic #720). Pin to the highest 26.7.x patch — the
 # floating `quay.io/keycloak/keycloak:26.7` runtime tag resolves to it; SPI APIs are
 # stable across a minor, so an exact match avoids any load-time surprises.
-keycloak = "26.7.0"
+keycloak = "26.7.1"
 # JUnit pinned explicitly for the keycloak-spi module only — it has no Spring Boot
 # dependency-management to supply a JUnit version, unlike backend/frontend. Kept in
 # lockstep with the JUnit version Spring Boot 4.1.0 manages for those modules (6.0.3)

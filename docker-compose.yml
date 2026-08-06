@@ -247,7 +247,7 @@ x-db-keycloak: &db-keycloak-template
 x-keycloak: &keycloak-template
   # Same digest pin policy as the Postgres images. Refresh with
   # `docker buildx imagetools inspect quay.io/keycloak/keycloak:26.7`.
-  image: quay.io/keycloak/keycloak:26.7@sha256:0f198be292568439d700cdbfb893e69a6009bb43a94a06a945b1d3d506c76b13
+  image: quay.io/keycloak/keycloak:26.7@sha256:f1f1f01e472c8a78df40d8f2a49a925274eda4d3d80d5f6edbb5c880ee3c01c6
   command: start --proxy-headers xforwarded --cache=local --log=console,file --log-file=/var/log/keycloak/keycloak.log
   restart: unless-stopped
   logging: *default-logging
