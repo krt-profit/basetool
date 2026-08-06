@@ -108,14 +108,22 @@ install the pinned release binary and verify its checksum before installing:
 ```bash
 COSIGN_VERSION=v3.1.3
 arch=$(dpkg --print-architecture)          # amd64 or arm64
-curl -fsSLo /tmp/cosign        "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-${arch}"
-curl -fsSLo /tmp/cosign_checksums.txt "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign_checksums.txt"
+cd /tmp
+# Download under the SAME name the checksum file lists — `sha256sum -c` resolves
+# the name from its input line against the cwd, so saving it as /tmp/cosign makes
+# the check fail with "No such file or directory" instead of verifying anything.
+curl -fsSLo "cosign-linux-${arch}" "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-${arch}"
+curl -fsSLo cosign_checksums.txt   "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign_checksums.txt"
 # Verify the download against the published checksum, then install:
-( cd /tmp && grep " cosign-linux-${arch}\$" cosign_checksums.txt | sha256sum -c - )
-sudo install -m 0755 /tmp/cosign /usr/local/bin/cosign
-rm -f /tmp/cosign /tmp/cosign_checksums.txt
+grep " cosign-linux-${arch}\$" cosign_checksums.txt | sha256sum -c -
+sudo install -m 0755 "cosign-linux-${arch}" /usr/local/bin/cosign
+rm -f "cosign-linux-${arch}" cosign_checksums.txt
 cosign version
 ```
+
+Expect `cosign-linux-<arch>: OK` from the checksum line and the new version from
+`cosign version`. Chain the steps with `&&` if you paste them as a one-liner, so a
+failed checksum cannot fall through to `install`.
 
 > **Use cosign 3.x, and never a lower major than the CI signs with.** The CI signs
 > images with the cosign that `sigstore/cosign-installer@v4.1.2` pins — currently
@@ -1199,19 +1207,36 @@ the defaults match this repository's `release-images.yml`.
 cosign is a single static binary, so an update is an in-place replace with the
 **same download + checksum-verify pattern** used at bootstrap, pointing at the new
 version. No service restart is needed — the next `iri-deploy.timer` tick picks up
-the new `/usr/local/bin/cosign`. To go from an older cosign (e.g. a 2.x install) to
-the current 3.x:
+the new `/usr/local/bin/cosign`. Back the old binary up first so a rollback is a
+single `mv`, then replace it:
 
 ```bash
+sudo cp -a /usr/local/bin/cosign /usr/local/bin/cosign.bak
+
 COSIGN_VERSION=v3.1.3
 arch=$(dpkg --print-architecture)
-curl -fsSLo /tmp/cosign               "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-${arch}"
-curl -fsSLo /tmp/cosign_checksums.txt "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign_checksums.txt"
-( cd /tmp && grep " cosign-linux-${arch}\$" cosign_checksums.txt | sha256sum -c - )
-sudo install -m 0755 /tmp/cosign /usr/local/bin/cosign   # overwrites the old binary
-rm -f /tmp/cosign /tmp/cosign_checksums.txt
-cosign version                                            # expect 3.1.3
+cd /tmp
+rm -f "cosign-linux-${arch}" cosign_checksums.txt        # clear any earlier attempt
+curl -fsSLo "cosign-linux-${arch}" "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-${arch}"
+curl -fsSLo cosign_checksums.txt   "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign_checksums.txt"
+grep " cosign-linux-${arch}\$" cosign_checksums.txt | sha256sum -c -   # expect: cosign-linux-<arch>: OK
+sudo install -m 0755 "cosign-linux-${arch}" /usr/local/bin/cosign     # overwrites the old binary
+rm -f "cosign-linux-${arch}" cosign_checksums.txt
+cosign version                                                        # expect v3.1.3
 ```
+
+Chain the steps with `&&` when pasting them as a one-liner, so a failed checksum
+aborts instead of falling through to `install`. Rolling back is
+`sudo mv /usr/local/bin/cosign.bak /usr/local/bin/cosign`.
+
+**Do not check the download against a differently-named file.** `sha256sum -c`
+takes the filename from the checksum line (`cosign-linux-amd64`) and resolves it
+against the working directory, so downloading to `/tmp/cosign` makes the check
+report `No such file or directory` — a *skipped* verification, not a passed one.
+That bug sat in both blocks of this runbook until 2026-08-06. It never installed
+anything unverified: the skipped check still exits non-zero, so it fails the same
+way a real checksum mismatch does — but only if the steps are `&&`-chained or run
+one at a time with the output actually read.
 
 Then **prove the host can verify a real CI-signed image** before relying on the
 gate — verify the live `:stable` against the release-images identity (any artifact;
