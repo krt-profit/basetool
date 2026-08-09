@@ -5,7 +5,7 @@ Module-scoped guidance lives in [`backend/CLAUDE.md`](backend/CLAUDE.md) and
 
 ## Project
 
-Profit Basetool — a squadron-management web app (mission planning, hangar, inventory, refinery, user admin) for the "DAS KARTELL" / IRIDIUM organization. Two Spring Boot 4 modules (`backend`, `frontend`) on Java 25, PostgreSQL 18, Keycloak 26 OAuth2, Redis-backed Spring Sessions. Gradle 9 with Kotlin DSL. Dependencies are managed by [refreshVersions](https://jmfayard.github.io/refreshVersions/) — **edit `versions.properties`, not `build.gradle.kts`**. Run `./gradlew refreshVersions` to discover updates.
+Profit Basetool — a squadron-management web app (mission planning, hangar, inventory, refinery, user admin) for the "DAS KARTELL" / IRIDIUM organization. Two Spring Boot 4 modules (`backend`, `frontend`) on Java 25, PostgreSQL 18, Keycloak 26 OAuth2, Redis-backed Spring Sessions. Gradle 9 with Kotlin DSL. Dependency versions live in the **version catalog** at **`gradle/libs.versions.toml`** — edit that, not `build.gradle.kts`. [refreshVersions](https://jmfayard.github.io/refreshVersions/) runs in *catalog* mode: `./gradlew refreshVersions` annotates the catalog in place with `## ⬆ = "…"` comment markers for each available update and changes no version itself. **`versions.properties` is vestigial** — it holds zero version entries and nothing reads it; earlier revisions of this file pointed there, which sent readers to a file that cannot affect the build.
 
 ## Requirements, specs & decisions (binding)
 

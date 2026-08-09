@@ -656,7 +656,7 @@ docker run --rm -v /var/iri/code/monitoring/prometheus:/p:ro \
 
 # alloy config check:
 docker run --rm -v /var/iri/code/monitoring/alloy:/a:ro \
-  grafana/alloy:v1.18.0 fmt /a/config.alloy >/dev/null && echo "alloy config parses"
+  grafana/alloy:v1.18.1 fmt /a/config.alloy >/dev/null && echo "alloy config parses"
 ```
 
 ### 8.3 Fire a test alert; confirm the mail + healthchecks.io green

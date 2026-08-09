@@ -4,6 +4,18 @@
 
 ### Changed
 
+- **Redis läuft jetzt auf 8.10.0 (vorher 8.8.0).** Der Digest-Pin des `redis:8-alpine`-Images zeigte noch auf den Stand von Juni. Keine Konfigurationsänderung. **Deploy-Hinweis:** Der Redis-Container muss dafür neu gestartet werden.
+
+- **Monitoring-Images aktualisiert:** Loki 3.7.6, Alloy 1.18.1 und redis_exporter 1.89.0. Grafana bleibt bewusst auf 13.0.2 — die OSS-Variante hat bis heute keinen 13.1.x-Tag veröffentlicht.
+
+- **Die TypeScript-Typen der Backend-Schnittstelle erzeugt das Basetool jetzt selbst.** Statt des Pakets `openapi-typescript` läuft ein eigenes, abhängigkeitsfreies Skript; die erzeugte Datei schrumpft von 1,7 MB auf 96 KB und 22 npm-Pakete entfallen. Die Absicherung bleibt: Wird ein Feld im Backend umbenannt, bricht der Build, statt dass eine Auswahlliste stillschweigend leer bleibt. Rein intern, keine Auswirkung auf die Oberfläche (ADR-0130).
+
+- **Der Typprüfer der Browser-Skripte läuft auf TypeScript 7.** Das war zuvor durch `openapi-typescript` blockiert. Nichts wird kompiliert oder gebündelt — die Skripte bleiben unverändert.
+
+- **Fehlende Prüfungen auf nicht vorhandene Seitenelemente geschlossen.** Die Typprüfung deckte auf, dass mehrere Stellen in der Blaupausen-Ansicht und im Blaupausen-Import Elemente benutzten, ohne zu prüfen, ob sie überhaupt da sind. Fehlt eines — etwa weil ein Seitenteil nicht gerendert wurde —, brach dort bisher das Skript ab und die restliche Seite blieb tot; jetzt wird der betroffene Teil übersprungen und der Rest funktioniert weiter.
+
+- **Build- und Bibliotheks-Abhängigkeiten auf den aktuellen Stand gebracht.** Gradle 9.7.0, Flyway 13.2.0, ArchUnit 1.5.0, Playwright 1.62.0, Checkstyle 13.9.0, OWASP Dependency-Check 13.0.0 und die übrigen Werkzeuge; die PostgreSQL-, Tomcat- und Netty-Pins ziehen auf den jeweils neuesten Patch nach. Rein intern, keine Auswirkung auf die Oberfläche.
+
 - **Keycloak auf 26.7.1 angehoben (Sicherheitsupdate).** Das Patch-Release schließt fünf Schwachstellen im Anmeldedienst — unter anderem eine Umgehung der Signaturprüfung bei verschlüsselten OIDC-Request-Objects, eine Rechte-Eskalation über die Client-Verwaltung und drei Lücken in der feingranularen Rechteverwaltung. Keine Funktions- oder Konfigurationsänderung: Das gepinnte Container-Image (`quay.io/keycloak/keycloak:26.7`-Digest, weiterhin JDK 21) und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit. **Deploy-Hinweis:** Der Keycloak-Container muss dafür neu gestartet werden.
 
 ### Fixed

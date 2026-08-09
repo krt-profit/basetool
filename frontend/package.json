@@ -8,21 +8,20 @@
   "scripts": {
     "lint:css": "stylelint \"src/main/resources/static/css/**/*.css\"",
     "lint:html": "htmlhint \"src/main/resources/templates/**/*.html\"",
-    "lint:js": "eslint \"src/main/resources/static/js/**/*.js\"",
-    "gen:api-types": "openapi-typescript ../backend/src/main/resources/api/openapi.json -o build/generated/ts/api.d.ts",
+    "lint:js": "eslint \"src/main/resources/static/js/**/*.js\" \"scripts/**/*.mjs\"",
+    "gen:api-types": "node scripts/gen-api-types.mjs ../backend/src/main/resources/api/openapi.json build/generated/ts/api.d.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "format": "prettier --write \"src/main/resources/static/css/**/*.css\" \"src/main/resources/static/js/**/*.js\" \"types/**/*.d.ts\"",
-    "format:check": "prettier --check \"src/main/resources/static/css/**/*.css\" \"src/main/resources/static/js/**/*.js\" \"types/**/*.d.ts\""
+    "format": "prettier --write \"src/main/resources/static/css/**/*.css\" \"src/main/resources/static/js/**/*.js\" \"types/**/*.d.ts\" \"scripts/**/*.mjs\"",
+    "format:check": "prettier --check \"src/main/resources/static/css/**/*.css\" \"src/main/resources/static/js/**/*.js\" \"types/**/*.d.ts\" \"scripts/**/*.mjs\""
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "eslint": "^10.8.0",
-    "globals": "^17.8.0",
+    "eslint": "^10.8.1",
+    "globals": "^17.9.0",
     "htmlhint": "^1.9.2",
-    "openapi-typescript": "^7.13.0",
     "prettier": "^3.9.6",
     "stylelint": "^17.14.1",
     "stylelint-config-standard": "^40.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^7.0.2"
   }
 }

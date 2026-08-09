@@ -520,9 +520,9 @@ docker run --rm -v "$PWD:/cfg" quay.io/prometheus/alertmanager:v0.33.1 \
   amtool check-config /cfg/alertmanager.yml
 
 # Alloy — format check + validate
-docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.18.0 \
+docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.18.1 \
   fmt --test /cfg/config.alloy
-docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.18.0 \
+docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.18.1 \
   validate /cfg/config.alloy
 
 # Compose project — syntax/interpolation check

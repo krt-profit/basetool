@@ -53,8 +53,10 @@
     const SSE_LIVENESS_TIMEOUT_MS = 60000;
     const bell = document.getElementById('notification-bell');
     const i18n = readMessages();
+    /** @type {number | null} */
     let pollTimer = null;
     let sseHealthy = false;
+    /** @type {number | null} */
     let sseWatchdogTimer = null;
 
     // Read the localized strings the templates expose so this static JS stays text-free.
@@ -626,7 +628,9 @@
     // pool (#1130 / #1110). The polling fallback above is the guaranteed correctness path, so SSE
     // never needs to be reliable.
     const SSE_RECONNECT_BASE_MS = 3000;
+    /** @type {EventSource | null} */
     let sseSource = null;
+    /** @type {number | null} */
     let sseReconnectTimer = null;
     let sseStopped = false;
 

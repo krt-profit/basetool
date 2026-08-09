@@ -1,11 +1,14 @@
 name: Refresh Versions
 
 # `./gradlew refreshVersions` is the project's canonical way to surface
-# dependency / plugin updates (see CLAUDE.md: "Dependencies are managed by
-# refreshVersions — edit `versions.properties`, not `build.gradle.kts`").
+# dependency / plugin updates (see CLAUDE.md: versions live in the version
+# catalog at `gradle/libs.versions.toml`, which refreshVersions annotates in
+# place with `## ⬆ = "…"` markers).
 # This workflow runs it on a weekly cadence and opens a single rolling pull
-# request whenever the tool annotates new versions into `versions.properties`
-# or `gradle/libs.versions.toml`. The maintainer then promotes the desired
+# request whenever the tool annotates new versions into `gradle/libs.versions.toml`
+# (`versions.properties` is vestigial and holds no versions, but is still listed
+# below so a stray annotation there could never be silently dropped). The
+# maintainer then promotes the desired
 # bumps by hand — the workflow deliberately does NOT auto-apply updates,
 # because refreshVersions emits proposals as comments rather than mutations.
 #
@@ -44,7 +47,7 @@ jobs:
           java-version: '25'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+        uses: gradle/actions/setup-gradle@67621b124fd2e251c5e8a0e6e3b91318f2287669 # v6.3.0
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew

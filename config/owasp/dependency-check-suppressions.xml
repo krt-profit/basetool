@@ -256,4 +256,67 @@
     <cve>CVE-2026-44891</cve>
   </suppress>
 
+  <!--
+    August 2026 Netty batch, same situation as the July batch directly above and suppressed on the
+    same grounds - but re-verified rather than assumed, because the argument only holds while two
+    facts stay true:
+
+      1. The SHIPPED line is not affected. Dependency-Check flagged only the `4.1.135.Final` jars
+         in this batch; the `4.2.17.Final` jars are on the very same scanned classpaths and were
+         NOT flagged, so 4.2.17 is outside the affected range. If a future batch flags the 4.2.x
+         jars too, this suppression must NOT be extended - bump `netty.version` instead.
+      2. The 4.1.x jars never reach a runtime classpath. Re-confirmed on 2026-08-09 by running
+         `dependencyInsight` against the `runtimeClasspath` configuration for the dependency
+         `io.netty:netty-common` in all four modules (see the note element below for the exact
+         invocation, which cannot be spelled here because XML comments forbid double hyphens):
+         backend, frontend and ingest all resolve 4.2.17.Final ("selected by rule", i.e. the BOM
+         override), and `:keycloak-spi:runtimeClasspath` contains no Netty at all. The 4.1.135
+         jars are compileOnly transitives of keycloak-services 26.7.1 via Quarkus/Vert.x, and the
+         real Keycloak container supplies its own Netty.
+
+    Pinned to the exact 4.1.135.Final coordinate and scoped per-CVE, so any other 4.1.x Netty
+    entering a real classpath still fails the gate.
+  -->
+  <suppress>
+    <notes>False positive: build-time-only. The August 2026 Netty CVE batch affects the 4.1.x line, but our 4.1.135.Final jars are compileOnly transitives of keycloak-services 26.7.1 (via Quarkus/Vert.x) on the keycloak-spi module only. Re-verified 2026-08-09 with `./gradlew :&lt;module&gt;:dependencyInsight --configuration runtimeClasspath --dependency io.netty:netty-common` across backend/frontend/ingest/keycloak-spi: the first three resolve 4.2.17.Final via the BOM override and keycloak-spi's runtimeClasspath carries no Netty at all. The shipped 4.2.17.Final line is not flagged by this batch.</notes>
+    <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@4\.1\.135\.Final$</packageUrl>
+    <cve>CVE-2026-56821</cve>
+    <cve>CVE-2026-56822</cve>
+    <cve>CVE-2026-59898</cve>
+    <cve>CVE-2026-59899</cve>
+    <cve>CVE-2026-59900</cve>
+    <cve>CVE-2026-59901</cve>
+    <cve>CVE-2026-59919</cve>
+    <cve>CVE-2026-59920</cve>
+    <cve>CVE-2026-59921</cve>
+  </suppress>
+
+  <!--
+    CVE-2026-66299 is an uncontrolled-resource-consumption DoS in the WebSocket **chat example**
+    of Apache Tomcat (affected: 11.0.0-M20 through 11.0.24; fixed in 11.0.25, unreleased at the
+    time of writing). The advisory's own mitigation is "remove the examples web application" -
+    and an embedded Tomcat never had it in the first place.
+
+    The examples webapp ships in the standalone Tomcat *binary distribution* under
+    `webapps/examples`. It is not part of the `tomcat-embed-*` artifacts, and Spring Boot deploys
+    only this application's own servlet context. Verified on 2026-08-09 rather than reasoned
+    about: `tomcat-embed-core-11.0.24.jar` contains 1611 entries under exactly three top-level
+    package roots (`jakarta/servlet/`, `jakarta/security/`, `org/apache/`) and zero entries
+    matching `websocket/chat`, `ChatAnnotation` or `examples`. The vulnerable code is absent from
+    the artifact, so no configuration of ours can reach it.
+
+    Same class as the netty HTTP/3 suppression higher up: the broad
+    `cpe:2.3:a:apache:tomcat` match attributes a distribution-only vulnerability to the embedded
+    library. This is NOT a "real CVE we chose to live with" - CLAUDE.md forbids that, and rightly.
+
+    Pinned to 11.0.24 so the entry lapses on its own: bumping to 11.0.25 (which fixes this
+    upstream) stops the match, and the suppression should be deleted in that same change. Any
+    other Tomcat CVE, and any other embedded-Tomcat version, still fails the gate.
+  -->
+  <suppress>
+    <notes>False positive: CPE scope confusion. CVE-2026-66299 affects the WebSocket chat example in Tomcat's `webapps/examples`, which ships only with the standalone binary distribution. Verified 2026-08-09 that tomcat-embed-core-11.0.24.jar contains no examples/websocket-chat classes at all (1611 entries, only jakarta/servlet, jakarta/security and org/apache roots), so the vulnerable code is not on any classpath here. Remove this entry when the Boot BOM or our override moves to Tomcat 11.0.25, which fixes it upstream.</notes>
+    <packageUrl regex="true">^pkg:maven/org\.apache\.tomcat\.embed/tomcat\-embed\-.*@11\.0\.24$</packageUrl>
+    <cve>CVE-2026-66299</cve>
+  </suppress>
+
 </suppressions>

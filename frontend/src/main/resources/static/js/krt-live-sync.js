@@ -80,8 +80,10 @@
         // deny drops back to 'idle' instead, which the reconnect path picks up again.
         const topics = Object.create(null);
         const publishBuffer = []; // { topic, sections } queued until the socket is open
+        /** @type {WebSocket | null} */
         let ws = null;
         let reconnectDelay = RECONNECT_BASE_MS;
+        /** @type {number | null} */
         let reconnectTimer = null;
         // Set once the server has refused this tab terminally (today only the consent gate). Nothing
         // clears it: it must survive a later subscribe() or sendChanged() from page code that knows
@@ -99,7 +101,7 @@
         }
 
         function rawSend(obj) {
-            if (!isOpen()) {
+            if (!isOpen() || !ws) {
                 return false;
             }
             try {
@@ -336,6 +338,7 @@
 
         const pendingNow = {}; // sections queued for the next debounce tick (Set-like map)
         const deferred = {}; // sections held back because the user is editing (Set-like map)
+        /** @type {number | null} */
         let timer = null;
 
         // Never yank a section out from under an active edit. A modal open anywhere means the user

@@ -351,7 +351,9 @@
         let rendered = [];
         let activeIndex = -1;
         let remoteSeq = 0;
+        /** @type {number | null} */
         let remoteTimer = null;
+        /** @type {(() => void) | null} */
         let repositionHandler = null;
 
         function isOpen() {
@@ -580,7 +582,7 @@
             input.setAttribute('aria-expanded', 'true');
             positionListbox();
             attachReposition();
-            window.clearTimeout(remoteTimer);
+            window.clearTimeout(remoteTimer ?? undefined);
             remoteTimer = window.setTimeout(function () {
                 loadRemote(query);
             }, delay || 0);
@@ -621,6 +623,7 @@
         // arms the custom-validity message so submit stays blocked until resolved.
         function reconcile() {
             const typed = input.value.trim().toLowerCase();
+            /** @type {any} */
             let exact = null;
             for (let i = 0; i < items.length; i++) {
                 if (items[i].label.toLowerCase() === typed) {
@@ -784,6 +787,7 @@
          */
         function setValue(value, label, data) {
             const v = value == null ? '' : String(value);
+            /** @type {any} */
             let match = null;
             for (let i = 0; i < items.length; i++) {
                 if (items[i].value === v) {

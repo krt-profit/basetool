@@ -1501,7 +1501,11 @@ errors a build failure. Coverage is expected to grow, and the sequencing lives i
 
 **Backend DTO shapes are never restated by hand.** `:frontend:generateApiTypes` derives
 `build/generated/ts/api.d.ts` from `backend/src/main/resources/api/openapi.json` on every build,
-and `typecheckJs` depends on it. The generated file is **build output and must not be committed**:
+and `typecheckJs` depends on it. The emitter is `frontend/scripts/gen-api-types.mjs`, a
+dependency-free Node script (ADR-0130) — it emits `components.schemas` only, and **fails the
+build** on an OpenAPI construct it cannot express (`allOf` / `oneOf` / `anyOf` / `not` /
+`discriminator`) or a dangling `$ref`, because a DTO silently degraded to `unknown` type-checks
+everywhere and removes exactly the protection this rule exists to give. The generated file is **build output and must not be committed**:
 deriving it every time is what makes drift between the frontend's idea of a DTO and the published
 contract structurally impossible. Annotations use the global aliases from `types/dto.d.ts`
 (`ApiDto<'MaterialDto'>`, `ApiPage<…>`, `ApiProblem`) — never a hand-copied field list.
@@ -1528,7 +1532,8 @@ Convert them when opting a file in.
 > **Config:** `frontend/tsconfig.json` (`allowJs` + `noEmit` + `moduleDetection: legacy`),
 > `frontend/build.gradle.kts` (`generateApiTypes`, `typecheckJs`) · **Code:**
 > `frontend/types/globals.d.ts`, `frontend/types/thymeleaf-bootstrap.d.ts`,
-> `frontend/types/dto.d.ts`, the 29 files carrying `// @ts-check` · **ADR:** ADR-0125 ·
+> `frontend/types/dto.d.ts`, `frontend/scripts/gen-api-types.mjs`, the 32 files carrying
+> `// @ts-check` · **ADR:** ADR-0125, ADR-0130 ·
 > **Issues:** —
 
 ## Out of scope

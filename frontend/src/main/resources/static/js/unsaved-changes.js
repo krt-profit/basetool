@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', function () {
     window.__unsavedChangesInitialized = true;
 
     let isDirty = false;
+    /** @type {string | null} */
     let targetUrl = null;
 
     const modal = document.getElementById('unsaved-changes-modal');

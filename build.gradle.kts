@@ -197,7 +197,9 @@ subprojects {
     // management emits the managed version as a `{strictly ...}` constraint, so a competing plain
     // Gradle constraint would collide instead of winning. Remove once the Boot BOM ships
     // >= 42.7.12 (the OWASP dependencyCheckAggregate gate will keep this honest either way).
-    extra["postgresql.version"] = "42.7.12"
+    // Boot 4.1.0 still manages 42.7.11, so the override stays; tracked forward to the current
+    // 42.7.x patch (42.7.13) rather than frozen at the minimum the CVE fix required.
+    extra["postgresql.version"] = "42.7.13"
 
     // Second security override in the same vein: the Boot 4 BOM pins the embedded Tomcat to
     // 11.0.23, which is flagged by CVE-2026-59083 (the RewriteValve decodes `+` to a space while
@@ -209,6 +211,9 @@ subprojects {
     // conflict-free mechanism as the PostgreSQL override: io.spring.dependency-management emits the
     // Boot BOM `tomcat.version` property as a `{strictly ...}` constraint. Remove once the Boot BOM
     // ships >= 11.0.24 (the OWASP dependencyCheckAggregate gate keeps this honest either way).
+    // Boot 4.1.0 still manages 11.0.22, so the override stays. This is the SINGLE owner of the pin:
+    // gradle.properties used to carry a competing (lower) `tomcat.version` that this line silently
+    // overrode — see the note there.
     extra["tomcat.version"] = "11.0.24"
 
     // Third security override in the same vein: the Boot 4.1 BOM pins Netty (via its
@@ -222,8 +227,9 @@ subprojects {
     // that one - Quarkus/Vert.x pin it independently and it is never shipped). Fixed in
     // 4.2.16.Final, released 2026-07-06 - same conflict-free `{strictly ...}` mechanism as the
     // PostgreSQL/Tomcat overrides above. Remove once the Boot BOM ships >= 4.2.16.Final (the
-    // OWASP dependencyCheckAggregate gate keeps this honest either way).
-    extra["netty.version"] = "4.2.16.Final"
+    // OWASP dependencyCheckAggregate gate keeps this honest either way). Boot 4.1.0 still manages
+    // 4.2.15.Final, so the override stays; tracked forward to the current 4.2.17.Final.
+    extra["netty.version"] = "4.2.17.Final"
   }
 
   // JaCoCo coverage. Both modules want the same setup: emit XML + CSV + HTML
@@ -499,7 +505,7 @@ tasks.register("generateTermsVersion") {
   }
 }
 
-// OWASP Dependency-Check (org.owasp.dependencycheck) 12.2.2. Aggregates over
+// OWASP Dependency-Check (org.owasp.dependencycheck) 13.0.0. Aggregates over
 // all subprojects via `./gradlew dependencyCheckAggregate`. CVSS gate now fails
 // the build on findings with CVSS 7.0 or higher (audit finding L-8: previously
 // the gate was wide open at CVSS 11 — triage-only). 7.0 covers the OWASP "HIGH"

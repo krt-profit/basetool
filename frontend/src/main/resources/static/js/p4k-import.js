@@ -21,19 +21,31 @@
 (function () {
     'use strict';
 
+    /** @type {HTMLInputElement | null} */
     let fileInput = null;
+    /** @type {HTMLElement | null} */
     let filenameEl = null;
+    /** @type {HTMLButtonElement | null} */
     let uploadBtn = null;
+    /** @type {HTMLElement | null} */
     let jobsBody = null;
+    /** @type {HTMLElement | null} */
     let jobsEmptyEl = null;
+    /** @type {HTMLElement | null} */
     let resultsEl = null;
+    /** @type {HTMLElement | null} */
     let applyPanelEl = null;
+    /** @type {HTMLElement | null} */
     let applyFilenameEl = null;
+    /** @type {HTMLInputElement | null} */
     let seedEl = null;
+    /** @type {HTMLButtonElement | null} */
     let applyConfirmBtn = null;
 
     let lastJobs = [];
+    /** @type {string | null} */
     let applyTargetId = null;
+    /** @type {number | null} */
     let pollTimer = null;
 
     // Set once a gate (re-authentication or the Terms-of-Use consent gate) has taken the page over.
@@ -145,16 +157,16 @@
     }
 
     function init() {
-        fileInput = $('krt-p4k-file');
+        fileInput = /** @type {HTMLInputElement | null} */ ($('krt-p4k-file'));
         filenameEl = $('krt-p4k-filename');
-        uploadBtn = $('krt-p4k-upload-btn');
+        uploadBtn = /** @type {HTMLButtonElement | null} */ ($('krt-p4k-upload-btn'));
         jobsBody = $('krt-p4k-jobs');
         jobsEmptyEl = $('krt-p4k-jobs-empty');
         resultsEl = $('krt-p4k-results');
         applyPanelEl = $('krt-p4k-apply-panel');
         applyFilenameEl = $('krt-p4k-apply-filename');
-        seedEl = $('krt-p4k-seed');
-        applyConfirmBtn = $('krt-p4k-apply-confirm');
+        seedEl = /** @type {HTMLInputElement | null} */ ($('krt-p4k-seed'));
+        applyConfirmBtn = /** @type {HTMLButtonElement | null} */ ($('krt-p4k-apply-confirm'));
 
         const pickBtn = $('krt-p4k-pick');
         const detailsCloseBtn = $('krt-p4k-details-close');
