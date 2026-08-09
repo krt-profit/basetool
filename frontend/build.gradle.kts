@@ -1,4 +1,5 @@
 import com.github.gradle.node.npm.task.NpxTask
+import com.github.gradle.node.task.NodeTask
 import org.cyclonedx.Version
 
 plugins {
@@ -521,17 +522,23 @@ tasks.register<NpxTask>("prettierApply") {
 val openApiSpec = rootProject.file("backend/src/main/resources/api/openapi.json")
 val generatedApiTypes = layout.buildDirectory.file("generated/ts/api.d.ts")
 
+// Runs our own zero-dependency emitter rather than `openapi-typescript` (ADR-0130): printing a
+// `.d.ts` is printing text, and routing that through the TypeScript compiler API is what pinned
+// the whole module to the TS 5.x line once TypeScript 7 removed `ts.factory`. A NodeTask (not
+// NpxTask) because the script is ours and has no package to resolve.
+val generateApiTypesScript = layout.projectDirectory.file("scripts/gen-api-types.mjs")
+
 val generateApiTypes =
-  tasks.register<NpxTask>("generateApiTypes") {
+  tasks.register<NodeTask>("generateApiTypes") {
     group = "build"
     description =
       "Generates TypeScript types for the backend DTOs from the OpenAPI spec (build output)."
-    dependsOn(tasks.named("npmInstall"))
-    command.set("openapi-typescript")
-    args.set(listOf(openApiSpec.absolutePath, "-o", generatedApiTypes.get().asFile.absolutePath))
+    dependsOn(tasks.named("npmSetup"))
+    script.set(generateApiTypesScript.asFile)
+    args.set(listOf(openApiSpec.absolutePath, generatedApiTypes.get().asFile.absolutePath))
     ignoreExitValue.set(false)
     inputs.file(openApiSpec)
-    inputs.file("package.json")
+    inputs.file(generateApiTypesScript)
     outputs.file(generatedApiTypes)
   }
 
@@ -556,6 +563,23 @@ val typecheckJs =
     inputs.file("tsconfig.json")
   }
 
+// The emitter replaced a maintained package, so its own correctness is now our problem — and its
+// guard (fail on an OpenAPI construct it cannot express) is the load-bearing part: without it an
+// unhandled keyword degrades a DTO to `unknown`, which type-checks everywhere and silently voids
+// REQ-FE-018's drift protection. Gated in `check` rather than given its own workflow (the pattern
+// the root `scripts/*.test.sh` use) because it is a frontend build script and runs in ~200 ms.
+val testGenApiTypes =
+  tasks.register<NodeTask>("testGenApiTypes") {
+    group = "verification"
+    description = "Regression tests for the OpenAPI -> .d.ts emitter (scripts/gen-api-types.mjs)."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/gen-api-types.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(generateApiTypesScript)
+    inputs.file(layout.projectDirectory.file("scripts/gen-api-types.test.mjs"))
+    outputs.upToDateWhen { false }
+  }
+
 tasks.named("check").configure {
-  dependsOn(lintCss, lintHtml, lintJs, prettierCheck, typecheckJs)
+  dependsOn(lintCss, lintHtml, lintJs, prettierCheck, typecheckJs, testGenApiTypes)
 }

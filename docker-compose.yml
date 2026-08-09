@@ -568,7 +568,8 @@ x-backend: &backend-template
 x-redis: &redis-template
   # Same digest pin policy as the Postgres images. Refresh with
   # `docker buildx imagetools inspect redis:8-alpine`.
-  image: redis:8-alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005
+  # Digest last refreshed 2026-08-09: 8-alpine now resolves to Redis 8.10.0 (was 8.8.0).
+  image: redis:8-alpine@sha256:978f0e01593e65eed801f2402944efcd936d43b5027e4908a7897baf88ed6241
   # Persistence + memory policy for the Spring-Session / ingest-handoff store
   # (REQ-OPS-018, ADR-0079).
   #

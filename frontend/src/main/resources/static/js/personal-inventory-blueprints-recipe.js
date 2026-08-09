@@ -25,19 +25,33 @@
 (function () {
     'use strict';
 
+    /** @type {HTMLElement | null} */
     let mdEl = null;
+    /** @type {HTMLElement | null} */
     let rowsEl = null;
+    /** @type {HTMLInputElement | null} */
     let filterInput = null;
+    /** @type {HTMLElement | null} */
     let detailEmpty = null;
+    /** @type {HTMLElement | null} */
     let detailContent = null;
+    /** @type {HTMLElement | null} */
     let nameEl = null;
+    /** @type {HTMLElement | null} */
     let acquiredEl = null;
+    /** @type {HTMLElement | null} */
     let recipeEl = null;
+    /** @type {HTMLElement | null} */
     let noteSection = null;
+    /** @type {HTMLElement | null} */
     let noteEl = null;
+    /** @type {HTMLElement | null} */
     let editBtn = null;
+    /** @type {HTMLElement | null} */
     let deleteBtn = null;
+    /** @type {HTMLElement | null} */
     let backBtn = null;
+    /** @type {HTMLElement | null} */
     let activeRow = null;
 
     // id -> recipe JSON, so re-selecting a row never refetches.
@@ -47,14 +61,18 @@
     // (with includeRefinery=true, so both inventory-only and refinery-included figures are present)
     // and re-fetched only after the collection is re-rendered (batch add / import / remove).
     const craftabilityById = new Map();
+    /** @type {HTMLElement | null} */
     let detailCraftEl = null;
+    /** @type {HTMLInputElement | null} */
     let refineryToggle = null;
     let refineryOn = false;
+    /** @type {any} */
     let activeCraftability = null;
 
     // "Show only craftable" view filter: a client-side filter over the same craftability data,
     // combined (AND) with the master search filter. Honours the refinery toggle, so a blueprint
     // craftable only via refinery is shown iff the refinery toggle is on.
+    /** @type {HTMLInputElement | null} */
     let craftableToggle = null;
     let craftableOnly = false;
 
@@ -71,6 +89,14 @@
 
     /* ------------------------------------------------------------ DOM helpers */
 
+    /**
+     * Creates a detached element with an optional class and text content.
+     *
+     * @param {string} tag element tag name
+     * @param {string | null} [cls] class attribute to set when truthy
+     * @param {string | null} [text] text content to set when not null/undefined
+     * @returns {HTMLElement} the new, unattached element
+     */
     function el(tag, cls, text) {
         const node = document.createElement(tag);
         if (cls) {
@@ -82,6 +108,12 @@
         return node;
     }
 
+    /**
+     * Removes every child of `node`, leaving the node itself in place.
+     *
+     * @param {Node} node the node to empty
+     * @returns {void}
+     */
     function clear(node) {
         while (node.firstChild) {
             node.removeChild(node.firstChild);
@@ -124,8 +156,17 @@
 
     /* ------------------------------------------------------- selection state */
 
+    /**
+     * The master-list rows, or an empty list before the collection is wired.
+     *
+     * @returns {HTMLElement[]} the row elements in document order
+     */
     function rows() {
-        return rowsEl ? Array.from(rowsEl.querySelectorAll('.master-row')) : [];
+        return rowsEl
+            ? Array.from(
+                  /** @type {NodeListOf<HTMLElement>} */ (rowsEl.querySelectorAll('.master-row')),
+              )
+            : [];
     }
 
     function visibleRows() {
@@ -174,7 +215,7 @@
     }
 
     function renderDetailHead(row) {
-        if (!detailContent) {
+        if (!detailContent || !detailEmpty || !nameEl || !acquiredEl || !noteEl || !noteSection) {
             return;
         }
         detailEmpty.hidden = true;
@@ -261,6 +302,9 @@
     }
 
     function showError() {
+        if (!recipeEl) {
+            return;
+        }
         clear(recipeEl);
         recipeEl.appendChild(el('div', 'krt-bp-recipe-error', i18n().error || 'Error.'));
     }
@@ -268,6 +312,9 @@
     /* -------------------------------------------------------------- rendering */
 
     function renderRecipe(recipe) {
+        if (!recipeEl) {
+            return;
+        }
         clear(recipeEl);
         const groups = recipe.requirementGroups || [];
         const flat = recipe.ingredients || [];
@@ -289,8 +336,9 @@
         }
 
         if (groups.length > 0) {
+            const pane = recipeEl;
             groups.forEach(function (g, idx) {
-                recipeEl.appendChild(renderQualityBlock(g, idx));
+                pane.appendChild(renderQualityBlock(g, idx));
             });
         } else {
             // Legacy fallback for a blueprint synced without requirement groups: the flat
@@ -623,7 +671,9 @@
                 aside = el('span', 'krt-bp-row-aside');
                 r.appendChild(aside);
             }
-            let badge = aside.querySelector('.krt-bp-craft-badge');
+            let badge = /** @type {HTMLElement | null} */ (
+                aside.querySelector('.krt-bp-craft-badge')
+            );
             if (!badge) {
                 badge = el('span', 'krt-bp-craft-badge');
                 aside.appendChild(badge);
@@ -881,7 +931,7 @@
             return;
         }
         e.preventDefault();
-        let idx = vis.indexOf(activeRow);
+        let idx = activeRow ? vis.indexOf(activeRow) : -1;
         if (e.key === 'ArrowDown') {
             idx = Math.min(vis.length - 1, idx + 1);
         } else if (e.key === 'ArrowUp') {
@@ -910,7 +960,7 @@
             return; // empty collection — nothing to wire
         }
         rowsEl = document.getElementById('krt-bp-master-rows');
-        filterInput = document.getElementById('krt-bp-q');
+        filterInput = /** @type {HTMLInputElement | null} */ (document.getElementById('krt-bp-q'));
         detailEmpty = document.getElementById('krt-bp-detail-empty');
         detailContent = document.getElementById('krt-bp-detail-content');
         nameEl = document.getElementById('krt-bp-detail-name');
@@ -928,8 +978,12 @@
         // toggle likewise. Both are grabbed first so the one-time persisted-state restore
         // (REQ-UI-017) can set their checked states BEFORE they are mirrored into
         // refineryOn/craftableOnly below and before the first recompute (loadCraftability).
-        refineryToggle = document.getElementById('krt-bp-refinery-toggle');
-        craftableToggle = document.getElementById('krt-bp-craftable-toggle');
+        refineryToggle = /** @type {HTMLInputElement | null} */ (
+            document.getElementById('krt-bp-refinery-toggle')
+        );
+        craftableToggle = /** @type {HTMLInputElement | null} */ (
+            document.getElementById('krt-bp-craftable-toggle')
+        );
         restoreToggles();
         if (refineryToggle) {
             refineryOn = /** @type {HTMLInputElement} */ (refineryToggle).checked;
@@ -977,6 +1031,9 @@
         }
         if (backBtn) {
             backBtn.addEventListener('click', function () {
+                if (!mdEl) {
+                    return;
+                }
                 mdEl.classList.remove('is-detail');
                 if (activeRow) {
                     activeRow.focus();
@@ -986,6 +1043,7 @@
 
         // Initial selection: ?bp= deeplink wins; otherwise the first row. On desktop the
         // detail pane is permanent, so auto-select; on mobile only a deeplink opens it.
+        /** @type {Element | null | undefined} */
         let initial = null;
         let fromDeeplink = false;
         try {

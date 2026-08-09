@@ -176,6 +176,7 @@
         if (!form) {
             return;
         }
+        /** @type {number | null} */
         let debounce = null;
         form.addEventListener('submit', function (event) {
             event.preventDefault();

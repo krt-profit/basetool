@@ -45,4 +45,29 @@ export default [
       "no-undef": "error",
     },
   },
+  {
+    // Build-time Node scripts (the OpenAPI -> .d.ts emitter, ADR-0130). Unlike the browser
+    // scripts these ARE ES modules and run under Node, so they need the node globals and
+    // `sourceType: module` — linting them under the browser block above would flag every
+    // `process` / `console` as `no-undef`. They are not served and not type-checked.
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: "module",
+      globals: { ...globals.node },
+    },
+    rules: {
+      "no-var": "error",
+      eqeqeq: ["error", "smart"],
+      "no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+        },
+      ],
+      "no-undef": "error",
+    },
+  },
 ];

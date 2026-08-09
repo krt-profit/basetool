@@ -19,10 +19,15 @@
 (function () {
     'use strict';
 
+    /** @type {HTMLInputElement | null} */
     let fileInput = null;
+    /** @type {HTMLElement | null} */
     let modal = null;
+    /** @type {HTMLElement | null} */
     let bodyEl = null;
+    /** @type {HTMLElement | null} */
     let summaryEl = null;
+    /** @type {HTMLButtonElement | null} */
     let applyBtn = null;
     const rowDebounce = new WeakMap();
 
@@ -64,11 +69,11 @@
     }
 
     function init() {
-        fileInput = $('krt-bp-import-file');
+        fileInput = /** @type {HTMLInputElement | null} */ ($('krt-bp-import-file'));
         modal = $('krt-bp-import-modal');
         bodyEl = $('krt-bp-import-body');
         summaryEl = $('krt-bp-import-summary');
-        applyBtn = $('krt-bp-import-apply');
+        applyBtn = /** @type {HTMLButtonElement | null} */ ($('krt-bp-import-apply'));
         if (fileInput) fileInput.addEventListener('change', onFileChosen);
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') closeModal();
@@ -344,7 +349,9 @@
         });
         bodyEl.querySelectorAll('.krt-bp-imp-search').forEach(function (input) {
             const row = input.closest('.krt-bp-imp-row');
-            const results = row ? row.querySelector('.krt-bp-imp-results') : null;
+            const results = row
+                ? /** @type {HTMLElement | null} */ (row.querySelector('.krt-bp-imp-results'))
+                : null;
             input.addEventListener('input', function () {
                 if (rowDebounce.has(input)) clearTimeout(rowDebounce.get(input));
                 rowDebounce.set(
@@ -429,7 +436,9 @@
 
     function selectAll(value) {
         if (!bodyEl) return;
-        bodyEl.querySelectorAll('.krt-bp-imp-include').forEach(function (cb) {
+        /** @type {NodeListOf<HTMLInputElement>} */ (
+            bodyEl.querySelectorAll('.krt-bp-imp-include')
+        ).forEach(function (cb) {
             if (!cb.disabled) {
                 const row = cb.closest('.krt-bp-imp-row');
                 // Only tick rows that actually have a resolved product.
@@ -442,10 +451,14 @@
         if (!bodyEl) return;
         const resolutions = [];
         bodyEl.querySelectorAll('.krt-bp-imp-row').forEach(function (row) {
-            const include = row.querySelector('.krt-bp-imp-include');
+            const include = /** @type {HTMLInputElement | null} */ (
+                row.querySelector('.krt-bp-imp-include')
+            );
             const key = row.getAttribute('data-key');
             if (!include || !include.checked || !key) return;
-            const noteEl = row.querySelector('.krt-bp-imp-note');
+            const noteEl = /** @type {HTMLInputElement | null} */ (
+                row.querySelector('.krt-bp-imp-note')
+            );
             const acquired = row.getAttribute('data-acquired');
             resolutions.push({
                 externalName: row.getAttribute('data-external'),

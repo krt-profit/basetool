@@ -104,6 +104,7 @@
 
     // De-duplicates concurrent refreshes: parallel writes that all 403 share one
     // in-flight GET /csrf instead of stampeding the endpoint.
+    /** @type {Promise<any> | null} */
     let refreshInFlight = null;
 
     /**
@@ -395,6 +396,7 @@
     // write()/submitForm() consume+disable it SYNCHRONOUSLY on first use (see resolveSubmitter), so
     // an unrelated later write never inherits a stale submitter. Raw-fetch writes that do not go
     // through write() guard their submit button explicitly instead.
+    /** @type {Element | null} */
     let pendingSubmitter = null;
     document.addEventListener(
         'submit',

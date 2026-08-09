@@ -66,6 +66,39 @@ the sources stay JavaScript, stay classic non-module `<script>` tags sharing one
 full migration is an unscheduled, costed option in
 [`docs/TYPESCRIPT_MIGRATION_PLAN.md`](../docs/TYPESCRIPT_MIGRATION_PLAN.md), not a default.
 
+**The module runs TypeScript 7, and the DTO declarations are emitted by us** — `openapi-typescript`
+is gone (ADR-0130). Two consequences you will actually trip over:
+
+- **`let x = null;` no longer self-types.** TS 7 grants such a declaration an *evolving* implicit
+  `any` only when `noImplicitAny` is on, and this config deliberately keeps it **off**. So TS 7
+  infers the literal type `null` and then rejects every later assignment (`TS2322`), every deref
+  (`TS18047`) and every post-narrowing use (`TS2339` on `never`) — 179 errors across 12 files when
+  the upgrade landed. **Annotate the declaration with the precise type**:
+  `/** @type {HTMLInputElement | null} */`, `/** @type {number | null} */`, … `any` is reserved for
+  genuinely untyped JSON (a `Map` lookup, an untyped list item) — **no element handle is `any`**,
+  and re-introducing one would silently re-open the null-safety gap below. Two DOM-signature
+  papercuts follow: `clearTimeout` takes `number | undefined`, so a `number | null` handle needs
+  `clearTimeout(t ?? undefined)`; and a generic `getElementById` feeding a specifically-typed
+  variable needs a cast at the assignment.
+- **`| null` on a handle means the null case is now yours to handle.** Because `noImplicitAny` is
+  off, these handles used to be `any` and their null dereferences went unchecked — the gap
+  ADR-0125 believed it had closed. They are typed now, so a function that dereferences a handle
+  must guard it, and the guard has to cover **every** handle it touches, not just the first one
+  (`renderDetailHead` guarded one of six). Before adding a guard, check whether the real fix is
+  upstream: a helper with no declared return type poisons everything downstream of it — typing
+  `el()` alone fixed nine errors — and a `querySelector` whose result is used as a checkbox or
+  text input wants one cast at the query, not a cast at every use.
+- **`scripts/gen-api-types.mjs` is ours to extend.** It covers the flat-object subset springdoc
+  emits today (`$ref`, `items`, `enum`, `additionalProperties`, `nullable`, primitives) and
+  **fails the build** on `allOf` / `oneOf` / `anyOf` / `not` / `discriminator`. The realistic
+  trigger is a backend model gaining `@JsonSubTypes`. When that build failure names a construct,
+  extend the emitter — never weaken the guard, because a DTO degraded to `unknown` type-checks
+  everywhere and silently removes the drift protection the whole mechanism exists for.
+
+`noImplicitAny` stays **off**: turning it on also clears the evolving-`any` class, but costs 514
+implicit-any errors — and TS 5.9.3 reported the identical 514, so that is pre-existing annotation
+debt rather than anything TS 7 introduced.
+
 - **Opt in per file** with a leading `// @ts-check`. A file that opts in **must** be error-free —
   there is no partial state. Prefer opting in any file you substantially touch.
 - **Declare shared contracts in the same change.** A new `window.krt*` API, a new custom DOM event
