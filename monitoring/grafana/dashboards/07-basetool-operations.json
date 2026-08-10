@@ -537,7 +537,7 @@
       },
       "targets": [
         {
-          "expr": "time() - basetool_scheduled_job_last_success_timestamp_seconds",
+          "expr": "time() - (basetool_scheduled_job_last_success_timestamp_seconds > 0)",
           "refId": "A",
           "legendFormat": "{{task}}",
           "datasource": {
