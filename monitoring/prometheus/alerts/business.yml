@@ -37,6 +37,25 @@ groups:
       # one silently never fired when it matched plain `job`. TAG_JOB was renamed to `task` to
       # sidestep the reserved name, so match on `task`. The 180d history splits at the rename (old
       # series carry `exported_job`, new ones `task`) — a Grafana annotation marks the cutover.
+      #
+      # NEVER-SUCCEEDED SENTINEL GUARD (2026-08-10): every rule below reads the last-success gauge
+      # through `(… > 0)` rather than bare. All six compute `time() - gauge`, so a gauge value of 0
+      # means "last succeeded 1970-01-01" — an age of ~1.79e9 s, above EVERY threshold in this file.
+      # TaskMetrics registered the gauge with a 0 sentinel when a run STARTED and only wrote the real
+      # timestamp when it finished, and the holder is per-process, so each job's first run after a
+      # backend restart published 0 for its whole duration. The prod SC-Wiki sweep runs ~10-15 min
+      # (sync-all-items), which outlasts ExternalSyncStale's `for: 10m` — so that alert fired on
+      # every restart and self-resolved when the sweep finished (the 2026-08-10 05:27→05:32 CEST
+      # pair). TaskMetrics now registers the gauge on the first SUCCESS, seeded with that timestamp,
+      # so the sentinel no longer exists; this guard is defence in depth (rules reload without a
+      # backend deploy, and it immunises the six rules against a re-introduced sentinel).
+      # The filter goes INSIDE the subtraction — `time() - (gauge > 0)` — so the guard is part of the
+      # same selector rather than a second copy of it joined back on. An `… and gauge > 0` rewrite is
+      # equivalent today (set-operator matching ignores __name__, so the name-dropped left side still
+      # matches the right), but it duplicates the selector and would need an explicit `on (task)` the
+      # moment the two sides' label sets diverge. Both shapes are covered by
+      # tests/staleness_never_succeeded_sentinel_test.yml.
+      #
       # Role drift vs. Keycloak: the user sync last succeeded too long ago. The sync now runs once
       # per day at 05:00 (app.keycloak.sync.cron default `0 0 5 * * *` in app.keycloak.sync.zone,
       # moved off the pre-2026-07 1-minute cadence that fed the native-thread exhaustion incident).
@@ -46,7 +65,7 @@ groups:
       # now" (POST /api/v1/users/sync) refreshes the same last-success gauge, so a manual run also
       # clears this alert.
       - alert: UserSyncStale
-        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"}) > 93600
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"} > 0)) > 93600
         for: 10m
         labels:
           severity: warning
@@ -54,8 +73,13 @@ groups:
           summary: "User sync stale >26h"
           description: "The Keycloak user sync last succeeded more than 26 hours ago (daily 05:00 cadence, so the last run was missed) — local roles/accounts may drift from Keycloak. Trigger 'Sync now' on the member-management page or check the scheduler/Keycloak."
 
+      # Both catalogue syncs run on a ~24h fixedDelay, so a genuine firing means at least two
+      # consecutive runs produced no success. Triage note: a fire that RESOLVES on its own within
+      # minutes is not staleness at all — it is the never-succeeded sentinel above (check
+      # `changes(process_start_time_seconds[1h])` for a restart, and whether the fire lands one
+      # `krt.scwiki.scheduler-initial-delay` after it). A real one stays up until someone acts.
       - alert: ExternalSyncStale
-        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{task=~"uex_sync|scwiki_sync"}) > 172800
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"uex_sync|scwiki_sync"} > 0)) > 172800
         for: 10m
         labels:
           severity: warning
@@ -206,10 +230,11 @@ groups:
       # (#1041 item 3) All-jobs staleness. UserSyncStale/ExternalSyncStale covered only user_sync and
       # the two catalogue syncs; the daily notification-retention purge and the hourly default-
       # blueprint back-fill had no staleness guard. No absent() — the last-success gauge is registered
-      # lazily by TaskMetrics, so a job whose bean is config-gated off never publishes it and cannot
-      # report a false stale (deliberate, per the issue).
+      # by TaskMetrics only on a job's first SUCCESS, so a job whose bean is config-gated off (or that
+      # has not yet completed a run in this process) never publishes it and cannot report a false
+      # stale (deliberate, per the issue; see the sentinel-guard note at the top of this group).
       - alert: ScheduledJobStale
-        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning"}) > 93600
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning"} > 0)) > 93600
         for: 10m
         labels:
           severity: warning
@@ -223,7 +248,7 @@ groups:
       # undetected. Tighter 6h window (the sweep is hourly) and critical, matching the severity of the
       # invariant it guards.
       - alert: BankLedgerIntegritySweepStale
-        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"}) > 21600
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"} > 0)) > 21600
         for: 10m
         labels:
           severity: critical
@@ -235,7 +260,7 @@ groups:
       # freezes basetool_job_order_integrity_violations, so JobOrderItemBlueprintDrift can never fire
       # and a "0 drifted lines" reading means nothing. Warning, matching the alert it guards.
       - alert: JobOrderIntegritySweepStale
-        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"}) > 21600
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"} > 0)) > 21600
         for: 10m
         labels:
           severity: warning
@@ -247,7 +272,7 @@ groups:
       # depth gauge. If it wedges, the gauges FREEZE and the *ApprovalOverdue alerts silently consume
       # stale numbers. A last-success age > 10 min means ~10 missed samples — the sampler is stuck.
       - alert: BusinessMetricsStale
-        expr: (time() - basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"}) > 600
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"} > 0)) > 600
         for: 5m
         labels:
           severity: warning

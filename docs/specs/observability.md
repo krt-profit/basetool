@@ -730,8 +730,9 @@ transaction per pass) rather than per-scrape.
   > violations gauge freezes and `BankLedgerIntegrityViolation` cannot fire),
   > `JobOrderIntegritySweepStale` (`job_order_integrity`, > 6 h — same frozen-gauge trap for
   > `JobOrderItemBlueprintDrift`) and `BusinessMetricsStale`
-  > (`business_metrics`, > 10 min); it is registered lazily so a config-gated-off job never reports a
-  > falsely-stale `0`. The items counter is present only for jobs that report a count: user sync,
+  > (`business_metrics`, > 10 min); it is registered on a job's first success, so a job that has not
+  > yet succeeded in this process publishes nothing at all rather than a falsely-stale `0` (see the
+  > never-succeeded-sentinel bullet below). The items counter is present only for jobs that report a count: user sync,
   > notification retention, default-blueprint provisioning, and — since #1041 item 2 — `uex_sync` (the
   > `UexItemSyncService` `game_item` upsert tally, with the unchanged-catalogue carve-out below) and
   > `scwiki_sync` (the sum of the five SC-Wiki step counts, a failing step contributing `0`; same
@@ -761,6 +762,28 @@ transaction per pass) rather than per-scrape.
   > backs `UserSyncZeroItems`
   > (`user_sync` synced zero users for 30 min while successful runs happened — Keycloak returned an
   > empty roster; #1041 item 3).
+
+- **Never-succeeded sentinel on the last-success gauge (2026-08-10).** The gauge is registered on a
+  job's **first success**, seeded with that timestamp — never at run start, and never with a `0`. All
+  six staleness rules subtract it from `time()`, so a published `0` reads as a success on 1970-01-01:
+  an age of ~1.79 × 10⁹ s, above *every* threshold in `business.yml`. The holder is a per-process
+  `AtomicLong`, so registering it when a run *started* published `0` for the whole duration of each
+  job's first run after a backend restart. The prod SC-Wiki sweep takes ~10–15 min
+  (`sync-all-items`), longer than `ExternalSyncStale`'s `for: 10m` — so that alert fired on every
+  backend restart and cleared itself when the sweep finished. Registering on first success leaves the
+  series **absent** until there is a real timestamp (subtracting an absent series yields an empty
+  vector, so no rule fires), which also preserves the original intent that a config-gated-off job
+  never reports a falsely-stale `0`. As defence in depth — alert rules reload without a backend
+  deploy — the six rules and the operations dashboard's age panel filter the sentinel out inside the
+  subtraction:
+
+  ```promql
+  (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="scwiki_sync"} > 0)) > 172800
+  ```
+
+  This is covered by `monitoring/prometheus/tests/staleness_never_succeeded_sentinel_test.yml`.
+  **Triage corollary:** a staleness alert that resolves on its own within minutes is not staleness at
+  all — a genuine one persists until someone acts.
 
 - `basetool_sync_events_total{source,event_type}` counter at the three `SyncReportService`
   `log*Event` write sites (`source` = `SyncSourceSystem`, `event_type` = `SyncEventType`; both

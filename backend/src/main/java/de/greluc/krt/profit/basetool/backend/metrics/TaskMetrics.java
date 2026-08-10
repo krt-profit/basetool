@@ -43,8 +43,9 @@ import org.springframework.stereotype.Component;
  *       tagged {@code success} or {@code failure};
  *   <li>{@code basetool_scheduled_job_duration_seconds{job}} — the wall-clock run time;
  *   <li>{@code basetool_scheduled_job_last_success_timestamp_seconds{job}} — epoch seconds of the
- *       last successful run ({@code 0} until the first success), the source of the "sync gone
- *       stale" alert (e.g. {@code user_sync} not succeeding within 15 min).
+ *       last successful run, the source of the "sync gone stale" alerts (e.g. {@code user_sync} not
+ *       succeeding within 26 h). Absent until the job's first success — see the sentinel note
+ *       below.
  * </ul>
  *
  * <p>The wrapper <strong>catches and swallows</strong> any exception the body throws, after
@@ -54,9 +55,18 @@ import org.springframework.stereotype.Component;
  * {@code success} even if it found problems — a bank integrity sweep that reports violations is a
  * successful run; the violation count is a separate gauge.
  *
- * <p>The last-success gauge is registered lazily on a job's first {@code record(...)} call, so one
- * whose bean is absent or config-gated off (never invoked) simply never publishes the gauge rather
- * than reporting a perpetual, falsely-stale {@code 0}.
+ * <p><b>The last-success gauge is registered on a job's first SUCCESS — never earlier, and never
+ * with a {@code 0} sentinel.</b> Every staleness alert reads it as {@code time() - gauge > N},
+ * which turns a published {@code 0} into "last succeeded on 1970-01-01" — an age that exceeds every
+ * threshold in {@code monitoring/prometheus/alerts/business.yml}. The holder is a per-process
+ * {@link AtomicLong}, so it starts empty again after every backend restart; registering it at the
+ * START of a run (as this class did until 2026-08-10) therefore published {@code 0} for the whole
+ * duration of each job's first post-restart run. The prod SC-Wiki sweep takes ~10–15 min ({@code
+ * sync-all-items}), which outlasts {@code ExternalSyncStale}'s {@code for: 10m}, so that alert
+ * fired on every backend restart and self-resolved the moment the sweep finished. Registering on
+ * first success instead leaves the series simply ABSENT until there is a real timestamp to report,
+ * and {@code time() - <absent>} yields an empty vector — no alert. That also preserves the original
+ * intent: a job whose bean is absent or config-gated off never publishes the gauge at all.
  *
  * <p>This class lives in the {@code metrics} leaf package and depends only on the Micrometer
  * registry, so every layer (task, service, filter) can reuse it without forming a package cycle
@@ -131,14 +141,13 @@ public class TaskMetrics {
    * @param work the job body returning an optional item count ({@code null} = no count reported)
    */
   private void recordInternal(@NotNull ScheduledJob job, @NotNull ThrowingItemWork work) {
-    AtomicLong lastSuccess = lastSuccessHolder(job);
     long startNanos = System.nanoTime();
     String outcome = MetricNames.OUTCOME_SUCCESS;
     Integer items = null;
     boolean mdcOwned = openRunContext(job);
     try {
       items = work.run();
-      lastSuccess.set(Instant.now().getEpochSecond());
+      markSuccess(job);
     } catch (Exception e) {
       outcome = MetricNames.OUTCOME_FAILURE;
       log.error("Scheduled job '{}' failed", job.label(), e);
@@ -197,13 +206,12 @@ public class TaskMetrics {
    * @return the item count the body reported on a clean run
    */
   public int recordCountingRethrow(@NotNull ScheduledJob job, @NotNull ThrowingIntSupplier work) {
-    AtomicLong lastSuccess = lastSuccessHolder(job);
     long startNanos = System.nanoTime();
     String outcome = MetricNames.OUTCOME_SUCCESS;
     Integer items = null;
     try {
       items = work.getAsInt();
-      lastSuccess.set(Instant.now().getEpochSecond());
+      markSuccess(job);
       return items;
     } catch (RuntimeException e) {
       outcome = MetricNames.OUTCOME_FAILURE;
@@ -249,27 +257,46 @@ public class TaskMetrics {
   }
 
   /**
-   * Returns the per-job epoch-seconds holder, registering the backing gauge on first use.
+   * Stamps the current epoch second into {@code job}'s last-success gauge, registering that gauge
+   * on the job's very first success.
    *
-   * @param job the job whose last-success holder is requested
-   * @return the shared, mutable holder feeding {@code basetool_scheduled_job_last_success_*}
+   * <p>Called ONLY from the success path of the three public entry points — never before or during
+   * a run. That ordering is the whole point: the gauge must not exist until there is a real
+   * timestamp to publish, because the staleness alerts compute {@code time() - gauge} and would
+   * read an as-yet-unset {@code 0} as a 56-year-old success (see the class Javadoc for the {@code
+   * ExternalSyncStale} false positive this caused on every backend restart).
+   *
+   * <p>The timestamp is taken BEFORE {@code computeIfAbsent} and passed into the registration, so
+   * the gauge is already carrying it the instant Micrometer can scrape it — a holder registered at
+   * {@code 0} and set immediately afterwards would leave a scrape-sized window in which the
+   * sentinel is observable again, which is exactly the bug being fixed.
+   *
+   * @param job the job whose run just completed cleanly
    */
-  private @NotNull AtomicLong lastSuccessHolder(@NotNull ScheduledJob job) {
-    return lastSuccessHolders.computeIfAbsent(job, this::registerLastSuccessGauge);
+  private void markSuccess(@NotNull ScheduledJob job) {
+    long epochSeconds = Instant.now().getEpochSecond();
+    lastSuccessHolders
+        .computeIfAbsent(job, first -> registerLastSuccessGauge(first, epochSeconds))
+        .set(epochSeconds);
   }
 
   /**
    * Registers the last-success timestamp gauge for {@code job} and returns its backing holder.
    *
    * @param job the job to register the gauge for
-   * @return a zero-initialised holder (0 = never succeeded) strongly referenced by the gauge
+   * @param epochSeconds the first successful run's completion time, seeded into the holder so the
+   *     gauge never publishes a {@code 0} sentinel
+   * @return the holder strongly referenced by the gauge, pre-set to {@code epochSeconds}
    */
-  private @NotNull AtomicLong registerLastSuccessGauge(@NotNull ScheduledJob job) {
-    AtomicLong holder = new AtomicLong(0L);
+  private @NotNull AtomicLong registerLastSuccessGauge(
+      @NotNull ScheduledJob job, long epochSeconds) {
+    AtomicLong holder = new AtomicLong(epochSeconds);
     Gauge.builder(MetricNames.SCHEDULED_JOB_LAST_SUCCESS, holder, AtomicLong::doubleValue)
         .tag(MetricNames.TAG_JOB, job.label())
         .baseUnit(MetricNames.UNIT_SECONDS)
-        .description("Epoch seconds of the last successful run of this scheduled job (0 = never).")
+        .description(
+            "Epoch seconds of the last successful run of this scheduled job"
+                + " (absent until the first success).")
         .register(registry);
     return holder;
   }
