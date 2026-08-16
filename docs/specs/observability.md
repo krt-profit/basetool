@@ -897,13 +897,27 @@ transaction per pass) rather than per-scrape.
   its own filter; the `application` common tag distinguishes the module.
 - `basetool_audit_events_total{domain}` counter at the single `AuditService.record` choke point
   (`domain` = the `AuditDomain` values, including `MARKET` since the Materialbörse). Silence
-  detection is two-tier: `AuditSilenceAnomaly` (no audited mutation anywhere for 5 d while the
-  backend is up) plus, since #1041 item 10, `AuditDomainSilenceAnomaly` (a single domain silent for
-  14 d while others stay active — the domain-lost-its-wiring failure mode the global sum masks;
-  `PROMOTION` / `PERSONAL_INVENTORY` / `MARKET` are excluded as legitimately-quiet and reviewed on
-  the operations dashboard's per-domain table instead). Item-order production bookings need no
-  dedicated meter — `JOB_ORDER_PRODUCTION_BOOKED` and `INVENTORY_CONSUMED_BY_PRODUCTION` roll into
-  the existing `JOB_ORDER` and `INVENTORY` domain counts (REQ-ORDERS-025).
+  detection is three-tier: `AuditSilenceAnomaly` (no audited mutation anywhere for 5 d while the
+  backend is up) plus, since #1041 item 10, a per-domain pair that catches the
+  domain-lost-its-wiring failure mode the global sum masks. The pair splits by how often a domain is
+  expected to record anything at all, because one window cannot serve both kinds:
+  `AuditDomainSilenceAnomaly` covers the *active* tier — the operational areas `INVENTORY`,
+  `JOB_ORDER`, `REFINERY`, `MISSION`, `OPERATION` — at 14 d, and `AuditQuietDomainSilenceAnomaly`
+  covers the *quiet* tier — the admin-driven or bursty areas `ROLE`, `PROMOTION`,
+  `PERSONAL_INVENTORY`, `MARKET` — at 60 d, the same window `BankAuditSilenceAnomaly` uses and
+  comfortably inside the 180 d TSDB retention. The two label matchers are complementary (the quiet
+  list negated in the first rule, asserted in the second), so **every** domain is covered by exactly
+  one rule and a newly added `AuditDomain` defaults into the active tier rather than into a silent
+  gap. Until this split `ROLE` sat in the 14 d tier and re-notified through every ordinary quiet
+  fortnight — the condition is a level, not an event, so it repeated on the Alertmanager
+  `repeat_interval` until somebody changed a role — while the three excluded domains had no
+  alerting whatsoever; both are now covered by the tier that matches their cadence. The rules are
+  pinned by promtool unit tests in
+  `monitoring/prometheus/tests/audit_domain_silence_alerts_test.yml`, and the operations dashboard
+  carries a per-domain table for each window (14 d and 60 d) for triage. Item-order production
+  bookings need no dedicated meter — `JOB_ORDER_PRODUCTION_BOOKED` and
+  `INVENTORY_CONSUMED_BY_PRODUCTION` roll into the existing `JOB_ORDER` and `INVENTORY` domain
+  counts (REQ-ORDERS-025).
 - `basetool_material_exchange_active_count{status="ACTIVE"}` gauge sampled by
   `BusinessMetricsCollector` — the number of active Materialbörse offers on the board, spanning
   **both** offer kinds (material and item, REQ-MARKET-012), via `countByStatus(ACTIVE)`
@@ -913,8 +927,8 @@ transaction per pass) rather than per-scrape.
   number of active Materialbörse requests (Gesuche) on the board, spanning both request kinds
   (material and item, REQ-MARKET-015), via `MaterialExchangeRequestRepository.countByStatus(ACTIVE)`
   (REQ-MARKET-018, REQ-OBS-011). Counts only, equally label-frugal (no per-request/per-user/per-kind
-  label). Requests reuse `AuditDomain.MARKET`, so they inherit the existing
-  `AuditDomainSilenceAnomaly` exclusion — no alert change is needed.
+  label). Requests reuse `AuditDomain.MARKET`, so they inherit that domain's place in the
+  quiet 60 d tier (`AuditQuietDomainSilenceAnomaly`) — no alert change is needed.
 - `basetool_bank_audit_events_total{event_type}` counter at the single `BankAuditService.record`
   choke point (`event_type` = the bounded `BankAuditEventType` enum). The bank keeps a physically
   separate `bank_audit_event` table excluded from `AuditDomain`, so before #1041 item 10 the most

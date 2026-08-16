@@ -733,22 +733,55 @@ groups:
           summary: "No bank audit events recorded in 60d while backend is up"
           description: "The backend has been up but recorded zero bank audit events for 60 days — possible bank audit-logging regression (REQ-AUDIT-001). Every bank mutation must write a bank_audit_event row."
 
-      # (#1041 item 10) Per-domain audit silence. AuditSilenceAnomaly sums across all domains, so one
-      # domain losing its audit wiring in a refactor (the exact REQ-AUDIT-001 failure mode) is masked
-      # as long as any other domain stays active. This fires per domain. PROMOTION / PERSONAL_INVENTORY /
-      # MARKET are excluded — they legitimately stay quiet for weeks (the Materialbörse is a young,
-      # bursty trade board); their silence is reviewed on the 07 "Audit events (14d) by domain" table
-      # instead of paged. A domain that never emitted has no series and cannot fire; only one that WAS
-      # active and went silent 14d does.
+      # (#1041 item 10) Per-domain audit silence, split across two windows by how often a domain is
+      # expected to record anything at all. AuditSilenceAnomaly sums across all domains, so one domain
+      # losing its audit wiring in a refactor (the exact REQ-AUDIT-001 failure mode) is masked as long
+      # as any other domain stays active. These two rules fire per domain instead.
+      #
+      # The split exists because a single window cannot serve both kinds of domain: 14d of silence in
+      # INVENTORY or JOB_ORDER means something broke, while 14d without a single role grant is an
+      # ordinary quiet fortnight. Before the split the quiet domains were simply excluded and had NO
+      # alerting at all, and ROLE — which was not excluded — fired continuously through every quiet
+      # stretch (a level, not an event: it re-notifies on the Alertmanager repeat_interval until
+      # someone finally changes a role). Both failure modes are now covered by the tier that matches
+      # the domain's cadence.
+      #
+      # The two matchers are complementary by construction — the quiet list is negated in the first
+      # rule and asserted in the second — so every domain is covered by exactly one rule and there is
+      # no silent gap. A newly added AuditDomain therefore lands in the ACTIVE tier by default; moving
+      # it to the quiet tier must be a deliberate edit of both matchers, never an omission. In both
+      # tiers a domain that never emitted has no series and cannot fire; only one that WAS active and
+      # then went silent does.
+      #
+      # Active tier: the day-to-day operational areas (INVENTORY, JOB_ORDER, REFINERY, MISSION,
+      # OPERATION). A fortnight without a single audited mutation there is genuinely anomalous.
       # baseline-tune: the 14d window suits an active org; a very quiet squadron may need it widened.
       - alert: AuditDomainSilenceAnomaly
-        expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"PROMOTION|PERSONAL_INVENTORY|MARKET"}[14d])) == 0) and on() (up{job="basetool-backend"} == 1)
+        expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"ROLE|PROMOTION|PERSONAL_INVENTORY|MARKET"}[14d])) == 0) and on() (up{job="basetool-backend"} == 1)
         for: 1h
         labels:
           severity: warning
         annotations:
           summary: "Audit domain silent 14d ({{ $labels.domain }})"
           description: "The {{ $labels.domain }} audit domain recorded zero events in 14 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
+
+      # Quiet tier: admin-driven or bursty areas whose silence over weeks carries no signal — ROLE
+      # (role/membership admin, Kommando groups, user deletion), PROMOTION, PERSONAL_INVENTORY and
+      # MARKET (the Materialbörse is a young, bursty trade board). Same shape, 60d window, matching
+      # the BankAuditSilenceAnomaly precedent — that alert was widened 5d -> 60d for exactly this
+      # reason. 60d fits inside the 180d TSDB retention, so the range is never truncated into a
+      # spurious zero. Two months without one single event in such a domain is no longer "quiet", it
+      # is a wiring loss worth checking.
+      # baseline-tune: 60d is the first non-paging window for these domains; widen if a genuinely
+      # dormant area (e.g. an unused Materialbörse) proves it out.
+      - alert: AuditQuietDomainSilenceAnomaly
+        expr: (sum by (domain) (increase(basetool_audit_events_total{domain=~"ROLE|PROMOTION|PERSONAL_INVENTORY|MARKET"}[60d])) == 0) and on() (up{job="basetool-backend"} == 1)
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Quiet audit domain silent 60d ({{ $labels.domain }})"
+          description: "The {{ $labels.domain }} audit domain recorded zero events in 60 days while the backend is up. This domain is expected to be quiet for weeks, so it is alerted on a 60d window rather than the 14d one — two months of total silence still points at lost audit wiring (REQ-AUDIT-001). Check the domain's auditService.record call sites before writing it off as inactivity."
 
       # Frontend → backend call failures (bounded reason/method), sustained.
       - alert: BackendCallFailureSustained
