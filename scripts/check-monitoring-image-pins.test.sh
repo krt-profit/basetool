@@ -5,6 +5,9 @@
 #
 # SPDX-License-Identifier: GPL-3.0-only
 #
+# image-pin-gate: ignore-file — the fixtures below pin WRONG tags on purpose. "Repairing" them would
+# make this suite pass vacuously, the one outcome a regression suite must never have.
+#
 # Regression tests for scripts/check-monitoring-image-pins.sh.
 #
 # Builds throwaway git repositories that reproduce the drift scenarios the gate is meant to (and
@@ -347,7 +350,7 @@ DOC
 
   run_checker "$repo" || rc=$?
   assert_exit 1 "$rc" "the lone file is still scanned"
-  assert_contains "across 1 Markdown file(s)" "the list really did collapse to one file"
+  assert_contains "across 1 tracked file(s)" "the list really did collapse to one file"
   assert_contains "monitoring/README.md:3" "the report names the file, not the line number"
 
   rc=0
@@ -414,6 +417,146 @@ DOC
   rm -rf "$repo"
 }
 
+# ---------------------------------------------------------------------------
+# Scenario 9 (the 2026-08-16 widening): the same copy-pasteable command in a NON-Markdown file. Nine
+# of the ten promtool test files under monitoring/prometheus/tests/ had drifted while the gate only
+# looked at *.md, so this is the headline case for the widened scan — a pinned tag is a pinned tag
+# whatever the file extension.
+# ---------------------------------------------------------------------------
+scenario_non_markdown_file_is_gated() {
+  echo "Scenario: stale pin in a .yml header comment (must FAIL, then be fixable)"
+  local repo rc=0
+  repo="$(mktmp)"
+  init_repo "$repo"
+  write_compose "$repo" "prom/prometheus:v3.13.2"
+  write_doc "$repo" "monitoring/prometheus/tests/some_alerts_test.yml" <<'DOC'
+# Run locally:
+#   docker run --rm --entrypoint promtool prom/prometheus:v3.13.0 test rules tests/x.yml
+rule_files:
+  - ../alerts/business.yml
+DOC
+  commit_all "$repo"
+
+  run_checker "$repo" || rc=$?
+  assert_exit 1 "$rc" "the stale pin in a .yml is flagged"
+  assert_contains "monitoring/prometheus/tests/some_alerts_test.yml:2" "the report names the file and its line"
+  assert_contains "prom/prometheus:v3.13.0  ->  v3.13.2" "the report names found and wanted tag"
+
+  rc=0
+  run_checker "$repo" --fix || rc=$?
+  assert_exit 0 "$rc" "--fix succeeds"
+  assert_file_contains "${repo}/monitoring/prometheus/tests/some_alerts_test.yml" \
+    "prom/prometheus:v3.13.2" "--fix rewrote the pin in the .yml"
+  rm -rf "$repo"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 10: the compose file is the AUTHORITY, not a document about it. Two services pinning the
+# same repository at different tags is legal there (a canary, a staged bump); with the widened scan
+# the gate would otherwise compare the source of truth against itself and report the loser.
+# ---------------------------------------------------------------------------
+scenario_compose_authority_is_never_flagged() {
+  echo "Scenario: compose pins the same repository twice (must PASS)"
+  local repo rc=0
+  repo="$(mktmp)"
+  init_repo "$repo"
+  write_compose "$repo" "grafana/loki:3.7.4" "grafana/loki:3.7.0"
+  write_doc "$repo" "monitoring/README.md" <<'DOC'
+# Monitoring
+DOC
+  commit_all "$repo"
+
+  run_checker "$repo" || rc=$?
+  assert_exit 0 "$rc" "the authority is not scanned against itself"
+  # The success line names the compose file, so match the report's `file:line` shape instead.
+  assert_excludes "${COMPOSE_FILE}:1" "the compose file is absent from the drift report"
+  rm -rf "$repo"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 11: the inline opt-out for files whose tags are deliberately not pins — this suite's own
+# fixtures are the case it exists for. --fix must leave them byte-identical, or a red gate would
+# "repair" a regression suite into passing vacuously.
+# ---------------------------------------------------------------------------
+scenario_ignore_marker_exempts() {
+  echo "Scenario: 'image-pin-gate: ignore-file' in the header (must PASS and stay unwritten)"
+  local repo rc=0
+  repo="$(mktmp)"
+  init_repo "$repo"
+  write_compose "$repo" "grafana/tempo:3.4.0"
+  write_doc "$repo" "scripts/fixtures.sh" <<'DOC'
+#!/usr/bin/env bash
+#
+# image-pin-gate: ignore-file — the tag below is a fixture, not a pin.
+write_fixture 'grafana/tempo:3.0.2'
+DOC
+  write_doc "$repo" "monitoring/README.md" <<'DOC'
+# Monitoring
+DOC
+  commit_all "$repo"
+
+  run_checker "$repo" || rc=$?
+  assert_exit 0 "$rc" "the marked file is exempt"
+  assert_excludes "scripts/fixtures.sh" "it is absent from the report"
+
+  rc=0
+  run_checker "$repo" --fix || rc=$?
+  assert_exit 0 "$rc" "--fix succeeds"
+  assert_file_contains "${repo}/scripts/fixtures.sh" "grafana/tempo:3.0.2" \
+    "--fix left the fixture tag alone"
+  rm -rf "$repo"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 12: the ignore marker is header matter, not a magic word anywhere in the file — the same
+# guard scenario 5 puts on the "Doc type:" convention. A document that DOCUMENTS the marker (this
+# suite, the gate's own header, a future contributing guide) must not exempt itself by talking.
+# ---------------------------------------------------------------------------
+scenario_late_ignore_marker_does_not_exempt() {
+  echo "Scenario: ignore marker quoted below the header (must FAIL)"
+  local repo rc=0
+  repo="$(mktmp)"
+  init_repo "$repo"
+  write_compose "$repo" "grafana/alloy:v1.18.0"
+  {
+    printf '# Contributing\n'
+    # Push the marker past EXEMPTION_HEADER_LINES, exactly as a prose document would.
+    for _ in $(seq 1 20); do printf '\n'; done
+    printf 'A file opts out with "image-pin-gate: ignore-file" in its header.\n'
+    printf '\n    docker run --rm grafana/alloy:v1.17.1 fmt /cfg/config.alloy\n'
+  } >"${repo}/CONTRIBUTING.md"
+  commit_all "$repo"
+
+  run_checker "$repo" || rc=$?
+  assert_exit 1 "$rc" "a quoted marker deep in the body does not exempt the file"
+  assert_contains "CONTRIBUTING.md" "the file is still reported"
+  rm -rf "$repo"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 13: binary files are skipped rather than scanned. `git ls-files` lists the keystore, the
+# fonts and every image in the repository; grep -I is what keeps them out of both the exemption pass
+# and the scan, and a NUL byte next to a plausible tag is the cheapest way to prove it.
+# ---------------------------------------------------------------------------
+scenario_binary_files_are_skipped() {
+  echo "Scenario: a binary file carrying a tag-like byte sequence (must PASS)"
+  local repo rc=0
+  repo="$(mktmp)"
+  init_repo "$repo"
+  write_compose "$repo" "prom/blackbox-exporter:v0.28.0"
+  printf 'header\000\001\002 prom/blackbox-exporter:v0.24.0 \000trailer\n' \
+    >"${repo}/frontend-asset.bin"
+  write_doc "$repo" "monitoring/README.md" <<'DOC'
+# Monitoring
+DOC
+  commit_all "$repo"
+
+  run_checker "$repo" || rc=$?
+  assert_exit 0 "$rc" "the binary is not scanned"
+  assert_excludes "frontend-asset.bin" "it is absent from the report"
+  rm -rf "$repo"
+}
+
 scenario_ordinary_doc_is_gated
 scenario_adr_is_a_historical_record
 scenario_changelog_is_excluded
@@ -422,6 +565,11 @@ scenario_late_front_matter_does_not_exempt
 scenario_single_file_list_keeps_filename
 scenario_fix_does_not_leak_through_regex_metacharacters
 scenario_all_docs_excluded_is_an_error
+scenario_non_markdown_file_is_gated
+scenario_compose_authority_is_never_flagged
+scenario_ignore_marker_exempts
+scenario_late_ignore_marker_does_not_exempt
+scenario_binary_files_are_skipped
 
 echo
 if [[ "$tests_failed" -eq 0 ]]; then

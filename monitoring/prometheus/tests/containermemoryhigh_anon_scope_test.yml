@@ -17,7 +17,7 @@
 #
 # Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
 #   docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.13.1 test rules tests/containermemoryhigh_anon_scope_test.yml
+#     prom/prometheus:v3.13.2 test rules tests/containermemoryhigh_anon_scope_test.yml
 
 rule_files:
   - ../alerts/infrastructure.yml

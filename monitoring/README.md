@@ -62,9 +62,13 @@ docker inspect --format '{{.Name}} {{.Config.Image}}' \
   $(docker ps --filter label=com.docker.compose.project=iri-monitoring -q)
 ```
 
-Tags quoted inside the runnable commands in this file *are* pinned, and
+Tags quoted inside runnable commands *are* pinned, and
 [`scripts/check-monitoring-image-pins.sh`](../scripts/check-monitoring-image-pins.sh) (run in CI by
-`repo-lint.yml`) fails the build if any of them drifts from the compose file.
+`repo-lint.yml`) fails the build if any of them drifts from the compose file. Since 2026-08-16 it
+scans every tracked text file, not only Markdown — the promtool test headers under
+`prometheus/tests/` carry the same copy-pasteable command and nine of ten had drifted while they
+were out of scope. A file whose tags are deliberately not pins opts out with an
+`image-pin-gate: ignore-file` marker in its first ten lines.
 
 ## Config tree map
 

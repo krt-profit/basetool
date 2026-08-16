@@ -23,11 +23,11 @@
 # unit-test engine aborts with "query processing would load too many samples into memory". The 1h
 # grid is still well under the rule's `for: 1h`.
 #
-# Run locally with the "Alert-rule unit tests" command in monitoring/README.md § Local validation —
-# from the repo root, so the `../alerts` path above resolves. The image tag is deliberately NOT
-# repeated here: check-monitoring-image-pins.sh only gates Markdown, so a tag quoted in a .yml would
-# drift silently on the next Prometheus bump and have an operator validate against a version the
-# stack does not run.
+# Run locally from the repo root (no promtool on the host — use an ephemeral container; -w /work
+# makes the `../alerts` path above resolve). The tag is pinned and kept honest by
+# scripts/check-monitoring-image-pins.sh:
+#   docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.13.2 -c 'promtool test rules tests/audit_domain_silence_alerts_test.yml'
 
 rule_files:
   - ../alerts/business.yml
