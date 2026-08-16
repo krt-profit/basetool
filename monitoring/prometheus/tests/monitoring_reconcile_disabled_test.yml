@@ -9,7 +9,7 @@
 # Run locally (no promtool installed on the host — use an ephemeral container, see
 # monitoring/README.md monitoring-config lint recipe):
 #   docker run --rm -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.13.0 promtool test rules tests/monitoring_reconcile_disabled_test.yml
+#     prom/prometheus:v3.13.2 promtool test rules tests/monitoring_reconcile_disabled_test.yml
 
 rule_files:
   - ../alerts/meta.yml
