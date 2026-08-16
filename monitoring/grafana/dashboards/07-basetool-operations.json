@@ -1173,7 +1173,7 @@
         "y": 64
       },
       "type": "table",
-      "title": "Audit events (last 14d) by domain (active tier window)",
+      "title": "Audit events (last 14d) by domain",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1210,7 +1210,7 @@
         "y": 80
       },
       "type": "table",
-      "title": "Audit events (last 60d) by domain (quiet tier window)",
+      "title": "Audit events (last 60d) by domain (review of the non-alerted domains)",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
