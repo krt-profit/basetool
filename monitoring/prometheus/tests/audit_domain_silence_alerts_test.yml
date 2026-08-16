@@ -1,0 +1,135 @@
+# promtool unit tests for the per-domain audit-silence alert (REQ-OBS-011 / REQ-AUDIT-001).
+#
+# Context: AuditDomainSilenceAnomaly runs a 14d window over every audit domain except an excluded
+# set. ROLE — role/membership admin, Kommando groups, user deletion — was NOT in that set but
+# legitimately records nothing for weeks, so it fired through every quiet stretch; and because the
+# condition is a LEVEL, not an event, it kept re-notifying on the Alertmanager repeat_interval until
+# somebody finally changed a role. ROLE therefore joined PROMOTION, PERSONAL_INVENTORY and MARKET in
+# the exclusion list: those four are reviewed on the operations dashboard's per-domain tables rather
+# than paged, at any horizon.
+#
+# What these tests pin down:
+#   - the alert still catches a 14d wiring loss in an alerted domain,
+#   - ROLE going quiet is silent both at 14d (the regression that produced the mail flood) and far
+#     beyond it, so the exclusion is an exemption and not merely a longer fuse,
+#   - a domain named in the exclusion list of neither rule is alerted — the default is coverage,
+#   - the `up` guard suppresses the rule while the backend is down.
+#
+# Sampling notes: `interval` and `evaluation_interval` are deliberately BOTH 1h. The
+# `up{job="basetool-backend"}` guard is an INSTANT selector, so it must not be stale at evaluation
+# time or the `and on()` drops every alert and the tests pass for the wrong reason; aligning the two
+# intervals puts an `up` sample on exactly every evaluation timestamp. A denser 5m grid would keep
+# `up` fresh too, but the 62-day case then loads ~17k samples per evaluation and promtool's
+# unit-test engine aborts with "query processing would load too many samples into memory". The 1h
+# grid is still well under the rule's `for: 1h`.
+#
+# Run locally with the "Alert-rule unit tests" command in monitoring/README.md § Local validation —
+# from the repo root, so the `../alerts` path above resolves. The image tag is deliberately NOT
+# repeated here: check-monitoring-image-pins.sh only gates Markdown, so a tag quoted in a .yml would
+# drift silently on the next Prometheus bump and have an operator validate against a version the
+# stack does not run.
+
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1h
+
+tests:
+  # An operational domain recording steadily. The alert must not fire — this is the normal state.
+  - name: silent - alerted domain with continuous traffic
+    interval: 1h
+    input_series:
+      - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="JOB_ORDER"}'
+        values: "0+1x403"
+      - series: 'up{job="basetool-backend", instance="backend:11261"}'
+        values: "1x403"
+    alert_rule_test:
+      - eval_time: 360h
+        alertname: AuditDomainSilenceAnomaly
+        exp_alerts: []
+
+  # The failure the alert exists for: an operational domain that WAS recording and then went silent
+  # — a refactor dropped its auditService.record call. Increments stop after the first hours, so by
+  # day 15 the 14d window is entirely flat.
+  - name: fires - alerted domain silent for 14d
+    interval: 1h
+    input_series:
+      - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="JOB_ORDER"}'
+        values: "0+1x2 2x400"
+      - series: 'up{job="basetool-backend", instance="backend:11261"}'
+        values: "1x403"
+    alert_rule_test:
+      - eval_time: 360h
+        alertname: AuditDomainSilenceAnomaly
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              domain: JOB_ORDER
+            exp_annotations:
+              summary: "Audit domain silent 14d (JOB_ORDER)"
+              description: "The JOB_ORDER audit domain recorded zero events in 14 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
+
+  # THE regression the exclusion fixes. Identical shape to the case above, but on ROLE: no role or
+  # membership change for a fortnight is an ordinary quiet period in a squadron. Before ROLE was
+  # excluded this fired and then repeated every 4h indefinitely.
+  - name: silent - ROLE quiet for 14d is an ordinary quiet fortnight
+    interval: 1h
+    input_series:
+      - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="ROLE"}'
+        values: "0+1x2 2x400"
+      - series: 'up{job="basetool-backend", instance="backend:11261"}'
+        values: "1x403"
+    alert_rule_test:
+      - eval_time: 360h
+        alertname: AuditDomainSilenceAnomaly
+        exp_alerts: []
+
+  # The exclusion is an exemption, not a longer fuse: ROLE stays silent at 62 days too. This pins the
+  # deliberate decision that the four excluded domains are reviewed on the dashboard instead of
+  # paged — if that trade is ever revisited, this test is the one that must change with it.
+  - name: silent - ROLE stays exempt far beyond the 14d window
+    interval: 1h
+    input_series:
+      - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="ROLE"}'
+        values: "0+1x2 2x1550"
+      - series: 'up{job="basetool-backend", instance="backend:11261"}'
+        values: "1x1553"
+    alert_rule_test:
+      - eval_time: 1490h
+        alertname: AuditDomainSilenceAnomaly
+        exp_alerts: []
+
+  # Coverage is the default: a domain absent from the exclusion list (a future AuditDomain someone
+  # adds without touching this rule) is alerted at 14d. Exempting a domain must be a deliberate edit,
+  # never an omission.
+  - name: fires - an unlisted domain is alerted by default
+    interval: 1h
+    input_series:
+      - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="FUTURE_AREA"}'
+        values: "0+1x2 2x400"
+      - series: 'up{job="basetool-backend", instance="backend:11261"}'
+        values: "1x403"
+    alert_rule_test:
+      - eval_time: 360h
+        alertname: AuditDomainSilenceAnomaly
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              domain: FUTURE_AREA
+            exp_annotations:
+              summary: "Audit domain silent 14d (FUTURE_AREA)"
+              description: "The FUTURE_AREA audit domain recorded zero events in 14 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
+
+  # A backend that is down records nothing by definition. The `up` guard must suppress the rule, or
+  # every outage longer than the `for` would page on top of the outage itself.
+  - name: silent - backend down suppresses the alert
+    interval: 1h
+    input_series:
+      - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="JOB_ORDER"}'
+        values: "0+1x2 2x400"
+      - series: 'up{job="basetool-backend", instance="backend:11261"}'
+        values: "0x403"
+    alert_rule_test:
+      - eval_time: 360h
+        alertname: AuditDomainSilenceAnomaly
+        exp_alerts: []

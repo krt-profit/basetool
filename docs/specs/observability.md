@@ -899,11 +899,21 @@ transaction per pass) rather than per-scrape.
   (`domain` = the `AuditDomain` values, including `MARKET` since the Materialbörse). Silence
   detection is two-tier: `AuditSilenceAnomaly` (no audited mutation anywhere for 5 d while the
   backend is up) plus, since #1041 item 10, `AuditDomainSilenceAnomaly` (a single domain silent for
-  14 d while others stay active — the domain-lost-its-wiring failure mode the global sum masks;
-  `PROMOTION` / `PERSONAL_INVENTORY` / `MARKET` are excluded as legitimately-quiet and reviewed on
-  the operations dashboard's per-domain table instead). Item-order production bookings need no
-  dedicated meter — `JOB_ORDER_PRODUCTION_BOOKED` and `INVENTORY_CONSUMED_BY_PRODUCTION` roll into
-  the existing `JOB_ORDER` and `INVENTORY` domain counts (REQ-ORDERS-025).
+  14 d while others stay active — the domain-lost-its-wiring failure mode the global sum masks).
+  Four domains are excluded from the per-domain rule and never notify at any horizon: `PROMOTION`,
+  `PERSONAL_INVENTORY`, `MARKET`, and — since 2026-08-16 — `ROLE`. `ROLE` covers
+  role/membership admin, Kommando groups and user deletion, all admin actions rather than daily
+  traffic, so a fortnight without one is an ordinary quiet period; while it was still alerted it
+  fired through every such period and, the condition being a level rather than an event, re-notified
+  on the Alertmanager `repeat_interval` until somebody changed a role. Their volume is reviewed on
+  the operations dashboard's per-domain tables (14 d and 60 d) instead of paged — a deliberate
+  trade of coverage for signal. Everything not named there is alerted, so a newly added
+  `AuditDomain` is covered by default and exempting one is a deliberate edit rather than an
+  omission. The rule, its exclusions and the `up` guard are pinned by promtool unit tests in
+  `monitoring/prometheus/tests/audit_domain_silence_alerts_test.yml`. Item-order production
+  bookings need no dedicated meter — `JOB_ORDER_PRODUCTION_BOOKED` and
+  `INVENTORY_CONSUMED_BY_PRODUCTION` roll into the existing `JOB_ORDER` and `INVENTORY` domain
+  counts (REQ-ORDERS-025).
 - `basetool_material_exchange_active_count{status="ACTIVE"}` gauge sampled by
   `BusinessMetricsCollector` — the number of active Materialbörse offers on the board, spanning
   **both** offer kinds (material and item, REQ-MARKET-012), via `countByStatus(ACTIVE)`

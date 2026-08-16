@@ -735,14 +735,24 @@ groups:
 
       # (#1041 item 10) Per-domain audit silence. AuditSilenceAnomaly sums across all domains, so one
       # domain losing its audit wiring in a refactor (the exact REQ-AUDIT-001 failure mode) is masked
-      # as long as any other domain stays active. This fires per domain. PROMOTION / PERSONAL_INVENTORY /
-      # MARKET are excluded — they legitimately stay quiet for weeks (the Materialbörse is a young,
-      # bursty trade board); their silence is reviewed on the 07 "Audit events (14d) by domain" table
-      # instead of paged. A domain that never emitted has no series and cannot fire; only one that WAS
-      # active and went silent 14d does.
+      # as long as any other domain stays active. This fires per domain.
+      #
+      # EXCLUSIONS — the domains whose silence carries no signal, and which therefore never notify at
+      # any horizon: PROMOTION, PERSONAL_INVENTORY, MARKET (the Materialbörse is a young, bursty trade
+      # board) and, since 2026-08-16, ROLE. ROLE covers role/membership admin, Kommando groups and
+      # user deletion — admin actions, not daily traffic — so a fortnight without one is an ordinary
+      # quiet period. It sat in the alerted set until then and fired continuously through every such
+      # period: the condition is a LEVEL, not an event, so once true it re-notified on the
+      # Alertmanager repeat_interval (four-hourly) until somebody finally changed a role. Silence in
+      # all four is reviewed on the 07 dashboard's per-domain tables (14d and 60d) instead of paged —
+      # a deliberate trade of coverage for signal, decided by @greluc.
+      #
+      # Everything NOT named above is alerted, so a newly added AuditDomain is covered by default and
+      # exempting it has to be a deliberate edit here rather than an omission. A domain that never
+      # emitted has no series and cannot fire; only one that WAS active and went silent 14d does.
       # baseline-tune: the 14d window suits an active org; a very quiet squadron may need it widened.
       - alert: AuditDomainSilenceAnomaly
-        expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"PROMOTION|PERSONAL_INVENTORY|MARKET"}[14d])) == 0) and on() (up{job="basetool-backend"} == 1)
+        expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"ROLE|PROMOTION|PERSONAL_INVENTORY|MARKET"}[14d])) == 0) and on() (up{job="basetool-backend"} == 1)
         for: 1h
         labels:
           severity: warning
