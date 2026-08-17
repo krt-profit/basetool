@@ -156,11 +156,13 @@ and `https://keycloak:18443` both authenticate.
 docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config truststore \
     --trustpass - /run/secrets/keystore.p12
 
-# 2. authenticate. This must come BEFORE any read: kcadm refuses every command without a stored
-#    credential, and says "No server specified. Use --server, or 'kcadm.sh config credentials'."
-#    rather than anything about being unauthenticated. Omitting --password makes it prompt.
+# 2. authenticate as the provisioning service account (see the section below — an admin account
+#    with OTP cannot authenticate here at all). This must come BEFORE any read: kcadm refuses
+#    every command without a stored credential, and says "No server specified. Use --server, or
+#    'kcadm.sh config credentials'." rather than anything about being unauthenticated.
+#    Omitting --secret makes it prompt, keeping the secret out of shell history.
 docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
-    --server https://localhost:18443 --realm master --user <admin>
+    --server https://localhost:18443 --realm iri --client basetool-provisioner
 
 # 3. save the current lists — this is the rollback basis, and both are expected to be empty
 docker exec keycloak /opt/keycloak/bin/kcadm.sh get client-policies/profiles -r iri \
@@ -182,6 +184,46 @@ docker exec keycloak rm -f /opt/keycloak/.keycloak/kcadm.config
 
 The kcadm session survives a container **restart** but not a **recreate**, so a deploy that replaces
 the container clears it — which is also why step 6 costs nothing.
+
+### Why a service account and not the admin user
+
+**kcadm cannot log in as an admin account that has OTP enabled.** Its `config credentials` command
+offers exactly three authentication modes — `--user/--password`, `--client/--secret` and
+`--client/--keystore` — and none of them can carry a second factor. The direct-grant login simply
+fails, and it fails as `invalid_grant` / **"Invalid user credentials"**, which reads as a wrong
+password and sends you looking in the wrong place. The realm's own log is what disambiguates it:
+
+```bash
+docker logs keycloak --tail 300 2>&1 | grep LOGIN_ERROR \
+    | grep -oE 'realmName="[^"]*"|error="[^"]*"' | tail -10
+```
+
+`error="invalid_user_credentials"` for an account whose password demonstrably works in the Admin
+Console means the second factor, not the password. (`user_temporarily_disabled` would mean the
+brute-force lockout instead — `iri` has `bruteForceProtected` on with `failureFactor: 5`, so retrying
+a failing login is actively counterproductive.)
+
+Create a short-lived provisioning identity in the Admin Console instead — **Clients → Create client**:
+
+- Client ID `basetool-provisioner`, **Client authentication ON** (confidential).
+- Authentication flow: **Service accounts roles ON**, everything else OFF — no standard flow, no
+  direct access grants. It is not a login client.
+- Then **Service accounts roles → Assign role → Filter by clients → `realm-management`** and assign
+  **`manage-clients`** and **`manage-realm`**.
+
+Both roles are required and neither is surplus, verified against Keycloak 26.7 in both directions:
+with `manage-clients` alone the client-policy endpoints answer **403**, with `manage-realm` alone the
+client endpoints answer **403**. The service account deliberately cannot edit its own role mappings
+(that needs `manage-users`), so it cannot widen its own reach.
+
+The credential is short-lived in use, too: the service-account token carries the realm's 300 s
+access-token lifespan and there is no refresh token on the client-credentials grant, so a step run
+after a long pause may need step 2 again.
+
+**Remove it when done.** Disable or delete `basetool-provisioner` after the procedure; it exists to
+be used for minutes, not to sit in the realm holding `manage-realm`. Re-create it the next time the
+client needs an edit — which, per the frozen-client note below, is the only supported way to edit it
+anyway.
 
 Use `--profile test` on a test realm: it additionally registers the custom-scheme and loopback
 redirect URIs the prod client deliberately does without.
