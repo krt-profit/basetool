@@ -333,7 +333,7 @@ services:
   tempo:
     <<: *mon-base
     container_name: tempo
-    image: grafana/tempo:3.0.2
+    image: grafana/tempo:3.0.3
     cap_drop: [ALL]
     # -config.expand-env: expand ${PROMETHEUS_WEB_PASSWORD} in tempo.yaml so the metrics-generator's
     # remote_write can basic-auth to Prometheus as the shared `grafana` user (#1041 item 22a).
@@ -515,6 +515,14 @@ services:
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
+      # Notification-log retention. This is what remembers "this alert was already mailed", and it
+      # bounds repeat_interval from below: entries older than this are garbage-collected, after
+      # which a still-firing alert is treated as never-notified and mails again. The default is 120h
+      # (5d), so the config's 720h (30d) "one mail per event" would silently have degraded into a
+      # five-day cadence. 744h = 31d, one day of headroom. Raise it with repeat_interval or neither.
+      # Cost is a handful of tiny nflog entries on the existing bind mount — not a memory concern at
+      # this alert volume, and the mount makes it survive a restart.
+      - --data.retention=744h
     volumes:
       - /var/iri/monitoring/secrets/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - /var/iri/monitoring/data/alertmanager:/alertmanager

@@ -16,7 +16,7 @@ x-db-backend: &db-backend-template
   # `docker compose pull` on the deploy server and a subsequent compose-driven
   # restart. Refresh by running `docker buildx imagetools inspect postgres:18-alpine`
   # locally and updating the digest below — never via :latest.
-  image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+  image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
   restart: unless-stopped
   logging: *default-logging
   # Runtime-hardening baseline (REQ-OPS-014). The official postgres entrypoint boots as root to
@@ -171,7 +171,7 @@ x-db-backend: &db-backend-template
 
 x-db-keycloak: &db-keycloak-template
   # Same digest pin policy as db-backend (see comment there).
-  image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+  image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
   restart: unless-stopped
   logging: *default-logging
   # Runtime-hardening baseline (REQ-OPS-014) — same cap set + rationale as db-backend.
