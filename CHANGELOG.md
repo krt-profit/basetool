@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Vorbereitung für die Android-App: Anmelde-Verfahren festgelegt und als Skript hinterlegt.** Die künftige App bekommt einen Keycloak-Zugang, bei dem nur ihr Erneuerungs-Token an das jeweilige Gerät gebunden ist — ein gestohlenes Token ist damit außerhalb des Handys wertlos. Ein neues Betreiber-Skript legt diesen Zugang samt Richtlinie an und prüft das Ergebnis. Rein vorbereitend, keine Auswirkung auf die Oberfläche (ADR-0131, REQ-SEC-030).
+
 ### Changed
 
 - **Kontakt-E-Mail-Adresse aktualisiert.** Die Betreiber-Adresse in Impressum und Datenschutzerklärung (alle drei Sprachvarianten) sowie in CLA, Code of Conduct und Beitragsleitfaden lautet jetzt lucas.greuloch@gmail.com (vorher lucas.greuloch@pm.me).
