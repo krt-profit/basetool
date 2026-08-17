@@ -113,20 +113,55 @@ allowlist from day one; the app's terms gate and `PENDING_APPROVAL` handling dep
 anonymous **write** paths open only when the app's guest mode ships (owner decision Q6: with the
 first release), each with its own rate budget and abuse counter.
 
-## 5. Open questions
+## 5. Decisions (owner, 2026-08-17)
 
-1. **Hostname** — `api.profit-base.online`, or a different name?
-2. **Keycloak event log** (D1) — enabling user events creates a new personal-data store. Retention
-   period, and confirmation that the privacy notice extension (B6) is acceptable?
-3. **Configuration form** — should the Keycloak client and policies be delivered as an importable
-   JSON/`kcadm` script (repeatable, reviewable) or as documented console steps?
-4. **Sequencing** — may the Track A hardening PRs land independently and early (they improve the
-   current deployment regardless), or should the whole package move as one series?
-5. **Test-stack Keycloak** — E1 needs a throwaway realm with the DPoP policy. Confirm that the
-   existing `docker-compose.test.yml` stack plus a stripped realm export is the right vehicle
-   (never the production realm export — hard repo rule).
+| # |                                                                                  Decision                                                                                  |
+|---|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1 | **Hostname: `api.profit-base.online`** — its own vhost with its own rate limits, probes and deny rules, separately switchable from the frontend                            |
+| 2 | **Keycloak event log stays off for now** — see the accepted risk below                                                                                                     |
+| 3 | **Keycloak configuration ships as a versioned `kcadm` script**, built against a **fresh sanitized export** of the current production realm rather than against assumptions |
+| 4 | **Track A hardening lands early and as individual PRs** — each improves the current deployment on its own merits, independent of the exposure decision                     |
+| 5 | **E1 runs on the existing `docker-compose.test.yml` stack** with a stripped realm export and throwaway credentials (never production artefacts — hard repo rule)           |
 
-## 6. What this plan deliberately does not do
+### Accepted risk: no Keycloak event log
+
+Decision 2 leaves the realm without login-failure, token-error and client-disable events. The
+consequence, stated plainly: **on the newly public token endpoint, failed authentication is
+invisible at the identity provider.** The abuse ladder of the app's security concept keeps its
+"raise cost", "throttle" and "revoke" rungs, but loses one of its "detect" sources.
+
+What still covers part of that gap:
+
+- Keycloak's brute-force protection stays on and locks accounts regardless of logging.
+- The edge budget for the token endpoint (D3) throttles volumetric abuse before Keycloak sees it,
+  and edge rejections are visible in the NPM access log and the `EdgeRateLimitSpike` alert.
+- The backend-side counters of A8 see authentication failures at the **API** — a token that fails
+  validation, an unknown `azp`, a rate-limit rejection. What they cannot see is an attack that
+  never gets past Keycloak, for example password spraying against the token endpoint.
+
+Revisit if the public surface ever shows abuse the API-side counters cannot explain. Because this
+is a deliberate deviation from the app security concept's §2.11 recommendation, it is recorded
+there as well.
+
+## 6. Realm export handling
+
+The `kcadm` script of decision 3 needs the current production realm, and a raw export carries
+operator secrets (SMTP credentials, identity-provider secrets, the service-account user). The
+split follows the production-access rule of `CLAUDE.md`: **the export is the owner's to take, the
+sanitization is automated, and only the sanitized result is ever read or committed.**
+
+1. @greluc exports the `iri` realm from the Admin Console (partial export including clients,
+   groups and roles) to a local file **outside the repository**.
+2. `python scripts/sanitize-realm-export.py RAW.json docs/keycloak/realm-config.reference.json`
+   applies the list documented in `docs/keycloak/README.md`: secrets to `__SET_AT_DEPLOY__`, SMTP
+   block replaced, public hostnames neutralized, users, realm keys, flows and Keycloak's built-in
+   clients dropped.
+3. The script **refuses to write anything** when a guard pattern — an e-mail address, a real
+   hostname, an unreplaced secret value — survives; it reports counts and labels, never the
+   matched text. A missed secret therefore fails loudly instead of landing in a commit.
+4. The raw export is deleted afterwards. It never enters the repository, a transcript or a diff.
+
+## 7. What this plan deliberately does not do
 
 No production access is assumed or requested. Every Track D item is described so that @greluc can
 execute it with the exact command and its rollback in hand; nothing in this repository reaches for
