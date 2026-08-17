@@ -605,15 +605,21 @@ authentication with no obvious cause, which is why the extractor names clock dri
 
 **Acceptance**
 
-- [ ] The gateway does not configure `dPoP(...)`; a DPoP-scheme request is not a supported call.
+- [x] The gateway configures `.dPoP(...)` alongside `.jwt(...)`, with `htu` pinned to
+  `app.ingest.public-base-url` via `PublicUriDpopAuthenticationConverter` and the failure handler
+  replaced so a rejected proof produces problem+json and increments
+  `basetool_ingest_auth_failures_total`. (Earlier drafts of this list said the gateway does *not*
+  configure `dPoP(...)`; the requirement body above and the ingest `SecurityConfig` both show it
+  does — the extractor still presents its token under the `DPoP` scheme.)
 - [ ] An access token arriving with `cnf.jkt` is logged at `WARN` as a realm-policy regression — it
   means access-token binding was switched on and the backend relay is about to fail.
 - [ ] The refresh token is bound; a replayed refresh token without the key is refused by Keycloak.
 - [ ] A plain bearer access token relays to the backend unchanged.
 
 **Enforced by:** `ClientIdentityFilterTest` (the `cnf.jkt` canary), `IngestControllerTest` (the
-bearer path through the real filter chain) · **Code:** ingest `SecurityConfig` (deliberately no
-`dPoP(...)`, with the reasoning inline), `ClientIdentityFilter#warnOnDowngrade` · **Operator:**
+bearer path through the real filter chain) · **Code:** ingest `SecurityConfig` (configures
+`.dPoP(...)` beside `.jwt(...)`, with the reasoning inline), `PublicUriDpopAuthenticationConverter`,
+`ClientIdentityFilter#warnOnDowngrade` · **Operator:**
 `INGEST_KEYCLOAK_SETUP.md` step 8 · **Client:** the extractor keeps its DPoP key and its
 token-endpoint proofs, and must **not** send `Authorization: DPoP` to the gateway.
 

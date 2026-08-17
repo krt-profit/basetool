@@ -96,17 +96,28 @@ kcadm.sh add-roles -r iri \
 The realm-level token settings reproduced verbatim in the reference are what govern login
 longevity and the refresh flow. As of 2026-06-18:
 
-|                    Setting                    |   Value    |                                    Meaning                                    |
-|-----------------------------------------------|------------|-------------------------------------------------------------------------------|
-| `accessTokenLifespan`                         | 300        | 5 min                                                                         |
-| `revokeRefreshToken` / `refreshTokenMaxReuse` | true / 5   | refresh-token rotation on; up to 5 replays tolerated before family revocation |
-| `ssoSessionIdleTimeout`                       | 2 592 000  | **30 days**                                                                   |
-| `ssoSessionMaxLifespan`                       | 15 552 000 | **180 days**                                                                  |
-| `clientSessionIdleTimeout` / `…Max`           | 0 / 0      | inherit the realm SSO values                                                  |
+|                    Setting                    |   Value    |                         Meaning                          |
+|-----------------------------------------------|------------|----------------------------------------------------------|
+| `accessTokenLifespan`                         | 300        | 5 min                                                    |
+| `revokeRefreshToken` / `refreshTokenMaxReuse` | false / 5  | rotation **off** realm-wide since 2026-06-18 — see below |
+| `ssoSessionIdleTimeout`                       | 2 592 000  | **30 days**                                              |
+| `ssoSessionMaxLifespan`                       | 15 552 000 | **180 days**                                             |
+| `clientSessionIdleTimeout` / `…Max`           | 0 / 0      | inherit the realm SSO values                             |
 
 These values mean **no session/idle timeout fires anywhere near 30–60 minutes** — relevant when
 diagnosing forced re-logins (see [ADR-0019](../adr/0019-frontend-reauth-on-client-authorization-required.md)
 and [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md) step 4).
+
+**Refresh-token rotation is off, and that is deliberate.** `revokeRefreshToken` was turned off
+realm-wide on 2026-06-18 (REQ-SEC-012 / [ADR-0019](../adr/0019-frontend-reauth-on-client-authorization-required.md)
+amendment #4): the frontend is a server-rendered BFF whose refresh token never reaches the
+browser, so rotation plus reuse detection bought little there while being the direct cause of
+session revocations under the BFF's unavoidable concurrent-refresh race. `refreshTokenMaxReuse`
+is therefore inert — it only has meaning while rotation is on. Two consequences worth knowing:
+the persisted desktop-extractor refresh token is no longer protected by reuse detection (a
+recorded, reversible operator lever — see [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md)),
+and any future **public** client (native/mobile) must be sender-constrained via DPoP instead,
+since RFC 9700 requires public-client refresh tokens to be either rotated or bound.
 
 ## Open findings (hardening, tracked separately)
 
