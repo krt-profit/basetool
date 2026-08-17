@@ -1,0 +1,58 @@
+name: Keycloak Provisioner
+
+# Self-tests scripts/provision-keycloak-mobile-client.py on every PR that touches it.
+#
+# What the tests protect is not the happy path but two things that fail silently on a real
+# server: the two Keycloak client-policy endpoints replace realm-global lists wholesale, so a
+# merge bug deletes an unrelated policy without a word, and the write order is load-bearing
+# because Keycloak refuses every admin edit to a client while the DPoP policy is attached to it
+# (ADR-0131, REQ-SEC-030).
+#
+# The logic lives in scripts/provision-keycloak-mobile-client.test.sh, which drives the
+# provisioner against a stubbed kcadm — no Docker, no Keycloak, no network, finishes in a second.
+# Run it locally before pushing:
+#
+#   scripts/provision-keycloak-mobile-client.test.sh
+#
+# Like deploy-script.yml this workflow IS path-filtered: it is not a required check in the branch
+# ruleset, so a skipped run cannot hang a PR, and the script under test only changes when one of
+# these files changes.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/provision-keycloak-mobile-client.py"
+      - "scripts/provision-keycloak-mobile-client.test.sh"
+      - ".github/workflows/keycloak-provisioner.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/provision-keycloak-mobile-client.py"
+      - "scripts/provision-keycloak-mobile-client.test.sh"
+      - ".github/workflows/keycloak-provisioner.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keycloak-provisioner-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  selftest:
+    name: provisioner self-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run provisioner self-tests
+        shell: bash
+        run: |
+          chmod +x scripts/provision-keycloak-mobile-client.py \
+                   scripts/provision-keycloak-mobile-client.test.sh
+          scripts/provision-keycloak-mobile-client.test.sh
