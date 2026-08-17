@@ -161,7 +161,7 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
           request.getRequestURI());
     }
 
-    warnOnDowngrade(request, jwt);
+    warnOnUnboundAccessToken(request, jwt);
     meterRegistry
         .counter(MetricNames.INGEST_CLIENT, MetricNames.TAG_CLIENT_ID, clientLabel)
         .increment();
@@ -229,33 +229,37 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Warns when an access token arrives <b>sender-constrained</b> (it carries the RFC 7800 {@code
-   * cnf.jkt} confirmation), which under the intended realm configuration must never happen.
+   * Warns when an access token arrives <b>without</b> the RFC 7800 {@code cnf.jkt} confirmation,
+   * i.e. as a plain bearer rather than sender-constrained.
    *
-   * <p>This is a canary for a specific, silent misconfiguration. DPoP is used here to bind the
-   * <b>refresh</b> token only — the long-lived credential the extractor persists to disk
-   * (REQ-INGEST-007, REQ-INGEST-012) — while access tokens deliberately stay plain bearer so they
-   * relay cleanly to the backend. If the realm's client policy is ever changed to bind access
-   * tokens too ({@code allow-only-refresh-token-binding} turned off), tokens start arriving with
-   * {@code cnf.jkt} and the relay breaks at the BACKEND, not here: this gateway would still accept
-   * them, forward them as a plain bearer, and the caller would see the backend's opaque "you must
-   * sign in". That is exactly how the 2026-08-03 outage presented, and it cost hours.
+   * <p>This canary points the opposite way since ADR-0129. While the gateway still relayed the
+   * caller's token, a bound access token could not survive the second hop and the warning fired on
+   * {@code cnf.jkt} being <em>present</em>. The gateway no longer relays: it validates the caller
+   * itself and calls the backend under its own service account, so the internet-facing hop is the
+   * one that consumes the token — which is precisely where sender-constraining pays, and
+   * REQ-INGEST-012 requires the DPoP scheme accordingly.
    *
-   * <p>Logged rather than rejected: the token is otherwise valid, and refusing it here would trade
-   * a confusing failure for a different confusing failure. The line is the pointer that names the
-   * cause.
+   * <p>Leaving the old direction in place made the line fire on every successful send, with a
+   * stated cause ("the backend will refuse it") that had stopped being true — a canary that cries
+   * on the happy path teaches operators to ignore it.
+   *
+   * <p>An unbound token now means the protection lapsed silently: a client policy started binding
+   * nothing, Keycloak stopped honouring the proof, or an older extractor build authenticated
+   * without one. Logged rather than rejected, because the token is otherwise valid and the {@code
+   * azp} allowlist already decides who may call at all — this line names a regression, it does not
+   * gate traffic.
    *
    * @param request the current request
    * @param jwt the authenticated caller's token
    */
-  private void warnOnDowngrade(@NotNull HttpServletRequest request, @NotNull Jwt jwt) {
-    if (!isSenderConstrained(jwt)) {
+  private void warnOnUnboundAccessToken(@NotNull HttpServletRequest request, @NotNull Jwt jwt) {
+    if (isSenderConstrained(jwt)) {
       return;
     }
     log.warn(
-        "Access token is DPoP-bound (cnf.jkt present) but this gateway relays it as a plain bearer"
-            + " — the backend will refuse it. Expected realm policy binds the REFRESH token"
-            + " only (allow-only-refresh-token-binding): path={} {}",
+        "Access token is NOT DPoP-bound (no cnf.jkt) — the sender-constraining REQ-INGEST-012"
+            + " requires has lapsed. Check that the realm still binds on a presented proof and that"
+            + " no client policy restricts binding to the refresh token: path={} {}",
         request.getMethod(),
         request.getRequestURI());
   }

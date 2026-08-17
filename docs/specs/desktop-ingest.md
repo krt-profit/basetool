@@ -472,13 +472,15 @@ Four checks, each **inert until configured** and each **fail-closed** once it is
 | Client id     | JWT `azp` against an allowlist                                                                                                                                                                                                                            | `app.ingest.client-identity.allowed-client-ids` |
 | Capability    | `SCOPE_<value>` authority from the `scope` claim — must name a scope **only** the extractor carries **and** one that is emitted into the claim; the shipped `extractor-ingest` fails both (shared with the frontend, and `include.in.token.scope: false`) | `…required-scope`                               |
 | Producer      | payload `tool` field against an allowlist — the extractor emits a DIFFERENT spelling per export path (`basetool-sc-extractor` on refinery, `Basetool SC Extractor` on blueprints), so both must be listed; compared case-insensitively                    | `…allowed-tools`                                |
-| Token binding | DPoP scheme required (`REQ-INGEST-012`)                                                                                                                                                                                                                   | `…dpop-required`                                |
+| Token binding | **not a gate** — both schemes are accepted on purpose (`REQ-INGEST-012`: `.jwt()` alongside `.dPoP()`, so a client rollout needs no flag day). An access token arriving *unbound* is logged as a lapsed-protection canary, never refused                  | — (no property)                                 |
 
 A missing claim is refused exactly like an unknown one: treating "no `azp`" as "nothing to check"
 would silently disable the gate the moment a realm change stopped stamping it. The reject reasons
-stay distinct (`unknown_client`, `missing_azp`, `missing_scope`, `bad_provenance`, `dpop_required`)
-because they split into two operationally opposite causes — a foreign tool calling, versus a Keycloak
-mapper regression locking the legitimate extractor out.
+stay distinct (`unknown_client`, `missing_azp`, `missing_scope`, `bad_provenance`) because they split
+into two operationally opposite causes — a foreign tool calling, versus a Keycloak mapper regression
+locking the legitimate extractor out. Token binding is deliberately absent from that list: it is not
+a rejection reason, and neither `dpop_required` nor a `dpop-required` property exists — both were
+documented but never implemented, and the row above now says what the code does.
 
 **Nothing carries a default.** The allowlist contents are operational configuration, not source: the
 code shows *that* a gate exists, the environment decides *who* passes it. Empty-means-inert is
@@ -593,11 +595,18 @@ a token that anyone who lifted it from there could replay onward as a bearer. **
 exactly where it needs to hold.** Sender-constraining an access token only makes sense when the party
 that validates it is the party that consumes it.
 
-*Realm configuration:* the refresh-only behaviour is a **client policy**, not a client switch. The
-`dpop-bind-enforcer` executor carries `allow-only-refresh-token-binding` (verified against the
-Keycloak 26.7 image, `DPoPBindEnforcerExecutor$Configuration`; the per-client
-`dpop.bound.access.tokens` attribute is the *enforcement* switch and stays off). Since Keycloak 26.4
-DPoP needs no feature flag.
+*Realm configuration:* **none.** Since Keycloak 26.4 DPoP needs no feature flag and no client
+switch — it binds whenever a proof is presented, and the extractor always presents one, so both
+tokens are bound, which is what this requirement wants. Production carries zero client profiles and
+zero policies (verified 2026-08-17), and that is the correct state.
+
+The refresh-only narrowing that the earlier design needed does exist as a **client policy** — the
+`dpop-bind-enforcer` executor's `allow-only-refresh-token-binding`
+(`DPoPBindEnforcerExecutorFactory`, alongside `auto-configure` and
+`enforce-authorization-code-binding-to-dpop`) — but it must **not** be applied here: it would strip
+the sender-constraining from the one hop that validates it, without anything failing, because the
+gateway still accepts the `Bearer` scheme. The per-client `dpop.bound.access.tokens` attribute is
+the *enforcement* switch and likewise stays off, since accepting both schemes is deliberate.
 
 *Two constants worth knowing before debugging a proof:* Keycloak's `DPoPUtil` allows a proof lifetime
 of **10 s** and a clock skew of **15 s**. A client whose clock is off by more than that fails
