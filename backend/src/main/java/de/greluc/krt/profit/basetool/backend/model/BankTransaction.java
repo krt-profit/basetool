@@ -99,6 +99,21 @@ public class BankTransaction {
   private String justification;
 
   /**
+   * Optional free-text note authored by the <em>booking bank employee</em> ("Notiz
+   * Bankmitarbeiter", REQ-BANK-054) — internal context for the movement, as opposed to {@link
+   * #note} / {@link #justification}, which come from the requester / booking party.
+   *
+   * <p>Captured for <strong>every</strong> transaction kind including a {@code DEPOSIT} (unlike
+   * {@link #justification}, which debit-only rules govern), on a direct booking and on the
+   * confirmation of a booking request alike, and always optional. Shown in the booking history, the
+   * account statement and the management report, but <strong>redacted</strong> out of the org-unit
+   * member-facing history and statement (REQ-BANK-038) — an employee note is internal.
+   */
+  @Nullable
+  @Column(length = 500)
+  private String staffNote;
+
+  /**
    * The member on the far side of a {@link BankTransactionType#DEPOSIT} (the Einzahler who handed
    * the money in) or {@link BankTransactionType#WITHDRAWAL} (the Empf&auml;nger who received the
    * payout), distinct from the {@code BankHolderPosting} holder (the bank custodian who physically

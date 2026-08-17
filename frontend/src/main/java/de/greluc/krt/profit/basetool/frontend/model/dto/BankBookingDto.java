@@ -37,6 +37,9 @@ import org.jetbrains.annotations.Nullable;
  * @param note the transaction's free-text note, may be {@code null}
  * @param justification the transaction's free-text justification (Begr&uuml;ndung) for a {@code
  *     WITHDRAWAL} / {@code TRANSFER} (REQ-BANK-045), may be {@code null}
+ * @param staffNote the booking bank employee's own note ("Notiz Bankmitarbeiter", REQ-BANK-054);
+ *     always {@code null} on an org-unit member-facing row, where the backend redacts it as an
+ *     internal remark (REQ-BANK-038)
  * @param createdAt the booking instant (UTC)
  * @param reversedTransactionId for reversal rows the corrected transaction's id, else {@code null}
  * @param counterAccountNo for transfer legs the other account's number, {@code null} otherwise
@@ -62,6 +65,7 @@ public record BankBookingDto(
     String holderHandle,
     @Nullable String note,
     @Nullable String justification,
+    @Nullable String staffNote,
     Instant createdAt,
     @Nullable UUID reversedTransactionId,
     @Nullable String counterAccountNo,

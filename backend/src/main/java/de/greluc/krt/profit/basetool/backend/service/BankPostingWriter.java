@@ -137,6 +137,9 @@ public class BankPostingWriter {
    * @param note optional free-text note
    * @param justification optional free-text justification (Begr&uuml;ndung), only a {@code
    *     WITHDRAWAL} / {@code TRANSFER} carries one (REQ-BANK-045); {@code null} otherwise
+   * @param staffNote optional free-text note authored by the booking bank employee ("Notiz
+   *     Bankmitarbeiter", REQ-BANK-054); carried by every employee-initiated kind incl. a {@code
+   *     DEPOSIT}, and {@code null} for the holder Umbuchung, reversals and the wipe reset
    * @param reversed the reversed original for {@code REVERSAL} rows, else {@code null}
    * @param fee the in-game transfer fee added on top of the entered amount (ADR-0052); {@link
    *     BigDecimal#ZERO} for non-fee transactions
@@ -150,6 +153,7 @@ public class BankPostingWriter {
       @NotNull BankTransactionType type,
       @Nullable String note,
       @Nullable String justification,
+      @Nullable String staffNote,
       @Nullable BankTransaction reversed,
       @NotNull BigDecimal fee,
       @NotNull Instant now,
@@ -160,6 +164,7 @@ public class BankPostingWriter {
             .initiatedBy(authHelperService.currentUserId().orElse(null))
             .note(note)
             .justification(justification)
+            .staffNote(staffNote)
             .reversedTransaction(reversed)
             .transferFee(fee)
             .counterpartyUserId(counterparty == null ? null : counterparty.userId())

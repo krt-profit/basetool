@@ -120,6 +120,7 @@ class OrgUnitBankPageControllerMvcTest {
             new BigDecimal("5000"),
             "from sale",
             null,
+            null,
             "PENDING",
             "officerX",
             null,
@@ -299,6 +300,7 @@ class OrgUnitBankPageControllerMvcTest {
             "DEPOSIT",
             new BigDecimal("5000"),
             "from sale",
+            null,
             null,
             "PENDING",
             "officerX",
@@ -482,6 +484,7 @@ class OrgUnitBankPageControllerMvcTest {
             new BigDecimal("250000"),
             "someHolder",
             "Missionsertrag",
+            null,
             null,
             Instant.parse("2026-06-10T18:30:00Z"),
             null,
@@ -685,9 +688,11 @@ class OrgUnitBankPageControllerMvcTest {
    *
    * @param note the requester's note, or {@code null}
    * @param justification the requester's Begruendung, or {@code null}
+   * @param staffNote the confirming employee's own note (REQ-BANK-054), or {@code null}
    * @return the request DTO
    */
-  private static BankBookingRequestDto foreignRequest(String note, String justification) {
+  private static BankBookingRequestDto foreignRequest(
+      String note, String justification, String staffNote) {
     return new BankBookingRequestDto(
         UUID.randomUUID(),
         UUID.randomUUID(),
@@ -700,6 +705,7 @@ class OrgUnitBankPageControllerMvcTest {
         new BigDecimal("5000"),
         note,
         justification,
+        staffNote,
         "PENDING",
         "officerX",
         null,
@@ -731,7 +737,7 @@ class OrgUnitBankPageControllerMvcTest {
   void orgUnitBank_foreignRequestWithJustificationRendersExpandableDetailRow() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(FOREIGN_REQUESTS_URI), anyTypeRef()))
-        .thenReturn(List.of(foreignRequest("Missionsertrag", "Missionsfreigabe")));
+        .thenReturn(List.of(foreignRequest("Missionsertrag", "Missionsfreigabe", null)));
 
     mockMvc
         .perform(get("/org-unit-bank"))
@@ -748,13 +754,32 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(content().string(Matchers.containsString("ou-foreign-req-")));
   }
 
+  /**
+   * REQ-BANK-054: the confirming employee's note reaches the approval tab too, and on its own is
+   * enough to make the row expandable — a confirmed request may carry only a staff note.
+   */
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_foreignRequestStaffNoteRendersInTheDetailRow() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(FOREIGN_REQUESTS_URI), anyTypeRef()))
+        .thenReturn(List.of(foreignRequest(null, null, "Bar uebergeben, Zeuge greluc")));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-foreign-expand")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-foreign-staff-note")))
+        .andExpect(content().string(Matchers.containsString("Bar uebergeben, Zeuge greluc")));
+  }
+
   /** A row carrying neither Begruendung nor Notiz stays flat: no chevron, no empty sub-row. */
   @Test
   @WithMockUser(roles = {"OFFICER"})
   void orgUnitBank_foreignRequestWithoutDetailRendersNoChevron() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(FOREIGN_REQUESTS_URI), anyTypeRef()))
-        .thenReturn(List.of(foreignRequest(null, null)));
+        .thenReturn(List.of(foreignRequest(null, null, null)));
 
     mockMvc
         .perform(get("/org-unit-bank"))

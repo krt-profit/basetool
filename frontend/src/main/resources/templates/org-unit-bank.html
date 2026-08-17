@@ -219,7 +219,7 @@
                              document-delegated bank.js handler (no new JS, survives the fragment
                              swap). -->
                         <th:block th:each="r : ${foreignRequests}"
-                                  th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note())},detailId='ou-foreign-req-' + ${r.id()}">
+                                  th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note()) or !#strings.isEmpty(r.staffNote())},detailId='ou-foreign-req-' + ${r.id()}">
                         <tr data-testid="org-unit-bank-foreign-row" class="bank-booking-row"
                             th:classappend="${hasDetail} ? ' is-expandable' : ''">
                             <td class="bank-expand-cell">
@@ -281,6 +281,10 @@
                                         <span class="bank-detail-label" th:text="#{bank.booking.note}">Notiz</span>
                                         <span class="bank-detail-value" data-testid="org-unit-bank-foreign-note"
                                               th:text="${r.note()}">Missionsertrag</span>
+                                    </div>
+                                    <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.staffNote())}">
+                                        <span class="bank-detail-label" th:text="#{bank.booking.staffNote}">Notiz Bankmitarbeiter</span>
+                                        <span class="bank-detail-value" data-testid="org-unit-bank-foreign-staff-note" th:text="${r.staffNote()}">Nach Rücksprache</span>
                                     </div>
                                 </div>
                             </td>

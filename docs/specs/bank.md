@@ -2362,6 +2362,75 @@ seed, no roster) · **Code:** `repository/BankAccountRepository#findAllFiltered/
 `templates/fragments/bank-movement-modal.html`, `templates/bank-grants.html`,
 `templates/bank-manage.html` · **ADR:** ADR-0106 · **Issues:** —
 
+### REQ-BANK-054 — "Notiz Bankmitarbeiter": the booking employee's own note
+
+Every booking a **bank employee** performs carries an optional free-text **Notiz Bankmitarbeiter**
+(`staff_note`, `VARCHAR(500)`, V231) recording internal context for the movement — *"in zwei
+Tranchen übergeben"*, *"nach Rücksprache mit der SL"*. It is a **third** free-text field beside the
+existing two, and the distinction is **authorship**, not wording: `note` and `justification`
+(Begründung, REQ-BANK-045) come from the **requester / booking party**; `staff_note` comes from the
+**employee doing the booking**.
+
+**Where it is captured.** All four employee entry points: the direct **deposit**, **withdrawal** and
+**transfer** in the unified movement modal (REQ-BANK-017), and the **confirmation of a booking
+request** (REQ-BANK-023). Unlike the Begründung it is captured for a **deposit** too and is **never**
+mandatory — no account type demands it, so there is no `BANK_*_REQUIRED` conflict code and no
+per-account gate. The Halter-Umbuchung, reversals and the wipe reset carry none (they are not
+employee-authored movements in this sense).
+
+**Where it is stored.** On **both** tables, mirroring V198's justification rollout:
+`bank_transaction.staff_note` is the booking's note (history, statements, management report), and
+`bank_booking_request.staff_note` snapshots what the confirming employee recorded so the staff queue
+and the approval tab render it **without joining the resulting transaction per row** (the no-N+1
+rule). Confirmation writes the same value to both. On the request the column is deliberately **not**
+`updatable = false` — unlike `note` / `justification`, which the requester supplies at creation,
+this one is written at **confirmation**, and it stays `null` while `PENDING` and on a
+rejected/cancelled request.
+
+**Where it is shown — and where it is not.** Everywhere the note/Begründung already appear *for
+bank-facing eyes*: the bank-staff account-detail booking history, the request queue's expandable
+sub-row, the approval tab's sub-row (REQ-BANK-041), the account-statement PDF and the
+management-export PDF. On each surface it is a third line of the existing detail sub-row, after
+Begründung and Notiz, and its presence alone makes a row expandable.
+
+It is **redacted for org-unit members**, and this is the one place it parts company with the other
+two. `note` and `justification` survive the member-facing redaction because they are not
+player-identifying and the requester wrote them; a staff note is an **internal bank remark**, so
+`OrgUnitBankAccessService.redact()` nulls it exactly like the Halter columns (REQ-BANK-038), and the
+Halter-redacted org-unit **statement PDF** drops it for the same reason (same generator,
+`redactHolders = true`). The field's UI hint says so out loud, so an employee knows the audience
+before typing. Bankleitung, OL and the account's responsible holder are **not** affected — they
+read it through the bank-facing surfaces above.
+
+Like the Begründung it is **never** written into the audit `details` payload (REQ-BANK-012: no user
+free text / no PII there) and introduces **no** new `AuditEventType` — it is a field on existing
+movements, not a new audited activity. It adds no metric, endpoint or scheduled job.
+
+**Acceptance**
+
+- [x] A direct deposit, withdrawal and transfer each persist a supplied staff note on the ledger
+  transaction; a deposit accepts one although it accepts no Begründung.
+- [x] Confirming a booking request writes the employee's note onto **both** the request and the
+  booked transaction.
+- [x] The note is optional everywhere: omitting it books normally and stores `null`.
+- [x] An org-unit member's redacted booking row carries `note` and `justification` but **never**
+  `staffNote`; the Halter-redacted statement PDF likewise omits it.
+- [x] A request row whose *only* detail is a staff note still renders as expandable.
+- [x] The confirm modal and the movement modal both offer the field, and a reused modal never
+  carries a previous booking's staff note into the next one.
+
+**Enforced by:** `BankLedgerServiceTest` (deposit + withdrawal persist it alongside the untouched
+note/Begründung), `BankBookingRequestServiceTest` (confirmation snapshots it on the request *and*
+hands it to the ledger), `OrgUnitBankAccessServiceTest` (redaction keeps note/justification and nulls
+the staff note), frontend `BankRequestQueuePageControllerMvcTest` (both entry points offer the field)
+and `OrgUnitBankPageControllerMvcTest` (the approval tab renders it, and it alone makes the row
+expandable) • **Code:** `model/BankTransaction`, `model/BankBookingRequest`,
+`model/dto/request/Bank{Deposit,Withdrawal,Transfer}Request`,
+`model/dto/request/ConfirmBankBookingRequest`, `model/projection/BankBookingRow`,
+`model/dto/Bank{Booking,BookingRequest}Dto`, `service/BankPostingWriter`, `service/BankLedgerService`,
+`service/BankBookingRequestService`, `service/OrgUnitBankAccessService`,
+`service/Bank{Statement,Management}ReportService`, `service/pdf/KrtPdfSupport`, `db/migration/V231`
+
 ## Out of scope
 
 - **Accounts for individual players** — an explicit owner decision: players appear only

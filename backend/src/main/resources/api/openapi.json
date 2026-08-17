@@ -57924,6 +57924,9 @@
           "justification" : {
             "type" : "string"
           },
+          "staffNote" : {
+            "type" : "string"
+          },
           "status" : {
             "type" : "string",
             "enum" : [ "PENDING", "CONFIRMED", "REJECTED", "CANCELLED" ]
@@ -59242,6 +59245,11 @@
             "maxLength" : 500,
             "minLength" : 0
           },
+          "staffNote" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          },
           "counterpartyUserId" : {
             "type" : "string",
             "format" : "uuid"
@@ -59326,6 +59334,11 @@
             "maxLength" : 500,
             "minLength" : 0
           },
+          "staffNote" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          },
           "feeInclusive" : {
             "type" : "boolean"
           }
@@ -59370,6 +59383,11 @@
           },
           "ownerApprovalConfirmed" : {
             "type" : "boolean"
+          },
+          "staffNote" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
           },
           "version" : {
             "type" : "integer",
@@ -59519,6 +59537,11 @@
             "minimum" : 1
           },
           "note" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          },
+          "staffNote" : {
             "type" : "string",
             "maxLength" : 500,
             "minLength" : 0
@@ -61701,6 +61724,9 @@
             "type" : "string"
           },
           "justification" : {
+            "type" : "string"
+          },
+          "staffNote" : {
             "type" : "string"
           },
           "createdAt" : {

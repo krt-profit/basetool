@@ -1832,10 +1832,12 @@ public class OrgUnitBankAccessService {
    * REQ-BANK-044) is <em>kept</em>: the "von wem / an wen" of a booking on the member's own
    * org-unit account is shown to viewers (owner decision, amends REQ-BANK-044/-038 — only the
    * custody Halter stays hidden). The counter-<em>account</em> (transfer target/source) and the
-   * note/justification were never redacted.
+   * note/justification were never redacted. The booking employee's own {@code staffNote}
+   * (REQ-BANK-054) <em>is</em> redacted, unlike those two: it is an internal bank remark, not
+   * something the requester wrote, so an org-unit member must not read it.
    *
    * @param booking the bank-staff booking row
-   * @return a copy with only the holder/counter-holder handles removed
+   * @return a copy with the holder/counter-holder handles and the internal staff note removed
    */
   @NotNull
   private static BankBookingDto redact(@NotNull BankBookingDto booking) {
@@ -1847,6 +1849,9 @@ public class OrgUnitBankAccessService {
         null,
         booking.note(),
         booking.justification(),
+        // REQ-BANK-054: the employee's own note is internal and is redacted here exactly like
+        // the Halter columns above — an org-unit member must not read bank-internal remarks.
+        null,
         booking.createdAt(),
         booking.reversedTransactionId(),
         booking.counterAccountNo(),

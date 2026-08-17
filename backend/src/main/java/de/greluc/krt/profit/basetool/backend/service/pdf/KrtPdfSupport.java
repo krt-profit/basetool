@@ -358,6 +358,9 @@ public final class KrtPdfSupport {
    * @param reason the justification text, or an empty string when the booking has none
    * @param noteLabel the localized "Notiz" label
    * @param note the note text, or an empty string when the booking has none
+   * @param staffNoteLabel the localized "Notiz Bankmitarbeiter" label
+   * @param staffNote the booking employee's own note (REQ-BANK-054), or an empty string when the
+   *     booking has none or the caller must not see it (the Halter-redacted member statement)
    * @param background the parent row's background ({@link #rowBackground(boolean)}) so the sub-row
    *     reads as the same zebra band
    * @param colspan the number of columns to span (the full table width)
@@ -368,6 +371,8 @@ public final class KrtPdfSupport {
       @NotNull String reason,
       @NotNull String noteLabel,
       @NotNull String note,
+      @NotNull String staffNoteLabel,
+      @NotNull String staffNote,
       @NotNull Color background,
       int colspan) {
     Phrase phrase = new Phrase();
@@ -383,6 +388,14 @@ public final class KrtPdfSupport {
     if (hasNote) {
       phrase.add(new Chunk(noteLabel + ": ", bold(8, COLOR_LABEL)));
       phrase.add(new Chunk(note, regular(8, COLOR_LIGHT_GRAY)));
+    }
+    boolean hasStaffNote = !staffNote.isEmpty();
+    if ((hasReason || hasNote) && hasStaffNote) {
+      phrase.add(new Chunk("      ", regular(8, COLOR_LIGHT_GRAY)));
+    }
+    if (hasStaffNote) {
+      phrase.add(new Chunk(staffNoteLabel + ": ", bold(8, COLOR_LABEL)));
+      phrase.add(new Chunk(staffNote, regular(8, COLOR_LIGHT_GRAY)));
     }
     PdfPCell cell = new PdfPCell(phrase);
     cell.setColspan(colspan);
