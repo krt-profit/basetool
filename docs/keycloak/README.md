@@ -140,27 +140,48 @@ since RFC 9700 requires public-client refresh tokens to be either rotated or bou
 policy of [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md) / REQ-SEC-030. Run it on
 a **test realm first**; production only after that reads clean.
 
-```bash
-# 1. authenticate kcadm inside the container, so no password reaches the script's process.
-#    This comes FIRST: kcadm refuses every command without it, reads included, with
-#    "No server specified. Use --server, or 'kcadm.sh config credentials'."
-#    The token is container-lived — re-run this if a later command fails on expiry.
-docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
-    --server http://localhost:8080 --realm master --user <admin>
+**Two things about kcadm on the production container that cost a procedure attempt if assumed.**
+Production Keycloak serves **HTTPS only on 18443** (`--http-enabled=false`), so the usual
+`http://localhost:8080` answers `Connection refused` — there is no cleartext listener anywhere. And
+because the connector uses the shared **self-signed** `keystore.p12`, kcadm rejects the connection
+with a PKIX path error until a truststore is configured; the keystore itself serves as one. Both
+were verified against a Keycloak 26.7 started with the production command line and a throwaway
+keystore (2026-08-17). `KC_HOSTNAME_STRICT=true` does **not** interfere — `https://localhost:18443`
+and `https://keycloak:18443` both authenticate.
 
-# 2. save the current lists — this is the rollback basis, and both are expected to be empty
+```bash
+# 1. trust the self-signed connector cert. `--trustpass -` prompts, which needs the TTY that
+#    `-it` provides; without one kcadm refuses with "Console is not active". The password is
+#    KC_HTTPS_KEY_STORE_PASSWORD from the deployment env.
+docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config truststore \
+    --trustpass - /run/secrets/keystore.p12
+
+# 2. authenticate. This must come BEFORE any read: kcadm refuses every command without a stored
+#    credential, and says "No server specified. Use --server, or 'kcadm.sh config credentials'."
+#    rather than anything about being unauthenticated. Omitting --password makes it prompt.
+docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
+    --server https://localhost:18443 --realm master --user <admin>
+
+# 3. save the current lists — this is the rollback basis, and both are expected to be empty
 docker exec keycloak /opt/keycloak/bin/kcadm.sh get client-policies/profiles -r iri \
     > kc-profiles.before.json
 docker exec keycloak /opt/keycloak/bin/kcadm.sh get client-policies/policies -r iri \
     > kc-policies.before.json
 
-# 3. see every payload without writing anything
+# 4. see every payload without writing anything
 scripts/provision-keycloak-mobile-client.py --realm iri --profile prod --dry-run
 
-# 4. apply, then re-assert independently
+# 5. apply, then re-assert independently
 scripts/provision-keycloak-mobile-client.py --realm iri --profile prod
 scripts/provision-keycloak-mobile-client.py --realm iri --verify-only
+
+# 6. clean up: kcadm.config stores the truststore password AND an admin refresh token in
+#    cleartext (mode 0600, inside the container). Remove it when the procedure is done.
+docker exec keycloak rm -f /opt/keycloak/.keycloak/kcadm.config
 ```
+
+The kcadm session survives a container **restart** but not a **recreate**, so a deploy that replaces
+the container clears it — which is also why step 6 costs nothing.
 
 Use `--profile test` on a test realm: it additionally registers the custom-scheme and loopback
 redirect URIs the prod client deliberately does without.
