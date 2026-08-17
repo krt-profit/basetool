@@ -304,7 +304,7 @@ jobs:
       # failure that points at the scan instead of at the actual cause.
       - name: Upload Trivy SARIF to GitHub Security
         if: always() && steps.build.outcome == 'success'
-        uses: github/codeql-action/upload-sarif@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
+        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           sarif_file: trivy-${{ matrix.module }}-${{ env.PLATFORM_PAIR }}.sarif
           # Distinct category per (module, platform) so GitHub's Security
@@ -660,7 +660,7 @@ jobs:
           java-version: '25'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@67621b124fd2e251c5e8a0e6e3b91318f2287669 # v6.3.0
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
           cache-read-only: true
 
