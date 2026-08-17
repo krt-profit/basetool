@@ -790,6 +790,24 @@ change-delegation keep working unchanged; code that sets a value **after** enhan
 uses the control's `setValue` API (`getElementById(id).krtCombobox.setValue(v)`) so the visible label
 and the submitted value stay in sync.
 
+**The label and the value are one unit — every path must move both.** The control is split across two
+elements: the hidden input carries the submitted value, the visible textbox carries `required` (a
+`type=hidden` input is barred from constraint validation, so the browser only ever validates the
+textbox). Any path that writes one half and not the other produces a control that **looks filled and
+submits nothing**, and `required` will not catch it. This is not theoretical: the two abandon paths
+(blur without a pick, `Escape` while open) used to restore `input.value = committedLabel` and clear
+the custom validity while leaving `hidden.value` — emptied by `reconcile()` on the first
+non-matching keystroke, and `focus` does `input.select()` so one keystroke replaces the whole label —
+cleared. Both guards were dropped at once, and a bank employee confirming an over-limit withdrawal
+submitted an empty `holderId` next to a visibly filled-in holder (the over-limit gate disables submit
+until the approval checkbox is ticked, and that forced extra click is the blur). The committed
+selection is therefore tracked as a **label / value / item triple**, and both abandon paths go through
+the single `restoreCommitted()` helper that restores all three plus the mirrored option metadata, and
+re-fires `change` when the value moves — `reconcile()` already fired one when it cleared, so without
+the symmetric event dependent loaders keep the cleared state. Guarded by
+`ComboboxBlurRestoresValueE2eTest`, which asserts the cleared intermediate state as well so a
+regression that stops clearing (re-opening the "submits unresolved free text" hole) cannot pass.
+
 **Carve-outs.** (1) Fields that must also accept a free-text **guest** name — the mission
 participant-add and party-lead pickers — keep using the `/users/search`-backed autocomplete, which
 already live-searches both username and display name and must keep accepting non-user names; the
