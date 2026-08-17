@@ -333,7 +333,7 @@ services:
   tempo:
     <<: *mon-base
     container_name: tempo
-    image: grafana/tempo:3.0.2
+    image: grafana/tempo:3.0.3
     cap_drop: [ALL]
     # -config.expand-env: expand ${PROMETHEUS_WEB_PASSWORD} in tempo.yaml so the metrics-generator's
     # remote_write can basic-auth to Prometheus as the shared `grafana` user (#1041 item 22a).
