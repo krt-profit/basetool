@@ -141,14 +141,23 @@ policy of [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md) / REQ
 a **test realm first**; production only after that reads clean.
 
 ```bash
-# 1. authenticate kcadm inside the container, so no password reaches the script's process
+# 1. authenticate kcadm inside the container, so no password reaches the script's process.
+#    This comes FIRST: kcadm refuses every command without it, reads included, with
+#    "No server specified. Use --server, or 'kcadm.sh config credentials'."
+#    The token is container-lived — re-run this if a later command fails on expiry.
 docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
     --server http://localhost:8080 --realm master --user <admin>
 
-# 2. see every payload without writing anything
+# 2. save the current lists — this is the rollback basis, and both are expected to be empty
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get client-policies/profiles -r iri \
+    > kc-profiles.before.json
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get client-policies/policies -r iri \
+    > kc-policies.before.json
+
+# 3. see every payload without writing anything
 scripts/provision-keycloak-mobile-client.py --realm iri --profile prod --dry-run
 
-# 3. apply, then re-assert independently
+# 4. apply, then re-assert independently
 scripts/provision-keycloak-mobile-client.py --realm iri --profile prod
 scripts/provision-keycloak-mobile-client.py --realm iri --verify-only
 ```
