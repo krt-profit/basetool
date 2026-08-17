@@ -3,10 +3,10 @@
 # Context: AuditDomainSilenceAnomaly runs a 14d window over every audit domain except an excluded
 # set. ROLE — role/membership admin, Kommando groups, user deletion — was NOT in that set but
 # legitimately records nothing for weeks, so it fired through every quiet stretch; and because the
-# condition is a LEVEL, not an event, it kept re-notifying on the Alertmanager repeat_interval until
-# somebody finally changed a role. ROLE therefore joined PROMOTION, PERSONAL_INVENTORY and MARKET in
-# the exclusion list: those four are reviewed on the operations dashboard's per-domain tables rather
-# than paged, at any horizon.
+# condition is a LEVEL, not an event, it kept re-notifying on the Alertmanager repeat_interval (then
+# four-hourly) until somebody finally changed a role. ROLE therefore joined PROMOTION,
+# PERSONAL_INVENTORY and MARKET in the exclusion list: those four are reviewed on the operations
+# dashboard's per-domain tables rather than paged, at any horizon.
 #
 # What these tests pin down:
 #   - the alert still catches a 14d wiring loss in an alerted domain,
@@ -71,7 +71,8 @@ tests:
 
   # THE regression the exclusion fixes. Identical shape to the case above, but on ROLE: no role or
   # membership change for a fortnight is an ordinary quiet period in a squadron. Before ROLE was
-  # excluded this fired and then repeated every 4h indefinitely.
+  # excluded this fired and then repeated every 4h indefinitely (the mail cadence has since moved to
+  # one notification per event, which shortens such a flood but does not prevent it).
   - name: silent - ROLE quiet for 14d is an ordinary quiet fortnight
     interval: 1h
     input_series:

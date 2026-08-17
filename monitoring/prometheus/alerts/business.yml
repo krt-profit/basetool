@@ -743,7 +743,8 @@ groups:
       # user deletion — admin actions, not daily traffic — so a fortnight without one is an ordinary
       # quiet period. It sat in the alerted set until then and fired continuously through every such
       # period: the condition is a LEVEL, not an event, so once true it re-notified on the
-      # Alertmanager repeat_interval (four-hourly) until somebody finally changed a role. Silence in
+      # Alertmanager repeat_interval (four-hourly at the time; the mail cadence has since moved to
+      # one notification per event) until somebody finally changed a role. Silence in
       # all four is reviewed on the 07 dashboard's per-domain tables (14d and 60d) instead of paged —
       # a deliberate trade of coverage for signal, decided by @greluc.
       #
