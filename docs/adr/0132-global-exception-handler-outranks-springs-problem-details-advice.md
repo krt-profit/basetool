@@ -1,4 +1,4 @@
-# ADR-0131 — `GlobalExceptionHandler` outranks Spring's problem-details advice
+# ADR-0132 — `GlobalExceptionHandler` outranks Spring's problem-details advice
 
 - **Status:** Accepted
 - **Date:** 2026-08-17

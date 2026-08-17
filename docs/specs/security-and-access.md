@@ -1322,6 +1322,54 @@ filter runs, so such a test passes against the broken code.
 `ApiCacheControlFilter`, `RateLimitingFilter` (backend + ingest), `PayloadSizeLimitFilter`,
 `RequestLoggingFilter` (ingest)
 
+### REQ-SEC-030 — The native mobile client's refresh token MUST be sender-constrained, its access token MUST NOT be
+
+The public Android client (`basetool-android`) MUST hold a **DPoP-bound refresh token** and MUST
+receive **plain Bearer access tokens** carrying no `cnf` claim. RFC 9700 §2.2.2 requires a public
+client's refresh token to be sender-constrained or rotated; rotation is unavailable because
+`revokeRefreshToken` is a realm setting deliberately left off (REQ-SEC-012), so binding is the only
+remaining path. The access token must stay unbound because the backend's resource server refuses a
+`cnf.jkt`-bearing token on the plain Bearer path.
+
+The binding MUST be produced by a **client policy**, not by the per-client "Require DPoP bound
+tokens" switch: a client profile whose only executor is `dpop-bind-enforcer` with
+`allow-only-refresh-token-binding` enabled, attached by a policy scoped through the `client-roles`
+condition naming a marker client role that only this client carries. The per-client attribute
+`dpop.bound.access.tokens` MUST remain `false` — setting it overrides the profile and re-binds the
+access token.
+
+The client MUST keep direct access grants disabled. Beyond the ordinary reason, the password grant
+**mis-reports this very requirement**: it binds the access token on the initial grant and narrows it
+only from the first refresh, so a verification run through it draws the opposite conclusion to the
+authorization-code flow the app uses.
+
+The app MUST send DPoP proofs on token-endpoint calls only, never on an API call, and MUST take
+profile claims from the ID token rather than `/userinfo`, which answers HTTP 500 for a client under
+this policy.
+
+Realm changes implementing this MUST merge into the two client-policy lists rather than replacing
+them — both endpoints replace the realm-global list wholesale — and MUST apply the client
+configuration **before** attaching the policy, because Keycloak refuses every admin update to a
+client while the policy is attached.
+
+**Acceptance**
+
+- [x] In the authorization-code flow the token response is `token_type: Bearer`, the access token
+  carries no `cnf`, and the refresh token carries `cnf.jkt` (verified against Keycloak 26.7,
+  2026-08-17).
+- [x] A refresh presented without a proof, or with a different key, is refused.
+- [x] The binding survives refresh-token rotation.
+- [x] A client in the same realm without the marker role is unaffected.
+- [x] The provisioning script merges by name, preserving foreign client policies, and applies
+  detach → configure → attach in that order.
+- [x] Verification fails loudly when `dpop.bound.access.tokens` is flipped on, when the marker role
+  is missing, or when the policy is present but unscoped.
+
+**Enforced by:** `provision-keycloak-mobile-client.test.sh` · **Code:**
+`scripts/provision-keycloak-mobile-client.py` · **Decision:**
+[ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md) · **Measurements:**
+[`ANDROID_API_EXPOSURE_PLAN.md`](../ANDROID_API_EXPOSURE_PLAN.md) section 7
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the

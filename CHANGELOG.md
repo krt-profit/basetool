@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Vorbereitung für die Android-App: Anmelde-Verfahren festgelegt und als Skript hinterlegt.** Die künftige App bekommt einen Keycloak-Zugang, bei dem nur ihr Erneuerungs-Token an das jeweilige Gerät gebunden ist — ein gestohlenes Token ist damit außerhalb des Handys wertlos. Ein neues Betreiber-Skript legt diesen Zugang samt Richtlinie an und prüft das Ergebnis. Rein vorbereitend, keine Auswirkung auf die Oberfläche (ADR-0131, REQ-SEC-030).
+
 ### Changed
 
 - **Kontakt-E-Mail-Adresse aktualisiert.** Die Betreiber-Adresse in Impressum und Datenschutzerklärung (alle drei Sprachvarianten) sowie in CLA, Code of Conduct und Beitragsleitfaden lautet jetzt lucas.greuloch@gmail.com (vorher lucas.greuloch@pm.me).
@@ -10,7 +14,7 @@
 
 - **Auswahlfelder verlieren ihre Auswahl nicht mehr unsichtbar.** Wer in einem Auswahlfeld (Halter, Material, Ort, Nutzer …) erneut hineinklickte und tippte, ohne danach einen Eintrag aus der Liste zu wählen, verlor beim Wegklicken die Auswahl im Hintergrund — das Feld zeigte weiterhin den zuvor gewählten Namen an. Das Formular ließ sich abschicken und wurde dann abgewiesen, ohne dass erkennbar war, woran es lag. Betraf unter anderem die Auszahlung eines Bank-Antrags, deren Freigabe-Häkchen genau diesen Klick erzwingt.
 
-- **Meldungen zu ungültigen Eingaben benennen wieder das betroffene Feld.** Bei einem Prüffehler antwortete das Backend ohne Feldangabe, sodass die Oberfläche nur den Sammeltext „Einige Felder sind ungültig“ anzeigen konnte und im Server-Log gar kein Eintrag entstand — der Fehler war damit weder für Nutzer noch im Betrieb nachvollziehbar. Ursache war die Reihenfolge zweier Fehler-Handler (ADR-0131). Fehler werden jetzt wieder direkt am betroffenen Feld angezeigt und protokolliert.
+- **Meldungen zu ungültigen Eingaben benennen wieder das betroffene Feld.** Bei einem Prüffehler antwortete das Backend ohne Feldangabe, sodass die Oberfläche nur den Sammeltext „Einige Felder sind ungültig“ anzeigen konnte und im Server-Log gar kein Eintrag entstand — der Fehler war damit weder für Nutzer noch im Betrieb nachvollziehbar. Ursache war die Reihenfolge zweier Fehler-Handler (ADR-0132). Fehler werden jetzt wieder direkt am betroffenen Feld angezeigt und protokolliert.
 
 ## [v1.5.43](https://github.com/krt-profit/basetool/releases/tag/v1.5.43) - 2026-08-17
 

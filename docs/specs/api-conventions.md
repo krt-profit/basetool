@@ -43,7 +43,7 @@ stable machine-readable `code`, and a per-request `correlationId`; validation er
 Titles and details are localized via `MessageSource`. Extend `GlobalExceptionHandler` rather than
 throwing into the void; problem-type URIs come from `AppProblemProperties`, not hardcoded strings.
 
-**`GlobalExceptionHandler` must outrank Spring's own problem-details advice (ADR-0131).**
+**`GlobalExceptionHandler` must outrank Spring's own problem-details advice (ADR-0132).**
 `spring.mvc.problemdetails.enabled: true` makes Spring Boot register a competing
 `ProblemDetailsExceptionHandler` `@ControllerAdvice` at `@Order(0)`; an unordered advice sits at
 `LOWEST_PRECEDENCE` and **loses** for every exception type both declare

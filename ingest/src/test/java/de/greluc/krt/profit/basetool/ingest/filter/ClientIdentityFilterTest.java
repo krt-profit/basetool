@@ -300,12 +300,46 @@ class ClientIdentityFilterTest {
   }
 
   @Test
-  void shouldWarnWhenAnAccessTokenArrivesSenderConstrained() throws Exception {
-    // Canary for a silent realm-policy regression (REQ-INGEST-012). Access tokens must stay plain
-    // bearer, because this gateway RELAYS them to the backend and a bound token cannot survive
-    // that second hop. If allow-only-refresh-token-binding is ever turned off, tokens start
-    // arriving with cnf.jkt and the failure lands at the BACKEND as an opaque 'you must sign in'
-    // — exactly how the 2026-08-03 outage presented. This line is what names the cause.
+  void shouldWarnWhenAnAccessTokenArrivesWithoutSenderConstraining() throws Exception {
+    // Canary for a silent regression of REQ-INGEST-012. Since ADR-0129 the gateway no longer
+    // relays the caller's token — it validates it here and calls the backend under its own service
+    // account — so the bound access token is the REQUIRED state, and an unbound one means the
+    // protection lapsed: the realm stopped honouring the proof, a client policy narrowed binding
+    // to the refresh token, or an older extractor build authenticated without a proof.
+    Jwt jwt =
+        Jwt.withTokenValue("t")
+            .header("alg", "RS256")
+            .claim("sub", "sub-1")
+            .claim("azp", ALLOWED_CLIENT)
+            .build();
+    SecurityContextHolder.getContext()
+        .setAuthentication(new JwtAuthenticationToken(jwt, List.of()));
+
+    List<ILoggingEvent> events =
+        LogCapture.capture(
+            ClientIdentityFilter.class,
+            Level.WARN,
+            () -> {
+              try {
+                filter(new ClientIdentityProperties()).doFilter(request, response, chain);
+              } catch (Exception e) {
+                throw new IllegalStateException(e);
+              }
+            });
+
+    verify(chain, times(1)).doFilter(request, response);
+    assertThat(events).isNotEmpty();
+    assertThat(events.getFirst().getFormattedMessage())
+        .contains("NOT DPoP-bound")
+        .contains("REQ-INGEST-012");
+  }
+
+  @Test
+  void shouldStaySilentOnTheRequiredSenderConstrainedToken() throws Exception {
+    // The inverse of the canary, pinned because it is the whole point of the change: a bound
+    // access token is the expected state and must produce no warning. The previous direction fired
+    // on exactly this request — on every successful send — with a cause that had stopped being
+    // true, which is how a canary trains operators to ignore it.
     Jwt jwt =
         Jwt.withTokenValue("t")
             .header("alg", "RS256")
@@ -329,10 +363,7 @@ class ClientIdentityFilterTest {
             });
 
     verify(chain, times(1)).doFilter(request, response);
-    assertThat(events).isNotEmpty();
-    assertThat(events.getFirst().getFormattedMessage())
-        .contains("DPoP-bound")
-        .contains("allow-only-refresh-token-binding");
+    assertThat(events).isEmpty();
   }
 
   @Test
