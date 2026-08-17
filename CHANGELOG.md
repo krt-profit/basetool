@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Kontakt-E-Mail-Adresse aktualisiert.** Die Betreiber-Adresse in Impressum und Datenschutzerklärung (alle drei Sprachvarianten) sowie in CLA, Code of Conduct und Beitragsleitfaden lautet jetzt lucas.greuloch@gmail.com (vorher lucas.greuloch@pm.me).
+
 ## [v1.5.43](https://github.com/krt-profit/basetool/releases/tag/v1.5.43) - 2026-08-17
 
 ## [v1.5.42](https://github.com/krt-profit/basetool/releases/tag/v1.5.42) - 2026-08-17

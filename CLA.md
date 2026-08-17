@@ -54,7 +54,7 @@ specifics of this Project.
   excluded.
 - **"Project Maintainers"** means the individuals authorized to accept
   Contributions on behalf of the Project. The current point of contact
-  is [lucas.greuloch@pm.me](mailto:lucas.greuloch@pm.me).
+  is [lucas.greuloch@gmail.com](mailto:lucas.greuloch@gmail.com).
 
 ---
 
@@ -152,7 +152,7 @@ You agree to notify the Project Maintainers of any facts or
 circumstances of which You become aware that would make any of Your
 representations in this Agreement inaccurate in any respect. Notice
 shall be sent to
-[lucas.greuloch@pm.me](mailto:lucas.greuloch@pm.me).
+[lucas.greuloch@gmail.com](mailto:lucas.greuloch@gmail.com).
 
 ---
 
@@ -234,7 +234,7 @@ You sign electronically is the same one You see in this file.
 
 If You make Contributions on behalf of Your employer or another legal
 entity, the entity must execute a separate **Entity CLA**. Contact
-[lucas.greuloch@pm.me](mailto:lucas.greuloch@pm.me) to obtain the
+[lucas.greuloch@gmail.com](mailto:lucas.greuloch@gmail.com) to obtain the
 Entity CLA template. Until the Entity CLA is countersigned, Your
 employer-funded Contributions cannot be merged.
 
@@ -252,7 +252,7 @@ employer-funded Contributions cannot be merged.
 
 You may withdraw from this Agreement at any time by notifying the
 Project Maintainers in writing at
-[lucas.greuloch@pm.me](mailto:lucas.greuloch@pm.me).
+[lucas.greuloch@gmail.com](mailto:lucas.greuloch@gmail.com).
 
 Withdrawal takes effect **only for Contributions submitted after the
 date of withdrawal**. The licenses granted under §§ 2–3 for
