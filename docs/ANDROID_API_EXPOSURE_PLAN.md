@@ -80,11 +80,11 @@ mapping and masking for the new vhost's log stream · extension of the external
 
 ### Track E — verification (test stack, code)
 
-| #  |                                                                                                                                                                                                                                             Work package                                                                                                                                                                                                                                              |
-|----|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| E1 | **The decisive experiment:** on the isolated test stack, create the refresh-only DPoP client policy and confirm for `basetool-android` that the access token is issued **without** `cnf` (the backend accepts it as a plain Bearer), the refresh token is bound, and a refresh replayed with a different key fails. The entire token posture depends on this; if it fails, the fallback ladder (backend `.dPoP()` support, or plain PKCE as an approved deviation) changes the app's networking layer |
-| E2 | Tests for the A1 XFF walk (spoofed chains, trusted and untrusted peers) and for the A3 per-subject limiter                                                                                                                                                                                                                                                                                                                                                                                            |
-| E3 | Verify the vhost allowlist behaviour against the test stack before it is applied to production                                                                                                                                                                                                                                                                                                                                                                                                        |
+| #  |                                                                                                                                                                                                                                                                                                                                                                                   Work package                                                                                                                                                                                                                                                                                                                                                                                    |
+|----|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| E1 | ✅ **Done, 2026-08-17 — refresh-only binding works; full result and its four landmines in section 7.** The experiment was a first, not a repeat: production carries zero client profiles and zero policies, and the extractor deliberately needs none — since ADR-0129 it *wants* both tokens bound, because the gateway validates the proof at the hop that consumes it. The app is the opposite case: it talks to the backend directly, and Spring Security's bearer filter rejects a `cnf`-bound access token outright. Outcome: in the authorization-code flow the access token comes back as a plain `Bearer` without `cnf`, the refresh token is bound, and a refresh with a wrong key or no proof is refused. The fallback ladder stays unused; **B2 and D2 are unblocked** |
+| E2 | Tests for the A1 XFF walk (spoofed chains, trusted and untrusted peers) and for the A3 per-subject limiter                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| E3 | Verify the vhost allowlist behaviour against the test stack before it is applied to production                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ## 3. Order and gates
 
@@ -96,9 +96,10 @@ A7 (assetlinks) ──► App Link redirect usable
 B1 B3 B4 B5 B6 travel with the PRs that implement them
 ```
 
-Nothing in Track D runs before its Track A/C counterpart is merged and probed. E1 comes first
+Nothing in Track D runs before its Track A/C counterpart is merged and probed. E1 came first
 because it is cheap, needs no production access, and decides an app-architecture question that
-gets expensive to revisit later.
+gets expensive to revisit later — **it has since passed** (section 7), so the gate it held is open
+and the app's networking layer can be built against plain Bearer access tokens.
 
 ## 4. Anonymous surface — the stance to confirm
 
@@ -161,7 +162,79 @@ sanitization is automated, and only the sanitized result is ever read or committ
    matched text. A missed secret therefore fails loudly instead of landing in a commit.
 4. The raw export is deleted afterwards. It never enters the repository, a transcript or a diff.
 
-## 7. What this plan deliberately does not do
+## 7. E1 result — refresh-only DPoP binding works (verified 2026-08-17)
+
+**Verdict: the app can keep plain Bearer access tokens.** In the authorization-code flow the app
+actually uses, Keycloak 26.7 issues `token_type: Bearer` with **no `cnf` claim** on the access
+token while the refresh token carries `cnf.jkt`. The backend needs no change, and the fallback
+ladder is not required.
+
+The configuration that produces it — all three parts are load-bearing:
+
+|                    Part                     |                                  Value                                  |
+|---------------------------------------------|-------------------------------------------------------------------------|
+| Client profile executor                     | `dpop-bind-enforcer`                                                    |
+| Executor configuration                      | `allow-only-refresh-token-binding: true`, the other two options **off** |
+| Policy condition                            | `client-roles` with a marker **client role** on `basetool-android`      |
+| Client attribute `dpop.bound.access.tokens` | **`false` or absent** — see landmine 2                                  |
+
+Measured behaviour, authorization code + PKCE S256:
+
+|                  Case                   |                            Result                             |
+|-----------------------------------------|---------------------------------------------------------------|
+| Login with a proof                      | `Bearer`, access **unbound**, refresh **bound**               |
+| Token exchange without a proof          | refused — `invalid_grant`, "DPoP proof is missing"            |
+| Refresh with the proof                  | `Bearer`, access unbound, refresh stays bound across rotation |
+| Refresh with a **different** key        | refused — "DPoP confirmation doesn't match DPoP proof"        |
+| Refresh with **no** proof               | refused — `invalid_dpop_proof`                                |
+| `dpop_jkt` on the authorization request | optional; accepted, and worth sending as defence in depth     |
+| Client **without** the marker role      | unaffected — still gets bound tokens, proof still optional    |
+
+### Four landmines this experiment surfaced
+
+1. **Never verify this with a direct grant.** Under ROPC the same realm binds the access token on
+   the initial grant and only narrows it from the first refresh onward, and a proof-less ROPC login
+   is accepted outright. An earlier interim reading of this plan's question was wrong for exactly
+   that reason. The production client keeps `directAccessGrantsEnabled = false`.
+2. **While the policy is attached, every admin edit to the client is refused** with
+   `invalid_client_metadata` / "DPoP token is disabled" — including edits as harmless as a
+   description, and including removing the attribute. Provisioning order is therefore: create and
+   fully configure the client **first**, attach the policy **last**. Any later change to the client
+   requires detaching the policy, editing, and re-attaching — the `kcadm` script must do it in that
+   order and verify the re-attach.
+3. **The refresh-only profile and the per-client "require DPoP" switch do not compose.** Setting
+   `dpop.bound.access.tokens = true` re-binds the access token even on refresh, and
+   `enforce-authorization-code-binding-to-dpop` requires that switch. A DPoP-bound authorization
+   code and an unbound access token are therefore mutually exclusive in Keycloak 26.7. The residual
+   gap this leaves is small: the token exchange still demands a proof, so the code cannot be
+   redeemed without the key.
+4. **Keycloak's own `/userinfo` breaks for clients under this policy.** Called without a proof it
+   answers **HTTP 500** (`IllegalArgumentException: Unrecognized OAuth 2.0 error:
+   invalid_dpop_proof`) instead of a 401 — a Keycloak bug in `UserInfoEndpoint.issueUserInfo`. The
+   backend is unaffected because it validates JWTs locally against the JWKS, but **the app must
+   take profile claims from the ID token and never call `/userinfo`.**
+
+### The fallback, confirmed available but not needed
+
+Spring Security's `BearerTokenAuthenticationFilter` does reject a `cnf.jkt`-bearing token on the
+plain Bearer path, deliberately ("prevent downgraded usage of DPoP-bound access tokens"), after the
+JWT has otherwise validated. Full DPoP resource-server support exists since Spring Security **6.5**
+(servlet only; no WebFlux equivalent) and is **auto-enabled** whenever `oauth2-jose` is on the
+classpath — there is no DSL to switch on, and equally no supported seam to customise the `htu`
+comparison, which is plain string equality against `getRequestURL()`. Should the posture ever have
+to change, that is the rung to take; it needs `ForwardedHeaderFilter` to line the URL up behind the
+proxy, and it cannot survive a relay hop.
+
+### Deviation from decision 5, disclosed
+
+The experiment ran against a **throwaway `quay.io/keycloak/keycloak:26.7` container** on port
+18099, not the `docker-compose.test.yml` stack that decision 5 named. Reason: the question is pure
+Keycloak realm behaviour, and the test stack's `.env.test`, local keystore and stripped realm export
+do not exist in this worktree. No production artefact, credential or export was involved — realm,
+client, marker role and user were created by the script — and the container was removed afterwards.
+Everything above is reproducible from a bare Keycloak image.
+
+## 8. What this plan deliberately does not do
 
 No production access is assumed or requested. Every Track D item is described so that @greluc can
 execute it with the exact command and its rollback in hand; nothing in this repository reaches for

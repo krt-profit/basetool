@@ -397,49 +397,58 @@ Only when both hold, set `IRI_INGEST_CLIENT_AUDIT_ONLY=false` and restart. The
 > possible without downtime: ship the new extractor with a new id, run both, drop the old id once the
 > per-`client_id` counter shows no traffic on it.
 
-## Step 8 — DPoP: bind the REFRESH token only (REQ-INGEST-012)
+## Step 8 — DPoP: both tokens are bound, and that is correct (REQ-INGEST-012)
 
-> **Superseded in part by step 9 (ADR-0129).** This step still applies — the refresh token on disk
-> is the credential most worth binding — but its "access tokens stay plain bearer" premise is no
-> longer true. Since step 9 the gateway validates the access token's proof itself, so the access
-> token is bound as well. Read step 9 before acting on this one.
+DPoP protects two things here: the **refresh token** the extractor writes to disk — the credential
+most worth binding — and the **access token** it presents to the gateway, which since ADR-0129 is
+validated at the very hop that consumes it.
 
-DPoP protects the credential the extractor writes to disk — its **refresh token**. It also binds the
-access token, which the gateway now validates at the internet-facing hop (step 9). Getting the
-combination wrong broke every blueprint send from 2026-08-03: the token was bound and then presented
-as a plain bearer, which a resource server refuses outright.
+Since Keycloak 26.4 DPoP needs **no feature flag** and **no per-client switch**: it binds whenever a
+client sends a proof, and the extractor always sends one. So the correct configuration is *no
+configuration*.
 
-Since Keycloak 26.4 DPoP needs **no feature flag** and **no per-client switch** to work — it binds
-whenever a client sends a proof. What you configure here is that it binds the refresh token *only*.
+> **This step used to say the opposite.** While the gateway relayed the caller's token, a bound
+> access token could not survive the second hop, so the instruction was to narrow binding to the
+> refresh token. ADR-0129 removed the relay and with it that constraint; the instruction survived
+> until 2026-08-17 and would have degraded the deployment if followed.
 
-### 8a — Client policy with the DPoP bind enforcer
+### 8a — Nothing to configure
 
-The refresh-only behaviour lives in a **client policy executor**, not on the client. Realm settings
-→ **Client policies**:
+There is no step here any more, and that is the point: since Keycloak 26.4 DPoP binds whenever a
+client presents a proof, the extractor always presents one, and since ADR-0129 **both** tokens being
+bound is the wanted state. Verified against production on 2026-08-17: the realm carries zero client
+profiles and zero policies, which is correct.
 
-1. **Profiles** → create a profile (e.g. `extractor-dpop`) and add the executor
-   **`dpop-bind-enforcer`**.
-2. In the executor configuration set **`allow-only-refresh-token-binding` = On**. Leave
-   `auto-configure` and `enforce-authorization-code-binding-to-dpop` off unless you have a reason.
-3. **Policies** → create a policy that applies that profile, with a condition scoping it to the
-   client `basetool-sc-extractor` (a `client-access-type` / client-id condition).
-
-> Verified against the Keycloak 26.7 image
-> (`DPoPBindEnforcerExecutor$Configuration`: `auto-configure`,
-> `enforce-authorization-code-binding-to-dpop`, `allow-only-refresh-token-binding`). The per-client
-> **"Require DPoP bound tokens"** switch under *Settings → Capability config* (attribute
-> `dpop.bound.access.tokens`) is the **enforcement** switch — leave it **off**: it would demand
-> DPoP on the access token, which is exactly what must not happen here.
+> **Do not create the `extractor-dpop` profile this step used to describe.** A
+> `dpop-bind-enforcer` executor with `allow-only-refresh-token-binding = On` would narrow binding to
+> the refresh token, which was right while the gateway relayed the access token and is wrong now.
+> It would not break sending — the extractor follows the server and would fall back to the `Bearer`
+> scheme, which the gateway still accepts — it would silently *remove* the sender-constraining from
+> the one internet-facing hop, and `ClientIdentityFilter` would start logging the lapsed-protection
+> canary on every request.
+>
+> The per-client **"Require DPoP bound tokens"** switch (*Settings → Capability config*, attribute
+> `dpop.bound.access.tokens`) also stays **off**. It is an enforcement switch, and enforcement is
+> deliberately absent: the gateway keeps `.jwt()` alongside `.dPoP()` so a client rollout needs no
+> flag day (REQ-INGEST-012).
+>
+> The executor exists and its configuration keys are real
+> (`DPoPBindEnforcerExecutorFactory`: `auto-configure`,
+> `enforce-authorization-code-binding-to-dpop`, `allow-only-refresh-token-binding`) — it is simply
+> the wrong tool for this deployment. It **is** the right tool for a client that talks to the
+> backend directly, which is why the Android app plans to use it.
 
 ### 8b — Verify
 
 Send once from the extractor, then decode the access token it received:
 
-- `cnf` must be **absent** — the access token is a plain bearer.
-- `token_type` must be `Bearer`, not `DPoP`.
+- `cnf.jkt` must be **present** — the access token is sender-constrained to the extractor's key.
+- `token_type` must be `DPoP`, not `Bearer`.
 
-If `cnf.jkt` appears, access-token binding is on: the gateway logs a `WARN` naming exactly that, and
-the backend will refuse the relayed token. Turn `allow-only-refresh-token-binding` back on.
+If `cnf` is absent, the binding lapsed: the gateway logs a `WARN` naming REQ-INGEST-012, sends keep
+working over the `Bearer` path, and the protection is gone without anything failing. Check that no
+client policy narrowed the binding and that the extractor build still sends a proof at the token
+endpoint.
 
 ### 8c — Two numbers that bite
 
