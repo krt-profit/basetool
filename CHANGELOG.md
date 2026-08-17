@@ -20,6 +20,8 @@
 
 ### Fixed
 
+- **Alarm-Mails wiederholen sich nicht mehr stündlich bzw. alle vier Stunden.** Alertmanager kennt kein „zur Kenntnis genommen" und schickte dieselbe Meldung erneut, solange der Alarm anlag — bei einem Alarm, der einen Zustand prüft, also endlos. Pro Ereignis kommt jetzt eine Mail und, sobald es vorbei ist, eine Entwarnung; das stündliche Nachfassen bei kritischen Alarmen läuft weiter über Discord. **Deploy-Hinweis:** Der Alertmanager-Container muss dafür neu erzeugt werden (neue Option `--data.retention=744h`).
+
 - **Fehlalarm „External sync stale" nach jedem Backend-Neustart behoben.** Der Zeitstempel des letzten erfolgreichen Laufs eines Hintergrundjobs wurde bereits beim *Start* eines Laufs mit dem Platzhalter `0` veröffentlicht; die Überwachung las das als „zuletzt erfolgreich am 01.01.1970" und schlug an, solange der erste Lauf nach einem Neustart dauerte — beim SC-Wiki-Abgleich 10 bis 15 Minuten. Der Zeitstempel entsteht jetzt erst mit dem ersten Erfolg, und die sechs betroffenen Alarmregeln ignorieren den Platzhalter zusätzlich selbst.
 
 - **Fehlalarm „Audit domain silent 14d (ROLE)" behoben.** Die Überwachung meldete jede Audit-Domäne als verdächtig still, die 14 Tage lang nichts aufgezeichnet hat — für den Bereich Rollen & Mitglieder ist das aber eine gewöhnliche ruhige Phase, und da der Alarm einen Zustand und kein Ereignis prüft, wiederholte er sich alle vier Stunden per Mail, bis jemand eine Rolle änderte. Rollen & Mitglieder ist jetzt von der Regel ausgenommen — wie Beförderung, Mein Inventar und Materialbörse, die dort naturgemäß wochenlang still sind. Das Betriebs-Dashboard zeigt das Audit-Volumen dieser Bereiche stattdessen in einer 60-Tage-Tabelle.
