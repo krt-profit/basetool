@@ -73,3 +73,4 @@ __pycache__/
 
 ### Release-notes local progress tracker (never commit) ###
 /.release-notes-state.json
+ssh Befehle.txt
