@@ -39,9 +39,24 @@ mapper (`@Mapper(componentModel = "spring")`) for Entity↔DTO; break circular r
 
 Errors are `application/problem+json` with `type`, `title`, `status`, `detail`, `instance`, a
 stable machine-readable `code`, and a per-request `correlationId`; validation errors add an
-`errors` object (field → message). Titles and details are localized via `MessageSource`. Extend
-`GlobalExceptionHandler` rather than throwing into the void; problem-type URIs come from
-`AppProblemProperties`, not hardcoded strings.
+`errors` object (field → message) **and** a structured `fieldErrors` array (`{field, message}`).
+Titles and details are localized via `MessageSource`. Extend `GlobalExceptionHandler` rather than
+throwing into the void; problem-type URIs come from `AppProblemProperties`, not hardcoded strings.
+
+**`GlobalExceptionHandler` must outrank Spring's own problem-details advice (ADR-0132).**
+`spring.mvc.problemdetails.enabled: true` makes Spring Boot register a competing
+`ProblemDetailsExceptionHandler` `@ControllerAdvice` at `@Order(0)`; an unordered advice sits at
+`LOWEST_PRECEDENCE` and **loses** for every exception type both declare
+(`MethodArgumentNotValidException`, `HttpMessageNotReadableException`,
+`MethodArgumentTypeMismatchException`, `HttpRequestMethodNotSupportedException`,
+`NoResourceFoundException`, `ErrorResponseException`). Those responses then carry Spring's bare
+`ProblemDetail` — no `code`, no `correlationId`, no `fieldErrors`, untranslated English `detail` —
+which silently breaks the contract above and, because the frontend needs `fieldErrors` to place an
+inline message at the offending field, degrades every 400 to a generic "some fields are invalid"
+toast with nothing in the server log either. The `@Order(Ordered.HIGHEST_PRECEDENCE)` on
+`GlobalExceptionHandler` is therefore **load-bearing**; `GlobalExceptionHandlerAdviceOrderTest`
+guards it by driving Spring's own advice discovery and first-advice-wins resolution. A unit test that
+calls the handler methods directly cannot detect this class of break.
 
 **Sanctioned producers outside `GlobalExceptionHandler`.** Some errors are raised before the
 `DispatcherServlet` (in a filter or the security chain) and cannot reach the `@ControllerAdvice`, so

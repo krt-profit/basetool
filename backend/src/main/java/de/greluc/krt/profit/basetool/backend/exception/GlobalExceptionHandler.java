@@ -43,6 +43,8 @@ import org.hibernate.StaleObjectStateException;
 import org.slf4j.MDC;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -80,8 +82,27 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
  * <p>Expected, user-driven errors (4xx) are logged at {@code WARN}/{@code DEBUG} without a stack
  * trace; unexpected internal errors (5xx) are logged at {@code ERROR} with the full stack trace and
  * the correlation id to aid post-mortem debugging.
+ *
+ * <p><strong>The {@code @Order} is load-bearing — do not remove it.</strong> {@code
+ * application.yml} sets {@code spring.mvc.problemdetails.enabled: true}, which makes Spring Boot
+ * register its own {@code ProblemDetailsExceptionHandler} advice at {@code @Order(0)} (guarded only
+ * by {@code @ConditionalOnMissingBean(ResponseEntityExceptionHandler.class)}, and this class
+ * deliberately does not extend that base class). An unordered {@code @ControllerAdvice} sits at
+ * {@code LOWEST_PRECEDENCE} and therefore LOSES to it for every exception type Spring's advice also
+ * declares — {@link MethodArgumentNotValidException}, {@link
+ * org.springframework.http.converter.HttpMessageNotReadableException}, {@link
+ * org.springframework.web.method.annotation.MethodArgumentTypeMismatchException}, {@link
+ * HttpRequestMethodNotSupportedException}, {@link NoResourceFoundException} and {@link
+ * ErrorResponseException}. Those responses then ship Spring's bare {@link ProblemDetail}: no {@code
+ * code}, no {@code correlationId}, no {@code fieldErrors}, and an untranslated English {@code
+ * detail} ({@code "Invalid request content."}). The frontend needs {@code fieldErrors} to place an
+ * inline message at the offending field, so it degraded every 400 to a generic "some fields are
+ * invalid" toast, and {@link #handleValidationExceptions}'s diagnostic WARN log never ran — a bank
+ * employee hit exactly that on a booking-request confirmation and neither they nor the production
+ * log could tell which field was rejected.
  */
 @ControllerAdvice
+@Order(Ordered.HIGHEST_PRECEDENCE)
 @Slf4j
 @RequiredArgsConstructor
 public class GlobalExceptionHandler {
