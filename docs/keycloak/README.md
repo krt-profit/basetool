@@ -37,8 +37,23 @@ on for ROPC test logins). Do not cross-contaminate the two.
 
 ## Provenance & sanitization
 
-`realm-config.reference.json` was derived from a masked Admin-Console export of the prod realm
-(2026-06-18). The following were stripped or replaced — **never commit any of them**:
+`realm-config.reference.json` is **generated**, not hand-edited. Refresh it with:
+
+```bash
+# 1. Export the iri realm from the Admin Console into a file OUTSIDE the repository
+# 2. Sanitize — the script refuses to write when anything sensitive survives
+python scripts/sanitize-realm-export.py RAW_EXPORT.json docs/keycloak/realm-config.reference.json
+# 3. Delete the raw export
+```
+
+Automating this is the point. The previous file was a hand-curated subset from **2026-06-18**, and
+by August it had drifted far enough that two security documents contradicted the code (2026-08-17
+audit). A generated snapshot refreshes in seconds, so it stays true; it is also fuller than the old
+curated subset — more noise in exchange for no drift.
+
+Current snapshot: **2026-08-17**. Still a sanitized reference, still **not** importable.
+
+The script strips or replaces the following — **never commit any of them**:
 
 - **Client secrets** → `__SET_AT_DEPLOY__` (the source export already masked them as `**********`).
 - **SMTP credentials & address** → `smtp.example.invalid` / `noreply@example.invalid` /
