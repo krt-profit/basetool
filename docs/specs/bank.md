@@ -1635,6 +1635,17 @@ false` forever, so an action-worded chip would still demand an approval that is 
 queue's last column is headed **"Entscheidung"** rather than "Aktionen" for the same reason — it holds
 the confirm/reject buttons only while the request is `PENDING` and otherwise names the decider.
 
+**The approver sees the Begründung too ("Fremde Anträge").** Each row of the approval tab carries the
+same **expandable Begründung + Notiz sub-row** as the bank-staff queue (REQ-BANK-023/-045): a leading
+chevron on rows that have either field, revealing an indented detail row with Begründung first. This
+is not cosmetic parity — the approver is the one *deciding*, and on a `CARTEL` / `CARTEL_BANK` /
+`SPECIAL` account the Begründung is the **mandatory** reason for the outflow (REQ-BANK-045), so
+approving without it visible would mean signing off blind. It reuses the document-delegated
+`bank-row-expand` handler and the account-detail chevron pattern; no new endpoint, JS module or i18n
+key. The detail id is prefixed `ou-foreign-req-` because a responsible holder who raised the request
+themselves sees that request in **both** tables of `/org-unit-bank` ("Meine Anträge" and "Fremde
+Anträge"), and a shared `bank-req-<id>` would let one row's chevron toggle the other's sub-row.
+
 The two approval acts (holder in-app grant, employee checkbox) are on **different surfaces seen by
 different users**, so they are outside the same-surface peer-sync scope (REQ-FE-010 live multi-user
 is Mission-only). An out-of-band grant/revoke bumps the request's `@Version`; an already-open
