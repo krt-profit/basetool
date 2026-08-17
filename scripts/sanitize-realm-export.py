@@ -127,6 +127,27 @@ def sanitize(raw: dict[str, Any]) -> tuple[dict[str, Any], dict[str, int]]:
         stats["dropped:builtinClients"] = len(clients) - len(kept)
         raw["clients"] = kept
 
+    # Keycloak's own role catalogue for the built-in clients is several hundred lines of noise
+    # that says nothing about this deployment; the project's realm roles stay.
+    client_roles = (raw.get("roles") or {}).get("client")
+    if isinstance(client_roles, dict):
+        removed = [name for name in client_roles if name in BUILTIN_CLIENTS]
+        for name in removed:
+            client_roles.pop(name)
+        if removed:
+            stats["dropped:builtinClientRoles"] = len(removed)
+
+    # Identity-provider credentials sit in a plain config map, where the key names carry no hint
+    # that they are secrets: `clientId` there is the Discord application id, not a Keycloak client
+    # name, and docs/keycloak/README.md requires both halves to be replaced.
+    for provider in raw.get("identityProviders") or []:
+        config = provider.get("config")
+        if isinstance(config, dict):
+            for key in ("clientId", "clientSecret"):
+                if key in config:
+                    config[key] = DEPLOY_PLACEHOLDER
+                    stats["idpCredentials"] = stats.get("idpCredentials", 0) + 1
+
     smtp = raw.get("smtpServer")
     if isinstance(smtp, dict) and smtp:
         raw["smtpServer"] = {
