@@ -134,6 +134,78 @@ recorded, reversible operator lever — see [`INGEST_KEYCLOAK_SETUP.md`](../INGE
 and any future **public** client (native/mobile) must be sender-constrained via DPoP instead,
 since RFC 9700 requires public-client refresh tokens to be either rotated or bound.
 
+## Runbook — provisioning the mobile client `basetool-android`
+
+`scripts/provision-keycloak-mobile-client.py` creates the client and the refresh-token-only DPoP
+policy of [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md) / REQ-SEC-030. Run it on
+a **test realm first**; production only after that reads clean.
+
+```bash
+# 1. authenticate kcadm inside the container, so no password reaches the script's process
+docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
+    --server http://localhost:8080 --realm master --user <admin>
+
+# 2. see every payload without writing anything
+scripts/provision-keycloak-mobile-client.py --realm iri --profile prod --dry-run
+
+# 3. apply, then re-assert independently
+scripts/provision-keycloak-mobile-client.py --realm iri --profile prod
+scripts/provision-keycloak-mobile-client.py --realm iri --verify-only
+```
+
+Use `--profile test` on a test realm: it additionally registers the custom-scheme and loopback
+redirect URIs the prod client deliberately does without.
+
+**Expected output of a clean first run** — five steps, then the verification line. Session bounds
+are written as 30 d / 180 d against the production realm; on a realm with tighter SSO settings the
+script clamps and says so rather than failing.
+
+```
+[1/5] detaching 'krt-mobile-dpop-policy' so the client is editable
+  policy not attached — nothing to detach
+[2/5] client 'basetool-android' (prod redirect URIs)
+  create clients — client created
+[3/5] marker role, audience mapper, offline_access
+  create clients/<uuid>/roles — marker role created
+  create clients/<uuid>/protocol-mappers/models — audience mapper created
+  delete clients/<uuid>/optional-client-scopes/<id> — offline_access withheld
+[4/5] client profile 'krt-mobile-dpop'
+  update client-policies/profiles — profile merged into 0 existing
+[5/5] attaching policy 'krt-mobile-dpop-policy'
+  update client-policies/policies — policy merged into 0 existing
+
+[verify]
+  the client and its refresh-only DPoP policy are in the intended state
+```
+
+**The trap you will hit later.** Once the policy is attached, Keycloak refuses *every* admin edit
+to that client — including one made in the Admin Console, and including changes as harmless as the
+description:
+
+```
+Invalid client metadata: DPoP token is disabled [invalid_client_metadata]
+```
+
+That message names DPoP for no apparent reason and does not mention the policy. The supported route
+is detach → edit → re-attach, which is exactly what re-running the script does: it detaches first,
+writes the client, and attaches again. Edit through the script rather than the console.
+
+**Rollback.** Remove the two entries by name and, if the client itself should go, delete it. Both
+client-policy endpoints replace the whole realm-global list, so read the current list first and
+write it back **without** our entry — never post an empty list unless it is genuinely empty:
+
+```bash
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get client-policies/policies -r iri   # keep a copy
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get client-policies/profiles -r iri   # keep a copy
+# edit both copies to drop krt-mobile-dpop-policy / krt-mobile-dpop, then:
+docker exec -i keycloak /opt/keycloak/bin/kcadm.sh update client-policies/policies -r iri -f - < policies.json
+docker exec -i keycloak /opt/keycloak/bin/kcadm.sh update client-policies/profiles -r iri -f - < profiles.json
+docker exec keycloak /opt/keycloak/bin/kcadm.sh delete clients/<uuid> -r iri          # only if removing the client
+```
+
+Detaching the policy alone is the safe partial rollback: the client keeps working and simply stops
+having its refresh token bound.
+
 ## Open findings (hardening, tracked separately)
 
 - **`fullScopeAllowed: true`** on `basetool-frontend` and `basetool-sc-extractor` grants the full
