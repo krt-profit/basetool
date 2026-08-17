@@ -18,6 +18,8 @@
 
 - **Keycloak auf 26.7.1 angehoben (Sicherheitsupdate).** Das Patch-Release schließt fünf Schwachstellen im Anmeldedienst — unter anderem eine Umgehung der Signaturprüfung bei verschlüsselten OIDC-Request-Objects, eine Rechte-Eskalation über die Client-Verwaltung und drei Lücken in der feingranularen Rechteverwaltung. Keine Funktions- oder Konfigurationsänderung: Das gepinnte Container-Image (`quay.io/keycloak/keycloak:26.7`-Digest, weiterhin JDK 21) und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit. **Deploy-Hinweis:** Der Keycloak-Container muss dafür neu gestartet werden.
 
+- **Build- und Testwerkzeuge auf den aktuellen Stand gebracht:** CycloneDX 3.4.1, Flyway 13.3.0, OkHttp 5.5.0, axe-core 4.13.0, Spotless 8.10.0 und JUnit 6.1.3. MapStruct bleibt bewusst auf 1.6.3 — für 1.7.0 gibt es bisher nur Beta-Builds. Rein intern, keine Auswirkung auf die Oberfläche.
+
 ### Fixed
 
 - **Alarm-Mails wiederholen sich nicht mehr stündlich bzw. alle vier Stunden.** Alertmanager kennt kein „zur Kenntnis genommen" und schickte dieselbe Meldung erneut, solange der Alarm anlag — bei einem Alarm, der einen Zustand prüft, also endlos. Pro Ereignis kommt jetzt eine Mail und, sobald es vorbei ist, eine Entwarnung; das stündliche Nachfassen bei kritischen Alarmen läuft weiter über Discord. **Deploy-Hinweis:** Der Alertmanager-Container muss dafür neu erzeugt werden (neue Option `--data.retention=744h`).
