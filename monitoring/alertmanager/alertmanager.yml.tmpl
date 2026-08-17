@@ -26,7 +26,24 @@ route:
   group_by: ['alertname']
   group_wait: 30s
   group_interval: 5m
-  repeat_interval: 4h
+  # ONE MAIL PER EVENT. Alertmanager has no "acknowledged" state: a still-firing alert is re-sent
+  # every repeat_interval, forever. At the 4h this used to be, that is six identical mails a day —
+  # and for an alert that tests a STATE rather than an event (audit silence, a stale sync job, a
+  # queue over SLA) the state does not clear on its own, so it never stops. In August 2026
+  # AuditDomainSilenceAnomaly on the ROLE domain did exactly that for days. Re-notification is
+  # Alertmanager's substitute for an acknowledgement, and a single-operator setup does not need one:
+  # the mail is read the first time or not at all. 720h (30d) is "effectively never" without being
+  # infinite. `send_resolved: true` on the e-mail receiver keeps the pair complete — one mail when it
+  # starts, one when it clears — so silence between them means "still running", not "forgotten".
+  #
+  # If an alert genuinely needs muting before it resolves, that is what an Alertmanager SILENCE is
+  # for (time-boxed, per matcher, in the UI) — not a shorter repeat_interval.
+  #
+  # HARD CONSTRAINT: the notification log that remembers "already sent" is garbage-collected after
+  # `--data.retention` (default 120h). A repeat_interval above that silently degrades to the
+  # retention window, so docker-compose.monitoring.yml pins alertmanager to --data.retention=744h
+  # (31d) — one day of headroom over this value. Raise both together or neither.
+  repeat_interval: 720h
   routes:
     # The always-firing Watchdog goes only to the external heartbeat, never to e-mail.
     - matchers:
@@ -39,6 +56,11 @@ route:
     # (#1041 item 9) Second channel: mirror every critical to Discord first, then fall through
     # (continue: true) to the critical e-mail route below, so an SMTP outage never silently loses a
     # critical alert.
+    #
+    # Discord KEEPS the hourly repeat while e-mail no longer does. That asymmetry is the point: a
+    # chat channel is where a still-open critical may keep nudging without costing anything, whereas
+    # the same nudge in a mailbox is what made the inbox unreadable. So the mailbox states the event
+    # and Discord carries the reminder.
     - matchers:
         - severity = "critical"
       receiver: 'discord'
@@ -47,16 +69,20 @@ route:
       continue: true
     # AlertmanagerNotificationsFailing is itself e-mail-routed and thus circular when SMTP is the
     # failure — send it to Discord explicitly. It is a warning, so it never matches the critical route.
+    # Its repeat_interval is set here rather than inherited: this is a Discord route, so it follows
+    # the reminder rule above and must not silently follow the mailbox's 30d when that is retuned.
     - matchers:
         - alertname = "AlertmanagerNotificationsFailing"
       receiver: 'discord'
+      repeat_interval: 1h
       continue: false
-    # Critical alerts page e-mail immediately and repeat more often (reached via continue above).
+    # Critical alerts page e-mail immediately (group_wait: 0s — no 30s batching delay), but do not
+    # re-mail: they inherit the root route's 720h, so a critical is one mail plus its resolved mail,
+    # same as a warning. The hourly nudging lives on the Discord route above (decided 2026-08-16).
     - matchers:
         - severity = "critical"
       receiver: 'email'
       group_wait: 0s
-      repeat_interval: 1h
       continue: false
 
 receivers:
