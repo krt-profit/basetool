@@ -1621,6 +1621,18 @@ therefore alerts on:
   The template is rendered by the runbook with `envsubst` and validated with `amtool check-config`;
   because monitoring configs are inode-pinned bind mounts the reconcile force-recreates Alertmanager to
   apply a change (verify `AlertmanagerConfigReloadFailed == 0` after deploy).
+- **Notification cadence — one mail per event.** Alertmanager has no acknowledged state, so a
+  still-firing alert is re-notified every `repeat_interval` indefinitely. At the original 4 h
+  (warnings) / 1 h (criticals) that is six respectively twenty-four identical mails a day for as long
+  as the condition holds, and an alert that tests a *state* rather than an event never clears on its
+  own — `AuditDomainSilenceAnomaly` on the `ROLE` domain demonstrated it over several days in
+  August 2026. Since 2026-08-16 e-mail repeats at **720 h (30 d)** for both severities, so an event is
+  one mail plus, via `send_resolved: true`, one resolved mail; the hourly reminder for an open
+  critical lives on the **Discord** route instead, where repetition is free. Muting an alert before it
+  resolves is what a time-boxed **Silence** is for, not a shorter `repeat_interval`. The cadence is
+  bounded from below by Alertmanager's `--data.retention` — the notification log that remembers
+  “already sent”, default 120 h — so the compose file pins `--data.retention=744 h`; raising
+  one without the other silently degrades the cadence back to the retention window.
 
 All labels stay bounded (REQ-OBS-006): these alerts read only the exporters' own low-cardinality
 series (`job` / `instance` / `reason` / `name` / `path` / `health_type` / `component`), never per-user

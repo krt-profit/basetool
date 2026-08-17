@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.42](https://github.com/krt-profit/basetool/releases/tag/v1.5.42) - 2026-08-17
+
 ### Changed
 
 - **Redis läuft jetzt auf 8.10.0 (vorher 8.8.0).** Der Digest-Pin des `redis:8-alpine`-Images zeigte noch auf den Stand von Juni. Keine Konfigurationsänderung. **Deploy-Hinweis:** Der Redis-Container muss dafür neu gestartet werden.
@@ -18,15 +20,17 @@
 
 - **Keycloak auf 26.7.1 angehoben (Sicherheitsupdate).** Das Patch-Release schließt fünf Schwachstellen im Anmeldedienst — unter anderem eine Umgehung der Signaturprüfung bei verschlüsselten OIDC-Request-Objects, eine Rechte-Eskalation über die Client-Verwaltung und drei Lücken in der feingranularen Rechteverwaltung. Keine Funktions- oder Konfigurationsänderung: Das gepinnte Container-Image (`quay.io/keycloak/keycloak:26.7`-Digest, weiterhin JDK 21) und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit. **Deploy-Hinweis:** Der Keycloak-Container muss dafür neu gestartet werden.
 
+- **Build- und Testwerkzeuge auf den aktuellen Stand gebracht:** CycloneDX 3.4.1, Flyway 13.3.0, OkHttp 5.5.0, axe-core 4.13.0, Spotless 8.10.0 und JUnit 6.1.3. MapStruct bleibt bewusst auf 1.6.3 — für 1.7.0 gibt es bisher nur Beta-Builds. Rein intern, keine Auswirkung auf die Oberfläche.
+
 ### Fixed
+
+- **Alarm-Mails wiederholen sich nicht mehr stündlich bzw. alle vier Stunden.** Alertmanager kennt kein „zur Kenntnis genommen" und schickte dieselbe Meldung erneut, solange der Alarm anlag — bei einem Alarm, der einen Zustand prüft, also endlos. Pro Ereignis kommt jetzt eine Mail und, sobald es vorbei ist, eine Entwarnung; das stündliche Nachfassen bei kritischen Alarmen läuft weiter über Discord. **Deploy-Hinweis:** Der Alertmanager-Container muss dafür neu erzeugt werden (neue Option `--data.retention=744h`).
 
 - **Fehlalarm „External sync stale" nach jedem Backend-Neustart behoben.** Der Zeitstempel des letzten erfolgreichen Laufs eines Hintergrundjobs wurde bereits beim *Start* eines Laufs mit dem Platzhalter `0` veröffentlicht; die Überwachung las das als „zuletzt erfolgreich am 01.01.1970" und schlug an, solange der erste Lauf nach einem Neustart dauerte — beim SC-Wiki-Abgleich 10 bis 15 Minuten. Der Zeitstempel entsteht jetzt erst mit dem ersten Erfolg, und die sechs betroffenen Alarmregeln ignorieren den Platzhalter zusätzlich selbst.
 
 - **Fehlalarm „Audit domain silent 14d (ROLE)" behoben.** Die Überwachung meldete jede Audit-Domäne als verdächtig still, die 14 Tage lang nichts aufgezeichnet hat — für den Bereich Rollen & Mitglieder ist das aber eine gewöhnliche ruhige Phase, und da der Alarm einen Zustand und kein Ereignis prüft, wiederholte er sich alle vier Stunden per Mail, bis jemand eine Rolle änderte. Rollen & Mitglieder ist jetzt von der Regel ausgenommen — wie Beförderung, Mein Inventar und Materialbörse, die dort naturgemäß wochenlang still sind. Das Betriebs-Dashboard zeigt das Audit-Volumen dieser Bereiche stattdessen in einer 60-Tage-Tabelle.
 
 - **Das „+ Zuordnen"-Popover im Lager bleibt immer vollständig im Bild.** Klappte es nach oben auf, obwohl darüber zu wenig Platz war, ragte sein oberer Teil — im Auswahlmodus die Auftragsliste — aus dem sichtbaren Bereich und war nicht erreichbar, weil sich ein fest positioniertes Element nicht heranscrollen lässt. Es klappt jetzt nur noch nach oben, wenn es dort auch hineinpasst, und wird andernfalls in den sichtbaren Bereich gerückt.
-
-### Fixed
 
 - **Ein kurzer Aussetzer der Container-Registry löst keinen Sicherheitsalarm mehr aus.** Die Signaturprüfung vor dem Deploy wird jetzt bis zu dreimal wiederholt und schreibt die tatsächliche Fehlermeldung ins Log, statt sie zu verwerfen. Bisher war ein Netzwerk-Schluckauf nicht von einem manipulierten Image zu unterscheiden und brach den Deploy als kritischen Alarm ab. Neue Schalter: `IRI_COSIGN_VERIFY_ATTEMPTS` (Standard 3) und `IRI_COSIGN_VERIFY_DELAY` (Standard 5 s).
 

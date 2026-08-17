@@ -17,7 +17,7 @@ owasp-dependencycheck = { id = "org.owasp.dependencycheck", version.ref = "owasp
 
 springBoot = "4.1.0"
 springDependencyManagement = "1.1.7"
-cyclonedx = "3.4.0"
+cyclonedx = "3.4.1"
 testcontainers = "2.0.5"
 # 13.0.0 (2026-07-28): the three upstream breaking changes are all no-ops here — min Java moved
 # 17 -> 21 (toolchain is 25), the `createSchema.sql` -> `beforeCreateSchema.sql` callback rename
@@ -25,7 +25,10 @@ testcontainers = "2.0.5"
 # replacement hits nothing (no profile sets it; all three set only enabled + locations). Note the
 # Redgate release-notes page lists NO breaking changes for 13.0.0 — they are documented only in the
 # "Looking forward to Flyway V13" blog post, so do not clear a future major from that page alone.
-flyway = "13.2.0"
+flyway = "13.3.0"
+# Held at 1.6.3 on purpose: the only newer builds refreshVersions sees are 1.7.0 BETAS. The markers
+# below are left in place so the next sweep does not have to re-derive that — clear them when 1.7.0
+# goes final, not before.
 mapstruct = "1.6.3"
 ##     ⬆ = "1.7.0.Beta1"
 ##     ⬆ = "1.7.0.Beta2"
@@ -37,9 +40,9 @@ semver4j = "6.0.0"
 logstashLogback = "9.0"
 archunit = "1.5.0"
 springdocOpenapi = "3.1.0"
-okhttp3 = "5.4.0"
+okhttp3 = "5.5.0"
 playwright = "1.62.0"
-axeCorePlaywright = "4.12.0"
+axeCorePlaywright = "4.13.0"
 jetbrainsAnnotations = "26.1.0"
 lombokMapstructBinding = "0.2.0"
 openpdf = "3.0.5"
@@ -53,7 +56,7 @@ spotbugs = "6.5.10"
 pitest = "1.19.0"
 pitestJunit5 = "1.2.3"
 nodeGradle = "7.1.0"
-spotless = "8.9.0"
+spotless = "8.10.0"
 # 13.0.0 (2026-07): the single breaking change is a no-op here — the plugin's default report
 # directory moved to `build/reports/dependency-check` to stop clashing with other reports, and the
 # root build script already sets exactly that path explicitly. The other `!`-flagged item (dropping
@@ -75,12 +78,7 @@ keycloak = "26.7.1"
 # so the whole repo runs one JUnit, rather than chasing the newest upstream release.
 # 6.1.x (incl. 6.1.0 / 6.1.1 final) is available but deliberately declined: Spring Boot
 # 4.1.0 still manages 6.0.3, so taking it here alone would split the repo's JUnit.
-junit = "6.0.3"
-## ⬆ = "6.1.0-M1"
-## ⬆ = "6.1.0-RC1"
-## ⬆ = "6.1.0"
-## ⬆ = "6.1.1"
-## ⬆ = "6.1.2"
+junit = "6.1.3"
 
 [libraries]
 

@@ -232,6 +232,22 @@ every `instance`-scoped warning derived from that dead target's series. Notifica
 mail. If an expected warning is missing during an incident, check whether its root-cause critical is
 firing.
 
+**Notification cadence — one mail per event.** Alertmanager has no "acknowledged" state, so a
+still-firing alert is re-sent every `repeat_interval` forever. That used to be 4h for warnings and 1h
+for criticals, i.e. six respectively twenty-four identical mails a day for as long as the condition
+held — and an alert that tests a *state* rather than an event (audit silence, a stale sync job, a
+queue over SLA) does not clear on its own. Since 2026-08-16 e-mail repeats at **720h (30d)** for both
+severities: you get one mail when it starts and, because `send_resolved: true`, one when it clears.
+Silence in between means "still running", not "forgotten". The hourly nudging for an open critical
+moved to **Discord**, where repetition costs nothing. Two consequences worth knowing:
+
+- To mute an alert *before* it resolves, create a **Silence** in the Alertmanager UI (time-boxed, per
+  matcher). That is the supported mechanism; do not shorten `repeat_interval` to work around it.
+- `repeat_interval` is bounded from below by Alertmanager's `--data.retention` (the notification log
+  that remembers "already sent"; default 120h). The compose file pins `--data.retention=744h` for
+  exactly this reason — raising one without the other silently degrades the cadence back to the
+  retention window.
+
 One edge assertion runs **outside** this stack: the daily
 [`edge-deny-probe`](../.github/workflows/edge-deny-probe.yml) GitHub Action asserts from a
 genuinely external vantage point that the Keycloak Admin Console (`/admin`) is not reachable from
@@ -529,9 +545,11 @@ docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/cfg" prom/promet
 docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/work" -w /work \
   prom/prometheus:v3.13.2 -c 'promtool test rules tests/*_test.yml'
 
-# Alertmanager — check the RENDERED alertmanager.yml (after envsubst), not the .tmpl
-docker run --rm -v "$PWD:/cfg" quay.io/prometheus/alertmanager:v0.33.1 \
-  amtool check-config /cfg/alertmanager.yml
+# Alertmanager — check the RENDERED alertmanager.yml (after envsubst), not the .tmpl. Run it from
+# the directory holding the rendered file. The --entrypoint is required for the same reason as
+# promtool above: the image starts /bin/alertmanager, which rejects `amtool` as "unexpected amtool".
+docker run --rm --entrypoint amtool -v "$PWD:/cfg" quay.io/prometheus/alertmanager:v0.33.1 \
+  check-config /cfg/alertmanager.yml
 
 # Alloy — format check + validate
 docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.18.1 \
