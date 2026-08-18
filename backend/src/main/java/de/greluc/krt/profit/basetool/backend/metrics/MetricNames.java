@@ -110,11 +110,12 @@ public final class MetricNames {
   /**
    * Counter {@code basetool_ratelimit_rejections_total} — tags {@code bucket} and {@code
    * key_source} ({@link #KEY_SOURCE_FORWARDED} / {@link #KEY_SOURCE_PEER}). The {@code key_source}
-   * tag records where the bucket key came from: a trusted proxy's {@code X-Forwarded-For} client
-   * address, or the immediate peer's own address when no proxy is trusted or the header is absent.
-   * That distinction decides how to read a 429 spike — forwarded keys mean many real clients behind
-   * the edge tripped their own budgets, peer keys mean everything collapsed onto one shared bucket
-   * (a trusted-proxies misconfiguration or an untrusted hop), which throttles unrelated users
+   * tag records where the bucket key came from: a trusted proxy's {@code X-Forwarded-For} chain —
+   * the first untrusted hop walking from the right — or the peer's own address when no proxy is
+   * trusted, the header is absent, or every hop in the chain is itself a trusted proxy. That
+   * distinction decides how to read a 429 spike — forwarded keys mean many real clients behind the
+   * edge tripped their own budgets, peer keys mean everything collapsed onto one shared bucket (a
+   * trusted-proxies misconfiguration or an untrusted hop), which throttles unrelated users
    * together. Two bounded literals only: the address itself is never exported as a label
    * (REQ-OBS-004, REQ-OBS-006).
    */
@@ -437,16 +438,17 @@ public final class MetricNames {
   public static final String BUCKET_GLOBAL = "global";
 
   /**
-   * Rate-limit key source: the key came from the first entry of a trusted proxy's {@code
-   * X-Forwarded-For} header, i.e. per-client bucketing behind the edge works as designed.
+   * Rate-limit key source: the key was resolved from a trusted proxy's {@code X-Forwarded-For}
+   * chain — the first untrusted hop walking from the right, which is the address the proxy appended
+   * — i.e. per-client bucketing behind the edge works as designed.
    */
   public static final String KEY_SOURCE_FORWARDED = "forwarded";
 
   /**
-   * Rate-limit key source: the key came from the immediate peer address ({@code
-   * request.getRemoteAddr()}) because the peer is not a trusted proxy or sent no {@code
-   * X-Forwarded-For}. Sustained rejections on this value behind a reverse proxy mean every client
-   * shares one bucket — the signature of a broken {@code app.rate-limit.trusted-proxies} list.
+   * Rate-limit key source: the key is the immediate peer address, because the peer is not a trusted
+   * proxy, sent no {@code X-Forwarded-For}, or sent a chain consisting only of trusted hops.
+   * Sustained rejections on this value behind a reverse proxy mean every client shares one bucket —
+   * the signature of a broken {@code app.rate-limit.trusted-proxies} list.
    */
   public static final String KEY_SOURCE_PEER = "peer";
 
