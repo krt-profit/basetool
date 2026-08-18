@@ -146,8 +146,8 @@ docker compose --profile prod logs frontend | grep -iE 'redis.*fan|livesync.*fan
 
 # 3. Health: root health green on both apps; readiness UNAFFECTED by Redis (Redis is not in the
 #    readiness group and its health indicator is disabled — a Redis blip must not flip readiness).
-docker compose --profile prod exec backend  sh -c 'wget -qO- http://localhost:11261/actuator/health || true' ; echo
-docker compose --profile prod exec frontend sh -c 'wget -qO- http://localhost:18081/actuator/health || true' ; echo
+docker compose --profile prod exec backend  sh -c 'wget -qO- --no-check-certificate https://localhost:11271/actuator/health || true' ; echo
+docker compose --profile prod exec frontend sh -c 'wget -qO- --no-check-certificate https://localhost:18091/actuator/health || true' ; echo
 # Expect {"status":"UP"} on both.
 
 # 4. File-descriptor ceiling: the epic pins nofile=65536 on both apps (they now hold one /ws/sync

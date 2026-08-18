@@ -44,17 +44,18 @@ scrape_configs:
   # username is fixed to "monitoring" (not a secret) and MUST equal MONITORING_SCRAPE_USER
   # in the prod .env; the password comes from the mounted secret file (fail-closed if the
   # app has no MONITORING_SCRAPE_* set — the endpoint then denies every request).
+  # ADR-0134: the backend joined the ADR-0090 management-port posture (11271, internal-only), so
+  # like the two jobs below it carries NO basic_auth — the port is unreachable from the internet and
+  # from the host, which supersedes ADR-0072's fail-closed compensating control. Still HTTPS with
+  # the pinned CA (same keystore.p12, SAN dns:backend) so REQ-OBS-008 holds unchanged.
   - job_name: basetool-backend
     metrics_path: /actuator/prometheus
     scheme: https
-    basic_auth:
-      username: monitoring
-      password_file: /etc/prometheus/secrets/scrape_password
     tls_config:
       ca_file: /etc/prometheus/certs/basetool-ca.crt
       server_name: backend
     static_configs:
-      - targets: ["backend:11261"]
+      - targets: ["backend:11271"]
         labels:
           application: basetool-backend
 

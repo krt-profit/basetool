@@ -92,18 +92,30 @@ springdoc:
     enabled: false
 
 management:
-  # No `management.server.port` here, and that is deliberate: unlike frontend and ingest the backend
-  # keeps Actuator on its ordinary 11261 connector, which is not host-published and lives only on
-  # internal Docker networks (net-backend-*, net-monitoring-scrape) — it is NOT an "internal-only
-  # management port", it is the normal connector that happens to be unreachable from the internet.
-  # The consequence for REQ-OBS-016: the mutating POST /actuator/loggers/** runs through
-  # SecurityConfig's filter chain, so it can be — and is — gated on ROLE_ADMIN there, instead of
-  # falling through to `anyRequest().authenticated()` where ANY valid realm JWT could flip the ROOT
-  # logger to TRACE and make Spring Security / WebClient / Netty write bearer tokens and request
-  # bodies into a Loki stream retained for 744 h. Frontend and ingest cannot do that: their
-  # dedicated management ports are unauthenticated by construction, so there the write is removed
-  # altogether (`management.endpoint.loggers.access: read-only` in their prod profiles). The read
-  # (GET /actuator/loggers) stays available to any authenticated caller in all three modules.
+  # ADR-0134 (extending ADR-0090): Actuator moves off the 11261 application connector onto a
+  # dedicated internal-only management port. ADR-0090 deliberately left the backend out because it
+  # was not internet-reachable at all; the public API vhost removes that premise, so the connector a
+  # proxy will forward must serve no Actuator — a 404 from the application itself, independent of
+  # any edge deny living in the NPM admin database.
+  #
+  # Reachable only from net-monitoring-scrape (Prometheus) and localhost (the Docker HEALTHCHECK),
+  # never host-published, never on an NPM proxy network. HTTPS with the same keystore so the scrape
+  # keeps its pinned CA (REQ-OBS-008 unchanged).
+  #
+  # Unlike frontend and ingest this module does NOT set `endpoint.loggers.access: read-only`, and
+  # that asymmetry is now the other way round from before: ManagementPortSecurityConfig permits only
+  # the three READ endpoints, so POST /actuator/loggers/** still falls through to SecurityConfig and
+  # keeps its ROLE_ADMIN gate (REQ-OBS-016) — verified by ManagementPortIsolationTest. The two
+  # unauthenticated-by-construction modules have no identity to gate on and therefore delete the
+  # write instead; the backend is a resource server and can keep it.
+  server:
+    port: 11271
+    ssl:
+      enabled: true
+      key-store: ${SERVER_SSL_KEY_STORE:classpath:keystore.p12}
+      key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD}
+      key-store-type: PKCS12
+      key-alias: basetool
   #
   # Prod turns the notification SSE Redis fan-out ON (ADR-0094), so a notification pushed on one
   # backend replica reaches a user connected to another. The Redis health indicator is re-enabled
