@@ -391,11 +391,20 @@ class BankOrgUnitRequestsE2eTest {
         // REQ-BANK-055: the Empfaenger picker is seeded server-side with the requester, so the
         // common case needs no interaction at all. Asserting merely "not blank" is too weak - the
         // regression that shipped seeded the USERNAME, which is also not blank and which the
-        // backend then rejected as a malformed UUID. Pin the value to the officer's actual id.
-        assertThat(page.locator("[data-testid='org-unit-request-cp-user']"))
+        // backend then rejected as a malformed UUID. Pin the SUBMITTED value to the officer's id.
+        //
+        // Target the hidden input by its id, not by data-testid: krt-searchable-select transplants
+        // the original select's `id` onto the hidden value input but moves `data-testid` to the
+        // VISIBLE textbox, which carries the human-readable label. Asserting on the testid compares
+        // the label against a UUID and always fails.
+        assertThat(page.locator("#org-unit-request-cp-user"))
             .hasValue(
                 seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD),
                 new LocatorAssertions.HasValueOptions().setTimeout(10_000));
+        // ... and the visible textbox shows a label, so the box does not merely look empty.
+        assertThat(page.locator("[data-testid='org-unit-request-cp-user']"))
+            .not()
+            .hasValue("", new LocatorAssertions.HasValueOptions().setTimeout(10_000));
         dropFooter(page);
         page.waitForResponse(
             r ->
@@ -421,10 +430,15 @@ class BankOrgUnitRequestsE2eTest {
         E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
         page.locator("[data-testid='org-unit-bank-tab-requests']")
             .click(new Locator.ClickOptions().setTimeout(20_000));
-        // The edit button and its modal live on the row carrying this request's id.
+        // Target this request's edit button by the modal id it opens. The `preceding::` axis would
+        // be wrong here: every edit modal is rendered AFTER the whole table, so the nearest
+        // preceding edit button is the LAST row's regardless of which modal it is measured from —
+        // and the shared stack carries pending requests from the sibling tests.
         Locator editButton =
-            page.locator("#ou-req-edit-" + requestId)
-                .locator("xpath=preceding::button[@data-testid='org-unit-bank-edit-btn'][1]");
+            page.locator(
+                "[data-testid='org-unit-bank-edit-btn'][data-modal-id='ou-req-edit-"
+                    + requestId
+                    + "']");
         dropFooter(page);
         editButton.click(new Locator.ClickOptions().setTimeout(20_000));
         Locator modal = page.locator("#ou-req-edit-" + requestId);
