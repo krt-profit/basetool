@@ -381,6 +381,35 @@ scrape (epic #936, ADR-0072). The endpoint is **never public**:
 > management port set → Actuator stays on the app port, `MonitoringScrapeSecurityConfig` fail-closes
 > it). REQ-OBS-012's edge assertions remain as belt-and-braces drift detection.
 
+> **Amended again by ADR-0134 (backend, prod):** the backend now does the same on port `11271`, so
+> **all three** modules serve Actuator on an internal-only management port and **no** module keeps
+> the basic-auth compensating control. ADR-0090 excluded the backend because it was not
+> internet-reachable; the public API vhost removes that premise, and the connector a proxy forwards
+> MUST serve no Actuator. The bullets below therefore now describe **dev/test/e2e only** (no
+> management port set), where `MonitoringScrapeSecurityConfig` still fail-closes the app-port path
+> unchanged.
+>
+> The backend's permit-all chain is **narrower** than the other two: it enumerates
+> `/actuator/health`, `/actuator/health/**`, `/actuator/prometheus` and `/actuator/info` instead of
+> `/actuator/**`. Every other Actuator path keeps the main chain's protection, which is what lets the
+> backend retain the `ROLE_ADMIN` gate on `POST /actuator/loggers/**` (REQ-OBS-016) rather than
+> deleting the write the way frontend and ingest must. Widening that matcher would silently un-gate
+> the mutator; `ManagementPortIsolationTest` measures all of it — Actuator absent from the
+> application connector, the read endpoints served unauthenticated on the management port, and the
+> mutator answering 401/403 there.
+>
+> **Acceptance**
+>
+> - [x] `/actuator/health` and `/actuator/prometheus` answer 404 on the backend's application
+>   connector in prod, independent of any edge deny.
+> - [x] Prometheus scrapes `backend:11271` over HTTPS with the pinned CA and **no** credentials.
+> - [x] `POST /actuator/loggers/**` on the management port is refused without `ROLE_ADMIN`.
+> - [x] Dev, test and e2e are unchanged: no management port, Actuator on the app port, fail-closed.
+>
+> **Enforced by:** `ManagementPortIsolationTest` (backend, frontend, ingest) · **Code:**
+> `ManagementPortSecurityConfig`, `application-prod.yml`, `docker-compose.yml` (healthcheck
+> override), `monitoring/prometheus/prometheus.yml`
+
 - Each module guards exactly this path with a **dedicated `SecurityFilterChain`**
   (`MonitoringScrapeSecurityConfig`, ordered before the main chain) using HTTP basic auth
   against a single in-memory scrape identity fed by the `MONITORING_SCRAPE_USER` /
@@ -1701,10 +1730,11 @@ so a logger threshold can be read while the process runs, and — where the post
 raised:
 
 ```bash
-# backend, in prod: admin bearer token required (the write is ROLE_ADMIN-gated)
+# backend, in prod: on the management port 11271 since ADR-0134, and STILL ROLE_ADMIN-gated there
+# — its permit-all chain enumerates the read endpoints only, so the write keeps the main gate.
 curl -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer ${ADMIN_TOKEN}" \
   -d '{"configuredLevel":"DEBUG"}' \
-  https://backend:11261/actuator/loggers/de.greluc.krt.profit.basetool.backend.integration.scwiki
+  https://backend:11271/actuator/loggers/de.greluc.krt.profit.basetool.backend.integration.scwiki
 
 # frontend / ingest, in prod: read only — the write operation is not registered
 curl https://localhost:11272/actuator/loggers/de.greluc.krt.profit.basetool.ingest.filter

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die technischen Statusdaten des Backends sind nicht mehr über den normalen Anwendungsport erreichbar.** Gesundheitsprüfung und Messwerte laufen jetzt über einen eigenen, ausschließlich intern erreichbaren Port — so wie es Frontend und Ingest schon länger tun. Damit liefert der Port, den die geplante öffentliche Schnittstelle weiterreicht, diese Daten gar nicht erst aus, statt sich allein auf eine Sperre am Randserver zu verlassen. Die Möglichkeit, während einer Störung kurzfristig die Protokolltiefe zu erhöhen, bleibt Administratoren erhalten. **Deploy-Hinweis:** Anwendungsabbild und Konfigurationspaket müssen gemeinsam ausgerollt werden — einzeln schlägt die Gesundheitsprüfung fehl und der Deploy rollt zurück (ADR-0134).
+
+
 ## [v1.5.46](https://github.com/krt-profit/basetool/releases/tag/v1.5.46) - 2026-08-18
 
 ### Added
