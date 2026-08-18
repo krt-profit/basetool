@@ -23,6 +23,10 @@ frontend may change its response *shape* in place (no `/api/v2` bump) when front
 backend deploy atomically and `DtoOpenApiContractTest` guards the frontend mirror against
 `openapi.json` — e.g. the inventory `/grouped` move from `items` to `stacks` (ADR-0003).
 
+**The carve-out stops at the external contract set.** Its whole justification is the atomic
+deploy, which a released native client does not have. Operations listed in REQ-API-009 are
+therefore frozen against in-place shape change even though they live under `/api/v1`.
+
 ### REQ-API-002 — DTOs only at boundaries
 
 Never expose JPA entities at controller boundaries (also ArchUnit-enforced — see
@@ -211,3 +215,46 @@ per controller (S11, #917). Use the shared seams; do not re-derive them inline:
 The two resolvers are wired in `WebMvcConfig#addArgumentResolvers`; the JWT-subject annotations are
 hidden from the generated OpenAPI document via `SpringDocUtils.addAnnotationsToIgnore` in
 `OpenApiConfig` (they are as invisible as the `JwtAuthenticationToken` parameters they replaced).
+
+### REQ-API-009 — The external contract set is frozen against in-place change
+
+Endpoints a **shipped client** consumes are a contract, because the client cannot be redeployed
+with the server. A released Android build sits on a member's phone for weeks — distribution is
+GitHub Releases plus Obtainium, so nothing pushes a silent update — and a field the server stops
+sending is a crash in a version the operator cannot fix forward. REQ-API-001's internal-only
+carve-out rests on frontend and backend deploying atomically; that premise does not hold here, so
+the carve-out does not apply to this set (ADR-0136).
+
+**The set** is enumerated in `ExternalContractTest` and grows **one app phase at a time**, in the
+same change as the vhost allow-list that exposes those paths. As of the app's phase 1 it is:
+
+|                 Operation                  |                 Response fields a client may rely on                 |
+|--------------------------------------------|----------------------------------------------------------------------|
+| `GET /api/v1/terms/status`                 | `accepted`, `currentVersion`                                         |
+| `POST /api/v1/terms/acceptance`            | `accepted`, `currentVersion`                                         |
+| `GET /api/v1/me/active-org-unit`           | `orgUnitId`                                                          |
+| `GET /api/v1/me/capabilities`              | `canSeeBlueprintOverview`, `canViewJobOrders`, `canViewOwnJobOrders` |
+| `GET /api/v1/users/me/registration-status` | `approvalStatus`                                                     |
+
+**Frozen means**, for an operation in the set: it keeps its path and verb; its response keeps every
+field it had; its request accepts everything it accepted before (a new **required** field is a
+break); and retirement goes through `/api/v2` + `@ApiDeprecation` with a sunset rather than a
+deletion. Additive change stays free — new optional response fields, new optional request fields,
+new endpoints.
+
+**The spec and the test are the source of truth, not the allow-list.** The API vhost's allow-list
+decides what is *reachable* and lives in the NPM admin database, which no PR can review. It must be
+a subset of this set, and the two move together.
+
+**Acceptance**
+
+- [x] Every listed operation exists in the committed `openapi.json` with its recorded verb, and no
+  recorded response field has disappeared (`ExternalContractTest`).
+- [x] The set cannot be emptied to make the guard pass — its floor is asserted.
+- [ ] Type, nullability and enum changes are caught. **Open** — needs a schema diff of the contract
+  subset against the previous release tag; the current guard sees structure, not types (ADR-0136).
+- [ ] A sunset can actually retire old builds. **Open** — depends on the minimum-app-version gate
+  (exposure plan item A5), which is therefore a prerequisite for the first `/api/v2`.
+
+**Enforced by:** `ExternalContractTest` (backend) ·
+**Related:** ADR-0136, ADR-0135, ADR-0003, REQ-API-001, REQ-API-007, REQ-SEC-027
