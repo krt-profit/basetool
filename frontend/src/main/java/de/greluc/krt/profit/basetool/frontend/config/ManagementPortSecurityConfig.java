@@ -24,7 +24,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -56,8 +55,17 @@ public class ManagementPortSecurityConfig {
    * chain so the management-port scrape and health probes are served without authentication. On the
    * public connector this matcher is inert because Actuator is not mapped there in prod (the
    * management endpoints moved to the dedicated port), so a stray {@code /actuator/**} request to
-   * the public port still yields 404. Stateless with CSRF and the request cache disabled — these
-   * are credential-free machine GETs with no browser session.
+   * the public port still yields 404. Stateless with the request cache disabled — these are
+   * credential-free machine GETs with no browser session.
+   *
+   * <p>CSRF protection is deliberately left <b>on</b> rather than disabled, matching the backend
+   * copy of this class. It costs nothing: Spring only enforces a token on unsafe methods, and this
+   * chain serves none — {@code management.endpoint.loggers.access: read-only} (REQ-OBS-016) removes
+   * the one Actuator POST this module would otherwise expose, so every request the matcher sees is
+   * a GET. A {@code csrf().disable()} on a permit-all chain, by contrast, is a standing CodeQL
+   * finding ({@code java/spring-disabled-csrf-protection}, alerts 869/870) that a reader has to
+   * re-triage every time. Leaving the default in place removes the finding instead of arguing with
+   * it, and if a state-changing endpoint is ever added here it fails closed rather than open.
    *
    * @param http the Spring Security builder for this chain
    * @return the permit-all Actuator filter chain for the management port
@@ -68,7 +76,6 @@ public class ManagementPortSecurityConfig {
   public SecurityFilterChain managementPortActuatorFilterChain(HttpSecurity http) throws Exception {
     http.securityMatcher("/actuator/**")
         .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
-        .csrf(AbstractHttpConfigurer::disable)
         .requestCache(RequestCacheConfigurer::disable)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
     return http.build();
