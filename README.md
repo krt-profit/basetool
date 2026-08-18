@@ -97,7 +97,7 @@ The README is the overview; everything else lives in dedicated, versioned docs:
 - [Docker](https://www.docker.com/) and Docker Compose — for the dependency stack and the dev/test stacks.
 - Access to a Keycloak server — the Docker Compose stack ships one.
 
-The project uses **Gradle 9 with the Kotlin DSL**. Always use the wrapper (`./gradlew`); never the IDE test runner. Dependencies are managed by [refreshVersions](https://jmfayard.github.io/refreshVersions/) — edit `versions.properties`, not `build.gradle.kts`; run `./gradlew refreshVersions` to discover updates.
+The project uses **Gradle 9 with the Kotlin DSL**. Always use the wrapper (`./gradlew`); never the IDE test runner. Dependency versions live in the **version catalog** at `gradle/libs.versions.toml` — edit that, not `build.gradle.kts`. [refreshVersions](https://jmfayard.github.io/refreshVersions/) runs in catalog mode: `./gradlew refreshVersions` annotates the catalog in place with `## ⬆ = "…"` comments for each available update rather than changing any version itself. (`versions.properties` is a vestigial refreshVersions file and holds no versions; nothing reads it.)
 
 ### Local development (apps from Gradle)
 
@@ -214,7 +214,7 @@ The exact `keytool` and realm-rewrite recipes (and why real artifacts must never
 ### Tech stack
 
 - **Language / framework** — Java 25, Spring Boot 4.1
-- **Build** — Gradle 9 (Kotlin DSL), dependencies via refreshVersions
+- **Build** — Gradle 9 (Kotlin DSL), versions in the `gradle/libs.versions.toml` catalog, updates surfaced by refreshVersions
 - **Database** — PostgreSQL 18, schema owned by Flyway (Hibernate `ddl-auto=validate`)
 - **Session store** — Redis (`spring-session-data-redis`)
 - **Security** — Spring Security with OAuth2 / OIDC (Keycloak 26.7)

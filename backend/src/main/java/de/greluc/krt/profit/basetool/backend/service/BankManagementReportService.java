@@ -250,6 +250,7 @@ public class BankManagementReportService {
 
     String reasonLabel = label("pdf.bank.sub.justification");
     String noteLabel = label("pdf.bank.sub.note");
+    String staffNoteLabel = label("pdf.bank.sub.staffNote");
     boolean alt = false;
     for (BankBookingRow row : rows) {
       Color bg = KrtPdfSupport.rowBackground(alt);
@@ -266,8 +267,11 @@ public class BankManagementReportService {
       KrtPdfSupport.addTableCell(table, BankPdfFormat.signedAmount(row.amount()), bg, true);
       String reason = row.justification() != null ? row.justification() : "";
       String note = row.note() != null ? row.note() : "";
-      if (!reason.isEmpty() || !note.isEmpty()) {
-        KrtPdfSupport.addDetailSubRow(table, reasonLabel, reason, noteLabel, note, bg, 5);
+      // The management report is a Bankleitung-only artifact, so the internal staff note is kept.
+      String staffNote = row.staffNote() != null ? row.staffNote() : "";
+      if (!reason.isEmpty() || !note.isEmpty() || !staffNote.isEmpty()) {
+        KrtPdfSupport.addDetailSubRow(
+            table, reasonLabel, reason, noteLabel, note, staffNoteLabel, staffNote, bg, 5);
       }
       alt = !alt;
     }

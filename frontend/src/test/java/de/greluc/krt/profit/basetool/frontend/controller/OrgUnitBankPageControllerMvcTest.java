@@ -20,10 +20,14 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -47,11 +51,16 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.core.oidc.OidcIdToken;
+import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -69,6 +78,7 @@ class OrgUnitBankPageControllerMvcTest {
 
   private static final String BALANCES_URI = "/api/v1/org-units/bank/balances";
   private static final String REQUESTS_URI = "/api/v1/org-units/bank/requests";
+  private static final String FOREIGN_REQUESTS_URI = "/api/v1/org-units/bank/requests/foreign";
   private static final String TRANSFER_TARGETS_URI = "/api/v1/org-units/bank/transfer-targets";
 
   @Autowired private WebApplicationContext context;
@@ -119,6 +129,7 @@ class OrgUnitBankPageControllerMvcTest {
             new BigDecimal("5000"),
             "from sale",
             null,
+            null,
             "PENDING",
             "officerX",
             null,
@@ -136,6 +147,10 @@ class OrgUnitBankPageControllerMvcTest {
             false,
             null,
             false,
+            null,
+            null,
+            null,
+            null,
             null,
             0L);
     BankAccountRefDto target =
@@ -299,6 +314,7 @@ class OrgUnitBankPageControllerMvcTest {
             new BigDecimal("5000"),
             "from sale",
             null,
+            null,
             "PENDING",
             "officerX",
             null,
@@ -316,6 +332,10 @@ class OrgUnitBankPageControllerMvcTest {
             false,
             null,
             false,
+            null,
+            null,
+            null,
+            null,
             null,
             0L);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
@@ -481,6 +501,7 @@ class OrgUnitBankPageControllerMvcTest {
             new BigDecimal("250000"),
             "someHolder",
             "Missionsertrag",
+            null,
             null,
             Instant.parse("2026-06-10T18:30:00Z"),
             null,
@@ -676,5 +697,359 @@ class OrgUnitBankPageControllerMvcTest {
             get("/org-unit-bank/accounts/" + accountId).param("fragment", "orgUnitBankSettings"))
         .andExpect(status().isOk())
         .andExpect(view().name("org-unit-bank-account-detail :: orgUnitBankSettings"));
+  }
+
+  /**
+   * REQ-BANK-055 regression: the pre-filled Empfaenger option must carry the caller's <b>JWT
+   * subject</b> as its value, never their username.
+   *
+   * <p>This client is configured with {@code user-name-attribute: preferred_username}, so {@code
+   * #authentication.name} is the USERNAME. Seeding the option with it submitted a username where
+   * the backend deserializes a UUID, which 400'd <em>every</em> withdrawal request — the request
+   * was silently never created. Nothing in the render tests noticed (the markup looked perfectly
+   * well-formed); only {@code BankOrgUnitRequestsE2eTest} caught it, and only because it asserts
+   * the request exists afterwards. Asserting the shape of the seeded value here makes the
+   * regression cheap to catch again.
+   *
+   * @throws Exception if the MockMvc exchange fails
+   */
+  @Test
+  void orgUnitBank_empfaengerSeedIsTheSubjectNotTheUsername() throws Exception {
+    String sub = "11111111-2222-3333-4444-555555555555";
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(TRANSFER_TARGETS_URI), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new BankAccountRefDto(
+                    UUID.randomUUID(), "KB-0001", "Staffel IRIDIUM", "ORG_UNIT")));
+
+    String html =
+        mockMvc
+            .perform(get("/org-unit-bank").with(oidcLogin().oidcUser(officerPrincipal(sub))))
+            .andExpect(status().isOk())
+            .andExpect(content().string(Matchers.containsString("org-unit-request-cp-user")))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // The seeded option sits inside the counterparty picker; its value must parse as a UUID.
+    Matcher seeded =
+        Pattern.compile(
+                "counterpartyUserId.*?<option[^>]*value=\"([^\"]+)\"[^>]*selected", Pattern.DOTALL)
+            .matcher(html);
+    assertNotEquals(
+        sub,
+        officerPrincipal(sub).getName(),
+        "precondition: the principal's name must be the USERNAME, mirroring user-name-attribute;"
+            + " otherwise this test cannot distinguish the id from the name");
+    assertTrue(seeded.find(), "the Empfaenger picker renders a pre-selected option");
+    assertEquals(
+        sub,
+        seeded.group(1),
+        "the seeded Empfaenger value must be the JWT subject, not the username (user-name-attribute"
+            + " is preferred_username, so #authentication.name is NOT the id)");
+  }
+
+  /**
+   * Builds the caller principal the way {@code application.yml} configures this client: {@code
+   * user-name-attribute: preferred_username}.
+   *
+   * <p>That third constructor argument is the whole point. {@code oidcLogin()} defaults the name
+   * attribute to {@code sub}, which makes {@code #authentication.name} accidentally equal the user
+   * id in tests while it is the USERNAME in production — so a template reading {@code
+   * #authentication.name} as an id passes every render test and 400s every real request. Mirroring
+   * the configured key here is what lets {@link
+   * #orgUnitBank_empfaengerSeedIsTheSubjectNotTheUsername()} actually fail on that bug.
+   *
+   * @param sub the JWT subject (the real user id)
+   * @return an OIDC principal whose {@code getName()} is the username, not the subject
+   */
+  private static DefaultOidcUser officerPrincipal(String sub) {
+    OidcIdToken idToken =
+        OidcIdToken.withTokenValue("token")
+            .subject(sub)
+            .claim("preferred_username", "officer-username")
+            .claim("displayName", "Officer X")
+            .build();
+    return new DefaultOidcUser(
+        List.of(new SimpleGrantedAuthority("ROLE_OFFICER")), idToken, "preferred_username");
+  }
+
+  /**
+   * REQ-BANK-056: a still-pending, unapproved own request offers an edit action and its per-row
+   * modal, which PUTs to the request's own endpoint. The modal is rendered once per row (rather
+   * than primed) because the Empfaenger picker is a remote combobox that only seeds itself from a
+   * server-rendered {@code selected} option.
+   *
+   * @throws Exception if the MockMvc exchange fails
+   */
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_pendingOwnRequestOffersTheEditModal() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef()))
+        .thenReturn(List.of(bookingRequest("Missionsertrag", "Missionsfreigabe", null)));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-edit-btn")))
+        .andExpect(content().string(Matchers.containsString("ou-req-edit-")))
+        .andExpect(content().string(Matchers.containsString("data-method=\"PUT\"")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-edit-amount")))
+        // WITHDRAWAL -> the Empfaenger block and the Begruendung field are rendered; the fixture is
+        // a withdrawal, so a missing picker here would mean the type gating is inverted.
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-edit-cp-user")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-edit-justification")))
+        // The modal must NOT sit inside the table: a browser hoists it out of <tbody> and detaches
+        // it from its row. Assert it renders after the table has been closed.
+        .andExpect(
+            content()
+                .string(
+                    Matchers.matchesPattern(
+                        Pattern.compile(".*</table>.*ou-req-edit-.*", Pattern.DOTALL))));
+  }
+
+  /**
+   * REQ-BANK-056: once the responsible holder has granted the over-limit approval the request is
+   * frozen — the backend refuses the edit, so the button and its modal must be gone rather than
+   * offering the requester a dead end. Cancel stays available.
+   *
+   * @throws Exception if the MockMvc exchange fails
+   */
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_approvedOwnRequestOffersNoEditAction() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef()))
+        .thenReturn(List.of(approvedRequest()));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        // Positive control: the row itself renders, so this cannot pass for the wrong reason.
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-request-row")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-cancel-btn")))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("org-unit-bank-edit-btn"))))
+        .andExpect(content().string(Matchers.not(Matchers.containsString("ou-req-edit-"))));
+  }
+
+  /**
+   * Builds a PENDING withdrawal request whose over-limit approval has already been granted — the
+   * one state in which REQ-BANK-056 withholds the edit action.
+   *
+   * @return the approved request DTO
+   */
+  private static BankBookingRequestDto approvedRequest() {
+    return new BankBookingRequestDto(
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        "KB-0001",
+        "Staffel IRIDIUM",
+        UUID.randomUUID(),
+        "IRIDIUM",
+        "IRI",
+        "WITHDRAWAL",
+        new BigDecimal("5000"),
+        null,
+        "Missionsfreigabe",
+        null,
+        "PENDING",
+        "officerX",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        Instant.parse("2026-06-17T14:02:00Z"),
+        null,
+        null,
+        true,
+        new BigDecimal("1000"),
+        "RESPONSIBLE_HOLDER",
+        true,
+        "holderX",
+        false,
+        null,
+        null,
+        null,
+        null,
+        null,
+        0L);
+  }
+
+  /**
+   * Builds a booking request for either the approval tab or the requester's own list, varying only
+   * the fields that decide whether the row is expandable.
+   *
+   * @param note the requester's note, or {@code null}
+   * @param justification the requester's Begruendung, or {@code null}
+   * @param staffNote the confirming employee's own note (REQ-BANK-054), or {@code null}
+   * @return the request DTO
+   */
+  private static BankBookingRequestDto bookingRequest(
+      String note, String justification, String staffNote) {
+    return new BankBookingRequestDto(
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        "KB-0001",
+        "Staffel IRIDIUM",
+        UUID.randomUUID(),
+        "IRIDIUM",
+        "IRI",
+        "WITHDRAWAL",
+        new BigDecimal("5000"),
+        note,
+        justification,
+        staffNote,
+        "PENDING",
+        "officerX",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        Instant.parse("2026-06-17T14:02:00Z"),
+        null,
+        null,
+        true,
+        new BigDecimal("1000"),
+        "RESPONSIBLE_HOLDER",
+        false,
+        null,
+        false,
+        null,
+        null,
+        null,
+        null,
+        null,
+        0L);
+  }
+
+  /**
+   * REQ-BANK-041/-045: the approval tab's rows expand to reveal Begruendung + Notiz, exactly like
+   * the bank-staff queue. The approver decides on the Begruendung, so hiding it here would mean
+   * signing off blind on a mandating account.
+   */
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_foreignRequestWithJustificationRendersExpandableDetailRow() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(FOREIGN_REQUESTS_URI), anyTypeRef()))
+        .thenReturn(List.of(bookingRequest("Missionsertrag", "Missionsfreigabe", null)));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-foreign-expand")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-foreign-detail")))
+        .andExpect(content().string(Matchers.containsString("Missionsfreigabe")))
+        .andExpect(content().string(Matchers.containsString("Missionsertrag")))
+        // The sub-row must span every column incl. the leading expand cell, or the detail cell
+        // silently shrinks the table.
+        .andExpect(content().string(Matchers.containsString("colspan=\"8\"")))
+        // A shared bank-req-<id> would let this chevron toggle the "Meine Antraege" sub-row of the
+        // same request when the responsible holder raised it themselves.
+        .andExpect(content().string(Matchers.containsString("ou-foreign-req-")));
+  }
+
+  /**
+   * REQ-BANK-054: the confirming employee's note reaches the approval tab too, and on its own is
+   * enough to make the row expandable — a confirmed request may carry only a staff note.
+   */
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_foreignRequestStaffNoteRendersInTheDetailRow() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(FOREIGN_REQUESTS_URI), anyTypeRef()))
+        .thenReturn(List.of(bookingRequest(null, null, "Bar uebergeben, Zeuge greluc")));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-foreign-expand")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-foreign-staff-note")))
+        .andExpect(content().string(Matchers.containsString("Bar uebergeben, Zeuge greluc")));
+  }
+
+  /**
+   * REQ-BANK-022/-045: the requester's own "Meine Antraege" rows expand to reveal the Begruendung
+   * and Notiz they filed, the same mechanism as the staff queue and the approval tab. Without it a
+   * requester could not read back what they had written on a request they may still cancel.
+   *
+   * @throws Exception if the MockMvc exchange fails
+   */
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_ownRequestWithJustificationRendersExpandableDetailRow() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef()))
+        .thenReturn(List.of(bookingRequest("Missionsertrag", "Missionsfreigabe", null)));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-request-expand")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-request-detail")))
+        .andExpect(content().string(Matchers.containsString("Missionsfreigabe")))
+        .andExpect(content().string(Matchers.containsString("Missionsertrag")))
+        // Seven columns here, not the approval tab's eight -- a stale colspan silently shrinks the
+        // detail cell.
+        .andExpect(content().string(Matchers.containsString("colspan=\"7\"")))
+        // Distinct from the approval tab's ou-foreign-req-: a responsible holder who raised the
+        // request sees the SAME request in both tables, and a shared id would make one chevron
+        // toggle the other table's sub-row.
+        .andExpect(content().string(Matchers.containsString("ou-own-req-")));
+  }
+
+  /**
+   * REQ-BANK-054: the "Notiz Bankmitarbeiter" is bank-internal and must not surface in the
+   * requester's own list, even though the same DTO type carries it for the approval tab. The seam
+   * blanks it, so a staff note alone must leave the row flat — no chevron, no sub-row, no text.
+   *
+   * @throws Exception if the MockMvc exchange fails
+   */
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_ownRequestNeverRendersTheStaffNote() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    // Defence in depth: even if an unredacted DTO reached the template, nothing may render it.
+    when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef()))
+        .thenReturn(List.of(bookingRequest(null, null, "Bar uebergeben, Zeuge greluc")));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-request-row")))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("Bar uebergeben, Zeuge greluc"))))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("org-unit-bank-request-expand"))))
+        .andExpect(
+            content()
+                .string(Matchers.not(Matchers.containsString("org-unit-bank-request-detail"))));
+  }
+
+  /** A row carrying neither Begruendung nor Notiz stays flat: no chevron, no empty sub-row. */
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_foreignRequestWithoutDetailRendersNoChevron() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(FOREIGN_REQUESTS_URI), anyTypeRef()))
+        .thenReturn(List.of(bookingRequest(null, null, null)));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        // The tab itself must be there -- otherwise this test would pass for the wrong reason.
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-foreign-row")))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("org-unit-bank-foreign-expand"))))
+        .andExpect(
+            content()
+                .string(Matchers.not(Matchers.containsString("org-unit-bank-foreign-detail"))));
   }
 }

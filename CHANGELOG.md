@@ -5,6 +5,71 @@
 ### Changed
 
 - **Die Nutzungsbedingungen benennen das Fan-Projekt jetzt ausdrücklich.** § 9 hält fest, dass das Basetool ein inoffizielles, nicht kommerzielles Fan-Projekt ohne Unterstützung von Cloud Imperium ist und Material aus dem offiziellen Star-Citizen-Fankit nur nach dessen Bedingungen nutzt. Da sich der Wortlaut ändert, wird die Zustimmung beim nächsten Login erneut abgefragt.
+### Added
+
+- **Auszahlungsanträge haben jetzt ein Feld "Empfänger".** Wer über die Org-Einheits-Bank eine Auszahlung beantragt, kann angeben, wer das Geld bekommt — vorbelegt mit dir selbst. Bisher wurde beim Buchen immer der Antragsteller als Empfänger eingetragen; ging die Auszahlung an jemand anderen, ließ sich das weder eintragen noch von der Bank korrigieren. Der Empfänger erscheint auch beim Aufklappen des Antrags.
+
+- **Eigene Anträge lassen sich aufklappen und bearbeiten.** Unter "Meine Anträge" zeigt ein Pfeil vor der Zeile Begründung, Notiz und Empfänger — wie in der Antragsliste der Bank und bei den fremden Anträgen. Solange der Antrag noch aussteht und noch nicht freigegeben wurde, lässt er sich über "Bearbeiten" korrigieren (Betrag, Begründung, Notiz, Empfänger, Zielkonto), statt ihn zurückziehen und neu stellen zu müssen. Erhöhst du den Betrag über dein Freigabe-Limit, wird die Freigabepflicht neu bewertet. Konto und Vorgang bleiben fest; dafür ziehst du den Antrag weiterhin zurück und stellst ihn neu. Ist die Freigabe bereits erteilt, ist der Antrag gesperrt — sie galt für den ursprünglichen Betrag. Die "Notiz Bankmitarbeiter" bleibt hier bewusst unsichtbar, sie ist bankintern.
+
+- **Das Freigabe-Limit "Alle Mitglieder" heißt jetzt "Alle Mitglieder der Org-Einheit".** Es galt schon immer nur für Mitglieder der Org-Einheit, zu der das Konto gehört; der alte Name legte etwas Weiteres nahe. Reine Umbenennung, keine Verhaltensänderung.
+
+- **Bankmitarbeiter können jetzt eine eigene Notiz zu einer Buchung erfassen.** Beim Bestätigen eines Antrags und bei jeder direkten Einzahlung, Auszahlung und jedem Transfer gibt es das Feld "Notiz Bankmitarbeiter" für interne Anmerkungen ("in zwei Tranchen übergeben"). Sie erscheint überall dort, wo auch Notiz und Begründung stehen — Kontohistorie, Antragsliste, Fremde Anträge, Kontoauszug und 3-Monats-Report. Für Mitglieder einer Org-Einheit ist sie bewusst nicht sichtbar; sie ist eine bankinterne Anmerkung.
+
+- **Fremde Anträge lassen sich jetzt aufklappen.** In der Freigabe-Liste der Org-Einheits-Bank zeigt ein Pfeil vor der Zeile Begründung und Notiz des Antrags — genau wie in der Antragsliste der Bank. Wer freigibt, entscheidet damit nicht mehr blind: beim KRT-Konto, dem Bankkonto und jedem Sonderkonto ist die Begründung Pflicht und war für den Freigebenden bisher nicht sichtbar.
+
+## [v1.5.45](https://github.com/krt-profit/basetool/releases/tag/v1.5.45) - 2026-08-17
+
+### Added
+
+- **Vorbereitung für die Android-App: Anmelde-Verfahren festgelegt und als Skript hinterlegt.** Die künftige App bekommt einen Keycloak-Zugang, bei dem nur ihr Erneuerungs-Token an das jeweilige Gerät gebunden ist — ein gestohlenes Token ist damit außerhalb des Handys wertlos. Ein neues Betreiber-Skript legt diesen Zugang samt Richtlinie an und prüft das Ergebnis. Rein vorbereitend, keine Auswirkung auf die Oberfläche (ADR-0131, REQ-SEC-030).
+
+### Changed
+
+- **Kontakt-E-Mail-Adresse aktualisiert.** Die Betreiber-Adresse in Impressum und Datenschutzerklärung (alle drei Sprachvarianten) sowie in CLA, Code of Conduct und Beitragsleitfaden lautet jetzt lucas.greuloch@gmail.com (vorher lucas.greuloch@pm.me).
+
+### Fixed
+
+- **Auswahlfelder verlieren ihre Auswahl nicht mehr unsichtbar.** Wer in einem Auswahlfeld (Halter, Material, Ort, Nutzer …) erneut hineinklickte und tippte, ohne danach einen Eintrag aus der Liste zu wählen, verlor beim Wegklicken die Auswahl im Hintergrund — das Feld zeigte weiterhin den zuvor gewählten Namen an. Das Formular ließ sich abschicken und wurde dann abgewiesen, ohne dass erkennbar war, woran es lag. Betraf unter anderem die Auszahlung eines Bank-Antrags, deren Freigabe-Häkchen genau diesen Klick erzwingt.
+
+- **Meldungen zu ungültigen Eingaben benennen wieder das betroffene Feld.** Bei einem Prüffehler antwortete das Backend ohne Feldangabe, sodass die Oberfläche nur den Sammeltext „Einige Felder sind ungültig“ anzeigen konnte und im Server-Log gar kein Eintrag entstand — der Fehler war damit weder für Nutzer noch im Betrieb nachvollziehbar. Ursache war die Reihenfolge zweier Fehler-Handler (ADR-0132). Fehler werden jetzt wieder direkt am betroffenen Feld angezeigt und protokolliert.
+
+## [v1.5.43](https://github.com/krt-profit/basetool/releases/tag/v1.5.43) - 2026-08-17
+
+## [v1.5.42](https://github.com/krt-profit/basetool/releases/tag/v1.5.42) - 2026-08-17
+
+### Changed
+
+- **Redis läuft jetzt auf 8.10.0 (vorher 8.8.0).** Der Digest-Pin des `redis:8-alpine`-Images zeigte noch auf den Stand von Juni. Keine Konfigurationsänderung. **Deploy-Hinweis:** Der Redis-Container muss dafür neu gestartet werden.
+
+- **Monitoring-Images aktualisiert:** Loki 3.7.6, Alloy 1.18.1 und redis_exporter 1.89.0. Grafana bleibt bewusst auf 13.0.2 — die OSS-Variante hat bis heute keinen 13.1.x-Tag veröffentlicht.
+
+- **Die TypeScript-Typen der Backend-Schnittstelle erzeugt das Basetool jetzt selbst.** Statt des Pakets `openapi-typescript` läuft ein eigenes, abhängigkeitsfreies Skript; die erzeugte Datei schrumpft von 1,7 MB auf 96 KB und 22 npm-Pakete entfallen. Die Absicherung bleibt: Wird ein Feld im Backend umbenannt, bricht der Build, statt dass eine Auswahlliste stillschweigend leer bleibt. Rein intern, keine Auswirkung auf die Oberfläche (ADR-0130).
+
+- **Der Typprüfer der Browser-Skripte läuft auf TypeScript 7.** Das war zuvor durch `openapi-typescript` blockiert. Nichts wird kompiliert oder gebündelt — die Skripte bleiben unverändert.
+
+- **Fehlende Prüfungen auf nicht vorhandene Seitenelemente geschlossen.** Die Typprüfung deckte auf, dass mehrere Stellen in der Blaupausen-Ansicht und im Blaupausen-Import Elemente benutzten, ohne zu prüfen, ob sie überhaupt da sind. Fehlt eines — etwa weil ein Seitenteil nicht gerendert wurde —, brach dort bisher das Skript ab und die restliche Seite blieb tot; jetzt wird der betroffene Teil übersprungen und der Rest funktioniert weiter.
+
+- **Build- und Bibliotheks-Abhängigkeiten auf den aktuellen Stand gebracht.** Gradle 9.7.0, Flyway 13.2.0, ArchUnit 1.5.0, Playwright 1.62.0, Checkstyle 13.9.0, OWASP Dependency-Check 13.0.0 und die übrigen Werkzeuge; die PostgreSQL-, Tomcat- und Netty-Pins ziehen auf den jeweils neuesten Patch nach. Rein intern, keine Auswirkung auf die Oberfläche.
+
+- **Keycloak auf 26.7.1 angehoben (Sicherheitsupdate).** Das Patch-Release schließt fünf Schwachstellen im Anmeldedienst — unter anderem eine Umgehung der Signaturprüfung bei verschlüsselten OIDC-Request-Objects, eine Rechte-Eskalation über die Client-Verwaltung und drei Lücken in der feingranularen Rechteverwaltung. Keine Funktions- oder Konfigurationsänderung: Das gepinnte Container-Image (`quay.io/keycloak/keycloak:26.7`-Digest, weiterhin JDK 21) und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit. **Deploy-Hinweis:** Der Keycloak-Container muss dafür neu gestartet werden.
+
+- **Build- und Testwerkzeuge auf den aktuellen Stand gebracht:** CycloneDX 3.4.1, Flyway 13.3.0, OkHttp 5.5.0, axe-core 4.13.0, Spotless 8.10.0 und JUnit 6.1.3. MapStruct bleibt bewusst auf 1.6.3 — für 1.7.0 gibt es bisher nur Beta-Builds. Rein intern, keine Auswirkung auf die Oberfläche.
+
+### Fixed
+
+- **Alarm-Mails wiederholen sich nicht mehr stündlich bzw. alle vier Stunden.** Alertmanager kennt kein „zur Kenntnis genommen" und schickte dieselbe Meldung erneut, solange der Alarm anlag — bei einem Alarm, der einen Zustand prüft, also endlos. Pro Ereignis kommt jetzt eine Mail und, sobald es vorbei ist, eine Entwarnung; das stündliche Nachfassen bei kritischen Alarmen läuft weiter über Discord. **Deploy-Hinweis:** Der Alertmanager-Container muss dafür neu erzeugt werden (neue Option `--data.retention=744h`).
+
+- **Fehlalarm „External sync stale" nach jedem Backend-Neustart behoben.** Der Zeitstempel des letzten erfolgreichen Laufs eines Hintergrundjobs wurde bereits beim *Start* eines Laufs mit dem Platzhalter `0` veröffentlicht; die Überwachung las das als „zuletzt erfolgreich am 01.01.1970" und schlug an, solange der erste Lauf nach einem Neustart dauerte — beim SC-Wiki-Abgleich 10 bis 15 Minuten. Der Zeitstempel entsteht jetzt erst mit dem ersten Erfolg, und die sechs betroffenen Alarmregeln ignorieren den Platzhalter zusätzlich selbst.
+
+- **Fehlalarm „Audit domain silent 14d (ROLE)" behoben.** Die Überwachung meldete jede Audit-Domäne als verdächtig still, die 14 Tage lang nichts aufgezeichnet hat — für den Bereich Rollen & Mitglieder ist das aber eine gewöhnliche ruhige Phase, und da der Alarm einen Zustand und kein Ereignis prüft, wiederholte er sich alle vier Stunden per Mail, bis jemand eine Rolle änderte. Rollen & Mitglieder ist jetzt von der Regel ausgenommen — wie Beförderung, Mein Inventar und Materialbörse, die dort naturgemäß wochenlang still sind. Das Betriebs-Dashboard zeigt das Audit-Volumen dieser Bereiche stattdessen in einer 60-Tage-Tabelle.
+
+- **Das „+ Zuordnen"-Popover im Lager bleibt immer vollständig im Bild.** Klappte es nach oben auf, obwohl darüber zu wenig Platz war, ragte sein oberer Teil — im Auswahlmodus die Auftragsliste — aus dem sichtbaren Bereich und war nicht erreichbar, weil sich ein fest positioniertes Element nicht heranscrollen lässt. Es klappt jetzt nur noch nach oben, wenn es dort auch hineinpasst, und wird andernfalls in den sichtbaren Bereich gerückt.
+
+- **Ein kurzer Aussetzer der Container-Registry löst keinen Sicherheitsalarm mehr aus.** Die Signaturprüfung vor dem Deploy wird jetzt bis zu dreimal wiederholt und schreibt die tatsächliche Fehlermeldung ins Log, statt sie zu verwerfen. Bisher war ein Netzwerk-Schluckauf nicht von einem manipulierten Image zu unterscheiden und brach den Deploy als kritischen Alarm ab. Neue Schalter: `IRI_COSIGN_VERIFY_ATTEMPTS` (Standard 3) und `IRI_COSIGN_VERIFY_DELAY` (Standard 5 s).
+
+### Security
+
+- **Die Signaturprüfung vor dem Deploy läuft künftig mit cosign 3.1.3.** Das Update schließt eine Schwachstelle (GHSA-fx35-mq7g-6g98), bei der cosign die Prüfung der Signatur-Identität stillschweigend übergehen konnte. Unsere Prüfung der Container-Images war davon nicht betroffen — die Lücke greift nur bei der Prüfung einzelner Dateien (`verify-blob`). Reine Runbook-Änderung, keine Code-Änderung; das Programm auf dem Server wird beim nächsten Wartungsfenster ausgetauscht.
 
 ## [v1.5.41](https://github.com/krt-profit/basetool/releases/tag/v1.5.41) - 2026-08-05
 

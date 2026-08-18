@@ -385,6 +385,15 @@
         const form = modal.querySelector('form.bank-ajax-form');
         if (form) {
             clearErrors(form);
+            // The employee's own note (REQ-BANK-054) is authored per booking and is deliberately NOT
+            // primed from a `data-field-*` attribute. These modals are reused across rows, and the
+            // priming loop below only overwrites controls it has an attribute for — so without this
+            // reset a note typed for one request would still sit in the box on the next one and ride
+            // along with a different money movement.
+            const staffNote = form.querySelector('[name="staffNote"]');
+            if (staffNote) {
+                staffNote.value = '';
+            }
         }
         for (const attr of Array.from(trigger.attributes)) {
             if (!attr.name.startsWith('data-field-')) {
@@ -1545,8 +1554,56 @@
                 }
             }
         }
+        syncRequestCounterparty(form, type === 'WITHDRAWAL');
         updateJustificationRequired(form);
         updateLimitWarning(form);
+    }
+
+    /**
+     * Shows/enables the requester's Empfaenger block for a WITHDRAWAL request and hides + disables
+     * it otherwise (REQ-BANK-055), so a DEPOSIT/TRANSFER request omits both counterparty fields
+     * from the JSON body — the backend rejects a counterparty on either.
+     *
+     * Deliberately does NOT clear the controls on deactivation, unlike setMovementControlActive:
+     * the user picker is server-seeded with the requester, and clearing it when the type flips away
+     * would silently drop the pre-fill for good, since nothing re-seeds it. Disabled alone already
+     * keeps it out of the submit.
+     *
+     * The dependent Einheit select is populated by the shared change-delegated loader
+     * (fillCounterpartyOrgUnits). krtCombobox seeding fires no `change`, so on the first activation
+     * this pokes one synthetic bubbling `change` at the picker to load the seeded requester's
+     * memberships; the marker keeps it to once per picker, so re-opening the modal or toggling the
+     * type does not refetch and does not clobber a unit the requester has since chosen by hand.
+     *
+     * @param {HTMLFormElement} form the request form
+     * @param {boolean} on whether the block is active (the request is a withdrawal)
+     */
+    function syncRequestCounterparty(form, on) {
+        const block = form.querySelector('[data-request-withdrawal-only]');
+        if (!block) {
+            return;
+        }
+        block.hidden = !on;
+        block
+            .querySelectorAll(
+                'select, .krt-combobox input[type="hidden"], input:not(.krt-combobox__input)',
+            )
+            .forEach(function (control) {
+                control.disabled = !on;
+                const box = control.closest ? control.closest('.krt-combobox') : null;
+                const textbox = box ? box.querySelector('.krt-combobox__input') : null;
+                if (textbox) {
+                    textbox.disabled = !on;
+                }
+            });
+        if (!on) {
+            return;
+        }
+        const picker = block.querySelector('[data-counterparty-user]');
+        if (picker && picker.value && !picker.dataset.cpUnitsPrimed) {
+            picker.dataset.cpUnitsPrimed = 'true';
+            picker.dispatchEvent(new Event('change', { bubbles: true }));
+        }
     }
 
     document.addEventListener('change', function (event) {

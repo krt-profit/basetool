@@ -605,6 +605,7 @@ public class BankAccountService {
         holderHandle,
         row.note(),
         row.justification(),
+        row.staffNote(),
         row.createdAt(),
         row.reversedTransactionId(),
         counterAccountNo,

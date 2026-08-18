@@ -730,8 +730,9 @@ transaction per pass) rather than per-scrape.
   > violations gauge freezes and `BankLedgerIntegrityViolation` cannot fire),
   > `JobOrderIntegritySweepStale` (`job_order_integrity`, > 6 h — same frozen-gauge trap for
   > `JobOrderItemBlueprintDrift`) and `BusinessMetricsStale`
-  > (`business_metrics`, > 10 min); it is registered lazily so a config-gated-off job never reports a
-  > falsely-stale `0`. The items counter is present only for jobs that report a count: user sync,
+  > (`business_metrics`, > 10 min); it is registered on a job's first success, so a job that has not
+  > yet succeeded in this process publishes nothing at all rather than a falsely-stale `0` (see the
+  > never-succeeded-sentinel bullet below). The items counter is present only for jobs that report a count: user sync,
   > notification retention, default-blueprint provisioning, and — since #1041 item 2 — `uex_sync` (the
   > `UexItemSyncService` `game_item` upsert tally, with the unchanged-catalogue carve-out below) and
   > `scwiki_sync` (the sum of the five SC-Wiki step counts, a failing step contributing `0`; same
@@ -761,6 +762,28 @@ transaction per pass) rather than per-scrape.
   > backs `UserSyncZeroItems`
   > (`user_sync` synced zero users for 30 min while successful runs happened — Keycloak returned an
   > empty roster; #1041 item 3).
+
+- **Never-succeeded sentinel on the last-success gauge (2026-08-10).** The gauge is registered on a
+  job's **first success**, seeded with that timestamp — never at run start, and never with a `0`. All
+  six staleness rules subtract it from `time()`, so a published `0` reads as a success on 1970-01-01:
+  an age of ~1.79 × 10⁹ s, above *every* threshold in `business.yml`. The holder is a per-process
+  `AtomicLong`, so registering it when a run *started* published `0` for the whole duration of each
+  job's first run after a backend restart. The prod SC-Wiki sweep takes ~10–15 min
+  (`sync-all-items`), longer than `ExternalSyncStale`'s `for: 10m` — so that alert fired on every
+  backend restart and cleared itself when the sweep finished. Registering on first success leaves the
+  series **absent** until there is a real timestamp (subtracting an absent series yields an empty
+  vector, so no rule fires), which also preserves the original intent that a config-gated-off job
+  never reports a falsely-stale `0`. As defence in depth — alert rules reload without a backend
+  deploy — the six rules and the operations dashboard's age panel filter the sentinel out inside the
+  subtraction:
+
+  ```promql
+  (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="scwiki_sync"} > 0)) > 172800
+  ```
+
+  This is covered by `monitoring/prometheus/tests/staleness_never_succeeded_sentinel_test.yml`.
+  **Triage corollary:** a staleness alert that resolves on its own within minutes is not staleness at
+  all — a genuine one persists until someone acts.
 
 - `basetool_sync_events_total{source,event_type}` counter at the three `SyncReportService`
   `log*Event` write sites (`source` = `SyncSourceSystem`, `event_type` = `SyncEventType`; both
@@ -876,11 +899,21 @@ transaction per pass) rather than per-scrape.
   (`domain` = the `AuditDomain` values, including `MARKET` since the Materialbörse). Silence
   detection is two-tier: `AuditSilenceAnomaly` (no audited mutation anywhere for 5 d while the
   backend is up) plus, since #1041 item 10, `AuditDomainSilenceAnomaly` (a single domain silent for
-  14 d while others stay active — the domain-lost-its-wiring failure mode the global sum masks;
-  `PROMOTION` / `PERSONAL_INVENTORY` / `MARKET` are excluded as legitimately-quiet and reviewed on
-  the operations dashboard's per-domain table instead). Item-order production bookings need no
-  dedicated meter — `JOB_ORDER_PRODUCTION_BOOKED` and `INVENTORY_CONSUMED_BY_PRODUCTION` roll into
-  the existing `JOB_ORDER` and `INVENTORY` domain counts (REQ-ORDERS-025).
+  14 d while others stay active — the domain-lost-its-wiring failure mode the global sum masks).
+  Four domains are excluded from the per-domain rule and never notify at any horizon: `PROMOTION`,
+  `PERSONAL_INVENTORY`, `MARKET`, and — since 2026-08-16 — `ROLE`. `ROLE` covers
+  role/membership admin, Kommando groups and user deletion, all admin actions rather than daily
+  traffic, so a fortnight without one is an ordinary quiet period; while it was still alerted it
+  fired through every such period and, the condition being a level rather than an event, re-notified
+  on the Alertmanager `repeat_interval` until somebody changed a role. Their volume is reviewed on
+  the operations dashboard's per-domain tables (14 d and 60 d) instead of paged — a deliberate
+  trade of coverage for signal. Everything not named there is alerted, so a newly added
+  `AuditDomain` is covered by default and exempting one is a deliberate edit rather than an
+  omission. The rule, its exclusions and the `up` guard are pinned by promtool unit tests in
+  `monitoring/prometheus/tests/audit_domain_silence_alerts_test.yml`. Item-order production
+  bookings need no dedicated meter — `JOB_ORDER_PRODUCTION_BOOKED` and
+  `INVENTORY_CONSUMED_BY_PRODUCTION` roll into the existing `JOB_ORDER` and `INVENTORY` domain
+  counts (REQ-ORDERS-025).
 - `basetool_material_exchange_active_count{status="ACTIVE"}` gauge sampled by
   `BusinessMetricsCollector` — the number of active Materialbörse offers on the board, spanning
   **both** offer kinds (material and item, REQ-MARKET-012), via `countByStatus(ACTIVE)`
@@ -1588,6 +1621,18 @@ therefore alerts on:
   The template is rendered by the runbook with `envsubst` and validated with `amtool check-config`;
   because monitoring configs are inode-pinned bind mounts the reconcile force-recreates Alertmanager to
   apply a change (verify `AlertmanagerConfigReloadFailed == 0` after deploy).
+- **Notification cadence — one mail per event.** Alertmanager has no acknowledged state, so a
+  still-firing alert is re-notified every `repeat_interval` indefinitely. At the original 4 h
+  (warnings) / 1 h (criticals) that is six respectively twenty-four identical mails a day for as long
+  as the condition holds, and an alert that tests a *state* rather than an event never clears on its
+  own — `AuditDomainSilenceAnomaly` on the `ROLE` domain demonstrated it over several days in
+  August 2026. Since 2026-08-16 e-mail repeats at **720 h (30 d)** for both severities, so an event is
+  one mail plus, via `send_resolved: true`, one resolved mail; the hourly reminder for an open
+  critical lives on the **Discord** route instead, where repetition is free. Muting an alert before it
+  resolves is what a time-boxed **Silence** is for, not a shorter `repeat_interval`. The cadence is
+  bounded from below by Alertmanager's `--data.retention` — the notification log that remembers
+  “already sent”, default 120 h — so the compose file pins `--data.retention=744 h`; raising
+  one without the other silently degrades the cadence back to the retention window.
 
 All labels stay bounded (REQ-OBS-006): these alerts read only the exporters' own low-cardinality
 series (`job` / `instance` / `reason` / `name` / `path` / `health_type` / `component`), never per-user

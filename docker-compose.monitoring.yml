@@ -197,6 +197,10 @@ services:
     # grafana-oss:13.1.0 pinned a tag that does not exist and broke every Grafana `--force-recreate`
     # ("not found"). Pin to the newest tag actually published for grafana-oss (13.0.2); do NOT switch to
     # grafana/grafana. Dependabot advances this forward once the OSS repo publishes a newer tag.
+    # Re-verified 2026-08-09: grafana/grafana is on v13.1.3, but the grafana-oss repo still publishes
+    # NOTHING in the 13.1.x line — 13.0.2 remains its newest tag. Do not take a version from the
+    # GitHub release feed; the only authority for this pin is what grafana-oss has actually pushed
+    # (`curl -s 'https://hub.docker.com/v2/repositories/grafana/grafana-oss/tags?name=13.'`).
     image: grafana/grafana-oss:13.0.2
     cap_drop: [ALL]
     environment:
@@ -283,7 +287,7 @@ services:
   loki:
     <<: *mon-base
     container_name: loki
-    image: grafana/loki:3.7.4
+    image: grafana/loki:3.7.6
     cap_drop: [ALL]
     # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 288MiB = 75% of the 384M limit;
     # measured live heap 76.7 MiB, so the ceiling is ~3.8x actual demand. Loki is the one place where
@@ -329,7 +333,7 @@ services:
   tempo:
     <<: *mon-base
     container_name: tempo
-    image: grafana/tempo:3.0.2
+    image: grafana/tempo:3.0.3
     cap_drop: [ALL]
     # -config.expand-env: expand ${PROMETHEUS_WEB_PASSWORD} in tempo.yaml so the metrics-generator's
     # remote_write can basic-auth to Prometheus as the shared `grafana` user (#1041 item 22a).
@@ -394,7 +398,7 @@ services:
   alloy:
     <<: *mon-base
     container_name: alloy
-    image: grafana/alloy:v1.18.0
+    image: grafana/alloy:v1.18.1
     # 1.18.0 (taken 2026-07-28) also pulled in Prometheus 3.12 and otel-collector 0.153 upstream. If the
     # working set drifts up after this bump with NO config change of ours, that dependency jump is the
     # first suspect before the "Alloy-side leak" verdict at the end of the sizing note below — and the
@@ -511,6 +515,14 @@ services:
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
+      # Notification-log retention. This is what remembers "this alert was already mailed", and it
+      # bounds repeat_interval from below: entries older than this are garbage-collected, after
+      # which a still-firing alert is treated as never-notified and mails again. The default is 120h
+      # (5d), so the config's 720h (30d) "one mail per event" would silently have degraded into a
+      # five-day cadence. 744h = 31d, one day of headroom. Raise it with repeat_interval or neither.
+      # Cost is a handful of tiny nflog entries on the existing bind mount — not a memory concern at
+      # this alert volume, and the mount makes it survive a restart.
+      - --data.retention=744h
     volumes:
       - /var/iri/monitoring/secrets/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - /var/iri/monitoring/data/alertmanager:/alertmanager
@@ -739,7 +751,7 @@ services:
   redis-exporter:
     <<: *mon-base
     container_name: redis-exporter
-    image: oliver006/redis_exporter:v1.88.0
+    image: oliver006/redis_exporter:v1.89.0
     cap_drop: [ALL]
     environment:
       # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 24MiB = 75% of the 32M limit.

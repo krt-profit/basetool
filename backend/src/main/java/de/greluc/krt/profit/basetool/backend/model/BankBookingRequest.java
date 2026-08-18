@@ -59,6 +59,15 @@ import org.jetbrains.annotations.Nullable;
  * account, REQ-BANK-040); the destination holder is recorded only on the resulting ledger
  * transaction at confirmation.
  *
+ * <p><strong>What a requester may still edit (REQ-BANK-056).</strong> While the request is {@code
+ * PENDING} <em>and</em> not yet owner-approved, the requester may correct {@link #amount}, {@link
+ * #note}, {@link #justification}, {@link #targetAccount} and the Empf&auml;nger columns — those are
+ * deliberately not {@code updatable = false}. {@link #account} and {@link #type} stay immutable:
+ * the source account decides the approval limit, the Begr&uuml;ndung requirement and view
+ * eligibility, and the type decides the whole field shape, so changing either makes it a different
+ * request rather than a correction — cancel and re-raise instead. {@link #requiredApprover} is
+ * mutable only because an amount edit must be able to re-route the approval band.
+ *
  * <p><strong>Two-step owner approval (REQ-BANK-041).</strong> {@link #requiresOwnerApproval} and
  * {@link #applicableLimit} are <em>snapshotted at creation</em> by the org-unit-aware seam (it
  * resolves the requester's applicable approval limit); the org-unit-blind confirm path only reads
@@ -101,7 +110,7 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
    */
   @Nullable
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "target_account_id", updatable = false)
+  @JoinColumn(name = "target_account_id")
   @ToString.Exclude
   private BankAccount targetAccount;
 
@@ -110,15 +119,20 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
   @Column(nullable = false, length = 16, updatable = false)
   private BankBookingRequestType type;
 
-  /** The requested whole-aUEC amount, strictly positive; immutable. */
-  @Column(nullable = false, precision = 19, scale = 4, updatable = false)
+  /**
+   * The requested whole-aUEC amount, strictly positive. Mutable while the request is {@code
+   * PENDING} and unapproved (REQ-BANK-056) — an edit re-derives {@link #requiresOwnerApproval} from
+   * it, so raising the amount past the requester's limit re-arms the approval gate rather than
+   * slipping through on the original snapshot.
+   */
+  @Column(nullable = false, precision = 19, scale = 4)
   private BigDecimal amount;
 
   /**
    * Optional free-text note supplied by the requester; carried onto the booking on confirmation.
    */
   @Nullable
-  @Column(length = 500, updatable = false)
+  @Column(length = 500)
   private String note;
 
   /**
@@ -128,8 +142,69 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
    * BankAccountType#requiresDebitJustification() mandates a reason}; {@code null} otherwise.
    */
   @Nullable
-  @Column(length = 500, updatable = false)
+  @Column(length = 500)
   private String justification;
+
+  /**
+   * The confirming bank employee's own note ("Notiz Bankmitarbeiter", REQ-BANK-054), snapshotted
+   * here so the staff queue and the approval tab can render it without joining the resulting
+   * transaction per row, and copied onto {@link BankTransaction#getStaffNote()} of the booking the
+   * confirmation produces.
+   *
+   * <p>Deliberately <strong>not</strong> {@code updatable = false} — unlike {@link #note} / {@link
+   * #justification}, which the requester supplies at creation, this is written at
+   * <strong>confirmation</strong>. Stays {@code null} while the request is {@code PENDING}, on a
+   * rejected/cancelled request, and when the employee recorded none.
+   */
+  @Nullable
+  @Column(length = 500)
+  private String staffNote;
+
+  /**
+   * The <strong>Empf&auml;nger</strong> the requester named on a {@code WITHDRAWAL} request
+   * (REQ-BANK-055) — the member who receives the payout, as opposed to the {@link #holder}, the
+   * bank custodian who hands it over. {@code null} on a {@code DEPOSIT} / {@code TRANSFER} request
+   * and on any withdrawal request that named none.
+   *
+   * <p>At confirmation this <em>wins</em> over the requester-derived counterparty {@code
+   * BankBookingRequestService#confirm} otherwise computes (REQ-BANK-044): a {@code null} here means
+   * "requester", which is both the historical behaviour and the pre-filled default, so every row
+   * predating V232 keeps its meaning. Kept as a plain UUID (no JPA relation) exactly like {@link
+   * BankTransaction#getCounterpartyUserId()}; the database FK is {@code ON DELETE SET NULL} and
+   * {@link #counterpartyHandle} keeps the row attributable afterwards.
+   */
+  @Nullable
+  @Column(name = "counterparty_user_id")
+  private UUID counterpartyUserId;
+
+  /**
+   * Deletion-proof handle snapshot of {@link #counterpartyUserId}, taken when the request is
+   * raised, so the confirmation can copy it straight onto the ledger row even if the named user was
+   * deleted in between. {@code null} exactly when {@link #counterpartyUserId} is {@code null} (V232
+   * CHECK).
+   */
+  @Nullable
+  @Column(name = "counterparty_handle", length = 255)
+  private String counterpartyHandle;
+
+  /**
+   * The org unit of the named Empf&auml;nger, chosen at request time from <em>that user's</em>
+   * direct memberships across all four kinds and validated server-side against them (a foreign unit
+   * is a 400, mirroring the bank employee's path). {@code null} when no counterparty is named or
+   * the requester left the unit blank.
+   */
+  @Nullable
+  @Column(name = "counterparty_org_unit_id")
+  private UUID counterpartyOrgUnitId;
+
+  /**
+   * Deletion-proof name snapshot of {@link #counterpartyOrgUnitId}, so the request list and the
+   * booking it produces label the unit without a live polymorphic org-unit load. {@code null}
+   * exactly when {@link #counterpartyOrgUnitId} is {@code null} (V232 CHECK).
+   */
+  @Nullable
+  @Column(name = "counterparty_org_unit_name", length = 255)
+  private String counterpartyOrgUnitName;
 
   /**
    * Snapshot at creation (REQ-BANK-043): whether this {@code DEPOSIT} request distributes {@link
@@ -240,7 +315,7 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
    */
   @Nullable
   @Enumerated(EnumType.STRING)
-  @Column(name = "required_approver", length = 32, updatable = false)
+  @Column(name = "required_approver", length = 32)
   private BankRequestApprover requiredApprover;
 
   /**

@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const searchInput = /** @type {HTMLInputElement | null} */ (
         document.getElementById('squadron-ship-filter')
     );
+    /** @type {number | null} */
     let squadronFilterTimer = null;
 
     function applySquadronFilter(url) {
@@ -90,13 +91,13 @@ document.addEventListener('DOMContentLoaded', function () {
     if (filterForm) {
         filterForm.addEventListener('submit', function (event) {
             event.preventDefault();
-            clearTimeout(squadronFilterTimer);
+            clearTimeout(squadronFilterTimer ?? undefined);
             applySquadronFilter();
         });
     }
     if (searchInput) {
         searchInput.addEventListener('input', function () {
-            clearTimeout(squadronFilterTimer);
+            clearTimeout(squadronFilterTimer ?? undefined);
             squadronFilterTimer = setTimeout(function () {
                 applySquadronFilter();
             }, 300);

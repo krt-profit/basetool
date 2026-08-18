@@ -217,6 +217,55 @@ class BankLedgerServiceTest {
   }
 
   @Test
+  void bookDeposit_persistsStaffNote() {
+    // REQ-BANK-054: the bank employee's own note rides along on a DEPOSIT too — unlike the
+    // Begruendung, which the debit-only rules of REQ-BANK-045 gate.
+    BankTransactionDto tx =
+        bankLedgerService.bookDeposit(
+            new BankDepositRequest(
+                account.getId(),
+                holderA.getId(),
+                new BigDecimal("500"),
+                "vom Verkauf",
+                "in zwei Tranchen uebergeben",
+                false,
+                null,
+                null,
+                null,
+                null));
+
+    BankTransaction stored = transactionRepository.findById(tx.id()).orElseThrow();
+    assertEquals("in zwei Tranchen uebergeben", stored.getStaffNote());
+    assertEquals("vom Verkauf", stored.getNote(), "the party's own note is untouched");
+  }
+
+  @Test
+  void bookWithdrawal_persistsStaffNoteAlongsideJustification() {
+    // The two are independent fields with different authors: the Begruendung comes from the
+    // requester / booking party, the staff note from the employee doing the booking.
+    BankAccount special = newMandatingAccount("Sonderkonto " + UUID.randomUUID());
+    deposit(special, holderA, "500");
+
+    BankTransactionDto tx =
+        bankLedgerService.bookWithdrawal(
+            new BankWithdrawalRequest(
+                special.getId(),
+                holderA.getId(),
+                new BigDecimal("100"),
+                null,
+                "Reparaturkosten",
+                "nach Ruecksprache mit der SL",
+                null,
+                null,
+                false,
+                null));
+
+    BankTransaction stored = transactionRepository.findById(tx.id()).orElseThrow();
+    assertEquals("Reparaturkosten", stored.getJustification());
+    assertEquals("nach Ruecksprache mit der SL", stored.getStaffNote());
+  }
+
+  @Test
   void bookWithdrawal_allowsHolderToGoNegativeWhenAccountCovers() {
     // Given: account holds 1000 (A:300, B:700) — the account covers a 400 payout plus its fee,
     // holder A does not
@@ -393,6 +442,7 @@ class BankLedgerServiceTest {
                 holderB.getId(),
                 new BigDecimal("1000"),
                 "Bereichsanteil",
+                null,
                 null,
                 true),
             true);
@@ -910,6 +960,7 @@ class BankLedgerServiceTest {
                 holderA.getId(),
                 new BigDecimal("500"),
                 null,
+                null,
                 false,
                 null,
                 null,
@@ -945,6 +996,7 @@ class BankLedgerServiceTest {
                 null,
                 null,
                 null,
+                null,
                 false,
                 "Erika Extern"));
 
@@ -971,6 +1023,7 @@ class BankLedgerServiceTest {
                     account.getId(),
                     holderA.getId(),
                     new BigDecimal("10"),
+                    null,
                     null,
                     false,
                     null,

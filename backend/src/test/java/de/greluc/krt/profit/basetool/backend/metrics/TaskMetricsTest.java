@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -80,7 +81,7 @@ class TaskMetricsTest {
   }
 
   @Test
-  void record_onFailure_countsFailureSwallowsAndLeavesLastSuccessAtZero() {
+  void record_onFailure_countsFailureSwallowsAndPublishesNoLastSuccessGauge() {
     // Given a body that throws / When
     assertThatCode(
             () ->
@@ -91,7 +92,9 @@ class TaskMetricsTest {
                     }))
         .doesNotThrowAnyException();
 
-    // Then — counted as a failure, never a success, and the gauge stays 0 (never succeeded).
+    // Then — counted as a failure, never a success, and NO last-success gauge at all. A published
+    // 0 would read as "last succeeded 1970-01-01" through the alerts' time() - gauge, which is
+    // above every staleness threshold in business.yml.
     assertThat(
             registry
                 .get(MetricNames.SCHEDULED_JOB_EXECUTIONS)
@@ -115,11 +118,10 @@ class TaskMetricsTest {
         .isNull();
     assertThat(
             registry
-                .get(MetricNames.SCHEDULED_JOB_LAST_SUCCESS)
+                .find(MetricNames.SCHEDULED_JOB_LAST_SUCCESS)
                 .tag(MetricNames.TAG_JOB, ScheduledJob.UEX_SYNC.label())
-                .gauge()
-                .value())
-        .isEqualTo(0.0d);
+                .gauge())
+        .isNull();
   }
 
   @Test
@@ -191,6 +193,35 @@ class TaskMetricsTest {
   }
 
   @Test
+  void record_publishesNoLastSuccessGaugeWhileTheFirstRunIsStillInFlight() {
+    // The 2026-08-10 ExternalSyncStale false positive. The gauge used to be registered at 0 when
+    // a run STARTED, so throughout a job's first run in a fresh process the scrape exposed 0 and
+    // every staleness alert saw time() - 0 ~ 1.79e9 s. The prod SC-Wiki sweep takes ~10-15 min
+    // (sync-all-items), outlasting ExternalSyncStale's `for: 10m`, so the alert fired on every
+    // backend restart and self-resolved when the sweep finished. Nothing may publish the gauge
+    // before the body returns.
+    AtomicReference<Gauge> duringRun = new AtomicReference<>();
+
+    taskMetrics.record(
+        ScheduledJob.SCWIKI_SYNC,
+        () ->
+            duringRun.set(
+                registry
+                    .find(MetricNames.SCHEDULED_JOB_LAST_SUCCESS)
+                    .tag(MetricNames.TAG_JOB, ScheduledJob.SCWIKI_SYNC.label())
+                    .gauge()));
+
+    assertThat(duringRun.get()).isNull();
+    assertThat(
+            registry
+                .get(MetricNames.SCHEDULED_JOB_LAST_SUCCESS)
+                .tag(MetricNames.TAG_JOB, ScheduledJob.SCWIKI_SYNC.label())
+                .gauge()
+                .value())
+        .isGreaterThan(0.0d);
+  }
+
+  @Test
   void record_successAfterFailure_advancesGaugeAndKeepsBothOutcomeCounters() {
     // Given a failing run then a successful run of the same job
     taskMetrics.record(
@@ -198,19 +229,20 @@ class TaskMetricsTest {
         () -> {
           throw new IllegalStateException("transient");
         });
-    double afterFailure =
+    Gauge afterFailure =
         registry
-            .get(MetricNames.SCHEDULED_JOB_LAST_SUCCESS)
+            .find(MetricNames.SCHEDULED_JOB_LAST_SUCCESS)
             .tag(MetricNames.TAG_JOB, ScheduledJob.BANK_LEDGER_INTEGRITY.label())
-            .gauge()
-            .value();
+            .gauge();
 
     AtomicInteger runs = new AtomicInteger();
     taskMetrics.record(ScheduledJob.BANK_LEDGER_INTEGRITY, runs::incrementAndGet);
 
-    // Then the body ran, the gauge advanced past its post-failure 0, and both outcomes are counted.
+    // Then the body ran, the gauge was born only with the success (it did not exist after the
+    // failure — BankLedgerIntegritySweepStale is CRITICAL and a 0 would page on every restart),
+    // and both outcomes are counted.
     assertThat(runs.get()).isEqualTo(1);
-    assertThat(afterFailure).isEqualTo(0.0d);
+    assertThat(afterFailure).isNull();
     assertThat(
             registry
                 .get(MetricNames.SCHEDULED_JOB_LAST_SUCCESS)

@@ -104,7 +104,7 @@
                 </thead>
                 <tbody>
                 <th:block th:each="r : ${requests.content()}"
-                          th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note())},detailId='bank-req-' + ${r.id()}">
+                          th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note()) or !#strings.isEmpty(r.staffNote())},detailId='bank-req-' + ${r.id()}">
                 <tr data-testid="bank-request-row" class="bank-booking-row"
                     th:classappend="${hasDetail} ? ' is-expandable' : ''">
                     <td class="bank-expand-cell">
@@ -178,6 +178,10 @@
                             <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.note())}">
                                 <span class="bank-detail-label" th:text="#{bank.booking.note}">Notiz</span>
                                 <span class="bank-detail-value" data-testid="bank-request-note" th:text="${r.note()}">Missionsertrag</span>
+                            </div>
+                            <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.staffNote())}">
+                                <span class="bank-detail-label" th:text="#{bank.booking.staffNote}">Notiz Bankmitarbeiter</span>
+                                <span class="bank-detail-value" data-testid="bank-request-staff-note" th:text="${r.staffNote()}">Nach Rücksprache</span>
                             </div>
                         </div>
                     </td>
@@ -268,6 +272,21 @@
                     </div>
 
                     <p class="bank-field-hint" th:text="#{bank.request.confirm.modal.hint}">Erfasse den Halter, der das Geld erhalten bzw. ausgezahlt hat.</p>
+
+                    <!-- Notiz Bankmitarbeiter (REQ-BANK-054): the confirming employee's own note.
+                         Always optional; snapshotted on the request and copied onto the transaction
+                         the confirmation books, so it shows up in the queue, the approval tab and the
+                         booking history alike. Not primed per row — it is written here, not carried
+                         over from the request. -->
+                    <div class="bank-form-row">
+                        <label for="bank-confirm-staff-note">
+                            <span th:text="#{bank.field.staffNote}">Notiz Bankmitarbeiter</span>
+                            <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.staffNote.hint')}"></th:block>
+                        </label>
+                        <input type="text" id="bank-confirm-staff-note" name="staffNote" maxlength="500"
+                               data-testid="bank-confirm-staff-note">
+                        <span class="bank-field-error" data-error-for="staffNote"></span>
+                    </div>
                     <span class="bank-field-error" data-error-for="_global"></span>
                 </div>
                 <div class="krt-modal-foot">

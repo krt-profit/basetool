@@ -13,7 +13,7 @@
 #
 # Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
 #   docker run --rm -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.13.1 promtool test rules tests/ssepushchanneldead_traffic_guard_test.yml
+#     prom/prometheus:v3.13.2 promtool test rules tests/ssepushchanneldead_traffic_guard_test.yml
 
 rule_files:
   - ../alerts/business.yml

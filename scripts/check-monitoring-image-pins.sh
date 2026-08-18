@@ -5,7 +5,10 @@
 #
 # SPDX-License-Identifier: GPL-3.0-only
 #
-# Verifies that every pinned monitoring image tag quoted in the Markdown docs matches the
+# image-pin-gate: ignore-file — this script quotes a deliberately stale tag as an ILLUSTRATION
+# below, and rewriting an illustration to today's tag would erase the very point it makes.
+#
+# Verifies that every pinned monitoring image tag quoted anywhere in the tracked sources matches the
 # authoritative tag in docker-compose.monitoring.yml.
 #
 # WHY THIS GATE EXISTS
@@ -28,9 +31,18 @@
 # compose file adds nothing over `grep image: docker-compose.monitoring.yml`, and it cannot be true
 # about the *running* stack anyway (see the compose-definition apply gap the runbooks document).
 #
+# WHY THE SCAN IS NOT LIMITED TO MARKDOWN
+# ---------------------------------------
+# It was, until 2026-08-16, and the hazard simply moved: the same copy-pasteable command lives in the
+# header comment of every promtool test under monitoring/prometheus/tests/, where nothing gated it.
+# Nine of the ten files there had drifted, across three different Prometheus versions — the exact
+# failure this gate was written to prevent, in the files an operator reaches for while validating
+# alert rules. A pinned tag is a pinned tag whatever the file extension, so the scan now covers every
+# tracked text file and the exemptions carry the nuance instead.
+#
 # USAGE
 #   scripts/check-monitoring-image-pins.sh          # verify; non-zero exit on drift
-#   scripts/check-monitoring-image-pins.sh --fix    # rewrite the docs to the compose tags
+#   scripts/check-monitoring-image-pins.sh --fix    # rewrite the drifted pins to the compose tags
 #
 set -euo pipefail
 
@@ -56,19 +68,35 @@ COMPOSE_FILE="docker-compose.monitoring.yml"
 #       superseded by a new ADR; it is never silently edited. Same footing as the changelog, hence
 #       the same exclusion.
 #
-# Individual frozen documents outside those trees opt out through the repository's existing
-# front-matter convention instead of through a name list here: a "Doc type: ... Historical ..."
-# marker within the first few lines (see docs/BANK_PLAN.md and
-# docs/REFINERY_SCREENSHOT_IMPORT_PLAN.md, both frozen after implementation) exempts the file. That
-# is the inline escape hatch — a future incident or post-mortem write-up is covered the moment it
-# carries that header, with no edit here. The repository tracks no incident/post-mortem directory
-# today, which is why none is listed above; add its prefix here if one is ever introduced.
-EXCLUDED_DOCS_REGEX='^(CHANGELOG\.md$|CHANGELOG-ARCHIVE\.md$|docs/adr/)'
+#   docker-compose*.yml
+#       The compose files are the AUTHORITY the expected tags are parsed out of. Scanning them would
+#       compare each tag against itself — always green, pure noise — and the moment a second compose
+#       file pinned a different tag of the same repository on purpose, the gate would flag the source
+#       of truth. Excluded by path because "is this the authority?" is a property of the file, not
+#       something a marker inside it should have to assert.
+#
+# Individual files anywhere in the tree opt out through an inline marker instead of through a name
+# list here, so a future exemption needs no edit to this script:
+#
+#   "Doc type: ... Historical ..."  the repository's existing front-matter convention for a frozen
+#       document (see docs/BANK_PLAN.md and docs/REFINERY_SCREENSHOT_IMPORT_PLAN.md, both frozen
+#       after implementation). A future incident or post-mortem write-up is covered the moment it
+#       carries that header. The repository tracks no incident/post-mortem directory today, which is
+#       why none is listed above; add its prefix here if one is ever introduced.
+#
+#   "image-pin-gate: ignore-file"   this gate's own marker, for a file whose tags are deliberately
+#       not real pins. Two carry it today and both belong to the gate itself: this script, whose
+#       header quotes a stale tag as an illustration, and its test suite, whose fixtures pin wrong
+#       tags on purpose — "repairing" those would make the suite pass vacuously, which is the one
+#       outcome a regression suite must never have.
+EXCLUDED_PATHS_REGEX='^(CHANGELOG\.md$|CHANGELOG-ARCHIVE\.md$|docs/adr/|docker-compose[^/]*\.yml$)'
 
-# How far into a file the "Doc type:" front matter is looked for. Deliberately small: docs/specs/
-# INDEX.md quotes the very same header deep in its body as an authoring example, and that file is a
-# living index that must stay in scope.
-HISTORICAL_HEADER_LINES=10
+# How far into a file the two exemption markers are looked for. Deliberately small, and NOT widened
+# when the second marker was added: docs/specs/INDEX.md quotes the "Doc type:" header deep in its
+# body as an authoring example, and that file is a living index that must stay in scope. A file that
+# merely DISCUSSES a marker must not exempt itself by talking about it, so a real marker belongs
+# immediately under the licence header — above the prose, not inside it.
+EXEMPTION_HEADER_LINES=10
 
 fix_mode=0
 case "${1:-}" in
@@ -127,46 +155,69 @@ if [ ${#expected_tag[@]} -eq 0 ]; then
   exit 2
 fi
 
-if ! tracked_docs="$(git ls-files '*.md')"; then
-  printf 'error: git ls-files failed — cannot enumerate the docs to check.\n' >&2
+if ! tracked_files="$(git ls-files)"; then
+  printf 'error: git ls-files failed — cannot enumerate the files to check.\n' >&2
   exit 2
 fi
-mapfile -t candidate_docs < <(
-  printf '%s\n' "$tracked_docs" | grep -Ev "$EXCLUDED_DOCS_REGEX" || true
+mapfile -t path_included < <(
+  printf '%s\n' "$tracked_files" | grep -Ev "$EXCLUDED_PATHS_REGEX" || true
 )
-if [ ${#candidate_docs[@]} -eq 0 ]; then
-  # Not "nothing to drift, pass" — this repository always tracks Markdown, so an empty list means
-  # the enumeration broke (no git on PATH, run outside a work tree, a mangled exclude regex). A gate
+if [ ${#path_included[@]} -eq 0 ]; then
+  # Not "nothing to drift, pass" — this repository always tracks files, so an empty list means the
+  # enumeration broke (no git on PATH, run outside a work tree, a mangled exclude regex). A gate
   # that goes green when it could not look is worse than no gate: it reports "checked, clean".
-  printf 'error: no Markdown files to check — the enumeration is broken, not the repository.\n' >&2
+  printf 'error: no tracked files to check — the enumeration is broken, not the repository.\n' >&2
   exit 2
 fi
 
-# Second exclusion pass: individually frozen documents, recognised by their
-# "Doc type: ... Historical ..." front matter (see the EXCLUDED_DOCS_REGEX comment). One awk over
-# the whole list rather than a `head | grep` per file — under `set -o pipefail` a head that exits on
-# SIGPIPE would turn a match into a spurious pipeline failure.
-declare -A frozen_doc=()
-while IFS= read -r frozen; do
-  [ -n "$frozen" ] || continue
-  frozen_doc["$frozen"]=1
-done < <(awk -v limit="$HISTORICAL_HEADER_LINES" \
-  'FNR <= limit && /Doc type:/ && /Historical/ && !seen[FILENAME]++ { print FILENAME }' \
-  "${candidate_docs[@]}" || true)
+# Binary files cannot carry a copy-pasteable command, and feeding them to awk below is at best
+# noise. `grep -I` (= --binary-files=without-match) treats a binary as non-matching, so matching the
+# always-true empty pattern prints exactly the text files. A zero-byte file has no line to match and
+# drops out here too — it cannot carry a pin either, so that is harmless. xargs chunks the list, so
+# this holds on a repository far larger than this one.
+mapfile -t candidate_files < <(
+  printf '%s\0' "${path_included[@]}" | xargs -0 grep -lI '' -- 2>/dev/null || true
+)
+if [ ${#candidate_files[@]} -eq 0 ]; then
+  printf 'error: no text files to check — the enumeration is broken, not the repository.\n' >&2
+  exit 2
+fi
 
-doc_files=()
-for candidate in "${candidate_docs[@]}"; do
-  [ -z "${frozen_doc["$candidate"]:-}" ] || continue
-  doc_files+=("$candidate")
+# Second exclusion pass: files that opt out individually, in one awk over the whole list rather than
+# a `head | grep` per file — under `set -o pipefail` a head that exits on SIGPIPE would turn a match
+# into a spurious pipeline failure. Two markers, both only honoured in the first
+# EXEMPTION_HEADER_LINES lines so a file that merely *discusses* one (docs/specs/INDEX.md quotes the
+# front-matter convention deep in its body as an authoring example) is not exempted by talking:
+#
+#   "Doc type: ... Historical ..."   the repository's existing front-matter convention for a frozen
+#                                    document (see the EXCLUDED_PATHS_REGEX comment).
+#   "image-pin-gate: ignore-file"    this gate's own marker, for a file whose tags are deliberately
+#                                    not real pins. Two exist today, both belonging to the gate: the
+#                                    illustrative stale command in this script's own header, and the
+#                                    fixtures in its test suite, which pin wrong tags ON PURPOSE and
+#                                    would otherwise be "repaired" into passing vacuously.
+declare -A exempt_file=()
+while IFS= read -r exempt; do
+  [ -n "$exempt" ] || continue
+  exempt_file["$exempt"]=1
+done < <(awk -v limit="$EXEMPTION_HEADER_LINES" \
+  'FNR <= limit && (/image-pin-gate: ignore-file/ || (/Doc type:/ && /Historical/)) \
+     && !seen[FILENAME]++ { print FILENAME }' \
+  "${candidate_files[@]}" || true)
+
+scan_files=()
+for candidate in "${candidate_files[@]}"; do
+  [ -z "${exempt_file["$candidate"]:-}" ] || continue
+  scan_files+=("$candidate")
 done
-if [ ${#doc_files[@]} -eq 0 ]; then
-  # Same reasoning as above: every tracked document being exempt means the exemption logic broke.
-  printf 'error: every Markdown file is exempt — the gate would pass vacuously.\n' >&2
+if [ ${#scan_files[@]} -eq 0 ]; then
+  # Same reasoning as above: every tracked file being exempt means the exemption logic broke.
+  printf 'error: every tracked file is exempt — the gate would pass vacuously.\n' >&2
   exit 2
 fi
 
-printf 'Checking %d monitoring image pin(s) across %d Markdown file(s).\n' \
-  "${#expected_tag[@]}" "${#doc_files[@]}"
+printf 'Checking %d monitoring image pin(s) across %d tracked file(s).\n' \
+  "${#expected_tag[@]}" "${#scan_files[@]}"
 
 drift_count=0
 for repository in "${!expected_tag[@]}"; do
@@ -196,7 +247,7 @@ for repository in "${!expected_tag[@]}"; do
       replacement="$(escape_sed_replacement "${repository}:${want}")"
       sed -i "s#${search}#${replacement}#g" "$file"
     fi
-  done < <(grep -HnEo "${repository_ere}:[A-Za-z0-9][A-Za-z0-9._-]*" "${doc_files[@]}" || true)
+  done < <(grep -HnEoI "${repository_ere}:[A-Za-z0-9][A-Za-z0-9._-]*" "${scan_files[@]}" || true)
 done
 
 if [ "$drift_count" -eq 0 ]; then

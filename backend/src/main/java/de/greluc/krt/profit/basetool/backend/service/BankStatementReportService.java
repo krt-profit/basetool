@@ -249,6 +249,7 @@ public class BankStatementReportService {
 
       String reasonLabel = label("pdf.bank.sub.justification");
       String noteLabel = label("pdf.bank.sub.note");
+      String staffNoteLabel = label("pdf.bank.sub.staffNote");
       boolean alt = false;
       BigDecimal running = opening;
       for (BankBookingRow row : rows) {
@@ -270,8 +271,13 @@ public class BankStatementReportService {
         KrtPdfSupport.addTableCell(table, BankPdfFormat.amount(running), bg, true);
         String reason = row.justification() != null ? row.justification() : "";
         String note = row.note() != null ? row.note() : "";
-        if (!reason.isEmpty() || !note.isEmpty()) {
-          KrtPdfSupport.addDetailSubRow(table, reasonLabel, reason, noteLabel, note, bg, columns);
+        // REQ-BANK-054: the employee's own note is internal. The Halter-redacted member statement
+        // (REQ-BANK-038) is the same generator with redactHolders=true, so it is dropped there for
+        // the same reason the Halter column is.
+        String staffNote = redactHolders || row.staffNote() == null ? "" : row.staffNote();
+        if (!reason.isEmpty() || !note.isEmpty() || !staffNote.isEmpty()) {
+          KrtPdfSupport.addDetailSubRow(
+              table, reasonLabel, reason, noteLabel, note, staffNoteLabel, staffNote, bg, columns);
         }
         alt = !alt;
       }

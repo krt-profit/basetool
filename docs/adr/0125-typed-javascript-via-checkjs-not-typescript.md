@@ -1,6 +1,6 @@
 # ADR-0125 — Type-check the browser scripts with `checkJs` + JSDoc instead of migrating to TypeScript
 
-- **Status:** Accepted
+- **Status:** Accepted — DTO type generation and the TypeScript 5.x pin superseded by ADR-0130
 - **Date:** 2026-08-02
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec REQ-FE-018 ([`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md)) · ADR-0069 (inline-JS page-module extraction) · ADR-0012/0013 (the krtFetch foundation) · [`docs/TYPESCRIPT_MIGRATION_PLAN.md`](../TYPESCRIPT_MIGRATION_PLAN.md)
@@ -76,6 +76,10 @@ and we will not convert the sources to TypeScript.**
   TypeScript supplies the type. The two are complementary and both must stay.
 - **TypeScript is pinned to the 5.x line.** TypeScript 7's native compiler drops the `ts.factory`
   compiler API that `openapi-typescript` builds on.
+
+  > **Superseded by [ADR-0130](0130-own-openapi-dts-emitter-and-typescript-7.md) (2026-08-09).**
+  > The generator was replaced with a dependency-free emitter of our own, which removed the reason
+  > for the pin; the module now runs TypeScript 7. Everything else in this ADR still stands.
 
 ## Consequences
 

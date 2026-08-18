@@ -52,11 +52,12 @@
     }
     const approvedNotice = document.getElementById('pending-approval-approved');
 
+    /** @type {number | null} */
     let timer = null;
     let stopped = false;
 
     function schedule() {
-        window.clearTimeout(timer);
+        window.clearTimeout(timer ?? undefined);
         if (stopped || document.hidden) {
             return;
         }
@@ -65,7 +66,7 @@
 
     function onApproved() {
         stopped = true;
-        window.clearTimeout(timer);
+        window.clearTimeout(timer ?? undefined);
         if (approvedNotice) {
             approvedNotice.hidden = false;
         }
@@ -104,7 +105,7 @@
             return;
         }
         if (document.hidden) {
-            window.clearTimeout(timer);
+            window.clearTimeout(timer ?? undefined);
         } else {
             // Back in the foreground: check immediately rather than waiting out a full interval.
             poll();

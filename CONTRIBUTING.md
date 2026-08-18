@@ -64,7 +64,7 @@ This project and everyone who participates in it are governed by the
 [Contributor Covenant 3.0 Code of Conduct](CODE_OF_CONDUCT.md). By
 participating, you agree to uphold it. Report unacceptable behaviour
 confidentially to
-[lucas.greuloch@pm.me](mailto:lucas.greuloch@pm.me).
+[lucas.greuloch@gmail.com](mailto:lucas.greuloch@gmail.com).
 
 ---
 
@@ -278,7 +278,7 @@ There are two signing paths, both documented in
 
 If You contribute on behalf of an employer or other legal entity, a
 separate **Entity CLA** is required. Contact
-[lucas.greuloch@pm.me](mailto:lucas.greuloch@pm.me) to obtain the
+[lucas.greuloch@gmail.com](mailto:lucas.greuloch@gmail.com) to obtain the
 template. Until the Entity CLA is countersigned, Your employer-funded
 contributions cannot be merged.
 
@@ -801,7 +801,7 @@ compatible with GPL-3.0 and disclose it in the PR description
 GPL-compatible upstream licenses include MIT, BSD-2/3-Clause, Apache
 2.0 (with caveats), and ISC; LGPL and AGPL are compatible in
 context-sensitive ways. When in doubt, ask in the PR or via
-[lucas.greuloch@pm.me](mailto:lucas.greuloch@pm.me) before submitting.
+[lucas.greuloch@gmail.com](mailto:lucas.greuloch@gmail.com) before submitting.
 
 ---
 

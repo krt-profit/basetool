@@ -142,10 +142,20 @@ class BusinessMetricsCollectorTest {
     // Must not propagate — the scheduler thread has to survive.
     collector.refresh();
 
-    // The failed sample is recorded as a failure and last_success stays 0, so BusinessMetricsStale
-    // fires instead of the queue gauges silently freezing while ApprovalOverdue reads stale values.
+    // The failed sample is recorded as a failure and publishes NO last-success gauge at all. A 0
+    // would be wrong: BusinessMetricsStale computes time() - gauge, so a 0 fires it as "last
+    // succeeded 1970-01-01" rather than because the sampler wedged (the 2026-08-10 sentinel bug).
+    // A sampler that has never succeeded in this process is caught by ScheduledJobFailureStreak on
+    // the failure counter below — at a 60s cadence that trips within minutes. BusinessMetricsStale
+    // keeps covering the case it was written for: a sampler that succeeded, then wedged, freezing a
+    // REAL timestamp while ApprovalOverdue reads stale queue gauges.
     assertThat(execCount(MetricNames.OUTCOME_FAILURE)).isEqualTo(1.0d);
-    assertThat(lastSuccess()).isEqualTo(0.0d);
+    assertThat(
+            registry
+                .find(MetricNames.SCHEDULED_JOB_LAST_SUCCESS)
+                .tag(MetricNames.TAG_JOB, ScheduledJob.BUSINESS_METRICS.label())
+                .gauge())
+        .isNull();
   }
 
   private double gauge(String name) {

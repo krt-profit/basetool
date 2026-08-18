@@ -74,3 +74,24 @@ updates:
       - docker
     commit-message:
       prefix: "chore(compose)"
+
+  # The frontend's asset-lint toolchain (Stylelint / ESLint / HTMLHint / Prettier / TypeScript).
+  # This was the one ecosystem in the repo NOTHING watched: refreshVersions
+  # only knows Maven coordinates and the entries above only cover Actions and images, so
+  # `frontend/package.json` drifted silently until someone checked it by hand. These linters gate
+  # CI (REQ-FE-018), so an unnoticed major here breaks the build on a version nobody chose.
+  #
+  # `versioning-strategy: increase` bumps the declared range in package.json rather than only the
+  # lockfile — the ranges are carets, so a lockfile-only bump would leave the manifest reading as
+  # an older floor forever.
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "chore(npm)"

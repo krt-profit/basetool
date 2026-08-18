@@ -147,6 +147,14 @@ public enum BankAuditEventType {
   BOOKING_REQUEST_CANCELLED,
 
   /**
+   * The requester corrected their own still-pending, not-yet-approved booking request — amount,
+   * Notiz, Begr&uuml;ndung, transfer destination or Empf&auml;nger (REQ-BANK-056); no ledger
+   * effect. The detail names the new amount (a system value) and whether the edit re-armed the
+   * approval gate, never the corrected free text.
+   */
+  BOOKING_REQUEST_UPDATED,
+
+  /**
    * An account's balance target ("Kontostandsziel") was set or changed (REQ-BANK-036); the details
    * payload carries the new target amount.
    */

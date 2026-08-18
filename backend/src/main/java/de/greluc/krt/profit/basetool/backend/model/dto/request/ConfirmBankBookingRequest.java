@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.model.dto.request;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -38,10 +39,14 @@ import org.jetbrains.annotations.Nullable;
  * @param destinationHolderId the destination holder for a transfer; {@code null} otherwise
  * @param ownerApprovalConfirmed whether the employee attests the responsible holder's approval was
  *     obtained (required when the request exceeds the requester's limit)
+ * @param staffNote the confirming employee's own free-text note ("Notiz Bankmitarbeiter",
+ *     REQ-BANK-054) recording internal context for the booking; always optional, snapshotted on the
+ *     request and copied onto the transaction the confirmation books
  * @param version the request's echoed {@code @Version}; a mismatch surfaces as 409
  */
 public record ConfirmBankBookingRequest(
     @NotNull UUID holderId,
     @Nullable UUID destinationHolderId,
     boolean ownerApprovalConfirmed,
+    @Nullable @Size(max = 500) String staffNote,
     @NotNull Long version) {}

@@ -91,6 +91,7 @@ class BankRequestQueuePageControllerMvcTest {
             new BigDecimal("5000"),
             "from sale",
             null,
+            null,
             "PENDING",
             "officerX",
             null,
@@ -108,6 +109,10 @@ class BankRequestQueuePageControllerMvcTest {
             false,
             null,
             false,
+            null,
+            null,
+            null,
+            null,
             null,
             0L);
     PageResponse<BankBookingRequestDto> page =
@@ -227,6 +232,9 @@ class BankRequestQueuePageControllerMvcTest {
         // surface), which is now a server-side account-search combobox (remote-bank-accounts,
         // REQ-FE-017/ADR-0106) rather than a preloaded <select> of every active account.
         .andExpect(content().string(Matchers.containsString("bank-movement-type")))
+        // REQ-BANK-054: the direct-booking modal carries the employee's own note field too, for
+        // every type incl. a deposit.
+        .andExpect(content().string(Matchers.containsString("bank-movement-staff-note")))
         .andExpect(content().string(Matchers.containsString("bank-movement-source-account")))
         .andExpect(
             content().string(Matchers.containsString("data-krt-combobox=\"remote-bank-accounts\"")))
@@ -267,5 +275,20 @@ class BankRequestQueuePageControllerMvcTest {
         .andExpect(
             content().string(Matchers.not(Matchers.containsString("id=\"bank-movement-modal\""))))
         .andExpect(content().string(Matchers.not(Matchers.containsString("bank-movement-open"))));
+  }
+
+  /**
+   * REQ-BANK-054: the request confirmation modal offers the "Notiz Bankmitarbeiter" field, so the
+   * employee can record internal context for the booking the confirmation produces. (The movement
+   * modal's copy is asserted by the canBook test above, which owns that fixture.)
+   */
+  @Test
+  @WithMockUser(roles = {"BANK_EMPLOYEE"})
+  void bankRequests_confirmModalOffersTheStaffNoteField() throws Exception {
+    mockMvc
+        .perform(get("/bank/requests"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("bank-confirm-staff-note")))
+        .andExpect(content().string(Matchers.containsString("name=\"staffNote\"")));
   }
 }

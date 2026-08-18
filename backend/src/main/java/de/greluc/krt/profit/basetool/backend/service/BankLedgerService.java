@@ -156,6 +156,7 @@ public class BankLedgerService {
             BankTransactionType.DEPOSIT,
             request.note(),
             null,
+            request.staffNote(),
             null,
             BigDecimal.ZERO,
             now,
@@ -271,6 +272,7 @@ public class BankLedgerService {
             BankTransactionType.DEPOSIT,
             request.note(),
             null,
+            request.staffNote(),
             null,
             BigDecimal.ZERO,
             now,
@@ -390,6 +392,7 @@ public class BankLedgerService {
             BankTransactionType.WITHDRAWAL,
             request.note(),
             request.justification(),
+            request.staffNote(),
             null,
             fee,
             now,
@@ -498,6 +501,7 @@ public class BankLedgerService {
             BankTransactionType.TRANSFER,
             request.note(),
             request.justification(),
+            request.staffNote(),
             null,
             fee,
             now,
@@ -581,7 +585,7 @@ public class BankLedgerService {
     Instant now = Instant.now();
     BankTransaction tx =
         writer.persistTransaction(
-            BankTransactionType.HOLDER_TRANSFER, request.note(), null, null, fee, now, null);
+            BankTransactionType.HOLDER_TRANSFER, request.note(), null, null, null, fee, now, null);
     writer.persistHolderPosting(tx, sourceHolder, request.amount().add(fee).negate(), now);
     writer.persistHolderPosting(tx, destinationHolder, request.amount(), now);
     if (cartel != null) {
@@ -672,7 +676,7 @@ public class BankLedgerService {
     // a bookkeeping correction. Restoring the gross makes the source whole again.
     BankTransaction reversal =
         writer.persistTransaction(
-            BankTransactionType.REVERSAL, note, null, original, BigDecimal.ZERO, now, null);
+            BankTransactionType.REVERSAL, note, null, null, original, BigDecimal.ZERO, now, null);
     for (BankCounterLeg leg : accountLegs) {
       writer.persistAccountPosting(
           reversal, lockedAccounts.get(leg.accountId()), leg.amount().negate(), now);
@@ -734,6 +738,7 @@ public class BankLedgerService {
         writer.persistTransaction(
             BankTransactionType.WIPE_RESET,
             "SC wipe reset",
+            null,
             null,
             null,
             BigDecimal.ZERO,

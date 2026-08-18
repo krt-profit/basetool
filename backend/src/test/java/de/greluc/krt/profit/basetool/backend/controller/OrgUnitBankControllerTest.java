@@ -193,6 +193,7 @@ class OrgUnitBankControllerTest {
         new BigDecimal("500"),
         "note",
         null,
+        null,
         BankBookingRequestStatus.PENDING,
         "requester",
         null,
@@ -210,6 +211,10 @@ class OrgUnitBankControllerTest {
         false,
         null,
         false,
+        null,
+        null,
+        null,
+        null,
         null,
         0L);
   }

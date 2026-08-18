@@ -41,6 +41,9 @@ import org.jetbrains.annotations.Nullable;
  * @param note the requester's optional note, or {@code null}
  * @param justification the requester's optional justification (Begr&uuml;ndung) for a {@code
  *     WITHDRAWAL} / {@code TRANSFER} (REQ-BANK-045), or {@code null}
+ * @param staffNote the confirming bank employee's own note ("Notiz Bankmitarbeiter", REQ-BANK-054),
+ *     snapshotted on the request at confirmation; {@code null} while the request is pending, on a
+ *     rejected/cancelled one and when the employee recorded none
  * @param status lifecycle enum name (PENDING / CONFIRMED / REJECTED / CANCELLED)
  * @param requesterHandle the requesting officer/lead's effective-name snapshot
  * @param holderId the holder recorded at confirmation, or {@code null} while not confirmed
@@ -67,6 +70,12 @@ import org.jetbrains.annotations.Nullable;
  *     confirmation (REQ-BANK-044)
  * @param splitPercent the whole-percent (1–100) distributed across squadron accounts, or {@code
  *     null} when not a split
+ * @param counterpartyUserId the Empf&auml;nger named on a {@code WITHDRAWAL} request
+ *     (REQ-BANK-055), or {@code null} when confirmation should derive the requester
+ * @param counterpartyHandle name snapshot of that Empf&auml;nger, the value the request lists
+ *     display; {@code null} exactly when none is named
+ * @param counterpartyOrgUnitId the Empf&auml;nger's chosen org unit, or {@code null}
+ * @param counterpartyOrgUnitName name snapshot of that org unit, or {@code null}
  * @param version the optimistic-locking version echoed on cancel/confirm/reject
  */
 public record BankBookingRequestDto(
@@ -81,6 +90,7 @@ public record BankBookingRequestDto(
     BigDecimal amount,
     @Nullable String note,
     @Nullable String justification,
+    @Nullable String staffNote,
     @BackendEnumAsString String status,
     String requesterHandle,
     @Nullable UUID holderId,
@@ -99,4 +109,8 @@ public record BankBookingRequestDto(
     @Nullable String ownerApprovalGrantedByHandle,
     boolean splitEnabled,
     @Nullable BigDecimal splitPercent,
+    @Nullable UUID counterpartyUserId,
+    @Nullable String counterpartyHandle,
+    @Nullable UUID counterpartyOrgUnitId,
+    @Nullable String counterpartyOrgUnitName,
     Long version) {}

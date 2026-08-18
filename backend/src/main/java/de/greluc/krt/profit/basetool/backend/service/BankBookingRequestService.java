@@ -41,9 +41,11 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankTransactionDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankTransferRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankWithdrawalRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
@@ -137,10 +139,16 @@ public class BankBookingRequestService {
    *     confirmation (REQ-BANK-044); always {@code false} for withdrawal/transfer
    * @param splitPercent the whole-percent (1–100) of the deposit gross to distribute; {@code null}
    *     unless {@code splitEnabled}
+   * @param counterpartyUserId the Empf&auml;nger of a {@code WITHDRAWAL} request (REQ-BANK-055), or
+   *     {@code null} to keep deriving the requester at confirmation
+   * @param counterpartyOrgUnitId that Empf&auml;nger's org unit, validated against their own
+   *     memberships; {@code null} when none was chosen
    * @return the created request
    * @throws NotFoundException when the (source or destination) account does not exist
    * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a closed account or {@code
    *     BANK_SELF_TRANSFER} when source equals destination
+   * @throws BadRequestException when a counterparty is named on a non-withdrawal, or its org unit
+   *     is not one of that user's memberships
    */
   @Transactional
   public BankBookingRequestDto create(
@@ -154,7 +162,9 @@ public class BankBookingRequestService {
       @Nullable BigDecimal applicableLimit,
       @Nullable BankRequestApprover requiredApprover,
       boolean splitEnabled,
-      @Nullable BigDecimal splitPercent) {
+      @Nullable BigDecimal splitPercent,
+      @Nullable UUID counterpartyUserId,
+      @Nullable UUID counterpartyOrgUnitId) {
     BankAccount account =
         accountRepository
             .findById(accountId)
@@ -183,9 +193,6 @@ public class BankBookingRequestService {
       requireActiveForRequest(targetAccount);
     }
 
-    UUID requesterSub = authHelperService.currentUserId().orElse(null);
-    String requesterHandle = resolveHandle(requesterSub);
-
     BankBookingRequest request = new BankBookingRequest();
     request.setAccount(account);
     request.setTargetAccount(targetAccount);
@@ -193,7 +200,12 @@ public class BankBookingRequestService {
     request.setAmount(amount);
     request.setNote(note);
     request.setJustification(justification);
+    // Nothing is persisted until save() below, so a rejected counterparty aborts cleanly here.
+    applyCounterparty(
+        request, resolveRequestCounterparty(type, counterpartyUserId, counterpartyOrgUnitId));
     request.setStatus(BankBookingRequestStatus.PENDING);
+    UUID requesterSub = authHelperService.currentUserId().orElse(null);
+    String requesterHandle = resolveHandle(requesterSub);
     request.setRequestedBy(requesterSub);
     request.setRequesterHandle(requesterHandle);
     request.setRequiresOwnerApproval(requiresOwnerApproval);
@@ -230,6 +242,109 @@ public class BankBookingRequestService {
   }
 
   /**
+   * Resolves the Empf&auml;nger a requester named on a {@code WITHDRAWAL} request into a
+   * deletion-proof snapshot (REQ-BANK-055), or {@code null} when none was named.
+   *
+   * <p>The <strong>registered-user path only</strong>: unlike the bank employee's booking-time
+   * {@code BankLedgerService#resolveCounterparty}, this deliberately offers no free-text external
+   * counterparty. Recording an unverifiable name on the ledger stays a Bank-Employee capability
+   * (REQ-BANK-044/#994) — a requester picks a tool user or nobody.
+   *
+   * <p>The handle and org-unit name are snapshotted <em>now</em>, at request time, rather than
+   * re-resolved at confirmation: the named user (or their org unit) may be deleted in between, and
+   * the confirmation must still be able to stamp an attributable ledger row.
+   *
+   * @param type the movement kind; anything but {@code WITHDRAWAL} must not carry a counterparty
+   * @param userId the named Empf&auml;nger, or {@code null}
+   * @param orgUnitId the chosen org unit of that user, or {@code null}
+   * @return the snapshot, or {@code null} when no counterparty was named
+   * @throws BadRequestException when a counterparty is named on a non-withdrawal, an org unit is
+   *     given without a user, or the org unit is not one of that user's memberships
+   * @throws NotFoundException when the named user does not exist
+   */
+  @Nullable
+  private CounterpartySnapshot resolveRequestCounterparty(
+      @NotNull BankBookingRequestType type, @Nullable UUID userId, @Nullable UUID orgUnitId) {
+    if (userId == null) {
+      if (orgUnitId != null) {
+        throw new BadRequestException("A counterparty org unit requires a counterparty");
+      }
+      return null;
+    }
+    if (type != BankBookingRequestType.WITHDRAWAL) {
+      throw new BadRequestException(
+          "Only a withdrawal request records a counterparty (Empfaenger)");
+    }
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new NotFoundException("Counterparty user not found"));
+    if (orgUnitId == null) {
+      return new CounterpartySnapshot(user.getId(), user.getEffectiveName(), null, null);
+    }
+    OrgUnitMembershipOptionDto membership =
+        orgUnitMembershipQueryService.listDirectMembershipOptions(userId).stream()
+            .filter(option -> option.orgUnitId().equals(orgUnitId))
+            .findFirst()
+            .orElseThrow(
+                () ->
+                    new BadRequestException(
+                        "The selected org unit is not one of the counterparty's memberships"));
+    return new CounterpartySnapshot(
+        user.getId(), user.getEffectiveName(), membership.orgUnitId(), membership.orgUnitName());
+  }
+
+  /**
+   * The org unit to stamp on the booking a confirmation produces, for the counterparty {@code
+   * counterpartyId} (REQ-BANK-044/-055).
+   *
+   * <p>Confirmation happens an arbitrary time after the request was raised, and {@code
+   * BankLedgerService} re-validates that the org unit is still one of the counterparty's
+   * memberships — so passing the stored choice through blindly would let a membership change
+   * between request and confirmation turn into a <strong>400 that blocks the booking</strong>.
+   * Instead the stored choice is used only while it still holds, and otherwise degrades to the
+   * counterparty's current primary unit (and finally to none). A stale unit costs a less precise
+   * snapshot; it never costs the employee their ability to confirm.
+   *
+   * @param request the request being confirmed
+   * @param counterpartyId the resolved counterparty (the named Empf&auml;nger, else the requester),
+   *     or {@code null} when the request carries neither
+   * @return the org unit to record, or {@code null}
+   */
+  @Nullable
+  private UUID confirmCounterpartyOrgUnitId(
+      @NotNull BankBookingRequest request, @Nullable UUID counterpartyId) {
+    if (counterpartyId == null) {
+      return null;
+    }
+    UUID stored = request.getCounterpartyOrgUnitId();
+    if (stored != null
+        && orgUnitMembershipQueryService.listDirectMembershipOptions(counterpartyId).stream()
+            .anyMatch(option -> option.orgUnitId().equals(stored))) {
+      return stored;
+    }
+    return orgUnitMembershipQueryService
+        .findPrimaryDirectMembershipOrgUnitId(counterpartyId)
+        .orElse(null);
+  }
+
+  /**
+   * Writes a resolved counterparty snapshot onto the request, clearing all four columns when it is
+   * {@code null} so an edit that removes the Empf&auml;nger does not leave a half-populated row
+   * (the V232 CHECK ties the handle to the user id and the unit name to the unit id).
+   *
+   * @param request the request to stamp
+   * @param counterparty the resolved snapshot, or {@code null} to clear
+   */
+  private static void applyCounterparty(
+      @NotNull BankBookingRequest request, @Nullable CounterpartySnapshot counterparty) {
+    request.setCounterpartyUserId(counterparty == null ? null : counterparty.userId());
+    request.setCounterpartyHandle(counterparty == null ? null : counterparty.handle());
+    request.setCounterpartyOrgUnitId(counterparty == null ? null : counterparty.orgUnitId());
+    request.setCounterpartyOrgUnitName(counterparty == null ? null : counterparty.orgUnitName());
+  }
+
+  /**
    * Lists the current caller's own booking requests, newest first (REQ-BANK-022). Per-user
    * isolation: it reads strictly the caller's {@code sub}, so it can never surface a foreign
    * request.
@@ -246,6 +361,140 @@ public class BankBookingRequestService {
                     .map(this::toDto)
                     .toList())
         .orElseGet(List::of);
+  }
+
+  /**
+   * Applies a requester's correction to their own still-pending booking request (REQ-BANK-056).
+   *
+   * <p>Four guards, all evaluated under the row lock so a concurrent decision cannot slip between
+   * the check and the write:
+   *
+   * <ol>
+   *   <li><b>Ownership.</b> A request belonging to someone else is reported as <em>not found</em>,
+   *       never as forbidden — the same per-user isolation {@link #cancelOwn} uses, so the endpoint
+   *       cannot be used to probe which request ids exist.
+   *   <li><b>Still pending.</b> A confirmed request has already moved money and a
+   *       rejected/cancelled one is terminal ({@code BANK_REQUEST_NOT_PENDING}).
+   *   <li><b>Not yet owner-approved.</b> {@code BANK_REQUEST_ALREADY_APPROVED} — the approval was
+   *       granted for the amount and reason as they stood; editing afterwards would convert a small
+   *       approved request into an arbitrarily large pre-approved one.
+   *   <li><b>Version echo.</b> The usual optimistic-lock 409.
+   * </ol>
+   *
+   * <p>The caller ({@link OrgUnitBankAccessService}) has already re-derived the approval snapshot
+   * from the <em>new</em> amount and passes it in; this method only stamps it. That is what makes
+   * raising the amount past the requester's limit re-arm the approval gate instead of riding the
+   * original below-limit snapshot.
+   *
+   * <p>The request is mutated in place and flushed by dirty checking — no explicit {@code save}
+   * that would risk a second {@code @Version} bump (the {@code …WithinTransaction} discipline).
+   *
+   * @param requestId the request to correct
+   * @param update the corrected values plus the echoed version
+   * @param requiresOwnerApproval the re-derived approval flag for the new amount
+   * @param applicableLimit the re-derived applicable limit, or {@code null}
+   * @param requiredApprover the re-derived approver class, or {@code null}
+   * @return the updated request
+   * @throws NotFoundException when the request does not exist or belongs to another user
+   * @throws BankConflictException {@code BANK_REQUEST_NOT_PENDING} when already decided, {@code
+   *     BANK_REQUEST_ALREADY_APPROVED} when the responsible holder already signed off
+   * @throws BadRequestException on an inconsistent destination account or counterparty, or a
+   *     missing Begr&uuml;ndung on a mandating account
+   * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
+   */
+  @Transactional
+  public BankBookingRequestDto updateOwn(
+      @NotNull UUID requestId,
+      @NotNull UpdateBankBookingRequest update,
+      boolean requiresOwnerApproval,
+      @Nullable BigDecimal applicableLimit,
+      @Nullable BankRequestApprover requiredApprover) {
+    BankBookingRequest request = lockRequest(requestId);
+    UUID caller = authHelperService.currentUserId().orElse(null);
+    if (caller == null || !caller.equals(request.getRequestedBy())) {
+      throw new NotFoundException("Booking request not found");
+    }
+    requireVersion(request, update.version());
+    requirePending(request);
+    if (request.isOwnerApprovalGranted()) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_REQUEST_ALREADY_APPROVED,
+          "An approved request can no longer be edited; cancel it and raise a new one");
+    }
+
+    BankBookingRequestType type = request.getType();
+    // REQ-BANK-045: the Begründung rule is re-checked against the (unchanged) source account, so an
+    // edit cannot blank a mandatory reason.
+    if (type == BankBookingRequestType.WITHDRAWAL || type == BankBookingRequestType.TRANSFER) {
+      BankBookingGuards.requireDebitJustification(request.getAccount(), update.justification());
+    }
+    applyTargetAccount(request, type, update.targetAccountId());
+    applyCounterparty(
+        request,
+        resolveRequestCounterparty(
+            type, update.counterpartyUserId(), update.counterpartyOrgUnitId()));
+    request.setAmount(update.amount());
+    request.setNote(update.note());
+    request.setJustification(update.justification());
+    request.setRequiresOwnerApproval(requiresOwnerApproval);
+    request.setApplicableLimit(applicableLimit);
+    request.setRequiredApprover(requiredApprover);
+
+    // REQ-AUDIT-001: the new amount is a system value, not user free text, so it may be named. The
+    // corrected note/Begründung/Empfaenger deliberately are NOT — the details payload carries no
+    // user free text and no PII.
+    bankAuditService.record(
+        BankAuditEventType.BOOKING_REQUEST_UPDATED,
+        request.getAccount().getId(),
+        null,
+        caller,
+        "edited request "
+            + shortId(request.getId())
+            + " to "
+            + plain(update.amount())
+            + " aUEC"
+            + (requiresOwnerApproval ? " (needs approval)" : ""));
+    return toDto(request);
+  }
+
+  /**
+   * Re-points a {@code TRANSFER} request's destination account, enforcing the same shape rules the
+   * create path applies: a transfer names an active destination that differs from its source, and a
+   * deposit/withdrawal names none.
+   *
+   * @param request the request being edited
+   * @param type the request's (immutable) movement kind
+   * @param targetAccountId the corrected destination, or {@code null}
+   * @throws BadRequestException when the destination is missing on a transfer or present otherwise
+   * @throws BankConflictException {@code BANK_SELF_TRANSFER} when it equals the source
+   * @throws NotFoundException when the destination account does not exist
+   */
+  private void applyTargetAccount(
+      @NotNull BankBookingRequest request,
+      @NotNull BankBookingRequestType type,
+      @Nullable UUID targetAccountId) {
+    if (type != BankBookingRequestType.TRANSFER) {
+      if (targetAccountId != null) {
+        throw new BadRequestException(
+            "A non-transfer request must not carry a destination account");
+      }
+      request.setTargetAccount(null);
+      return;
+    }
+    if (targetAccountId == null) {
+      throw new BadRequestException("A transfer request requires a destination account");
+    }
+    if (targetAccountId.equals(request.getAccount().getId())) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_SELF_TRANSFER,
+          "Source and destination account of a transfer must differ");
+    }
+    BankAccount target =
+        accountRepository
+            .findById(targetAccountId)
+            .orElseThrow(() -> new NotFoundException("Destination account not found"));
+    requireActiveForRequest(target);
+    request.setTargetAccount(target);
   }
 
   /**
@@ -352,6 +601,8 @@ public class BankBookingRequestService {
    * @param requestId the request to confirm
    * @param holderId the holder the employee records for the booking (source holder for a transfer)
    * @param destinationHolderId the destination holder for a transfer; {@code null} otherwise
+   * @param staffNote the confirming employee's own note ("Notiz Bankmitarbeiter", REQ-BANK-054),
+   *     snapshotted on the request and copied onto the booked transaction; {@code null} when none
    * @param ownerApprovalConfirmed the over-limit "approval by responsible holder obtained"
    *     attestation (REQ-BANK-041); required when the request needs approval
    * @param version the echoed optimistic-locking version
@@ -371,6 +622,7 @@ public class BankBookingRequestService {
       @NotNull UUID holderId,
       @Nullable UUID destinationHolderId,
       boolean ownerApprovalConfirmed,
+      @Nullable String staffNote,
       long version,
       Authentication authentication) {
     BankBookingRequest request = lockRequest(requestId);
@@ -387,19 +639,16 @@ public class BankBookingRequestService {
     UUID accountId = request.getAccount().getId();
     requireConfirmCapability(request.getType(), accountId, authentication);
 
-    // REQ-BANK-044: a confirmed deposit/withdrawal records the requester as the counterparty
-    // (Einzahler/Empfänger — for a deposit request, REQ-BANK-042, the requester IS the depositor)
-    // together with their org unit. requested_by is ON DELETE SET NULL, so a non-null id always
-    // still resolves; the requester may belong to several units, so the deterministic primary unit
-    // is recorded (name-sorted primary Staffel, or a leader's Bereich/OL), null when they have
-    // none.
-    UUID requesterId = request.getRequestedBy();
-    UUID counterpartyOrgUnitId =
-        requesterId == null
-            ? null
-            : orgUnitMembershipQueryService
-                .findPrimaryDirectMembershipOrgUnitId(requesterId)
-                .orElse(null);
+    // REQ-BANK-044/-055: a confirmed deposit/withdrawal records a counterparty
+    // (Einzahler/Empfänger). An Empfänger the requester NAMED on the request wins; otherwise the
+    // requester is derived — for a deposit request (REQ-BANK-042) the requester IS the depositor,
+    // and for a withdrawal that named nobody it is the historical default the pre-V232 rows carry.
+    // requested_by is ON DELETE SET NULL, so a non-null id always still resolves; the requester may
+    // belong to several units, so the deterministic primary unit is recorded (name-sorted primary
+    // Staffel, or a leader's Bereich/OL), null when they have none.
+    UUID namedCounterparty = request.getCounterpartyUserId();
+    UUID requesterId = namedCounterparty != null ? namedCounterparty : request.getRequestedBy();
+    UUID counterpartyOrgUnitId = confirmCounterpartyOrgUnitId(request, requesterId);
 
     BankTransactionDto booked =
         switch (request.getType()) {
@@ -414,10 +663,12 @@ public class BankBookingRequestService {
                       holderId,
                       request.getAmount(),
                       request.getNote(),
+                      staffNote,
                       request.isSplitEnabled(),
                       request.getSplitPercent(),
                       requesterId,
-                      counterpartyOrgUnitId));
+                      counterpartyOrgUnitId,
+                      null));
           case WITHDRAWAL ->
               bankLedgerService.bookWithdrawal(
                   new BankWithdrawalRequest(
@@ -426,12 +677,14 @@ public class BankBookingRequestService {
                       request.getAmount(),
                       request.getNote(),
                       request.getJustification(),
+                      staffNote,
                       requesterId,
                       counterpartyOrgUnitId,
                       // A booking request never carries the fee-inclusive flag (REQ-BANK-033,
                       // #999);
                       // confirmation always books the default on-top fee mode.
-                      false));
+                      false,
+                      null));
           case TRANSFER -> {
             BankAccount target = request.getTargetAccount();
             if (target == null || destinationHolderId == null) {
@@ -454,6 +707,7 @@ public class BankBookingRequestService {
                     request.getAmount(),
                     request.getNote(),
                     request.getJustification(),
+                    staffNote,
                     // A booking request never carries the fee-inclusive flag (REQ-BANK-033, #999);
                     // confirmation always books the default on-top fee mode.
                     false),
@@ -473,6 +727,7 @@ public class BankBookingRequestService {
     request.setHolder(holder);
     request.setResultingTransaction(transaction);
     request.setStatus(BankBookingRequestStatus.CONFIRMED);
+    request.setStaffNote(staffNote);
     request.setDecidedBy(decider);
     request.setDeciderHandle(resolveHandle(decider));
     request.setDecidedAt(Instant.now());
@@ -744,6 +999,7 @@ public class BankBookingRequestService {
         request.getAmount(),
         request.getNote(),
         request.getJustification(),
+        request.getStaffNote(),
         request.getStatus(),
         request.getRequesterHandle(),
         holder == null ? null : holder.getId(),
@@ -762,6 +1018,10 @@ public class BankBookingRequestService {
         request.getOwnerApprovalGrantedByHandle(),
         request.isSplitEnabled(),
         request.getSplitPercent(),
+        request.getCounterpartyUserId(),
+        request.getCounterpartyHandle(),
+        request.getCounterpartyOrgUnitId(),
+        request.getCounterpartyOrgUnitName(),
         request.getVersion());
   }
 

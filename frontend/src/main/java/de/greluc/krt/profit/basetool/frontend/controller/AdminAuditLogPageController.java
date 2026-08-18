@@ -111,6 +111,7 @@ public class AdminAuditLogPageController {
               "BOOKING_REQUEST_CONFIRMED",
               "BOOKING_REQUEST_REJECTED",
               "BOOKING_REQUEST_CANCELLED",
+              "BOOKING_REQUEST_UPDATED",
               "AUDIT_LOG_EXPORTED",
               "AUDIT_LOG_PURGED",
               "BALANCE_TARGET_SET",

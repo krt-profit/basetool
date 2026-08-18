@@ -17,7 +17,12 @@
  *     path, replacing `selectedOptions[0].dataset.*` reads (REQ-FE-016);
  *   - `required` is mirrored onto the visible textbox and a custom validity
  *     message is set while the typed text matches no option, so the browser's
- *     own constraint-validation bubble keeps gating submit at the right field.
+ *     own constraint-validation bubble keeps gating submit at the right field;
+ *   - the committed selection is tracked as a label/value/item TRIPLE and the
+ *     two abandon paths (Escape, blur) restore all three through
+ *     restoreCommitted(). Restoring the label alone would leave the value that
+ *     reconcile() cleared empty behind a filled-looking box — a required picker
+ *     that passes `required` and submits nothing.
  *
  * Follows the WAI-ARIA editable-combobox-with-list-autocomplete pattern
  * (role=combobox textbox + role=listbox popup, aria-activedescendant, keyboard
@@ -332,12 +337,23 @@
         }
 
         // Seed the display from a preselected value (edit mode / adopted sub-assembly).
+        //
+        // The committed selection is tracked as a TRIPLE — label, value and the item itself — and
+        // every one of them is restored together by restoreCommitted(). Tracking only the label (the
+        // original shape) made the two restore paths (Escape, blur) put the visible text back while
+        // leaving the submitted value cleared by reconcile(): a required picker then looked correctly
+        // filled, passed its `required` check, and submitted nothing. See restoreCommitted().
         let committedLabel = '';
+        let committedValue = '';
+        /** @type {any} */
+        let committedItem = null;
         const preselected = items.find(function (it) {
             return it.value === select.value;
         });
         if (preselected) {
             committedLabel = preselected.label;
+            committedValue = preselected.value;
+            committedItem = preselected;
             hidden.value = preselected.value;
             input.value = committedLabel;
             mirrorItemData(preselected);
@@ -351,7 +367,9 @@
         let rendered = [];
         let activeIndex = -1;
         let remoteSeq = 0;
+        /** @type {number | null} */
         let remoteTimer = null;
+        /** @type {(() => void) | null} */
         let repositionHandler = null;
 
         function isOpen() {
@@ -580,7 +598,7 @@
             input.setAttribute('aria-expanded', 'true');
             positionListbox();
             attachReposition();
-            window.clearTimeout(remoteTimer);
+            window.clearTimeout(remoteTimer ?? undefined);
             remoteTimer = window.setTimeout(function () {
                 loadRemote(query);
             }, delay || 0);
@@ -608,9 +626,39 @@
             // (unit/step refreshers) already see the new option's metadata.
             mirrorItemData(next ? item : null);
             committedLabel = next ? item.label : '';
+            committedValue = next;
+            committedItem = next ? item : null;
             input.value = committedLabel;
             input.setCustomValidity('');
             close();
+            if (changed) {
+                hidden.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+        /**
+         * Puts the committed selection back on screen AND back into the submitted value.
+         *
+         * Both abandon paths (Escape while open, blur without a pick) used to assign
+         * {@code input.value = committedLabel} and clear the custom validity, but never restored
+         * {@code hidden.value}. Since {@link reconcile} empties the hidden input on any non-matching
+         * keystroke — and {@code focus} does {@code input.select()}, so a single keystroke replaces
+         * the whole label — that combination silently desynced the two halves of the control: the
+         * textbox showed the previously picked entry, the browser's `required` check passed, the
+         * arming custom-validity message was dropped, and the form submitted an EMPTY value. On the
+         * bank withdrawal confirm that surfaced as an unactionable "some fields are invalid" while
+         * the holder was visibly filled in.
+         *
+         * Restores the mirrored option metadata too, and re-fires {@code change} when the value
+         * actually moves, because reconcile() already fired one when it cleared the value — without
+         * the symmetric event, dependent loaders (unit/step refreshers) would keep the cleared state.
+         */
+        function restoreCommitted() {
+            const changed = hidden.value !== committedValue;
+            hidden.value = committedValue;
+            mirrorItemData(committedItem);
+            input.value = committedLabel;
+            input.setCustomValidity('');
             if (changed) {
                 hidden.dispatchEvent(new Event('change', { bubbles: true }));
             }
@@ -621,6 +669,7 @@
         // arms the custom-validity message so submit stays blocked until resolved.
         function reconcile() {
             const typed = input.value.trim().toLowerCase();
+            /** @type {any} */
             let exact = null;
             for (let i = 0; i < items.length; i++) {
                 if (items[i].label.toLowerCase() === typed) {
@@ -630,6 +679,8 @@
             }
             if (exact) {
                 committedLabel = exact.label;
+                committedValue = exact.value;
+                committedItem = exact;
                 if (hidden.value !== exact.value) {
                     hidden.value = exact.value;
                     mirrorItemData(exact);
@@ -653,6 +704,8 @@
             // selection.
             if (optional && !input.value.trim()) {
                 committedLabel = '';
+                committedValue = '';
+                committedItem = null;
             }
             input.setCustomValidity(input.value.trim() ? texts.invalid : '');
         }
@@ -728,8 +781,7 @@
                     if (isOpen()) {
                         event.preventDefault();
                         close();
-                        input.value = committedLabel;
-                        input.setCustomValidity('');
+                        restoreCommitted();
                     }
                     break;
                 case 'Home':
@@ -758,8 +810,7 @@
                     return;
                 }
                 close();
-                input.value = committedLabel;
-                input.setCustomValidity('');
+                restoreCommitted();
             }, 150);
         });
 
@@ -784,6 +835,7 @@
          */
         function setValue(value, label, data) {
             const v = value == null ? '' : String(value);
+            /** @type {any} */
             let match = null;
             for (let i = 0; i < items.length; i++) {
                 if (items[i].value === v) {
@@ -797,6 +849,8 @@
             hidden.value = match ? match.value : '';
             mirrorItemData(match);
             committedLabel = match ? match.label : '';
+            committedValue = match ? match.value : '';
+            committedItem = match;
             input.value = committedLabel;
             input.setCustomValidity('');
         }

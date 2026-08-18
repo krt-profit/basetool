@@ -365,11 +365,29 @@ blocking every deploy; it is logged loudly on every skipped verification.
 both 2.x and 3.x keyless signatures, but cosign 2.x **cannot** verify 3.x signatures. The CI signs
 with the cosign that `sigstore/cosign-installer` pins (currently 3.0.6 via `@v4.1.2`), so the host
 cosign must be **≥ that version and never a lower major** — otherwise the fail-closed gate blocks
-every deploy. The host tracks the current 3.x release (3.1.2); when the CI installer pin is bumped,
-the host is kept ≥ it.
+every deploy. The host tracks the current 3.x release (3.1.3); when the CI installer pin is bumped,
+the host is kept ≥ it. The host binary is also kept current for its **own** advisories, not only for
+signature compatibility: cosign ≤ 3.1.2 carries GHSA-fx35-mq7g-6g98, an identity-pinning bypass that
+reaches `verify-blob` only and therefore never exposed this OCI-image gate.
+
+**A transient failure is not a supply-chain alarm.** Verification is a network round-trip — it
+fetches the signature layer from GHCR and reaches the Sigstore roots — so it fails for the same
+transient reasons `release-images.yml` already wraps `cosign sign` in a 5-attempt retry for. The
+gate therefore **retries** (`IRI_COSIGN_VERIFY_ATTEMPTS`, default 3, delay
+`IRI_COSIGN_VERIFY_DELAY` doubling per attempt) before it escalates, and it **captures cosign's
+stderr** so both the retry log and the abort quote the actual reason. Discarding that output made a
+registry blip and a forged image produce byte-identical operator-facing output. On 2026-08-05 that
+cost a critical `DeployFailed` page reading "refusing to deploy an unverified/untrusted image":
+the identical digest verified cleanly by hand minutes later, and the same tick had also failed to
+resolve `keycloak-spi:stable` — one GHCR hiccup, two symptoms. Retrying costs at most a few seconds
+on a genuinely bad signature, which still aborts fail-closed.
 
 **Acceptance**
 
+- [ ] A verification that fails transiently is retried before the tick aborts; only an exhausted
+  retry budget escalates to the security abort and the deploy-failure metric.
+- [ ] The retry log line and the abort both quote cosign's own stderr, so a registry/Sigstore error
+  is distinguishable from a signature mismatch without host access.
 - [ ] `deploy.sh` runs `cosign verify` (identity `…/release-images.yml@refs/(heads/main|tags/v.+)`,
   issuer `token.actions.githubusercontent.com`) against every resolved `image@digest` — backend,
   frontend, ingest, and the config + keycloak-spi bundles when resolved — **before** the first

@@ -146,7 +146,10 @@ jobs:
       # commands — `docker run ... grafana/alloy:<tag> fmt /cfg/config.alloy`. Those must stay pinned
       # to be reproducible, and a stale one is the sharper hazard: the command still succeeds, just
       # against a binary that is not deployed, so the wrong answer is silent. This gate keeps them
-      # honest. `--fix` rewrites every drifted pin in one go.
+      # honest. `--fix` rewrites every drifted pin in one go. Since 2026-08-16 the scan covers every
+      # tracked text file rather than only Markdown: the same command sits in the header of each
+      # promtool test under monitoring/prometheus/tests/, where nothing gated it, and nine of the ten
+      # files there had drifted across three Prometheus versions.
       - name: Check documented monitoring image pins
         # chmod first, mirroring the migration-numbering gate: this repo is developed on Windows
         # where `core.filemode=false`, so a local `chmod +x` is not recorded and the executable bit

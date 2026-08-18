@@ -70,6 +70,7 @@ const REFINERY_ORDER_SECTIONS = {
 
 // The page's { refresh, notify } seam, built lazily below. Null when the krtFetch foundation is
 // absent (no-JS), in which case every write falls back to the classic form POST -> redirect.
+/** @type {KrtSectionWriter | null} */
 let refinerySeam = null;
 
 /** The refinery-order:{id} room this page publishes to, or null before the id bootstrap ran. */
@@ -121,7 +122,10 @@ function refineryStoreModalOpen() {
             topic: refineryTopic(),
             sections: REFINERY_ORDER_SECTIONS,
             refresh: function (keys) {
-                refinerySeam.refresh(keys, { broadcast: false });
+                // The receiver is created after the seam is assigned, so this can only be
+                // null if wiring order ever changes — fail soft rather than throw in a
+                // peer-message callback.
+                refinerySeam?.refresh(keys, { broadcast: false });
             },
             // The receiver's default busy test only recognises .krt-modal-overlay dialogs; the
             // Einlagern dialog is an older .modal, so without this a peer's save would yank the

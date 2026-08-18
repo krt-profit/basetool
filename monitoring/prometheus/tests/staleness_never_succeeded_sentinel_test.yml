@@ -1,0 +1,110 @@
+# promtool unit test for the never-succeeded sentinel guard on the last-success staleness rules
+# (REQ-OBS-011, 2026-08-10).
+#
+# All six staleness rules compute `time() - basetool_scheduled_job_last_success_timestamp_seconds`,
+# so a gauge reading 0 means "last succeeded 1970-01-01" — an age above EVERY threshold in
+# business.yml. TaskMetrics used to register that gauge with a 0 sentinel when a run STARTED and
+# write the real timestamp only when it finished; the holder is per-process, so each job's first run
+# after a backend restart published 0 for its whole duration. The prod SC-Wiki sweep takes ~10-15 min
+# (sync-all-items), outlasting ExternalSyncStale's `for: 10m` — the alert fired on every restart and
+# self-resolved when the sweep completed (2026-08-10 05:27→05:32 CEST).
+#
+# TaskMetrics now registers the gauge on the first SUCCESS, seeded with that timestamp, so the
+# sentinel is gone at the source. These cases pin the rules' own `(gauge > 0)` guard, which is what
+# protects the stack between a rules reload and a backend deploy:
+#   - SILENT on the 0 sentinel, for the warning rule (ExternalSyncStale) and for the CRITICAL one
+#     (BankLedgerIntegritySweepStale, which would otherwise page on every restart);
+#   - still FIRES on genuine staleness (a real, old timestamp);
+#   - SILENT on a healthy, recent success.
+#
+# The guard is written as `time() - (gauge > 0)` — the filter inside the subtraction, not a second
+# copy of the selector joined back on. The "fires" cases below are the ones that matter if anyone
+# rewrites it: they catch a guard that suppresses genuine staleness along with the sentinel.
+#
+# promtool evaluates from epoch 0, so eval_time IS time(): at 52h, time() = 187200.
+#
+# Run locally (no promtool on the host — use an ephemeral container). NOTE the `--entrypoint`: the
+# prom/prometheus image's entrypoint is /bin/prometheus, so passing `promtool` as the first argument
+# fails with "unexpected promtool".
+#   docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.13.2 test rules tests/staleness_never_succeeded_sentinel_test.yml
+
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1h
+
+tests:
+  # The exact 2026-08-10 false positive: a fresh backend process whose SC-Wiki sweep is mid-first-run,
+  # so the gauge is parked at the 0 sentinel. time() - 0 = 187200 > 172800 would fire; the `> 0`
+  # filter drops the series entirely and the alert MUST stay silent.
+  - name: suppressed - never-succeeded sentinel 0 does not read as 1970 staleness (ExternalSyncStale)
+    interval: 1h
+    input_series:
+      - series: 'basetool_scheduled_job_last_success_timestamp_seconds{task="scwiki_sync"}'
+        values: "0x60"
+    alert_rule_test:
+      - eval_time: 52h
+        alertname: ExternalSyncStale
+        exp_alerts: []
+
+  # Same sentinel against the CRITICAL bank rule (6h threshold, so it trips on a far shorter window
+  # than the catalogue syncs). A 0 here paged on every backend restart.
+  - name: suppressed - sentinel 0 does not page the critical bank sweep rule
+    interval: 1h
+    input_series:
+      - series: 'basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"}'
+        values: "0x60"
+    alert_rule_test:
+      - eval_time: 52h
+        alertname: BankLedgerIntegritySweepStale
+        exp_alerts: []
+
+  # Genuine staleness must still fire: a REAL last-success timestamp (epoch 3600 = 1h) leaves an age
+  # of 187200 - 3600 = 183600 s > 172800. Guards against the `> 0` filter (or an `and` rewrite)
+  # accidentally suppressing the alert outright.
+  - name: fires - genuine >48h staleness on a real timestamp (ExternalSyncStale)
+    interval: 1h
+    input_series:
+      - series: 'basetool_scheduled_job_last_success_timestamp_seconds{task="scwiki_sync"}'
+        values: "3600x60"
+    alert_rule_test:
+      - eval_time: 52h
+        alertname: ExternalSyncStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              task: scwiki_sync
+            exp_annotations:
+              summary: "External sync stale >48h (scwiki_sync)"
+              description: "The scwiki_sync catalogue sync last succeeded more than 48 hours ago."
+
+  # The critical bank rule likewise still fires on a real, >6h-old timestamp: 187200 - 3600 = 183600
+  # > 21600.
+  - name: fires - genuine >6h staleness on a real timestamp (BankLedgerIntegritySweepStale)
+    interval: 1h
+    input_series:
+      - series: 'basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"}'
+        values: "3600x60"
+    alert_rule_test:
+      - eval_time: 52h
+        alertname: BankLedgerIntegritySweepStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              task: bank_ledger_integrity
+            exp_annotations:
+              summary: "Bank ledger-integrity sweep stale >6h"
+              description: "The hourly bank ledger-integrity sweep last succeeded more than 6 hours ago. While it is stale the violations gauge is frozen and BankLedgerIntegrityViolation cannot fire — the data-corruption detector is blind. Restore the sweep before trusting a 'no violations' reading."
+
+  # A healthy sync that succeeded 3h ago (epoch 176400 = 49h): 187200 - 176400 = 10800 s, well inside
+  # the 48h window -> silent.
+  - name: silent - healthy sync with a recent success
+    interval: 1h
+    input_series:
+      - series: 'basetool_scheduled_job_last_success_timestamp_seconds{task="uex_sync"}'
+        values: "176400x60"
+    alert_rule_test:
+      - eval_time: 52h
+        alertname: ExternalSyncStale
+        exp_alerts: []

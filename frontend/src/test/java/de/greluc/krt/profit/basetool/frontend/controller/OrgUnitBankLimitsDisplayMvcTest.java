@@ -156,6 +156,7 @@ class OrgUnitBankLimitsDisplayMvcTest {
             "someHolder",
             "Missionsertrag",
             null,
+            null,
             Instant.parse("2026-06-10T18:30:00Z"),
             null,
             null,
@@ -240,5 +241,33 @@ class OrgUnitBankLimitsDisplayMvcTest {
         .andExpect(
             content()
                 .string(Matchers.containsString("data-testid=\"bank-approval-limits-display\"")));
+  }
+
+  /**
+   * REQ-BANK-041: the all-members limit row is labelled "Alle Mitglieder der Org-Einheit", from its
+   * own {@code bank.approvalLimit.tier.allMembers} key — the tier binds only an actual member of
+   * the account's owning org unit, so the bare "Alle Mitglieder" understated its scope.
+   *
+   * <p>The label must NOT come from the visibility bundle's {@code
+   * bank.orgUnit.settings.visibility.allMembers}: that same key also labels the visibility bucket,
+   * where {@code ALL_MEMBERS} on a {@code SPECIAL} account means <em>all KRT members</em> — so a
+   * shared string cannot be correct for both. Asserting the resolved German text (rather than the
+   * key) also catches a missing bundle entry, which Thymeleaf would render as {@code ??key_de??}.
+   *
+   * @throws Exception if the MockMvc exchange fails
+   */
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_limitsDisplay_labelsAllMembersTierWithItsOrgUnitScope() throws Exception {
+    UUID accountId = UUID.randomUUID();
+    stubDetail(accountId, false);
+
+    mockMvc
+        .perform(get("/org-unit-bank/accounts/" + accountId))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString(">Alle Mitglieder der Org-Einheit<")))
+        .andExpect(content().string(Matchers.not(Matchers.containsString(">Alle Mitglieder<"))))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("??bank.approvalLimit.tier"))));
   }
 }
