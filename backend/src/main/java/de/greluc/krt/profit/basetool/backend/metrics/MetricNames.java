@@ -438,6 +438,14 @@ public final class MetricNames {
   public static final String BUCKET_GLOBAL = "global";
 
   /**
+   * Rate-limit bucket label: the per-authenticated-subject budget (REQ-SEC-033), as opposed to the
+   * per-IP buckets. A rejection here means one account drove the API past its own budget, which is
+   * actionable in a way an IP-keyed rejection is not — the identity is real and cannot be rotated.
+   * The subject itself is never a label value: it is unbounded and it is PII.
+   */
+  public static final String BUCKET_SUBJECT = "subject";
+
+  /**
    * Rate-limit key source: the key was resolved from a trusted proxy's {@code X-Forwarded-For}
    * chain — the first untrusted hop walking from the right, which is the address the proxy appended
    * — i.e. per-client bucketing behind the edge works as designed.

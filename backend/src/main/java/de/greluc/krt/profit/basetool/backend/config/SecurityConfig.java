@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.support.ActingMemberAuthorities;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.Permissions;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
 import de.greluc.krt.profit.basetool.backend.support.RefusedSubjectWindow;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.support.TermsConsentCheck;
@@ -328,7 +329,8 @@ public class SecurityConfig {
       TermsConsentCheck termsConsentCheck,
       RefusedSubjectWindow refusedSubjectWindow,
       IngestGatewayProperties ingestGatewayProperties,
-      ActingMemberAuthorities actingMemberAuthorities)
+      ActingMemberAuthorities actingMemberAuthorities,
+      RateLimitProperties rateLimitProperties)
       throws Exception {
 
     boolean isTest = java.util.Arrays.asList(env.getActiveProfiles()).contains("test");
@@ -747,6 +749,19 @@ public class SecurityConfig {
                 meterRegistry,
                 refusedSubjectWindow),
             PendingApprovalAccessFilter.class)
+        // A3 / REQ-SEC-033: bound how hard one authenticated ACCOUNT can drive the API. The per-IP
+        // limiter ahead of the chain bounds a network position, which is the wrong unit in both
+        // directions — CGNAT puts many members behind one address, and an address pool escapes it
+        // entirely. Placed after the gates above so a pending or unconsented caller is refused on
+        // its own terms rather than spending a token first.
+        .addFilterAfter(
+            new SubjectRateLimitingFilter(
+                rateLimitProperties,
+                messageSource,
+                problemResponseFactory,
+                objectMapper,
+                meterRegistry),
+            TermsAcceptanceAccessFilter.class)
         // REQ-SEC-024: catch an identity-provider-unreachable failure (JWKS fetch timeout / 5xx /
         // Docker-DNS strand) escaping the bearer-token filter as a re-thrown
         // AuthenticationServiceException and re-map it to a retryable 503 instead of the opaque 500
