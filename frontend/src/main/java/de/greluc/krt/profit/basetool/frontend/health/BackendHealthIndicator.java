@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.health;
 
-import de.greluc.krt.profit.basetool.frontend.config.AppBackendProperties;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import java.net.Socket;
 import java.net.http.HttpClient;
@@ -39,6 +38,7 @@ import javax.net.ssl.X509TrustManager;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.health.autoconfigure.contributor.ConditionalOnEnabledHealthIndicator;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
@@ -67,11 +67,18 @@ import org.springframework.web.client.RestClientResponseException;
  * service's {@code service_healthy} gate, so the frontend's own readiness reflects an end-to-end
  * "the upstream I depend on is ready" check.
  *
- * <p>The probe target is derived from {@link AppBackendProperties#getBackendUrl()} (property {@code
- * app.backend-url}, e.g. {@code https://backend:11261} in prod, {@code http://backend:11261} under
- * the {@code test} profile). The backend serves HTTPS with a self-signed certificate whose SAN is
- * {@code localhost}, not the Docker alias {@code backend} the probe connects to; the probe's TLS
- * trust mirrors {@link de.greluc.krt.profit.basetool.frontend.config.WebClientConfig} (see {@link
+ * <p><b>The probe target is the backend's ACTUATOR base URL, which is not always its API base
+ * URL.</b> It comes from {@code app.backend-health-url} and falls back to {@code app.backend-url}
+ * when that key is unset — right for every profile that serves both from one connector (dev, test,
+ * e2e). Production is not one of them: ADR-0134 moved the backend's Actuator to the internal-only
+ * management port {@code 11271}, so {@code https://backend:11261/actuator/health/readiness} answers
+ * 404 there. Because this indicator sits in the readiness group that gates the Docker HEALTHCHECK,
+ * that 404 made the frontend container permanently unhealthy and the deploy loop rolled v1.5.47
+ * back twice before the cause was found. Whenever the backend's management port moves, this
+ * property moves with it — {@code BackendHealthUrlProdParityTest} fails if the two drift apart. The
+ * backend serves HTTPS with a self-signed certificate whose SAN is {@code localhost}, not the
+ * Docker alias {@code backend} the probe connects to; the probe's TLS trust mirrors {@link
+ * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig} (see {@link
  * #backendTls(SslBundles, Environment)}): trust-all in dev/test, and pinned to the {@code
  * backend-trust} bundle in prod with TLS endpoint identity (hostname) verification skipped.
  * Relaxing the certificate-to-hostname binding — never the chain validation, on the prod pinned
@@ -105,29 +112,28 @@ public class BackendHealthIndicator implements HealthIndicator {
   private final RestClient client;
 
   /**
-   * Production constructor used by Spring; resolves the backend base URL from {@link
-   * AppBackendProperties} and builds a {@link RestClient} with indicator-specific timeouts and the
-   * backend trust policy resolved by {@link #backendTls(SslBundles, Environment)} — pinned to the
-   * {@code backend-trust} bundle (hostname check skipped) in prod, trust-all in dev/test and as the
-   * prod fallback when no bundle is configured (audit L-5). {@link Autowired} is required because
-   * the class declares a second (package-private, test-only) constructor; without it Spring 4+'s
-   * constructor-selection logic falls back to a non-existent default constructor and fails at
-   * startup with {@code NoSuchMethodException: <init>()}.
+   * Production constructor used by Spring; resolves the backend Actuator base URL from the {@code
+   * app.backend-health-url} property and builds a {@link RestClient} with indicator-specific
+   * timeouts and the backend trust policy resolved by {@link #backendTls(SslBundles, Environment)}
+   * — pinned to the {@code backend-trust} bundle (hostname check skipped) in prod, trust-all in
+   * dev/test and as the prod fallback when no bundle is configured (audit L-5). {@link Autowired}
+   * is required because the class declares a second (package-private, test-only) constructor;
+   * without it Spring 4+'s constructor-selection logic falls back to a non-existent default
+   * constructor and fails at startup with {@code NoSuchMethodException: <init>()}.
    *
-   * @param backendProperties type-safe binding of the {@code app.backend-url} property; the
-   *     readiness probe path is appended verbatim to {@link AppBackendProperties#getBackendUrl()}
+   * @param backendHealthUrl base URL of the backend's <em>Actuator</em>, {@code
+   *     app.backend-health-url}, defaulting to the API base URL {@code app.backend-url} for every
+   *     profile that serves both from one connector; the readiness probe path is appended verbatim
    * @param sslBundles the application's configured SSL bundles, source of the {@code backend-trust}
    *     truststore used to pin the probe's TLS trust in prod
    * @param environment the active environment, used to pick the trust policy per profile
    */
   @Autowired
   public BackendHealthIndicator(
-      AppBackendProperties backendProperties, SslBundles sslBundles, Environment environment) {
-    this(
-        backendProperties.backendUrl(),
-        CONNECT_TIMEOUT,
-        READ_TIMEOUT,
-        backendTls(sslBundles, environment));
+      @Value("${app.backend-health-url:${app.backend-url}}") String backendHealthUrl,
+      SslBundles sslBundles,
+      Environment environment) {
+    this(backendHealthUrl, CONNECT_TIMEOUT, READ_TIMEOUT, backendTls(sslBundles, environment));
   }
 
   /**

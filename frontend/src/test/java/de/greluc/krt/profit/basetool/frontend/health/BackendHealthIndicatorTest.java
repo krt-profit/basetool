@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.frontend.config.AppBackendProperties;
 import java.lang.reflect.Constructor;
 import java.net.Socket;
 import java.security.cert.X509Certificate;
@@ -223,7 +222,6 @@ class BackendHealthIndicatorTest {
             .setResponseCode(200)
             .setHeader("Content-Type", "application/json")
             .setBody("{\"status\":\"UP\"}"));
-    AppBackendProperties props = new AppBackendProperties(backendUrl);
     SslBundles sslBundles = mock(SslBundles.class);
     when(sslBundles.getBundle("backend-trust"))
         .thenThrow(
@@ -231,7 +229,8 @@ class BackendHealthIndicatorTest {
     Environment environment = mock(Environment.class);
     when(environment.getActiveProfiles()).thenReturn(new String[] {"prod"});
 
-    BackendHealthIndicator indicator = new BackendHealthIndicator(props, sslBundles, environment);
+    BackendHealthIndicator indicator =
+        new BackendHealthIndicator(backendUrl, sslBundles, environment);
 
     assertEquals(Status.UP, indicator.health().getStatus());
   }
@@ -289,9 +288,10 @@ class BackendHealthIndicatorTest {
 
   @Test
   void productionConstructor_isAnnotatedAutowired_soSpringCanInstantiate() {
-    // Regression guard: the indicator declares TWO constructors -- the production
-    // AppBackendProperties one and a package-private test-only one with explicit Duration
-    // parameters. Spring 4+ refuses to auto-select between multiple constructors and falls back
+    // Regression guard: the indicator declares TWO constructors -- the production one (the
+    // @Value-injected app.backend-health-url) and a package-private test-only one with explicit
+    // Duration parameters. Spring 4+ refuses to auto-select between multiple constructors and falls
+    // back
     // to a no-arg default; without that, it aborts startup with
     // `NoSuchMethodException: <init>()`. The fix is exactly the @Autowired marker on the
     // production constructor; the test below asserts that marker survives any future refactor.
