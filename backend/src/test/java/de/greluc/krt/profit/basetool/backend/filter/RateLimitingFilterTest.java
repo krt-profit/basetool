@@ -92,6 +92,33 @@ class RateLimitingFilterTest {
     filter = new RateLimitingFilter(properties, problemProperties, messageSource, meterRegistry);
   }
 
+  /**
+   * Runs the production filter pair in order: client-IP resolution, then rate limiting.
+   *
+   * <p>They are only correct together. {@code ClientIpContextFilter} is the sole reader of the raw
+   * proxy chain — it runs ahead of {@code ForwardedHeaderFilter}, which would otherwise overwrite
+   * the peer and hide the header — and {@code RateLimitingFilter} is the sole consumer of its
+   * verdict. Driving the limiter alone would test a fallback path that production never takes.
+   *
+   * <p>The resolver is built per call because tests mutate {@code properties.trustedProxies} in
+   * their bodies and the allowlist is compiled once per instance.
+   *
+   * @param limiter the rate-limiting filter under test
+   * @param request the request to send through the pair
+   * @param response the response the pair writes to
+   * @throws ServletException if the chain fails
+   * @throws IOException if the chain fails
+   */
+  private void runChain(
+      RateLimitingFilter limiter, MockHttpServletRequest request, MockHttpServletResponse response)
+      throws ServletException, IOException {
+    // Chained by hand rather than through MockFilterChain(servlet, filters...): that overload
+    // ends in a bare HttpServlet, whose default doGet answers 405 and masks every assertion.
+    new ClientIpContextFilter(properties)
+        .doFilter(
+            request, response, (req, res) -> limiter.doFilter(req, res, new MockFilterChain()));
+  }
+
   // ---------------------------------------------------------------
   // shouldNotFilter — path matching + global disable
   // ---------------------------------------------------------------
@@ -356,13 +383,54 @@ class RateLimitingFilterTest {
     }
 
     @Test
-    void trustedPeerWithCommaSeparatedXff_usesFirstIp() throws Exception {
+    void trustedPeerWithCommaSeparatedXff_usesRightmostUntrustedHop() throws Exception {
+      // An appending proxy puts the truth on the RIGHT. Walking right-to-left and skipping our own
+      // hops lands on the client; the old leftmost read landed on whatever the client typed.
       properties.setTrustedProxies(List.of("10.0.0.1"));
       MockHttpServletRequest req = newRequest("/api/v1/missions");
       req.setRemoteAddr("10.0.0.1");
       req.addHeader("X-Forwarded-For", "203.0.113.7, 10.0.0.1, 198.51.100.99");
 
-      assertConsumesBucketKeyContaining("203.0.113.7", req);
+      assertConsumesBucketKeyContaining("198.51.100.99", req);
+    }
+
+    @Test
+    void spoofedLeadingEntry_cannotMintAFreshBucket() throws Exception {
+      // The bypass this change closes: two requests whose only difference is the attacker-supplied
+      // leading entry must share one bucket, because both resolve to the proxy-appended client.
+      properties.setTrustedProxies(List.of("10.0.0.1"));
+      properties.setCapacity(1);
+      properties.setRefillTokens(1);
+
+      MockHttpServletRequest first = newRequest("/api/v1/missions");
+      first.setRemoteAddr("10.0.0.1");
+      first.addHeader("X-Forwarded-For", "1.1.1.1, 198.51.100.99");
+      MockHttpServletResponse firstResponse = new MockHttpServletResponse();
+      runChain(filter, first, firstResponse);
+      assertEquals(200, firstResponse.getStatus(), "first request must consume cleanly");
+
+      MockHttpServletRequest second = newRequest("/api/v1/missions");
+      second.setRemoteAddr("10.0.0.1");
+      second.addHeader("X-Forwarded-For", "2.2.2.2, 198.51.100.99");
+      MockHttpServletResponse secondResponse = new MockHttpServletResponse();
+      runChain(filter, second, secondResponse);
+
+      assertEquals(
+          429,
+          secondResponse.getStatus(),
+          "rotating the spoofable leading entry must not yield a second bucket");
+    }
+
+    @Test
+    void everyHopTrusted_fallsBackToPeer() throws Exception {
+      // A chain consisting only of our own proxies carries no client address at all. Falling back
+      // to the peer keeps the budget shared rather than keying on one of our own hops.
+      properties.setTrustedProxies(List.of("10.0.0.0/24"));
+      MockHttpServletRequest req = newRequest("/api/v1/missions");
+      req.setRemoteAddr("10.0.0.1");
+      req.addHeader("X-Forwarded-For", "10.0.0.5, 10.0.0.9");
+
+      assertConsumesBucketKeyContaining("10.0.0.1", req);
     }
 
     @Test
@@ -370,7 +438,7 @@ class RateLimitingFilterTest {
       properties.setTrustedProxies(List.of("10.0.0.1"));
       MockHttpServletRequest req = newRequest("/api/v1/missions");
       req.setRemoteAddr("10.0.0.1");
-      req.addHeader("X-Forwarded-For", "   203.0.113.7   , 198.51.100.99");
+      req.addHeader("X-Forwarded-For", "   203.0.113.7   ");
 
       assertConsumesBucketKeyContaining("203.0.113.7", req);
     }
@@ -432,11 +500,11 @@ class RateLimitingFilterTest {
       properties.setRefillTokens(1);
 
       MockHttpServletResponse resp1 = new MockHttpServletResponse();
-      filter.doFilter(copy(req), resp1, new MockFilterChain());
+      runChain(filter, copy(req), resp1);
       assertEquals(200, resp1.getStatus(), "first request must consume cleanly");
 
       MockHttpServletResponse resp2 = new MockHttpServletResponse();
-      filter.doFilter(copy(req), resp2, new MockFilterChain());
+      runChain(filter, copy(req), resp2);
       assertEquals(
           429,
           resp2.getStatus(),
@@ -828,21 +896,19 @@ class RateLimitingFilterTest {
     /**
      * Drains a capacity-1 bucket and returns the rejected second response.
      *
-     * <p>Rebuilds the filter rather than reusing the {@code @BeforeEach} instance on purpose: the
-     * trusted-proxy list is compiled into {@code IpAddressMatcher}s once in the constructor, so a
-     * {@code properties.setTrustedProxies(...)} in the test body is invisible to an already-built
-     * filter and every case would silently resolve to {@code peer}. Rebuilding also hands each case
-     * an empty bucket cache, so the two requests below are the only ones in the bucket.
+     * <p>Rebuilds the filter rather than reusing the {@code @BeforeEach} instance so each case
+     * starts with an empty bucket cache and the two requests below are the only ones in the bucket.
+     * The request goes through {@link #runChain}, so the {@code key_source} tag reflects the same
+     * resolution production performs.
      */
     private MockHttpServletResponse drainAndReject(String remoteAddr, String xff) throws Exception {
       properties.setCapacity(1);
       properties.setRefillTokens(1);
       RateLimitingFilter freshFilter =
           new RateLimitingFilter(properties, problemProperties, messageSource, meterRegistry);
-      freshFilter.doFilter(
-          request(remoteAddr, xff), new MockHttpServletResponse(), new MockFilterChain());
+      runChain(freshFilter, request(remoteAddr, xff), new MockHttpServletResponse());
       MockHttpServletResponse rejected = new MockHttpServletResponse();
-      freshFilter.doFilter(request(remoteAddr, xff), rejected, new MockFilterChain());
+      runChain(freshFilter, request(remoteAddr, xff), rejected);
       return rejected;
     }
 
@@ -890,10 +956,12 @@ class RateLimitingFilterTest {
     }
 
     @Test
-    void rejection_withAnEmptyLeadingXffEntry_fallsBackToPeerRatherThanClaimingForwarded()
+    void rejection_withAnEmptyLeadingXffEntry_stillFindsTheClientAndReportsForwarded()
         throws Exception {
-      // " , 1.2.3.4" would otherwise key every such request on the empty string and still report
-      // `forwarded`, hiding exactly the collapse this tag exists to expose.
+      // The leftmost read had to special-case " , 1.2.3.4", because an empty first element would
+      // key every such request on the empty string while still reporting `forwarded` — hiding the
+      // very collapse this tag exists to expose. Walking from the right removes the special case:
+      // the empty element is simply skipped and the real client is found.
       properties.setTrustedProxies(List.of("10.0.0.1"));
 
       assertEquals(429, drainAndReject("10.0.0.1", " , 203.0.113.7").getStatus());
@@ -902,9 +970,35 @@ class RateLimitingFilterTest {
           1.0d,
           meterRegistry
               .get(MetricNames.RATELIMIT_REJECTIONS)
+              .tag(MetricNames.TAG_KEY_SOURCE, MetricNames.KEY_SOURCE_FORWARDED)
+              .counter()
+              .count(),
+          "the client is resolvable despite the empty element, so the tag must say so");
+    }
+
+    @Test
+    void rejection_withoutTheResolverInTheChain_isTaggedPeer() throws Exception {
+      // Defensive: a dispatch the resolver is not mapped to must not silently trust a header.
+      properties.setTrustedProxies(List.of("10.0.0.1"));
+      properties.setCapacity(1);
+      properties.setRefillTokens(1);
+      RateLimitingFilter lone =
+          new RateLimitingFilter(properties, problemProperties, messageSource, meterRegistry);
+
+      lone.doFilter(
+          request("10.0.0.1", "203.0.113.7"), new MockHttpServletResponse(), new MockFilterChain());
+      MockHttpServletResponse rejected = new MockHttpServletResponse();
+      lone.doFilter(request("10.0.0.1", "203.0.113.7"), rejected, new MockFilterChain());
+
+      assertEquals(429, rejected.getStatus());
+      assertEquals(
+          1.0d,
+          meterRegistry
+              .get(MetricNames.RATELIMIT_REJECTIONS)
               .tag(MetricNames.TAG_KEY_SOURCE, MetricNames.KEY_SOURCE_PEER)
               .counter()
-              .count());
+              .count(),
+          "without a resolved attribute the peer is the only trustworthy key");
     }
 
     /**

@@ -85,11 +85,15 @@ public class RateLimitProperties {
   private List<@Valid Rule> rules = new ArrayList<>();
 
   /**
-   * List of trusted reverse-proxy IPs, exact match against {@code request.getRemoteAddr()}. Only
-   * when the immediate peer is in this list does the filter honor {@code X-Forwarded-For} to derive
-   * the client IP for bucketing. An empty list disables {@code X-Forwarded-For} entirely. The
+   * Trusted reverse-proxy addresses or CIDR ranges, consumed by {@code ClientIpContextFilter}. Only
+   * when the immediate peer matches one of these does client-IP resolution honour {@code
+   * X-Forwarded-For}; the chain is then walked right-to-left and the first hop that is NOT in this
+   * list is taken as the client. An empty list disables {@code X-Forwarded-For} entirely. The
    * literal {@code "*"} is NOT a valid entry and is silently ignored - blanket trust would let any
    * client spoof the header and bypass IP-based rate limiting.
+   *
+   * <p>The key stays under {@code app.rate-limit} for continuity with the deployed configuration
+   * even though resolution now serves more than the rate limiter (REQ-SEC-011).
    */
   private List<String> trustedProxies = new java.util.ArrayList<>();
 

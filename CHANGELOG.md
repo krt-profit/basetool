@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Die Rate-Limit-Zählung lässt sich nicht mehr durch einen gefälschten Absender aushebeln.** Bisher hätte ein Aufrufer, sobald das Backend hinter einem öffentlichen Proxy steht, sich mit jeder Anfrage als neuer Absender ausgeben und damit ein frisches Anfragekontingent erschleichen können — die Begrenzung wäre wirkungslos gewesen. Das Backend ermittelt die echte Absenderadresse jetzt so, dass nur die vorgeschalteten eigenen Server dazu etwas beitragen können. Im heutigen Betrieb ändert sich nichts, weil das Backend nur intern erreichbar ist; die Lücke wäre mit der geplanten öffentlichen Schnittstelle aufgegangen (REQ-SEC-011).
+
+
 ## [v1.5.46](https://github.com/krt-profit/basetool/releases/tag/v1.5.46) - 2026-08-18
 
 ### Added

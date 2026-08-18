@@ -36,7 +36,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -49,7 +48,6 @@ import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.PathContainer;
-import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
@@ -125,23 +123,20 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   private final PathPatternParser pathPatternParser = new PathPatternParser();
   private final Map<String, Optional<PathPattern>> compiledPatterns = new ConcurrentHashMap<>();
   private final Cache<String, Bucket> bucketCache;
-  private final List<IpAddressMatcher> trustedProxyMatchers;
   private final MeterRegistry meterRegistry;
 
   /**
    * Constructs the filter with the bucket cache sized from compile-time constants ({@code 1h}
    * idle-expiry, 100 000 entries max). Both properties classes carry the validated
-   * {@code @ConfigurationProperties} values pulled from {@code application.yml}. The trusted-proxy
-   * list is compiled into {@link IpAddressMatcher} instances once during construction so that the
-   * per-request {@link #resolveClientKey} hot path no longer allocates a fresh matcher (and
-   * re-parses the CIDR / IP literal) on every call. Malformed entries are logged once here and
-   * dropped from the cached list, exactly as the previous per-request path did. Every configured
-   * rate-limit pattern is likewise compiled and validated here via {@link
+   * {@code @ConfigurationProperties} values pulled from {@code application.yml}. Client-IP
+   * attribution is NOT done here: {@link ClientIpContextFilter} owns the trusted-proxy walk,
+   * because it is the only filter that runs before {@code ForwardedHeaderFilter} rewrites the
+   * request. Every configured rate-limit pattern is compiled and validated here via {@link
    * #precompileAndValidatePatterns(RateLimitProperties)}, so a malformed pattern fails startup
    * instead of silently disabling enforcement at runtime.
    *
-   * @param properties bucket capacity/refill configuration plus path patterns, endpoint-specific
-   *     rules and trusted proxies
+   * @param properties bucket capacity/refill configuration plus path patterns and endpoint-specific
+   *     rules
    * @param problemProperties RFC&nbsp;7807 problem-type base URI used in the 429 response body
    * @param messageSource resolves the localized 429 {@code title}/{@code detail} from the request's
    *     {@code Accept-Language}, mirroring GlobalExceptionHandler's i18n so the rate limiter is no
@@ -164,7 +159,6 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             .expireAfterAccess(BUCKET_EXPIRE_AFTER_ACCESS)
             .maximumSize(BUCKET_MAX_ENTRIES)
             .build();
-    this.trustedProxyMatchers = compileTrustedProxies(properties.getTrustedProxies());
     precompileAndValidatePatterns(properties);
   }
 
@@ -236,34 +230,6 @@ public class RateLimitingFilter extends OncePerRequestFilter {
               + ex.getMessage(),
           ex);
     }
-  }
-
-  /**
-   * Compiles each entry of the trusted-proxies list into an {@link IpAddressMatcher} once at filter
-   * construction. Blank entries and the literal {@code "*"} blanket-trust sentinel are explicitly
-   * excluded (the latter would let any client spoof {@code X-Forwarded-For}); malformed CIDR / IP
-   * literals are logged at WARN and dropped so a configuration typo cannot disable the rest of the
-   * trusted list. Returns an unmodifiable list because the field is shared across request threads.
-   */
-  private static List<IpAddressMatcher> compileTrustedProxies(List<String> entries) {
-    if (entries == null || entries.isEmpty()) {
-      return List.of();
-    }
-    List<IpAddressMatcher> matchers = new ArrayList<>(entries.size());
-    for (String entry : entries) {
-      if (entry == null || entry.isBlank() || "*".equals(entry)) {
-        continue;
-      }
-      try {
-        matchers.add(new IpAddressMatcher(entry));
-      } catch (IllegalArgumentException ex) {
-        log.warn(
-            "Invalid app.rate-limit.trusted-proxies entry '{}'; ignoring. Reason: {}",
-            entry,
-            ex.getMessage());
-      }
-    }
-    return Collections.unmodifiableList(matchers);
   }
 
   @Override
@@ -482,51 +448,32 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Resolves the rate-limit key for the incoming request <em>together with the branch that produced
-   * it</em>. {@code X-Forwarded-For} is only honored when the immediate peer ({@code
-   * request.getRemoteAddr()}) matches one of the trusted-proxy matchers compiled at filter
-   * construction; the literal {@code "*"} is intentionally NOT a valid trust value, since blanket
-   * trust lets any client spoof the header and obtain a fresh bucket per request.
+   * Resolves the rate-limit key for the incoming request together with the branch that produced it.
    *
-   * <p>The branch is returned rather than discarded because it is the only thing that makes a 429
-   * spike interpretable without logging the address: {@link KeySource#PEER} behind a reverse proxy
-   * means every client shares one bucket, {@link KeySource#FORWARDED} means per-client bucketing
-   * works as designed.
+   * <p>The address itself is resolved by {@link ClientIpContextFilter}, which runs ahead of {@code
+   * ForwardedHeaderFilter} and is the only place in the request lifecycle where the raw peer and
+   * the raw {@code X-Forwarded-For} chain are both still visible. This filter only consumes the
+   * result, so there is exactly one implementation of the trusted-proxy walk to get right.
    *
-   * <p>Audit finding H-8: each trusted-proxies entry may be either an exact IP ({@code 172.17.0.1})
-   * or a CIDR range ({@code 172.17.0.0/16}). Matching delegates to Spring Security's {@link
-   * IpAddressMatcher} so docker-network ranges (typically {@code 172.17.0.0/16}, {@code
-   * 10.0.0.0/8}, etc.) can be configured without enumerating every proxy IP individually.
+   * <p>The branch is carried along rather than discarded because it is the only thing that makes a
+   * 429 spike interpretable without logging the address: {@link KeySource#PEER} behind a reverse
+   * proxy means every client shares one bucket, {@link KeySource#FORWARDED} means per-client
+   * bucketing works as designed.
    *
    * @param request the request whose bucket key is being derived
    * @return the bucket key plus the branch it came from; never {@code null}
    */
   private ClientKey resolveClientKey(HttpServletRequest request) {
-    String remoteAddr = request.getRemoteAddr();
-    boolean isTrusted = false;
-    for (IpAddressMatcher matcher : trustedProxyMatchers) {
-      if (matcher.matches(remoteAddr)) {
-        isTrusted = true;
-        break;
-      }
+    Object resolved = request.getAttribute(ClientIpContextFilter.CLIENT_IP_ATTRIBUTE);
+    if (resolved instanceof String ip && !ip.isBlank()) {
+      boolean forwarded =
+          Boolean.TRUE.equals(
+              request.getAttribute(ClientIpContextFilter.CLIENT_IP_FORWARDED_ATTRIBUTE));
+      return new ClientKey(ip, forwarded ? KeySource.FORWARDED : KeySource.PEER);
     }
-
-    if (isTrusted) {
-      String xff = request.getHeader("X-Forwarded-For");
-      if (xff != null && !xff.isBlank()) {
-        // First IP in the list is the original client
-        int idx = xff.indexOf(',');
-        String forwarded = idx > 0 ? xff.substring(0, idx).trim() : xff.trim();
-        // A header whose first element is empty (e.g. " , 1.2.3.4") would otherwise key every such
-        // request on the empty string AND report `forwarded`, i.e. hide the very collapse this tag
-        // exists to expose. Fall through to the peer address, which is always present.
-        if (!forwarded.isEmpty()) {
-          return new ClientKey(forwarded, KeySource.FORWARDED);
-        }
-      }
-    }
-
-    return new ClientKey(remoteAddr, KeySource.PEER);
+    // No attribute means ClientIpContextFilter did not run for this dispatch. Fall back to the raw
+    // peer rather than to a header this filter cannot validate on its own.
+    return new ClientKey(request.getRemoteAddr(), KeySource.PEER);
   }
 
   private String firstMatchingPattern(PathContainer parsedPath, List<String> patterns) {

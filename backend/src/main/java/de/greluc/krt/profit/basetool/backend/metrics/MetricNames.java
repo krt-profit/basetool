@@ -437,16 +437,17 @@ public final class MetricNames {
   public static final String BUCKET_GLOBAL = "global";
 
   /**
-   * Rate-limit key source: the key came from the first entry of a trusted proxy's {@code
-   * X-Forwarded-For} header, i.e. per-client bucketing behind the edge works as designed.
+   * Rate-limit key source: the key was resolved from a trusted proxy's {@code X-Forwarded-For}
+   * chain — the first untrusted hop walking from the right, which is the address the proxy appended
+   * — i.e. per-client bucketing behind the edge works as designed.
    */
   public static final String KEY_SOURCE_FORWARDED = "forwarded";
 
   /**
-   * Rate-limit key source: the key came from the immediate peer address ({@code
-   * request.getRemoteAddr()}) because the peer is not a trusted proxy or sent no {@code
-   * X-Forwarded-For}. Sustained rejections on this value behind a reverse proxy mean every client
-   * shares one bucket — the signature of a broken {@code app.rate-limit.trusted-proxies} list.
+   * Rate-limit key source: the key is the immediate peer address, because the peer is not a trusted
+   * proxy, sent no {@code X-Forwarded-For}, or sent a chain consisting only of trusted hops.
+   * Sustained rejections on this value behind a reverse proxy mean every client shares one bucket —
+   * the signature of a broken {@code app.rate-limit.trusted-proxies} list.
    */
   public static final String KEY_SOURCE_PEER = "peer";
 

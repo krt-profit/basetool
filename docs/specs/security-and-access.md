@@ -309,10 +309,44 @@ frontend (no browser hits it directly), the frontend MUST relay the originating 
 outbound backend call as `X-Forwarded-For` (`ClientIpRelayFilter`, snapshotted per request by
 `ClientIpContextFilter` and carried across the Reactor hop via the registered `ThreadLocalAccessor`).
 The backend honours `X-Forwarded-For` only from its configured `app.rate-limit.trusted-proxies` (the
-frontend container) and reads the first hop as the client. Without the relay every per-IP bucket
-collapses onto the single frontend container IP, so one caller can trip a public endpoint's budget for
-the whole organisation. The relay never overwrites an existing header and degrades silently to
-"frontend IP" for background tasks with no bound request.
+frontend container). Without the relay every per-IP bucket collapses onto the single frontend
+container IP, so one caller can trip a public endpoint's budget for the whole organisation. The relay
+never overwrites an existing header and degrades silently to "frontend IP" for background tasks with
+no bound request.
+
+**Attribution MUST resolve the chain right-to-left, ahead of `ForwardedHeaderFilter`.** Reading the
+*first* hop is only safe while exactly one trusted hop writes the header, which is true of the
+frontend relay and false of any appending proxy: nginx-proxy-manager uses
+`$proxy_add_x_forwarded_for`, so the real peer lands on the **right** and everything left of it is
+client-supplied. The resolver MUST therefore honour the header only when the immediate peer is a
+trusted proxy, then walk the chain from the right, skip trusted hops, and take the first untrusted
+address.
+
+It MUST run **before** Spring's `ForwardedHeaderFilter`. That filter rewrites `getRemoteAddr()` to the
+leftmost — client-chosen — entry and hides the header from everything downstream, so a later filter
+can neither see the real peer nor re-derive it. Because `server.forward-headers-strategy: framework`
+pins it to `Integer.MIN_VALUE`, which nothing can precede, the backend sets the strategy to `none` and
+`ForwardedHeaderConfig` re-registers it at `HIGHEST_PRECEDENCE + 1`, one slot behind
+`ClientIpContextFilter`. Scheme/host rewriting for problem-detail `instance` URIs, `Location` headers
+and HSTS is unchanged. The resolved address and its provenance are published as request attributes;
+`RateLimitingFilter` consumes them and MUST NOT re-derive the address itself, so there is one
+implementation of the walk rather than one per consumer.
+
+**Acceptance**
+
+- [x] With peer = a trusted proxy and chain `9.9.9.9, 203.0.113.7`, the resolved client is
+  `203.0.113.7`; rotating the leading entry does not yield a second rate-limit bucket.
+- [x] An untrusted peer's `X-Forwarded-For` is ignored entirely.
+- [x] A chain consisting only of trusted hops falls back to the peer and is reported as `peer`.
+- [x] A non-IP token (`unknown`) and empty elements are skipped rather than keyed on or thrown on.
+- [x] The `key_source` label distinguishes a resolved client from a peer fallback, so a collapse
+  stays visible without logging an address.
+- [x] The framework behaviour the ordering depends on is pinned by a test, so a Spring upgrade that
+  changed it would fail rather than silently regress attribution.
+
+**Enforced by:** `ClientIpContextFilterTest`, `ForwardedHeaderRewriteTest`, `RateLimitingFilterTest`
+· **Code:** `ClientIpContextFilter`, `ForwardedHeaderConfig`, `RateLimitingFilter` (backend),
+`ClientIpContextFilter`, `ClientIpRelayFilter`, `ForwardedHeaderConfig` (frontend)
 
 **Spoofing-resistant attribution at the frontend edge (finding SEC-02).** The relay is only as
 trustworthy as the IP the frontend *resolves*. The frontend keeps `server.forward-headers-strategy:
