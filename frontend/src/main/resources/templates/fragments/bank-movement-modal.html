@@ -259,6 +259,22 @@
                     <input type="text" id="bank-mv-note" name="note" maxlength="500"
                            th:placeholder="#{bank.field.note.placeholder}">
                 </div>
+
+                <!-- Notiz Bankmitarbeiter (REQ-BANK-054): the booking employee's OWN note, as opposed
+                     to the note/Begruendung above, which the requester or booking party supplies. All
+                     three types incl. a deposit, always optional and never gated by an account type
+                     (unlike the Begruendung), so it needs no data-movement-types and no disabled
+                     state. The hint says out loud that it is internal: the backend redacts it from
+                     the org-unit member-facing history and statement (REQ-BANK-038). -->
+                <div class="bank-form-row">
+                    <label for="bank-mv-staff-note">
+                        <span th:text="#{bank.field.staffNote}">Notiz Bankmitarbeiter</span>
+                        <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.staffNote.hint')}"></th:block>
+                    </label>
+                    <input type="text" id="bank-mv-staff-note" name="staffNote" maxlength="500"
+                           data-testid="bank-movement-staff-note">
+                    <span class="bank-field-error" data-error-for="staffNote"></span>
+                </div>
                 <span class="bank-field-error" data-error-for="_global"></span>
             </div>
             <div class="krt-modal-foot">

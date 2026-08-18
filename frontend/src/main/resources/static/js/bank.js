@@ -385,6 +385,15 @@
         const form = modal.querySelector('form.bank-ajax-form');
         if (form) {
             clearErrors(form);
+            // The employee's own note (REQ-BANK-054) is authored per booking and is deliberately NOT
+            // primed from a `data-field-*` attribute. These modals are reused across rows, and the
+            // priming loop below only overwrites controls it has an attribute for — so without this
+            // reset a note typed for one request would still sit in the box on the next one and ride
+            // along with a different money movement.
+            const staffNote = form.querySelector('[name="staffNote"]');
+            if (staffNote) {
+                staffNote.value = '';
+            }
         }
         for (const attr of Array.from(trigger.attributes)) {
             if (!attr.name.startsWith('data-field-')) {

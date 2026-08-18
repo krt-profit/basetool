@@ -482,7 +482,7 @@ class BankBookingRequestServiceTest {
     when(orgUnitMembershipQueryService.findPrimaryDirectMembershipOrgUnitId(requester))
         .thenReturn(Optional.of(requesterOrgUnit));
 
-    BankBookingRequestDto dto = service.confirm(requestId, holderId, null, false, 0L, null);
+    BankBookingRequestDto dto = service.confirm(requestId, holderId, null, false, null, 0L, null);
 
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.CONFIRMED);
     assertThat(dto.holderId()).isEqualTo(holderId);
@@ -519,6 +519,39 @@ class BankBookingRequestServiceTest {
   }
 
   @Test
+  void confirm_staffNote_isSnapshottedOnRequestAndHandedToTheBooking() {
+    // REQ-BANK-054: the confirming employee's note is written in TWO places on purpose — onto the
+    // request (so the staff queue and the approval tab render it without joining the transaction)
+    // and onto the booking the confirmation produces (so it reaches the history and the PDFs).
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID holderId = UUID.randomUUID();
+    UUID txId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(requestId, account(accountId), BankBookingRequestType.DEPOSIT, requester, 0L);
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    when(bankSecurityService.canDeposit(eq(accountId), any())).thenReturn(true);
+    when(bankLedgerService.bookDeposit(any(BankDepositRequest.class)))
+        .thenReturn(
+            new BankTransactionDto(txId, BankTransactionType.DEPOSIT, "from sale", Instant.now()));
+    BankHolder holder = new BankHolder();
+    holder.setId(holderId);
+    holder.setHandle("greluc");
+    holder.setActive(true);
+    when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
+    when(transactionRepository.findById(txId)).thenReturn(Optional.of(new BankTransaction()));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
+
+    service.confirm(requestId, holderId, null, false, "Bar uebergeben, Zeuge: greluc", 0L, null);
+
+    ArgumentCaptor<BankDepositRequest> booked = ArgumentCaptor.forClass(BankDepositRequest.class);
+    verify(bankLedgerService).bookDeposit(booked.capture());
+    assertThat(booked.getValue().staffNote()).isEqualTo("Bar uebergeben, Zeuge: greluc");
+    assertThat(request.getStaffNote()).isEqualTo("Bar uebergeben, Zeuge: greluc");
+  }
+
+  @Test
   void confirm_splitDeposit_booksWithSplitSnapshot() {
     // REQ-BANK-043: confirming a split deposit request books via bookDeposit carrying the
     // snapshotted
@@ -547,7 +580,7 @@ class BankBookingRequestServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
     when(userRepository.findById(decider)).thenReturn(Optional.of(new User()));
 
-    service.confirm(requestId, holderId, null, false, 0L, null);
+    service.confirm(requestId, holderId, null, false, null, 0L, null);
 
     ArgumentCaptor<BankDepositRequest> booked = ArgumentCaptor.forClass(BankDepositRequest.class);
     verify(bankLedgerService).bookDeposit(booked.capture());
@@ -573,7 +606,7 @@ class BankBookingRequestServiceTest {
 
     assertThrows(
         AccessDeniedException.class,
-        () -> service.confirm(requestId, UUID.randomUUID(), null, false, 0L, null));
+        () -> service.confirm(requestId, UUID.randomUUID(), null, false, null, 0L, null));
     verify(bankLedgerService, never()).bookWithdrawal(any());
   }
 
@@ -593,7 +626,7 @@ class BankBookingRequestServiceTest {
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
-            () -> service.confirm(requestId, UUID.randomUUID(), null, false, 2L, null));
+            () -> service.confirm(requestId, UUID.randomUUID(), null, false, null, 2L, null));
     assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_REQUEST_NOT_PENDING);
     verify(bankLedgerService, never()).bookDeposit(any());
   }
@@ -612,7 +645,7 @@ class BankBookingRequestServiceTest {
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
-        () -> service.confirm(requestId, UUID.randomUUID(), null, false, 4L, null));
+        () -> service.confirm(requestId, UUID.randomUUID(), null, false, null, 4L, null));
     verify(bankLedgerService, never()).bookDeposit(any());
   }
 
@@ -661,7 +694,7 @@ class BankBookingRequestServiceTest {
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
-            () -> service.confirm(requestId, UUID.randomUUID(), null, false, 0L, null));
+            () -> service.confirm(requestId, UUID.randomUUID(), null, false, null, 0L, null));
     assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_OWNER_APPROVAL_REQUIRED);
     verify(bankLedgerService, never()).bookDeposit(any());
   }
@@ -689,7 +722,7 @@ class BankBookingRequestServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
     when(userRepository.findById(any())).thenReturn(Optional.of(new User()));
 
-    BankBookingRequestDto dto = service.confirm(requestId, holderId, null, true, 0L, null);
+    BankBookingRequestDto dto = service.confirm(requestId, holderId, null, true, null, 0L, null);
 
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.CONFIRMED);
     verify(bankAuditService)
@@ -732,7 +765,7 @@ class BankBookingRequestServiceTest {
     when(userRepository.findById(any())).thenReturn(Optional.of(new User()));
 
     BankBookingRequestDto dto =
-        service.confirm(requestId, sourceHolder, destHolder, false, 0L, null);
+        service.confirm(requestId, sourceHolder, destHolder, false, null, 0L, null);
 
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.CONFIRMED);
     ArgumentCaptor<BankTransferRequest> booked = ArgumentCaptor.forClass(BankTransferRequest.class);

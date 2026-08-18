@@ -84,7 +84,8 @@ class BankLedgerServiceGuardTest {
     // dropped/inverted guard cannot leak money into an account the caller may not see.
     assertThrows(AccessDeniedException.class, () -> bankLedgerService.bookTransfer(request, false));
     verify(writer, never()).lockAccount(any());
-    verify(writer, never()).persistTransaction(any(), any(), any(), any(), any(), any(), any());
+    verify(writer, never())
+        .persistTransaction(any(), any(), any(), any(), any(), any(), any(), any());
     verify(writer, never()).persistAccountPosting(any(), any(), any(), any());
     verify(writer, never()).persistHolderPosting(any(), any(), any(), any());
   }
@@ -124,6 +125,7 @@ class BankLedgerServiceGuardTest {
             new BigDecimal("1"),
             "Bereichsanteil",
             null,
+            null,
             true);
 
     // When / Then: bookTransfer routes the holder-changing inclusive path through the guard and
@@ -134,7 +136,8 @@ class BankLedgerServiceGuardTest {
             BankConflictException.class, () -> bankLedgerService.bookTransfer(request, true));
     assertEquals(BankConflictException.CODE_BANK_FEE_EXCEEDS_AMOUNT, ex.getCode());
     assertEquals("1", ex.getProperties().get("fee"));
-    verify(writer, never()).persistTransaction(any(), any(), any(), any(), any(), any(), any());
+    verify(writer, never())
+        .persistTransaction(any(), any(), any(), any(), any(), any(), any(), any());
     verify(writer, never()).persistAccountPosting(any(), any(), any(), any());
     verify(writer, never()).persistHolderPosting(any(), any(), any(), any());
   }

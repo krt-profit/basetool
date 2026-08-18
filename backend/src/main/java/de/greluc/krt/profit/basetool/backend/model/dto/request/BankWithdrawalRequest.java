@@ -43,6 +43,9 @@ import org.jetbrains.annotations.Nullable;
  *     {@linkplain
  *     de.greluc.krt.profit.basetool.backend.model.BankAccountType#requiresDebitJustification()
  *     mandates a reason}, optional otherwise
+ * @param staffNote optional free-text note authored by the booking bank employee ("Notiz
+ *     Bankmitarbeiter", REQ-BANK-054): internal context for the movement, shown to bank staff and
+ *     the account's responsible side but redacted from the org-unit member-facing views
  * @param counterpartyUserId optional Empf&auml;nger — the member who received the payout
  *     (REQ-BANK-044), distinct from the paying holder; {@code null} when no counterparty is
  *     recorded
@@ -67,6 +70,7 @@ public record BankWithdrawalRequest(
     @NotNull @DecimalMin("1") @DecimalMax("1000000000000.0") @WholeNumber BigDecimal amount,
     @Nullable @Size(max = 500) String note,
     @Nullable @Size(max = 500) String justification,
+    @Nullable @Size(max = 500) String staffNote,
     @Nullable UUID counterpartyUserId,
     @Nullable UUID counterpartyOrgUnitId,
     boolean feeInclusive,
@@ -87,7 +91,7 @@ public record BankWithdrawalRequest(
    */
   public BankWithdrawalRequest(
       UUID accountId, UUID holderId, BigDecimal amount, @Nullable String note) {
-    this(accountId, holderId, amount, note, null, null, null, false, null);
+    this(accountId, holderId, amount, note, null, null, null, null, false, null);
   }
 
   /**
@@ -121,6 +125,7 @@ public record BankWithdrawalRequest(
         amount,
         note,
         justification,
+        null,
         counterpartyUserId,
         counterpartyOrgUnitId,
         feeInclusive,

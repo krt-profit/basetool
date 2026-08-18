@@ -133,7 +133,7 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankBookingRow(p.id, t.id, t.type, p.amount, t.note, t.justification, p.createdAt, rt.id,
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankBookingRow(p.id, t.id, t.type, p.amount, t.note, t.justification, t.staffNote, p.createdAt, rt.id,
       t.transferFee, t.counterpartyHandle, t.counterpartyOrgUnitName)
       FROM BankPosting p JOIN p.transaction t
       LEFT JOIN t.reversedTransaction rt
@@ -157,7 +157,7 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankBookingRow(p.id, t.id, t.type, p.amount, t.note, t.justification, p.createdAt, rt.id,
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BankBookingRow(p.id, t.id, t.type, p.amount, t.note, t.justification, t.staffNote, p.createdAt, rt.id,
       t.transferFee, t.counterpartyHandle, t.counterpartyOrgUnitName)
       FROM BankPosting p JOIN p.transaction t
       LEFT JOIN t.reversedTransaction rt

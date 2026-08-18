@@ -69,6 +69,7 @@ class OrgUnitBankPageControllerMvcTest {
 
   private static final String BALANCES_URI = "/api/v1/org-units/bank/balances";
   private static final String REQUESTS_URI = "/api/v1/org-units/bank/requests";
+  private static final String FOREIGN_REQUESTS_URI = "/api/v1/org-units/bank/requests/foreign";
   private static final String TRANSFER_TARGETS_URI = "/api/v1/org-units/bank/transfer-targets";
 
   @Autowired private WebApplicationContext context;
@@ -118,6 +119,7 @@ class OrgUnitBankPageControllerMvcTest {
             "DEPOSIT",
             new BigDecimal("5000"),
             "from sale",
+            null,
             null,
             "PENDING",
             "officerX",
@@ -298,6 +300,7 @@ class OrgUnitBankPageControllerMvcTest {
             "DEPOSIT",
             new BigDecimal("5000"),
             "from sale",
+            null,
             null,
             "PENDING",
             "officerX",
@@ -481,6 +484,7 @@ class OrgUnitBankPageControllerMvcTest {
             new BigDecimal("250000"),
             "someHolder",
             "Missionsertrag",
+            null,
             null,
             Instant.parse("2026-06-10T18:30:00Z"),
             null,
@@ -676,5 +680,116 @@ class OrgUnitBankPageControllerMvcTest {
             get("/org-unit-bank/accounts/" + accountId).param("fragment", "orgUnitBankSettings"))
         .andExpect(status().isOk())
         .andExpect(view().name("org-unit-bank-account-detail :: orgUnitBankSettings"));
+  }
+
+  /**
+   * Builds a foreign (approval-tab) booking request, varying only the two fields that decide
+   * whether the row is expandable.
+   *
+   * @param note the requester's note, or {@code null}
+   * @param justification the requester's Begruendung, or {@code null}
+   * @param staffNote the confirming employee's own note (REQ-BANK-054), or {@code null}
+   * @return the request DTO
+   */
+  private static BankBookingRequestDto foreignRequest(
+      String note, String justification, String staffNote) {
+    return new BankBookingRequestDto(
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        "KB-0001",
+        "Staffel IRIDIUM",
+        UUID.randomUUID(),
+        "IRIDIUM",
+        "IRI",
+        "WITHDRAWAL",
+        new BigDecimal("5000"),
+        note,
+        justification,
+        staffNote,
+        "PENDING",
+        "officerX",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        Instant.parse("2026-06-17T14:02:00Z"),
+        null,
+        null,
+        true,
+        new BigDecimal("1000"),
+        "RESPONSIBLE_HOLDER",
+        false,
+        null,
+        false,
+        null,
+        0L);
+  }
+
+  /**
+   * REQ-BANK-041/-045: the approval tab's rows expand to reveal Begruendung + Notiz, exactly like
+   * the bank-staff queue. The approver decides on the Begruendung, so hiding it here would mean
+   * signing off blind on a mandating account.
+   */
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_foreignRequestWithJustificationRendersExpandableDetailRow() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(FOREIGN_REQUESTS_URI), anyTypeRef()))
+        .thenReturn(List.of(foreignRequest("Missionsertrag", "Missionsfreigabe", null)));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-foreign-expand")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-foreign-detail")))
+        .andExpect(content().string(Matchers.containsString("Missionsfreigabe")))
+        .andExpect(content().string(Matchers.containsString("Missionsertrag")))
+        // The sub-row must span every column incl. the leading expand cell, or the detail cell
+        // silently shrinks the table.
+        .andExpect(content().string(Matchers.containsString("colspan=\"8\"")))
+        // A shared bank-req-<id> would let this chevron toggle the "Meine Antraege" sub-row of the
+        // same request when the responsible holder raised it themselves.
+        .andExpect(content().string(Matchers.containsString("ou-foreign-req-")));
+  }
+
+  /**
+   * REQ-BANK-054: the confirming employee's note reaches the approval tab too, and on its own is
+   * enough to make the row expandable — a confirmed request may carry only a staff note.
+   */
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_foreignRequestStaffNoteRendersInTheDetailRow() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(FOREIGN_REQUESTS_URI), anyTypeRef()))
+        .thenReturn(List.of(foreignRequest(null, null, "Bar uebergeben, Zeuge greluc")));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-foreign-expand")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-foreign-staff-note")))
+        .andExpect(content().string(Matchers.containsString("Bar uebergeben, Zeuge greluc")));
+  }
+
+  /** A row carrying neither Begruendung nor Notiz stays flat: no chevron, no empty sub-row. */
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_foreignRequestWithoutDetailRendersNoChevron() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(FOREIGN_REQUESTS_URI), anyTypeRef()))
+        .thenReturn(List.of(foreignRequest(null, null, null)));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        // The tab itself must be there -- otherwise this test would pass for the wrong reason.
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-foreign-row")))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("org-unit-bank-foreign-expand"))))
+        .andExpect(
+            content()
+                .string(Matchers.not(Matchers.containsString("org-unit-bank-foreign-detail"))));
   }
 }

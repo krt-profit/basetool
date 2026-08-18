@@ -89,6 +89,7 @@ class BankAccountDetailFragmentMvcTest {
             "alpha",
             "Fragment note",
             "Fragment reason",
+            null,
             Instant.parse("2026-06-10T18:30:00Z"),
             null,
             null,

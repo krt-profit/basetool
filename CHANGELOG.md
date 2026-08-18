@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Bankmitarbeiter können jetzt eine eigene Notiz zu einer Buchung erfassen.** Beim Bestätigen eines Antrags und bei jeder direkten Einzahlung, Auszahlung und jedem Transfer gibt es das Feld "Notiz Bankmitarbeiter" für interne Anmerkungen ("in zwei Tranchen übergeben"). Sie erscheint überall dort, wo auch Notiz und Begründung stehen — Kontohistorie, Antragsliste, Fremde Anträge, Kontoauszug und 3-Monats-Report. Für Mitglieder einer Org-Einheit ist sie bewusst nicht sichtbar; sie ist eine bankinterne Anmerkung.
+
+- **Fremde Anträge lassen sich jetzt aufklappen.** In der Freigabe-Liste der Org-Einheits-Bank zeigt ein Pfeil vor der Zeile Begründung und Notiz des Antrags — genau wie in der Antragsliste der Bank. Wer freigibt, entscheidet damit nicht mehr blind: beim KRT-Konto, dem Bankkonto und jedem Sonderkonto ist die Begründung Pflicht und war für den Freigebenden bisher nicht sichtbar.
+
 ## [v1.5.45](https://github.com/krt-profit/basetool/releases/tag/v1.5.45) - 2026-08-17
 
 ### Added

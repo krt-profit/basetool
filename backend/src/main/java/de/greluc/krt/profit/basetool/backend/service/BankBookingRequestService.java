@@ -352,6 +352,8 @@ public class BankBookingRequestService {
    * @param requestId the request to confirm
    * @param holderId the holder the employee records for the booking (source holder for a transfer)
    * @param destinationHolderId the destination holder for a transfer; {@code null} otherwise
+   * @param staffNote the confirming employee's own note ("Notiz Bankmitarbeiter", REQ-BANK-054),
+   *     snapshotted on the request and copied onto the booked transaction; {@code null} when none
    * @param ownerApprovalConfirmed the over-limit "approval by responsible holder obtained"
    *     attestation (REQ-BANK-041); required when the request needs approval
    * @param version the echoed optimistic-locking version
@@ -371,6 +373,7 @@ public class BankBookingRequestService {
       @NotNull UUID holderId,
       @Nullable UUID destinationHolderId,
       boolean ownerApprovalConfirmed,
+      @Nullable String staffNote,
       long version,
       Authentication authentication) {
     BankBookingRequest request = lockRequest(requestId);
@@ -414,10 +417,12 @@ public class BankBookingRequestService {
                       holderId,
                       request.getAmount(),
                       request.getNote(),
+                      staffNote,
                       request.isSplitEnabled(),
                       request.getSplitPercent(),
                       requesterId,
-                      counterpartyOrgUnitId));
+                      counterpartyOrgUnitId,
+                      null));
           case WITHDRAWAL ->
               bankLedgerService.bookWithdrawal(
                   new BankWithdrawalRequest(
@@ -426,12 +431,14 @@ public class BankBookingRequestService {
                       request.getAmount(),
                       request.getNote(),
                       request.getJustification(),
+                      staffNote,
                       requesterId,
                       counterpartyOrgUnitId,
                       // A booking request never carries the fee-inclusive flag (REQ-BANK-033,
                       // #999);
                       // confirmation always books the default on-top fee mode.
-                      false));
+                      false,
+                      null));
           case TRANSFER -> {
             BankAccount target = request.getTargetAccount();
             if (target == null || destinationHolderId == null) {
@@ -454,6 +461,7 @@ public class BankBookingRequestService {
                     request.getAmount(),
                     request.getNote(),
                     request.getJustification(),
+                    staffNote,
                     // A booking request never carries the fee-inclusive flag (REQ-BANK-033, #999);
                     // confirmation always books the default on-top fee mode.
                     false),
@@ -473,6 +481,7 @@ public class BankBookingRequestService {
     request.setHolder(holder);
     request.setResultingTransaction(transaction);
     request.setStatus(BankBookingRequestStatus.CONFIRMED);
+    request.setStaffNote(staffNote);
     request.setDecidedBy(decider);
     request.setDeciderHandle(resolveHandle(decider));
     request.setDecidedAt(Instant.now());
@@ -744,6 +753,7 @@ public class BankBookingRequestService {
         request.getAmount(),
         request.getNote(),
         request.getJustification(),
+        request.getStaffNote(),
         request.getStatus(),
         request.getRequesterHandle(),
         holder == null ? null : holder.getId(),

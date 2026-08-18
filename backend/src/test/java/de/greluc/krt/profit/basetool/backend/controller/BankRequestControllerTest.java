@@ -95,14 +95,15 @@ class BankRequestControllerTest {
     UUID holderId = UUID.randomUUID();
     BankBookingRequestDto dto = requestDto();
     when(bankBookingRequestService.confirm(
-            eq(id), eq(holderId), eq(null), eq(false), eq(2L), any()))
+            eq(id), eq(holderId), eq(null), eq(false), eq(null), eq(2L), any()))
         .thenReturn(dto);
 
     assertSame(
         dto,
-        controller.confirm(id, new ConfirmBankBookingRequest(holderId, null, false, 2L), null));
+        controller.confirm(
+            id, new ConfirmBankBookingRequest(holderId, null, false, null, 2L), null));
     verify(bankBookingRequestService)
-        .confirm(eq(id), eq(holderId), eq(null), eq(false), eq(2L), any());
+        .confirm(eq(id), eq(holderId), eq(null), eq(false), eq(null), eq(2L), any());
   }
 
   @Test
@@ -127,6 +128,7 @@ class BankRequestControllerTest {
         BankBookingRequestType.DEPOSIT,
         new BigDecimal("500"),
         "note",
+        null,
         null,
         BankBookingRequestStatus.PENDING,
         "requester",

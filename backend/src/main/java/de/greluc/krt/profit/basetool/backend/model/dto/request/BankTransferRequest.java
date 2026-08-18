@@ -47,6 +47,9 @@ import org.jetbrains.annotations.Nullable;
  *     {@linkplain
  *     de.greluc.krt.profit.basetool.backend.model.BankAccountType#requiresDebitJustification()
  *     mandates a reason}, optional otherwise
+ * @param staffNote optional free-text note authored by the booking bank employee ("Notiz
+ *     Bankmitarbeiter", REQ-BANK-054): internal context for the movement, shown to bank staff and
+ *     the account's responsible side but redacted from the org-unit member-facing views
  * @param feeInclusive fee-mode toggle (REQ-BANK-033, #999), effective only on a holder-changing
  *     (fee-bearing) transfer: {@code false} (default, unchanged) means the entered {@code amount}
  *     arrives at the destination and the fee is added on top — the source is debited {@code amount
@@ -62,6 +65,7 @@ public record BankTransferRequest(
     @NotNull @DecimalMin("1") @DecimalMax("1000000000000.0") @WholeNumber BigDecimal amount,
     @Nullable @Size(max = 500) String note,
     @Nullable @Size(max = 500) String justification,
+    @Nullable @Size(max = 500) String staffNote,
     boolean feeInclusive) {
 
   /**
@@ -92,6 +96,7 @@ public record BankTransferRequest(
         destinationHolderId,
         amount,
         note,
+        null,
         null,
         false);
   }

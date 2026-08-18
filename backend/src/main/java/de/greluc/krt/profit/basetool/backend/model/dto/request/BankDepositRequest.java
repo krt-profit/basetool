@@ -47,6 +47,9 @@ import org.jetbrains.annotations.Nullable;
  * @param holderId the player who physically received the money (REQ-BANK-003)
  * @param amount whole-aUEC amount, at least 1
  * @param note optional free-text note for the booking history and statements
+ * @param staffNote optional free-text note authored by the booking bank employee ("Notiz
+ *     Bankmitarbeiter", REQ-BANK-054): internal context for the movement, shown to bank staff and
+ *     the account's responsible side but redacted from the org-unit member-facing views
  * @param splitEnabled whether to distribute {@link #splitPercent} of the gross across all squadron
  *     accounts (REQ-BANK-044)
  * @param splitPercent the whole-percent (1–100) of the gross to distribute; required when {@link
@@ -67,6 +70,7 @@ public record BankDepositRequest(
     @NotNull UUID holderId,
     @NotNull @DecimalMin("1") @DecimalMax("1000000000000.0") @WholeNumber BigDecimal amount,
     @Nullable @Size(max = 500) String note,
+    @Nullable @Size(max = 500) String staffNote,
     boolean splitEnabled,
     @Nullable @DecimalMin("1") @DecimalMax("100") @WholeNumber BigDecimal splitPercent,
     @Nullable UUID counterpartyUserId,
@@ -107,7 +111,7 @@ public record BankDepositRequest(
       @NotNull UUID holderId,
       @NotNull BigDecimal amount,
       @Nullable String note) {
-    this(accountId, holderId, amount, note, false, null, null, null, null);
+    this(accountId, holderId, amount, note, null, false, null, null, null, null);
   }
 
   /**
@@ -130,7 +134,7 @@ public record BankDepositRequest(
       @Nullable String note,
       boolean splitEnabled,
       @Nullable BigDecimal splitPercent) {
-    this(accountId, holderId, amount, note, splitEnabled, splitPercent, null, null, null);
+    this(accountId, holderId, amount, note, null, splitEnabled, splitPercent, null, null, null);
   }
 
   /**
@@ -158,6 +162,7 @@ public record BankDepositRequest(
         holderId,
         amount,
         note,
+        null,
         false,
         null,
         counterpartyUserId,
@@ -194,6 +199,7 @@ public record BankDepositRequest(
         holderId,
         amount,
         note,
+        null,
         splitEnabled,
         splitPercent,
         counterpartyUserId,

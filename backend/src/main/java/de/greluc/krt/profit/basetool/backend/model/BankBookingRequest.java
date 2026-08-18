@@ -132,6 +132,21 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
   private String justification;
 
   /**
+   * The confirming bank employee's own note ("Notiz Bankmitarbeiter", REQ-BANK-054), snapshotted
+   * here so the staff queue and the approval tab can render it without joining the resulting
+   * transaction per row, and copied onto {@link BankTransaction#getStaffNote()} of the booking the
+   * confirmation produces.
+   *
+   * <p>Deliberately <strong>not</strong> {@code updatable = false} — unlike {@link #note} / {@link
+   * #justification}, which the requester supplies at creation, this is written at
+   * <strong>confirmation</strong>. Stays {@code null} while the request is {@code PENDING}, on a
+   * rejected/cancelled request, and when the employee recorded none.
+   */
+  @Nullable
+  @Column(length = 500)
+  private String staffNote;
+
+  /**
    * Snapshot at creation (REQ-BANK-043): whether this {@code DEPOSIT} request distributes {@link
    * #splitPercent} of the gross evenly across all active squadron accounts on confirmation (the
    * named account is credited the remainder). DEPOSIT-only and immutable; always {@code false} for

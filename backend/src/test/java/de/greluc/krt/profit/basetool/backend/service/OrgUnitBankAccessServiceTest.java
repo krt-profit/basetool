@@ -411,6 +411,7 @@ class OrgUnitBankAccessServiceTest {
             "greluc",
             "note",
             "Reparatur",
+            "intern: Rueckfrage SL",
             Instant.now(),
             null,
             "KB-0002",
@@ -433,6 +434,11 @@ class OrgUnitBankAccessServiceTest {
     assertThat(redacted.counterpartyHandle()).isEqualTo("carol");
     assertThat(redacted.counterpartyOrgUnitName()).isEqualTo("Staffel Rot");
     assertThat(redacted.counterAccountNo()).isEqualTo("KB-0002");
+    // REQ-BANK-054: the requester-supplied note/Begruendung stay (they are not player-identifying),
+    // but the bank employee's own note is internal and must not reach an org-unit member.
+    assertThat(redacted.note()).isEqualTo("note");
+    assertThat(redacted.justification()).isEqualTo("Reparatur");
+    assertThat(redacted.staffNote()).isNull();
     assertThat(redacted.amount()).isEqualByComparingTo("-100");
     // REQ-BANK-045: the Begründung is not player-identifying, so it survives redaction like the
     // note.
@@ -1749,6 +1755,7 @@ class OrgUnitBankAccessServiceTest {
         BankBookingRequestType.DEPOSIT,
         new BigDecimal("500"),
         "from sale",
+        null,
         null,
         BankBookingRequestStatus.PENDING,
         "requester",

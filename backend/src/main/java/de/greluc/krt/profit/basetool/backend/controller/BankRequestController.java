@@ -115,6 +115,7 @@ public class BankRequestController {
         request.holderId(),
         request.destinationHolderId(),
         request.ownerApprovalConfirmed(),
+        request.staffNote(),
         request.version(),
         authentication);
   }
