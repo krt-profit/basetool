@@ -154,17 +154,6 @@ public class AnonymousPageSizeFilter extends OncePerRequestFilter {
    * @throws IOException if the body cannot be written.
    */
   private void reject(HttpServletRequest request, HttpServletResponse response) throws IOException {
-    String correlationId = response.getHeader(CORRELATION_ID_HEADER);
-    Locale locale = request.getLocale();
-    String title =
-        messageSource.getMessage("problem.page_size_too_large.title", null, "Bad Request", locale);
-    String detail =
-        messageSource.getMessage(
-            "problem.page_size_too_large.detail",
-            new Object[] {MAX_ANONYMOUS_PAGE_SIZE},
-            "The requested page size exceeds the limit for unauthenticated callers.",
-            locale);
-
     // Bounded label, and the counter is the only record: the path is already on the access log and
     // the caller's address is deliberately never logged here (REQ-OBS-004).
     meterRegistry
@@ -177,9 +166,19 @@ public class AnonymousPageSizeFilter extends OncePerRequestFilter {
 
     response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+    String correlationId = response.getHeader(CORRELATION_ID_HEADER);
     if (correlationId != null) {
       response.setHeader(CORRELATION_ID_HEADER, correlationId);
     }
+    Locale locale = request.getLocale();
+    String title =
+        messageSource.getMessage("problem.page_size_too_large.title", null, "Bad Request", locale);
+    String detail =
+        messageSource.getMessage(
+            "problem.page_size_too_large.detail",
+            new Object[] {MAX_ANONYMOUS_PAGE_SIZE},
+            "The requested page size exceeds the limit for unauthenticated callers.",
+            locale);
     ProblemDetail problem =
         problemResponseFactory.problem(
             HttpStatus.BAD_REQUEST,
