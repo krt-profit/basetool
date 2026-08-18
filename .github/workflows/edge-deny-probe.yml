@@ -57,11 +57,10 @@ jobs:
           https://profit-base.online/actuator/health
           https://ingest.profit-base.online/actuator/prometheus
           https://ingest.profit-base.online/actuator/health
-          # STAGED — un-comment together with the Prometheus blackbox-edge-deny targets when the
-          # API vhost goes live (docs/MONITORING_ROLLOUT_RUNBOOK.md, Appendix C). This external
-          # vantage point matters most on that host: it is the one the native app reaches, and the
-          # only place a mistaken `location /actuator` proxy_pass would be visible from outside.
-          #https://api.profit-base.online/actuator/prometheus
-          #https://api.profit-base.online/actuator/health
+          # The API vhost (un-staged as runbook phase F). This external vantage point matters most
+          # on that host: it is the one the native app reaches, and the only place a mistaken
+          # `location /actuator` proxy_pass would be visible from outside.
+          https://api.profit-base.online/actuator/prometheus
+          https://api.profit-base.online/actuator/health
           TARGETS
           exit $fail

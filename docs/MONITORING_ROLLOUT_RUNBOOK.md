@@ -961,6 +961,13 @@ docker run --rm -v "$PWD/monitoring/blackbox:/cfg" prom/blackbox-exporter:v0.28.
    once by hand — `gh workflow run "Edge deny probe"` — and confirm it stays green.
 
 7. **Record the date here**, so a later reader can tell a staged rule from a forgotten one.
+   *Un-staged 2026-08-18 (`feat/enable-api-vhost-probes`): the four api targets inside
+   `blackbox-http-auth`, `blackbox-http-auth-ipv6`, `blackbox-edge-deny` and
+   `blackbox-force-ssl`, the three jobs `blackbox-hsts-auth` / `blackbox-dns-api-a` /
+   `blackbox-dns-api-aaaa`, the two external URLs in `edge-deny-probe.yml`, and the widening
+   of `EdgeHstsHeaderMissing` to `job=~"blackbox-hsts.*"` — all in one commit, as step 3
+   requires. The `ApiClientAttributionBlind` rule below stays staged; its gate is evidence,
+   not the vhost.*
 
 ### Related: the staged `ApiClientAttributionBlind` rule
 

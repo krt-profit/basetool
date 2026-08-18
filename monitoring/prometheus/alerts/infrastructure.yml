@@ -454,9 +454,13 @@ groups:
           summary: "HTTP→HTTPS redirect broken: {{ $labels.instance }}"
           description: "Port 80 on {{ $labels.instance }} no longer answers with a 301/308 to https:// — the Force SSL toggle on the NPM proxy host is off or drifted."
 
+      # Regex, not the bare job name: blackbox-hsts-auth (the API vhost, whose probeable paths
+      # answer 401 and therefore need the http_2xx_or_401_hsts module) is a separate job.
+      # Prometheus anchors label regexes fully, so the old spelling `job="blackbox-hsts"` collected
+      # that job's probe_success and alerted on none of it.
       - alert: EdgeHstsHeaderMissing
         expr: >-
-          probe_success{job="blackbox-hsts"} == 0
+          probe_success{job=~"blackbox-hsts.*"} == 0
           and on() (probe_success{job="blackbox-http", instance="https://profit-base.online"} == 1)
         for: 30m
         labels:

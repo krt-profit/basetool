@@ -1928,8 +1928,10 @@ loosening the frontend's `http_2xx_hsts` assertion.
   is not counted as an authentication failure (`SecurityProblemResponseHandlerTest`).
 - [x] `ApiUnknownClient` fires on sustained `other` traffic, stays silent for known clients at any
   volume, and does not claim the `none` series (`tests/apiunknownclient_scope_test.yml`).
-- [ ] The staged probes are enabled and green after D3/D4, and `EdgeHstsHeaderMissing` is widened to
-  `job=~"blackbox-hsts.*"` in the same edit. **Open** — owner step, runbook Appendix C.
+- [x] The staged probes are enabled and `EdgeHstsHeaderMissing` is widened to
+  `job=~"blackbox-hsts.*"` in the same edit (2026-08-18, runbook Appendix C). Their **green** state
+  is a deploy-time observation, not a repo property: confirm every new `blackbox-*` target is `up`
+  with `probe_success == 1` after the config reaches production.
 - [ ] The staged `ApiClientAttributionBlind` rule is enabled once a week of production data shows the
   `none` series flat at zero. **Open**.
 
