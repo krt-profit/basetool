@@ -226,6 +226,14 @@ public class OrgUnitBankPageController {
     // REQ-BANK-055: the Empfaenger picker of a withdrawal request is pre-filled with the requester,
     // so the common case ("pay out to me") needs no interaction. The picker is a REMOTE combobox,
     // which needs the LABEL alongside the id to seed itself -- an id alone renders a blank box.
+    //
+    // The id MUST be the JWT subject, NOT #authentication.name: this client is configured with
+    // `user-name-attribute: preferred_username`, so Authentication#getName() is the USERNAME.
+    // Seeding
+    // the option value with it submitted a username where the backend deserializes a UUID, which
+    // 400'd every withdrawal request (caught by BankOrgUnitRequestsE2eTest, invisible to the MVC
+    // render tests). `sub` is the same value as app_user.id, which is what the backend expects.
+    model.addAttribute("requesterId", principal == null ? null : principal.getSubject());
     model.addAttribute("requesterHandle", requesterHandle(principal));
     if ("orgUnitBank".equals(fragment)) {
       return "org-unit-bank :: orgUnitBank";

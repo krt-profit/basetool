@@ -588,7 +588,7 @@
                          Leaving it as-is reproduces the previous behaviour exactly (confirmation
                          derived the requester); changing it lets a member request a payout TO
                          someone else, which was previously impossible to express. -->
-                    <th:block th:replace="~{fragments/bank-counterparty :: requestCounterpartyBlock(${#authentication.name}, ${requesterHandle})}"></th:block>
+                    <th:block th:replace="~{fragments/bank-counterparty :: requestCounterpartyBlock(${requesterId}, ${requesterHandle})}"></th:block>
                     <div class="bank-form-row">
                         <label for="org-unit-request-note" th:text="#{bank.field.note}">Notiz</label>
                         <input type="text" id="org-unit-request-note" name="note" maxlength="500"

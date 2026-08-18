@@ -389,10 +389,13 @@ class BankOrgUnitRequestsE2eTest {
         page.locator("[data-testid='org-unit-request-account']").selectOption(accountId);
         page.locator("[data-testid='org-unit-request-amount']").fill(Long.toString(amount));
         // REQ-BANK-055: the Empfaenger picker is seeded server-side with the requester, so the
-        // common case needs no interaction at all. A blank box here would mean the seed regressed.
+        // common case needs no interaction at all. Asserting merely "not blank" is too weak - the
+        // regression that shipped seeded the USERNAME, which is also not blank and which the
+        // backend then rejected as a malformed UUID. Pin the value to the officer's actual id.
         assertThat(page.locator("[data-testid='org-unit-request-cp-user']"))
-            .not()
-            .hasValue("", new LocatorAssertions.HasValueOptions().setTimeout(10_000));
+            .hasValue(
+                seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD),
+                new LocatorAssertions.HasValueOptions().setTimeout(10_000));
         dropFooter(page);
         page.waitForResponse(
             r ->
