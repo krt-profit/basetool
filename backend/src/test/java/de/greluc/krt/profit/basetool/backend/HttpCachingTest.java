@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend;
 
 import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -95,30 +94,35 @@ class HttpCachingTest {
         .andExpect(status().is4xxClientError());
   }
 
+  /**
+   * REQ-SEC-031 turned this endpoint's guarantee from "no usable oracle" into "no oracle at all".
+   *
+   * <p>The test previously obtained a real ETag from {@code /api/v1/users} as an authorized member,
+   * confirmed the intended 304 on replay, and then showed that an unauthenticated replay is denied
+   * rather than answered with a 304 (finding L-9). Since the member families carry {@code
+   * no-store}, Spring's {@code ShallowEtagHeaderFilter} deliberately emits no ETag for them at all
+   * — so the cross-principal comparison it was guarding against cannot even be attempted. The 304
+   * half is unchanged and still covered on a non-sensitive family by {@link
+   * #etagAndConditionalGet_ShouldReturn304_OnMatch()}.
+   *
+   * <p>The cost is real and accepted: this family no longer benefits from conditional requests and
+   * transfers its body every time.
+   */
   @Test
-  void protectedEndpoint_etagReplayedWithoutAuth_isDeniedNot304() throws Exception {
+  void protectedSensitiveEndpoint_emitsNoEtagAndStillDeniesAnUnauthenticatedReplay()
+      throws Exception {
     SimpleGrantedAuthority member = new SimpleGrantedAuthority("ROLE_KRT_MEMBER");
 
-    // An authorized member reads the protected endpoint and obtains its real ETag...
-    String etag =
-        mockMvc
-            .perform(get("/api/v1/users").with(jwt().authorities(member)))
-            .andExpect(status().isOk())
-            .andExpect(header().string("ETag", notNullValue()))
-            .andReturn()
-            .getResponse()
-            .getHeader("ETag");
-    assertNotNull(etag);
-
-    // ...the same authorized principal replaying that ETag gets the intended 304 (caching works)...
     mockMvc
-        .perform(get("/api/v1/users").with(jwt().authorities(member)).header("If-None-Match", etag))
-        .andExpect(status().isNotModified());
+        .perform(get("/api/v1/users").with(jwt().authorities(member)))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", "private, no-store"))
+        .andExpect(header().doesNotExist("ETag"));
 
-    // ...but replaying the very same ETag WITHOUT authentication must NOT yield a 304 (L-9): there
-    // is no cross-principal ETag equality oracle — security denies before the comparison happens.
+    // A fabricated ETag must still be denied rather than short-circuited to a 304 of protected
+    // content: security answers before any comparison, exactly as it did before.
     mockMvc
-        .perform(get("/api/v1/users").header("If-None-Match", etag))
+        .perform(get("/api/v1/users").header("If-None-Match", "\"fabricated-etag\""))
         .andExpect(status().is4xxClientError());
   }
 }

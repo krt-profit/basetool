@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.filter.RateLimitingFilter;
@@ -30,6 +32,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -133,6 +136,62 @@ class SecurityTest {
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.jwt()
                         .jwt(jwt)))
+        .andExpect(status().isOk());
+  }
+
+  /**
+   * The material x terminal price matrix is the largest single response the API can produce, and it
+   * used to fall into the catalog {@code permitAll} through {@code /api/v1/materials/**} — the
+   * cheapest amplification lever an unauthenticated caller had. Its only consumer is an
+   * {@code @PreAuthorize("isAuthenticated()")} page controller, so requiring a token costs nothing
+   * (A6, REQ-SEC-032). Ordering is what makes this work, and what a future edit could quietly undo:
+   * Spring Security takes the first matching rule, so moving this below the catalog block would
+   * re-open the surface with no other symptom.
+   */
+  @Test
+  void materialsMatrixIsNotAnonymouslyReachable() throws Exception {
+    mockMvc.perform(get("/api/v1/materials/matrix")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void theRestOfTheMaterialCatalogStaysAnonymous() throws Exception {
+    // The carve-out must be surgical: the anonymous order form's material picker still needs the
+    // ordinary catalog list, so a too-broad matcher would break the guest flow instead.
+    mockMvc.perform(get("/api/v1/materials")).andExpect(status().isOk());
+  }
+
+  /**
+   * The anonymous page-size ceiling (A6, REQ-SEC-032).
+   *
+   * <p>{@code PaginationUtil} clamps at 100 000, which is right for the authenticated consumers
+   * that page-walk large catalogues and far too generous for a surface anyone can reach. The
+   * refusal is deliberate rather than a silent clamp: reducing the size quietly is the defect
+   * ADR-0104 forbids, because a caller built on "one big page" would then present an incomplete
+   * list as complete.
+   */
+  @Test
+  void anonymousPageSizeAboveTheCeilingIsRefusedRatherThanTruncated() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/materials").param("size", "50000"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("PAGE_SIZE_TOO_LARGE"));
+  }
+
+  @Test
+  void anonymousPageSizeAtTheCeilingStillWorks() throws Exception {
+    // 1000 is what every anonymous caller in the codebase already asks for — the guest order form's
+    // pickers and the catalogue page-walks — so the ceiling must not start rejecting them.
+    mockMvc.perform(get("/api/v1/materials").param("size", "1000")).andExpect(status().isOk());
+  }
+
+  @Test
+  void anAuthenticatedCallerIsNotSubjectToTheAnonymousCeiling() throws Exception {
+    // The large page-walks are authenticated and must keep their 100 000 clamp.
+    mockMvc
+        .perform(
+            get("/api/v1/materials")
+                .param("size", "50000")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk());
   }
 

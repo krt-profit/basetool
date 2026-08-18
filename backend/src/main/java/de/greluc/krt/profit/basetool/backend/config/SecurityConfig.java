@@ -493,6 +493,18 @@ public class SecurityConfig {
                     // the controller enforces its own constant-time shared-secret header instead.
                     .requestMatchers("/internal/**")
                     .permitAll()
+                    // A6 / REQ-SEC-032: carved OUT of the catalog permitAll below, which it would
+                    // otherwise fall into via /api/v1/materials/**. The material x terminal price
+                    // matrix is the largest single response the API can produce — the frontend
+                    // page-walks it at size=100000 — so leaving it anonymous hands an
+                    // unauthenticated
+                    // caller the cheapest amplification lever on the whole surface. It is operating
+                    // data, not guest content: its only consumer is MaterialsPageController, which
+                    // carries @PreAuthorize("isAuthenticated()"), so requiring a token here costs
+                    // nothing. Ordering matters — Spring Security takes the FIRST matching rule, so
+                    // this must stay above the /api/v1/materials/** entry.
+                    .requestMatchers(HttpMethod.GET, "/api/v1/materials/matrix")
+                    .authenticated()
                     .requestMatchers(
                         "/api/v1/frequency-types", "/api/v1/frequency-types/**",
                         "/api/v1/locations", "/api/v1/locations/**",
@@ -749,7 +761,19 @@ public class SecurityConfig {
                 meterRegistry,
                 refusedSubjectWindow),
             PendingApprovalAccessFilter.class)
-        // A3 / REQ-SEC-033: bound how hard one authenticated ACCOUNT can drive the API. The per-IP
+        // A6 / REQ-SEC-032: bound the page size an unauthenticated caller may ask for. Placed here
+        // because the only question it asks is "is this caller anonymous", which is settled by the
+        // authentication filters above; an authenticated caller passes straight through.
+        .addFilterAfter(
+            new AnonymousPageSizeFilter(
+                messageSource, problemResponseFactory, objectMapper, meterRegistry),
+            TermsAcceptanceAccessFilter.class)
+        // A3 / REQ-SEC-033: bound how hard one authenticated ACCOUNT can drive the API.
+        // Anchored behind the anonymous page-size gate above rather than behind the terms
+        // filter, so the order of these two is stated here instead of falling out of the
+        // registration order (addFilterAfter inserts directly after its anchor, so two calls
+        // naming the same one end up reversed). The two are disjoint anyway — one only ever
+        // sees anonymous callers, the other only authenticated ones. The per-IP
         // limiter ahead of the chain bounds a network position, which is the wrong unit in both
         // directions — CGNAT puts many members behind one address, and an address pool escapes it
         // entirely. Placed after the gates above so a pending or unconsented caller is refused on
@@ -761,7 +785,7 @@ public class SecurityConfig {
                 problemResponseFactory,
                 objectMapper,
                 meterRegistry),
-            TermsAcceptanceAccessFilter.class)
+            AnonymousPageSizeFilter.class)
         // REQ-SEC-024: catch an identity-provider-unreachable failure (JWKS fetch timeout / 5xx /
         // Docker-DNS strand) escaping the bearer-token filter as a re-thrown
         // AuthenticationServiceException and re-map it to a retryable 503 instead of the opaque 500

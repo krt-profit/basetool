@@ -1407,6 +1407,74 @@ client while the policy is attached.
 [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md) · **Measurements:**
 [`ANDROID_API_EXPOSURE_PLAN.md`](../ANDROID_API_EXPOSURE_PLAN.md) section 7
 
+### REQ-SEC-031 — Sensitive GET families MUST be uncacheable, not merely revalidatable
+
+API GET responses under `/api/v1/bank/**`, `/api/v1/users/**`, `/api/v1/me/**` and
+`/api/v1/notifications/**` MUST carry `Cache-Control: private, no-store`. Every other `/api/**` GET
+keeps `no-cache, must-revalidate`.
+
+The distinction is not cosmetic. `no-cache, must-revalidate` permits an intermediary to **store** the
+body and reuse it after a successful revalidation; only `no-store` forbids the copy existing at all.
+For master data and mission lists the weaker directive is the right trade. For a bank ledger, a
+member record — the only PII the API serves — or one person's notification feed it is not: a
+corporate middlebox, a shared proxy or a browser disk cache would be holding data that must not
+outlive the response.
+
+While the backend was reachable only from the frontend across an internal network there was no
+intermediary for the header to talk to. A public API vhost makes one plausible, which is what turns
+this from theory into a control.
+
+The scope MUST be matched against the **decoded** path (REQ-SEC-029), so an encoded spelling such as
+`/api/v1/%62ank/accounts` cannot fall back into the weaker directive. The list is maintained in code
+rather than configuration: which data is sensitive is a property of the domain, not of a deployment.
+
+**Acceptance**
+
+- [x] The four families answer with `private, no-store`, including the notification SSE stream.
+- [x] An encoded spelling of a sensitive path still gets `no-store`.
+- [x] Other `/api/**` GETs are unchanged, and non-API paths and writes are untouched.
+- [x] `Vary: Accept-Encoding` is still set on the sensitive families.
+
+**Enforced by:** `ApiCacheControlFilterTest` · **Code:** `ApiCacheControlFilter`
+
+### REQ-SEC-032 — The anonymous surface MUST NOT be an amplification lever
+
+`PaginationUtil` clamps `size` at 100 000. That is correct for the authenticated consumers that
+page-walk large catalogues and far too generous for endpoints anyone on the internet can reach once
+the API vhost is live: one request would return an entire catalogue, and repeating it is the cheapest
+amplification the surface offers.
+
+Two rules follow.
+
+**The material x terminal price matrix MUST require authentication.** `GET /api/v1/materials/matrix`
+is the largest single response the API can produce and used to fall into the catalog `permitAll`
+through `/api/v1/materials/**`. It is operating data rather than guest content, and its only consumer
+is a page controller annotated `@PreAuthorize("isAuthenticated()")`, so the carve-out costs nothing.
+Because Spring Security takes the **first** matching rule, the authenticated matcher MUST stay above
+the catalog block; moving it below re-opens the surface with no other symptom.
+
+**An unauthenticated caller MUST NOT request more than 1000 entries per page**, and the refusal MUST
+be an explicit `400` naming the limit rather than a silent reduction. Silently clamping is the defect
+ADR-0104 forbids: the caller gets fewer rows than it asked for, cannot tell, and any surface built on
+a single large page then presents an incomplete list as complete. A page-walking consumer is
+unaffected either way, since it asks for pages until they run out. The ceiling is 1000 because that is
+exactly what the existing anonymous callers request — the guest order form's pickers and the catalogue
+page-walks — so it costs the legitimate flows nothing.
+
+Authenticated callers keep the 100 000 clamp. The scope is matched on the **decoded** path
+(REQ-SEC-029).
+
+**Acceptance**
+
+- [x] `GET /api/v1/materials/matrix` answers 401 without a token; the rest of the material catalogue
+  stays anonymously readable.
+- [x] An anonymous request with `size=50000` is refused with `400` and the stable code
+  `PAGE_SIZE_TOO_LARGE`.
+- [x] An anonymous request with `size=1000` still succeeds.
+- [x] An authenticated caller with `size=50000` is unaffected.
+
+**Enforced by:** `SecurityTest` · **Code:** `AnonymousPageSizeFilter`, `SecurityConfig`
+
 ### REQ-SEC-033 — An authenticated account MUST have a budget of its own
 
 Every `/api/**` write (`POST`, `PUT`, `PATCH`, `DELETE`) and the notification SSE connect MUST be
