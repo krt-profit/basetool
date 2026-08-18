@@ -1113,6 +1113,10 @@ services:
       - net-backend-frontend
       - net-backend-keycloak
       - net-backend-ingest
+      # ADR-0135: the ONLY net-proxy-* network the backend joins, so NPM can reach the app connector
+      # for the public API vhost. Without it the vhost's forward target `backend` does not resolve
+      # and every allow-listed path answers 503 from the maintenance page (measured 2026-08-18).
+      - net-proxy-api
       # Notification SSE cross-replica fan-out (ADR-0094) — reaches the `redis` service.
       - net-redis-backend
       # Prometheus scrapes /actuator/prometheus (HTTPS) and Alloy receives OTLP spans here (epic #936).
@@ -1357,6 +1361,8 @@ services:
       # NPM re-encrypts the public grafana.profit-base.online host to grafana:3000 over this dedicated
       # net (Grafana joins it from docker-compose.monitoring.yml). Keeps NPM OFF net-monitoring-core.
       - net-proxy-grafana
+      # API vhost of the mobile-client exposure (ADR-0135) — NPM's route to backend:11261.
+      - net-proxy-api
 
 # Every bridge network is pinned to a fixed /24 under 172.28.0.0/16 instead of
 # being left to Docker's dynamic address pool. This is deliberate, not cosmetic:
@@ -1504,3 +1510,35 @@ networks:
       config:
         - subnet: 172.28.11.0/24
           gateway: 172.28.11.1
+  # NPM <-> backend for the public API vhost `api.profit-base.online` (ADR-0135). A dedicated bridge
+  # rather than putting the backend on the existing net-proxy-frontend: that one carries the web
+  # vhost, and keeping the API path on its own network means the two can be reasoned about — and if
+  # it ever comes to it, severed — independently. The single new lateral path is NPM -> backend,
+  # which is the entire point; frontend <-> backend already exists over net-backend-frontend.
+  #
+  # Dual-stack for the same reason net-proxy-frontend is (ADR-0112): with an IPv4-only bridge Docker
+  # installs no ip6tables DNAT, so the userland docker-proxy relays every IPv6 client through the
+  # bridge gateway and the app sees ONE address for all of them. That collapses the edge per-IP
+  # limiter (the 2026-07-20 outage) and would feed the same single address to the backend's
+  # client-IP attribution (REQ-SEC-011) — on a surface whose whole purpose is native clients on
+  # mobile networks, where IPv6 is the norm.
+  #
+  # Subnet continues the pinned 172.28.0.0/16 block (.13); .12 (net-redis-backend) was the last one
+  # taken. `app.rate-limit.trusted-proxies` already covers the whole /16 and needs no change. The
+  # new gateway 172.28.13.1 must be in the Keycloak /admin allow-list before this lands, or the
+  # SSH-tunnel admin route can break — see docs/API_VHOST_ROLLOUT_RUNBOOK.md, phase A.
+  #
+  # NOTE: adding a top-level network edits the block deploy.sh diffs (`network_block()`), so the
+  # apply is a CLEAN-SLATE recreate of the whole stack — a brief full-stack outage, once. That is
+  # deliberate and unavoidable: an in-place `up` can neither move a running container onto a new
+  # bridge nor recreate one that still has endpoints, and silently strands container name
+  # resolution (#974). Apply it in a maintenance window.
+  net-proxy-api:
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.28.13.0/24
+          gateway: 172.28.13.1
+        - subnet: fd00:28:13::/64
+          gateway: fd00:28:13::1
