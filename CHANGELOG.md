@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die Nutzungsbedingungen benennen das Fan-Projekt jetzt ausdrücklich.** § 9 hält fest, dass das Basetool ein inoffizielles, nicht kommerzielles Fan-Projekt ohne Unterstützung von Cloud Imperium ist und Material aus dem offiziellen Star-Citizen-Fankit nur nach dessen Bedingungen nutzt. Da sich der Wortlaut ändert, wird die Zustimmung beim nächsten Login erneut abgefragt.
 ### Added
 
 - **Auszahlungsanträge haben jetzt ein Feld "Empfänger".** Wer über die Org-Einheits-Bank eine Auszahlung beantragt, kann angeben, wer das Geld bekommt — vorbelegt mit dir selbst. Bisher wurde beim Buchen immer der Antragsteller als Empfänger eingetragen; ging die Auszahlung an jemand anderen, ließ sich das weder eintragen noch von der Bank korrigieren. Der Empfänger erscheint auch beim Aufklappen des Antrags.
