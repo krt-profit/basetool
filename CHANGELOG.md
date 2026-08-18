@@ -2,12 +2,13 @@
 
 ## [Unreleased]
 
+## [v1.5.47](https://github.com/krt-profit/basetool/releases/tag/v1.5.47) - 2026-08-18
+
 ### Added
 
 - **Vorbereitung für die Android-App: Der Betrieb sieht jetzt, welche Client-Software die Schnittstelle nutzt und warum eine Anmeldung scheitert.** Zwei neue Messwerte ordnen jede angemeldete Anfrage ihrem Programm zu — eine unbekannte Software löst eine Warnung aus — und schlüsseln abgelehnte Anmeldungen nach Ursache auf (abgelaufenes Token, fehlerhafter Kopfeintrag …). Die Überwachung der geplanten öffentlichen Schnittstelle ist vorbereitet, aber bewusst noch abgeschaltet, bis der Host existiert. Keine Auswirkung auf die Oberfläche (ADR-0135, REQ-OBS-018).
 
 - **Jedes Benutzerkonto hat jetzt ein eigenes Anfragekontingent für Änderungen.** Bisher wurde nur pro Netzwerkadresse begrenzt — was Mitglieder hinter einem gemeinsamen Anschluss gegenseitig ausbremst und einen Aufrufer mit wechselnden Adressen gar nicht erfasst. Das neue Kontingent (120 Änderungen pro Minute) hängt an der Anmeldung und liegt weit über dem, was normale Bedienung erzeugt (REQ-SEC-033).
-
 
 ### Changed
 
