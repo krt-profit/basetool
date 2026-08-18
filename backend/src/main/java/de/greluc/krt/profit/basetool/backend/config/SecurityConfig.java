@@ -735,6 +735,30 @@ public class SecurityConfig {
         // (REQ-SEC-028) and approval (REQ-SEC-017) would be evaluated against a service account and
         // the ingest path would silently stop enforcing either. Runs immediately after the
         // bearer-token filter, which is the first point at which there IS a caller to check.
+        // A8 / REQ-OBS-018: attribute every authenticated API request to its client software.
+        // The window is narrow and both edges matter. AFTER BearerTokenAuthenticationFilter,
+        // because before it there is no SecurityContext and the filter would see every request as
+        // anonymous — and it skips those silently, so the metric would simply stay empty
+        // (measured: no series at all in production between 2026-08-18 and this fix). BEFORE
+        // ActingMemberFilter, because that filter swaps an on-behalf-of call's authentication for
+        // an ActingMemberAuthentication which carries no claims, so a gateway request observed
+        // after it would count as anonymous too. Ahead of the refusing gates for a third reason: a
+        // client must not be able to hide from the counter behind its own 403s and 429s.
+        //
+        // Expressed as addFilterAfter on the bearer filter — the SAME anchor ActingMemberFilter
+        // uses — and registered FIRST, which is what puts it between the two. Measured, not
+        // reasoned: with two addFilterAfter calls naming one anchor, the earlier registration ends
+        // up earlier (registering this one second placed it at 10, behind ActingMemberFilter at 9).
+        // Do not "simplify" this to addFilterBefore(…, ActingMemberFilter.class): that spelling
+        // reads as if it did the same and instead lands the filter at the bearer filter's own slot
+        // — position 8 ahead of the bearer filter at 9, i.e. before there is any SecurityContext,
+        // which is exactly how the counter shipped dead. ApiClientMetricsChainTest pins both edges
+        // now; each wrong variant above fails it.
+        .addFilterAfter(
+            new ApiClientMetricsFilter(
+                apiClientMetricsProperties, ingestGatewayProperties, meterRegistry),
+            org.springframework.security.oauth2.server.resource.web.authentication
+                .BearerTokenAuthenticationFilter.class)
         .addFilterAfter(
             new ActingMemberFilter(
                 ingestGatewayProperties,
@@ -745,20 +769,6 @@ public class SecurityConfig {
                 meterRegistry),
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
-        // A8 / REQ-OBS-018: attribute every authenticated API request to its client software.
-        // Runs BEFORE ActingMemberFilter on purpose — that filter swaps an on-behalf-of call's
-        // authentication for an ActingMemberAuthentication, which carries no claims, so a gateway
-        // request observed after it would count as an anonymous one. Ahead of the refusing gates
-        // for the same reason: a client must not be able to hide from the counter behind its own
-        // rejections.
-        // Registered here rather than above the ActingMemberFilter call although it runs earlier:
-        // an anchor class must already have an order in Spring Security's FilterOrderRegistration,
-        // which ActingMemberFilter only gets from the addFilterAfter above. Naming it before that
-        // call fails the context with "does not have a registered order".
-        .addFilterBefore(
-            new ApiClientMetricsFilter(
-                apiClientMetricsProperties, ingestGatewayProperties, meterRegistry),
-            ActingMemberFilter.class)
         .addFilterAfter(
             new PendingApprovalAccessFilter(
                 messageSource, problemResponseFactory, objectMapper, meterRegistry),

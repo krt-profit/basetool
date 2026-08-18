@@ -1886,10 +1886,23 @@ the realm carries, and turning an unrecognised `azp` into a 403 would lock out a
 it is registered in Keycloak and before it reaches a properties file. The gate that matters is the
 audience check on the token itself.
 
-Placement is load-bearing: the filter runs **before** `ActingMemberFilter`, which replaces an
-on-behalf-of call's authentication with an `ActingMemberAuthentication` that carries no claims, and
-**before** the pending-approval, terms, page-size and per-subject gates, so a client cannot hide
-from the counter behind its own 403s and 429s.
+Placement is load-bearing on **both** sides, and the metric is silent rather than loud when it is
+wrong. The filter must run **after** `BearerTokenAuthenticationFilter` — before it there is no
+`SecurityContext`, every request looks anonymous, and the filter skips anonymous requests by
+design, so the metric simply stays empty. It must run **before** `ActingMemberFilter`, which
+replaces an on-behalf-of call's authentication with an `ActingMemberAuthentication` that carries no
+claims, and before the pending-approval, terms, page-size and per-subject gates, so a client cannot
+hide from the counter behind its own 403s and 429s.
+
+That narrow window was missed on the first attempt: `addFilterBefore(…, ActingMemberFilter.class)`
+reads as "just before the identity swap" and actually lands the filter at the bearer filter's own
+slot, one position too early. The counter therefore recorded **nothing at all** in production
+between 2026-08-18 and the fix, while `basetool_ratelimit_requests_total{bucket="subject"}` proved
+authenticated API traffic was flowing — that contradiction is what surfaced it. The working spelling
+is `addFilterAfter(…, BearerTokenAuthenticationFilter.class)` registered *before* the
+`ActingMemberFilter` registration; with two `addFilterAfter` calls on one anchor the earlier
+registration ends up earlier, which is measured rather than assumed. `ApiClientMetricsChainTest`
+pins both edges, and every wrong variant fails it.
 
 **Why authentication failed.** `basetool_auth_failures_total{reason}` breaks the 401s down by the
 RFC 6750 bearer error code (`invalid_token` / `invalid_request` / `insufficient_scope` / `other`),
@@ -1921,8 +1934,9 @@ loosening the frontend's `http_2xx_hsts` assertion.
 
 - [x] Every authenticated `/api/**` request is counted under a bounded `client_id`; an unregistered
   client reads as `other` and its `azp` never becomes a label (`ApiClientMetricsFilterTest`).
-- [x] A gateway call keeps its own client identity rather than reading as anonymous — the filter
-  runs ahead of the identity swap (`ApiClientMetricsFilterTest`).
+- [x] The filter sits strictly between `BearerTokenAuthenticationFilter` and `ActingMemberFilter` in
+  the chain as built, so an authenticated request is counted at all and a gateway call keeps its own
+  client identity (`ApiClientMetricsChainTest`, both edges asserted).
 - [x] An encoded path spelling cannot drop a request out of the attribution (REQ-SEC-029).
 - [x] Every 401 is counted under its RFC 6750 code, an unknown code collapses to `other`, and a 403
   is not counted as an authentication failure (`SecurityProblemResponseHandlerTest`).
