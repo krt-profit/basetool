@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Das Frontend wurde nach dem letzten Deploy nicht mehr gesund und der Rollout ist zurückgerollt.** Die Bereitschaftsprüfung des Frontends fragt das Backend ab — über genau den Port, dessen technische Statusdaten mit dem vorherigen Release auf einen internen Port umgezogen sind (ADR-0134). Sie zeigt jetzt auf den richtigen Port; ein Test hält beide Seiten zusammen, damit ein weiterer Portwechsel nicht wieder unbemerkt bleibt.
+
 ## [v1.5.47](https://github.com/krt-profit/basetool/releases/tag/v1.5.47) - 2026-08-18
 
 ### Added

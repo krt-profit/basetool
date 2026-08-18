@@ -93,6 +93,16 @@ management:
 
 app:
   backend-url: ${BACKEND_URL:https://backend:11261}
+  # The backend's ACTUATOR base URL, which in prod is NOT its API base URL: ADR-0134 moved the
+  # backend's Actuator to the internal-only management port 11271, so
+  # https://backend:11261/actuator/health/readiness answers 404 here. BackendHealthIndicator sits in
+  # the readiness group that gates the Docker HEALTHCHECK, so leaving it pointed at the API port
+  # made the frontend container permanently unhealthy and the deploy loop rolled v1.5.47 back
+  # (2026-08-18). The port must track backend/src/main/resources/application-prod.yml's
+  # management.server.port — BackendHealthUrlProdParityTest fails if the two drift apart. The host
+  # deliberately mirrors BACKEND_URL's default: the management connector binds every interface, so
+  # net-backend-frontend reaches it without a new network (REQ-OBS-005, ADR-0090/-0134).
+  backend-health-url: ${BACKEND_HEALTH_URL:https://backend:11271}
   logging:
     structured-enabled: true
   # SEC-02 / REQ-SEC-011: the reverse proxies whose X-Forwarded-For the frontend trusts when

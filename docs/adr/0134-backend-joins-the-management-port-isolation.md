@@ -96,9 +96,25 @@ because the port is reachable neither from the internet nor from the host.
 application port, and `MonitoringScrapeSecurityConfig` keeps failing it closed exactly as before.
 Full runtime log-level control also stays available there.
 
+**The frontend probes this port too, and that was missed — it cost a rolled-back release.** The
+frontend's `BackendHealthIndicator` polls the backend's `/actuator/health/readiness` and sits in the
+readiness group that gates its Docker HEALTHCHECK (ADR-0084). Moving the Actuator turned that probe
+into a 404, so on 2026-08-18 the frontend container never became healthy, `deploy.sh` rolled v1.5.47
+back after 180 s, and it retried on the bad-digest backoff until `:stable` was demoted. Nothing in CI
+could see it: `ManagementPortSecurityConfig` is conditional on `management.server.port`, which only
+the prod profile sets, and the frontend's `test` profile redefines the readiness group without the
+`backend` indicator — the combination existed nowhere but production. The fix gives the frontend its
+own `app.backend-health-url` (prod: `https://backend:11271`, defaulting to the API base URL
+everywhere else) and pins the two ports together with `BackendHealthUrlProdParityTest`. The lesson
+generalises past this ADR: **moving an endpoint means auditing every consumer of it, not only the
+module that serves it.** The management port now has two consumers inside the compose network —
+Prometheus over `net-monitoring-scrape` and the frontend over `net-backend-frontend`; both are
+closed networks, so the isolation argument is unchanged.
+
 **First-deploy verification, which cannot be exercised without the live stack.** After rollout
-confirm that the backend container reports `healthy`, that the Prometheus `basetool-backend` target
-is `up` on `11271`, and that `/actuator/prometheus` on `11261` answers 404 from inside the network.
+confirm that the backend container reports `healthy`, that the **frontend** container reports
+`healthy` (the check this ADR originally omitted), that the Prometheus `basetool-backend` target is
+`up` on `11271`, and that `/actuator/prometheus` on `11261` answers 404 from inside the network.
 
 ## Alternatives considered
 
