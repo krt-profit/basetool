@@ -26,7 +26,7 @@ phase D.
 | C     | `net-proxy-api` network, backend + NPM join it                   | Claude prepares the PR, you merge/promote | repo → deploy loop           |
 | D     | The vhost itself: proxy host, cert, allow-list, headers (**D3**) | you                                       | NPM admin UI                 |
 | E     | Verify from outside (**E3**)                                     | you                                       | your workstation             |
-| F     | Enable the staged probes                                         | Claude prepares the PR, you merge/promote | repo → deploy loop           |
+| F     | Enable the staged probes (done — PR, pending deploy)             | Claude prepares the PR, you merge/promote | repo → deploy loop           |
 | G     | Flip the audience enforcement (**D5**, release gate)             | you                                       | `/var/iri/code/.env`         |
 
 Claude never touches production. Where a phase needs a repo change, the deliverable is a PR; the
