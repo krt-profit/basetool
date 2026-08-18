@@ -115,6 +115,19 @@ class ApiClientMetricsChainTest {
             "after the swap, a gateway call carries an ActingMemberAuthentication with no claims "
                 + "and would be counted as anonymous")
         .isLessThan(identitySwap);
+
+    // The other half of the sandwich, and the one this test was missing: BEFORE the bearer filter
+    // there is no SecurityContext at all, so the filter would see every request as anonymous and
+    // count nothing — silently, because "no subject" is a legitimate outcome it skips.
+    int authentication =
+        indexOf(
+            filters,
+            org.springframework.security.oauth2.server.resource.web.authentication
+                .BearerTokenAuthenticationFilter.class);
+    assertThat(authentication).as("the bearer filter must be in the chain").isNotNegative();
+    assertThat(attribution)
+        .as("before authentication the security context is empty and nothing is ever counted")
+        .isGreaterThan(authentication);
   }
 
   @Test
