@@ -2,9 +2,8 @@
 
 ## [Unreleased]
 
-### Changed
+## [v1.5.46](https://github.com/krt-profit/basetool/releases/tag/v1.5.46) - 2026-08-18
 
-- **Die Nutzungsbedingungen benennen das Fan-Projekt jetzt ausdrücklich.** § 9 hält fest, dass das Basetool ein inoffizielles, nicht kommerzielles Fan-Projekt ohne Unterstützung von Cloud Imperium ist und Material aus dem offiziellen Star-Citizen-Fankit nur nach dessen Bedingungen nutzt. Da sich der Wortlaut ändert, wird die Zustimmung beim nächsten Login erneut abgefragt.
 ### Added
 
 - **Auszahlungsanträge haben jetzt ein Feld "Empfänger".** Wer über die Org-Einheits-Bank eine Auszahlung beantragt, kann angeben, wer das Geld bekommt — vorbelegt mit dir selbst. Bisher wurde beim Buchen immer der Antragsteller als Empfänger eingetragen; ging die Auszahlung an jemand anderen, ließ sich das weder eintragen noch von der Bank korrigieren. Der Empfänger erscheint auch beim Aufklappen des Antrags.
@@ -16,6 +15,10 @@
 - **Bankmitarbeiter können jetzt eine eigene Notiz zu einer Buchung erfassen.** Beim Bestätigen eines Antrags und bei jeder direkten Einzahlung, Auszahlung und jedem Transfer gibt es das Feld "Notiz Bankmitarbeiter" für interne Anmerkungen ("in zwei Tranchen übergeben"). Sie erscheint überall dort, wo auch Notiz und Begründung stehen — Kontohistorie, Antragsliste, Fremde Anträge, Kontoauszug und 3-Monats-Report. Für Mitglieder einer Org-Einheit ist sie bewusst nicht sichtbar; sie ist eine bankinterne Anmerkung.
 
 - **Fremde Anträge lassen sich jetzt aufklappen.** In der Freigabe-Liste der Org-Einheits-Bank zeigt ein Pfeil vor der Zeile Begründung und Notiz des Antrags — genau wie in der Antragsliste der Bank. Wer freigibt, entscheidet damit nicht mehr blind: beim KRT-Konto, dem Bankkonto und jedem Sonderkonto ist die Begründung Pflicht und war für den Freigebenden bisher nicht sichtbar.
+
+### Changed
+
+- **Die Nutzungsbedingungen benennen das Fan-Projekt jetzt ausdrücklich.** § 9 hält fest, dass das Basetool ein inoffizielles, nicht kommerzielles Fan-Projekt ohne Unterstützung von Cloud Imperium ist und Material aus dem offiziellen Star-Citizen-Fankit nur nach dessen Bedingungen nutzt. Da sich der Wortlaut ändert, wird die Zustimmung beim nächsten Login erneut abgefragt.
 
 ## [v1.5.45](https://github.com/krt-profit/basetool/releases/tag/v1.5.45) - 2026-08-17
 
