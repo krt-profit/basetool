@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.49](https://github.com/krt-profit/basetool/releases/tag/v1.5.49) - 2026-08-18
+
 ### Changed
 
 - **Das Backend bekommt einen eigenen Netzwerkpfad zum Randserver, damit die geplante App-Schnittstelle erreichbar wird.** Bisher lag das Backend auf keinem Proxy-Netz — der neue Vhost `api.profit-base.online` konnte den Dienst deshalb gar nicht auflösen und beantwortete jeden Aufruf mit der Wartungsseite. Keine Auswirkung auf die Oberfläche (ADR-0135). **Deploy-Hinweis:** die Änderung erweitert die Netzwerk-Topologie, deshalb setzt der Deploy den gesamten Stack einmal neu auf — kurze Komplettunterbrechung, bitte in einem Wartungsfenster ausrollen.
