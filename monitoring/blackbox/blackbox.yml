@@ -154,6 +154,38 @@ modules:
         fail_if_not_matches_regexp:
           - "profit-base\\.online\\.\\s+\\d+\\s+IN\\s+AAAA\\s+.+"
 
+  # Same assertions for the API vhost of the mobile-client exposure (ADR-0135). Its records are
+  # separate from the apex's, so the apex probes above prove nothing about them: a zone edit that
+  # drops api.profit-base.online leaves both apex probes green while every app in the field loses
+  # the backend. The modules are inert until the matching jobs in prometheus.yml are un-staged
+  # (docs/MONITORING_ROLLOUT_RUNBOOK.md, Appendix C) — a module nothing probes costs nothing, which
+  # is why these ship now rather than in the same edit as the cut-over.
+  dns_api_a:
+    prober: dns
+    timeout: 5s
+    dns:
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+      query_name: "api.profit-base.online"
+      query_type: "A"
+      valid_rcodes: ["NOERROR"]
+      validate_answer_rrs:
+        fail_if_not_matches_regexp:
+          - "api\\.profit-base\\.online\\.\\s+\\d+\\s+IN\\s+A\\s+.+"
+
+  dns_api_aaaa:
+    prober: dns
+    timeout: 5s
+    dns:
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+      query_name: "api.profit-base.online"
+      query_type: "AAAA"
+      valid_rcodes: ["NOERROR"]
+      validate_answer_rrs:
+        fail_if_not_matches_regexp:
+          - "api\\.profit-base\\.online\\.\\s+\\d+\\s+IN\\s+AAAA\\s+.+"
+
   # Succeeds ONLY on exactly 404 — the /actuator edge deny (ADR-0072 compensating control). The
   # live block is `location /actuator { return 404; }`; if it drifts, the Spring apps answer the
   # probed /actuator/prometheus path with 401 (fail-closed basic auth) and the probe fails.
@@ -197,6 +229,29 @@ modules:
     http:
       valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
       valid_status_codes: [200, 301, 302, 303, 307, 308]
+      method: GET
+      follow_redirects: false
+      fail_if_header_not_matches:
+        - header: Strict-Transport-Security
+          regexp: "max-age=\\d+"
+      fail_if_ssl: false
+      fail_if_not_ssl: false
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+      tls_config:
+        insecure_skip_verify: false
+
+  # HSTS on a surface whose probeable path answers 401. The API vhost proxies an allow-list of
+  # /api/** families and 404s everything else, so there is no unauthenticated 2xx to probe — the
+  # plain http_2xx_hsts module would fail on the status before it ever looked at the header and
+  # read as "HSTS is broken". Spring Security writes the header on the 401 too, so the assertion is
+  # unchanged; only the accepted status set differs.
+  http_2xx_or_401_hsts:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: [200, 301, 302, 303, 307, 308, 401]
       method: GET
       follow_redirects: false
       fail_if_header_not_matches:

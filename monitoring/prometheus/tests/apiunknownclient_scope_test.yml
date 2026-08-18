@@ -1,0 +1,75 @@
+# promtool unit test for ApiUnknownClient (A8, REQ-OBS-018).
+#
+# Locks the two halves of the rule that are easy to get wrong:
+#   - it fires on the BOUNDED literal `other`, i.e. on a client nobody registered, and
+#   - it stays silent for every known client, however much traffic they produce, because a busy
+#     frontend must never look like a foreign one.
+# It also pins that `none` is NOT covered by the enabled rule: that series means a Keycloak mapper
+# regression rather than a foreign caller, and its rule ships staged (see business.yml). Without
+# this case, enabling the staged rule later could silently duplicate an alert that already fires.
+#
+# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
+#   docker run --rm -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.13.2 promtool test rules tests/apiunknownclient_scope_test.yml
+
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  # A foreign client calling roughly once a minute: low volume on purpose, because that is the
+  # realistic shape of a scripted caller and the reason the threshold is "> 0" rather than tuned.
+  - name: fires - an unregistered client drives the API
+    interval: 1m
+    input_series:
+      - series: 'basetool_api_client_requests_total{client_id="other", application="basetool-backend"}'
+        values: "0+1x60"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: ApiUnknownClient
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Unregistered client software is calling the backend API"
+              description: "A token whose azp names no known client drove /api/** for 10 minutes. Either a first-party client was added to the realm without being added to app.monitoring.api-clients.known-client-ids, or something nobody approved is using the API. Identify it from the Keycloak client sessions and the api vhost access log; the label is deliberately bounded to 'other' and will never name it."
+
+  # The normal day: the web frontend and the app produce all the traffic there is. The rule must be
+  # blind to volume — it is a membership question, not a rate question.
+  - name: silent - only known clients, at high volume
+    interval: 1m
+    input_series:
+      - series: 'basetool_api_client_requests_total{client_id="basetool-frontend", application="basetool-backend"}'
+        values: "0+250x60"
+      - series: 'basetool_api_client_requests_total{client_id="basetool-android", application="basetool-backend"}'
+        values: "0+40x60"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: ApiUnknownClient
+        exp_alerts: []
+
+  # A missing azp claim is a realm-side regression, not an unapproved caller. The enabled rule must
+  # not claim it; the staged ApiClientAttributionBlind is the one that will.
+  - name: silent - tokens without an azp claim are a different failure
+    interval: 1m
+    input_series:
+      - series: 'basetool_api_client_requests_total{client_id="none", application="basetool-backend"}'
+        values: "0+5x60"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: ApiUnknownClient
+        exp_alerts: []
+
+  # The `for: 10m` is load-bearing and easy to lose in an edit: sustained unknown-client traffic
+  # must still be PENDING, not firing, eight minutes in. Without the delay a single misconfigured
+  # curl during a release would page.
+  - name: silent - eight minutes in, the for-clause has not elapsed
+    interval: 1m
+    input_series:
+      - series: 'basetool_api_client_requests_total{client_id="other", application="basetool-backend"}'
+        values: "0+1x60"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: ApiUnknownClient
+        exp_alerts: []

@@ -30,9 +30,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -43,6 +48,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.servlet.HandlerExceptionResolver;
@@ -58,6 +65,31 @@ import org.springframework.web.servlet.ModelAndView;
 class SecurityProblemResponseHandlerTest {
 
   private static final String SUB = "6a1f2c9e-0000-4000-8000-00000000abcd";
+
+  private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
+  /**
+   * Builds the handler over the shared registry, so every rejection a test drives also lands on
+   * {@code basetool_auth_failures_total} and the counter assertions below see the real call path.
+   *
+   * @param resolver the stubbed MVC exception resolver
+   * @return the handler under test
+   */
+  private SecurityProblemResponseHandler newHandler(HandlerExceptionResolver resolver) {
+    return new SecurityProblemResponseHandler(resolver, meterRegistry);
+  }
+
+  /**
+   * Reads the auth-failure counter for one bearer error code.
+   *
+   * @param reason the bounded {@code reason} label
+   * @return the count, or {@code 0} when the series does not exist yet
+   */
+  private double authFailures(String reason) {
+    Counter counter =
+        meterRegistry.find(MetricNames.AUTH_FAILURES).tag(MetricNames.TAG_REASON, reason).counter();
+    return counter == null ? 0d : counter.count();
+  }
 
   @AfterEach
   void clear() {
@@ -97,8 +129,7 @@ class SecurityProblemResponseHandlerTest {
   void handle_stampsJwtSubIntoUserIdMdcForTheRejectionWrite() throws Exception {
     authenticateWithJwt();
     AtomicReference<String> seen = new AtomicReference<>();
-    SecurityProblemResponseHandler handler =
-        new SecurityProblemResponseHandler(resolverCapturingUserId(seen));
+    SecurityProblemResponseHandler handler = newHandler(resolverCapturingUserId(seen));
 
     handler.handle(
         new MockHttpServletRequest("POST", "/api/v1/x"),
@@ -115,7 +146,7 @@ class SecurityProblemResponseHandlerTest {
   void handle_removesTheUserIdItStampedSoNothingBleedsIntoTheNextRequest() throws Exception {
     authenticateWithJwt();
     SecurityProblemResponseHandler handler =
-        new SecurityProblemResponseHandler(resolverCapturingUserId(new AtomicReference<>()));
+        newHandler(resolverCapturingUserId(new AtomicReference<>()));
 
     handler.handle(
         new MockHttpServletRequest("POST", "/api/v1/x"),
@@ -128,8 +159,7 @@ class SecurityProblemResponseHandlerTest {
   @Test
   void commence_leavesUserIdUnsetForAnAnonymousCaller() throws Exception {
     AtomicReference<String> seen = new AtomicReference<>("sentinel");
-    SecurityProblemResponseHandler handler =
-        new SecurityProblemResponseHandler(resolverCapturingUserId(seen));
+    SecurityProblemResponseHandler handler = newHandler(resolverCapturingUserId(seen));
 
     handler.commence(
         new MockHttpServletRequest("GET", "/api/v1/x"),
@@ -148,8 +178,7 @@ class SecurityProblemResponseHandlerTest {
     SecurityContextHolder.getContext()
         .setAuthentication(new UsernamePasswordAuthenticationToken("callsign", "n/a", List.of()));
     AtomicReference<String> seen = new AtomicReference<>("sentinel");
-    SecurityProblemResponseHandler handler =
-        new SecurityProblemResponseHandler(resolverCapturingUserId(seen));
+    SecurityProblemResponseHandler handler = newHandler(resolverCapturingUserId(seen));
 
     handler.handle(
         new MockHttpServletRequest("POST", "/api/v1/x"),
@@ -164,8 +193,7 @@ class SecurityProblemResponseHandlerTest {
     authenticateWithJwt();
     MDC.put("userId", "already-set");
     AtomicReference<String> seen = new AtomicReference<>();
-    SecurityProblemResponseHandler handler =
-        new SecurityProblemResponseHandler(resolverCapturingUserId(seen));
+    SecurityProblemResponseHandler handler = newHandler(resolverCapturingUserId(seen));
 
     handler.handle(
         new MockHttpServletRequest("POST", "/api/v1/x"),
@@ -181,7 +209,7 @@ class SecurityProblemResponseHandlerTest {
   void commence_delegatesAuthenticationExceptionToResolver() throws Exception {
     HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
     when(resolver.resolveException(any(), any(), isNull(), any())).thenReturn(new ModelAndView());
-    SecurityProblemResponseHandler handler = new SecurityProblemResponseHandler(resolver);
+    SecurityProblemResponseHandler handler = newHandler(resolver);
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/x");
     MockHttpServletResponse response = new MockHttpServletResponse();
     AuthenticationException ex = new BadCredentialsException("invalid token");
@@ -195,7 +223,7 @@ class SecurityProblemResponseHandlerTest {
   void handle_delegatesAccessDeniedExceptionToResolver() throws Exception {
     HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
     when(resolver.resolveException(any(), any(), isNull(), any())).thenReturn(new ModelAndView());
-    SecurityProblemResponseHandler handler = new SecurityProblemResponseHandler(resolver);
+    SecurityProblemResponseHandler handler = newHandler(resolver);
     MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/x");
     MockHttpServletResponse response = new MockHttpServletResponse();
     AccessDeniedException ex = new AccessDeniedException("denied");
@@ -209,7 +237,7 @@ class SecurityProblemResponseHandlerTest {
   void commence_fallsBackToSendErrorWhenResolverDoesNotHandle() throws Exception {
     HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
     when(resolver.resolveException(any(), any(), isNull(), any())).thenReturn(null);
-    SecurityProblemResponseHandler handler = new SecurityProblemResponseHandler(resolver);
+    SecurityProblemResponseHandler handler = newHandler(resolver);
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/x");
     MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -221,7 +249,7 @@ class SecurityProblemResponseHandlerTest {
   @Test
   void handle_skipsResolverWhenResponseAlreadyCommitted() throws Exception {
     HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
-    SecurityProblemResponseHandler handler = new SecurityProblemResponseHandler(resolver);
+    SecurityProblemResponseHandler handler = newHandler(resolver);
     MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/x");
     MockHttpServletResponse response = new MockHttpServletResponse();
     response.setCommitted(true);
@@ -229,5 +257,81 @@ class SecurityProblemResponseHandlerTest {
     handler.handle(request, response, new AccessDeniedException("denied"));
 
     verify(resolver, never()).resolveException(any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("a rejected token is counted under its RFC 6750 code, not merely as a 401")
+  void aRejectedTokenIsCountedUnderItsBearerErrorCode() throws Exception {
+    HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
+    when(resolver.resolveException(any(), any(), isNull(), any())).thenReturn(new ModelAndView());
+
+    newHandler(resolver)
+        .commence(
+            new MockHttpServletRequest("GET", "/api/v1/missions"),
+            new MockHttpServletResponse(),
+            new OAuth2AuthenticationException(
+                new OAuth2Error(MetricNames.AUTH_INVALID_TOKEN, "expired at …", null)));
+
+    assertEquals(
+        1.0d,
+        authFailures(MetricNames.AUTH_INVALID_TOKEN),
+        "the whole point of the metric is telling a bad token from a malformed header");
+    assertEquals(0.0d, authFailures(MetricNames.AUTH_OTHER));
+  }
+
+  @Test
+  void anErrorCodeOutsideTheRfcSetCollapsesToTheBoundedLiteral() throws Exception {
+    // The code is a string on the wire: a custom authorization server (or a future Spring release)
+    // can put anything there, and an unbounded label is a cardinality bomb (REQ-OBS-006).
+    HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
+    when(resolver.resolveException(any(), any(), isNull(), any())).thenReturn(new ModelAndView());
+
+    newHandler(resolver)
+        .commence(
+            new MockHttpServletRequest("GET", "/api/v1/missions"),
+            new MockHttpServletResponse(),
+            new OAuth2AuthenticationException(new OAuth2Error("mint_your_own_error_code")));
+
+    assertEquals(1.0d, authFailures(MetricNames.AUTH_OTHER));
+    assertNull(
+        meterRegistry
+            .find(MetricNames.AUTH_FAILURES)
+            .tag(MetricNames.TAG_REASON, "mint_your_own_error_code")
+            .counter(),
+        "an arbitrary code must never reach the label");
+  }
+
+  @Test
+  void aNonBearerAuthenticationFailureIsStillCounted() throws Exception {
+    // A failure that is not an OAuth2AuthenticationException carries no code at all; dropping it
+    // would make the counter disagree with basetool_http_error_total{code="UNAUTHENTICATED"} and
+    // leave the difference unexplained.
+    HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
+    when(resolver.resolveException(any(), any(), isNull(), any())).thenReturn(new ModelAndView());
+
+    newHandler(resolver)
+        .commence(
+            new MockHttpServletRequest("GET", "/api/v1/missions"),
+            new MockHttpServletResponse(),
+            new BadCredentialsException("nope"));
+
+    assertEquals(1.0d, authFailures(MetricNames.AUTH_OTHER));
+  }
+
+  @Test
+  void anAccessDeniedVerdictIsNotAnAuthenticationFailure() throws Exception {
+    // 403 means the caller authenticated fine and lacks an authority. Counting it here would
+    // inflate
+    // the spike alert with ordinary authorization outcomes.
+    HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
+    when(resolver.resolveException(any(), any(), isNull(), any())).thenReturn(new ModelAndView());
+
+    newHandler(resolver)
+        .handle(
+            new MockHttpServletRequest("GET", "/api/v1/audit"),
+            new MockHttpServletResponse(),
+            new AccessDeniedException("denied"));
+
+    assertNull(meterRegistry.find(MetricNames.AUTH_FAILURES).counter());
   }
 }

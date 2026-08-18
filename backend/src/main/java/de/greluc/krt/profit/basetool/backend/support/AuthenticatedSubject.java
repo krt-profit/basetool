@@ -65,6 +65,9 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
  */
 public final class AuthenticatedSubject {
 
+  /** Authorized-party claim: the Keycloak client id a token was issued to (OIDC Core section 2). */
+  private static final String AUTHORIZED_PARTY_CLAIM = "azp";
+
   private AuthenticatedSubject() {
     // Utility holder — not instantiable.
   }
@@ -101,6 +104,45 @@ public final class AuthenticatedSubject {
     // AnonymousAuthenticationToken that name is a placeholder, and on a username/password token it
     // is the member's callsign, which REQ-OBS-004 keeps out of logs entirely.
     return Optional.empty();
+  }
+
+  /**
+   * Extracts the {@code azp} claim — which Keycloak client the caller's token was issued to.
+   *
+   * <p>Lives here rather than in the one filter that needs it for the reason the class exists: the
+   * question "what is in this caller's token" must be asked in exactly one place, or the next
+   * authentication type splits its consumers into fail-open and fail-closed all over again. A
+   * token-less authentication (the acting member of ADR-0129) has no authorized party at all, and
+   * that reads as empty rather than as an exception — an absent client identity is a legitimate
+   * answer that the caller decides how to treat.
+   *
+   * <p>Bounding the value is deliberately NOT this method's job. It returns whatever the token
+   * says; a consumer that turns it into a metric label must map it onto a bounded set first
+   * (REQ-OBS-006), which is what {@code ApiClientMetricsProperties} is for.
+   *
+   * @param authentication the current authentication, may be {@code null}
+   * @return the {@code azp} claim, or empty when there is no token or the claim is absent/blank
+   */
+  public static Optional<String> authorizedParty(@Nullable Authentication authentication) {
+    return token(authentication)
+        .map(jwt -> jwt.getClaimAsString(AUTHORIZED_PARTY_CLAIM))
+        .filter(azp -> !azp.isBlank());
+  }
+
+  /**
+   * The caller's token, from either shape Spring Security presents it in.
+   *
+   * @param authentication the current authentication, may be {@code null}
+   * @return the token, or empty for a token-less or absent authentication
+   */
+  private static Optional<Jwt> token(@Nullable Authentication authentication) {
+    if (authentication == null) {
+      return Optional.empty();
+    }
+    if (authentication instanceof JwtAuthenticationToken jwtAuth) {
+      return Optional.ofNullable(jwtAuth.getToken());
+    }
+    return authentication.getPrincipal() instanceof Jwt jwt ? Optional.of(jwt) : Optional.empty();
   }
 
   /**

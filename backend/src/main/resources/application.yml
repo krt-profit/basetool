@@ -179,6 +179,13 @@ app:
       # real values.
       username: ${MONITORING_SCRAPE_USER:}
       password: ${MONITORING_SCRAPE_PASSWORD:}
+    api-clients:
+      # Which client ids basetool_api_client_requests_total may carry verbatim as its client_id
+      # label (A8, REQ-OBS-018). This BOUNDS the label, it authorises nobody: an unlisted client is
+      # served exactly as before and counted under the literal "other", which is the series
+      # ApiUnknownClient alerts on. A configured app.security.ingest-gateway client counts as known
+      # without being repeated here. Override only when a deployment renames its realm clients.
+      known-client-ids: ${APP_MONITORING_API_CLIENTS_KNOWN_CLIENT_IDS:basetool-frontend,basetool-android}
     business-metrics:
       # BusinessMetricsCollector samples the approval/work-queue depth and oldest-pending-age
       # gauges (basetool_*_pending_*, REQ-OBS-011) on this fixed cadence. Disabled under the test

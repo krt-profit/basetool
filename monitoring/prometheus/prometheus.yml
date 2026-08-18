@@ -189,6 +189,14 @@ scrape_configs:
     static_configs:
       - targets:
           - https://ingest.profit-base.online
+          # STAGED (ADR-0135, A7/C) — the API vhost of the mobile exposure. It does not resolve
+          # until D3/D4 are applied, and an un-staged target would page BlackboxProbeFailed and
+          # DnsResolutionFailed from the minute this merges. Enable per REQ-OBS-014's staging rule,
+          # following docs/MONITORING_ROLLOUT_RUNBOOK.md, Appendix C.
+          # The probed path is deliberately an ALLOW-LISTED one that answers 401: the vhost is a
+          # default-deny allow-list and 404s its own root, so probing `/` would assert nothing
+          # about the backend behind it and would fail on a perfectly healthy edge.
+          # - https://api.profit-base.online/api/v1/terms/status
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -221,6 +229,12 @@ scrape_configs:
           - https://profit-base.online/actuator/health
           - https://ingest.profit-base.online/actuator/prometheus
           - https://ingest.profit-base.online/actuator/health
+          # STAGED with the api vhost (Appendix C). The backend's actuator already moved to the
+          # internal-only management port 11271 (ADR-0134), so these assert the SECOND layer: that
+          # the vhost's own `location /actuator { return 404; }` is in place, independently of which
+          # port the app happens to serve today.
+          # - https://api.profit-base.online/actuator/prometheus
+          # - https://api.profit-base.online/actuator/health
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -240,6 +254,10 @@ scrape_configs:
           - http://ingest.profit-base.online
           - http://grafana.profit-base.online
           - http://keycloak.profit-base.online
+          # STAGED with the api vhost (Appendix C). A native client that ever speaks plain HTTP to
+          # the API leaks its bearer token on the first request, so the per-host Force-SSL toggle is
+          # not optional here — and it lives only in the NPM admin DB, which is why it is probed.
+          # - http://api.profit-base.online
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -259,6 +277,9 @@ scrape_configs:
     static_configs:
       - targets:
           - https://profit-base.online
+          # NOT extended to the api vhost: its probeable paths answer 401, which this module does
+          # not accept. The staged blackbox-hsts-auth job below uses the http_2xx_or_401_hsts
+          # variant instead of loosening the frontend's assertion.
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -341,6 +362,10 @@ scrape_configs:
     static_configs:
       - targets:
           - https://ingest.profit-base.online
+          # STAGED with its IPv4 twin above — the instance label MUST stay byte-identical to it, or
+          # EdgeIpv6Unreachable's `on(instance)` guard silently matches nothing and the v6 path
+          # ships unmonitored while the rule looks healthy.
+          # - https://api.profit-base.online/api/v1/terms/status
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -383,3 +408,71 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: blackbox-exporter:9115
+
+  # --- STAGED: API vhost of the mobile-client exposure (ADR-0135, Track C) ------------------------
+  # Everything below is inert on purpose. api.profit-base.online does not exist until the owner
+  # applies D3 (NPM vhost) and D4 (DNS + CAA); shipping these jobs live would page
+  # BlackboxProbeFailed, EdgeActuatorDenyBroken and DnsResolutionFailed from the minute the config
+  # deploys, and a permanently-firing channel is one an operator stops reading. They ship now,
+  # reviewed and deployed, so the cut-over is an un-comment rather than a config change written
+  # under time pressure — the same staging discipline REQ-OBS-014 applies to the
+  # JvmNativeThreadExhaustion Loki rule.
+  #
+  # The enable procedure, including what to verify BEFORE un-commenting, is
+  # docs/MONITORING_ROLLOUT_RUNBOOK.md, Appendix C. Un-comment these together with the staged
+  # targets inside blackbox-http-auth, blackbox-http-auth-ipv6, blackbox-edge-deny and
+  # blackbox-force-ssl above — a partial enable leaves the surface half-probed, which reads as
+  # "monitored".
+  #
+  # - job_name: blackbox-hsts-auth
+  #   metrics_path: /probe
+  #   scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above
+  #   params:
+  #     module: [http_2xx_or_401_hsts]
+  #   static_configs:
+  #     - targets:
+  #         - https://api.profit-base.online/api/v1/terms/status
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: __param_target
+  #     - source_labels: [__param_target]
+  #       target_label: instance
+  #     - target_label: __address__
+  #       replacement: blackbox-exporter:9115
+  #
+  # NOTE when enabling blackbox-hsts-auth: EdgeHstsHeaderMissing is scoped to
+  # job="blackbox-hsts". Widen it to job=~"blackbox-hsts.*" in alerts/infrastructure.yml in the
+  # same edit, or the new job's probe_success is collected and alerted on by nothing.
+  #
+  # - job_name: blackbox-dns-api-a
+  #   metrics_path: /probe
+  #   scrape_timeout: 15s
+  #   params:
+  #     module: [dns_api_a]
+  #   static_configs:
+  #     - targets: ["1.1.1.1"]
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: __param_target
+  #     - source_labels: [__param_target]
+  #       target_label: instance
+  #     - target_label: __address__
+  #       replacement: blackbox-exporter:9115
+  #
+  # - job_name: blackbox-dns-api-aaaa
+  #   metrics_path: /probe
+  #   scrape_timeout: 15s
+  #   params:
+  #     module: [dns_api_aaaa]
+  #   static_configs:
+  #     - targets: ["1.1.1.1"]
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: __param_target
+  #     - source_labels: [__param_target]
+  #       target_label: instance
+  #     - target_label: __address__
+  #       replacement: blackbox-exporter:9115
+  #
+  # DnsResolutionFailed already matches these two (job=~"blackbox-dns-.*", widened in this PR), and
+  # TargetDown already excludes them, so the DNS half needs no rule change when it is enabled.
