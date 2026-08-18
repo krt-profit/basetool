@@ -1077,6 +1077,32 @@ services:
     <<: *backend-template
     profiles: ["prod"]
     container_name: backend
+    # ADR-0134: in prod Actuator lives on the internal-only management port 11271 (see
+    # application-prod.yml), so the image's default HEALTHCHECK — which probes 11261 — would hit a
+    # 404 and keep the container unhealthy forever. Params mirror the Dockerfile. Only the prod
+    # service carries this override; backend-dev keeps the image default because the dev profile
+    # configures no management port.
+    #
+    # This override and the port move must be promoted TOGETHER (ADR-0049 lock-step): a new config
+    # bundle on an old image probes a port that does not exist yet, and the reverse probes a port
+    # that no longer serves health. Either way the health gate fails and the deploy rolls back
+    # cleanly rather than breaking silently.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "--no-check-certificate",
+          "-O",
+          "/dev/null",
+          "https://localhost:11271/actuator/health/readiness",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 90s
+      start_interval: 5s
+      retries: 3
     depends_on:
       db-backend:
         condition: service_healthy
