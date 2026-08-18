@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.50](https://github.com/krt-profit/basetool/releases/tag/v1.5.50) - 2026-08-18
+
 ### Fixed
 
 - **Die Zuordnung von Anfragen zur Client-Software hat nichts gezählt.** Der dafür zuständige Filter lief eine Position zu früh — vor der Authentifizierung, wo noch keine Anmeldung sichtbar ist — und lieferte deshalb seit seiner Einführung gar keine Messwerte. Er sitzt jetzt an der richtigen Stelle; ein Test hält beide Seiten des schmalen Fensters fest. Die Aufschlüsselung fehlgeschlagener Anmeldungen war davon nicht betroffen (REQ-OBS-018).
