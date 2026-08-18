@@ -44,9 +44,16 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>The row says: members of the named tier may raise a booking request against this account up to
  * {@link #limitAmount} whole aUEC <em>without</em> the account's responsible holder having to grant
- * an explicit approval; a request above it is flagged {@code requiresOwnerApproval} on creation. A
- * <em>missing</em> row for a tier means "unlimited" — no approval is ever required, which preserves
- * the pre-feature behaviour (no regression).
+ * an explicit approval; a request above it is flagged {@code requiresOwnerApproval} on creation.
+ *
+ * <p><strong>A <em>missing</em> row means the opposite of what it originally did.</strong> The
+ * feature shipped with "no matching row = unlimited" (no approval ever required, preserving the
+ * pre-feature behaviour); that default was later <em>inverted</em> by owner decision, so a
+ * requester matching no tier now needs the responsible holder's approval for <em>any</em> amount
+ * (REQ-BANK-041, {@code requires_owner_approval = (applicable_limit == null) || amount >
+ * applicable_limit}). The V193 table/column comments still carry the retired wording — they are a
+ * shipped migration and cannot be edited; {@code OrgUnitBankAccessService#resolveApplicableLimit}
+ * is the authority.
  *
  * <p>The audience dimension mirrors {@link BankAccountViewGrant} one-for-one (V193 {@code
  * chk_bank_appr_limit_payload} enforces the column combination): a {@link MembershipRole} on the

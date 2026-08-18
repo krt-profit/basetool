@@ -819,7 +819,11 @@ public class OrgUnitBankAccessService {
           // A deposit is never approval-limited, so it needs no approver (REQ-BANK-042).
           null,
           request.splitEnabled(),
-          request.splitPercent());
+          request.splitPercent(),
+          // REQ-BANK-042/-055: a deposit request records no Empfaenger -- the requester IS the
+          // depositor, which confirmation derives.
+          null,
+          null);
     }
 
     // REQ-BANK-039: a withdrawal/transfer stays gated by view eligibility — only a caller who may
@@ -873,7 +877,12 @@ public class OrgUnitBankAccessService {
         routing.applicableLimit(),
         routing.requiredApprover(),
         false,
-        null);
+        null,
+        // REQ-BANK-055: the Empfaenger the requester named. A TRANSFER must not carry one (the
+        // counter-account already names the other side) — the service rejects that, it is not
+        // silently dropped here.
+        request.counterpartyUserId(),
+        request.counterpartyOrgUnitId());
   }
 
   /**
@@ -975,17 +984,31 @@ public class OrgUnitBankAccessService {
         routing.applicableLimit(),
         routing.requiredApprover(),
         false,
+        null,
+        // The employee's over-ceiling direct booking is auto-filed as a request; its counterparty
+        // is not carried across (pre-existing, unchanged by REQ-BANK-055) and confirmation derives
+        // the requester as before.
+        null,
         null);
   }
 
   /**
-   * Lists the caller's own booking requests (REQ-BANK-022).
+   * Lists the caller's own booking requests (REQ-BANK-022), with the bank employee's "Notiz
+   * Bankmitarbeiter" redacted (REQ-BANK-054).
    *
-   * @return the caller's requests, newest first
+   * <p>The requester sees their own Notiz and Begr&uuml;ndung expanded in "Meine Antr&auml;ge", but
+   * the staff note is an internal remark and is stripped <em>here</em>, at the seam, rather than
+   * merely omitted from the template — so it never reaches the rendering layer at all. The
+   * responsible holder's {@link #listRequestsForResponsibleAccounts()} keeps it: that is the
+   * approver lens the note exists to inform.
+   *
+   * @return the caller's requests, newest first, without staff notes
    */
   @NotNull
   public List<BankBookingRequestDto> listOwnBookingRequests() {
-    return bankBookingRequestService.listForCurrentRequester();
+    return bankBookingRequestService.listForCurrentRequester().stream()
+        .map(BankBookingRequestDto::withoutStaffNote)
+        .toList();
   }
 
   /**
@@ -1506,7 +1529,7 @@ public class OrgUnitBankAccessService {
 
   /**
    * Resolves the current caller's applicable approval limit from the given limit rows
-   * (REQ-BANK-041, amended by REQ-BANK-047/-047).
+   * (REQ-BANK-041, amended by REQ-BANK-047/-048).
    *
    * <ul>
    *   <li>The KRT account ({@code CARTEL}) does not use per-audience limits at all — its ladder
@@ -1516,18 +1539,29 @@ public class OrgUnitBankAccessService {
    *       (maximum) of every membership tier the caller actually matches — a role bucket held on
    *       the owning unit, the whole-area cascade ({@code AREA_MEMBERS}) when the caller is
    *       anywhere in it, and the all-members ceiling <em>only when the caller is a member of the
-   *       owning org unit</em> ("Alle Mitglieder" = the account's own org unit, REQ-BANK-047); else
-   *       {@code null} = unlimited.
+   *       owning org unit</em> ("Alle Mitglieder der Org-Einheit" = the account's own org unit,
+   *       REQ-BANK-047); else {@code null}.
    * </ul>
+   *
+   * <p>The tiers are <strong>maxed, not ranked</strong>: a Kommandoleiter who is also a member of
+   * the owning unit matches both {@code MEMBERSHIP_ROLE} and {@code ALL_MEMBERS} and gets the
+   * larger of the two, so the all-members value is a <em>floor</em> under every role tier, not a
+   * fallback below them.
    *
    * <p>The members-only gating of the {@code ALL_MEMBERS} tier means an outsider holding only an
    * individual view grant matches no membership tier and falls through to {@code null} (⇒ the
    * caller needs an explicit USER limit, else the request requires approval) — retiring the former
    * catch-all-for-everyone behaviour.
    *
+   * <p><strong>{@code null} does not mean "unlimited".</strong> It is the "no tier matched"
+   * sentinel, and the sole caller ({@code createBookingRequest}) turns it into {@code needsApproval
+   * = true} for <em>any</em> amount — the owner-approved inversion of the original "missing limit =
+   * unlimited" rule (REQ-BANK-041). Older comments on {@code BankAccountApprovalLimit} and in V193
+   * still carry the retired wording; this method is the authority.
+   *
    * @param account the account
    * @param limits the account's approval-limit rows (possibly empty)
-   * @return the caller's limit, or {@code null} = unlimited
+   * @return the caller's limit, or {@code null} when no tier matched (⇒ approval required)
    */
   @Nullable
   private BigDecimal resolveApplicableLimit(

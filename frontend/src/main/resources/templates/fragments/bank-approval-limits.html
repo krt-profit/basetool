@@ -28,7 +28,7 @@
                   th:text="${#numbers.formatInteger(@moneyFormat.round(limits.roleLimits().get(role)), 1, 'POINT')} + ' aUEC'">1.000.000 aUEC</span>
         </div>
         <div class="vis-row" th:if="${limits.allMembersLimit() != null}">
-            <span class="v-label" th:text="#{bank.orgUnit.settings.visibility.allMembers}">Alle Mitglieder</span>
+            <span class="v-label" th:text="#{bank.approvalLimit.tier.allMembers}">Alle Mitglieder der Org-Einheit</span>
             <span class="vis-state bank-amount"
                   th:text="${#numbers.formatInteger(@moneyFormat.round(limits.allMembersLimit()), 1, 'POINT')} + ' aUEC'">500.000 aUEC</span>
         </div>
@@ -83,7 +83,7 @@
 
         <!-- All members -->
         <div th:if="${limits.allMembersSupported()}" class="vis-row" th:with="current=${limits.allMembersLimit()}">
-            <span class="v-label" th:text="#{bank.orgUnit.settings.visibility.allMembers}">Alle Mitglieder</span>
+            <span class="v-label" th:text="#{bank.approvalLimit.tier.allMembers}">Alle Mitglieder der Org-Einheit</span>
             <span class="vis-state bank-limit-edit">
                 <form class="bank-ajax-form no-track krtm-display-inline-2f87" data-livesync="bank:@account/account orgunit-bank/orgUnitBankSettings" th:data-livesync-account="${acct.id()}"
                       th:attr="data-refresh=${refresh}"

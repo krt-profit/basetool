@@ -669,6 +669,8 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             isNull(),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(expected);
 
@@ -692,7 +694,9 @@ class OrgUnitBankAccessServiceTest {
             "from sale",
             null,
             true,
-            new BigDecimal("30"));
+            new BigDecimal("30"),
+            null,
+            null);
     BankBookingRequestDto expected = requestDto(accountId, orgUnitId);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
     when(bankBookingRequestService.create(
@@ -706,7 +710,9 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             isNull(),
             eq(true),
-            eq(new BigDecimal("30"))))
+            eq(new BigDecimal("30")),
+            eq(null),
+            eq(null)))
         .thenReturn(expected);
 
     assertThat(service.createBookingRequest(request)).isSameAs(expected);
@@ -736,6 +742,8 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             isNull(),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(expected);
 
@@ -767,6 +775,8 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             isNull(),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(expected);
 
@@ -800,6 +810,8 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             isNull(),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
@@ -817,6 +829,8 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             isNull(),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null));
     verify(approvalLimitRepository, never()).findByAccountId(any());
   }
@@ -886,6 +900,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("100")),
             eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
@@ -903,6 +919,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("100")),
             eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null));
   }
 
@@ -933,6 +951,8 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
@@ -950,6 +970,8 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null));
   }
 
@@ -979,6 +1001,8 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
@@ -996,6 +1020,8 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null));
   }
 
@@ -1039,6 +1065,8 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
@@ -1056,6 +1084,8 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null));
     verify(ownerScopeService).currentUserIsMemberOfOrgUnit(orgUnitId);
   }
@@ -1093,6 +1123,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("100")),
             eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
@@ -1110,6 +1142,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("100")),
             eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null));
   }
 
@@ -1156,6 +1190,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("1000")),
             isNull(),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
@@ -1173,6 +1209,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("1000")),
             isNull(),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null));
   }
 
@@ -1195,6 +1233,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("1000")),
             eq(BankRequestApprover.BANK_MANAGEMENT),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
@@ -1212,6 +1252,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("1000")),
             eq(BankRequestApprover.BANK_MANAGEMENT),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null));
   }
 
@@ -1234,6 +1276,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("1000")),
             eq(BankRequestApprover.ORGANISATIONSLEITUNG),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
@@ -1251,6 +1295,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("1000")),
             eq(BankRequestApprover.ORGANISATIONSLEITUNG),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null));
   }
 
@@ -1282,6 +1328,8 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(null),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
@@ -1299,6 +1347,8 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(null),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null));
     // The holder's exemption short-circuits before any limit lookup.
     verify(approvalLimitRepository, never()).findByAccountId(accountId);
@@ -1330,7 +1380,9 @@ class OrgUnitBankAccessServiceTest {
             any(),
             any(),
             anyBoolean(),
-            any()))
+            any(),
+            eq(null),
+            eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
     service.createBookingRequest(request);
@@ -1347,6 +1399,8 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(null),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null));
   }
 
@@ -1371,7 +1425,9 @@ class OrgUnitBankAccessServiceTest {
             any(),
             any(),
             anyBoolean(),
-            any()))
+            any(),
+            eq(null),
+            eq(null)))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
     service.createBookingRequest(request);
@@ -1388,6 +1444,8 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(null),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null));
   }
 
@@ -1498,6 +1556,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("1000")),
             eq(BankRequestApprover.BANK_MANAGEMENT),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
@@ -1517,6 +1577,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("1000")),
             eq(BankRequestApprover.BANK_MANAGEMENT),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null));
   }
 
@@ -1544,6 +1606,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("1000")),
             eq(BankRequestApprover.BANK_MANAGEMENT),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
@@ -1567,6 +1631,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("1000")),
             eq(BankRequestApprover.BANK_MANAGEMENT),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null));
   }
 
@@ -1591,6 +1657,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("1000")),
             eq(BankRequestApprover.ORGANISATIONSLEITUNG),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
@@ -1609,6 +1677,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("1000")),
             eq(BankRequestApprover.ORGANISATIONSLEITUNG),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null));
   }
 
@@ -1657,6 +1727,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("100")),
             eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(requestDto(accountId, orgUnitId));
 
@@ -1674,6 +1746,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("100")),
             eq(BankRequestApprover.RESPONSIBLE_HOLDER),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null));
   }
 
@@ -1723,6 +1797,8 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("1000")),
             isNull(),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null)))
         .thenReturn(requestDto(accountId, bereichId));
 
@@ -1740,10 +1816,66 @@ class OrgUnitBankAccessServiceTest {
             eq(new BigDecimal("1000")),
             isNull(),
             eq(false),
+            eq(null),
+            eq(null),
             eq(null));
   }
 
+  /**
+   * REQ-BANK-054: the requester's own list is the member audience, so the seam blanks the bank
+   * employee's "Notiz Bankmitarbeiter" before it can reach a template. Pinning it here rather than
+   * only in the view keeps the redaction out of the rendering layer's hands — the same DTO type
+   * carries the note unredacted for the approval tab.
+   */
+  @Test
+  void listOwnBookingRequests_redactsTheStaffNote() {
+    UUID accountId = UUID.randomUUID();
+    BankBookingRequestDto withNote =
+        requestDto(accountId, UUID.randomUUID(), "Bar uebergeben, Zeuge greluc");
+    when(bankBookingRequestService.listForCurrentRequester()).thenReturn(List.of(withNote));
+
+    List<BankBookingRequestDto> own = service.listOwnBookingRequests();
+
+    assertThat(own).hasSize(1);
+    assertThat(own.getFirst().staffNote()).isNull();
+    // Everything else survives verbatim -- the requester still reads back their own note.
+    assertThat(own.getFirst().note()).isEqualTo("from sale");
+    assertThat(own.getFirst().id()).isEqualTo(withNote.id());
+    assertThat(own.getFirst().version()).isEqualTo(withNote.version());
+  }
+
+  /**
+   * The approver lens is deliberately NOT redacted: a responsible holder decides on the request and
+   * the employee's note is part of that context (REQ-BANK-054). This is the negative control for
+   * {@link #listOwnBookingRequests_redactsTheStaffNote()} — without it, a blanket redaction in the
+   * shared {@code toDto} would pass that test while silently emptying the approval tab.
+   */
+  @Test
+  void listRequestsForResponsibleAccounts_keepsTheStaffNote() {
+    UUID accountId = UUID.randomUUID();
+    UUID orgUnitId = UUID.randomUUID();
+    // An admin is responsible for every account, which keeps this focused on the redaction rather
+    // than on re-deriving responsible-holder resolution (covered by its own service test).
+    when(authHelperService.isAdmin()).thenReturn(true);
+    when(bankAccountRepository.findAllByOrderByAccountNoAsc())
+        .thenReturn(List.of(account(accountId, "KB-0001", null)));
+    when(bankBookingRequestService.listForAccounts(anyCollection()))
+        .thenReturn(List.of(requestDto(accountId, orgUnitId, "Bar uebergeben, Zeuge greluc")));
+
+    List<BankBookingRequestDto> foreign = service.listRequestsForResponsibleAccounts();
+
+    assertThat(foreign)
+        .singleElement()
+        .extracting(BankBookingRequestDto::staffNote)
+        .isEqualTo("Bar uebergeben, Zeuge greluc");
+  }
+
   private static BankBookingRequestDto requestDto(UUID accountId, UUID orgUnitId) {
+    return requestDto(accountId, orgUnitId, null);
+  }
+
+  private static BankBookingRequestDto requestDto(
+      UUID accountId, UUID orgUnitId, String staffNote) {
     return new BankBookingRequestDto(
         UUID.randomUUID(),
         accountId,
@@ -1756,7 +1888,7 @@ class OrgUnitBankAccessServiceTest {
         new BigDecimal("500"),
         "from sale",
         null,
-        null,
+        staffNote,
         BankBookingRequestStatus.PENDING,
         "requester",
         null,
@@ -1774,6 +1906,10 @@ class OrgUnitBankAccessServiceTest {
         false,
         null,
         false,
+        null,
+        null,
+        null,
+        null,
         null,
         0L);
   }

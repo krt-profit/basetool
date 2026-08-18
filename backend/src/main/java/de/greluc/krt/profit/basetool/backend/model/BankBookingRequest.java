@@ -147,6 +147,52 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
   private String staffNote;
 
   /**
+   * The <strong>Empf&auml;nger</strong> the requester named on a {@code WITHDRAWAL} request
+   * (REQ-BANK-055) — the member who receives the payout, as opposed to the {@link #holder}, the
+   * bank custodian who hands it over. {@code null} on a {@code DEPOSIT} / {@code TRANSFER} request
+   * and on any withdrawal request that named none.
+   *
+   * <p>At confirmation this <em>wins</em> over the requester-derived counterparty {@code
+   * BankBookingRequestService#confirm} otherwise computes (REQ-BANK-044): a {@code null} here means
+   * "requester", which is both the historical behaviour and the pre-filled default, so every row
+   * predating V232 keeps its meaning. Kept as a plain UUID (no JPA relation) exactly like {@link
+   * BankTransaction#getCounterpartyUserId()}; the database FK is {@code ON DELETE SET NULL} and
+   * {@link #counterpartyHandle} keeps the row attributable afterwards.
+   */
+  @Nullable
+  @Column(name = "counterparty_user_id")
+  private UUID counterpartyUserId;
+
+  /**
+   * Deletion-proof handle snapshot of {@link #counterpartyUserId}, taken when the request is
+   * raised, so the confirmation can copy it straight onto the ledger row even if the named user was
+   * deleted in between. {@code null} exactly when {@link #counterpartyUserId} is {@code null} (V232
+   * CHECK).
+   */
+  @Nullable
+  @Column(name = "counterparty_handle", length = 255)
+  private String counterpartyHandle;
+
+  /**
+   * The org unit of the named Empf&auml;nger, chosen at request time from <em>that user's</em>
+   * direct memberships across all four kinds and validated server-side against them (a foreign unit
+   * is a 400, mirroring the bank employee's path). {@code null} when no counterparty is named or
+   * the requester left the unit blank.
+   */
+  @Nullable
+  @Column(name = "counterparty_org_unit_id")
+  private UUID counterpartyOrgUnitId;
+
+  /**
+   * Deletion-proof name snapshot of {@link #counterpartyOrgUnitId}, so the request list and the
+   * booking it produces label the unit without a live polymorphic org-unit load. {@code null}
+   * exactly when {@link #counterpartyOrgUnitId} is {@code null} (V232 CHECK).
+   */
+  @Nullable
+  @Column(name = "counterparty_org_unit_name", length = 255)
+  private String counterpartyOrgUnitName;
+
+  /**
    * Snapshot at creation (REQ-BANK-043): whether this {@code DEPOSIT} request distributes {@link
    * #splitPercent} of the gross evenly across all active squadron accounts on confirmation (the
    * named account is credited the remainder). DEPOSIT-only and immutable; always {@code false} for

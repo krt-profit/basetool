@@ -139,6 +139,10 @@ class OrgUnitBankPageControllerMvcTest {
             null,
             false,
             null,
+            null,
+            null,
+            null,
+            null,
             0L);
     BankAccountRefDto target =
         new BankAccountRefDto(accountId, "KB-0001", "Staffel IRIDIUM", "ORG_UNIT");
@@ -319,6 +323,10 @@ class OrgUnitBankPageControllerMvcTest {
             false,
             null,
             false,
+            null,
+            null,
+            null,
+            null,
             null,
             0L);
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
@@ -683,15 +691,15 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   /**
-   * Builds a foreign (approval-tab) booking request, varying only the two fields that decide
-   * whether the row is expandable.
+   * Builds a booking request for either the approval tab or the requester's own list, varying only
+   * the fields that decide whether the row is expandable.
    *
    * @param note the requester's note, or {@code null}
    * @param justification the requester's Begruendung, or {@code null}
    * @param staffNote the confirming employee's own note (REQ-BANK-054), or {@code null}
    * @return the request DTO
    */
-  private static BankBookingRequestDto foreignRequest(
+  private static BankBookingRequestDto bookingRequest(
       String note, String justification, String staffNote) {
     return new BankBookingRequestDto(
         UUID.randomUUID(),
@@ -724,6 +732,10 @@ class OrgUnitBankPageControllerMvcTest {
         null,
         false,
         null,
+        null,
+        null,
+        null,
+        null,
         0L);
   }
 
@@ -737,7 +749,7 @@ class OrgUnitBankPageControllerMvcTest {
   void orgUnitBank_foreignRequestWithJustificationRendersExpandableDetailRow() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(FOREIGN_REQUESTS_URI), anyTypeRef()))
-        .thenReturn(List.of(foreignRequest("Missionsertrag", "Missionsfreigabe", null)));
+        .thenReturn(List.of(bookingRequest("Missionsertrag", "Missionsfreigabe", null)));
 
     mockMvc
         .perform(get("/org-unit-bank"))
@@ -763,7 +775,7 @@ class OrgUnitBankPageControllerMvcTest {
   void orgUnitBank_foreignRequestStaffNoteRendersInTheDetailRow() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(FOREIGN_REQUESTS_URI), anyTypeRef()))
-        .thenReturn(List.of(foreignRequest(null, null, "Bar uebergeben, Zeuge greluc")));
+        .thenReturn(List.of(bookingRequest(null, null, "Bar uebergeben, Zeuge greluc")));
 
     mockMvc
         .perform(get("/org-unit-bank"))
@@ -773,13 +785,71 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(content().string(Matchers.containsString("Bar uebergeben, Zeuge greluc")));
   }
 
+  /**
+   * REQ-BANK-022/-045: the requester's own "Meine Antraege" rows expand to reveal the Begruendung
+   * and Notiz they filed, the same mechanism as the staff queue and the approval tab. Without it a
+   * requester could not read back what they had written on a request they may still cancel.
+   *
+   * @throws Exception if the MockMvc exchange fails
+   */
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_ownRequestWithJustificationRendersExpandableDetailRow() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef()))
+        .thenReturn(List.of(bookingRequest("Missionsertrag", "Missionsfreigabe", null)));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-request-expand")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-request-detail")))
+        .andExpect(content().string(Matchers.containsString("Missionsfreigabe")))
+        .andExpect(content().string(Matchers.containsString("Missionsertrag")))
+        // Seven columns here, not the approval tab's eight -- a stale colspan silently shrinks the
+        // detail cell.
+        .andExpect(content().string(Matchers.containsString("colspan=\"7\"")))
+        // Distinct from the approval tab's ou-foreign-req-: a responsible holder who raised the
+        // request sees the SAME request in both tables, and a shared id would make one chevron
+        // toggle the other table's sub-row.
+        .andExpect(content().string(Matchers.containsString("ou-own-req-")));
+  }
+
+  /**
+   * REQ-BANK-054: the "Notiz Bankmitarbeiter" is bank-internal and must not surface in the
+   * requester's own list, even though the same DTO type carries it for the approval tab. The seam
+   * blanks it, so a staff note alone must leave the row flat — no chevron, no sub-row, no text.
+   *
+   * @throws Exception if the MockMvc exchange fails
+   */
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_ownRequestNeverRendersTheStaffNote() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    // Defence in depth: even if an unredacted DTO reached the template, nothing may render it.
+    when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef()))
+        .thenReturn(List.of(bookingRequest(null, null, "Bar uebergeben, Zeuge greluc")));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-request-row")))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("Bar uebergeben, Zeuge greluc"))))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("org-unit-bank-request-expand"))))
+        .andExpect(
+            content()
+                .string(Matchers.not(Matchers.containsString("org-unit-bank-request-detail"))));
+  }
+
   /** A row carrying neither Begruendung nor Notiz stays flat: no chevron, no empty sub-row. */
   @Test
   @WithMockUser(roles = {"OFFICER"})
   void orgUnitBank_foreignRequestWithoutDetailRendersNoChevron() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq(FOREIGN_REQUESTS_URI), anyTypeRef()))
-        .thenReturn(List.of(foreignRequest(null, null, null)));
+        .thenReturn(List.of(bookingRequest(null, null, null)));
 
     mockMvc
         .perform(get("/org-unit-bank"))

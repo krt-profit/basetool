@@ -1590,13 +1590,20 @@ the request **always needs the responsible holder's approval** (amended above �
 default; the pre-amendment "missing = unlimited" behaviour is retired). The limit a requester is
 subject to is resolved **at request creation** in the seam: **the account's responsible holder is
 exempt outright** (amended above — no limit binds them, no ladder, no approver); otherwise an
-individual-user limit wins; otherwise
-the maximum of the limits for the role tiers they hold; otherwise the all-members limit; otherwise
-**none applies and approval is required**. The
-**all-members tier is the catch-all ceiling for every eligible requester** who matches no more
-specific tier — *not only* org-unit members: because request eligibility = view eligibility
-(REQ-BANK-039), it applies equally to an outsider holding only a per-user view grant and to any KRT
-member raising a request against the cartel account. (Resolution mirrors the visibility model's
+individual-user limit **wins outright** (it is returned before any other tier is examined, so an
+individual limit may also *lower* a requester below their role ceiling); otherwise the **maximum
+across every membership tier the requester actually matches** — the role buckets they hold on the
+owning unit, the `AREA_MEMBERS` cascade, and `ALL_MEMBERS`; otherwise **none applies and approval is
+required**. The tiers are **maxed, not ranked**: a Kommandoleiter who is a member of the owning unit
+matches both `MEMBERSHIP_ROLE` and `ALL_MEMBERS` and receives the *larger* of the two, so the
+all-members value acts as a **floor** under every role tier rather than as a fallback below them.
+`ALL_MEMBERS` binds **only an actual member of the account's owning org unit** — hence its UI label
+**"Alle Mitglieder der Org-Einheit"** (`bank.approvalLimit.tier.allMembers`, a key of its own: the
+visibility editor's `ALL_MEMBERS` bucket keeps the plain "Alle Mitglieder" label because on a
+`SPECIAL` account it means *all KRT members*, and the two must not share a string). An outsider
+holding only a per-user view grant is request-eligible (REQ-BANK-039) but matches no membership
+tier, so they fall through to *approval required* unless they hold their own `USER` limit.
+(Resolution mirrors the visibility model's
 four-kind grantee set; the `GLOBAL_ROLE` tier is reserved for parity and never produced for limits,
 since it is the Sonderkonto role bucket and Sonderkonten are non-request-capable — see
 `BankApprovalLimitService`.) The result is **snapshotted** onto the request

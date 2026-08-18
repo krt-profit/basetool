@@ -145,6 +145,7 @@
                     <table class="data-table" data-testid="org-unit-bank-requests">
                         <thead>
                         <tr>
+                            <th class="bank-expand-cell"></th>
                             <th th:text="#{bank.request.col.type}">Typ</th>
                             <th class="text-right" th:text="#{bank.request.col.amount}">Betrag</th>
                             <th th:text="#{bank.request.col.status}">Status</th>
@@ -154,7 +155,27 @@
                         </tr>
                         </thead>
                         <tbody>
-                        <tr th:each="r : ${ownRequests}" data-testid="org-unit-bank-request-row">
+                        <!-- Expandable rows, same mechanism as the staff queue and the approval tab:
+                             the requester reads back the Begr&uuml;ndung and Notiz they filed. The
+                             detail id is prefixed `ou-own-req-` so it cannot collide with the
+                             `ou-foreign-req-` one — a responsible holder who raised the request sees
+                             the very same request in BOTH tables on this page, and a shared id would
+                             make one chevron toggle the other's sub-row. No "Notiz Bankmitarbeiter"
+                             here: the seam strips it from the own-requests list (REQ-BANK-054), so
+                             `r.staffNote()` is always null in this table. -->
+                        <th:block th:each="r : ${ownRequests}"
+                                  th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note()) or !#strings.isEmpty(r.counterpartyHandle())},detailId='ou-own-req-' + ${r.id()}">
+                        <tr data-testid="org-unit-bank-request-row" class="bank-booking-row"
+                            th:classappend="${hasDetail} ? ' is-expandable' : ''">
+                            <td class="bank-expand-cell">
+                                <button type="button" class="bank-row-toggle" th:if="${hasDetail}"
+                                        data-trigger="bank-row-expand" aria-expanded="false"
+                                        th:attr="aria-controls=${detailId}"
+                                        th:aria-label="#{bank.detail.toggleDetails}"
+                                        data-testid="org-unit-bank-request-expand">
+                                    <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                                </button>
+                            </td>
                             <td th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</td>
                             <td class="text-right bank-amount"
                                 th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</td>
@@ -181,6 +202,31 @@
                                 <span th:unless="${r.status() == 'PENDING'}" class="text-muted">&ndash;</span>
                             </td>
                         </tr>
+                        <!-- Detail sub-row: Begr&uuml;ndung first (it carries the request's reason),
+                             then Notiz. colspan spans all seven columns incl. the expand cell. -->
+                        <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
+                            data-testid="org-unit-bank-request-detail">
+                            <td colspan="7" class="bank-booking-detail-cell">
+                                <div class="bank-booking-detail-body">
+                                    <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.counterpartyHandle())}">
+                                        <span class="bank-detail-label" th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
+                                        <span class="bank-detail-value" data-testid="org-unit-bank-request-counterparty"
+                                              th:text="${r.counterpartyOrgUnitName() != null} ? ${r.counterpartyHandle()} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${r.counterpartyHandle()}">greluc (IRIDIUM)</span>
+                                    </div>
+                                    <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.justification())}">
+                                        <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>
+                                        <span class="bank-detail-value" data-testid="org-unit-bank-request-justification"
+                                              th:text="${r.justification()}">Missionsfreigabe</span>
+                                    </div>
+                                    <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.note())}">
+                                        <span class="bank-detail-label" th:text="#{bank.booking.note}">Notiz</span>
+                                        <span class="bank-detail-value" data-testid="org-unit-bank-request-note"
+                                              th:text="${r.note()}">Missionsertrag</span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        </th:block>
                         </tbody>
                     </table>
                 </div>
@@ -219,7 +265,7 @@
                              document-delegated bank.js handler (no new JS, survives the fragment
                              swap). -->
                         <th:block th:each="r : ${foreignRequests}"
-                                  th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note()) or !#strings.isEmpty(r.staffNote())},detailId='ou-foreign-req-' + ${r.id()}">
+                                  th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note()) or !#strings.isEmpty(r.staffNote()) or !#strings.isEmpty(r.counterpartyHandle())},detailId='ou-foreign-req-' + ${r.id()}">
                         <tr data-testid="org-unit-bank-foreign-row" class="bank-booking-row"
                             th:classappend="${hasDetail} ? ' is-expandable' : ''">
                             <td class="bank-expand-cell">
@@ -272,6 +318,11 @@
                             data-testid="org-unit-bank-foreign-detail">
                             <td colspan="8" class="bank-booking-detail-cell">
                                 <div class="bank-booking-detail-body">
+                                    <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.counterpartyHandle())}">
+                                        <span class="bank-detail-label" th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
+                                        <span class="bank-detail-value" data-testid="org-unit-bank-foreign-counterparty"
+                                              th:text="${r.counterpartyOrgUnitName() != null} ? ${r.counterpartyHandle()} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${r.counterpartyHandle()}">greluc (IRIDIUM)</span>
+                                    </div>
                                     <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.justification())}">
                                         <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>
                                         <span class="bank-detail-value" data-testid="org-unit-bank-foreign-justification"
@@ -405,6 +456,11 @@
                         <span class="bank-field-hint" th:text="#{bank.field.justification.hint}">Pflicht bei Abrufen aus dem KRT-, Bank- oder Sonderkonto.</span>
                         <span class="bank-field-error" data-error-for="justification"></span>
                     </div>
+                    <!-- Empfaenger (REQ-BANK-055): WITHDRAWAL-only, pre-filled with the requester.
+                         Leaving it as-is reproduces the previous behaviour exactly (confirmation
+                         derived the requester); changing it lets a member request a payout TO
+                         someone else, which was previously impossible to express. -->
+                    <th:block th:replace="~{fragments/bank-counterparty :: requestCounterpartyBlock(${#authentication.name}, ${requesterHandle})}"></th:block>
                     <div class="bank-form-row">
                         <label for="org-unit-request-note" th:text="#{bank.field.note}">Notiz</label>
                         <input type="text" id="org-unit-request-note" name="note" maxlength="500"

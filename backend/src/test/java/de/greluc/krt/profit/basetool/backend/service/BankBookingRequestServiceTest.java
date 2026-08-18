@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCancelledEv
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestConfirmedEvent;
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestRejectedEvent;
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
@@ -46,12 +47,15 @@ import de.greluc.krt.profit.basetool.backend.model.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.model.BankTransaction;
 import de.greluc.krt.profit.basetool.backend.model.BankTransactionType;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankTransactionDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankTransferRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.BankWithdrawalRequest;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
@@ -60,6 +64,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepositor
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -171,6 +176,130 @@ class BankBookingRequestServiceTest {
     return request;
   }
 
+  /**
+   * REQ-BANK-055: a withdrawal request stores the Empfaenger the requester named, snapshotting the
+   * handle and org-unit name at request time so a confirmation months later can stamp an
+   * attributable ledger row even if the user has been deleted since.
+   */
+  @Test
+  void create_withdrawalWithCounterparty_snapshotsHandleAndOrgUnit() {
+    UUID accountId = UUID.randomUUID();
+    UUID requesterSub = UUID.randomUUID();
+    UUID recipientId = UUID.randomUUID();
+    UUID orgUnitId = UUID.randomUUID();
+    BankAccount account = account(accountId);
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(requesterSub));
+    User requester = new User();
+    requester.setUsername("officer");
+    when(userRepository.findById(requesterSub)).thenReturn(Optional.of(requester));
+    User recipient = new User();
+    recipient.setId(recipientId);
+    recipient.setUsername("payee");
+    when(userRepository.findById(recipientId)).thenReturn(Optional.of(recipient));
+    when(orgUnitMembershipQueryService.listDirectMembershipOptions(recipientId))
+        .thenReturn(
+            List.of(
+                new OrgUnitMembershipOptionDto(
+                    orgUnitId, "IRIDIUM", "IRI", OrgUnitKind.SQUADRON, true)));
+    when(requestRepository.save(any(BankBookingRequest.class)))
+        .thenAnswer(
+            invocation -> {
+              BankBookingRequest saved = invocation.getArgument(0);
+              saved.setId(UUID.randomUUID());
+              return saved;
+            });
+
+    BankBookingRequestDto dto =
+        service.create(
+            accountId,
+            BankBookingRequestType.WITHDRAWAL,
+            new BigDecimal("500"),
+            null,
+            "reason",
+            null,
+            false,
+            null,
+            null,
+            false,
+            null,
+            recipientId,
+            orgUnitId);
+
+    assertThat(dto.counterpartyUserId()).isEqualTo(recipientId);
+    assertThat(dto.counterpartyHandle()).isEqualTo("payee");
+    assertThat(dto.counterpartyOrgUnitId()).isEqualTo(orgUnitId);
+    assertThat(dto.counterpartyOrgUnitName()).isEqualTo("IRIDIUM");
+  }
+
+  /**
+   * REQ-BANK-055: the chosen org unit must be one the NAMED user actually belongs to. Without this
+   * a requester could stamp an arbitrary unit onto the ledger snapshot; the bank employee's booking
+   * path enforces the identical rule (REQ-BANK-044).
+   */
+  @Test
+  void create_counterpartyOrgUnitNotAMembership_isRejected() {
+    UUID accountId = UUID.randomUUID();
+    UUID recipientId = UUID.randomUUID();
+    BankAccount account = account(accountId);
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    User recipient = new User();
+    recipient.setUsername("payee");
+    when(userRepository.findById(recipientId)).thenReturn(Optional.of(recipient));
+    when(orgUnitMembershipQueryService.listDirectMembershipOptions(recipientId))
+        .thenReturn(List.of());
+
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            service.create(
+                accountId,
+                BankBookingRequestType.WITHDRAWAL,
+                new BigDecimal("500"),
+                null,
+                "reason",
+                null,
+                false,
+                null,
+                null,
+                false,
+                null,
+                recipientId,
+                UUID.randomUUID()));
+    verify(requestRepository, never()).save(any(BankBookingRequest.class));
+  }
+
+  /**
+   * REQ-BANK-042/-055: a DEPOSIT request records no Empfaenger (the requester IS the depositor), so
+   * naming one is a client error rather than a silently dropped field. Same for a TRANSFER, whose
+   * counter-account already names the other side (REQ-BANK-044).
+   */
+  @Test
+  void create_counterpartyOnDeposit_isRejected() {
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId);
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            service.create(
+                accountId,
+                BankBookingRequestType.DEPOSIT,
+                new BigDecimal("500"),
+                null,
+                null,
+                null,
+                false,
+                null,
+                null,
+                false,
+                null,
+                UUID.randomUUID(),
+                null));
+    verify(requestRepository, never()).save(any(BankBookingRequest.class));
+  }
+
   @Test
   void create_persistsPendingAuditsAndPublishesEvent() {
     UUID accountId = UUID.randomUUID();
@@ -201,6 +330,8 @@ class BankBookingRequestServiceTest {
             null,
             null,
             false,
+            null,
+            null,
             null);
 
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.PENDING);
@@ -253,7 +384,9 @@ class BankBookingRequestServiceTest {
         null,
         null,
         true,
-        new BigDecimal("30"));
+        new BigDecimal("30"),
+        null,
+        null);
 
     assertThat(saved.getValue().isSplitEnabled()).isTrue();
     assertThat(saved.getValue().getSplitPercent()).isEqualByComparingTo(new BigDecimal("30"));
@@ -281,6 +414,8 @@ class BankBookingRequestServiceTest {
                     null,
                     null,
                     false,
+                    null,
+                    null,
                     null));
     assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_ACCOUNT_CLOSED);
     verify(requestRepository, never()).save(any());
@@ -310,6 +445,8 @@ class BankBookingRequestServiceTest {
                     null,
                     BankRequestApprover.RESPONSIBLE_HOLDER,
                     false,
+                    null,
+                    null,
                     null));
     assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_JUSTIFICATION_REQUIRED);
     verify(requestRepository, never()).save(any());
@@ -345,6 +482,8 @@ class BankBookingRequestServiceTest {
         null,
         BankRequestApprover.RESPONSIBLE_HOLDER,
         false,
+        null,
+        null,
         null);
 
     assertThat(saved.getValue().getJustification()).isNull();
@@ -380,6 +519,8 @@ class BankBookingRequestServiceTest {
         null,
         BankRequestApprover.RESPONSIBLE_HOLDER,
         false,
+        null,
+        null,
         null);
 
     assertThat(saved.getValue().getJustification()).isEqualTo("Reparaturkosten");
@@ -549,6 +690,134 @@ class BankBookingRequestServiceTest {
     verify(bankLedgerService).bookDeposit(booked.capture());
     assertThat(booked.getValue().staffNote()).isEqualTo("Bar uebergeben, Zeuge: greluc");
     assertThat(request.getStaffNote()).isEqualTo("Bar uebergeben, Zeuge: greluc");
+  }
+
+  /**
+   * REQ-BANK-055: an Empfaenger the requester NAMED wins over the requester-derived counterparty,
+   * and the org unit they chose is carried onto the booking. Without this the payout would still be
+   * attributed to whoever filed the request.
+   */
+  @Test
+  void confirm_withdrawal_namedCounterpartyWinsOverTheRequester() {
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID holderId = UUID.randomUUID();
+    UUID txId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    UUID recipientId = UUID.randomUUID();
+    UUID orgUnitId = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(requestId, account(accountId), BankBookingRequestType.WITHDRAWAL, requester, 0L);
+    request.setCounterpartyUserId(recipientId);
+    request.setCounterpartyHandle("payee");
+    request.setCounterpartyOrgUnitId(orgUnitId);
+    request.setCounterpartyOrgUnitName("IRIDIUM");
+    stubWithdrawalConfirm(requestId, accountId, holderId, txId, request);
+    when(orgUnitMembershipQueryService.listDirectMembershipOptions(recipientId))
+        .thenReturn(
+            List.of(
+                new OrgUnitMembershipOptionDto(
+                    orgUnitId, "IRIDIUM", "IRI", OrgUnitKind.SQUADRON, true)));
+
+    service.confirm(requestId, holderId, null, false, null, 0L, null);
+
+    ArgumentCaptor<BankWithdrawalRequest> booked =
+        ArgumentCaptor.forClass(BankWithdrawalRequest.class);
+    verify(bankLedgerService).bookWithdrawal(booked.capture());
+    assertThat(booked.getValue().counterpartyUserId()).isEqualTo(recipientId);
+    assertThat(booked.getValue().counterpartyOrgUnitId()).isEqualTo(orgUnitId);
+  }
+
+  /**
+   * REQ-BANK-055: confirmation happens an arbitrary time after the request, and the ledger
+   * re-validates the org unit against the counterparty's CURRENT memberships. A unit that went
+   * stale in between must degrade to their primary unit rather than 400 and block the employee from
+   * confirming at all.
+   */
+  @Test
+  void confirm_withdrawal_staleCounterpartyOrgUnitDegradesToThePrimary() {
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID holderId = UUID.randomUUID();
+    UUID txId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    UUID recipientId = UUID.randomUUID();
+    UUID leftUnit = UUID.randomUUID();
+    UUID primaryUnit = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(requestId, account(accountId), BankBookingRequestType.WITHDRAWAL, requester, 0L);
+    request.setCounterpartyUserId(recipientId);
+    request.setCounterpartyHandle("payee");
+    request.setCounterpartyOrgUnitId(leftUnit);
+    request.setCounterpartyOrgUnitName("Ex-Staffel");
+    stubWithdrawalConfirm(requestId, accountId, holderId, txId, request);
+    // They are no longer in the unit they picked when filing.
+    when(orgUnitMembershipQueryService.listDirectMembershipOptions(recipientId))
+        .thenReturn(List.of());
+    when(orgUnitMembershipQueryService.findPrimaryDirectMembershipOrgUnitId(recipientId))
+        .thenReturn(Optional.of(primaryUnit));
+
+    service.confirm(requestId, holderId, null, false, null, 0L, null);
+
+    ArgumentCaptor<BankWithdrawalRequest> booked =
+        ArgumentCaptor.forClass(BankWithdrawalRequest.class);
+    verify(bankLedgerService).bookWithdrawal(booked.capture());
+    assertThat(booked.getValue().counterpartyUserId()).isEqualTo(recipientId);
+    assertThat(booked.getValue().counterpartyOrgUnitId()).isEqualTo(primaryUnit);
+  }
+
+  /**
+   * A withdrawal request that named nobody keeps the historical behaviour exactly: the requester is
+   * derived as the Empfaenger (REQ-BANK-044). This is the no-regression control for every request
+   * raised before V232.
+   */
+  @Test
+  void confirm_withdrawal_withoutNamedCounterparty_stillDerivesTheRequester() {
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID holderId = UUID.randomUUID();
+    UUID txId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    UUID primaryUnit = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(requestId, account(accountId), BankBookingRequestType.WITHDRAWAL, requester, 0L);
+    stubWithdrawalConfirm(requestId, accountId, holderId, txId, request);
+    when(orgUnitMembershipQueryService.findPrimaryDirectMembershipOrgUnitId(requester))
+        .thenReturn(Optional.of(primaryUnit));
+
+    service.confirm(requestId, holderId, null, false, null, 0L, null);
+
+    ArgumentCaptor<BankWithdrawalRequest> booked =
+        ArgumentCaptor.forClass(BankWithdrawalRequest.class);
+    verify(bankLedgerService).bookWithdrawal(booked.capture());
+    assertThat(booked.getValue().counterpartyUserId()).isEqualTo(requester);
+    assertThat(booked.getValue().counterpartyOrgUnitId()).isEqualTo(primaryUnit);
+  }
+
+  /**
+   * Shared stubs for confirming a WITHDRAWAL request: the locked row, the employee's capability, an
+   * active holder, the booked transaction and the acting user.
+   *
+   * @param requestId the request being confirmed
+   * @param accountId the source account
+   * @param holderId the holder the employee records
+   * @param txId the id of the transaction the ledger returns
+   * @param request the locked request row
+   */
+  private void stubWithdrawalConfirm(
+      UUID requestId, UUID accountId, UUID holderId, UUID txId, BankBookingRequest request) {
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    when(bankSecurityService.canWithdraw(eq(accountId), any())).thenReturn(true);
+    when(bankLedgerService.bookWithdrawal(any(BankWithdrawalRequest.class)))
+        .thenReturn(
+            new BankTransactionDto(txId, BankTransactionType.WITHDRAWAL, "payout", Instant.now()));
+    BankHolder holder = new BankHolder();
+    holder.setId(holderId);
+    holder.setHandle("greluc");
+    holder.setActive(true);
+    when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
+    when(transactionRepository.findById(txId)).thenReturn(Optional.of(new BankTransaction()));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
   }
 
   @Test

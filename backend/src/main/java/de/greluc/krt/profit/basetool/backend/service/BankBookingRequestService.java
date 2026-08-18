@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BankTransactionDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankTransferRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankWithdrawalRequest;
@@ -137,10 +138,16 @@ public class BankBookingRequestService {
    *     confirmation (REQ-BANK-044); always {@code false} for withdrawal/transfer
    * @param splitPercent the whole-percent (1–100) of the deposit gross to distribute; {@code null}
    *     unless {@code splitEnabled}
+   * @param counterpartyUserId the Empf&auml;nger of a {@code WITHDRAWAL} request (REQ-BANK-055), or
+   *     {@code null} to keep deriving the requester at confirmation
+   * @param counterpartyOrgUnitId that Empf&auml;nger's org unit, validated against their own
+   *     memberships; {@code null} when none was chosen
    * @return the created request
    * @throws NotFoundException when the (source or destination) account does not exist
    * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a closed account or {@code
    *     BANK_SELF_TRANSFER} when source equals destination
+   * @throws BadRequestException when a counterparty is named on a non-withdrawal, or its org unit
+   *     is not one of that user's memberships
    */
   @Transactional
   public BankBookingRequestDto create(
@@ -154,7 +161,9 @@ public class BankBookingRequestService {
       @Nullable BigDecimal applicableLimit,
       @Nullable BankRequestApprover requiredApprover,
       boolean splitEnabled,
-      @Nullable BigDecimal splitPercent) {
+      @Nullable BigDecimal splitPercent,
+      @Nullable UUID counterpartyUserId,
+      @Nullable UUID counterpartyOrgUnitId) {
     BankAccount account =
         accountRepository
             .findById(accountId)
@@ -183,9 +192,6 @@ public class BankBookingRequestService {
       requireActiveForRequest(targetAccount);
     }
 
-    UUID requesterSub = authHelperService.currentUserId().orElse(null);
-    String requesterHandle = resolveHandle(requesterSub);
-
     BankBookingRequest request = new BankBookingRequest();
     request.setAccount(account);
     request.setTargetAccount(targetAccount);
@@ -193,7 +199,12 @@ public class BankBookingRequestService {
     request.setAmount(amount);
     request.setNote(note);
     request.setJustification(justification);
+    // Nothing is persisted until save() below, so a rejected counterparty aborts cleanly here.
+    applyCounterparty(
+        request, resolveRequestCounterparty(type, counterpartyUserId, counterpartyOrgUnitId));
     request.setStatus(BankBookingRequestStatus.PENDING);
+    UUID requesterSub = authHelperService.currentUserId().orElse(null);
+    String requesterHandle = resolveHandle(requesterSub);
     request.setRequestedBy(requesterSub);
     request.setRequesterHandle(requesterHandle);
     request.setRequiresOwnerApproval(requiresOwnerApproval);
@@ -227,6 +238,109 @@ public class BankBookingRequestService {
             orgUnit == null ? null : orgUnit.getShorthand(),
             requesterSub));
     return toDto(saved);
+  }
+
+  /**
+   * Resolves the Empf&auml;nger a requester named on a {@code WITHDRAWAL} request into a
+   * deletion-proof snapshot (REQ-BANK-055), or {@code null} when none was named.
+   *
+   * <p>The <strong>registered-user path only</strong>: unlike the bank employee's booking-time
+   * {@code BankLedgerService#resolveCounterparty}, this deliberately offers no free-text external
+   * counterparty. Recording an unverifiable name on the ledger stays a Bank-Employee capability
+   * (REQ-BANK-044/#994) — a requester picks a tool user or nobody.
+   *
+   * <p>The handle and org-unit name are snapshotted <em>now</em>, at request time, rather than
+   * re-resolved at confirmation: the named user (or their org unit) may be deleted in between, and
+   * the confirmation must still be able to stamp an attributable ledger row.
+   *
+   * @param type the movement kind; anything but {@code WITHDRAWAL} must not carry a counterparty
+   * @param userId the named Empf&auml;nger, or {@code null}
+   * @param orgUnitId the chosen org unit of that user, or {@code null}
+   * @return the snapshot, or {@code null} when no counterparty was named
+   * @throws BadRequestException when a counterparty is named on a non-withdrawal, an org unit is
+   *     given without a user, or the org unit is not one of that user's memberships
+   * @throws NotFoundException when the named user does not exist
+   */
+  @Nullable
+  private CounterpartySnapshot resolveRequestCounterparty(
+      @NotNull BankBookingRequestType type, @Nullable UUID userId, @Nullable UUID orgUnitId) {
+    if (userId == null) {
+      if (orgUnitId != null) {
+        throw new BadRequestException("A counterparty org unit requires a counterparty");
+      }
+      return null;
+    }
+    if (type != BankBookingRequestType.WITHDRAWAL) {
+      throw new BadRequestException(
+          "Only a withdrawal request records a counterparty (Empfaenger)");
+    }
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new NotFoundException("Counterparty user not found"));
+    if (orgUnitId == null) {
+      return new CounterpartySnapshot(user.getId(), user.getEffectiveName(), null, null);
+    }
+    OrgUnitMembershipOptionDto membership =
+        orgUnitMembershipQueryService.listDirectMembershipOptions(userId).stream()
+            .filter(option -> option.orgUnitId().equals(orgUnitId))
+            .findFirst()
+            .orElseThrow(
+                () ->
+                    new BadRequestException(
+                        "The selected org unit is not one of the counterparty's memberships"));
+    return new CounterpartySnapshot(
+        user.getId(), user.getEffectiveName(), membership.orgUnitId(), membership.orgUnitName());
+  }
+
+  /**
+   * The org unit to stamp on the booking a confirmation produces, for the counterparty {@code
+   * counterpartyId} (REQ-BANK-044/-055).
+   *
+   * <p>Confirmation happens an arbitrary time after the request was raised, and {@code
+   * BankLedgerService} re-validates that the org unit is still one of the counterparty's
+   * memberships — so passing the stored choice through blindly would let a membership change
+   * between request and confirmation turn into a <strong>400 that blocks the booking</strong>.
+   * Instead the stored choice is used only while it still holds, and otherwise degrades to the
+   * counterparty's current primary unit (and finally to none). A stale unit costs a less precise
+   * snapshot; it never costs the employee their ability to confirm.
+   *
+   * @param request the request being confirmed
+   * @param counterpartyId the resolved counterparty (the named Empf&auml;nger, else the requester),
+   *     or {@code null} when the request carries neither
+   * @return the org unit to record, or {@code null}
+   */
+  @Nullable
+  private UUID confirmCounterpartyOrgUnitId(
+      @NotNull BankBookingRequest request, @Nullable UUID counterpartyId) {
+    if (counterpartyId == null) {
+      return null;
+    }
+    UUID stored = request.getCounterpartyOrgUnitId();
+    if (stored != null
+        && orgUnitMembershipQueryService.listDirectMembershipOptions(counterpartyId).stream()
+            .anyMatch(option -> option.orgUnitId().equals(stored))) {
+      return stored;
+    }
+    return orgUnitMembershipQueryService
+        .findPrimaryDirectMembershipOrgUnitId(counterpartyId)
+        .orElse(null);
+  }
+
+  /**
+   * Writes a resolved counterparty snapshot onto the request, clearing all four columns when it is
+   * {@code null} so an edit that removes the Empf&auml;nger does not leave a half-populated row
+   * (the V232 CHECK ties the handle to the user id and the unit name to the unit id).
+   *
+   * @param request the request to stamp
+   * @param counterparty the resolved snapshot, or {@code null} to clear
+   */
+  private static void applyCounterparty(
+      @NotNull BankBookingRequest request, @Nullable CounterpartySnapshot counterparty) {
+    request.setCounterpartyUserId(counterparty == null ? null : counterparty.userId());
+    request.setCounterpartyHandle(counterparty == null ? null : counterparty.handle());
+    request.setCounterpartyOrgUnitId(counterparty == null ? null : counterparty.orgUnitId());
+    request.setCounterpartyOrgUnitName(counterparty == null ? null : counterparty.orgUnitName());
   }
 
   /**
@@ -390,19 +504,16 @@ public class BankBookingRequestService {
     UUID accountId = request.getAccount().getId();
     requireConfirmCapability(request.getType(), accountId, authentication);
 
-    // REQ-BANK-044: a confirmed deposit/withdrawal records the requester as the counterparty
-    // (Einzahler/Empfänger — for a deposit request, REQ-BANK-042, the requester IS the depositor)
-    // together with their org unit. requested_by is ON DELETE SET NULL, so a non-null id always
-    // still resolves; the requester may belong to several units, so the deterministic primary unit
-    // is recorded (name-sorted primary Staffel, or a leader's Bereich/OL), null when they have
-    // none.
-    UUID requesterId = request.getRequestedBy();
-    UUID counterpartyOrgUnitId =
-        requesterId == null
-            ? null
-            : orgUnitMembershipQueryService
-                .findPrimaryDirectMembershipOrgUnitId(requesterId)
-                .orElse(null);
+    // REQ-BANK-044/-055: a confirmed deposit/withdrawal records a counterparty
+    // (Einzahler/Empfänger). An Empfänger the requester NAMED on the request wins; otherwise the
+    // requester is derived — for a deposit request (REQ-BANK-042) the requester IS the depositor,
+    // and for a withdrawal that named nobody it is the historical default the pre-V232 rows carry.
+    // requested_by is ON DELETE SET NULL, so a non-null id always still resolves; the requester may
+    // belong to several units, so the deterministic primary unit is recorded (name-sorted primary
+    // Staffel, or a leader's Bereich/OL), null when they have none.
+    UUID namedCounterparty = request.getCounterpartyUserId();
+    UUID requesterId = namedCounterparty != null ? namedCounterparty : request.getRequestedBy();
+    UUID counterpartyOrgUnitId = confirmCounterpartyOrgUnitId(request, requesterId);
 
     BankTransactionDto booked =
         switch (request.getType()) {
@@ -772,6 +883,10 @@ public class BankBookingRequestService {
         request.getOwnerApprovalGrantedByHandle(),
         request.isSplitEnabled(),
         request.getSplitPercent(),
+        request.getCounterpartyUserId(),
+        request.getCounterpartyHandle(),
+        request.getCounterpartyOrgUnitId(),
+        request.getCounterpartyOrgUnitName(),
         request.getVersion());
   }
 

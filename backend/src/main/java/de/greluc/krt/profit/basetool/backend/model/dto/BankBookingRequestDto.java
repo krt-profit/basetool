@@ -75,6 +75,13 @@ import org.jetbrains.annotations.Nullable;
  *     confirmation (REQ-BANK-044)
  * @param splitPercent the whole-percent (1–100) distributed across squadron accounts, or {@code
  *     null} when not a split
+ * @param counterpartyUserId the Empf&auml;nger the requester named on a {@code WITHDRAWAL}
+ *     (REQ-BANK-055), or {@code null} — then confirmation derives the requester (REQ-BANK-044).
+ *     Carried so the edit modal can pre-select the picker
+ * @param counterpartyHandle deletion-proof name snapshot of {@code counterpartyUserId}, the value
+ *     the request lists actually display; {@code null} exactly when no Empf&auml;nger is named
+ * @param counterpartyOrgUnitId the named Empf&auml;nger's chosen org unit, or {@code null}
+ * @param counterpartyOrgUnitName name snapshot of that org unit, or {@code null}
  * @param version the optimistic-locking version the client echoes on cancel/confirm/reject
  */
 public record BankBookingRequestDto(
@@ -108,4 +115,63 @@ public record BankBookingRequestDto(
     @Nullable String ownerApprovalGrantedByHandle,
     boolean splitEnabled,
     @Nullable BigDecimal splitPercent,
-    Long version) {}
+    @Nullable UUID counterpartyUserId,
+    @Nullable String counterpartyHandle,
+    @Nullable UUID counterpartyOrgUnitId,
+    @Nullable String counterpartyOrgUnitName,
+    Long version) {
+
+  /**
+   * This request with {@link #staffNote} blanked — the requester-facing projection (REQ-BANK-054).
+   *
+   * <p>The "Notiz Bankmitarbeiter" is a bank-<em>internal</em> remark about processing the request
+   * and is redacted from the member audience exactly like the Halter columns of the org-unit
+   * booking history. The requester's own "Meine Anträge" list is that audience; the responsible
+   * holder's "Fremde Anträge" list is <strong>not</strong> and keeps the note, because approving is
+   * the decision the note exists to inform. A responsible holder who raised the request themselves
+   * therefore sees it only under the approver lens — deliberate, not a rendering bug.
+   *
+   * @return {@code this} when no staff note is set, else a copy with the note removed
+   */
+  public BankBookingRequestDto withoutStaffNote() {
+    if (staffNote == null) {
+      return this;
+    }
+    return new BankBookingRequestDto(
+        id,
+        accountId,
+        accountNo,
+        accountName,
+        orgUnitId,
+        orgUnitName,
+        orgUnitShorthand,
+        type,
+        amount,
+        note,
+        justification,
+        null,
+        status,
+        requesterHandle,
+        holderId,
+        holderHandle,
+        resultingTransactionId,
+        deciderHandle,
+        rejectReason,
+        decidedAt,
+        createdAt,
+        targetAccountId,
+        targetAccountNo,
+        requiresOwnerApproval,
+        applicableLimit,
+        requiredApprover,
+        ownerApprovalGranted,
+        ownerApprovalGrantedByHandle,
+        splitEnabled,
+        splitPercent,
+        counterpartyUserId,
+        counterpartyHandle,
+        counterpartyOrgUnitId,
+        counterpartyOrgUnitName,
+        version);
+  }
+}

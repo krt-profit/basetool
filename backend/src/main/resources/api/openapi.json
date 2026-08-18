@@ -57880,6 +57880,14 @@
             "type" : "number",
             "maximum" : 100,
             "minimum" : 1
+          },
+          "counterpartyUserId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "counterpartyOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
           }
         },
         "required" : [ "amount", "sourceAccountId", "type" ]
@@ -57986,6 +57994,20 @@
           },
           "splitPercent" : {
             "type" : "number"
+          },
+          "counterpartyUserId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "counterpartyHandle" : {
+            "type" : "string"
+          },
+          "counterpartyOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "counterpartyOrgUnitName" : {
+            "type" : "string"
           },
           "version" : {
             "type" : "integer",
