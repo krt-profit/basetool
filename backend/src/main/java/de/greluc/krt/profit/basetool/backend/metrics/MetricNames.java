@@ -110,11 +110,12 @@ public final class MetricNames {
   /**
    * Counter {@code basetool_ratelimit_rejections_total} — tags {@code bucket} and {@code
    * key_source} ({@link #KEY_SOURCE_FORWARDED} / {@link #KEY_SOURCE_PEER}). The {@code key_source}
-   * tag records where the bucket key came from: a trusted proxy's {@code X-Forwarded-For} client
-   * address, or the immediate peer's own address when no proxy is trusted or the header is absent.
-   * That distinction decides how to read a 429 spike — forwarded keys mean many real clients behind
-   * the edge tripped their own budgets, peer keys mean everything collapsed onto one shared bucket
-   * (a trusted-proxies misconfiguration or an untrusted hop), which throttles unrelated users
+   * tag records where the bucket key came from: a trusted proxy's {@code X-Forwarded-For} chain —
+   * the first untrusted hop walking from the right — or the peer's own address when no proxy is
+   * trusted, the header is absent, or every hop in the chain is itself a trusted proxy. That
+   * distinction decides how to read a 429 spike — forwarded keys mean many real clients behind the
+   * edge tripped their own budgets, peer keys mean everything collapsed onto one shared bucket (a
+   * trusted-proxies misconfiguration or an untrusted hop), which throttles unrelated users
    * together. Two bounded literals only: the address itself is never exported as a label
    * (REQ-OBS-004, REQ-OBS-006).
    */

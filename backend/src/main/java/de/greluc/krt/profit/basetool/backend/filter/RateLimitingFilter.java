@@ -78,13 +78,14 @@ import tools.jackson.core.io.JsonStringEncoder;
  * {@code X-Rate-Limit-Limit} / {@code X-Rate-Limit-Remaining} response headers reflect the tightest
  * matching budget on the happy path.
  *
- * <p>{@code X-Forwarded-For} is only honored when the immediate peer is listed in {@code
- * app.rate-limit.trusted-proxies}; blanket trust (the literal {@code "*"}) is explicitly rejected
- * because it would let any client spoof the header and get a fresh bucket per request. Which of the
- * two branches produced the bucket key is carried as {@link KeySource} on the {@link ClientKey} and
- * exported both as the {@code key_source} tag of the rejection counter and as {@code keySource=} in
- * the DEBUG line — never the address itself. That is what makes a 429 spike readable: {@code peer}
- * keys behind the edge mean the trusted-proxy list drifted and every user collapsed onto one shared
+ * <p>The address itself is resolved by {@code ClientIpContextFilter}, which runs ahead of {@code
+ * ForwardedHeaderFilter} — the only point in the request lifecycle where the raw peer and the raw
+ * {@code X-Forwarded-For} chain are both still visible — and honours the header only from a trusted
+ * peer. This filter consumes that verdict and does no trust evaluation of its own. Which branch
+ * produced the bucket key is carried as {@link KeySource} on the {@link ClientKey} and exported
+ * both as the {@code key_source} tag of the rejection counter and as {@code keySource=} in the
+ * DEBUG line — never the address itself. That is what makes a 429 spike readable: {@code peer} keys
+ * behind the edge mean the trusted-proxy list drifted and every user collapsed onto one shared
  * budget (the 2026-07-06 recurrence), {@code forwarded} keys mean individual callers tripped their
  * own. The 429 short-circuits before {@code RequestLoggingFilter}, so there is no access-log line
  * to fall back on. Logging the raw client IP instead is not an option: it is PII the backend stdout
@@ -471,8 +472,11 @@ public class RateLimitingFilter extends OncePerRequestFilter {
               request.getAttribute(ClientIpContextFilter.CLIENT_IP_FORWARDED_ATTRIBUTE));
       return new ClientKey(ip, forwarded ? KeySource.FORWARDED : KeySource.PEER);
     }
-    // No attribute means ClientIpContextFilter did not run for this dispatch. Fall back to the raw
-    // peer rather than to a header this filter cannot validate on its own.
+    // No attribute means ClientIpContextFilter did not run for this dispatch. Fall back to
+    // getRemoteAddr() — note that in production ForwardedHeaderFilter has already rewritten it,
+    // so this is the peer only in a test that drives this filter alone. Unreachable in prod,
+    // where both filters are mapped over /* with the same dispatcher types; kept because a
+    // header this filter cannot validate is the worse fallback.
     return new ClientKey(request.getRemoteAddr(), KeySource.PEER);
   }
 
@@ -617,7 +621,10 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    */
   private enum KeySource {
 
-    /** The key is the first entry of a trusted proxy's {@code X-Forwarded-For} header. */
+    /**
+     * The key was resolved from a trusted proxy's {@code X-Forwarded-For} chain — the first
+     * untrusted hop walking from the right, i.e. the address the proxy appended.
+     */
     FORWARDED(MetricNames.KEY_SOURCE_FORWARDED),
 
     /**

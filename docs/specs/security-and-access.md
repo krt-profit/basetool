@@ -338,7 +338,10 @@ implementation of the walk rather than one per consumer.
   `203.0.113.7`; rotating the leading entry does not yield a second rate-limit bucket.
 - [x] An untrusted peer's `X-Forwarded-For` is ignored entirely.
 - [x] A chain consisting only of trusted hops falls back to the peer and is reported as `peer`.
-- [x] A non-IP token (`unknown`) and empty elements are skipped rather than keyed on or thrown on.
+- [x] Empty elements are skipped. A non-IP token (`unknown`) does **not** throw and is **not**
+  trusted: it terminates the walk like any untrusted hop and becomes the resolved client, which
+  is the safe direction — treating an unparseable hop as one of our own proxies would let it be
+  skipped over.
 - [x] The `key_source` label distinguishes a resolved client from a peer fallback, so a collapse
   stays visible without logging an address.
 - [x] The framework behaviour the ordering depends on is pinned by a test, so a Spring upgrade that

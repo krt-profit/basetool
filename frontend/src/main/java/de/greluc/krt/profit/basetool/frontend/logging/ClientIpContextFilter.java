@@ -27,7 +27,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.List;
+import java.util.StringJoiner;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -110,15 +112,39 @@ public class ClientIpContextFilter extends OncePerRequestFilter implements Order
       @NotNull FilterChain chain)
       throws ServletException, IOException {
     ClientIpContext.set(
-        resolveClientIp(
-            request.getRemoteAddr(),
-            request.getHeader(FORWARDED_FOR_HEADER),
-            trustedProxyMatchers));
+        resolveClientIp(request.getRemoteAddr(), forwardedForChain(request), trustedProxyMatchers));
     try {
       chain.doFilter(request, response);
     } finally {
       ClientIpContext.clear();
     }
+  }
+
+  /**
+   * Folds every {@code X-Forwarded-For} line of the request into one chain.
+   *
+   * <p>HTTP permits a header to be repeated. Some proxies append to the existing line ({@code
+   * $proxy_add_x_forwarded_for}), others add a second line (HAProxy's {@code http-request
+   * add-header}, several CDNs, any chain where two hops each add their own). {@code getHeader}
+   * returns only the <b>first</b> line, so on the add-header shape it hands back the
+   * client-supplied entry and the walk returns exactly the value this filter distrusts. Tomcat's
+   * {@code RemoteIpFilter} concatenates {@code getHeaders} for the same reason. Today's edge
+   * normalises duplicates, so this is defence against a topology change.
+   *
+   * @param request the incoming request.
+   * @return the joined chain, or {@code null} when the header is absent entirely.
+   */
+  @Nullable
+  private static String forwardedForChain(@NotNull HttpServletRequest request) {
+    Enumeration<String> lines = request.getHeaders(FORWARDED_FOR_HEADER);
+    if (lines == null || !lines.hasMoreElements()) {
+      return null;
+    }
+    StringJoiner joined = new StringJoiner(",");
+    while (lines.hasMoreElements()) {
+      joined.add(lines.nextElement());
+    }
+    return joined.toString();
   }
 
   /**

@@ -114,7 +114,7 @@ class RateLimitingFilterTest {
       throws ServletException, IOException {
     // Chained by hand rather than through MockFilterChain(servlet, filters...): that overload
     // ends in a bare HttpServlet, whose default doGet answers 405 and masks every assertion.
-    new ClientIpContextFilter(properties)
+    new ClientIpContextFilter(properties.getTrustedProxies())
         .doFilter(
             request, response, (req, res) -> limiter.doFilter(req, res, new MockFilterChain()));
   }
@@ -435,10 +435,13 @@ class RateLimitingFilterTest {
 
     @Test
     void trustedPeerWithXffWhitespace_trimsBeforeUsing() throws Exception {
+      // The padded hop is a TRUSTED one on purpose: if trimming were dropped, " 10.0.0.1 " would
+      // miss the trusted entry, terminate the walk and be returned as the client. A padded client
+      // hop alone would not catch that.
       properties.setTrustedProxies(List.of("10.0.0.1"));
       MockHttpServletRequest req = newRequest("/api/v1/missions");
       req.setRemoteAddr("10.0.0.1");
-      req.addHeader("X-Forwarded-For", "   203.0.113.7   ");
+      req.addHeader("X-Forwarded-For", "   203.0.113.7   ,  10.0.0.1  ");
 
       assertConsumesBucketKeyContaining("203.0.113.7", req);
     }
@@ -492,6 +495,18 @@ class RateLimitingFilterTest {
 
     private void assertConsumesBucketKeyContaining(String expectedIp, MockHttpServletRequest req)
         throws ServletException, IOException {
+      // Assert the resolved address FIRST. Draining a capacity-1 bucket twice yields 429 for any
+      // deterministic key, so on its own it cannot tell a leftmost read from a rightmost one — the
+      // same chain passed this helper before and after the walk was reversed. Reading the published
+      // attribute is what makes `expectedIp` load-bearing rather than decorative.
+      MockHttpServletRequest probe = copy(req);
+      new ClientIpContextFilter(properties.getTrustedProxies())
+          .doFilter(probe, new MockHttpServletResponse(), new MockFilterChain());
+      assertEquals(
+          expectedIp,
+          probe.getAttribute(ClientIpContextFilter.CLIENT_IP_ATTRIBUTE),
+          "the resolver must key on " + expectedIp);
+
       // Tight bucket (capacity=1). The first call consumes; a second call with
       // the same bucket key MUST be rate-limited (429). If the resolved IP
       // doesn't match, the second call would land in a different bucket and

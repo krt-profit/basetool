@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.filter;
 
-import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,11 +26,12 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.List;
+import java.util.StringJoiner;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.Ordered;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -42,8 +42,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * <p><b>Why this filter has to exist at all.</b> The backend runs with {@code
  * server.forward-headers-strategy: none} and re-registers Spring's {@code ForwardedHeaderFilter}
  * one ordering slot later ({@code ForwardedHeaderConfig}). That looks like a detour, and it is not:
- * with the {@code framework} strategy Spring Boot pins {@code ForwardedHeaderFilter} to {@link
- * Ordered#HIGHEST_PRECEDENCE} ({@code Integer.MIN_VALUE}), which no servlet filter can precede, and
+ * with the {@code framework} strategy Spring Boot pins {@code ForwardedHeaderFilter} to {@code
+ * Ordered.HIGHEST_PRECEDENCE} ({@code Integer.MIN_VALUE}), which no servlet filter can precede, and
  * that filter rewrites the request before anything else sees it. Measured with the chain {@code
  * X-Forwarded-For: 9.9.9.9, 203.0.113.7} arriving from peer {@code 172.28.0.5} (pinned by {@code
  * ForwardedHeaderRewriteTest}), a filter placed after it observes:
@@ -61,21 +61,22 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * reachable only from the frontend, which relays a single, already-validated entry — and goes live
  * the moment a public vhost puts an appending proxy in front of it.
  *
- * <p><b>What it does instead.</b> Running at {@link Ordered#HIGHEST_PRECEDENCE}, ahead of the
- * re-registered {@code ForwardedHeaderFilter}, it sees the raw peer and the raw chain, and applies
- * the RemoteIpValve algorithm: honour {@code X-Forwarded-For} only when the immediate peer is a
- * configured trusted proxy, then walk the chain right-to-left skipping trusted hops and take the
- * first untrusted address. A forged entry sits to the left of the proxy-appended truth and is never
- * reached. The result is published as {@link #CLIENT_IP_ATTRIBUTE} and {@link
- * #CLIENT_IP_FORWARDED_ATTRIBUTE}; {@code ForwardedHeaderFilter} still runs afterwards and rebuilds
- * scheme, host and {@code getRemoteAddr()} for problem-detail {@code instance} URIs and redirects
- * exactly as before.
+ * <p><b>What it does instead.</b> Registered at {@code Ordered.HIGHEST_PRECEDENCE} by {@code
+ * ForwardedHeaderConfig} — on the {@code FilterRegistrationBean}, which is the only order the
+ * servlet container consults — and therefore ahead of the re-registered {@code
+ * ForwardedHeaderFilter}, it it sees the raw peer and the raw chain, and applies the RemoteIpValve
+ * algorithm: honour {@code X-Forwarded-For} only when the immediate peer is a configured trusted
+ * proxy, then walk the chain right-to-left skipping trusted hops and take the first untrusted
+ * address. A forged entry sits to the left of the proxy-appended truth and is never reached. The
+ * result is published as {@link #CLIENT_IP_ATTRIBUTE} and {@link #CLIENT_IP_FORWARDED_ATTRIBUTE};
+ * {@code ForwardedHeaderFilter} still runs afterwards and rebuilds scheme, host and {@code
+ * getRemoteAddr()} for problem-detail {@code instance} URIs and redirects exactly as before.
  *
  * <p>This mirrors the frontend filter of the same name (finding SEC-02); the two modules hit the
  * same trap for different reasons and are deliberately kept structurally identical.
  */
 @Slf4j
-public class ClientIpContextFilter extends OncePerRequestFilter implements Ordered {
+public class ClientIpContextFilter extends OncePerRequestFilter {
 
   /**
    * Request attribute carrying the resolved client IP as a {@code String}.
@@ -100,32 +101,26 @@ public class ClientIpContextFilter extends OncePerRequestFilter implements Order
   /** Standard header carrying the proxy chain; entries left of the peer are client-controlled. */
   private static final String FORWARDED_FOR_HEADER = "X-Forwarded-For";
 
+  /** Separator used when folding repeated header lines into one chain, per RFC 9110 section 5.3. */
+  private static final String HOP_SEPARATOR = ",";
+
   /** Trusted-proxy matchers compiled once at construction, never re-parsed per request. */
   private final List<IpAddressMatcher> trustedProxyMatchers;
 
   /**
    * Compiles the trusted-proxy allowlist once.
    *
-   * <p>The list is read from {@code app.rate-limit.trusted-proxies} rather than from a key of this
-   * filter's own: that is the value production already sets and REQ-SEC-011 documents, and
-   * splitting it would create a second place to get the proxy network wrong.
+   * <p>Takes the raw list rather than a properties bean on purpose. Resolution is a cross-cutting
+   * primitive that A3's per-subject limiter and A8's counters are meant to reuse, so it must not
+   * depend on the rate limiter's configuration type; which key the value comes from is a wiring
+   * detail and belongs in {@code ForwardedHeaderConfig}. The deployed key stays {@code
+   * app.rate-limit.trusted-proxies} for continuity (REQ-SEC-011).
    *
-   * @param properties the validated rate-limit configuration supplying the trusted-proxy list;
-   *     never {@code null}.
+   * @param trustedProxies the raw trusted-proxy entries, exact addresses or CIDR ranges; may be
+   *     {@code null} or empty, which disables {@code X-Forwarded-For} entirely.
    */
-  public ClientIpContextFilter(@NotNull RateLimitProperties properties) {
-    this.trustedProxyMatchers = compileTrustedProxies(properties.getTrustedProxies());
-  }
-
-  /**
-   * Runs first in the chain so the raw peer and the raw {@code X-Forwarded-For} are still intact.
-   *
-   * @return {@link Ordered#HIGHEST_PRECEDENCE}, one slot ahead of the re-registered {@code
-   *     ForwardedHeaderFilter}.
-   */
-  @Override
-  public int getOrder() {
-    return Ordered.HIGHEST_PRECEDENCE;
+  public ClientIpContextFilter(@Nullable List<String> trustedProxies) {
+    this.trustedProxyMatchers = compileTrustedProxies(trustedProxies);
   }
 
   /**
@@ -147,11 +142,44 @@ public class ClientIpContextFilter extends OncePerRequestFilter implements Order
       @NotNull FilterChain chain)
       throws ServletException, IOException {
     String peer = request.getRemoteAddr();
-    String resolved =
-        resolveClientIp(peer, request.getHeader(FORWARDED_FOR_HEADER), trustedProxyMatchers);
-    request.setAttribute(CLIENT_IP_ATTRIBUTE, resolved);
-    request.setAttribute(CLIENT_IP_FORWARDED_ATTRIBUTE, resolved != null && !resolved.equals(peer));
+    String resolved = resolveClientIp(peer, forwardedForChain(request), trustedProxyMatchers);
+    // The Servlet API treats setAttribute(name, null) as removeAttribute, which would break the
+    // "always set" contract above for a peer-less request; skip instead of publishing a hole.
+    if (resolved != null) {
+      request.setAttribute(CLIENT_IP_ATTRIBUTE, resolved);
+      request.setAttribute(CLIENT_IP_FORWARDED_ATTRIBUTE, !resolved.equals(peer));
+    }
     chain.doFilter(request, response);
+  }
+
+  /**
+   * Folds every {@code X-Forwarded-For} line of the request into one chain.
+   *
+   * <p>HTTP permits a header to be repeated, and the two forms are semantically identical. Some
+   * proxies append to the existing line ({@code $proxy_add_x_forwarded_for}) while others add a
+   * second line (HAProxy's {@code http-request add-header}, several CDNs, any chain where two hops
+   * each add their own). {@code getHeader} returns only the <b>first</b> line, so on the add-header
+   * shape it would return the client-supplied one and the walk would hand back exactly the value
+   * this filter exists to distrust. Tomcat's {@code RemoteIpFilter} concatenates {@code getHeaders}
+   * for the same reason.
+   *
+   * <p>Today's edge normalises duplicates into one line, so this is defence against a topology
+   * change rather than a live hole — but the failure mode is silent and the fix is three lines.
+   *
+   * @param request the incoming request.
+   * @return the joined chain, or {@code null} when the header is absent entirely.
+   */
+  @Nullable
+  private static String forwardedForChain(@NotNull HttpServletRequest request) {
+    Enumeration<String> lines = request.getHeaders(FORWARDED_FOR_HEADER);
+    if (lines == null || !lines.hasMoreElements()) {
+      return null;
+    }
+    StringJoiner joined = new StringJoiner(HOP_SEPARATOR);
+    while (lines.hasMoreElements()) {
+      joined.add(lines.nextElement());
+    }
+    return joined.toString();
   }
 
   /**
@@ -201,6 +229,13 @@ public class ClientIpContextFilter extends OncePerRequestFilter implements Order
    */
   private static boolean isTrusted(
       @NotNull String ip, @NotNull List<IpAddressMatcher> trustedProxies) {
+    // Cheap shape check first. Without it a non-IP hop costs one IllegalArgumentException per
+    // configured matcher per request — Spring Security's parser builds the message and fills in a
+    // stack trace before it even attempts to parse — and a token like "unknown" is a value some
+    // proxies emit routinely rather than an anomaly.
+    if (!looksLikeIpLiteral(ip)) {
+      return false;
+    }
     for (IpAddressMatcher matcher : trustedProxies) {
       try {
         if (matcher.matches(ip)) {
@@ -214,9 +249,37 @@ public class ClientIpContextFilter extends OncePerRequestFilter implements Order
   }
 
   /**
+   * Rejects anything that cannot possibly be an IPv4 or IPv6 literal, without allocating.
+   *
+   * <p>Deliberately permissive: it only has to exclude the obvious non-addresses cheaply, and
+   * {@link IpAddressMatcher} still does the real parsing for whatever survives. A false accept
+   * costs one exception, exactly as before; a false reject is impossible for a well-formed address
+   * because every character of one is covered here.
+   *
+   * @param candidate the hop to screen; never {@code null}.
+   * @return {@code true} when every character could appear in an address literal.
+   */
+  private static boolean looksLikeIpLiteral(@NotNull String candidate) {
+    for (int i = 0; i < candidate.length(); i++) {
+      char c = candidate.charAt(i);
+      boolean plausible =
+          (c >= '0' && c <= '9')
+              || (c >= 'a' && c <= 'f')
+              || (c >= 'A' && c <= 'F')
+              || c == '.'
+              || c == ':'
+              || c == '%';
+      if (!plausible) {
+        return false;
+      }
+    }
+    return !candidate.isEmpty();
+  }
+
+  /**
    * Compiles configured entries into matchers, dropping the ones that would re-open the spoof.
    *
-   * @param entries the raw {@code app.rate-limit.trusted-proxies} values; may be {@code null}.
+   * @param entries the raw trusted-proxy values; may be {@code null}.
    * @return an immutable list of matchers; empty when nothing valid is configured, which disables
    *     {@code X-Forwarded-For} entirely rather than trusting it.
    */

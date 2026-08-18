@@ -24,12 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.Ordered;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -138,13 +136,6 @@ class ClientIpContextFilterTest {
   class FilterTests {
 
     @Test
-    void runsBeforeTheForwardedHeaderFilter() {
-      // One slot ahead of ForwardedHeaderConfig's HIGHEST_PRECEDENCE + 1. Reverse the two and the
-      // resolver reads an already-rewritten request, which is the bug this class exists to avoid.
-      assertEquals(Ordered.HIGHEST_PRECEDENCE, filterWith(List.of("10.0.0.1")).getOrder());
-    }
-
-    @Test
     void publishesTheResolvedAddressAndItsProvenance() throws Exception {
       MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
       request.setRemoteAddr("10.0.0.1");
@@ -174,6 +165,38 @@ class ClientIpContextFilterTest {
           "198.51.100.10", request.getAttribute(ClientIpContextFilter.CLIENT_IP_ATTRIBUTE));
       assertFalse(
           (Boolean) request.getAttribute(ClientIpContextFilter.CLIENT_IP_FORWARDED_ATTRIBUTE));
+    }
+
+    @Test
+    void aRepeatedHeaderLineIsFoldedIntoOneChain() throws Exception {
+      // Add-header proxies emit a second line instead of appending. getHeader() would return only
+      // the client-supplied first one, and the walk would hand back exactly the spoof.
+      MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
+      request.setRemoteAddr("10.0.0.1");
+      request.addHeader("X-Forwarded-For", "9.9.9.9");
+      request.addHeader("X-Forwarded-For", "203.0.113.7");
+
+      filterWith(List.of("10.0.0.0/24"))
+          .doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+
+      assertEquals(
+          "203.0.113.7",
+          request.getAttribute(ClientIpContextFilter.CLIENT_IP_ATTRIBUTE),
+          "both header lines form one chain; the rightmost untrusted hop wins");
+    }
+
+    @Test
+    void aPeerlessRequestPublishesNoAttributeRatherThanRemovingIt() throws Exception {
+      // setAttribute(name, null) is defined as removeAttribute, so publishing a null would leave
+      // consumers unable to tell "did not run" from "ran and found nothing".
+      MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
+      request.setRemoteAddr(null);
+
+      filterWith(List.of("10.0.0.0/24"))
+          .doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+
+      assertNull(request.getAttribute(ClientIpContextFilter.CLIENT_IP_ATTRIBUTE));
+      assertNull(request.getAttribute(ClientIpContextFilter.CLIENT_IP_FORWARDED_ATTRIBUTE));
     }
 
     @Test
@@ -208,9 +231,7 @@ class ClientIpContextFilterTest {
      * @return a filter whose allowlist is already compiled.
      */
     private ClientIpContextFilter filterWith(List<String> trustedProxies) {
-      RateLimitProperties properties = new RateLimitProperties();
-      properties.setTrustedProxies(trustedProxies);
-      return new ClientIpContextFilter(properties);
+      return new ClientIpContextFilter(trustedProxies);
     }
   }
 }
