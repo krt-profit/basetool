@@ -23,13 +23,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 /**
- * Unit tests for {@link ApiCacheControlFilter}: idempotent API GETs get revalidation headers, and
- * nothing else does.
+ * Unit tests for {@link ApiCacheControlFilter}: idempotent API GETs get revalidation headers, the
+ * sensitive families get {@code no-store} instead, and nothing else is touched.
  */
 class ApiCacheControlFilterTest {
 
@@ -54,7 +56,9 @@ class ApiCacheControlFilterTest {
 
   @Test
   void apiGet_getsRevalidationHeaders() throws Exception {
-    assertEquals("no-cache, must-revalidate", run("GET", "/api/v1/users").getHeader(CACHE_CONTROL));
+    // An ordinary family: storable by an intermediary as long as it revalidates first.
+    assertEquals(
+        "no-cache, must-revalidate", run("GET", "/api/v1/missions").getHeader(CACHE_CONTROL));
   }
 
   /**
@@ -68,7 +72,35 @@ class ApiCacheControlFilterTest {
   @Test
   void percentEncodedApiGet_stillGetsRevalidationHeaders() throws Exception {
     assertEquals(
-        "no-cache, must-revalidate", run("GET", "/%61pi/v1/users").getHeader(CACHE_CONTROL));
+        "no-cache, must-revalidate", run("GET", "/%61pi/v1/missions").getHeader(CACHE_CONTROL));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "/api/v1/bank/accounts",
+        "/api/v1/users/42",
+        "/api/v1/me",
+        "/api/v1/notifications",
+        "/api/v1/notifications/stream"
+      })
+  void sensitiveFamilies_areNeverStored(String uri) throws Exception {
+    // Balances, member records and one person's feed must not sit in a proxy or a disk cache at
+    // all — revalidation is not enough, because it still permits the copy to exist.
+    assertEquals("private, no-store", run("GET", uri).getHeader(CACHE_CONTROL));
+  }
+
+  @Test
+  void percentEncodedSensitivePath_doesNotEscapeIntoTheWeakerDirective() throws Exception {
+    // Same trap as the /api scope itself (REQ-SEC-029): the match runs on the decoded path, so an
+    // encoded spelling cannot downgrade a bank response to merely revalidatable.
+    assertEquals(
+        "private, no-store", run("GET", "/api/v1/%62ank/accounts").getHeader(CACHE_CONTROL));
+  }
+
+  @Test
+  void sensitiveFamiliesStillCarryTheVaryHeader() throws Exception {
+    assertEquals("Accept-Encoding", run("GET", "/api/v1/bank/accounts").getHeader("Vary"));
   }
 
   @Test

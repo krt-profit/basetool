@@ -1407,6 +1407,36 @@ client while the policy is attached.
 [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md) · **Measurements:**
 [`ANDROID_API_EXPOSURE_PLAN.md`](../ANDROID_API_EXPOSURE_PLAN.md) section 7
 
+### REQ-SEC-031 — Sensitive GET families MUST be uncacheable, not merely revalidatable
+
+API GET responses under `/api/v1/bank/**`, `/api/v1/users/**`, `/api/v1/me/**` and
+`/api/v1/notifications/**` MUST carry `Cache-Control: private, no-store`. Every other `/api/**` GET
+keeps `no-cache, must-revalidate`.
+
+The distinction is not cosmetic. `no-cache, must-revalidate` permits an intermediary to **store** the
+body and reuse it after a successful revalidation; only `no-store` forbids the copy existing at all.
+For master data and mission lists the weaker directive is the right trade. For a bank ledger, a
+member record — the only PII the API serves — or one person's notification feed it is not: a
+corporate middlebox, a shared proxy or a browser disk cache would be holding data that must not
+outlive the response.
+
+While the backend was reachable only from the frontend across an internal network there was no
+intermediary for the header to talk to. A public API vhost makes one plausible, which is what turns
+this from theory into a control.
+
+The scope MUST be matched against the **decoded** path (REQ-SEC-029), so an encoded spelling such as
+`/api/v1/%62ank/accounts` cannot fall back into the weaker directive. The list is maintained in code
+rather than configuration: which data is sensitive is a property of the domain, not of a deployment.
+
+**Acceptance**
+
+- [x] The four families answer with `private, no-store`, including the notification SSE stream.
+- [x] An encoded spelling of a sensitive path still gets `no-store`.
+- [x] Other `/api/**` GETs are unchanged, and non-API paths and writes are untouched.
+- [x] `Vary: Accept-Encoding` is still set on the sensitive families.
+
+**Enforced by:** `ApiCacheControlFilterTest` · **Code:** `ApiCacheControlFilter`
+
 ### REQ-SEC-032 — The anonymous surface MUST NOT be an amplification lever
 
 `PaginationUtil` clamps `size` at 100 000. That is correct for the authenticated consumers that
