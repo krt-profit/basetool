@@ -161,4 +161,40 @@ class AuthenticatedSubjectTest {
     assertThat(AuthenticatedSubject.idOf(new TokenlessSubject("service-account-gateway")))
         .isEmpty();
   }
+
+  /** The authorized party is the token's {@code azp}, read through the same seam as the subject. */
+  @Test
+  void readsTheAuthorizedPartyFromTheToken() {
+    Jwt jwt =
+        Jwt.withTokenValue("t")
+            .header("alg", "none")
+            .subject(SUB)
+            .claim("azp", "basetool-android")
+            .build();
+
+    assertThat(AuthenticatedSubject.authorizedParty(new JwtAuthenticationToken(jwt, List.of())))
+        .contains("basetool-android");
+  }
+
+  /**
+   * A token without the claim yields empty rather than a blank or a guess.
+   *
+   * <p>The distinction is load-bearing for the client attribution (REQ-OBS-018): "no azp" is a
+   * Keycloak mapper regression, and a consumer that cannot tell it from "an unknown client" would
+   * point the operator at the wrong system.
+   */
+  @Test
+  void yieldsNoAuthorizedPartyWhenTheClaimIsAbsent() {
+    Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject(SUB).build();
+
+    assertThat(AuthenticatedSubject.authorizedParty(new JwtAuthenticationToken(jwt, List.of())))
+        .isEmpty();
+  }
+
+  /** A token-less acting member has a subject but no authorized party, and that is not an error. */
+  @Test
+  void yieldsNoAuthorizedPartyForATokenlessAuthentication() {
+    assertThat(AuthenticatedSubject.authorizedParty(new TokenlessSubject(SUB))).isEmpty();
+    assertThat(AuthenticatedSubject.authorizedParty(null)).isEmpty();
+  }
 }

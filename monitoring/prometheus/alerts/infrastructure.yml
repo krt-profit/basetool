@@ -485,7 +485,11 @@ groups:
       # Public DNS resolution: the blackbox DNS probe against 1.1.1.1 failed — the apex is not resolving
       # an A or AAAA record (missing/removed record, or a zone/provider outage). Warning.
       - alert: DnsResolutionFailed
-        expr: probe_success{job=~"blackbox-dns-a|blackbox-dns-aaaa"} == 0
+        # Regex, not an alternation of the two apex jobs: the staged api-vhost DNS jobs
+        # (blackbox-dns-api-a / -aaaa, see prometheus.yml) must be covered the moment they are
+        # uncommented. Prometheus anchors label regexes fully, so the old spelling silently would
+        # not have matched them and the new records would have shipped without a resolution alert.
+        expr: probe_success{job=~"blackbox-dns-.*"} == 0
         for: 5m
         labels:
           severity: warning

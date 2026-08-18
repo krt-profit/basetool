@@ -40,18 +40,28 @@ jobs:
       - name: Actuator edge deny must answer 404 from the internet
         run: |
           fail=0
-          for url in \
-            https://profit-base.online/actuator/prometheus \
-            https://profit-base.online/actuator/health \
-            https://ingest.profit-base.online/actuator/prometheus \
-            https://ingest.profit-base.online/actuator/health
-          do
-            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --retry 2 --retry-delay 10 \
-              "$url" || true)
+          # Read from a heredoc rather than a `for url in … \` list so a target can be STAGED as a
+          # comment: api.profit-base.online does not exist until the owner applies the vhost (D3)
+          # and its DNS (D4), and a live entry would fail this workflow nightly until then — which
+          # trains the reader to ignore a red run. Blank and `#` lines are skipped.
+          while read -r url; do
+            case "$url" in ''|\#*) continue ;; esac
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --retry 2 --retry-delay 10 "$url" || true)
             echo "GET $url -> HTTP ${code:-000}"
             if [ "$code" != "404" ]; then
               echo "::error::$url answered ${code:-000} instead of 404 — the /actuator edge deny drifted (ADR-0072 compensating control), or the edge is unreachable from this runner."
               fail=1
             fi
-          done
+          done <<'TARGETS'
+          https://profit-base.online/actuator/prometheus
+          https://profit-base.online/actuator/health
+          https://ingest.profit-base.online/actuator/prometheus
+          https://ingest.profit-base.online/actuator/health
+          # STAGED — un-comment together with the Prometheus blackbox-edge-deny targets when the
+          # API vhost goes live (docs/MONITORING_ROLLOUT_RUNBOOK.md, Appendix C). This external
+          # vantage point matters most on that host: it is the one the native app reaches, and the
+          # only place a mistaken `location /actuator` proxy_pass would be visible from outside.
+          #https://api.profit-base.online/actuator/prometheus
+          #https://api.profit-base.online/actuator/health
+          TARGETS
           exit $fail

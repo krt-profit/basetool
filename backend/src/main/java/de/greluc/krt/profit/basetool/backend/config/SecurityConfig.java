@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.ActingMemberAuthorities;
+import de.greluc.krt.profit.basetool.backend.support.ApiClientMetricsProperties;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.Permissions;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
@@ -313,6 +314,8 @@ public class SecurityConfig {
    * @param objectMapper serializes those filters' {@code ProblemDetail}s to JSON
    * @param meterRegistry counts the identity-provider-unavailable 503 on {@code
    *     basetool_http_error_total} (REQ-OBS-011)
+   * @param apiClientMetricsProperties bounds the {@code client_id} label of {@code
+   *     basetool_api_client_requests_total} (A8, REQ-OBS-018)
    * @return the configured security filter chain
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
@@ -330,7 +333,8 @@ public class SecurityConfig {
       RefusedSubjectWindow refusedSubjectWindow,
       IngestGatewayProperties ingestGatewayProperties,
       ActingMemberAuthorities actingMemberAuthorities,
-      RateLimitProperties rateLimitProperties)
+      RateLimitProperties rateLimitProperties,
+      ApiClientMetricsProperties apiClientMetricsProperties)
       throws Exception {
 
     boolean isTest = java.util.Arrays.asList(env.getActiveProfiles()).contains("test");
@@ -741,6 +745,20 @@ public class SecurityConfig {
                 meterRegistry),
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
+        // A8 / REQ-OBS-018: attribute every authenticated API request to its client software.
+        // Runs BEFORE ActingMemberFilter on purpose — that filter swaps an on-behalf-of call's
+        // authentication for an ActingMemberAuthentication, which carries no claims, so a gateway
+        // request observed after it would count as an anonymous one. Ahead of the refusing gates
+        // for the same reason: a client must not be able to hide from the counter behind its own
+        // rejections.
+        // Registered here rather than above the ActingMemberFilter call although it runs earlier:
+        // an anchor class must already have an order in Spring Security's FilterOrderRegistration,
+        // which ActingMemberFilter only gets from the addFilterAfter above. Naming it before that
+        // call fails the context with "does not have a registered order".
+        .addFilterBefore(
+            new ApiClientMetricsFilter(
+                apiClientMetricsProperties, ingestGatewayProperties, meterRegistry),
+            ActingMemberFilter.class)
         .addFilterAfter(
             new PendingApprovalAccessFilter(
                 messageSource, problemResponseFactory, objectMapper, meterRegistry),

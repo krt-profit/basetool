@@ -136,6 +136,41 @@ public final class MetricNames {
    */
   public static final String REQUEST_BODY_REJECTED = "basetool.request.body.rejected";
 
+  // --- Public-surface client attribution (A8, REQ-OBS-018) -------------------------------
+
+  /**
+   * Counter {@code basetool_api_client_requests_total} — tag {@code client_id}. Bumped once per
+   * authenticated {@code /api/**} request with the calling client's {@code azp}, so "which client
+   * software is driving the API" is answerable at all. Until the native app ships, every series but
+   * the web client's is a question worth asking; afterwards this is the only place a request can be
+   * attributed to the app rather than to the browser, and the only signal a client kill switch
+   * could ever act on.
+   *
+   * <p>The label is bounded exactly as the ingest gateway bounds its own ({@code
+   * basetool_ingest_client_total}): the {@code azp} is used verbatim only while it names a client
+   * the deployment already knows — one of {@code ApiClientMetricsProperties#getKnownClientIds()} or
+   * a configured ingest gateway — and collapses to {@link #CLIENT_ID_OTHER} otherwise, to {@link
+   * #CLIENT_ID_NONE} when the token carries no {@code azp} at all. Keycloak only ever stamps a
+   * registered client id, but deriving a Prometheus label from a token claim without a bound is the
+   * kind of thing that stays correct until the day it is not (REQ-OBS-006).
+   */
+  public static final String API_CLIENT_REQUESTS = "basetool.api.client.requests";
+
+  /**
+   * Counter {@code basetool_auth_failures_total} — tag {@code reason}, the RFC 6750 bearer error
+   * code the resource server raised ({@link #AUTH_INVALID_TOKEN} / {@link #AUTH_INVALID_REQUEST} /
+   * {@link #AUTH_INSUFFICIENT_SCOPE} / {@link #AUTH_OTHER}).
+   *
+   * <p>{@link #HTTP_ERROR}{@code {code="UNAUTHENTICATED"}} already counts the 401s and drives
+   * {@code BackendAuthFailureSpike}; what it cannot say is <em>why</em>. A malformed header, an
+   * expired token, a wrong issuer and a failed audience check are one number there, and the
+   * operator has to raise a log level in production to tell them apart — which on an
+   * internet-facing surface means inviting every anonymous scanner into the log. That cost real
+   * time on the ingest gateway on 2026-08-03; this is the same signal on the backend, added before
+   * its surface becomes public rather than after.
+   */
+  public static final String AUTH_FAILURES = "basetool.auth.failures";
+
   // --- Discord SPI precheck (DiscordAccountExistenceController) ---------------------------
 
   /**
@@ -320,6 +355,12 @@ public final class MetricNames {
    */
   public static final String TAG_KEY_SOURCE = "key_source";
 
+  /**
+   * Tag key: the calling client's Keycloak client id on {@link #API_CLIENT_REQUESTS}, bounded by
+   * the known-client configuration rather than taken from the token unfiltered.
+   */
+  public static final String TAG_CLIENT_ID = "client_id";
+
   /** Tag key: the bank ledger-integrity violation category. */
   public static final String TAG_CATEGORY = "category";
 
@@ -459,6 +500,33 @@ public final class MetricNames {
    * the signature of a broken {@code app.rate-limit.trusted-proxies} list.
    */
   public static final String KEY_SOURCE_PEER = "peer";
+
+  /**
+   * Bounded {@code client_id} value for a caller whose {@code azp} names no known client. It says
+   * "something else called the API", never which something — that is the point of the bound, and
+   * the reason {@code ApiUnknownClient} alerts on this series rather than on a name.
+   */
+  public static final String CLIENT_ID_OTHER = "other";
+
+  /**
+   * Bounded {@code client_id} value for an authenticated caller whose token carries no {@code azp}
+   * claim. Kept distinct from {@link #CLIENT_ID_OTHER} because the two mean opposite things:
+   * "other" is a client nobody registered here, "none" is a Keycloak mapper regression that would
+   * silently blind the attribution for every client at once.
+   */
+  public static final String CLIENT_ID_NONE = "none";
+
+  /** Bearer error (RFC 6750): the token was rejected — expired, bad signature, wrong audience. */
+  public static final String AUTH_INVALID_TOKEN = "invalid_token";
+
+  /** Bearer error: the request itself was malformed, e.g. two authentication schemes at once. */
+  public static final String AUTH_INVALID_REQUEST = "invalid_request";
+
+  /** Bearer error: the token is valid but lacks the required scope. */
+  public static final String AUTH_INSUFFICIENT_SCOPE = "insufficient_scope";
+
+  /** Bearer error: anything outside the RFC set, collapsed so the label stays bounded. */
+  public static final String AUTH_OTHER = "other";
 
   /** Discord precheck outcome: an existence check ran and answered {@code 200}. */
   public static final String DISCORD_PRECHECK_OK = "ok";

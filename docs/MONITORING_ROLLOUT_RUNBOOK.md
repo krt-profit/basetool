@@ -31,6 +31,7 @@ Epic #936, ADR-0072, REQ-OBS-005..011. Compose project: `iri-monitoring`
 14. [Keystore-rotation note (MUST update `docs/deployment.md`)](#keystore-rotation-note)
 15. [Appendix A — UI click-path verification log](#appendix-a--ui-click-path-verification-log)
 16. [Appendix B — Enabling the staged `JvmNativeThreadExhaustion` Loki rule](#appendix-b--enabling-the-staged-jvmnativethreadexhaustion-loki-rule)
+17. [Appendix C — Enabling the staged `api.profit-base.online` probes](#appendix-c--enabling-the-staged-apiprofit-baseonline-probes)
 
 ---
 
@@ -895,3 +896,77 @@ but the native line is emitted *outside* logback, so its presence must be observ
    (`LokiRuleEvaluationFailures` stays green; the group appears in the ruler). Update the rule's
    staging comment to record the verification date.
 
+---
+
+## Appendix C — Enabling the staged `api.profit-base.online` probes
+
+ADR-0135 exposes `/api/v1` on its own public vhost. Its monitoring — liveness, the IPv6 twin, the
+`/actuator` edge deny, Force-SSL, HSTS and DNS A/AAAA — is written, reviewed and deployed, but ships
+**commented out** (REQ-OBS-014, REQ-OBS-018), because the host does not resolve until the owner
+applies plan items **D3** (NPM vhost) and **D4** (DNS + CAA). An un-staged probe of a non-existent
+host pages `BlackboxProbeFailed` and `DnsResolutionFailed` from the minute the config deploys, and a
+channel that fires permanently is one people stop reading.
+
+**Enable only after D3 and D4 are live, and enable all of it in one edit.** A partially enabled probe
+set is worse than none: it reads as "monitored".
+
+1. **Confirm the host answers, from outside.** From a machine that is not the prod host (a probe
+   from inside hairpins and is SNAT'd to the Docker bridge gateways):
+
+   ```bash
+   curl -sS -o /dev/null -w '%{http_code} %{ssl_verify_result}
+   ```
+
+' https://api.profit-base.online/api/v1/terms/status
+curl -sS -o /dev/null -w '%{http_code}
+' https://api.profit-base.online/actuator/health
+curl -sSI http://api.profit-base.online | head -n 3
+dig +short api.profit-base.online A; dig +short api.profit-base.online AAAA
+
+```
+
+Expected: `401 0` on the terms path (the allow-listed probe target — the vhost 404s its own root,
+so do NOT probe `/`), `404` on the actuator path, a `301`/`308` to `https://` on port 80, and both
+DNS record types answering. Anything else means D3/D4 are incomplete; fix that first rather than
+enabling a probe that documents the gap.
+
+2. **Confirm HSTS is on the 401.** `curl -sSI https://api.profit-base.online/api/v1/terms/status | grep -i strict-transport`
+must print a `max-age=…`. The backend writes it (`SecurityConfig`), but a proxy can strip response
+headers, and `http_2xx_or_401_hsts` asserts the header on the FIRST response.
+
+3. **Un-comment, all of it.** In `monitoring/prometheus/prometheus.yml`: the staged targets inside
+`blackbox-http-auth`, `blackbox-http-auth-ipv6`, `blackbox-edge-deny` (two URLs) and
+`blackbox-force-ssl`, plus the three staged jobs at the end of the file (`blackbox-hsts-auth`,
+`blackbox-dns-api-a`, `blackbox-dns-api-aaaa`). In `.github/workflows/edge-deny-probe.yml`: the two
+commented URLs in the `TARGETS` heredoc.
+
+4. **Widen `EdgeHstsHeaderMissing` in the same commit.** It is scoped to `job="blackbox-hsts"`;
+change it to `job=~"blackbox-hsts.*"` in `monitoring/prometheus/alerts/infrastructure.yml`, or the
+new job's `probe_success` is scraped and alerted on by nothing. `DnsResolutionFailed` already
+matches `blackbox-dns-.*` and `TargetDown` already excludes the probe jobs — no change needed
+there.
+
+5. **Lint before deploying.** From the repo root:
+
+```bash
+docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.13.2 check config /cfg/prometheus.yml
+docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.13.2 -c 'promtool check rules /cfg/alerts/*.yml'
+docker run --rm -v "$PWD/monitoring/blackbox:/cfg" prom/blackbox-exporter:v0.28.0 --config.file=/cfg/blackbox.yml --config.check
+```
+
+6. **Verify after the deploy tick.** In Prometheus → Targets, the four `blackbox-*` jobs must list the
+   new `api.profit-base.online` instances and every one must be `up` with `probe_success == 1`. On
+   dashboard 08 the new instances appear in "Probe success per endpoint" and "Days until cert expiry"
+   without a dashboard edit (those panels are deliberately unfiltered). Then run the external probe
+   once by hand — `gh workflow run "Edge deny probe"` — and confirm it stays green.
+
+7. **Record the date here**, so a later reader can tell a staged rule from a forgotten one.
+
+### Related: the staged `ApiClientAttributionBlind` rule
+
+`monitoring/prometheus/alerts/business.yml` also carries a commented `ApiClientAttributionBlind`,
+which fires when authenticated API requests arrive with no `azp` claim (REQ-OBS-018). It is
+independent of the vhost and gated on evidence instead: enable it once
+`sum(rate(basetool_api_client_requests_total{client_id="none"}[10m]))` has been flat at zero for a
+week of production traffic. If it is **not** flat, some realm flow mints tokens without `azp` — fix
+that (or narrow the rule) rather than enabling an alert that will fire forever.

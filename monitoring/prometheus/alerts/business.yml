@@ -847,6 +847,51 @@ groups:
           summary: "Ingest client-identity gate rejecting callers ({{ $labels.reason }})"
           description: "The ingest gateway refused a caller under reason '{{ $labels.reason }}'. unknown_client/bad_provenance means an unapproved tool is calling the restricted ingest interface; missing_azp/missing_scope means a Keycloak mapper or scope assignment regressed and the official extractor may be locked out. Check the gateway log for the matching WARN and the allowlist in APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS."
 
+      # A8 / REQ-OBS-018: a client nobody registered here is driving the backend API.
+      #
+      # The backend counterpart of IngestUnknownClient above, and deliberately weaker: the ingest
+      # gateway REFUSES an unlisted client, this one only counts it. The backend serves whichever
+      # first-party clients the realm carries, and 403ing an unrecognised azp would lock out a
+      # client the day it is registered in Keycloak and before it reaches a properties file. So the
+      # allowlist bounds the label and this rule is what turns "counted" into "noticed".
+      #
+      # Reading it: client_id="other" means a token minted for some OTHER realm client called
+      # /api/**. That is not automatically an attack — a new first-party client that nobody added
+      # to app.monitoring.api-clients.known-client-ids reads identically — but both cases want the
+      # same first move: find out which client, from the Keycloak event log or the vhost access log,
+      # and then either register it or revoke it.
+      #
+      # Threshold: any sustained occurrence, like its ingest sibling. A foreign client calling once
+      # a minute is the signal, not the noise. It counts requests the downstream gates went on to
+      # refuse, on purpose — a client must not be able to hide behind its own 403s and 429s.
+      - alert: ApiUnknownClient
+        expr: sum (rate(basetool_api_client_requests_total{client_id="other"}[10m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unregistered client software is calling the backend API"
+          description: "A token whose azp names no known client drove /api/** for 10 minutes. Either a first-party client was added to the realm without being added to app.monitoring.api-clients.known-client-ids, or something nobody approved is using the API. Identify it from the Keycloak client sessions and the api vhost access log; the label is deliberately bounded to 'other' and will never name it."
+
+      # STAGED (REQ-OBS-014) — do NOT uncomment before the verification in
+      # docs/MONITORING_ROLLOUT_RUNBOOK.md, Appendix C.
+      #
+      # client_id="none" means an authenticated caller whose token carries no azp claim at all.
+      # Unlike "other" that is not a foreign client but a Keycloak mapper regression, and it blinds
+      # the attribution for every client at once — worth alerting on precisely because nothing else
+      # would notice. It ships disabled because the opposite failure is worse: if some legitimate
+      # flow in this realm mints tokens without azp, the rule fires the day it merges and keeps
+      # firing, and a permanently-firing rule is how an operator learns to ignore a channel. Enable
+      # it once a week of production data shows the series flat at zero.
+      # - alert: ApiClientAttributionBlind
+      #   expr: sum (rate(basetool_api_client_requests_total{client_id="none"}[10m])) > 0
+      #   for: 15m
+      #   labels:
+      #     severity: warning
+      #   annotations:
+      #     summary: "API requests arrive without a client identity (azp missing)"
+      #     description: "Authenticated /api/** requests carry no azp claim, so basetool_api_client_requests_total can no longer attribute traffic to a client and ApiUnknownClient is blind. This is a realm-side regression (a removed/renamed protocol mapper on the client's dedicated scope), not a caller problem."
+
       # Terms-of-Use consent rollout stalled (REQ-SEC-028). After a wording change every member is
       # blocked until they accept, so the gate refusing callers is EXPECTED for a while — what is
       # not expected is refusals continuing while nobody gets through, which is what a broken

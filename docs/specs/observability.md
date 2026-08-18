@@ -974,6 +974,13 @@ transaction per pass) rather than per-scrape.
   misconfiguration that would silently collapse every caller onto one bucket. The address itself
   never becomes a label.
 
+- `basetool_api_client_requests_total{client_id}` counter (`ApiClientMetricsFilter`, A8) — one per
+  authenticated `/api/**` request, keyed on the token's `azp` and bounded by
+  `app.monitoring.api-clients.known-client-ids` plus the configured ingest gateways; anything else
+  is `other` (`ApiUnknownClient`) and a token without the claim is `none`. Paired with
+  `basetool_auth_failures_total{reason}` (`SecurityProblemResponseHandler`), the RFC 6750 bearer
+  error code behind each 401 — the cause `basetool_http_error_total{code="UNAUTHENTICATED"}` counts
+  but cannot name. Full rules, placement and the staged rules: REQ-OBS-018.
 - `basetool_discord_precheck_total{outcome}` counter (`DiscordAccountExistenceController`, #1041
   item 19; `outcome` = `ok` / `unauthorized` / `disabled`). The endpoint sits outside `/api/**`, the
   rate limiter and the `basetool_http_error` funnel, so this is the only signal for secret-guessing
@@ -1852,3 +1859,84 @@ perfectly healthy while the file stays empty. All three modules therefore:
 
 **Enforced by:** `{backend,frontend,ingest}/src/main/resources/logback-spring.xml` ·
 **Related:** ADR-0095 (`<svc>-stdout` shipping), ADR-0072 (`stop_grace_period`), REQ-OBS-007
+
+### REQ-OBS-018 — The public API surface must be attributable, and probed before it exists
+
+Exposing `/api/v1` on its own internet-reachable vhost (ADR-0135) adds two questions the monitoring
+plane could not answer, and both have to be answerable *before* the surface is live rather than
+after the first incident.
+
+**Which client software is calling.** The backend counts every authenticated `/api/**` request on
+`basetool_api_client_requests_total{client_id}`, keyed on the token's `azp`. Until the native app
+ships this is almost entirely the web frontend, and that is the point: the counter needs a baseline
+to be read against, and afterwards it is the only place a request can be attributed to the app
+rather than to a browser — the denominator of any per-client budget, and the one signal a client
+kill switch could ever act on. The label is **bounded** and never taken from the token unfiltered
+(REQ-OBS-006): an `azp` is used verbatim only while it names a client the deployment knows —
+`app.monitoring.api-clients.known-client-ids` or a configured ingest gateway
+(`app.security.ingest-gateway.client-ids`, so the two lists cannot drift) — collapsing to `other`
+otherwise and to `none` when the token carries no `azp` at all. The two literals mean opposite
+things: `other` is a client nobody registered here, `none` is a Keycloak mapper regression that
+blinds the attribution for every client at once. `ApiUnknownClient` (warning) fires on a sustained
+`other`; the `none` rule ships staged (below).
+
+The counter **observes and never refuses**. The ingest gateway enforces a client allow-list because
+it fronts a single approved tool (REQ-INGEST-011); this surface serves whichever first-party clients
+the realm carries, and turning an unrecognised `azp` into a 403 would lock out a client on the day
+it is registered in Keycloak and before it reaches a properties file. The gate that matters is the
+audience check on the token itself.
+
+Placement is load-bearing: the filter runs **before** `ActingMemberFilter`, which replaces an
+on-behalf-of call's authentication with an `ActingMemberAuthentication` that carries no claims, and
+**before** the pending-approval, terms, page-size and per-subject gates, so a client cannot hide
+from the counter behind its own 403s and 429s.
+
+**Why authentication failed.** `basetool_auth_failures_total{reason}` breaks the 401s down by the
+RFC 6750 bearer error code (`invalid_token` / `invalid_request` / `insufficient_scope` / `other`),
+counted in the one funnel every filter-level rejection passes through. `basetool_http_error_total`
+`{code="UNAUTHENTICATED"}` already had the volume and drives `BackendAuthFailureSpike`; what it
+could not say is whether a spike is a malformed header, an expired token, a wrong issuer or a failed
+audience check — a distinction that otherwise costs a log-level change on a surface anonymous
+scanners can reach, and that cost the ingest gateway an afternoon on 2026-08-03 (REQ-INGEST-011).
+Only the code is taken, never the `OAuth2Error` description: Spring embeds the raw decode failure
+there and it can quote fragments of the presented token (REQ-OBS-004).
+
+**Probes for a host that does not resolve yet.** The API vhost's liveness, IPv6 twin, `/actuator`
+edge deny, Force-SSL, HSTS and DNS A/AAAA probes are written, reviewed and deployed **staged** —
+present in `prometheus.yml` and the external `edge-deny-probe.yml` as commented targets — with the
+blackbox modules they need shipped live and inert. Rationale is REQ-OBS-014's: an un-staged probe of
+a host that does not exist pages `BlackboxProbeFailed` and `DnsResolutionFailed` from the minute it
+merges, and a permanently-firing channel is one an operator stops reading. The enable procedure,
+including what to verify first and which alert scopes must be widened in the same edit, is
+[`MONITORING_ROLLOUT_RUNBOOK.md`, Appendix C](../MONITORING_ROLLOUT_RUNBOOK.md). Enabling is
+all-or-nothing per surface: a partially enabled probe set reads as "monitored".
+
+The liveness probe deliberately targets an **allow-listed path that answers 401**
+(`/api/v1/terms/status`), not the vhost root: the vhost is a default-deny allow-list that 404s its
+own root, so a root probe would assert nothing about the backend behind it and would fail on a
+perfectly healthy edge. For the same reason HSTS uses the `http_2xx_or_401_hsts` module rather than
+loosening the frontend's `http_2xx_hsts` assertion.
+
+**Acceptance**
+
+- [x] Every authenticated `/api/**` request is counted under a bounded `client_id`; an unregistered
+  client reads as `other` and its `azp` never becomes a label (`ApiClientMetricsFilterTest`).
+- [x] A gateway call keeps its own client identity rather than reading as anonymous — the filter
+  runs ahead of the identity swap (`ApiClientMetricsFilterTest`).
+- [x] An encoded path spelling cannot drop a request out of the attribution (REQ-SEC-029).
+- [x] Every 401 is counted under its RFC 6750 code, an unknown code collapses to `other`, and a 403
+  is not counted as an authentication failure (`SecurityProblemResponseHandlerTest`).
+- [x] `ApiUnknownClient` fires on sustained `other` traffic, stays silent for known clients at any
+  volume, and does not claim the `none` series (`tests/apiunknownclient_scope_test.yml`).
+- [ ] The staged probes are enabled and green after D3/D4, and `EdgeHstsHeaderMissing` is widened to
+  `job=~"blackbox-hsts.*"` in the same edit. **Open** — owner step, runbook Appendix C.
+- [ ] The staged `ApiClientAttributionBlind` rule is enabled once a week of production data shows the
+  `none` series flat at zero. **Open**.
+
+**Enforced by:** `ApiClientMetricsFilter`, `ApiClientMetricsProperties`,
+`SecurityProblemResponseHandler` (backend) · `monitoring/prometheus/alerts/business.yml`,
+`monitoring/prometheus/alerts/apps.yml`, `monitoring/prometheus/prometheus.yml`,
+`monitoring/blackbox/blackbox.yml`, `.github/workflows/edge-deny-probe.yml`,
+`monitoring/grafana/dashboards/07-basetool-operations.json` ·
+**Related:** ADR-0135, ADR-0129 (the identity swap this filter must precede), ADR-0134, REQ-OBS-006,
+REQ-OBS-011, REQ-OBS-012, REQ-OBS-014, REQ-SEC-029, REQ-INGEST-011

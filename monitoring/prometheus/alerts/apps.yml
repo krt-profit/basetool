@@ -14,6 +14,12 @@ groups:
           summary: "5xx rate >1% ({{ $labels.application }})"
           description: "More than 1% of requests to {{ $labels.application }} returned 5xx over the last 5 minutes."
 
+      # Kept on basetool_http_error_total rather than moved to the newer
+      # basetool_auth_failures_total (A8): the two count the same rejections, and re-pointing a
+      # proven alert at a fresh series buys nothing but a gap in its history. What the new metric
+      # adds is the CAUSE, which the description sends the operator to — a spike of invalid_token is
+      # a client with a stale/rotated key, a spike of invalid_request is a malformed Authorization
+      # header, and until A8 those were one number (REQ-OBS-018).
       - alert: BackendAuthFailureSpike
         expr: rate(basetool_http_error_total{application="basetool-backend",code="UNAUTHENTICATED"}[5m]) > 0.2
         for: 10m
@@ -21,7 +27,7 @@ groups:
           severity: warning
         annotations:
           summary: "401 spike on backend (possible JWT brute force)"
-          description: "The backend is rejecting authentication at an elevated rate — possible credential/JWT guessing."
+          description: "The backend is rejecting authentication at an elevated rate — possible credential/JWT guessing. Split it by cause with sum by (reason) (rate(basetool_auth_failures_total{application=\"basetool-backend\"}[5m])): invalid_token is a rejected token (expired, wrong issuer/audience, bad signature), invalid_request a malformed Authorization header, insufficient_scope a valid token missing a scope."
 
       - alert: IngestAuthFailureSpike
         expr: rate(http_server_requests_seconds_count{application="basetool-ingest",status="401"}[5m]) > 0.2

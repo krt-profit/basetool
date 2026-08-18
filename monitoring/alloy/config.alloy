@@ -134,6 +134,11 @@ loki.process "keycloak_mask" {
 }
 
 // --- NPM access + error logs (client IPs retained 31d — owner-approved, REQ-OBS-007/-010) -----
+// The glob is per-FILE, not per-host: NPM writes proxy-host-<n>_access.log for every proxy host,
+// so the API vhost of ADR-0135 is tailed the moment it is created — no Alloy change, and no
+// LogStreamSilent gap on the day it goes live. Its lines carry the same fields and the same
+// 31-day client-IP retention as every other vhost (REQ-OBS-010), which is why the privacy policy
+// needed no new category for it either. Verify after D3 with {app="npm-access"} |= "api.profit-base.online".
 local.file_match "npm_access" {
 	path_targets = [{__path__ = "/logs/npm/*_access.log", app = "npm-access"}]
 }

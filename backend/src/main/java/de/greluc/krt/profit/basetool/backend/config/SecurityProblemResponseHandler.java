@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -31,6 +33,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
@@ -89,19 +93,23 @@ public class SecurityProblemResponseHandler
   private static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
 
   private final HandlerExceptionResolver resolver;
+  private final MeterRegistry meterRegistry;
 
   /**
    * Injects the composite MVC exception resolver that fronts the {@code @ControllerAdvice} handler
-   * methods.
+   * methods, and the registry the bearer-error breakdown is counted on.
    *
    * @param resolver the {@code handlerExceptionResolver} bean (the {@code
    *     HandlerExceptionResolverComposite} that includes the {@code
    *     ExceptionHandlerExceptionResolver} processing {@code GlobalExceptionHandler}); qualified by
    *     name because several {@link HandlerExceptionResolver} beans exist in the context
+   * @param meterRegistry carries {@code basetool_auth_failures_total} (A8, REQ-OBS-018)
    */
   public SecurityProblemResponseHandler(
-      @Qualifier("handlerExceptionResolver") @NotNull HandlerExceptionResolver resolver) {
+      @Qualifier("handlerExceptionResolver") @NotNull HandlerExceptionResolver resolver,
+      @NotNull MeterRegistry meterRegistry) {
     this.resolver = resolver;
+    this.meterRegistry = meterRegistry;
   }
 
   /**
@@ -120,7 +128,42 @@ public class SecurityProblemResponseHandler
       HttpServletResponse response,
       AuthenticationException authException)
       throws IOException {
+    // Counted here rather than derived from basetool_http_error_total{code="UNAUTHENTICATED"}: that
+    // counter has the volume but not the cause, and the cause is what an operator needs at 3 a.m.
+    // The RFC 6750 code separates a malformed header from a rejected token — the distinction that
+    // cost the ingest gateway an afternoon on 2026-08-03 — without raising a log level on a surface
+    // anonymous scanners can reach (REQ-OBS-018).
+    meterRegistry
+        .counter(MetricNames.AUTH_FAILURES, MetricNames.TAG_REASON, bearerErrorCode(authException))
+        .increment();
     delegate(request, response, authException, HttpServletResponse.SC_UNAUTHORIZED);
+  }
+
+  /**
+   * Maps an authentication failure onto its RFC 6750 bearer error code, kept to the fixed set the
+   * spec defines so the metric label stays bounded (REQ-OBS-006).
+   *
+   * <p>Only the code is taken, never {@code OAuth2Error#getDescription()}: Spring puts the raw
+   * decode failure in there ("An error occurred while attempting to decode the Jwt: …"), which can
+   * quote fragments of the presented token and must never reach a label or an appender
+   * (REQ-OBS-004).
+   *
+   * @param authException the failure Spring Security raised
+   * @return one of the bounded {@code MetricNames.AUTH_*} values
+   */
+  private static @NotNull String bearerErrorCode(@NotNull AuthenticationException authException) {
+    if (!(authException instanceof OAuth2AuthenticationException oauth2Exception)) {
+      return MetricNames.AUTH_OTHER;
+    }
+    OAuth2Error error = oauth2Exception.getError();
+    String code = error == null ? null : error.getErrorCode();
+    if (MetricNames.AUTH_INVALID_TOKEN.equals(code)
+        || MetricNames.AUTH_INVALID_REQUEST.equals(code)
+        || MetricNames.AUTH_INSUFFICIENT_SCOPE.equals(code)) {
+      return code;
+    }
+    // Anything outside the RFC set collapses to the bounded literal rather than becoming a label.
+    return MetricNames.AUTH_OTHER;
   }
 
   /**
