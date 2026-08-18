@@ -24,7 +24,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -76,8 +75,15 @@ public class ManagementPortSecurityConfig {
    *
    * <p>On the application connector the matcher is inert, because in prod Actuator is not mapped
    * there at all — a stray {@code /actuator/**} request to the app port still yields 404. Stateless
-   * with CSRF and the request cache disabled: these are credential-free machine GETs with no
-   * browser session.
+   * with the request cache disabled: these are credential-free machine GETs with no browser
+   * session.
+   *
+   * <p>CSRF protection is deliberately left <b>on</b> rather than disabled, unlike the frontend and
+   * ingest copies of this class. It costs nothing here — Spring only enforces a token on unsafe
+   * methods, and every endpoint this chain matches is a GET — while a {@code csrf().disable()} on a
+   * permit-all chain is a genuine CodeQL finding ({@code java/spring-disabled-csrf-protection})
+   * that a reader then has to re-triage every time. Leaving the default in place removes the
+   * finding instead of arguing with it.
    *
    * @param http the Spring Security builder for this chain.
    * @return the permit-all filter chain for the management port's read endpoints.
@@ -88,7 +94,6 @@ public class ManagementPortSecurityConfig {
   public SecurityFilterChain managementPortActuatorFilterChain(HttpSecurity http) throws Exception {
     http.securityMatcher(UNAUTHENTICATED_READ_ENDPOINTS)
         .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
-        .csrf(AbstractHttpConfigurer::disable)
         .requestCache(RequestCacheConfigurer::disable)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
     return http.build();
