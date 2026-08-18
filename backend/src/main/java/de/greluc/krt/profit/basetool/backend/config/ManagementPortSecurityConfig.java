@@ -78,12 +78,13 @@ public class ManagementPortSecurityConfig {
    * with the request cache disabled: these are credential-free machine GETs with no browser
    * session.
    *
-   * <p>CSRF protection is deliberately left <b>on</b> rather than disabled, unlike the frontend and
-   * ingest copies of this class. It costs nothing here — Spring only enforces a token on unsafe
-   * methods, and every endpoint this chain matches is a GET — while a {@code csrf().disable()} on a
-   * permit-all chain is a genuine CodeQL finding ({@code java/spring-disabled-csrf-protection})
-   * that a reader then has to re-triage every time. Leaving the default in place removes the
-   * finding instead of arguing with it.
+   * <p>CSRF protection is deliberately left <b>on</b> rather than disabled — as it now is in the
+   * frontend and ingest copies of this class, which shipped with {@code csrf().disable()} and were
+   * corrected for the same reason (alerts 869/870). It costs nothing here — Spring only enforces a
+   * token on unsafe methods, and every endpoint this chain matches is a GET — while a {@code
+   * csrf().disable()} on a permit-all chain is a genuine CodeQL finding ({@code
+   * java/spring-disabled-csrf-protection}) that a reader then has to re-triage every time. Leaving
+   * the default in place removes the finding instead of arguing with it.
    *
    * @param http the Spring Security builder for this chain.
    * @return the permit-all filter chain for the management port's read endpoints.
