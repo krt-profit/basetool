@@ -97,6 +97,15 @@ public final class BankConflictException extends AppException {
   public static final String CODE_BANK_REQUEST_NOT_PENDING = "BANK_REQUEST_NOT_PENDING";
 
   /**
+   * Edit attempt by the requester on a booking request whose responsible holder has already granted
+   * the over-limit approval (REQ-BANK-056). The approval was given for the amount and reason <em>as
+   * they stood</em>, so letting the requester change them afterwards would turn a small approved
+   * request into an arbitrarily large pre-approved one — an approval-gate bypass, not a correction.
+   * The requester's route is to cancel and re-raise.
+   */
+  public static final String CODE_BANK_REQUEST_ALREADY_APPROVED = "BANK_REQUEST_ALREADY_APPROVED";
+
+  /**
    * Close attempt on an account that still has at least one open {@code PENDING} booking request —
    * the request must be confirmed, rejected or cancelled first (REQ-BANK-025).
    */

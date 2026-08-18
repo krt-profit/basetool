@@ -42,8 +42,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -114,6 +117,8 @@ public class OrgUnitBankPageController {
    * @param layout {@code table} for the dense table, otherwise the default card grid
    * @param fragment when {@code "orgUnitBankAccounts"} only the switchable account list is
    *     re-rendered (view-toggle swap); when {@code "orgUnitBank"} the tabs + own-request region
+   * @param principal the authenticated OIDC user, whose display name seeds the pre-filled
+   *     Empf&auml;nger picker of a withdrawal request (REQ-BANK-055)
    * @param model Spring MVC model
    * @return the template, or its {@code orgUnitBankAccounts} / {@code orgUnitBank} fragment view
    */
@@ -122,6 +127,7 @@ public class OrgUnitBankPageController {
   public String orgUnitBank(
       @RequestParam(required = false) String layout,
       @RequestParam(required = false) String fragment,
+      @AuthenticationPrincipal OidcUser principal,
       Model model) {
     String effectiveLayout = "table".equals(layout) ? "table" : "card";
     model.addAttribute("layout", effectiveLayout);
@@ -217,10 +223,51 @@ public class OrgUnitBankPageController {
             .map(OrgUnitBankBalanceDto::accountId)
             .collect(Collectors.toSet());
     model.addAttribute("approvalExemptAccountIds", approvalExemptAccountIds);
+    // REQ-BANK-055: the Empfaenger picker of a withdrawal request is pre-filled with the requester,
+    // so the common case ("pay out to me") needs no interaction. The picker is a REMOTE combobox,
+    // which needs the LABEL alongside the id to seed itself -- an id alone renders a blank box.
+    //
+    // The id MUST be the JWT subject, NOT #authentication.name: this client is configured with
+    // `user-name-attribute: preferred_username`, so Authentication#getName() is the USERNAME.
+    // Seeding
+    // the option value with it submitted a username where the backend deserializes a UUID, which
+    // 400'd every withdrawal request (caught by BankOrgUnitRequestsE2eTest, invisible to the MVC
+    // render tests). `sub` is the same value as app_user.id, which is what the backend expects.
+    model.addAttribute("requesterId", principal == null ? null : principal.getSubject());
+    model.addAttribute("requesterHandle", requesterHandle(principal));
     if ("orgUnitBank".equals(fragment)) {
       return "org-unit-bank :: orgUnitBank";
     }
     return "org-unit-bank";
+  }
+
+  /**
+   * The caller's display label for the pre-filled Empf&auml;nger picker (REQ-BANK-055), read
+   * straight off the OIDC token so the page load costs no extra backend call.
+   *
+   * <p>Falls back {@code displayName} &rarr; {@code preferred_username} &rarr; the subject,
+   * matching how the backend's {@code User#getEffectiveName()} resolves the same name — the label
+   * is only cosmetic (the submitted value is the id), but a blank one would make the seeded
+   * combobox look empty and invite the requester to re-pick themselves.
+   *
+   * @param principal the authenticated OIDC user, or {@code null} outside a user context
+   * @return a non-blank label, or {@code null} when nothing identifies the caller
+   */
+  @Nullable
+  private static String requesterHandle(@Nullable OidcUser principal) {
+    if (principal == null) {
+      return null;
+    }
+    Object displayName = principal.getClaim("displayName");
+    if (displayName instanceof String name && !name.isBlank()) {
+      return name;
+    }
+    String preferred = principal.getPreferredUsername();
+    if (preferred != null && !preferred.isBlank()) {
+      return preferred;
+    }
+    String subject = principal.getSubject();
+    return subject == null || subject.isBlank() ? null : subject;
   }
 
   /**

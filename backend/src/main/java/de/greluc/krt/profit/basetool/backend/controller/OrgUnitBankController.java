@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.request.CancelBankBooking
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.OrgUnitBalanceTargetRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.SetBankApprovalLimitRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitBankAccessService;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.web.PdfResponses;
@@ -515,6 +516,27 @@ public class OrgUnitBankController {
   public BankBookingRequestDto cancelOwnBookingRequest(
       @PathVariable UUID id, @Valid @RequestBody CancelBankBookingRequest request) {
     return orgUnitBankAccessService.cancelOwnBookingRequest(id, request.version());
+  }
+
+  /**
+   * Corrects one of the caller's own booking requests while it is still {@code PENDING} and not yet
+   * owner-approved (REQ-BANK-056). A request that is not the caller's is reported as not found; one
+   * that is already decided or already approved is a 409.
+   *
+   * <p>The source account and the movement kind are deliberately not editable — see {@link
+   * UpdateBankBookingRequest}.
+   *
+   * @param id the request to correct
+   * @param request the corrected values plus the echoed optimistic-locking version
+   * @return the updated request
+   */
+  @PutMapping("/requests/{id}")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Edit one of the caller's own pending, unapproved booking requests")
+  @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Request updated")})
+  public BankBookingRequestDto updateOwnBookingRequest(
+      @PathVariable UUID id, @Valid @RequestBody UpdateBankBookingRequest request) {
+    return orgUnitBankAccessService.updateOwnBookingRequest(id, request);
   }
 
   /**

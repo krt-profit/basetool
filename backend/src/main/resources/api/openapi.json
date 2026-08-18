@@ -4646,6 +4646,104 @@
         } ]
       }
     },
+    "/api/v1/org-units/bank/requests/{id}" : {
+      "put" : {
+        "tags" : [ "org-unit-bank-controller" ],
+        "summary" : "Edit one of the caller's own pending, unapproved booking requests",
+        "operationId" : "updateOwnBookingRequest",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateBankBookingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Request updated",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BankBookingRequestDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/org-units/bank/accounts/{id}/visibility/area-members/{enabled}" : {
       "put" : {
         "tags" : [ "org-unit-bank-controller" ],
@@ -49904,7 +50002,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "ACCOUNT_RESPONSIBLE_CHANGED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "DEPOSIT_SPLIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_TRANSFER", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "AUDIT_LOG_EXPORTED", "AUDIT_LOG_PURGED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED", "BALANCE_TARGET_SET", "BALANCE_TARGET_CLEARED", "BALANCE_VISIBILITY_GRANTED", "BALANCE_VISIBILITY_REVOKED", "APPROVAL_LIMIT_SET", "APPROVAL_LIMIT_CLEARED", "BOOKING_REQUEST_OWNER_APPROVAL_GRANTED", "BOOKING_REQUEST_OWNER_APPROVAL_REVOKED", "BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED", "CARTEL_APPROVAL_TIERS_SET", "CARTEL_APPROVAL_TIERS_CLEARED" ]
+            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "ACCOUNT_RESPONSIBLE_CHANGED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "DEPOSIT_SPLIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_TRANSFER", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "AUDIT_LOG_EXPORTED", "AUDIT_LOG_PURGED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED", "BOOKING_REQUEST_UPDATED", "BALANCE_TARGET_SET", "BALANCE_TARGET_CLEARED", "BALANCE_VISIBILITY_GRANTED", "BALANCE_VISIBILITY_REVOKED", "APPROVAL_LIMIT_SET", "APPROVAL_LIMIT_CLEARED", "BOOKING_REQUEST_OWNER_APPROVAL_GRANTED", "BOOKING_REQUEST_OWNER_APPROVAL_REVOKED", "BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED", "CARTEL_APPROVAL_TIERS_SET", "CARTEL_APPROVAL_TIERS_CLEARED" ]
           }
         }, {
           "name" : "page",
@@ -54771,6 +54869,166 @@
           }
         }
       },
+      "UpdateBankBookingRequest" : {
+        "type" : "object",
+        "properties" : {
+          "amount" : {
+            "type" : "number",
+            "maximum" : 1.0E12,
+            "minimum" : 1
+          },
+          "note" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          },
+          "justification" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "minLength" : 0
+          },
+          "targetAccountId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "counterpartyUserId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "counterpartyOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "amount" ]
+      },
+      "BankBookingRequestDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "accountId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "accountNo" : {
+            "type" : "string"
+          },
+          "accountName" : {
+            "type" : "string"
+          },
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "orgUnitName" : {
+            "type" : "string"
+          },
+          "orgUnitShorthand" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string",
+            "enum" : [ "DEPOSIT", "WITHDRAWAL", "TRANSFER" ]
+          },
+          "amount" : {
+            "type" : "number"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "justification" : {
+            "type" : "string"
+          },
+          "staffNote" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "PENDING", "CONFIRMED", "REJECTED", "CANCELLED" ]
+          },
+          "requesterHandle" : {
+            "type" : "string"
+          },
+          "holderId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "holderHandle" : {
+            "type" : "string"
+          },
+          "resultingTransactionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "deciderHandle" : {
+            "type" : "string"
+          },
+          "rejectReason" : {
+            "type" : "string"
+          },
+          "decidedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "targetAccountId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "targetAccountNo" : {
+            "type" : "string"
+          },
+          "requiresOwnerApproval" : {
+            "type" : "boolean"
+          },
+          "applicableLimit" : {
+            "type" : "number"
+          },
+          "requiredApprover" : {
+            "type" : "string"
+          },
+          "ownerApprovalGranted" : {
+            "type" : "boolean"
+          },
+          "ownerApprovalGrantedByHandle" : {
+            "type" : "string"
+          },
+          "splitEnabled" : {
+            "type" : "boolean"
+          },
+          "splitPercent" : {
+            "type" : "number"
+          },
+          "counterpartyUserId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "counterpartyHandle" : {
+            "type" : "string"
+          },
+          "counterpartyOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "counterpartyOrgUnitName" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
       "BankApprovalLimitUserDto" : {
         "type" : "object",
         "properties" : {
@@ -57880,118 +58138,17 @@
             "type" : "number",
             "maximum" : 100,
             "minimum" : 1
+          },
+          "counterpartyUserId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "counterpartyOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
           }
         },
         "required" : [ "amount", "sourceAccountId", "type" ]
-      },
-      "BankBookingRequestDto" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "accountId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "accountNo" : {
-            "type" : "string"
-          },
-          "accountName" : {
-            "type" : "string"
-          },
-          "orgUnitId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "orgUnitName" : {
-            "type" : "string"
-          },
-          "orgUnitShorthand" : {
-            "type" : "string"
-          },
-          "type" : {
-            "type" : "string",
-            "enum" : [ "DEPOSIT", "WITHDRAWAL", "TRANSFER" ]
-          },
-          "amount" : {
-            "type" : "number"
-          },
-          "note" : {
-            "type" : "string"
-          },
-          "justification" : {
-            "type" : "string"
-          },
-          "staffNote" : {
-            "type" : "string"
-          },
-          "status" : {
-            "type" : "string",
-            "enum" : [ "PENDING", "CONFIRMED", "REJECTED", "CANCELLED" ]
-          },
-          "requesterHandle" : {
-            "type" : "string"
-          },
-          "holderId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "holderHandle" : {
-            "type" : "string"
-          },
-          "resultingTransactionId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "deciderHandle" : {
-            "type" : "string"
-          },
-          "rejectReason" : {
-            "type" : "string"
-          },
-          "decidedAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "createdAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "targetAccountId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "targetAccountNo" : {
-            "type" : "string"
-          },
-          "requiresOwnerApproval" : {
-            "type" : "boolean"
-          },
-          "applicableLimit" : {
-            "type" : "number"
-          },
-          "requiredApprover" : {
-            "type" : "string"
-          },
-          "ownerApprovalGranted" : {
-            "type" : "boolean"
-          },
-          "ownerApprovalGrantedByHandle" : {
-            "type" : "string"
-          },
-          "splitEnabled" : {
-            "type" : "boolean"
-          },
-          "splitPercent" : {
-            "type" : "number"
-          },
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        }
       },
       "CancelBankBookingRequest" : {
         "type" : "object",
@@ -64335,7 +64492,7 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "ACCOUNT_RESPONSIBLE_CHANGED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "DEPOSIT_SPLIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_TRANSFER", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "AUDIT_LOG_EXPORTED", "AUDIT_LOG_PURGED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED", "BALANCE_TARGET_SET", "BALANCE_TARGET_CLEARED", "BALANCE_VISIBILITY_GRANTED", "BALANCE_VISIBILITY_REVOKED", "APPROVAL_LIMIT_SET", "APPROVAL_LIMIT_CLEARED", "BOOKING_REQUEST_OWNER_APPROVAL_GRANTED", "BOOKING_REQUEST_OWNER_APPROVAL_REVOKED", "BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED", "CARTEL_APPROVAL_TIERS_SET", "CARTEL_APPROVAL_TIERS_CLEARED" ]
+            "enum" : [ "ACCOUNT_CREATED", "ACCOUNT_RENAMED", "ACCOUNT_CLOSED", "ACCOUNT_REOPENED", "ACCOUNT_RESPONSIBLE_CHANGED", "HOLDER_REGISTERED", "HOLDER_DEACTIVATED", "HOLDER_REACTIVATED", "GRANT_CREATED", "GRANT_UPDATED", "GRANT_REVOKED", "DEPOSIT_BOOKED", "DEPOSIT_SPLIT_BOOKED", "WITHDRAWAL_BOOKED", "TRANSFER_BOOKED", "HOLDER_TRANSFER", "HOLDER_REBOOKED", "TRANSACTION_REVERSED", "WIPE_RESET_EXECUTED", "STATEMENT_EXPORTED", "MANAGEMENT_REPORT_EXPORTED", "AUDIT_LOG_EXPORTED", "AUDIT_LOG_PURGED", "BOOKING_REQUEST_CREATED", "BOOKING_REQUEST_CONFIRMED", "BOOKING_REQUEST_REJECTED", "BOOKING_REQUEST_CANCELLED", "BOOKING_REQUEST_UPDATED", "BALANCE_TARGET_SET", "BALANCE_TARGET_CLEARED", "BALANCE_VISIBILITY_GRANTED", "BALANCE_VISIBILITY_REVOKED", "APPROVAL_LIMIT_SET", "APPROVAL_LIMIT_CLEARED", "BOOKING_REQUEST_OWNER_APPROVAL_GRANTED", "BOOKING_REQUEST_OWNER_APPROVAL_REVOKED", "BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED", "CARTEL_APPROVAL_TIERS_SET", "CARTEL_APPROVAL_TIERS_CLEARED" ]
           },
           "accountId" : {
             "type" : "string",

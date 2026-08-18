@@ -70,6 +70,12 @@ import org.jetbrains.annotations.Nullable;
  *     confirmation (REQ-BANK-044)
  * @param splitPercent the whole-percent (1–100) distributed across squadron accounts, or {@code
  *     null} when not a split
+ * @param counterpartyUserId the Empf&auml;nger named on a {@code WITHDRAWAL} request
+ *     (REQ-BANK-055), or {@code null} when confirmation should derive the requester
+ * @param counterpartyHandle name snapshot of that Empf&auml;nger, the value the request lists
+ *     display; {@code null} exactly when none is named
+ * @param counterpartyOrgUnitId the Empf&auml;nger's chosen org unit, or {@code null}
+ * @param counterpartyOrgUnitName name snapshot of that org unit, or {@code null}
  * @param version the optimistic-locking version echoed on cancel/confirm/reject
  */
 public record BankBookingRequestDto(
@@ -103,4 +109,8 @@ public record BankBookingRequestDto(
     @Nullable String ownerApprovalGrantedByHandle,
     boolean splitEnabled,
     @Nullable BigDecimal splitPercent,
+    @Nullable UUID counterpartyUserId,
+    @Nullable String counterpartyHandle,
+    @Nullable UUID counterpartyOrgUnitId,
+    @Nullable String counterpartyOrgUnitName,
     Long version) {}

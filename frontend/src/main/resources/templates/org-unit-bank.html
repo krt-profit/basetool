@@ -145,6 +145,7 @@
                     <table class="data-table" data-testid="org-unit-bank-requests">
                         <thead>
                         <tr>
+                            <th class="bank-expand-cell"></th>
                             <th th:text="#{bank.request.col.type}">Typ</th>
                             <th class="text-right" th:text="#{bank.request.col.amount}">Betrag</th>
                             <th th:text="#{bank.request.col.status}">Status</th>
@@ -154,7 +155,27 @@
                         </tr>
                         </thead>
                         <tbody>
-                        <tr th:each="r : ${ownRequests}" data-testid="org-unit-bank-request-row">
+                        <!-- Expandable rows, same mechanism as the staff queue and the approval tab:
+                             the requester reads back the Begr&uuml;ndung and Notiz they filed. The
+                             detail id is prefixed `ou-own-req-` so it cannot collide with the
+                             `ou-foreign-req-` one — a responsible holder who raised the request sees
+                             the very same request in BOTH tables on this page, and a shared id would
+                             make one chevron toggle the other's sub-row. No "Notiz Bankmitarbeiter"
+                             here: the seam strips it from the own-requests list (REQ-BANK-054), so
+                             `r.staffNote()` is always null in this table. -->
+                        <th:block th:each="r : ${ownRequests}"
+                                  th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note()) or !#strings.isEmpty(r.counterpartyHandle())},detailId='ou-own-req-' + ${r.id()}">
+                        <tr data-testid="org-unit-bank-request-row" class="bank-booking-row"
+                            th:classappend="${hasDetail} ? ' is-expandable' : ''">
+                            <td class="bank-expand-cell">
+                                <button type="button" class="bank-row-toggle" th:if="${hasDetail}"
+                                        data-trigger="bank-row-expand" aria-expanded="false"
+                                        th:attr="aria-controls=${detailId}"
+                                        th:aria-label="#{bank.detail.toggleDetails}"
+                                        data-testid="org-unit-bank-request-expand">
+                                    <svg class="krt-icon bank-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+                                </button>
+                            </td>
                             <td th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</td>
                             <td class="text-right bank-amount"
                                 th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</td>
@@ -170,7 +191,19 @@
                             <td th:text="${r.holderHandle() != null} ? ${r.holderHandle()} : '&ndash;'">&ndash;</td>
                             <td><span class="utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span></td>
                             <td>
-                                <form th:if="${r.status() == 'PENDING'}" class="bank-ajax-form no-track" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
+                                <!-- Edit is offered only while the request is still PENDING *and*
+                                     unapproved (REQ-BANK-056): once the responsible holder has signed
+                                     off, the approval was given for the amount and reason as they
+                                     stood, so the backend refuses the edit
+                                     (BANK_REQUEST_ALREADY_APPROVED) and offering the button would
+                                     only produce a dead end. Cancel stays available either way. -->
+                                <button type="button" class="btn btn-ghost btn-xs"
+                                        th:if="${r.status() == 'PENDING' and !r.ownerApprovalGranted()}"
+                                        data-trigger="open-modal-display"
+                                        th:attr="data-modal-id='ou-req-edit-' + ${r.id()}"
+                                        data-testid="org-unit-bank-edit-btn"
+                                        th:text="#{bank.request.action.edit}">Bearbeiten</button>
+                                <form th:if="${r.status() == 'PENDING'}" class="bank-ajax-form no-track krtm-display-inline-2f87" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
                                       data-endpoint="/api/proxy/org-units/bank/requests/{id}/cancel" data-method="POST">
                                     <input type="hidden" name="_id" th:value="${r.id()}">
                                     <input type="hidden" name="version" th:value="${r.version()}">
@@ -181,8 +214,149 @@
                                 <span th:unless="${r.status() == 'PENDING'}" class="text-muted">&ndash;</span>
                             </td>
                         </tr>
+                        <!-- Detail sub-row: Begr&uuml;ndung first (it carries the request's reason),
+                             then Notiz. colspan spans all seven columns incl. the expand cell. -->
+                        <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
+                            data-testid="org-unit-bank-request-detail">
+                            <td colspan="7" class="bank-booking-detail-cell">
+                                <div class="bank-booking-detail-body">
+                                    <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.counterpartyHandle())}">
+                                        <span class="bank-detail-label" th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
+                                        <span class="bank-detail-value" data-testid="org-unit-bank-request-counterparty"
+                                              th:text="${r.counterpartyOrgUnitName() != null} ? ${r.counterpartyHandle()} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${r.counterpartyHandle()}">greluc (IRIDIUM)</span>
+                                    </div>
+                                    <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.justification())}">
+                                        <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>
+                                        <span class="bank-detail-value" data-testid="org-unit-bank-request-justification"
+                                              th:text="${r.justification()}">Missionsfreigabe</span>
+                                    </div>
+                                    <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.note())}">
+                                        <span class="bank-detail-label" th:text="#{bank.booking.note}">Notiz</span>
+                                        <span class="bank-detail-value" data-testid="org-unit-bank-request-note"
+                                              th:text="${r.note()}">Missionsertrag</span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        </th:block>
                         </tbody>
                     </table>
+                </div>
+                <!-- EDIT MODALS (REQ-BANK-056), one per still-editable request. Rendered here,
+                     AFTER the table, because a modal inside <tbody> is invalid HTML and the browser
+                     hoists it out of the table, detaching it from the row it belongs to.
+
+                     One modal per row rather than a single primed singleton: the Empf&auml;nger
+                     picker is a REMOTE combobox, which seeds itself from a `selected` option but
+                     cannot be primed through the data-field-* mechanism (that writes the hidden
+                     value only, and the next blur restores the empty committed label).
+                     Server-seeding each row's modal sidesteps that entirely, keeps the echoed
+                     `version` correct after every fragment swap, and needs no new JS. The type is
+                     fixed per row, so each modal renders exactly the fields that request kind
+                     carries - no client-side gating either. -->
+                <div th:each="r : ${ownRequests}"
+                     th:if="${r.status() == 'PENDING' and !r.ownerApprovalGranted()}"
+                     class="krt-modal-overlay" th:id="'ou-req-edit-' + ${r.id()}">
+                    <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.request.edit.title}">
+                        <div class="krt-modal-head">
+                            <h3 th:text="#{bank.request.edit.title}">Antrag bearbeiten</h3>
+                            <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                                    th:attr="data-modal-id='ou-req-edit-' + ${r.id()}" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+                        </div>
+                        <form class="bank-ajax-form no-track" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
+                              data-endpoint="/api/proxy/org-units/bank/requests/{id}" data-method="PUT">
+                            <div class="krt-modal-body">
+                                <input type="hidden" name="_id" th:value="${r.id()}">
+                                <input type="hidden" name="version" th:value="${r.version()}">
+                                <!-- Konto and Vorgang are shown read-only: they are NOT editable
+                                     (they decide the approval limit, the Begr&uuml;ndung requirement
+                                     and the field shape), but hiding them would leave the requester
+                                     guessing which request they are editing. -->
+                                <div class="bank-form-row">
+                                    <span class="bank-detail-label" th:text="#{bank.request.col.account}">Konto</span>
+                                    <span class="bank-detail-value" th:text="${r.accountName()} + ' (' + ${r.accountNo()} + ')'">Staffel IRIDIUM (KB-0001)</span>
+                                    <span class="bank-field-hint" th:text="#{bank.request.edit.fixedHint}">Konto und Vorgang lassen sich nicht &auml;ndern.</span>
+                                </div>
+                                <div class="bank-form-row">
+                                    <span class="bank-detail-label" th:text="#{bank.request.field.type}">Vorgang</span>
+                                    <span class="bank-detail-value" th:text="#{'bank.request.type.' + ${r.type()}}">Auszahlung</span>
+                                </div>
+                                <div class="bank-form-row" th:if="${r.type() == 'TRANSFER'}">
+                                    <label th:for="'ou-req-edit-dest-' + ${r.id()}" th:text="#{bank.field.destinationAccount}">Zielkonto</label>
+                                    <select th:id="'ou-req-edit-dest-' + ${r.id()}" name="targetAccountId"
+                                            data-testid="org-unit-bank-edit-destination">
+                                        <option value="" th:text="#{bank.field.destinationAccount.placeholder}">Zielkonto w&auml;hlen &hellip;</option>
+                                        <option th:each="t : ${requestTransferTargets}" th:value="${t.id()}"
+                                                th:selected="${t.id() == r.targetAccountId()}"
+                                                th:text="${t.name()} + ' (' + ${t.accountNo()} + ')'">KRT (KB-0002)</option>
+                                    </select>
+                                    <span class="bank-field-error" data-error-for="targetAccountId"></span>
+                                </div>
+                                <div class="bank-form-row">
+                                    <label th:for="'ou-req-edit-amount-' + ${r.id()}" th:text="#{bank.field.amount}">Betrag (aUEC)</label>
+                                    <input type="number" th:id="'ou-req-edit-amount-' + ${r.id()}" name="amount" min="1" step="1" required
+                                           th:value="${@moneyFormat.round(r.amount())}"
+                                           data-testid="org-unit-bank-edit-amount">
+                                    <span class="bank-field-hint" th:text="#{bank.request.edit.amountHint}">&Auml;nderst du den Betrag, wird die Freigabepflicht neu bewertet.</span>
+                                    <span class="bank-field-error" data-error-for="amount"></span>
+                                </div>
+                                <!-- Empf&auml;nger (REQ-BANK-055): WITHDRAWAL-only, seeded with
+                                     whatever the request currently names. Picking a different person
+                                     fires the shared fillCounterpartyOrgUnits loader, which
+                                     repopulates the Einheit select from THAT user's memberships. -->
+                                <th:block th:if="${r.type() == 'WITHDRAWAL'}">
+                                    <div class="bank-form-row">
+                                        <label th:for="'ou-req-edit-cp-' + ${r.id()}">
+                                            <span th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
+                                            <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.request.counterparty.recipient.hint')}"></th:block>
+                                        </label>
+                                        <select th:id="'ou-req-edit-cp-' + ${r.id()}" name="counterpartyUserId"
+                                                data-counterparty-user data-krt-combobox="remote-bank-users"
+                                                th:attr="data-orgunit-target='ou-req-edit-cp-ou-' + ${r.id()}"
+                                                data-testid="org-unit-bank-edit-cp-user">
+                                            <option value="" th:text="#{bank.field.counterparty.placeholder}">Person w&auml;hlen &hellip;</option>
+                                            <option th:if="${r.counterpartyUserId() != null}"
+                                                    th:value="${r.counterpartyUserId()}" th:selected="true"
+                                                    th:text="${r.counterpartyHandle()}">greluc</option>
+                                        </select>
+                                        <span class="bank-field-error" data-error-for="counterpartyUserId"></span>
+                                    </div>
+                                    <div class="bank-form-row">
+                                        <label th:for="'ou-req-edit-cp-ou-' + ${r.id()}" th:text="#{bank.field.counterparty.orgUnit}">Einheit</label>
+                                        <select th:id="'ou-req-edit-cp-ou-' + ${r.id()}" name="counterpartyOrgUnitId" data-counterparty-orgunit
+                                                data-testid="org-unit-bank-edit-cp-ou">
+                                            <option value="" th:text="#{bank.field.counterparty.orgUnit.placeholder}">Einheit w&auml;hlen &hellip;</option>
+                                            <option th:if="${r.counterpartyOrgUnitId() != null}"
+                                                    th:value="${r.counterpartyOrgUnitId()}" th:selected="true"
+                                                    th:text="${r.counterpartyOrgUnitName()}">IRIDIUM</option>
+                                        </select>
+                                        <span class="bank-field-error" data-error-for="counterpartyOrgUnitId"></span>
+                                    </div>
+                                </th:block>
+                                <div class="bank-form-row" th:if="${r.type() != 'DEPOSIT'}">
+                                    <label th:for="'ou-req-edit-just-' + ${r.id()}" th:text="#{bank.field.justification}">Begr&uuml;ndung</label>
+                                    <input type="text" th:id="'ou-req-edit-just-' + ${r.id()}" name="justification" maxlength="500"
+                                           th:value="${r.justification()}" data-testid="org-unit-bank-edit-justification"
+                                           th:placeholder="#{bank.field.justification.placeholder}">
+                                    <span class="bank-field-hint" th:text="#{bank.field.justification.hint}">Pflicht bei Abrufen aus dem KRT-, Bank- oder Sonderkonto.</span>
+                                    <span class="bank-field-error" data-error-for="justification"></span>
+                                </div>
+                                <div class="bank-form-row">
+                                    <label th:for="'ou-req-edit-note-' + ${r.id()}" th:text="#{bank.field.note}">Notiz</label>
+                                    <input type="text" th:id="'ou-req-edit-note-' + ${r.id()}" name="note" maxlength="500"
+                                           th:value="${r.note()}" data-testid="org-unit-bank-edit-note"
+                                           th:placeholder="#{bank.field.note.placeholder}">
+                                </div>
+                                <span class="bank-field-error" data-error-for="_global"></span>
+                            </div>
+                            <div class="krt-modal-foot">
+                                <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                                        th:attr="data-modal-id='ou-req-edit-' + ${r.id()}" th:text="#{general.cancel}">Abbrechen</button>
+                                <button type="submit" class="btn btn--cta" data-testid="org-unit-bank-edit-submit"
+                                        th:text="#{general.save}">Speichern</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
 
@@ -219,7 +393,7 @@
                              document-delegated bank.js handler (no new JS, survives the fragment
                              swap). -->
                         <th:block th:each="r : ${foreignRequests}"
-                                  th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note()) or !#strings.isEmpty(r.staffNote())},detailId='ou-foreign-req-' + ${r.id()}">
+                                  th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note()) or !#strings.isEmpty(r.staffNote()) or !#strings.isEmpty(r.counterpartyHandle())},detailId='ou-foreign-req-' + ${r.id()}">
                         <tr data-testid="org-unit-bank-foreign-row" class="bank-booking-row"
                             th:classappend="${hasDetail} ? ' is-expandable' : ''">
                             <td class="bank-expand-cell">
@@ -272,6 +446,11 @@
                             data-testid="org-unit-bank-foreign-detail">
                             <td colspan="8" class="bank-booking-detail-cell">
                                 <div class="bank-booking-detail-body">
+                                    <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.counterpartyHandle())}">
+                                        <span class="bank-detail-label" th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
+                                        <span class="bank-detail-value" data-testid="org-unit-bank-foreign-counterparty"
+                                              th:text="${r.counterpartyOrgUnitName() != null} ? ${r.counterpartyHandle()} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${r.counterpartyHandle()}">greluc (IRIDIUM)</span>
+                                    </div>
                                     <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.justification())}">
                                         <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>
                                         <span class="bank-detail-value" data-testid="org-unit-bank-foreign-justification"
@@ -405,6 +584,11 @@
                         <span class="bank-field-hint" th:text="#{bank.field.justification.hint}">Pflicht bei Abrufen aus dem KRT-, Bank- oder Sonderkonto.</span>
                         <span class="bank-field-error" data-error-for="justification"></span>
                     </div>
+                    <!-- Empfaenger (REQ-BANK-055): WITHDRAWAL-only, pre-filled with the requester.
+                         Leaving it as-is reproduces the previous behaviour exactly (confirmation
+                         derived the requester); changing it lets a member request a payout TO
+                         someone else, which was previously impossible to express. -->
+                    <th:block th:replace="~{fragments/bank-counterparty :: requestCounterpartyBlock(${requesterId}, ${requesterHandle})}"></th:block>
                     <div class="bank-form-row">
                         <label for="org-unit-request-note" th:text="#{bank.field.note}">Notiz</label>
                         <input type="text" id="org-unit-request-note" name="note" maxlength="500"

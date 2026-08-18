@@ -94,6 +94,23 @@ public class OrgUnitBankProxyController {
   }
 
   /**
+   * Forwards a correction of the caller's own still-pending, unapproved booking request
+   * (REQ-BANK-056). The backend owns every guard — ownership, pending-ness, the not-yet-approved
+   * precondition and the version echo — so this only relays; its errors reach the user as inline
+   * field messages via {@code krtFetch}.
+   *
+   * @param id the request to correct
+   * @param body the corrected values plus the echoed version
+   * @return the updated request
+   */
+  @PutMapping("/requests/{id}")
+  @PreAuthorize("isAuthenticated()")
+  public Map<String, Object> updateRequest(
+      @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
+    return putMap("/api/v1/org-units/bank/requests/" + id, body);
+  }
+
+  /**
    * Forwards setting/clearing an account's balance target (REQ-BANK-036). A {@code null} target in
    * the body clears it.
    *

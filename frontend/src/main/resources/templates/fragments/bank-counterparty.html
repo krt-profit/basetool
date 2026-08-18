@@ -84,5 +84,59 @@
         <span class="bank-field-error" data-error-for="counterpartyOrgUnitId"></span>
     </div>
 </div>
+
+<!--
+  Requester-side Empfaenger block for the org-unit booking-request modal (REQ-BANK-055). A sibling
+  of counterpartyBlock rather than a parameterisation of it, because three things genuinely differ:
+
+    1. It is gated on the REQUEST type ([data-request-withdrawal-only], driven by
+       syncRequestTypeRows) instead of the movement type ([data-movement-types], syncMovementRows).
+    2. It has NO "kein Tool-Account" toggle. Recording a free-text external counterparty on the
+       ledger stays a Bank-Employee capability (REQ-BANK-044/#994) — a requester names a registered
+       tool user or nobody.
+    3. It is PRE-FILLED with the requester. The picker is a remote combobox, which seeds itself from
+       a `selected` option, so the caller is rendered as a real option here; the dependent unit
+       select is populated by the same bank.js change-delegated loader as the employee modal, which
+       activateRequestCounterparty pokes once when the block first becomes active.
+
+  Both selects stay disabled while the block is hidden so a DEPOSIT/TRANSFER request omits them from
+  the JSON body entirely (submitBankForm skips disabled controls).
+
+  Parameters:
+    - requesterId     : the caller's user id (#authentication.name), seeded as the selected option.
+    - requesterHandle : the caller's display label; a remote combobox needs it alongside the id.
+-->
+<div th:fragment="requestCounterpartyBlock(requesterId, requesterHandle)"
+     data-request-withdrawal-only hidden>
+    <div class="bank-form-row">
+        <label for="org-unit-request-cp-user">
+            <span th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
+            <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.request.counterparty.recipient.hint')}"></th:block>
+        </label>
+        <select id="org-unit-request-cp-user" name="counterpartyUserId" disabled
+                data-counterparty-user data-krt-combobox="remote-bank-users"
+                data-orgunit-target="org-unit-request-cp-ou"
+                data-testid="org-unit-request-cp-user">
+            <option value="" th:text="#{bank.field.counterparty.placeholder}">Person w&auml;hlen &hellip;</option>
+            <!-- The seed. th:selected is load-bearing: the enhancer seeds itself from select.value,
+                 so without it the box renders empty and the requester has to pick themselves. -->
+            <option th:if="${requesterId != null and requesterHandle != null}"
+                    th:value="${requesterId}" th:selected="true"
+                    th:text="${requesterHandle}">greluc</option>
+        </select>
+        <span class="bank-field-error" data-error-for="counterpartyUserId"></span>
+    </div>
+    <div class="bank-form-row">
+        <label for="org-unit-request-cp-ou">
+            <span th:text="#{bank.field.counterparty.orgUnit}">Einheit</span>
+            <th:block th:replace="~{fragments/scu-hint :: fieldHint('bank.field.counterparty.orgUnit.hint')}"></th:block>
+        </label>
+        <select id="org-unit-request-cp-ou" name="counterpartyOrgUnitId" data-counterparty-orgunit disabled
+                data-testid="org-unit-request-cp-ou">
+            <option value="" th:text="#{bank.field.counterparty.orgUnit.placeholder}">Einheit w&auml;hlen &hellip;</option>
+        </select>
+        <span class="bank-field-error" data-error-for="counterpartyOrgUnitId"></span>
+    </div>
+</div>
 </body>
 </html>

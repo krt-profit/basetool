@@ -62,6 +62,14 @@ import org.jetbrains.annotations.Nullable;
  *     accounts (REQ-BANK-044)
  * @param splitPercent the whole-percent (1–100) to distribute; required when {@link #splitEnabled},
  *     absent otherwise
+ * @param counterpartyUserId the <strong>Empf&auml;nger</strong> of a {@code WITHDRAWAL} — the
+ *     member who receives the payout (REQ-BANK-055). {@code WITHDRAWAL}-only and optional; the UI
+ *     pre-fills the requester, and leaving it {@code null} keeps the historical behaviour of
+ *     deriving the requester at confirmation (REQ-BANK-044). Must be a registered tool user — the
+ *     free-text external counterparty (#994) stays a bank-employee capability
+ * @param counterpartyOrgUnitId the org unit of {@link #counterpartyUserId}, which the service
+ *     validates is one of <em>that user's</em> direct memberships (else 400); requires a
+ *     counterparty user
  */
 public record CreateBankBookingRequest(
     @NotNull UUID sourceAccountId,
@@ -71,7 +79,9 @@ public record CreateBankBookingRequest(
     @Nullable @Size(max = 500) String note,
     @Nullable @Size(max = 500) String justification,
     boolean splitEnabled,
-    @Nullable @DecimalMin("1") @DecimalMax("100") @WholeNumber BigDecimal splitPercent) {
+    @Nullable @DecimalMin("1") @DecimalMax("100") @WholeNumber BigDecimal splitPercent,
+    @Nullable UUID counterpartyUserId,
+    @Nullable UUID counterpartyOrgUnitId) {
 
   /**
    * Cross-field rule (REQ-BANK-043): the split is DEPOSIT-only and, when enabled, must carry a
@@ -96,8 +106,30 @@ public record CreateBankBookingRequest(
   }
 
   /**
-   * Convenience constructor for a request without a split (the pre-REQ-BANK-043 shape), delegating
-   * to the canonical constructor with the split disabled.
+   * Cross-field rule (REQ-BANK-055): an Empf&auml;nger belongs to a {@code WITHDRAWAL} only, and a
+   * counterparty org unit is meaningless without the user it qualifies. A deposit's depositor and a
+   * transfer's counter-account are already implied (REQ-BANK-042/-044), so naming a counterparty on
+   * either is a client error rather than a silently ignored field.
+   *
+   * <p>{@code @Schema(hidden = true)} keeps this derived guard out of {@code openapi.json}: an
+   * accessor-derived schema property is harvested in unguaranteed {@code
+   * Class#getDeclaredMethods()} order and rewrites the document between builds (see {@code
+   * OpenApiDerivedPropertyTest}).
+   *
+   * @return {@code true} when the counterparty fields are consistent with the movement kind
+   */
+  @Schema(hidden = true)
+  @AssertTrue(message = "A counterparty is only valid on a withdrawal and an org unit needs a user")
+  public boolean isCounterpartyConfigConsistent() {
+    if (counterpartyUserId == null) {
+      return counterpartyOrgUnitId == null;
+    }
+    return type == BankBookingRequestType.WITHDRAWAL;
+  }
+
+  /**
+   * Convenience constructor for a request without a split (the pre-REQ-BANK-043 shape) and without
+   * a named counterparty (the pre-REQ-BANK-055 shape), delegating to the canonical constructor.
    *
    * @param sourceAccountId the (source) account
    * @param type the movement kind
@@ -111,6 +143,6 @@ public record CreateBankBookingRequest(
       @Nullable UUID targetAccountId,
       @NotNull BigDecimal amount,
       @Nullable String note) {
-    this(sourceAccountId, type, targetAccountId, amount, note, null, false, null);
+    this(sourceAccountId, type, targetAccountId, amount, note, null, false, null, null, null);
   }
 }

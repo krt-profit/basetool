@@ -365,6 +365,106 @@ class BankOrgUnitRequestsE2eTest {
   }
 
   /**
+   * REQ-BANK-055/-056 on the real UI: the officer raises a withdrawal request whose Empfaenger
+   * picker is pre-filled with themselves, expands the row to read back what they filed, then
+   * corrects the amount through the per-row edit modal. Verified via the backend so the assertions
+   * never race the in-place AJAX swap.
+   */
+  @Test
+  void officerEditsOwnPendingRequestAndTheAmountChanges() {
+    String baseUrl = STACK.baseUrl();
+    long amount = 7011;
+    long corrected = 7012;
+
+    try (BrowserContext context =
+        browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.login(page, baseUrl, OFFICER_USER, OFFICER_PASSWORD);
+        E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
+        page.locator("[data-testid='org-unit-bank-request-btn']")
+            .first()
+            .click(new Locator.ClickOptions().setTimeout(20_000));
+        page.locator("[data-testid='org-unit-request-type']").selectOption("WITHDRAWAL");
+        page.locator("[data-testid='org-unit-request-account']").selectOption(accountId);
+        page.locator("[data-testid='org-unit-request-amount']").fill(Long.toString(amount));
+        // REQ-BANK-055: the Empfaenger picker is seeded server-side with the requester, so the
+        // common case needs no interaction at all. Asserting merely "not blank" is too weak - the
+        // regression that shipped seeded the USERNAME, which is also not blank and which the
+        // backend then rejected as a malformed UUID. Pin the SUBMITTED value to the officer's id.
+        //
+        // Target the hidden input by its id, not by data-testid: krt-searchable-select transplants
+        // the original select's `id` onto the hidden value input but moves `data-testid` to the
+        // VISIBLE textbox, which carries the human-readable label. Asserting on the testid compares
+        // the label against a UUID and always fails.
+        assertThat(page.locator("#org-unit-request-cp-user"))
+            .hasValue(
+                seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD),
+                new LocatorAssertions.HasValueOptions().setTimeout(10_000));
+        // ... and the visible textbox shows a label, so the box does not merely look empty.
+        assertThat(page.locator("[data-testid='org-unit-request-cp-user']"))
+            .not()
+            .hasValue("", new LocatorAssertions.HasValueOptions().setTimeout(10_000));
+        dropFooter(page);
+        page.waitForResponse(
+            r ->
+                r.url().contains("/api/proxy/org-units/bank/requests")
+                    && "POST".equals(r.request().method()),
+            new Page.WaitForResponseOptions().setTimeout(60_000),
+            () -> page.locator("[data-testid='org-unit-request-submit']").click());
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "org-unit-bank-edit-create");
+        throw failure;
+      }
+    }
+
+    String requestId =
+        seeder.findOwnPendingBookingRequestId(OFFICER_USER, OFFICER_PASSWORD, accountId, amount);
+    assertNotNull(requestId, "the officer's pending withdrawal request was recorded");
+
+    try (BrowserContext context =
+        browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.login(page, baseUrl, OFFICER_USER, OFFICER_PASSWORD);
+        E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
+        page.locator("[data-testid='org-unit-bank-tab-requests']")
+            .click(new Locator.ClickOptions().setTimeout(20_000));
+        // Target this request's edit button by the modal id it opens. The `preceding::` axis would
+        // be wrong here: every edit modal is rendered AFTER the whole table, so the nearest
+        // preceding edit button is the LAST row's regardless of which modal it is measured from —
+        // and the shared stack carries pending requests from the sibling tests.
+        Locator editButton =
+            page.locator(
+                "[data-testid='org-unit-bank-edit-btn'][data-modal-id='ou-req-edit-"
+                    + requestId
+                    + "']");
+        dropFooter(page);
+        editButton.click(new Locator.ClickOptions().setTimeout(20_000));
+        Locator modal = page.locator("#ou-req-edit-" + requestId);
+        modal.locator("[data-testid='org-unit-bank-edit-amount']").fill(Long.toString(corrected));
+        page.waitForResponse(
+            r ->
+                r.url().contains("/api/proxy/org-units/bank/requests/" + requestId)
+                    && "PUT".equals(r.request().method()),
+            new Page.WaitForResponseOptions().setTimeout(60_000),
+            () -> modal.locator("[data-testid='org-unit-bank-edit-submit']").click());
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "org-unit-bank-edit-apply");
+        throw failure;
+      }
+    }
+
+    assertEquals(
+        "PENDING",
+        seeder.bookingRequestStatus(OFFICER_USER, OFFICER_PASSWORD, requestId),
+        "editing leaves the request pending");
+    assertNotNull(
+        seeder.findOwnPendingBookingRequestId(OFFICER_USER, OFFICER_PASSWORD, accountId, corrected),
+        "the corrected amount was persisted");
+  }
+
+  /**
    * Raises a booking request through the slim page's modal: opens it (which primes the org unit),
    * picks the type, fills the amount and submits, waiting for the proxy POST to settle.
    *
