@@ -124,9 +124,20 @@ table-wide pessimistic lock), so a blocklist misses paths — and any *future* `
 added for the web app would otherwise become internet-reachable the day it merges.
 
 The terms/consent endpoints (`/api/v1/terms/**`) and the registration-status read are on the
-allowlist from day one; the app's terms gate and `PENDING_APPROVAL` handling depend on them. The
-anonymous **write** paths open only when the app's guest mode ships (owner decision Q6: with the
-first release), each with its own rate budget and abuse counter.
+allowlist from day one; the app's terms gate and `PENDING_APPROVAL` handling depend on them.
+
+**The anonymous write paths stay closed permanently.** They were held in reserve for the app's
+guest mode, and guest mode was **dropped** (owner decision, 2026-08-18; recorded as Q8 in the app
+repo's `ANDROID_APP_PLAN.md`): every user of the app signs in. Nothing on the app's side will ever
+need `POST /api/v1/orders/items`, the guest participant mutations or the redacted browsing twins
+from the public vhost, so the allowlist never has to grow in that direction — and the rate budgets
+and abuse counters those paths would have required are not needed either.
+
+This is a reduction in attack surface, not a deferral. The endpoints continue to exist for the web
+frontend, which reaches the backend on the internal network; what changes is that the *public*
+vhost has no reason to expose them, now or later. Should guest access ever be revisited, the
+allowlist entry, its rate budget and its abuse counter come back with it — this paragraph is the
+record of why they are absent, so their absence does not read as an oversight.
 
 ## 5. Decisions (owner, 2026-08-17)
 
