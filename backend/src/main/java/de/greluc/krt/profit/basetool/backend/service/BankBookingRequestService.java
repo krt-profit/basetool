@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDt
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankTransferRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankWithdrawalRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
@@ -360,6 +361,140 @@ public class BankBookingRequestService {
                     .map(this::toDto)
                     .toList())
         .orElseGet(List::of);
+  }
+
+  /**
+   * Applies a requester's correction to their own still-pending booking request (REQ-BANK-056).
+   *
+   * <p>Four guards, all evaluated under the row lock so a concurrent decision cannot slip between
+   * the check and the write:
+   *
+   * <ol>
+   *   <li><b>Ownership.</b> A request belonging to someone else is reported as <em>not found</em>,
+   *       never as forbidden — the same per-user isolation {@link #cancelOwn} uses, so the endpoint
+   *       cannot be used to probe which request ids exist.
+   *   <li><b>Still pending.</b> A confirmed request has already moved money and a
+   *       rejected/cancelled one is terminal ({@code BANK_REQUEST_NOT_PENDING}).
+   *   <li><b>Not yet owner-approved.</b> {@code BANK_REQUEST_ALREADY_APPROVED} — the approval was
+   *       granted for the amount and reason as they stood; editing afterwards would convert a small
+   *       approved request into an arbitrarily large pre-approved one.
+   *   <li><b>Version echo.</b> The usual optimistic-lock 409.
+   * </ol>
+   *
+   * <p>The caller ({@link OrgUnitBankAccessService}) has already re-derived the approval snapshot
+   * from the <em>new</em> amount and passes it in; this method only stamps it. That is what makes
+   * raising the amount past the requester's limit re-arm the approval gate instead of riding the
+   * original below-limit snapshot.
+   *
+   * <p>The request is mutated in place and flushed by dirty checking — no explicit {@code save}
+   * that would risk a second {@code @Version} bump (the {@code …WithinTransaction} discipline).
+   *
+   * @param requestId the request to correct
+   * @param update the corrected values plus the echoed version
+   * @param requiresOwnerApproval the re-derived approval flag for the new amount
+   * @param applicableLimit the re-derived applicable limit, or {@code null}
+   * @param requiredApprover the re-derived approver class, or {@code null}
+   * @return the updated request
+   * @throws NotFoundException when the request does not exist or belongs to another user
+   * @throws BankConflictException {@code BANK_REQUEST_NOT_PENDING} when already decided, {@code
+   *     BANK_REQUEST_ALREADY_APPROVED} when the responsible holder already signed off
+   * @throws BadRequestException on an inconsistent destination account or counterparty, or a
+   *     missing Begr&uuml;ndung on a mandating account
+   * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
+   */
+  @Transactional
+  public BankBookingRequestDto updateOwn(
+      @NotNull UUID requestId,
+      @NotNull UpdateBankBookingRequest update,
+      boolean requiresOwnerApproval,
+      @Nullable BigDecimal applicableLimit,
+      @Nullable BankRequestApprover requiredApprover) {
+    BankBookingRequest request = lockRequest(requestId);
+    UUID caller = authHelperService.currentUserId().orElse(null);
+    if (caller == null || !caller.equals(request.getRequestedBy())) {
+      throw new NotFoundException("Booking request not found");
+    }
+    requireVersion(request, update.version());
+    requirePending(request);
+    if (request.isOwnerApprovalGranted()) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_REQUEST_ALREADY_APPROVED,
+          "An approved request can no longer be edited; cancel it and raise a new one");
+    }
+
+    BankBookingRequestType type = request.getType();
+    // REQ-BANK-045: the Begründung rule is re-checked against the (unchanged) source account, so an
+    // edit cannot blank a mandatory reason.
+    if (type == BankBookingRequestType.WITHDRAWAL || type == BankBookingRequestType.TRANSFER) {
+      BankBookingGuards.requireDebitJustification(request.getAccount(), update.justification());
+    }
+    applyTargetAccount(request, type, update.targetAccountId());
+    applyCounterparty(
+        request,
+        resolveRequestCounterparty(
+            type, update.counterpartyUserId(), update.counterpartyOrgUnitId()));
+    request.setAmount(update.amount());
+    request.setNote(update.note());
+    request.setJustification(update.justification());
+    request.setRequiresOwnerApproval(requiresOwnerApproval);
+    request.setApplicableLimit(applicableLimit);
+    request.setRequiredApprover(requiredApprover);
+
+    // REQ-AUDIT-001: the new amount is a system value, not user free text, so it may be named. The
+    // corrected note/Begründung/Empfaenger deliberately are NOT — the details payload carries no
+    // user free text and no PII.
+    bankAuditService.record(
+        BankAuditEventType.BOOKING_REQUEST_UPDATED,
+        request.getAccount().getId(),
+        null,
+        caller,
+        "edited request "
+            + shortId(request.getId())
+            + " to "
+            + plain(update.amount())
+            + " aUEC"
+            + (requiresOwnerApproval ? " (needs approval)" : ""));
+    return toDto(request);
+  }
+
+  /**
+   * Re-points a {@code TRANSFER} request's destination account, enforcing the same shape rules the
+   * create path applies: a transfer names an active destination that differs from its source, and a
+   * deposit/withdrawal names none.
+   *
+   * @param request the request being edited
+   * @param type the request's (immutable) movement kind
+   * @param targetAccountId the corrected destination, or {@code null}
+   * @throws BadRequestException when the destination is missing on a transfer or present otherwise
+   * @throws BankConflictException {@code BANK_SELF_TRANSFER} when it equals the source
+   * @throws NotFoundException when the destination account does not exist
+   */
+  private void applyTargetAccount(
+      @NotNull BankBookingRequest request,
+      @NotNull BankBookingRequestType type,
+      @Nullable UUID targetAccountId) {
+    if (type != BankBookingRequestType.TRANSFER) {
+      if (targetAccountId != null) {
+        throw new BadRequestException(
+            "A non-transfer request must not carry a destination account");
+      }
+      request.setTargetAccount(null);
+      return;
+    }
+    if (targetAccountId == null) {
+      throw new BadRequestException("A transfer request requires a destination account");
+    }
+    if (targetAccountId.equals(request.getAccount().getId())) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_SELF_TRANSFER,
+          "Source and destination account of a transfer must differ");
+    }
+    BankAccount target =
+        accountRepository
+            .findById(targetAccountId)
+            .orElseThrow(() -> new NotFoundException("Destination account not found"));
+    requireActiveForRequest(target);
+    request.setTargetAccount(target);
   }
 
   /**

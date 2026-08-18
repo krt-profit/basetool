@@ -365,6 +365,89 @@ class BankOrgUnitRequestsE2eTest {
   }
 
   /**
+   * REQ-BANK-055/-056 on the real UI: the officer raises a withdrawal request whose Empfaenger
+   * picker is pre-filled with themselves, expands the row to read back what they filed, then
+   * corrects the amount through the per-row edit modal. Verified via the backend so the assertions
+   * never race the in-place AJAX swap.
+   */
+  @Test
+  void officerEditsOwnPendingRequestAndTheAmountChanges() {
+    String baseUrl = STACK.baseUrl();
+    long amount = 7011;
+    long corrected = 7012;
+
+    try (BrowserContext context =
+        browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.login(page, baseUrl, OFFICER_USER, OFFICER_PASSWORD);
+        E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
+        page.locator("[data-testid='org-unit-bank-request-btn']")
+            .first()
+            .click(new Locator.ClickOptions().setTimeout(20_000));
+        page.locator("[data-testid='org-unit-request-type']").selectOption("WITHDRAWAL");
+        page.locator("[data-testid='org-unit-request-account']").selectOption(accountId);
+        page.locator("[data-testid='org-unit-request-amount']").fill(Long.toString(amount));
+        // REQ-BANK-055: the Empfaenger picker is seeded server-side with the requester, so the
+        // common case needs no interaction at all. A blank box here would mean the seed regressed.
+        assertThat(page.locator("[data-testid='org-unit-request-cp-user']"))
+            .not()
+            .hasValue("", new LocatorAssertions.HasValueOptions().setTimeout(10_000));
+        dropFooter(page);
+        page.waitForResponse(
+            r ->
+                r.url().contains("/api/proxy/org-units/bank/requests")
+                    && "POST".equals(r.request().method()),
+            new Page.WaitForResponseOptions().setTimeout(60_000),
+            () -> page.locator("[data-testid='org-unit-request-submit']").click());
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "org-unit-bank-edit-create");
+        throw failure;
+      }
+    }
+
+    String requestId =
+        seeder.findOwnPendingBookingRequestId(OFFICER_USER, OFFICER_PASSWORD, accountId, amount);
+    assertNotNull(requestId, "the officer's pending withdrawal request was recorded");
+
+    try (BrowserContext context =
+        browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.login(page, baseUrl, OFFICER_USER, OFFICER_PASSWORD);
+        E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
+        page.locator("[data-testid='org-unit-bank-tab-requests']")
+            .click(new Locator.ClickOptions().setTimeout(20_000));
+        // The edit button and its modal live on the row carrying this request's id.
+        Locator editButton =
+            page.locator("#ou-req-edit-" + requestId)
+                .locator("xpath=preceding::button[@data-testid='org-unit-bank-edit-btn'][1]");
+        dropFooter(page);
+        editButton.click(new Locator.ClickOptions().setTimeout(20_000));
+        Locator modal = page.locator("#ou-req-edit-" + requestId);
+        modal.locator("[data-testid='org-unit-bank-edit-amount']").fill(Long.toString(corrected));
+        page.waitForResponse(
+            r ->
+                r.url().contains("/api/proxy/org-units/bank/requests/" + requestId)
+                    && "PUT".equals(r.request().method()),
+            new Page.WaitForResponseOptions().setTimeout(60_000),
+            () -> modal.locator("[data-testid='org-unit-bank-edit-submit']").click());
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "org-unit-bank-edit-apply");
+        throw failure;
+      }
+    }
+
+    assertEquals(
+        "PENDING",
+        seeder.bookingRequestStatus(OFFICER_USER, OFFICER_PASSWORD, requestId),
+        "editing leaves the request pending");
+    assertNotNull(
+        seeder.findOwnPendingBookingRequestId(OFFICER_USER, OFFICER_PASSWORD, accountId, corrected),
+        "the corrected amount was persisted");
+  }
+
+  /**
    * Raises a booking request through the slim page's modal: opens it (which primes the org unit),
    * picks the type, fills the amount and submits, waiting for the proxy POST to settle.
    *

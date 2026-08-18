@@ -56,6 +56,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDt
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankDepositRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankTransferRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.BankWithdrawalRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
@@ -591,6 +592,226 @@ class BankBookingRequestServiceTest {
     BankConflictException ex =
         assertThrows(BankConflictException.class, () -> service.cancelOwn(requestId, 1L));
     assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_REQUEST_NOT_PENDING);
+  }
+
+  /**
+   * REQ-BANK-056: the requester corrects amount, Notiz and Begruendung on their own pending
+   * request; the re-derived approval snapshot the seam computed is stamped, and the edit is
+   * audited.
+   */
+  @Test
+  void updateOwn_byRequester_appliesTheCorrectionAndAudits() {
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(requestId, account(accountId), BankBookingRequestType.WITHDRAWAL, requester, 0L);
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+
+    service.updateOwn(
+        requestId,
+        new UpdateBankBookingRequest(
+            new BigDecimal("900"), "corrected note", "corrected reason", null, null, null, 0L),
+        true,
+        new BigDecimal("500"),
+        BankRequestApprover.RESPONSIBLE_HOLDER);
+
+    assertThat(request.getAmount()).isEqualByComparingTo(new BigDecimal("900"));
+    assertThat(request.getNote()).isEqualTo("corrected note");
+    assertThat(request.getJustification()).isEqualTo("corrected reason");
+    assertThat(request.getStatus()).isEqualTo(BankBookingRequestStatus.PENDING);
+    verify(bankAuditService)
+        .record(
+            eq(BankAuditEventType.BOOKING_REQUEST_UPDATED),
+            eq(accountId),
+            eq(null),
+            eq(requester),
+            any());
+  }
+
+  /**
+   * REQ-BANK-056, the security-critical half: raising the amount past the requester's limit must
+   * re-arm the approval gate. The seam re-derives the snapshot and this method stamps it, so an
+   * edit cannot ride the original below-limit snapshot into a confirmation without approval.
+   */
+  @Test
+  void updateOwn_raisingTheAmount_reArmsTheApprovalGate() {
+    UUID requestId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(
+            requestId,
+            account(UUID.randomUUID()),
+            BankBookingRequestType.WITHDRAWAL,
+            requester,
+            0L);
+    request.setRequiresOwnerApproval(false);
+    request.setApplicableLimit(new BigDecimal("1000"));
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+
+    service.updateOwn(
+        requestId,
+        new UpdateBankBookingRequest(new BigDecimal("5000"), null, "reason", null, null, null, 0L),
+        true,
+        new BigDecimal("1000"),
+        BankRequestApprover.RESPONSIBLE_HOLDER);
+
+    assertThat(request.isRequiresOwnerApproval()).isTrue();
+    assertThat(request.getRequiredApprover()).isEqualTo(BankRequestApprover.RESPONSIBLE_HOLDER);
+  }
+
+  /**
+   * REQ-BANK-056: once the responsible holder has granted the over-limit approval, the request is
+   * frozen. The approval was given for the amount and reason AS THEY STOOD, so allowing an edit
+   * would turn a small approved request into an arbitrarily large pre-approved one.
+   */
+  @Test
+  void updateOwn_alreadyApproved_throwsConflict() {
+    UUID requestId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(
+            requestId,
+            account(UUID.randomUUID()),
+            BankBookingRequestType.WITHDRAWAL,
+            requester,
+            0L);
+    request.setRequiresOwnerApproval(true);
+    request.setOwnerApprovalGranted(true);
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+
+    BankConflictException conflict =
+        assertThrows(
+            BankConflictException.class,
+            () ->
+                service.updateOwn(
+                    requestId,
+                    new UpdateBankBookingRequest(
+                        new BigDecimal("999999"), null, "reason", null, null, null, 0L),
+                    true,
+                    null,
+                    BankRequestApprover.RESPONSIBLE_HOLDER));
+
+    assertThat(conflict.getCode())
+        .isEqualTo(BankConflictException.CODE_BANK_REQUEST_ALREADY_APPROVED);
+    assertThat(request.getAmount()).isEqualByComparingTo(new BigDecimal("500"));
+  }
+
+  /** REQ-BANK-056: a foreign request is reported as not found, never as forbidden. */
+  @Test
+  void updateOwn_foreignRequest_throwsNotFound() {
+    UUID requestId = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(
+            requestId,
+            account(UUID.randomUUID()),
+            BankBookingRequestType.WITHDRAWAL,
+            UUID.randomUUID(),
+            0L);
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
+
+    assertThrows(
+        NotFoundException.class,
+        () ->
+            service.updateOwn(
+                requestId,
+                new UpdateBankBookingRequest(
+                    new BigDecimal("900"), null, "reason", null, null, null, 0L),
+                false,
+                null,
+                null));
+  }
+
+  /** REQ-BANK-056: a request that is no longer PENDING cannot be edited. */
+  @Test
+  void updateOwn_alreadyDecided_throwsConflict() {
+    UUID requestId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(
+            requestId,
+            account(UUID.randomUUID()),
+            BankBookingRequestType.WITHDRAWAL,
+            requester,
+            0L);
+    request.setStatus(BankBookingRequestStatus.CONFIRMED);
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+
+    BankConflictException conflict =
+        assertThrows(
+            BankConflictException.class,
+            () ->
+                service.updateOwn(
+                    requestId,
+                    new UpdateBankBookingRequest(
+                        new BigDecimal("900"), null, "reason", null, null, null, 0L),
+                    false,
+                    null,
+                    null));
+
+    assertThat(conflict.getCode()).isEqualTo(BankConflictException.CODE_BANK_REQUEST_NOT_PENDING);
+  }
+
+  /** REQ-BANK-056: a stale echoed version is the usual optimistic-lock 409. */
+  @Test
+  void updateOwn_versionMismatch_throwsOptimisticLock() {
+    UUID requestId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(
+            requestId,
+            account(UUID.randomUUID()),
+            BankBookingRequestType.WITHDRAWAL,
+            requester,
+            3L);
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+
+    assertThrows(
+        ObjectOptimisticLockingFailureException.class,
+        () ->
+            service.updateOwn(
+                requestId,
+                new UpdateBankBookingRequest(
+                    new BigDecimal("900"), null, "reason", null, null, null, 1L),
+                false,
+                null,
+                null));
+  }
+
+  /**
+   * REQ-BANK-045 still binds an edit: a mandating source account (CARTEL) rejects a correction that
+   * blanks the Begruendung, so an edit cannot launder away a mandatory reason.
+   */
+  @Test
+  void updateOwn_blankingAMandatoryJustification_isRejected() {
+    UUID requestId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(
+            requestId,
+            cartelAccount(UUID.randomUUID()),
+            BankBookingRequestType.WITHDRAWAL,
+            requester,
+            0L);
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+
+    assertThrows(
+        BankConflictException.class,
+        () ->
+            service.updateOwn(
+                requestId,
+                new UpdateBankBookingRequest(
+                    new BigDecimal("900"), null, null, null, null, null, 0L),
+                false,
+                null,
+                null));
   }
 
   @Test

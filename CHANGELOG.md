@@ -4,6 +4,12 @@
 
 ### Added
 
+- **Auszahlungsanträge haben jetzt ein Feld "Empfänger".** Wer über die Org-Einheits-Bank eine Auszahlung beantragt, kann angeben, wer das Geld bekommt — vorbelegt mit dir selbst. Bisher wurde beim Buchen immer der Antragsteller als Empfänger eingetragen; ging die Auszahlung an jemand anderen, ließ sich das weder eintragen noch von der Bank korrigieren. Der Empfänger erscheint auch beim Aufklappen des Antrags.
+
+- **Eigene Anträge lassen sich aufklappen und bearbeiten.** Unter "Meine Anträge" zeigt ein Pfeil vor der Zeile Begründung, Notiz und Empfänger — wie in der Antragsliste der Bank und bei den fremden Anträgen. Solange der Antrag noch aussteht und noch nicht freigegeben wurde, lässt er sich über "Bearbeiten" korrigieren (Betrag, Begründung, Notiz, Empfänger, Zielkonto), statt ihn zurückziehen und neu stellen zu müssen. Erhöhst du den Betrag über dein Freigabe-Limit, wird die Freigabepflicht neu bewertet. Konto und Vorgang bleiben fest; dafür ziehst du den Antrag weiterhin zurück und stellst ihn neu. Ist die Freigabe bereits erteilt, ist der Antrag gesperrt — sie galt für den ursprünglichen Betrag. Die "Notiz Bankmitarbeiter" bleibt hier bewusst unsichtbar, sie ist bankintern.
+
+- **Das Freigabe-Limit "Alle Mitglieder" heißt jetzt "Alle Mitglieder der Org-Einheit".** Es galt schon immer nur für Mitglieder der Org-Einheit, zu der das Konto gehört; der alte Name legte etwas Weiteres nahe. Reine Umbenennung, keine Verhaltensänderung.
+
 - **Bankmitarbeiter können jetzt eine eigene Notiz zu einer Buchung erfassen.** Beim Bestätigen eines Antrags und bei jeder direkten Einzahlung, Auszahlung und jedem Transfer gibt es das Feld "Notiz Bankmitarbeiter" für interne Anmerkungen ("in zwei Tranchen übergeben"). Sie erscheint überall dort, wo auch Notiz und Begründung stehen — Kontohistorie, Antragsliste, Fremde Anträge, Kontoauszug und 3-Monats-Report. Für Mitglieder einer Org-Einheit ist sie bewusst nicht sichtbar; sie ist eine bankinterne Anmerkung.
 
 - **Fremde Anträge lassen sich jetzt aufklappen.** In der Freigabe-Liste der Org-Einheits-Bank zeigt ein Pfeil vor der Zeile Begründung und Notiz des Antrags — genau wie in der Antragsliste der Bank. Wer freigibt, entscheidet damit nicht mehr blind: beim KRT-Konto, dem Bankkonto und jedem Sonderkonto ist die Begründung Pflicht und war für den Freigebenden bisher nicht sichtbar.

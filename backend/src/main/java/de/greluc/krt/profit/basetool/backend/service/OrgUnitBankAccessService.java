@@ -49,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankAccountSetting
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankBalanceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitBankViewUserDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateBankBookingRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankAccountBalance;
 import de.greluc.krt.profit.basetool.backend.model.projection.BankPostingSlice;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountApprovalLimitRepository;
@@ -844,27 +845,7 @@ public class OrgUnitBankAccessService {
     } else if (request.targetAccountId() != null) {
       throw new BadRequestException("A non-transfer request must not carry a destination account");
     }
-    // REQ-BANK-041/-046: resolve which approver (if any) the request needs and snapshot it. The
-    // org-unit-blind confirm path only reads the boolean; the seam routes the "Fremde Anträge"
-    // approval surface by the recorded approver class.
-    ApprovalRouting routing;
-    if (isApprovalExempt(account)) {
-      // REQ-BANK-041 (owner decision): the responsible holder disposes freely over their own
-      // account. Neither a per-audience limit nor the KRT amount ladder binds them — asking a
-      // holder to counter-sign their own request would be a no-op click.
-      routing = new ApprovalRouting(false, null, null);
-    } else if (account.getType() == BankAccountType.CARTEL) {
-      routing = resolveCartelApprovalRouting(account, request.amount());
-    } else {
-      // Every other request-capable account: a configured per-audience limit lets the requester
-      // through up to its ceiling; no matching limit ⇒ the responsible holder's approval is the
-      // safe default (REQ-BANK-041).
-      BigDecimal limit = resolveApplicableLimit(account);
-      boolean needsApproval = limit == null || request.amount().compareTo(limit) > 0;
-      routing =
-          new ApprovalRouting(
-              needsApproval, limit, needsApproval ? BankRequestApprover.RESPONSIBLE_HOLDER : null);
-    }
+    ApprovalRouting routing = resolveApprovalRouting(account, request.amount());
     // A withdrawal/transfer never carries a split (REQ-BANK-043, DEPOSIT-only).
     return bankBookingRequestService.create(
         account.getId(),
@@ -990,6 +971,76 @@ public class OrgUnitBankAccessService {
         // the requester as before.
         null,
         null);
+  }
+
+  /**
+   * Resolves which approver (if any) a debit request against this account for this amount needs,
+   * and snapshots the requester's applicable ceiling (REQ-BANK-041/-046/-047).
+   *
+   * <p>Extracted so the create path and the {@linkplain #updateOwnBookingRequest edit} path cannot
+   * drift apart. They must not: the whole point of re-deriving this on an edit is that raising the
+   * amount past the requester's limit re-arms the approval gate, and a second, subtly different
+   * copy of this rule would be an approval-gate bypass rather than a cosmetic inconsistency.
+   *
+   * @param account the source account
+   * @param amount the requested amount
+   * @return the approval snapshot to stamp on the request
+   */
+  @NotNull
+  private ApprovalRouting resolveApprovalRouting(
+      @NotNull BankAccount account, @NotNull BigDecimal amount) {
+    if (isApprovalExempt(account)) {
+      // REQ-BANK-041 (owner decision): the responsible holder disposes freely over their own
+      // account. Neither a per-audience limit nor the KRT amount ladder binds them — asking a
+      // holder to counter-sign their own request would be a no-op click.
+      return new ApprovalRouting(false, null, null);
+    }
+    if (account.getType() == BankAccountType.CARTEL) {
+      return resolveCartelApprovalRouting(account, amount);
+    }
+    // Every other request-capable account: a configured per-audience limit lets the requester
+    // through up to its ceiling; no matching limit ⇒ the responsible holder's approval is the
+    // safe default (REQ-BANK-041).
+    BigDecimal limit = resolveApplicableLimit(account);
+    boolean needsApproval = limit == null || amount.compareTo(limit) > 0;
+    return new ApprovalRouting(
+        needsApproval, limit, needsApproval ? BankRequestApprover.RESPONSIBLE_HOLDER : null);
+  }
+
+  /**
+   * Applies a requester's correction to their own still-pending booking request (REQ-BANK-056) and
+   * re-derives the approval snapshot from the new amount.
+   *
+   * <p>The ownership check here is an early-out only — it avoids resolving an approval limit for a
+   * request the caller may not touch, and reports a foreign id as "not found" so the endpoint never
+   * reveals that it exists. {@link BankBookingRequestService#updateOwn} re-checks ownership,
+   * pending-ness, the un-approved precondition and the version <em>under the row lock</em>, which
+   * is where those guards are authoritative.
+   *
+   * @param requestId the request to correct
+   * @param request the corrected values plus the echoed version
+   * @return the updated request
+   * @throws NotFoundException when the request does not exist or belongs to another user
+   */
+  @NotNull
+  @Transactional
+  public BankBookingRequestDto updateOwnBookingRequest(
+      @NotNull UUID requestId, @NotNull UpdateBankBookingRequest request) {
+    BankBookingRequest existing =
+        bankBookingRequestRepository
+            .findById(requestId)
+            .orElseThrow(() -> new NotFoundException("Booking request not found"));
+    UUID caller = authHelperService.currentUserId().orElse(null);
+    if (caller == null || !caller.equals(existing.getRequestedBy())) {
+      throw new NotFoundException("Booking request not found");
+    }
+    ApprovalRouting routing = resolveApprovalRouting(existing.getAccount(), request.amount());
+    return bankBookingRequestService.updateOwn(
+        requestId,
+        request,
+        routing.requiresOwnerApproval(),
+        routing.applicableLimit(),
+        routing.requiredApprover());
   }
 
   /**

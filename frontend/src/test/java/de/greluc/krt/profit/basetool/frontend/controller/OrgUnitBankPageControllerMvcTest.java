@@ -47,6 +47,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -688,6 +689,111 @@ class OrgUnitBankPageControllerMvcTest {
             get("/org-unit-bank/accounts/" + accountId).param("fragment", "orgUnitBankSettings"))
         .andExpect(status().isOk())
         .andExpect(view().name("org-unit-bank-account-detail :: orgUnitBankSettings"));
+  }
+
+  /**
+   * REQ-BANK-056: a still-pending, unapproved own request offers an edit action and its per-row
+   * modal, which PUTs to the request's own endpoint. The modal is rendered once per row (rather
+   * than primed) because the Empfaenger picker is a remote combobox that only seeds itself from a
+   * server-rendered {@code selected} option.
+   *
+   * @throws Exception if the MockMvc exchange fails
+   */
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_pendingOwnRequestOffersTheEditModal() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef()))
+        .thenReturn(List.of(bookingRequest("Missionsertrag", "Missionsfreigabe", null)));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-edit-btn")))
+        .andExpect(content().string(Matchers.containsString("ou-req-edit-")))
+        .andExpect(content().string(Matchers.containsString("data-method=\"PUT\"")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-edit-amount")))
+        // WITHDRAWAL -> the Empfaenger block and the Begruendung field are rendered; the fixture is
+        // a withdrawal, so a missing picker here would mean the type gating is inverted.
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-edit-cp-user")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-edit-justification")))
+        // The modal must NOT sit inside the table: a browser hoists it out of <tbody> and detaches
+        // it from its row. Assert it renders after the table has been closed.
+        .andExpect(
+            content()
+                .string(
+                    Matchers.matchesPattern(
+                        Pattern.compile(".*</table>.*ou-req-edit-.*", Pattern.DOTALL))));
+  }
+
+  /**
+   * REQ-BANK-056: once the responsible holder has granted the over-limit approval the request is
+   * frozen — the backend refuses the edit, so the button and its modal must be gone rather than
+   * offering the requester a dead end. Cancel stays available.
+   *
+   * @throws Exception if the MockMvc exchange fails
+   */
+  @Test
+  @WithMockUser(roles = {"OFFICER"})
+  void orgUnitBank_approvedOwnRequestOffersNoEditAction() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
+    when(backendApiClient.get(eq(REQUESTS_URI), anyTypeRef()))
+        .thenReturn(List.of(approvedRequest()));
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        // Positive control: the row itself renders, so this cannot pass for the wrong reason.
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-request-row")))
+        .andExpect(content().string(Matchers.containsString("org-unit-bank-cancel-btn")))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("org-unit-bank-edit-btn"))))
+        .andExpect(content().string(Matchers.not(Matchers.containsString("ou-req-edit-"))));
+  }
+
+  /**
+   * Builds a PENDING withdrawal request whose over-limit approval has already been granted — the
+   * one state in which REQ-BANK-056 withholds the edit action.
+   *
+   * @return the approved request DTO
+   */
+  private static BankBookingRequestDto approvedRequest() {
+    return new BankBookingRequestDto(
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        "KB-0001",
+        "Staffel IRIDIUM",
+        UUID.randomUUID(),
+        "IRIDIUM",
+        "IRI",
+        "WITHDRAWAL",
+        new BigDecimal("5000"),
+        null,
+        "Missionsfreigabe",
+        null,
+        "PENDING",
+        "officerX",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        Instant.parse("2026-06-17T14:02:00Z"),
+        null,
+        null,
+        true,
+        new BigDecimal("1000"),
+        "RESPONSIBLE_HOLDER",
+        true,
+        "holderX",
+        false,
+        null,
+        null,
+        null,
+        null,
+        null,
+        0L);
   }
 
   /**

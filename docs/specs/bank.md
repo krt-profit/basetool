@@ -393,7 +393,11 @@ since REQ-BANK-047 — the **KRT-account approval-threshold** changes (`CARTEL_A
 `CARTEL_APPROVAL_TIERS_CLEARED`, the two amounts in the details payload — no PII), and — since
 REQ-BANK-034 (ADR-0070) — a change of an account's **derived responsible holder**
 (`ACCOUNT_RESPONSIBLE_CHANGED`, with the old and new responsible-holder user-id sets in the details
-payload — ids are system identifiers, not free text or PII).
+payload — ids are system identifiers, not free text or PII), and — since REQ-BANK-056 — a
+requester's **correction of their own still-pending booking request** (`BOOKING_REQUEST_UPDATED`,
+with the request's short id, the new amount and whether the edit re-armed the approval gate — the
+corrected Notiz / Begründung / Empfänger are deliberately **not** named, they are user free text and
+a player identity).
 Each event stores: timestamp, actor user id (FK
 `ON DELETE SET NULL`) **plus** a denormalized actor handle snapshot (the trail must
 survive user deletion), event type, affected account/transaction/target-user references,
@@ -774,7 +778,8 @@ it is audited on creation (`BOOKING_REQUEST_CREATED`) and visible, but moves **n
 the balance does not change until a bank employee confirms it (REQ-BANK-023). The requester
 chooses **no holder** (that is recorded at confirmation). A requester sees the status of
 their **own** requests only (per-user isolation) and may **cancel** an own request while it
-is still `PENDING` (`BOOKING_REQUEST_CANCELLED`). The requester endpoints live under
+is still `PENDING` (`BOOKING_REQUEST_CANCELLED`) or **correct** it while it is still pending
+*and* unapproved (REQ-BANK-056). The requester endpoints live under
 `/api/v1/org-units/bank/requests/**`, scope-checked by the same seam (create requires the
 caller to oversee the org unit; cancel requires owning the request). A request cannot be
 raised against a `CLOSED` account.
@@ -2458,6 +2463,147 @@ expandable) • **Code:** `model/BankTransaction`, `model/BankBookingRequest`,
   stays purely descriptive (REQ-ORG-010).~~ **Superseded by epic #692:** Bereich and OL are now
   first-class `org_unit` kinds (REQ-ORG-014); `AREA` accounts link to a Bereich and `CARTEL` to the OL
   (REQ-BANK-027). The org chart stays descriptive, but is widened to multi-Bereich + OL (org-chart spec).
+
+### REQ-BANK-055 — Empfänger on a withdrawal request
+
+A **withdrawal request** raised from the Org-Einheits-Bank page carries an optional
+**Empfänger** — the member who receives the payout — pre-filled with the requester.
+
+Before this, only the bank employee's Kontobewegung modal could record a counterparty (REQ-BANK-044,
+V197). The requester's modal had none, so `BankBookingRequestService#confirm` always **derived** the
+counterparty from the requester. That is correct in the common case (you request your own payout)
+and wrong whenever the payout goes to somebody else — a case the requester could not express and the
+confirming employee could not correct.
+
+**Storage** (V232): four columns on `bank_booking_request` mirroring V197's shape one-for-one —
+`counterparty_user_id` (FK `app_user`, `ON DELETE SET NULL`), the deletion-proof `counterparty_handle`
+snapshot, `counterparty_org_unit_id` (FK `org_unit`) and its `counterparty_org_unit_name` snapshot,
+under the same CHECK (a handle exists iff a user is named; a unit only ever accompanies a user).
+Unlike `bank_transaction` these columns are **updatable** — a pending request is still editable
+(REQ-BANK-056) — so the CHECK must hold after an `UPDATE` too. The handle and unit name are
+snapshotted **at request time**, not re-resolved at confirmation, so the booking stays attributable
+even if the named user is deleted in between.
+
+**Scope, deliberately narrower than the employee's field:**
+
+- **WITHDRAWAL only.** A deposit's depositor is the requester by definition (REQ-BANK-042) and a
+  transfer's other side is its counter-account (REQ-BANK-044), so naming a counterparty on either is
+  a **400**, not a silently ignored field.
+- **Registered tool users only.** The free-text external counterparty (#994) stays a **Bank
+  Employee** capability per REQ-BANK-044 — a requester picks a tool user or nobody. Letting any
+  member stamp an unverifiable name onto the ledger is a different decision from letting them name
+  a payout recipient.
+- The chosen org unit is validated to be one of **that user's** direct memberships (else 400),
+  exactly as the employee's booking path validates it.
+
+**At confirmation** the stored Empfänger **wins** over the requester-derived counterparty; a request
+that names none keeps the previous behaviour verbatim, which is also what every pre-V232 row carries
+— so no historical request changes meaning. The stored **org unit** is used only while it is still
+one of the counterparty's memberships: confirmation happens an arbitrary time after the request and
+`BankLedgerService` re-validates the unit, so passing a stale choice through would turn a membership
+change into a **400 that blocks the employee from confirming at all**. It degrades to the
+counterparty's current primary unit instead, and finally to none. A stale unit costs a less precise
+snapshot; it never costs the employee their ability to book.
+
+No authorization change was required: `/users/search-bank` and `/users/{id}/memberships` already
+admit `KRT_MEMBER` (REQ-BANK-044/#1193).
+
+**Acceptance**
+
+- [x] A withdrawal request naming an Empfänger stamps the user id + handle snapshot and, when a unit
+  is chosen, validates it against that user's memberships (else 400) and snapshots its name.
+- [x] A counterparty on a `DEPOSIT` or `TRANSFER` request is a 400; a counterparty org unit without a
+  counterparty user is a 400.
+- [x] Confirming a withdrawal request prefers the named Empfänger over the requester; a request that
+  named none still derives the requester (the pre-V232 no-regression control).
+- [x] A stored org unit that is no longer a membership degrades to the counterparty's primary unit
+  rather than failing the confirmation.
+- [x] The picker is pre-filled with the requester and rendered only for a withdrawal; both controls
+  are disabled while hidden, so a deposit/transfer request omits them from the body.
+- [x] The Empfänger is shown in the expandable detail row of both "Meine Anträge" and "Fremde
+  Anträge".
+
+**Enforced by:** `BankBookingRequestServiceTest` (snapshot on create, membership 400, non-withdrawal
+400, confirm prefers the named Empfänger, stale-unit degradation, no-counterparty derivation),
+frontend `OrgUnitBankPageControllerMvcTest`, `BankOrgUnitRequestsE2eTest` (the seeded picker on the
+real UI) · **Code:** `model/BankBookingRequest`, `model/dto/request/CreateBankBookingRequest`,
+`model/dto/BankBookingRequestDto`, `service/BankBookingRequestService`
+(`resolveRequestCounterparty`, `applyCounterparty`, `confirmCounterpartyOrgUnitId`),
+`service/OrgUnitBankAccessService#createBookingRequest`, `db/migration/V232`, frontend
+`controller/OrgUnitBankPageController`, `templates/fragments/bank-counterparty.html`
+(`requestCounterpartyBlock`), `templates/org-unit-bank.html`, `static/js/bank.js`
+(`syncRequestCounterparty`)
+
+### REQ-BANK-056 — Editing an own still-pending booking request
+
+A requester may **correct** their own booking request while it is still `PENDING` **and** the
+responsible holder has **not yet granted** the over-limit approval. Until now the only move was to
+cancel and re-file, which loses the request's place in the queue and its audit continuity for what is
+usually a typo.
+
+**Editable:** `amount`, `note`, `justification`, the `TRANSFER` destination account and the
+Empfänger (REQ-BANK-055) — the corresponding columns are deliberately no longer `updatable = false`.
+
+**Not editable: the source account and the movement kind.** The source account decides the
+applicable approval limit, whether a Begründung is mandatory and whether the caller may request
+against it at all; the type decides the whole field shape. Changing either makes the row a
+*different* request rather than a correction, so the supported move stays cancel-and-re-raise — one
+click, on the same row. Keeping them out also keeps this endpoint off the eligibility-resolution
+path, where a mistake would be an authorization defect rather than a bad edit.
+
+**The approval snapshot is re-derived from the new amount.** This is the security-critical half:
+without it a requester could file 100 aUEC under a 1000 ceiling and then edit it to 100 000, arriving
+at the bank employee still carrying the original "no approval needed" snapshot. The seam resolves it
+through the *same* `resolveApprovalRouting` the create path uses — extracted precisely so the two
+cannot drift apart.
+
+**An already-approved request is frozen** (`BANK_REQUEST_ALREADY_APPROVED`, 409). The approval was
+granted for the amount and reason **as they stood**; allowing an edit afterwards would convert a
+small approved request into an arbitrarily large pre-approved one. The UI withholds the edit button
+in that state rather than offering a dead end.
+
+The endpoint is `PUT /api/v1/org-units/bank/requests/{id}` with **PUT semantics** (an omitted field
+clears it), guarded under the row lock by: ownership (a foreign id is **404**, never 403 — the same
+per-user isolation `cancelOwn` uses, so the endpoint cannot probe which ids exist), still-`PENDING`
+(`BANK_REQUEST_NOT_PENDING`), not-yet-approved, and the echoed `@Version` (409). REQ-BANK-045 still
+binds, so an edit cannot blank a Begründung that the source account mandates.
+
+**Audit:** `BOOKING_REQUEST_UPDATED` (REQ-BANK-012). **Notifications:** an edit deliberately fires
+none — the request was already announced when it was raised and stays in the same queues; the staff
+queue and the approval tab pick the change up through the existing live-sync broadcast, and the
+approval chip flips there without a reload.
+
+**UI:** a per-row "Bearbeiten" modal in "Meine Anträge", rendered once per editable row rather than
+as a primed singleton. The Empfänger picker is a **remote** combobox, which seeds itself from a
+server-rendered `selected` option but cannot be primed through the `data-field-*` mechanism (that
+writes the hidden value only, and the next blur restores the empty committed label). Per-row modals
+also keep the echoed `version` correct after every fragment swap and need no new JS. They are
+rendered **after** the table — a modal inside `<tbody>` is invalid HTML and the browser hoists it
+out, detaching it from its row.
+
+**Acceptance**
+
+- [x] A requester edits their own pending, unapproved request; amount / Notiz / Begründung /
+  destination / Empfänger are applied and `BOOKING_REQUEST_UPDATED` is audited.
+- [x] Raising the amount past the requester's limit flips `requires_owner_approval` to true and
+  records the approver class; staying under it leaves the request approval-free.
+- [x] Editing an already-approved request is a 409 `BANK_REQUEST_ALREADY_APPROVED` and changes
+  nothing; a decided request is a 409 `BANK_REQUEST_NOT_PENDING`; a foreign request is a 404; a
+  stale version is a 409.
+- [x] An edit cannot blank a Begründung the source account mandates (REQ-BANK-045).
+- [x] The edit action and its modal are withheld once the approval has been granted; cancel stays.
+
+**Enforced by:** `BankBookingRequestServiceTest` (apply + audit, approval re-arming, already-approved
+409, not-pending 409, foreign 404, version 409, mandatory-Begründung guard),
+`OrgUnitBankAccessServiceTest` (re-derivation over/under the limit, foreign 404 before resolving),
+frontend `OrgUnitBankPageControllerMvcTest` (modal renders after the table, withheld once approved),
+`BankOrgUnitRequestsE2eTest` · **Code:** `model/BankBookingRequest` (relaxed `updatable`),
+`model/dto/request/UpdateBankBookingRequest`, `service/BankBookingRequestService#updateOwn`,
+`service/OrgUnitBankAccessService#updateOwnBookingRequest` / `#resolveApprovalRouting`,
+`controller/OrgUnitBankController`, `exception/BankConflictException`,
+`model/BankAuditEventType`, frontend `controller/OrgUnitBankProxyController`,
+`controller/AdminAuditLogPageController` (audit filter), `templates/org-unit-bank.html` ·
+**ADR:** [ADR-0133](../adr/0133-editable-pending-booking-requests.md)
 
 ## Open questions
 
