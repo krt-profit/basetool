@@ -22,10 +22,17 @@ server:
     max-connections: 10000
   # Audit finding H-8: behind nginx-proxy-manager the immediate peer for `request.getRemoteAddr()`
   # is NPM's docker-internal IP — every client looks the same to the rate-limit filter and the
-  # global bucket collapses into a single org-wide budget. With `framework` strategy Spring
-  # consumes X-Forwarded-For / X-Forwarded-Proto / X-Forwarded-Host, exposes the real client IP
-  # to downstream filters, and lets HSTS detect the proxy-terminated TLS scheme correctly.
-  forward-headers-strategy: framework
+  # global bucket collapses into a single org-wide budget. ForwardedHeaderFilter fixes that, and
+  # it is still registered — by config.ForwardedHeaderConfig rather than by the framework.
+  #
+  # Why `none` and not `framework` (REQ-SEC-011): the `framework` strategy pins that filter to
+  # Integer.MIN_VALUE, which no servlet filter can precede, and it overwrites getRemoteAddr() with
+  # the LEFTMOST X-Forwarded-For entry while hiding the header from everything downstream. An
+  # appending proxy puts the real peer on the right, so the leftmost entry is attacker-controlled
+  # and no later filter can recover the truth. ForwardedHeaderConfig therefore registers
+  # ClientIpContextFilter at HIGHEST_PRECEDENCE and re-registers ForwardedHeaderFilter one slot
+  # later; scheme/host/remote-addr rewriting is unchanged, only attribution moved ahead of it.
+  forward-headers-strategy: none
   max-http-request-header-size: 65536
   http2:
     enabled: true

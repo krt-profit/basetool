@@ -33,10 +33,10 @@ import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
  * and collapses each per-client / per-endpoint budget into one shared org-wide bucket — letting a
  * single caller trip a public endpoint's limit for everyone (security audit DOS-1). The backend
  * already honours {@code X-Forwarded-For} only from its configured trusted proxies (the frontend
- * container) and reads the first hop as the client (see {@code
- * RateLimitingFilter.resolveClientIp}), so relaying the resolved IP restores per-client isolation
- * while reusing the backend's existing, hardened limiter rather than duplicating it on the
- * frontend.
+ * container) and resolves the client from the chain by walking it right-to-left, skipping its own
+ * trusted hops (see {@code backend ClientIpContextFilter.resolveClientIp}), so relaying the
+ * resolved IP restores per-client isolation while reusing the backend's existing, hardened limiter
+ * rather than duplicating it on the frontend.
  *
  * <p>An existing {@code X-Forwarded-For} on the outbound request is never overwritten, and a
  * request with no bound client IP (background task / scheduled job) degrades silently to "no header
