@@ -273,6 +273,18 @@ app:
     capacity: 5000
     refillTokens: 5000
     refillPeriod: 1m
+    # REQ-SEC-033: the per-authenticated-subject budget, applied to API writes and the
+    # notification SSE connect. Complements the per-IP buckets above rather than replacing them —
+    # a client can rotate its address and CGNAT makes many members share one, but the JWT `sub` is
+    # bound to a Keycloak identity and cannot be chosen by the caller. 120/min is roughly two writes
+    # a second sustained: far above what a person clicking through the UI produces, far below what a
+    # script does. Reads stay on the per-IP budget; they are cheap and are what a legitimate client
+    # hits most.
+    subject:
+      enabled: true
+      capacity: 120
+      refillTokens: 120
+      refillPeriod: 1m
     # Audit finding L-5 (2026-05-20): tighter per-endpoint budgets layered on top of the global
     # 300/min/IP bucket. A spam attacker with one fixed IP trips the per-endpoint budget below
     # before the loose global budget is even touched, so a flood of anonymous joborder POSTs

@@ -1475,6 +1475,46 @@ Authenticated callers keep the 100 000 clamp. The scope is matched on the **deco
 
 **Enforced by:** `SecurityTest` · **Code:** `AnonymousPageSizeFilter`, `SecurityConfig`
 
+### REQ-SEC-033 — An authenticated account MUST have a budget of its own
+
+Every `/api/**` write (`POST`, `PUT`, `PATCH`, `DELETE`) and the notification SSE connect MUST be
+bounded by a per-authenticated-subject token bucket, keyed on the JWT `sub`, in addition to the
+per-IP buckets of REQ-SEC-011.
+
+The per-IP limiter bounds a **network position**, which is the wrong unit in both directions. Behind
+CGNAT many unrelated members share one IPv4, so a budget tight enough to matter throttles innocents;
+and a caller with a pool of addresses is not bounded by it at all. The `sub` is bound to a Keycloak
+identity and cannot be chosen by the client, so it is the only key that bounds an *account*. The
+ingest gateway reached the same conclusion for the same reason (REQ-INGEST-005).
+
+Reads other than the SSE connect are deliberately left to the per-IP budget: they are cheap and are
+what a legitimate client hits most. Writes cost database work and produce audit rows, and an SSE
+connect holds a server-side emitter open, so a reconnect loop is worth bounding by identity. Both
+share one bucket on purpose — they come from the same client, and splitting them would let one
+starve the server while the other stayed within its own budget.
+
+Anonymous requests MUST pass through: they carry no subject to key on, and the per-IP limiter plus
+the anonymous page-size ceiling (REQ-SEC-032) are their bounds. The budget MUST be enforced after
+the pending-approval and terms gates, so a caller refused there does not spend a token first. The
+scope MUST be decided on the **decoded** path (REQ-SEC-029). The rejection MUST reuse the per-IP
+limiter's contract: `429`, the stable code `RATE_LIMIT_EXCEEDED`, and the
+`X-Rate-Limit-*` headers including a retry hint.
+
+The subject MUST NOT appear in a metric label or a log message — it is unbounded and it is PII. The
+bucket map MUST be bounded so a flood of distinct subjects cannot grow it without limit.
+
+**Acceptance**
+
+- [x] A second write beyond the budget from the same subject is refused with `429` and a retry hint.
+- [x] Two different subjects do not share a bucket.
+- [x] Ordinary reads spend no tokens; the SSE connect does.
+- [x] An encoded spelling of an API write cannot shed the budget.
+- [x] Anonymous callers pass through untouched.
+- [x] Rejections and attempts are counted under the bounded `bucket=subject` label.
+
+**Enforced by:** `SubjectRateLimitingFilterTest` · **Code:** `SubjectRateLimitingFilter`,
+`RateLimitProperties.Subject`, `SecurityConfig`
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the

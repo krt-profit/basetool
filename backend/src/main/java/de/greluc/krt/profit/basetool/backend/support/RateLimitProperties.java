@@ -98,6 +98,37 @@ public class RateLimitProperties {
   private List<String> trustedProxies = new java.util.ArrayList<>();
 
   /**
+   * Per-authenticated-subject budget (REQ-SEC-033), applied to API writes and the notification SSE
+   * connect.
+   *
+   * <p>Complements rather than replaces the per-IP buckets above. A client can rotate its apparent
+   * address — behind CGNAT many legitimate users even share one — but the JWT {@code sub} is bound
+   * to a Keycloak identity and cannot be chosen by the caller, so this is the budget that actually
+   * bounds how hard one authenticated account can drive the API.
+   */
+  @Data
+  public static class Subject {
+    /**
+     * Whether the per-subject budget is enforced; the e2e stack turns rate limiting off wholesale.
+     */
+    private boolean enabled = true;
+
+    /** Tokens a single subject may spend within {@link #refillPeriod}. */
+    @Min(1)
+    private int capacity = 120;
+
+    /** Tokens returned to a subject's bucket each {@link #refillPeriod}. */
+    @Min(1)
+    private int refillTokens = 120;
+
+    /** Refill window for {@link #refillTokens}. */
+    @NotNull private Duration refillPeriod = Duration.ofMinutes(1);
+  }
+
+  /** The per-subject budget; see {@link Subject}. */
+  @Valid private Subject subject = new Subject();
+
+  /**
    * Per-endpoint rate-limit overlay. Matches a request when (1) the request method is contained in
    * {@link #getMethods()} (case-insensitive, empty = any method) AND (2) the request URI matches at
    * least one Ant-style pattern in {@link #getPaths()}. Bucket key is {@code clientIp + "|rule:" +

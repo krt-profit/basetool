@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Jedes Benutzerkonto hat jetzt ein eigenes Anfragekontingent für Änderungen.** Bisher wurde nur pro Netzwerkadresse begrenzt — was Mitglieder hinter einem gemeinsamen Anschluss gegenseitig ausbremst und einen Aufrufer mit wechselnden Adressen gar nicht erfasst. Das neue Kontingent (120 Änderungen pro Minute) hängt an der Anmeldung und liegt weit über dem, was normale Bedienung erzeugt (REQ-SEC-033).
+
+
 ### Changed
 
 - **Bankdaten, Mitgliederdaten und Benachrichtigungen dürfen von Zwischenspeichern nicht mehr abgelegt werden.** Bisher durfte ein Proxy oder Browser-Cache diese Antworten aufbewahren, solange er vor der Wiederverwendung nachfragt; jetzt dürfen sie gar nicht erst gespeichert werden. Alle übrigen Abfragen bleiben unverändert (REQ-SEC-031).

@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.support.ActingMemberAuthorities;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.Permissions;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
 import de.greluc.krt.profit.basetool.backend.support.RefusedSubjectWindow;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.support.TermsConsentCheck;
@@ -328,7 +329,8 @@ public class SecurityConfig {
       TermsConsentCheck termsConsentCheck,
       RefusedSubjectWindow refusedSubjectWindow,
       IngestGatewayProperties ingestGatewayProperties,
-      ActingMemberAuthorities actingMemberAuthorities)
+      ActingMemberAuthorities actingMemberAuthorities,
+      RateLimitProperties rateLimitProperties)
       throws Exception {
 
     boolean isTest = java.util.Arrays.asList(env.getActiveProfiles()).contains("test");
@@ -766,6 +768,24 @@ public class SecurityConfig {
             new AnonymousPageSizeFilter(
                 messageSource, problemResponseFactory, objectMapper, meterRegistry),
             TermsAcceptanceAccessFilter.class)
+        // A3 / REQ-SEC-033: bound how hard one authenticated ACCOUNT can drive the API.
+        // Anchored behind the anonymous page-size gate above rather than behind the terms
+        // filter, so the order of these two is stated here instead of falling out of the
+        // registration order (addFilterAfter inserts directly after its anchor, so two calls
+        // naming the same one end up reversed). The two are disjoint anyway — one only ever
+        // sees anonymous callers, the other only authenticated ones. The per-IP
+        // limiter ahead of the chain bounds a network position, which is the wrong unit in both
+        // directions — CGNAT puts many members behind one address, and an address pool escapes it
+        // entirely. Placed after the gates above so a pending or unconsented caller is refused on
+        // its own terms rather than spending a token first.
+        .addFilterAfter(
+            new SubjectRateLimitingFilter(
+                rateLimitProperties,
+                messageSource,
+                problemResponseFactory,
+                objectMapper,
+                meterRegistry),
+            AnonymousPageSizeFilter.class)
         // REQ-SEC-024: catch an identity-provider-unreachable failure (JWKS fetch timeout / 5xx /
         // Docker-DNS strand) escaping the bearer-token filter as a re-thrown
         // AuthenticationServiceException and re-map it to a retryable 503 instead of the opaque 500
