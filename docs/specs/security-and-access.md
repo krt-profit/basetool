@@ -1437,6 +1437,44 @@ rather than configuration: which data is sensitive is a property of the domain, 
 
 **Enforced by:** `ApiCacheControlFilterTest` · **Code:** `ApiCacheControlFilter`
 
+### REQ-SEC-032 — The anonymous surface MUST NOT be an amplification lever
+
+`PaginationUtil` clamps `size` at 100 000. That is correct for the authenticated consumers that
+page-walk large catalogues and far too generous for endpoints anyone on the internet can reach once
+the API vhost is live: one request would return an entire catalogue, and repeating it is the cheapest
+amplification the surface offers.
+
+Two rules follow.
+
+**The material x terminal price matrix MUST require authentication.** `GET /api/v1/materials/matrix`
+is the largest single response the API can produce and used to fall into the catalog `permitAll`
+through `/api/v1/materials/**`. It is operating data rather than guest content, and its only consumer
+is a page controller annotated `@PreAuthorize("isAuthenticated()")`, so the carve-out costs nothing.
+Because Spring Security takes the **first** matching rule, the authenticated matcher MUST stay above
+the catalog block; moving it below re-opens the surface with no other symptom.
+
+**An unauthenticated caller MUST NOT request more than 1000 entries per page**, and the refusal MUST
+be an explicit `400` naming the limit rather than a silent reduction. Silently clamping is the defect
+ADR-0104 forbids: the caller gets fewer rows than it asked for, cannot tell, and any surface built on
+a single large page then presents an incomplete list as complete. A page-walking consumer is
+unaffected either way, since it asks for pages until they run out. The ceiling is 1000 because that is
+exactly what the existing anonymous callers request — the guest order form's pickers and the catalogue
+page-walks — so it costs the legitimate flows nothing.
+
+Authenticated callers keep the 100 000 clamp. The scope is matched on the **decoded** path
+(REQ-SEC-029).
+
+**Acceptance**
+
+- [x] `GET /api/v1/materials/matrix` answers 401 without a token; the rest of the material catalogue
+  stays anonymously readable.
+- [x] An anonymous request with `size=50000` is refused with `400` and the stable code
+  `PAGE_SIZE_TOO_LARGE`.
+- [x] An anonymous request with `size=1000` still succeeds.
+- [x] An authenticated caller with `size=50000` is unaffected.
+
+**Enforced by:** `SecurityTest` · **Code:** `AnonymousPageSizeFilter`, `SecurityConfig`
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the

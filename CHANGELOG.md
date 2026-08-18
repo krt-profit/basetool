@@ -6,8 +6,7 @@
 
 - **Bankdaten, Mitgliederdaten und Benachrichtigungen dürfen von Zwischenspeichern nicht mehr abgelegt werden.** Bisher durfte ein Proxy oder Browser-Cache diese Antworten aufbewahren, solange er vor der Wiederverwendung nachfragt; jetzt dürfen sie gar nicht erst gespeichert werden. Alle übrigen Abfragen bleiben unverändert (REQ-SEC-031).
 
-
-### Changed
+- **Die Preis-Matrix ist nur noch angemeldet abrufbar, und ohne Anmeldung sind höchstens 1000 Einträge pro Seite möglich.** Die Matrix ist die größte Einzelantwort der Schnittstelle und war bisher offen erreichbar; genutzt wird sie ohnehin nur auf einer Seite, die eine Anmeldung verlangt. Zu große Seitenanfragen werden jetzt mit einer klaren Fehlermeldung abgelehnt, statt stillschweigend gekürzt zu werden (REQ-SEC-032).
 
 - **Die technischen Statusdaten des Backends sind nicht mehr über den normalen Anwendungsport erreichbar.** Gesundheitsprüfung und Messwerte laufen jetzt über einen eigenen, ausschließlich intern erreichbaren Port — so wie es Frontend und Ingest schon länger tun. Damit liefert der Port, den die geplante öffentliche Schnittstelle weiterreicht, diese Daten gar nicht erst aus, statt sich allein auf eine Sperre am Randserver zu verlassen. Die Möglichkeit, während einer Störung kurzfristig die Protokolltiefe zu erhöhen, bleibt Administratoren erhalten. **Deploy-Hinweis:** Anwendungsabbild und Konfigurationspaket müssen gemeinsam ausgerollt werden — einzeln schlägt die Gesundheitsprüfung fehl und der Deploy rollt zurück (ADR-0134).
 
