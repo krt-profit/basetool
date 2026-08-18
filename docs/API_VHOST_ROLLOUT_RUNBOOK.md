@@ -110,7 +110,13 @@ At the DNS provider, not on the host.
    profit-base.online.  CAA  0 issue "letsencrypt.org"
    ```
 
-   > **Check before you add it.** A `CAA` record makes every CA *not* listed refuse to issue. NPM is
+   > **Read the zone first — it may already carry CAA records.** `dig +short profit-base.online CAA`
+   > on 2026-08-18 returned a provider-supplied default set permitting five issuers (`comodoca`,
+   > `digicert`, `letsencrypt`, `pki.goog`, `ssl.com`) for both `issue` and `issuewild`. Adding the
+   > line below to that is a no-op; achieving "Let's Encrypt only" means *removing* the other four,
+   > which is a deliberate narrowing rather than part of this rollout.
+   >
+   > **Check before you change it.** A `CAA` record makes every CA *not* listed refuse to issue. NPM is
    > the only thing that requests certificates here and it uses Let's Encrypt, so this is safe — but
    > if any certificate for this zone was ever obtained elsewhere (a mail provider, a CDN, a
    > registrar-managed cert), its renewal breaks silently at the next issuance. Confirm first.
@@ -371,6 +377,29 @@ in the same commit, lint, promote, and confirm every new blackbox target is `up`
 
 Ask Claude for that PR; it is a mechanical edit and the appendix lists every line.
 
+**Merging is not enabling.** The config bundle reaches `/var/iri/code/monitoring/**` on a deploy,
+but the running Prometheus only picks it up when the container is **recreated** — the config is a
+single-file bind mount and `rsync` replaces the inode, so the process keeps reading the old one
+(REQ-OBS-014). `deploy.sh` force-recreates on drift, but only on a tick that actually applies
+something: once the config has landed, every following tick reports `no change — already at target
+digests` and returns before the monitoring reconcile. On 2026-08-18 that left the api probes present
+on disk and absent from the running config for over an hour.
+
+Check both sides, and do not take the merge as the answer:
+
+```bash
+grep -c "api.profit-base.online" /var/iri/code/monitoring/prometheus/prometheus.yml
+```
+
+then in Prometheus `up{job=~"blackbox-hsts.*|blackbox-dns.*"}` — if `blackbox-hsts-auth` and
+`blackbox-dns-api-*` are missing while the file has them, force the reload:
+
+```bash
+sudo -u deploy env DOCKER_CONFIG=/var/lib/iri/.docker /usr/bin/docker compose -p iri-monitoring --project-directory /var/iri/code -f /var/iri/code/docker-compose.monitoring.yml up -d --force-recreate prometheus
+```
+
+A SIGHUP is not enough here, for the inode reason above.
+
 ---
 
 ## Phase G — flip the audience enforcement (D5, release gate)
@@ -399,17 +428,37 @@ public.
    Both together — the ingest gateway's tokens are validated by the same rule.
 
 3. Apply. An `.env` change is host state: the deploy timer sees no digest change and exits as a
-   no-op, so it must be applied by hand:
+   no-op, so it must be applied by hand.
 
    ```bash
-   sudo -u deploy /usr/bin/docker compose \
-       -f /var/iri/code/docker-compose.yml --profile prod \
-       up -d backend ingest
+   sudo -u deploy env DOCKER_CONFIG=/var/lib/iri/.docker /usr/bin/docker compose -f /var/iri/code/docker-compose.yml -f /var/lib/iri/current-digest-pin.yml --profile prod up -d backend ingest
    ```
+
+   Both extra pieces are load-bearing, and the command fails without them:
+
+   - **`DOCKER_CONFIG=/var/lib/iri/.docker`** — the `deploy` user was created with
+     `--no-create-home`, so its GHCR credentials live there rather than in a home directory, and
+     `deploy.sh` exports exactly this before its first docker call. Without it the pull is anonymous
+     and GHCR answers `unauthorized` on the private image (observed 2026-08-18).
+   - **`-f /var/lib/iri/current-digest-pin.yml`** — the override `deploy.sh` writes with the exact
+     digests currently deployed. With it the images are already local and nothing is pulled at all;
+     without it compose resolves `:stable`, which may have moved since the last deploy and would
+     quietly bring up a different version than the one running.
 4. Verify within a minute or two:
+   - **both** containers actually carry the variable — the first attempt at this step failed on the
+     pull above and left `ingest` behind, with the backend enforcing and the gateway not:
+
+     ```bash
+     for c in backend ingest; do echo -n "$c: "; docker inspect $c --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -c 'APP_SECURITY_JWT_EXPECTED_AUDIENCES=basetool-backend'; done
+     ```
+
+     Two `1`s. A `0` means that container was not recreated, whatever the compose output said;
+
    - the web app still works (log in, open a page that loads data) — that proves the frontend's
      tokens carry the audience;
+
    - check 1 of phase E still returns `401`, not `500`;
+
    - Grafana dashboard 07 → *Auth failures/hour by reason*: a jump in `invalid_token` right after
      the flip means the audience is **not** being stamped for some client. Roll back immediately.
 
