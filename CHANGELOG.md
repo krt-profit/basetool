@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die App trägt jetzt ihr eigenes Logo.** Kopfzeile, Browser-Tab, Startbildschirm-Symbol und die Anmeldeseite zeigen das neue Basetool-Zeichen statt der Kartell-Marke; das Kartell-Logo bleibt auf den erzeugten PDF-Dokumenten, wo die Organisation gemeint ist. Das Design-System ist dabei auf den aktuellen Stand gehoben worden (REQ-UI-019).
+
 ## [v1.5.52](https://github.com/krt-profit/basetool/releases/tag/v1.5.52) - 2026-08-19
 
 ### Changed

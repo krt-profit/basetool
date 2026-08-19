@@ -5,7 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta th:if="${_csrf != null}" name="_csrf" th:content="${_csrf.token}"/>
     <meta th:if="${_csrf != null}" name="_csrf_header" th:content="${_csrf.headerName}"/>
-    <link rel="icon" type="image/webp" th:href="@{/logos/krt-favicon.webp}">
+    <!--
+      App favicon + touch icon (REQ-UI-019). The Basetool mark replaces the DAS KARTELL org
+      mark here: at tab size the org logo was indistinguishable from every other KRT surface,
+      and the design system ships a dedicated favicon glyph that drops the ring and the star
+      because they stop carrying below 32 px (see the design skill's logo handoff).
+
+      Order matters. The SVG is listed FIRST and is what every current browser picks; the two
+      PNG rasters are the fallback for engines without SVG-favicon support, and are shipped at
+      their exact pixel sizes rather than downscaled from one large file, because a browser
+      resampling a 512 px raster into a 16 px tab slot turns the wedge into mush. The 64 px
+      raster is not linked: no browser requests it for a tab, and it exists in `logos/` for
+      bookmark/pinned-site slots that ask for it by size.
+
+      `apple-touch-icon` gets the 512 px app icon — the mark on an opaque black tile, not the
+      transparent glyph. iOS composites its own rounded mask and does NOT honour transparency,
+      so a transparent icon would land on a white plate on the home screen.
+    -->
+    <link rel="icon" type="image/svg+xml" th:href="@{/logos/basetool-favicon.svg}">
+    <link rel="icon" type="image/png" sizes="32x32" th:href="@{/logos/basetool-favicon-32.png}">
+    <link rel="icon" type="image/png" sizes="16x16" th:href="@{/logos/basetool-favicon-16.png}">
+    <link rel="apple-touch-icon" th:href="@{/logos/basetool-appicon-512.png}">
     <!--
       Preload the critical body font weight so the browser starts the request before stylesheet
       parsing. Without this hint, @font-face requests sit behind styles.css and a `font-display:

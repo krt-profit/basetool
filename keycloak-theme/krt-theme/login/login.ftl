@@ -4,7 +4,7 @@
         ${msg("loginAccountTitle")}
     <#elseif section = "form">
         <div class="login-container">
-            <img src="${url.resourcesPath}/img/krt.webp" alt="KRT" class="login-logo">
+            <img src="${url.resourcesPath}/img/basetool-logo.svg" alt="" class="login-logo">
             <h1>PROFIT BASETOOL</h1>
             <form id="kc-form-login" onsubmit="login.disabled = true; return true;" action="${url.loginAction}" method="post">
                 <div class="form-group">

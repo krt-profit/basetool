@@ -50,7 +50,7 @@ sub-issue are in §7.
 | Density                     | **Comfortable**                                      | 44px touch targets, generous table rows — readability over cramming.                                                |
 | Background texture          | **Honeycomb on** (`honeycomb-bg.svg`, ~0.32 opacity) | On-brand ambient HUD texture without hurting contrast.                                                              |
 | Confidence display (review) | **Percent + status dot**                             | Compact, exact, colour-coded by threshold.                                                                          |
-| Window chrome               | **Custom undecorated KRT title bar**                 | Keep the existing `WindowChrome.kt` look (logo + title + min/max/close, orange hairline, resize grip).              |
+| Window chrome               | **Custom undecorated KRT title bar**                 | Keep the existing `WindowChrome.kt` look (app mark + title + min/max/close, orange hairline, resize grip).          |
 | UI language                 | **German default, full EN parity**                   | Matches the live app's i18n; DE/EN toggle in the title bar.                                                         |
 
 These freeze the prototype's defaults. The other nav models (rail, launcher) and
@@ -94,6 +94,16 @@ tokens. The desktop app already mirrors these in `ui/Theme.kt`; keep them in syn
   review tables (§5.4): tinted text + canonical-hue dot.
 - **Iconography.** In-house 24×24, 2px-stroke line set (`currentColor`, sizes to
   1em). No emoji. Warnings use `⚠`/the warning glyph, status uses small square dots.
+- **App mark (binding).** The tool wears the **Extractor variant** of the Basetool logo
+  family (design skill `assets/basetool-extractor-*`), not the DAS KARTELL org mark. It
+  shares the orbit ring and the star with the web app's Basetool mark but turns the wedge
+  **downwards** into a catch bracket — same DNA, mirrored statement: data is extracted out
+  of the verse, so the two icons read as a family side by side. It ships as the window and
+  taskbar icon (`composeResources/drawable/basetool_extractor_icon.png`), the 18 dp mark in
+  the title bar, and the multi-size installer icon (`src/main/resources/app.ico`, frames
+  16/24/32/48/64/128/256 so Explorer never resamples one large frame). The org mark stays on
+  org-branded surfaces only — mirrors REQ-UI-019 in
+  [`specs/ui-design-system.md`](specs/ui-design-system.md).
 - **Motion.** Restrained: 0.2s colour/background on hover; progress bars and the
   extraction stepper animate; no bounce/parallax.
 - **Scrollbars.** KRT square scrollbars; the extraction console uses `.scroll-accent`
@@ -104,7 +114,7 @@ tokens. The desktop app already mirrors these in `ui/Theme.kt`; keep them in syn
 ## 3. Information architecture & navigation
 
 ```
-Title bar (40px, #141414, orange hairline): KRT logo · "BASETOOL SC EXTRACTOR" · [DE|EN] · _ □ ✕
+Title bar (40px, #141414, orange hairline): Extractor mark · "BASETOOL SC EXTRACTOR" · [DE|EN] · _ □ ✕
 │
 ├─ Tab bar:  [ ⌂ START ] [ ▣ BLUEPRINTS ] [ ⚗ REFINERY ]      (active = orange underline + tint)
 │
