@@ -10,10 +10,10 @@ Production deployment runs as a closed loop between three actors:
 │                              │       │                            │
 │  .github/workflows/          │  push │  ghcr.io/krt-profit/          │
 │    release-images.yml ───────┼──────►│    basetool-backend:1.4.2  │
-│      build  + push           │       │    basetool-frontend:1.4.2 │
-│      scan   (Trivy SARIF)    │       │    basetool-ingest:1.4.2   │
-│      sign   (cosign keyless) │       │    basetool-config:1.4.2   │
-│                              │       │      ... :latest, :edge,   │
+│      plan   (build or reuse) │       │    basetool-frontend:1.4.2 │
+│      build  + push           │       │    basetool-ingest:1.4.2   │
+│      scan   (Trivy SARIF)    │       │    basetool-config:1.4.2   │
+│      sign   (cosign keyless) │       │      ... :latest, :edge,   │
 │                              │       │      :sha-abc1234, :stable │
 │                              │       │                            │
 │  .github/workflows/          │       │                            │
@@ -416,6 +416,17 @@ the refreshed CHANGELOG + SBOM, so the tag is never moved afterwards);
 assets);
 - and the tag push fires `release-images.yml`.
 
+**The tag run does not rebuild.** The tag sits on the merge commit that `main`
+already built, so `release-images.yml` re-tags that commit's `:sha-<short>`
+digest with the semver tags instead of producing a second set of images
+(REQ-OPS-021, [ADR-0137](adr/0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md)).
+It does so only after cosign-verifying each digest against the workflow's own
+main-branch identity and confirming both architectures are present; any doubt —
+a missing tag, a bad signature, a single-arch index — falls back to a full
+build. Two operational consequences: a release takes ~5 minutes instead of
+~12:45, and `:1.4.3` and `:sha-<short>` are now the **same digest**, so a
+rollback to either lands on identical bytes.
+
 Closing the prep PR without merging cancels the release cleanly — no tag, no
 orphan commit on `main`.
 
@@ -426,7 +437,9 @@ orphan commit on `main`.
 > write`) so that `release-images.yml` fires. If the secret is absent the tag and
 > the GitHub Release are still produced, but you must start the image build by
 > hand (*Actions → Release Images → Run workflow → `v1.4.3`*); the publish job
-> logs a warning saying exactly this. `RELEASE_TOKEN` is a CI secret, separate
+> logs a warning saying exactly this. A `workflow_dispatch` run always performs
+> a **full build**, never the tag-run re-tag — it is the escape hatch for a
+> release whose images are missing or suspect, so it must not reuse them. `RELEASE_TOKEN` is a CI secret, separate
 > from the server's GHCR-pull PAT under [Token rotation](#token-rotation).
 
 Within ~10 minutes the images are built, scanned, signed, and available in GHCR
@@ -461,8 +474,11 @@ The promotion passes two gates before it flips `:stable` (REQ-OPS-002):
 2. **Signature.** cosign-verify of the exact digest against the release-images
    identity (the same identity the host re-verifies — REQ-OPS-015).
 
-`release-images.yml` still scans every build with Trivy and uploads the findings
-to the repository's Security tab, but the scan does not gate the promotion.
+`release-images.yml` still scans every built image with Trivy and uploads the
+findings to the repository's Security tab, but the scan does not gate the
+promotion. Coverage is per **digest**, not per run: a tag run that re-tags the
+main run's digest (REQ-OPS-021) publishes no new SARIF, because that digest was
+already scanned under the same categories.
 
 This re-tags the existing 1.4.3 image digest as `:stable` in GHCR. No
 rebuild. Same digest, two tags.
