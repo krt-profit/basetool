@@ -19,14 +19,19 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.ApproveRegistrationRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.LinkRegistrationRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.PendingRegistrationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RejectRegistrationRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.ReopenRegistrationRequest;
 import de.greluc.krt.profit.basetool.backend.service.UserRegistrationService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -40,6 +45,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -49,6 +55,10 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>Approval grants no Basetool roles by itself — after approval the admin seats the user's
  * roles/units via the existing tooling (Track 1 keeps role assignment manual).
+ *
+ * <p>The queue read also serves the rejected rows ({@code ?status=REJECTED}) and {@link #reopen}
+ * reverses an erroneous rejection back into the queue (REQ-SEC-034) — the two halves of making a
+ * mistaken rejection recoverable without a manual database write.
  */
 @RestController
 @RequestMapping("/api/v1/admin/registrations")
@@ -59,14 +69,36 @@ public class DiscordRegistrationAdminController {
   private final UserRegistrationService userRegistrationService;
 
   /**
-   * Lists the registrations awaiting an admin decision, oldest first.
+   * Lists registrations by approval status, oldest first — the pending queue by default, or the
+   * rejected rows so an erroneous rejection can be found and reopened (REQ-SEC-034).
    *
-   * @return the pending registrations
+   * <p>Only {@code PENDING} and {@code REJECTED} are accepted. {@code ACTIVE} is refused rather
+   * than served: it would turn this small admin queue into an unbounded dump of every member, which
+   * is the user-administration surface's job and carries a different DTO.
+   *
+   * @param status the approval status to list; defaults to {@code PENDING} when absent
+   * @return the registrations in that status, oldest registration first
+   * @throws BadRequestException when {@code status=ACTIVE} is requested
    */
   @GetMapping
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  public List<PendingRegistrationDto> listPending() {
-    return userRegistrationService.findPendingRegistrations().stream().map(this::toDto).toList();
+  public List<PendingRegistrationDto> list(
+      @RequestParam(name = "status", required = false)
+          @Nullable
+          // ACTIVE is a legal ApprovalStatus but not a legal argument here (it would dump every
+          // member), so the published schema advertises only the two values that can succeed
+          // rather than the whole enum springdoc would otherwise reflect.
+          @Parameter(schema = @Schema(allowableValues = {"PENDING", "REJECTED"}))
+          ApprovalStatus status) {
+    List<User> users =
+        switch (status == null ? ApprovalStatus.PENDING : status) {
+          case PENDING -> userRegistrationService.findPendingRegistrations();
+          case REJECTED -> userRegistrationService.findRejectedRegistrations();
+          case ACTIVE ->
+              throw new BadRequestException(
+                  "Only PENDING and REJECTED registrations can be listed here");
+        };
+    return users.stream().map(this::toDto).toList();
   }
 
   /**
@@ -109,6 +141,30 @@ public class DiscordRegistrationAdminController {
   }
 
   /**
+   * Reopens a rejected registration (moves it back to {@code PENDING} so it re-enters the queue and
+   * can be decided again). This is the supported reversal of an erroneous rejection (REQ-SEC-034);
+   * previously the only ways back were a manual production {@code UPDATE}, which bypasses the audit
+   * trail, or deleting the account outright, which destroys its data.
+   *
+   * @param id the rejected registration to reopen
+   * @param jwt the calling admin's token (for the audit's acting-admin id)
+   * @param body optional body carrying a note and the optimistic-lock version
+   * @return the now-pending registration (with its bumped version)
+   */
+  @PostMapping("/{id}/reopen")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  public PendingRegistrationDto reopen(
+      @PathVariable UUID id,
+      @AuthenticationPrincipal Jwt jwt,
+      @Nullable @Valid @RequestBody(required = false) ReopenRegistrationRequest body) {
+    String reason = body == null ? null : body.reason();
+    Long version = body == null ? null : body.version();
+    return toDto(
+        userRegistrationService.reopenRegistration(
+            id, reason, version, userService.getUserIdFromJwt(jwt)));
+  }
+
+  /**
    * Links a pending Discord registration onto an existing account (REQ-SEC-026): moves the Discord
    * identity onto the chosen account and removes the throwaway Discord-registered account. Used
    * when a member who already had an account registered anew via Discord (e.g. their Discord handle
@@ -136,6 +192,7 @@ public class DiscordRegistrationAdminController {
         user.getEffectiveName(),
         user.getDiscordGuildNickname(),
         user.getCreatedAt(),
+        user.getApprovedAt(),
         user.getVersion());
   }
 }

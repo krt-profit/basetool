@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Eine irrtümlich abgelehnte Registrierung kann wieder geöffnet werden.** Unter `/admin/discord-registrations` listet eine zweite Tabelle die abgelehnten Registrierungen; ein Admin holt eine davon per „Wiederöffnen“ zurück in die Warteschlange und gibt sie anschließend wie gewohnt frei. Bisher war eine Ablehnung endgültig — der Betroffene blieb dauerhaft auf der Warteseite hängen. Die Wiederöffnung wird protokolliert und ist für bereits freigeschaltete Konten gesperrt (REQ-SEC-034, ADR-0140).
+
 ## [v1.5.54](https://github.com/krt-profit/basetool/releases/tag/v1.5.54) - 2026-08-19
 
 ### Changed

@@ -30,7 +30,14 @@ import java.util.UUID;
  * @param serverNickname the user's per-guild Discord server nickname (REQ-DATA-008), or {@code
  *     null} when none was captured
  * @param registeredAt when the registration first appeared
+ * @param decidedAt when an admin last decided this registration, i.e. the rejection time for a row
+ *     in the rejected list (REQ-SEC-034); {@code null} for a row awaiting a decision
  * @param version optimistic-lock version, echoed back on approve/reject
  */
 public record PendingRegistrationDto(
-    UUID id, String username, String serverNickname, Instant registeredAt, Long version) {}
+    UUID id,
+    String username,
+    String serverNickname,
+    Instant registeredAt,
+    Instant decidedAt,
+    Long version) {}

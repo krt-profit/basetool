@@ -28,12 +28,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.event.UserApprovalDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.Role;
@@ -41,6 +43,8 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.UserApprovalEvent;
 import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -60,9 +64,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 /**
  * Mockito unit tests for {@link UserRegistrationService} — the registration approval lifecycle
  * (approve / reject / decide, the pending-queue read), the admin-driven {@link
- * UserRegistrationService#linkRegistrationToExistingAccount} merge (REQ-SEC-026), plus the shared
- * {@link UserRegistrationService#stampNewPendingRegistration} fail-safe PENDING stamping, extracted
- * out of {@code UserService} (audit Thema&nbsp;7, #1252).
+ * UserRegistrationService#linkRegistrationToExistingAccount} merge (REQ-SEC-026), the reversal of
+ * an erroneous rejection via {@link UserRegistrationService#reopenRegistration} (REQ-SEC-034), plus
+ * the shared {@link UserRegistrationService#stampNewPendingRegistration} fail-safe PENDING
+ * stamping, extracted out of {@code UserService} (audit Thema&nbsp;7, #1252).
  */
 @ExtendWith(MockitoExtension.class)
 class UserRegistrationServiceTest {
@@ -409,6 +414,146 @@ class UserRegistrationServiceTest {
                   USER_ID, USER_ID, 0L, ADMIN_ID));
 
       verifyNoInteractions(keycloakService);
+    }
+  }
+
+  /**
+   * Tests for the reversal of an erroneous rejection (REQ-SEC-034): {@link
+   * UserRegistrationService#findRejectedRegistrations()} makes a rejected row findable and {@link
+   * UserRegistrationService#reopenRegistration} returns it to the approval queue as PENDING.
+   */
+  @Nested
+  class ReopenRegistrationTests {
+
+    private static User rejectedUser(long version) {
+      User u = new User();
+      u.setId(USER_ID);
+      u.setApprovalStatus(ApprovalStatus.REJECTED);
+      u.setApprovedAt(Instant.parse("2026-06-29T10:15:00Z"));
+      u.setApprovedById(UUID.randomUUID());
+      u.setVersion(version);
+      return u;
+    }
+
+    @Test
+    void reopenRegistration_setsPending_clearsDecisionStamp_andAuditsReopened() {
+      User user = rejectedUser(7L);
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+      when(userRepository.saveAndFlush(user)).thenReturn(user);
+
+      User result =
+          userRegistrationService.reopenRegistration(USER_ID, "rejected by mistake", 7L, ADMIN_ID);
+
+      assertEquals(ApprovalStatus.PENDING, result.getApprovalStatus());
+      // The stale decision stamp is cleared so the row is indistinguishable from a fresh pending
+      // registration; who rejected it and when survives in the audit table.
+      assertNull(result.getApprovedAt());
+      assertNull(result.getApprovedById());
+      ArgumentCaptor<UserApprovalEvent> audit = ArgumentCaptor.forClass(UserApprovalEvent.class);
+      verify(userApprovalEventRepository).save(audit.capture());
+      assertEquals(ApprovalDecision.REOPENED, audit.getValue().getDecision());
+      assertEquals(USER_ID, audit.getValue().getUserId());
+      assertEquals(ADMIN_ID, audit.getValue().getDecidedById());
+      assertEquals("rejected by mistake", audit.getValue().getReason());
+    }
+
+    @Test
+    void reopenRegistration_publishesNoNotification() {
+      // A reopen is not a verdict, so it must not fire the approve/reject decision mail
+      // (REQ-NOTIF-014) nor the new-pending admin mail (REQ-NOTIF-012).
+      User user = rejectedUser(0L);
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+      when(userRepository.saveAndFlush(user)).thenReturn(user);
+
+      userRegistrationService.reopenRegistration(USER_ID, null, 0L, ADMIN_ID);
+
+      verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void reopenRegistration_onPendingUser_throwsConflict_andWritesNoAudit() {
+      User pending = pendingUser(1L);
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(pending));
+
+      assertThrows(
+          BusinessConflictException.class,
+          () -> userRegistrationService.reopenRegistration(USER_ID, null, 1L, ADMIN_ID));
+
+      verify(userApprovalEventRepository, never()).save(any());
+      verify(userRepository, never()).saveAndFlush(any());
+      assertEquals(ApprovalStatus.PENDING, pending.getApprovalStatus());
+    }
+
+    @Test
+    void reopenRegistration_onActiveUser_throwsConflict_andLeavesAccessIntact() {
+      // The mirror of the decide(...) guard: an ACTIVE member pushed back into the queue would lose
+      // their authorities, so reopening one is refused.
+      User active = pendingUser(2L);
+      active.setApprovalStatus(ApprovalStatus.ACTIVE);
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(active));
+
+      assertThrows(
+          BusinessConflictException.class,
+          () -> userRegistrationService.reopenRegistration(USER_ID, null, 2L, ADMIN_ID));
+
+      verify(userApprovalEventRepository, never()).save(any());
+      verify(userRepository, never()).saveAndFlush(any());
+      assertEquals(ApprovalStatus.ACTIVE, active.getApprovalStatus());
+    }
+
+    @Test
+    void reopenRegistration_staleVersion_throws409_andWritesNoAudit() {
+      User user = rejectedUser(5L);
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+
+      assertThrows(
+          ObjectOptimisticLockingFailureException.class,
+          () -> userRegistrationService.reopenRegistration(USER_ID, null, 3L, ADMIN_ID));
+
+      verify(userApprovalEventRepository, never()).save(any());
+      assertEquals(ApprovalStatus.REJECTED, user.getApprovalStatus());
+    }
+
+    @Test
+    void reopenRegistration_unknownUser_throwsNotFound() {
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+      assertThrows(
+          NotFoundException.class,
+          () -> userRegistrationService.reopenRegistration(USER_ID, null, null, ADMIN_ID));
+
+      verify(userApprovalEventRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectedRegistration_canBeReopenedAndThenApproved() {
+      // The end-to-end recovery this feature exists for: a registration rejected in error walks
+      // REJECTED -> PENDING -> ACTIVE through supported admin actions only, leaving two audit rows.
+      User user = rejectedUser(4L);
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+      when(userRepository.saveAndFlush(user)).thenReturn(user);
+
+      User reopened = userRegistrationService.reopenRegistration(USER_ID, null, 4L, ADMIN_ID);
+      assertEquals(ApprovalStatus.PENDING, reopened.getApprovalStatus());
+
+      User approved = userRegistrationService.approveUser(USER_ID, 4L, ADMIN_ID);
+      assertEquals(ApprovalStatus.ACTIVE, approved.getApprovalStatus());
+      assertEquals(ADMIN_ID, approved.getApprovedById());
+      assertNotNull(approved.getApprovedAt());
+
+      ArgumentCaptor<UserApprovalEvent> audit = ArgumentCaptor.forClass(UserApprovalEvent.class);
+      verify(userApprovalEventRepository, times(2)).save(audit.capture());
+      assertEquals(ApprovalDecision.REOPENED, audit.getAllValues().get(0).getDecision());
+      assertEquals(ApprovalDecision.APPROVED, audit.getAllValues().get(1).getDecision());
+    }
+
+    @Test
+    void findRejectedRegistrations_readsTheRejectedRows() {
+      User rejected = rejectedUser(0L);
+      when(userRepository.findByApprovalStatusOrderByCreatedAtAsc(ApprovalStatus.REJECTED))
+          .thenReturn(List.of(rejected));
+
+      assertEquals(List.of(rejected), userRegistrationService.findRejectedRegistrations());
     }
   }
 }

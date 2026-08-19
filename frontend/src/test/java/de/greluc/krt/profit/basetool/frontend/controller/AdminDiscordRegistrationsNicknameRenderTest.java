@@ -52,8 +52,10 @@ import org.springframework.web.context.WebApplicationContext;
  * server-nickname column (REQ-DATA-008) — a captured per-guild nickname is shown next to the name,
  * a registration without one falls back to the muted em-dash — and the admin
  * link-to-existing-account action (REQ-SEC-026): the "Verknüpfen" button and the remote-users
- * account picker render, and the {@code linkAjax} proxy forwards to the backend. The render
- * assertions key off controlled values / stable markers, so they are locale-independent.
+ * account picker render, and the {@code linkAjax} proxy forwards to the backend. Also covers the
+ * rejected table and its reopen action (REQ-SEC-034), including the deliberate degradation when
+ * only the rejected read fails. The render assertions key off controlled values / stable markers,
+ * so they are locale-independent.
  */
 @SpringBootTest
 class AdminDiscordRegistrationsNicknameRenderTest {
@@ -81,10 +83,16 @@ class AdminDiscordRegistrationsNicknameRenderTest {
             "AliceCallsign",
             "VanguardPilot",
             Instant.parse("2026-06-22T00:00:00Z"),
+            null,
             1L);
     PendingRegistrationDto withoutNick =
         new PendingRegistrationDto(
-            UUID.randomUUID(), "BobCallsign", null, Instant.parse("2026-06-22T00:00:00Z"), 1L);
+            UUID.randomUUID(),
+            "BobCallsign",
+            null,
+            Instant.parse("2026-06-22T00:00:00Z"),
+            null,
+            1L);
 
     when(backendApiClient.get(eq("/api/v1/admin/registrations"), anyTypeRef()))
         .thenReturn(List.of(withNick, withoutNick));
@@ -118,6 +126,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
                     "conrad7247",
                     null,
                     Instant.parse("2026-07-20T00:00:00Z"),
+                    null,
                     1L)));
 
     String html =
@@ -148,7 +157,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
             eq(PendingRegistrationDto.class)))
         .thenReturn(
             new PendingRegistrationDto(
-                target, "MadrukSedras", null, Instant.parse("2026-07-20T00:00:00Z"), 2L));
+                target, "MadrukSedras", null, Instant.parse("2026-07-20T00:00:00Z"), null, 2L));
 
     mockMvc
         .perform(
@@ -156,6 +165,95 @@ class AdminDiscordRegistrationsNicknameRenderTest {
                 .header("X-Requested-With", "XMLHttpRequest")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"targetUserId\":\"" + target + "\",\"version\":1}")
+                .with(csrf())
+                .with(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void rejectedTable_rendersRejectedRowsWithReopenAction() throws Exception {
+    when(backendApiClient.get(eq("/api/v1/admin/registrations"), anyTypeRef()))
+        .thenReturn(List.of());
+    when(backendApiClient.get(eq("/api/v1/admin/registrations?status=REJECTED"), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new PendingRegistrationDto(
+                    UUID.randomUUID(),
+                    "StolpiCallsign",
+                    null,
+                    Instant.parse("2026-06-22T00:00:00Z"),
+                    Instant.parse("2026-06-29T09:41:00Z"),
+                    3L)));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/admin/discord-registrations")
+                    .with(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("the rejected registration renders with its rejection time and the reopen action")
+        .contains("StolpiCallsign")
+        .contains("29.06.2026 09:41")
+        .contains("data-action=\"reopen\"")
+        .contains("id=\"reopen-modal\"")
+        .contains("id=\"reopen-reason\"");
+  }
+
+  @Test
+  void rejectedListFailure_doesNotBlankThePendingQueue() throws Exception {
+    // The rejected read is the secondary surface; a failure there (e.g. a backend that predates
+    // ?status= during a rolling deploy) must not take the pending queue down with it.
+    when(backendApiClient.get(eq("/api/v1/admin/registrations"), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new PendingRegistrationDto(
+                    UUID.randomUUID(),
+                    "AliceCallsign",
+                    null,
+                    Instant.parse("2026-06-22T00:00:00Z"),
+                    null,
+                    1L)));
+    when(backendApiClient.get(eq("/api/v1/admin/registrations?status=REJECTED"), anyTypeRef()))
+        .thenThrow(new IllegalStateException("backend does not know ?status="));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/admin/discord-registrations")
+                    .with(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("the pending queue still renders and the rejected table degrades to its empty state")
+        .contains("AliceCallsign")
+        .contains("id=\"rejectedEmpty\"");
+  }
+
+  @Test
+  void reopenAjax_forwardsToBackend_andReturnsOk() throws Exception {
+    UUID id = UUID.randomUUID();
+    when(backendApiClient.post(
+            eq("/api/v1/admin/registrations/" + id + "/reopen"),
+            any(),
+            eq(PendingRegistrationDto.class)))
+        .thenReturn(
+            new PendingRegistrationDto(
+                id, "StolpiCallsign", null, Instant.parse("2026-06-22T00:00:00Z"), null, 4L));
+
+    mockMvc
+        .perform(
+            post("/admin/discord-registrations/" + id + "/reopen")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\":\"rejected by mistake\",\"version\":3}")
                 .with(csrf())
                 .with(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isOk());

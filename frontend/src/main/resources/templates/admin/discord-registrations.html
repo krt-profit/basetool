@@ -10,7 +10,8 @@
             position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75);
             align-items: center; justify-content: center; padding: 1rem;
         }
-        #reject-reason {
+        #reject-reason,
+        #reopen-reason {
             width: 100%; min-height: 80px; padding: 0.5rem; box-sizing: border-box;
             background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3);
             color: var(--color-gray-1); font-family: var(--font-body);
@@ -84,6 +85,51 @@
         </div>
     </div>
 
+    <!-- Rejected registrations (REQ-SEC-034). Read-only apart from the reopen action, which returns
+         a row to the queue above so an erroneous rejection is recoverable from the UI instead of by
+         a manual database write. -->
+    <div class="hud-box mt-2">
+        <h2 class="mt-0" th:text="#{admin.discordRegistrations.rejected.title}">Abgelehnte Registrierungen</h2>
+        <p class="reg-when" th:text="#{admin.discordRegistrations.rejected.hint}">Eine irrtümlich abgelehnte Registrierung kann wieder in die Warteschlange zurückgeholt werden.</p>
+        <div class="table-responsive">
+            <table id="rejectedTable">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.discordRegistrations.col.user}">Nutzer</th>
+                        <th th:text="#{admin.discordRegistrations.col.nickname}">Server-Nickname</th>
+                        <th th:text="#{admin.discordRegistrations.col.registeredAt}">Registriert</th>
+                        <th th:text="#{admin.discordRegistrations.col.rejectedAt}">Abgelehnt</th>
+                        <th th:text="#{admin.discordRegistrations.col.actions}">Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody id="rejectedBody">
+                    <tr th:each="reg : ${rejected}" th:id="'rejected-row-' + ${reg.id}"
+                        th:attr="data-id=${reg.id},data-version=${reg.version}">
+                        <td th:text="${reg.username}">Nutzer</td>
+                        <td>
+                            <span th:if="${reg.serverNickname}" th:text="${reg.serverNickname}">Server-Nickname</span>
+                            <span th:unless="${reg.serverNickname}" class="reg-when" aria-hidden="true">&mdash;</span>
+                        </td>
+                        <td class="reg-when" th:text="${#temporals.format(reg.registeredAt, 'dd.MM.yyyy HH:mm', 'UTC')}">20.06.2026 00:00</td>
+                        <td class="reg-when">
+                            <span th:if="${reg.decidedAt}" th:text="${#temporals.format(reg.decidedAt, 'dd.MM.yyyy HH:mm', 'UTC')}">29.06.2026 00:00</span>
+                            <span th:unless="${reg.decidedAt}" aria-hidden="true">&mdash;</span>
+                        </td>
+                        <td>
+                            <div class="reg-actions">
+                                <button type="button" class="btn btn-outline" data-action="reopen"
+                                        th:text="#{admin.discordRegistrations.reopen}">Wiederöffnen</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr id="rejectedEmpty" th:if="${#lists.isEmpty(rejected)}">
+                        <td colspan="5" th:text="#{admin.discordRegistrations.rejected.empty}">Keine abgelehnten Registrierungen.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <!-- Reject reason modal (no native dialogs, REQ-UI) -->
     <div id="reject-modal" class="modal krtm-display-none-z-index-3100-25fb">
         <div class="modal-content hud-box krtm-max-width-520px-acb4">
@@ -93,6 +139,21 @@
             <div class="flex-center-gap krtm-margin-top-1rem-a6cb">
                 <button type="button" class="btn btn-ghost" id="reject-cancel" th:text="#{general.cancel}">Abbrechen</button>
                 <button type="button" class="btn btn-danger" id="reject-confirm" th:text="#{admin.discordRegistrations.reject}">Ablehnen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reopen-confirmation modal (no native dialogs, REQ-UI). Carries an optional note that lands
+         in the approval audit alongside the REOPENED decision (REQ-SEC-034). -->
+    <div id="reopen-modal" class="modal krtm-display-none-z-index-3100-25fb">
+        <div class="modal-content hud-box krtm-max-width-520px-acb4">
+            <h2 class="mt-0" th:text="#{admin.discordRegistrations.reopen.modal.title}">Registrierung wiederöffnen</h2>
+            <p class="reg-when" th:text="#{admin.discordRegistrations.reopen.modal.hint}">Die Registrierung kehrt in die Warteschlange zurück und muss danach erneut freigegeben werden.</p>
+            <label for="reopen-reason" th:text="#{admin.discordRegistrations.reopen.modal.reasonLabel}">Notiz (optional)</label>
+            <textarea id="reopen-reason" maxlength="1000"></textarea>
+            <div class="flex-center-gap krtm-margin-top-1rem-a6cb">
+                <button type="button" class="btn btn-ghost" id="reopen-cancel" th:text="#{general.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn--cta" id="reopen-confirm" th:text="#{admin.discordRegistrations.reopen}">Wiederöffnen</button>
             </div>
         </div>
     </div>
@@ -126,7 +187,13 @@
         rejectError: /*[[#{error.admin.discordRegistrations.reject}]]*/ 'Ablehnung fehlgeschlagen.',
         linkError: /*[[#{error.admin.discordRegistrations.link}]]*/ 'Verknüpfung fehlgeschlagen.',
         linkNoTarget: /*[[#{error.admin.discordRegistrations.link.noTarget}]]*/ 'Bitte einen Account auswählen.',
-        empty: /*[[#{admin.discordRegistrations.empty}]]*/ 'Keine offenen Registrierungen.'
+        reopened: /*[[#{admin.discordRegistrations.reopened}]]*/ 'Registrierung wieder eröffnet.',
+        reopenError: /*[[#{error.admin.discordRegistrations.reopen}]]*/ 'Wiederöffnen fehlgeschlagen.',
+        approve: /*[[#{admin.discordRegistrations.approve}]]*/ 'Freigeben',
+        link: /*[[#{admin.discordRegistrations.link}]]*/ 'Verknüpfen',
+        reject: /*[[#{admin.discordRegistrations.reject}]]*/ 'Ablehnen',
+        empty: /*[[#{admin.discordRegistrations.empty}]]*/ 'Keine offenen Registrierungen.',
+        rejectedEmpty: /*[[#{admin.discordRegistrations.rejected.empty}]]*/ 'Keine abgelehnten Registrierungen.'
     };
 </script>
 <script th:src="@{/js/discord-registrations.js}" th:attr="nonce=${cspNonce}"></script>
