@@ -144,11 +144,17 @@ convention `cleanup…ForGuest` is structurally enforced by the ArchUnit rule
 > Discord sign-up lands without approval in `PENDING` (REQ-SEC-017): the entire
 > authority assembly is short-circuited to the single authority `ROLE_PENDING_APPROVAL`
 > — no realm roles, no permissions, no OrgUnit roles, **and no `ROLE_GUEST`**.
-> Such users are routed in the frontend to an "approval pending" page until,
+> Such users are routed in the frontend to the account-status page until,
 > under `/admin/discord-registrations`, an admin approves them (then `ACTIVE`), **links** the
 > registration onto an existing account (REQ-SEC-026 — for a member who already had an account but
 > registered anew via Discord), or rejects them (`REJECTED`, stays without access). Roles/units are
 > assigned **manually** after approval (Track 1).
+>
+> **The two non-approved states share that route but not its copy.** `PENDING` is told an
+> administrator still has to approve the account; `REJECTED` gets a rejection notice with no
+> automatic continuation and a pointer to contact an admin on Discord. Rejection is terminal — the
+> backend refuses a second decision on a non-`PENDING` row — so showing it the waiting copy leaves
+> a declined user waiting for a verdict that has already been reached (REQ-SEC-017).
 >
 > **`ROLE_INGEST_GATEWAY` ≈ a machine, not a member.** A Keycloak service account is a full user
 > with a UUID `sub`, so the ingest gateway's own token was indistinguishable from a person's and

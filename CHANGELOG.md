@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Abgelehnte Registrierungen sahen weiter „Freigabe ausstehend".** Wartende und abgelehnte Konten landeten auf derselben Seite, und die zeigte unabhängig vom Status die Wartemeldung — abgelehnte Nutzer warteten deshalb auf eine Freigabe, die nie kommt, und meldeten das als hängende Freigabe. Die Seite unterscheidet jetzt: Abgelehnte sehen einen Ablehnungshinweis ohne automatische Freischaltung und den Verweis auf einen Administrator im Discord, Wartende die unveränderte Wartemeldung, und ein bereits freigegebenes Konto wird direkt ins Tool geleitet. Fällt die Ablehnung, während die Seite offen ist, wechselt der Text ohne Neuladen; danach wird nicht mehr auf eine Freigabe geprüft (REQ-SEC-017).
+
 ## [v1.5.54](https://github.com/krt-profit/basetool/releases/tag/v1.5.54) - 2026-08-19
 
 ### Changed

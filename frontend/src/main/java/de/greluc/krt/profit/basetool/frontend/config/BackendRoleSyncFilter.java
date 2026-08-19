@@ -253,6 +253,31 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   }
 
   /**
+   * Drops the cached approval verdict so the next request re-reads it from the backend instead of
+   * reusing one that the caller already knows is stale.
+   *
+   * <p>Exists for exactly one caller: {@code PendingApprovalPageController} redirects an {@code
+   * ACTIVE} caller off the waiting page, and the waiting page is reached precisely because this
+   * filter believes the caller is not approved. Without this, the redirect and the filter disagree
+   * for up to {@link #APPROVAL_RECHECK_MILLIS} and bounce the browser between {@code /} and {@code
+   * /pending-approval} until the cached verdict expires — the redirect is served from the session,
+   * so it costs no backend read and the loop runs at full speed straight into the browser's
+   * redirect cap. Clearing both attributes puts {@link #resolveApprovalState} back on its
+   * never-read path, where a successful read admits the caller and a failed one yields {@code null}
+   * (not pending) rather than resurrecting the stale verdict, so neither outcome can loop.
+   *
+   * @param session the caller's session, or {@code null} when there is none — then a no-op, since a
+   *     session-less request carries no cached verdict to begin with
+   */
+  public static void forgetApprovalVerdict(@Nullable HttpSession session) {
+    if (session == null) {
+      return;
+    }
+    session.removeAttribute(APPROVAL_STATE_FLAG);
+    session.removeAttribute(APPROVAL_CHECKED_AT_FLAG);
+  }
+
+  /**
    * Whether a periodically refreshed piece of session state is stale and must be re-read.
    *
    * @param stamp the stored epoch-millis stamp of the last successful read; anything that is not a
