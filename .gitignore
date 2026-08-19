@@ -38,6 +38,12 @@ out/
 
 *.p12
 keystore.p12
+# The one exception, and it is deliberate: the test stack's shared TLS material
+# (ADR-0139). It is a throwaway built to be published -- the CA key that signed it
+# was destroyed at generation time and the server key can only serve loopback and
+# docker-network names. The two rules above stay so the PRODUCTION keystore, which
+# is named exactly keystore.p12, still cannot land next to it.
+!docker/test-tls/basetool-test-keystore.p12
 realm-export.json
 *.log
 Mining_Hub_V0.3.0.py

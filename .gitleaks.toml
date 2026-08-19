@@ -6,6 +6,12 @@
 #   - .env.example                                       placeholder env values
 #   - frontend/src/e2e/resources/realm-export.e2e.json   stripped Keycloak realm
 #       export with a rotated, synthetic test client secret + a synthetic user
+#   - docker/test-tls/                                   the test stack's shared TLS
+#       material (ADR-0139). Deliberately published: the CA private key that signed it
+#       was destroyed at generation time, and the server key it does contain can only
+#       serve loopback / emulator / docker-network names. Scoped to the directory, so a
+#       keystore committed anywhere ELSE still trips the scan — including the exact name
+#       `keystore.p12`, which .gitignore refuses so the production file cannot land here.
 #
 # The PR scan in .github/workflows/gitleaks.yml is range-scoped (it only walks
 # the commits the PR introduces), so a NEW secret added anywhere else still
@@ -20,6 +26,8 @@ description = "Committed test/sample fixtures with throwaway placeholder credent
 paths = [
   '''\.env\.example$''',
   '''frontend/src/e2e/resources/realm-export\.e2e\.json$''',
+  '''docker/test-tls/basetool-test-ca\.crt$''',
+  '''docker/test-tls/basetool-test-keystore\.p12$''',
 ]
 # Obvious synthetic Discord snowflake used as a throwaway unit-test fixture (the
 # 18-digit placeholder id in UserServiceDiscordSyncTest). It is a sequential dummy,

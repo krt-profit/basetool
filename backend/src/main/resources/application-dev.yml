@@ -16,6 +16,13 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:https://keycloak.profit-base.online/realms/iri}
+          # Same escape hatch prod has (application-prod.yml), and dev needs it for a reason prod
+          # does not have: the Android emulator can only reach Keycloak under a host name the
+          # BACKEND cannot resolve. With KC_HOSTNAME pinned so the app's tokens carry
+          # iss=http://127.0.0.1:18080/..., the backend would have to fetch keys from 127.0.0.1 --
+          # which inside the container is itself. Empty (the default) keeps deriving the key URL
+          # from issuer-uri, i.e. nothing changes for a stack without that split.
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
 
 # SC Wiki catalogue sync. The per-sync feature flags default to false in code
 # (ScWikiProperties -- "ships dark"); enabled here so each scheduler step actually

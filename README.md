@@ -195,7 +195,7 @@ The multi-squadron / multi-OrgUnit rollout is long complete; its current model i
 
 ### Running the local test stack
 
-For UI verification in a worktree without exposing any production secret. Use an isolated `.env.test`, a locally generated `keystore.p12` (throwaway password), and a stripped `realm-export.json`, driven through the `docker-compose.test.yml` override:
+For UI verification in a worktree without exposing any production secret. Use an isolated `.env.test` and a stripped `realm-export.json`, driven through the `docker-compose.test.yml` override:
 
 ```bash
 docker compose --env-file .env.test \
@@ -205,24 +205,16 @@ docker compose --env-file .env.test \
     -f docker-compose.yml -f docker-compose.test.yml --profile dev down --volumes
 ```
 
+**The TLS material is not something you generate.** [`docker/test-tls/`](docker/test-tls/README.md) carries a committed keystore that every test stack, every CI run and the Android dev build share, so there is nothing to create and no CA to install on an emulator. It is bound by a hardcoded path rather than through `IRI_KEYSTORE_HOST_PATH`, which still selects the *production* keystore — a test stack must not be one typo away from mounting it. Why publishing it is safe, and the one price it costs: [ADR-0139](docs/adr/0139-shared-committed-tls-material-for-the-test-stack.md).
+
 The dev-profile Postgres and Redis services keep their data in **named volumes**, which Compose prefixes with the project name — so two worktrees do not share a database, and `down --volumes` genuinely resets the stack. (The prod services keep their `/var/iri/*` host binds, which are provisioned and backed up on the production host.) If a stack ever refuses to start with `password authentication failed`, the data directory was initialised by an earlier run with different credentials: `down --volumes` and start again, since `initdb` never re-runs on a non-empty directory.
 
-`.gitignore` already excludes `.env.*`, `keystore.p12` and `realm-export.json`, so none of the three artifacts below can be committed by accident. **Never substitute the production `.env`, `keystore.p12` or `realm-export.json`** — the reasoning is in the *Testing* section of [CLAUDE.md](CLAUDE.md).
+`.gitignore` already excludes `.env.*`, `keystore.p12` and `realm-export.json`, so neither of the two artifacts below can be committed by accident. **Never substitute the production `.env`, `keystore.p12` or `realm-export.json`** — the reasoning is in the *Testing* section of [CLAUDE.md](CLAUDE.md).
 
-**1. Throwaway keystore.** One self-signed cert covering every service alias the stack dials over TLS. The password is arbitrary but must match `SERVER_SSL_KEY_STORE_PASSWORD` in `.env.test`:
-
-```bash
-keytool -genkeypair -alias basetool -keyalg RSA -keysize 2048 -validity 30 \
-    -storetype PKCS12 -keystore keystore.p12 -storepass throwaway-test-pw \
-    -dname "CN=basetool-test, OU=test, O=test, L=test, S=test, C=DE" \
-    -ext "SAN=dns:localhost,dns:backend,dns:frontend,dns:ingest,dns:keycloak,ip:127.0.0.1"
-```
-
-**2. `.env.test`.** Every variable the base compose marks required, with throwaway values:
+**1. `.env.test`.** Every variable the base compose marks required, with throwaway values:
 
 ```bash
 SERVER_SSL_KEY_STORE_PASSWORD=throwaway-test-pw
-IRI_KEYSTORE_HOST_PATH=./keystore.p12
 POSTGRES_DB=krt_basetool
 POSTGRES_USER=basetool_test
 POSTGRES_PASSWORD=throwaway-test-pw
@@ -236,7 +228,9 @@ REDIS_PASSWORD=throwaway-test-pw
 IRI_BASETOOL_VERSION=stable
 ```
 
-**3. `realm-export.json`.** Keycloak imports it on first boot (`start-dev --import-realm`). Derive it from an existing export by rewriting every secret and replacing the user list — never by copying one in unchanged:
+`SERVER_SSL_KEY_STORE_PASSWORD` is still required — the base compose marks it mandatory, so interpolation fails without it — but its value is irrelevant to the test stack: `docker-compose.test.yml` pins the committed keystore's own password per service.
+
+**2. `realm-export.json`.** Keycloak imports it on first boot (`start-dev --import-realm`). Derive it from an existing export by rewriting every secret and replacing the user list — never by copying one in unchanged:
 
 ```bash
 python - <<'PY'
