@@ -1413,7 +1413,18 @@ a full edge outage pages once (liveness), not once per posture assertion.
 so the edge is also probed over IPv6 and for public DNS resolution: the `blackbox-http-ipv6` /
 `blackbox-http-auth-ipv6` jobs re-run the liveness probes pinned to IPv6 (no v4 fallback), and the
 `blackbox-dns-a` / `blackbox-dns-aaaa` jobs query a public resolver (1.1.1.1) for the apex's A and AAAA
-records (NODATA fails the probe, not only NXDOMAIN). For those v6-pinned probes to test the real edge,
+records, while `blackbox-dns-api-a` / `blackbox-dns-api-aaaa` do the same for the API vhost of the
+mobile-client exposure (ADR-0135) — its records are separate from the apex's, so the apex probes prove
+nothing about them (NODATA fails the probe, not only NXDOMAIN).
+
+The answer-RR assertion uses `fail_if_none_matches_regexp` (“at least ONE answer RR carries an address
+of the queried family”), never `fail_if_not_matches_regexp` (“EVERY answer RR matches”), and its regexp
+does **not** bind the owner name. On a name that is a CNAME — `api.profit-base.online` is one, an alias
+to the apex — the answer section carries the alias RR *alongside* the address RR, so an owner-bound
+“every RR” assertion can never hold and the probe fails while DNS is perfectly healthy. That shipped
+with the phase-F cut-over and fired `DnsResolutionFailed` for both api jobs from their first scrape on
+2026-08-18. The regexp stays anchored to an address literal, so the real failures still fail: NXDOMAIN
+(rcode), NODATA (empty answer), and a dangling CNAME whose target has no address record. For those v6-pinned probes to test the real edge,
 the `blackbox-exporter` container needs its own IPv6 egress: the two nets it otherwise joins
 (`net-monitoring-core`, `net-monitoring-scrape`) are IPv4-only, so before #1252 the container had **no
 v6 route** and every probe CONNECT-failed (`probe_success=0`) purely from the missing local route —
@@ -1422,8 +1433,8 @@ IPv6. The exporter now also joins a dedicated `net-blackbox-v6` bridge (`enable_
 masqueraded onto the host's global v6), so the probe exercises the real edge path and the alert is a
 **true** signal. `EdgeIpv6Unreachable` (warning) fires only when a
 vhost answers over IPv4 but not IPv6 (guarded `on(instance)` against the v4 probe, so a full outage
-pages once via `BlackboxProbeFailed`); `DnsResolutionFailed` (warning) fires when the apex stops
-resolving an A or AAAA record. These are reachability probes, not posture assertions — a v6-only or
+pages once via `BlackboxProbeFailed`); `DnsResolutionFailed` (warning) fires when the apex or the API
+vhost stops resolving an A or AAAA record. These are reachability probes, not posture assertions — a v6-only or
 DNS-only regression is invisible to the IPv4 liveness job.
 
 **Probe scrape timeout + `TargetDown` scoping (probe-liveness semantics).** Every blackbox `/probe`
@@ -1454,12 +1465,15 @@ off the probe jobs removes only the false page, not any real signal. (2026-07-12
 - [ ] `TargetDown` does **not** fire for any blackbox `/probe` job whose `up==0` (scrape-timeout
   artifact), but still fires for the `blackbox-exporter` self-scrape and every non-probe job
   (`targetdown_probe_scope_test.yml`).
+- [ ] Every `blackbox-dns-*` module answers `probe_success == 1` against the live zone **as it is
+  actually shaped** — including a query name that is a CNAME — while a dangling CNAME, a NODATA
+  answer and NXDOMAIN each still fail it.
 
 **Enforced by:** `monitoring/blackbox/blackbox.yml` (`http_deny_404` / `http_force_ssl_redirect` /
-`http_2xx_hsts`; the `http_2xx_ipv6` / `http_2xx_or_401_ipv6` / `dns_apex_a` / `dns_apex_aaaa`
-reachability modules) · `monitoring/prometheus/prometheus.yml` (the three posture jobs; the
-`blackbox-http-ipv6` / `blackbox-http-auth-ipv6` / `blackbox-dns-a` / `blackbox-dns-aaaa` reachability
-jobs; the per-`/probe`-job `scrape_timeout: 15s`) · `monitoring/prometheus/alerts/infrastructure.yml`
+`http_2xx_hsts`; the `http_2xx_ipv6` / `http_2xx_or_401_ipv6` / `dns_apex_a` / `dns_apex_aaaa` /
+`dns_api_a` / `dns_api_aaaa` reachability modules) · `monitoring/prometheus/prometheus.yml` (the three posture jobs; the
+`blackbox-http-ipv6` / `blackbox-http-auth-ipv6` / `blackbox-dns-a` / `blackbox-dns-aaaa` /
+`blackbox-dns-api-a` / `blackbox-dns-api-aaaa` reachability jobs; the per-`/probe`-job `scrape_timeout: 15s`) · `monitoring/prometheus/alerts/infrastructure.yml`
 (`EdgeActuatorDenyBroken`, `EdgeForceSslRedirectBroken`, `EdgeHstsHeaderMissing`, `EdgeIpv6Unreachable`,
 `DnsResolutionFailed`, scoped `BlackboxProbeFailed`, and the `TargetDown` regex that excludes the
 `/probe` jobs) · `monitoring/prometheus/tests/targetdown_probe_scope_test.yml` (promtool unit test) ·

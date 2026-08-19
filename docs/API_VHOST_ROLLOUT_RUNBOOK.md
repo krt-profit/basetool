@@ -360,6 +360,28 @@ Expected: `401`, `404`, `404`, a `301`/`308` to `https://`, a `max-age=…` line
 both address families. Anything else: fix it before phase F, so the probes you enable assert a state
 that actually holds.
 
+**Then assert the DNS modules against the real zone.** The checks above prove the vhost answers;
+they say nothing about whether the *probe definitions* match the zone's actual answer section, and
+that is a separate failure mode. `api.profit-base.online` is a **CNAME** to the apex, so its answer
+carries an alias RR next to the address RR — a probe regexp written for a direct A/AAAA record
+fails against it from the first scrape, while DNS is perfectly healthy. That is exactly how phase F
+shipped on 2026-08-18: both `blackbox-dns-api-*` jobs went straight to `DnsResolutionFailed`, a
+false alarm that cost a night of pages. Run the modules locally before enabling their jobs:
+
+```bash
+docker run --rm -d --name bb-precheck -p 19115:9115 \
+  -v "$PWD/monitoring/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro" \
+  prom/blackbox-exporter:v0.28.0 --config.file=/etc/blackbox/blackbox.yml
+for m in dns_apex_a dns_apex_aaaa dns_api_a dns_api_aaaa; do
+  echo "$m: $(curl -s "http://localhost:19115/probe?module=$m&target=1.1.1.1" \
+    | awk '/^probe_success /{print $2}')"
+done
+docker rm -f bb-precheck
+```
+
+Expected: `1` for all four. On a `0`, add `&debug=true` to the probe URL — the response names the
+RR that failed the regexp. Fix the module, never the alert threshold.
+
 One server-side check, over the monitoring plane rather than the host — in Grafana → Explore →
 Loki, `{app="npm-access"} |= "api.profit-base.online"` must show your probes. That confirms the new
 vhost's log stream is tailed (it is, by the per-file glob) and that the 31-day client-IP retention

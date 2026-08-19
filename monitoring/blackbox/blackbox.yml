@@ -125,9 +125,28 @@ modules:
         insecure_skip_verify: false
 
   # Public DNS resolution. The probe TARGET is the resolver (see prometheus.yml: 1.1.1.1); the query
-  # name/type live here. Requires NOERROR AND an answer RR of the exact type, so a NODATA response
-  # (zone still NOERROR but the A/AAAA record silently removed) fails the probe, not only NXDOMAIN.
-  # preferred_ip_protocol ip4 connects to the v4 resolver; the query type (A vs AAAA) is what is asserted.
+  # name/type live here. Requires NOERROR AND at least one answer RR carrying an address of the
+  # queried family, so a NODATA response (zone still NOERROR but the A/AAAA record silently removed)
+  # fails the probe, not only NXDOMAIN. preferred_ip_protocol ip4 connects to the v4 resolver; the
+  # query type (A vs AAAA) is what is asserted.
+  #
+  # `fail_if_none_matches_regexp` ("at least ONE answer RR matches"), never
+  # `fail_if_not_matches_regexp` ("EVERY answer RR matches"). The latter cannot express this
+  # assertion on a name that is a CNAME: the answer section then carries the alias RR *and* the
+  # address RR, and an alias RR matches no address regexp, so the probe fails while DNS is perfectly
+  # healthy. That is what fired DnsResolutionFailed for blackbox-dns-api-a/-aaaa from their first
+  # scrape on 2026-08-18 — api.profit-base.online is a CNAME to the apex. The apex modules escaped
+  # it only because the apex carries direct A/AAAA records (a CNAME there is not legal anyway), so
+  # they answer with a single RR; they are written the same way here because the difference was
+  # never intentional, and a future zone edit must not be able to resurrect this.
+  #
+  # The regexp deliberately does NOT bind the owner name. These probes assert that the name RESOLVES
+  # to an address, not which intermediate names the chain runs through — binding the owner is the
+  # exact mistake above, and it would misfire again on any legitimate re-pointing of the CNAME. It
+  # IS anchored to an address literal, so an answer holding only a CNAME (alias whose target has no
+  # address record) still fails. Verified against a local blackbox_exporter v0.28.0 over a CoreDNS
+  # zone: direct-A, CNAME-chain, dangling-CNAME, NODATA and NXDOMAIN each keep their intended
+  # verdict — only the CNAME-chain verdict changes, from a false failure to a pass.
   dns_apex_a:
     prober: dns
     timeout: 5s
@@ -138,8 +157,8 @@ modules:
       query_type: "A"
       valid_rcodes: ["NOERROR"]
       validate_answer_rrs:
-        fail_if_not_matches_regexp:
-          - "profit-base\\.online\\.\\s+\\d+\\s+IN\\s+A\\s+.+"
+        fail_if_none_matches_regexp:
+          - "\\s+\\d+\\s+IN\\s+A\\s+\\d+\\.\\d+\\.\\d+\\.\\d+$"
 
   dns_apex_aaaa:
     prober: dns
@@ -151,15 +170,17 @@ modules:
       query_type: "AAAA"
       valid_rcodes: ["NOERROR"]
       validate_answer_rrs:
-        fail_if_not_matches_regexp:
-          - "profit-base\\.online\\.\\s+\\d+\\s+IN\\s+AAAA\\s+.+"
+        fail_if_none_matches_regexp:
+          - "\\s+\\d+\\s+IN\\s+AAAA\\s+[0-9a-fA-F:.]+$"
 
   # Same assertions for the API vhost of the mobile-client exposure (ADR-0135). Its records are
   # separate from the apex's, so the apex probes above prove nothing about them: a zone edit that
   # drops api.profit-base.online leaves both apex probes green while every app in the field loses
-  # the backend. The modules are inert until the matching jobs in prometheus.yml are un-staged
-  # (docs/MONITORING_ROLLOUT_RUNBOOK.md, Appendix C) — a module nothing probes costs nothing, which
-  # is why these ship now rather than in the same edit as the cut-over.
+  # the backend. Live since the phase-F cut-over (docs/API_VHOST_ROLLOUT_RUNBOOK.md); the jobs that
+  # drive them are blackbox-dns-api-a / -aaaa in prometheus.yml.
+  #
+  # api.profit-base.online is a CNAME to the apex, so these two are the modules the owner-bound
+  # regexp broke — see the directive note above before touching the assertion.
   dns_api_a:
     prober: dns
     timeout: 5s
@@ -170,8 +191,8 @@ modules:
       query_type: "A"
       valid_rcodes: ["NOERROR"]
       validate_answer_rrs:
-        fail_if_not_matches_regexp:
-          - "api\\.profit-base\\.online\\.\\s+\\d+\\s+IN\\s+A\\s+.+"
+        fail_if_none_matches_regexp:
+          - "\\s+\\d+\\s+IN\\s+A\\s+\\d+\\.\\d+\\.\\d+\\.\\d+$"
 
   dns_api_aaaa:
     prober: dns
@@ -183,8 +204,8 @@ modules:
       query_type: "AAAA"
       valid_rcodes: ["NOERROR"]
       validate_answer_rrs:
-        fail_if_not_matches_regexp:
-          - "api\\.profit-base\\.online\\.\\s+\\d+\\s+IN\\s+AAAA\\s+.+"
+        fail_if_none_matches_regexp:
+          - "\\s+\\d+\\s+IN\\s+AAAA\\s+[0-9a-fA-F:.]+$"
 
   # Succeeds ONLY on exactly 404 — the /actuator edge deny (ADR-0072 compensating control). The
   # live block is `location /actuator { return 404; }`; if it drifts, the Spring apps answer the

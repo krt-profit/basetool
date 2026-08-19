@@ -551,6 +551,22 @@ docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/work" -w /work \
 docker run --rm --entrypoint amtool -v "$PWD:/cfg" quay.io/prometheus/alertmanager:v0.33.1 \
   check-config /cfg/alertmanager.yml
 
+# Blackbox — the exporter has no `check-config` subcommand, so validate by starting it on the
+# config and asserting it logs "Loaded config file" (a bad regexp escape or unknown field exits
+# non-zero here instead of reaching prod). Then run the DNS modules against the LIVE zone: their
+# regexps assert the answer section's actual shape, and a CNAME'd query name (api.profit-base.online
+# is one) answers with an alias RR next to the address RR. A module that does not match the real
+# answer fails from its first scrape — how the 2026-08-18 DnsResolutionFailed false alarm shipped.
+docker run --rm -d --name bb-lint -p 19115:9115 \
+  -v "$PWD/monitoring/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro" \
+  prom/blackbox-exporter:v0.28.0 --config.file=/etc/blackbox/blackbox.yml
+docker logs bb-lint 2>&1 | grep -E "Loaded config file|level=ERROR"
+for m in dns_apex_a dns_apex_aaaa dns_api_a dns_api_aaaa; do
+  echo "$m: $(curl -s "http://localhost:19115/probe?module=$m&target=1.1.1.1" \
+    | awk '/^probe_success /{print $2}')"   # expect 1; add &debug=true to see the failing RR
+done
+docker rm -f bb-lint
+
 # Alloy — format check + validate
 docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.18.1 \
   fmt --test /cfg/config.alloy

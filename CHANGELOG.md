@@ -6,6 +6,10 @@
 
 - **Gastmodus der App gestrichen — die anonymen Schreibpfade bleiben dauerhaft zu.** Die öffentliche API-Allowlist hielt `POST /api/v1/orders/items`, die Gast-Teilnehmer-Mutationen und die redigierten Browsing-Zwillinge für den Gastmodus der Android-App in Reserve. Der Modus entfällt (jeder Nutzer meldet sich an), also werden diese Pfade auf dem `api`-vhost nie freigeschaltet. Für die Weboberfläche ändert sich nichts — sie erreicht das Backend intern.
 
+### Fixed
+
+- **Der nächtliche Fehlalarm zur DNS-Auflösung der App-Schnittstelle ist behoben.** Die beiden neuen Überwachungsprüfungen für `api.profit-base.online` schlugen ab der ersten Messung fehl, obwohl die Auflösung einwandfrei funktioniert — der Name ist ein Alias auf die Hauptdomain, und die Prüfregel ließ nur einen direkten Adresseintrag gelten. Sie verlangt jetzt, dass die Antwort überhaupt eine Adresse liefert; echte Ausfälle (unbekannter Name, fehlender Eintrag, ins Leere zeigender Alias) schlagen unverändert an. Keine Auswirkung auf die Oberfläche (REQ-OBS-012).
+
 ## [v1.5.51](https://github.com/krt-profit/basetool/releases/tag/v1.5.51) - 2026-08-18
 
 ## [v1.5.50](https://github.com/krt-profit/basetool/releases/tag/v1.5.50) - 2026-08-18
