@@ -90,7 +90,12 @@ services:
     # published port on a Linux runner.
     extra_hosts: !override []
     volumes: !override
-      - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+      # The committed test certificate (ADR-0139), by a hardcoded path for the same reason
+      # docker-compose.test.yml uses one: IRI_KEYSTORE_HOST_PATH still selects the PRODUCTION
+      # keystore. It must be this file and not a locally generated one, because test.yml pins
+      # SERVER_SSL_KEY_STORE_PASSWORD to this keystore's password — mounting any other store makes
+      # the backend abort at start-up with "keystore password was incorrect".
+      - ./docker/test-tls/basetool-test-keystore.p12:/run/secrets/keystore.p12:ro
   frontend-dev:
     user: "0:0"
     # Serve HTTP/1.1 (not HTTP/2) for the throwaway E2E stack. The suite's dominant flake is an
@@ -110,7 +115,12 @@ services:
       SERVER_HTTP2_ENABLED: "false"
     extra_hosts: !override []
     volumes: !override
-      - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+      # The committed test certificate (ADR-0139), by a hardcoded path for the same reason
+      # docker-compose.test.yml uses one: IRI_KEYSTORE_HOST_PATH still selects the PRODUCTION
+      # keystore. It must be this file and not a locally generated one, because test.yml pins
+      # SERVER_SSL_KEY_STORE_PASSWORD to this keystore's password — mounting any other store makes
+      # the backend abort at start-up with "keystore password was incorrect".
+      - ./docker/test-tls/basetool-test-keystore.p12:/run/secrets/keystore.p12:ro
 
 volumes:
   iri-e2e-db-backend:

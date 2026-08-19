@@ -54,8 +54,9 @@ import org.junit.jupiter.api.extension.ExtensionContext;
  * JUnit test plan finishes, via an {@link AutoCloseable} stored in the root context.
  *
  * <p>All credentials baked in here are throwaway values that must match {@code
- * realm-export.e2e.json} (the {@code backend-service} client secret) and the generated keystore
- * password — never reuse them anywhere, never substitute production values.
+ * realm-export.e2e.json} (the {@code backend-service} client secret) and the committed test
+ * keystore in {@code docker/test-tls/} (ADR-0139) — never reuse them anywhere, never substitute
+ * production values.
  */
 public final class E2eStackExtension implements BeforeAllCallback {
 
@@ -63,10 +64,14 @@ public final class E2eStackExtension implements BeforeAllCallback {
   static final String EPHEMERAL_BASE_URL = "https://localhost:18081";
 
   /**
-   * Throwaway PKCS12 keystore password; must match {@code SERVER_SSL_KEY_STORE_PASSWORD} below and
-   * is read by {@link BackendSeeder} to build its trust store for the generated dev certificate.
+   * Password of the committed test keystore in {@code docker/test-tls/} (ADR-0139), which the
+   * compose stack mounts at {@code /run/secrets/keystore.p12}. It is fed to compose as {@code
+   * SERVER_SSL_KEY_STORE_PASSWORD} below and read by {@link BackendSeeder} to build its trust store
+   * from that certificate. The value is not a secret and is fixed by the committed file: this stack
+   * no longer generates a keystore of its own, because {@code docker-compose.test.yml} pins the
+   * same password per service and a locally generated store would fail to open against it.
    */
-  static final String KEYSTORE_PW = "keystore-e2e-pw-do-not-use-in-prod";
+  static final String KEYSTORE_PW = "basetool-test";
 
   /** Local image tag the compose build override tags the freshly built images with. */
   private static final String IMAGE_TAG = "e2e-local";
@@ -250,7 +255,6 @@ public final class E2eStackExtension implements BeforeAllCallback {
   private void bringUpAndSeed(ExtensionContext context) throws Exception {
     Path root = repoRoot();
     stageRealm(root);
-    ensureKeystore(root);
     prePullImages(root);
     composeUp(root);
     // Seed UEX-owned catalog reference data (refinery-hosting location, ship type, refining
@@ -320,56 +324,6 @@ public final class E2eStackExtension implements BeforeAllCallback {
       }
       Files.copy(in, root.resolve("realm-export.json"), StandardCopyOption.REPLACE_EXISTING);
     }
-  }
-
-  /**
-   * Generates a throwaway self-signed PKCS12 keystore at {@code <repoRoot>/keystore.p12} (alias
-   * {@code basetool}, SANs covering localhost / the Docker network aliases) if one is not already
-   * present. Uses the {@code keytool} shipped with the test JVM's own JDK so no {@code keytool} on
-   * {@code PATH} is required.
-   *
-   * @param root the repository root the compose files bind-mount the keystore from
-   * @throws Exception if {@code keytool} cannot be found or exits non-zero
-   */
-  private void ensureKeystore(Path root) throws Exception {
-    Path keystore = root.resolve("keystore.p12");
-    if (Files.exists(keystore)) {
-      return;
-    }
-    boolean windows = System.getProperty("os.name", "").toLowerCase().contains("win");
-    Path keytool =
-        Paths.get(System.getProperty("java.home"), "bin", windows ? "keytool.exe" : "keytool");
-    if (!Files.exists(keytool)) {
-      throw new IllegalStateException("keytool not found at " + keytool);
-    }
-    runProcess(
-        root,
-        "keytool",
-        List.of(
-            keytool.toString(),
-            "-genkeypair",
-            "-alias",
-            "basetool",
-            "-storetype",
-            "PKCS12",
-            "-keystore",
-            keystore.toString(),
-            "-storepass",
-            KEYSTORE_PW,
-            "-keypass",
-            KEYSTORE_PW,
-            "-keyalg",
-            "RSA",
-            "-keysize",
-            "2048",
-            "-validity",
-            "365",
-            "-dname",
-            "CN=localhost, OU=Test, O=KRT Basetool E2E, L=Test, ST=Test, C=DE",
-            "-ext",
-            "san=dns:localhost,ip:127.0.0.1,dns:backend,dns:frontend,dns:host.docker.internal"),
-        Map.of(),
-        Duration.ofMinutes(2));
   }
 
   /**
@@ -562,8 +516,10 @@ public final class E2eStackExtension implements BeforeAllCallback {
    * The throwaway environment compose substitutes its {@code ${VAR}} placeholders from. Passed via
    * the subprocess environment instead of an {@code --env-file}, so no credentials file is written
    * to disk. {@code KEYCLOAK_ADMIN_CLIENT_SECRET} must match the {@code backend-service} secret in
-   * {@code realm-export.e2e.json}; {@code SERVER_SSL_KEY_STORE_PASSWORD} must match the generated
-   * keystore.
+   * {@code realm-export.e2e.json}; {@code SERVER_SSL_KEY_STORE_PASSWORD} must match the committed
+   * test keystore the compose files mount by a hardcoded path (ADR-0139). {@code
+   * IRI_KEYSTORE_HOST_PATH} is deliberately NOT set: it selects the production keystore, and no
+   * compose file in this stack reads it any more.
    *
    * @return the environment variable map for the compose subprocess
    */
@@ -580,7 +536,6 @@ public final class E2eStackExtension implements BeforeAllCallback {
     env.put("KEYCLOAK_ADMIN_CLIENT_SECRET", "e2e-client-secret-do-not-use-in-prod");
     env.put("REDIS_PASSWORD", "redis-e2e-pw-do-not-use-in-prod");
     env.put("SERVER_SSL_KEY_STORE_PASSWORD", KEYSTORE_PW);
-    env.put("IRI_KEYSTORE_HOST_PATH", "./keystore.p12");
     env.put("IRI_BASETOOL_VERSION", IMAGE_TAG);
     // Audit L-1 / REQ-SEC-024: exercise the enforced `aud` path. See EXPECTED_AUDIENCE — the
     // e2e realm stamps this audience, so turning the knob on here rehearses the prod flip.
