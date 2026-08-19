@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.ApproveRegistrationReque
 import de.greluc.krt.profit.basetool.frontend.model.dto.LinkRegistrationRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PendingRegistrationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RejectRegistrationRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ReopenRegistrationRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -55,6 +56,10 @@ import org.springframework.web.bind.annotation.ResponseBody;
  *
  * <p>Approval grants no Basetool roles — after approval the admin seats roles/units via the
  * existing tooling (Track 1 keeps role assignment manual).
+ *
+ * <p>The page also renders the rejected registrations and can reopen one back into the queue
+ * (REQ-SEC-034), so an erroneous rejection is recoverable from the UI instead of by a manual
+ * database write.
  */
 @Controller
 @RequestMapping("/admin/discord-registrations")
@@ -64,6 +69,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 public class AdminDiscordRegistrationsPageController {
 
   private static final String BACKEND_BASE = "/api/v1/admin/registrations";
+
+  /** Query suffix selecting the rejected rows off the shared queue endpoint (REQ-SEC-034). */
+  private static final String REJECTED_QUERY = "?status=REJECTED";
 
   /**
    * Response type for the pending-registration queue read. A shared static {@link
@@ -96,7 +104,31 @@ public class AdminDiscordRegistrationsPageController {
       model.addAttribute("error", "error.admin.discordRegistrations.load");
       model.addAttribute("registrations", List.of());
     }
+    // Read the rejected list under its own guard rather than inside the block above: it is the
+    // secondary surface, and a failure there (a backend that predates ?status=, say, during a
+    // rolling deploy) must not blank out the pending queue that is this page's primary job.
+    model.addAttribute("rejected", loadRejected());
     return "admin/discord-registrations";
+  }
+
+  /**
+   * Reads the rejected registrations (REQ-SEC-034), degrading to an empty list on any failure so
+   * the pending queue still renders.
+   *
+   * @return the rejected registrations, or an empty list when the read failed
+   */
+  private List<PendingRegistrationDto> loadRejected() {
+    try {
+      List<PendingRegistrationDto> rejected =
+          backendApiClient.get(BACKEND_BASE + REJECTED_QUERY, PENDING_REGISTRATION_LIST_TYPE);
+      return rejected == null ? List.of() : rejected;
+    } catch (BackendServiceException e) {
+      log.debug("Failed to load the rejected registrations", e);
+      return List.of();
+    } catch (Exception e) {
+      log.error("Failed to load the rejected registrations", e);
+      return List.of();
+    }
   }
 
   /**
@@ -146,6 +178,33 @@ public class AdminDiscordRegistrationsPageController {
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Reject registration {} failed", id, e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  /**
+   * Reopens a rejected registration in place (krtFetch): the backend moves it back to {@code
+   * PENDING} and the row migrates from the rejected table into the queue without a reload
+   * (REQ-SEC-034).
+   *
+   * @param id the rejected registration to reopen
+   * @param body the JSON-bound note + optimistic-lock version
+   * @return the now-pending registration on success, the relayed backend status on conflict/failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/{id}/reopen", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> reopenAjax(
+      @PathVariable @NotNull UUID id,
+      @Nullable @RequestBody(required = false) ReopenRegistrationRequest body) {
+    try {
+      return ResponseEntity.ok(
+          backendApiClient.post(
+              BACKEND_BASE + "/" + id + "/reopen", body, PendingRegistrationDto.class));
+    } catch (BackendServiceException e) {
+      log.debug("Reopen registration {} failed", id, e);
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Reopen registration {} failed", id, e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }

@@ -1547,6 +1547,81 @@ bucket map MUST be bounded so a flood of distinct subjects cannot grow it withou
 **Enforced by:** `SubjectRateLimitingFilterTest` · **Code:** `SubjectRateLimitingFilter`,
 `RateLimitProperties.Subject`, `SecurityConfig`
 
+### REQ-SEC-034 — A rejected registration MUST be recoverable through a supported admin action
+
+Every approval state an account can be put into MUST have a way back out of it through the
+application. A `REJECTED` registration MUST be visible to an admin and MUST be returnable to the
+approval queue by an audited, admin-only action — without a manual database write and without
+destroying the account.
+
+Approval is fallible: an admin decides from a Discord handle and an optional server nickname, and a
+member whose handle does not resemble their in-game name is exactly the case the automatic collision
+check already fails to recognise (REQ-SEC-026). A wrong verdict is therefore expected, not
+exceptional. Before this requirement it was also **terminal**: the queue read serves `PENDING` only,
+so the row disappeared from the admin's view entirely, and the shared approve/reject body refuses
+every non-`PENDING` row, so even an admin who knew the id was answered with a `409`. The account was
+left permanently on the waiting page with no in-app remedy — the two supposed escapes both being
+worse than the disease: a manual `UPDATE` against production bypasses the audit trail and violates
+the read-only production policy, and deleting the account destroys its data and its history to
+recover the person.
+
+The reversal MUST move the account `REJECTED → PENDING` and MUST NOT be a `REJECTED → ACTIVE`
+shortcut. The "only a still-`PENDING` registration may be decided" invariant exists to stop an
+already-`ACTIVE` member from being silently stripped of their authorities by a re-decision, and
+widening it to admit `REJECTED` would put the guard one editing mistake away from admitting `ACTIVE`
+too. Routing the reversal through the queue keeps the invariant exactly as narrow as it is and makes
+the re-approval travel the same audited path as any other approval.
+
+The reversal MUST be refused for any account that is not `REJECTED`. A `PENDING` row needs no
+reopening, and an `ACTIVE` member pushed back into the queue would lose their access — the very
+failure the decision guard protects against.
+
+The reversal MUST write its own audit row with its own decision value (`REOPENED`), not reuse
+`APPROVED`. A reopen grants no access: the account lands `PENDING`, not `ACTIVE`. Recording it as an
+approval would make the audit trail assert an access grant that never happened, and would make the
+reversal indistinguishable from the re-approval that typically follows it moments later. The account
+row's decision stamp (`approvedAt` / `approvedById`) MUST be cleared on reopen so a queued row never
+displays a decision time; the history is not lost, because `user_approval_event` is the record.
+
+The reversal MUST NOT notify. The approve/reject mail (REQ-NOTIF-014) announces a verdict and a
+reopen is not one; the new-registration admin mail (REQ-NOTIF-012) would page the whole admin body
+about an old registration the acting admin is already looking at.
+
+The rejected-list read MUST serve `PENDING` and `REJECTED` only. `ACTIVE` is refused rather than
+served — it would turn a small admin queue into an unbounded dump of every member, which is the user
+administration surface's job and carries a different DTO.
+
+**Monitoring interaction (deliberate).** `basetool_registration_pending_oldest_age_seconds` measures
+from the registration's creation time, so reopening a months-old rejection makes the gauge jump to
+that full age and can fire `RegistrationApprovalOverdue` (>48 h, `for: 10m`). This is accepted rather
+than papered over: an admin who reopens and then decides within minutes never trips the `for` window,
+and one who reopens and walks away has left a genuinely overdue item in the queue — which is what the
+alert is for. Anyone triaging that alert immediately after a reopen should expect an age measured
+from the original registration.
+
+**Acceptance**
+
+- [x] An admin can list the rejected registrations; a non-admin cannot.
+- [x] An admin can reopen a rejected registration, which lands `PENDING` and re-enters the queue.
+- [x] Reopening a `PENDING` or an `ACTIVE` account is refused with `409`, leaving its status and its
+  access untouched.
+- [x] A stale `version` on the reopen is refused with `409` and writes no audit row.
+- [x] The reopen writes a `REOPENED` audit row carrying the acting admin and the optional note, and
+  clears the account's stale decision stamp.
+- [x] The reopen publishes no notification event.
+- [x] `REJECTED → reopened → approved` reaches `ACTIVE` through supported actions only, leaving two
+  audit rows.
+- [x] `?status=ACTIVE` on the queue endpoint is refused with `400`.
+- [x] The admin page renders the rejected table and moves a reopened row into the queue in place, with
+  no full-page reload (REQ-FE-001).
+
+**Enforced by:** `UserRegistrationServiceTest.ReopenRegistrationTests`,
+`DiscordRegistrationAdminControllerSecurityTest`, `AdminDiscordRegistrationsNicknameRenderTest` ·
+**Code:** `UserRegistrationService#reopenRegistration`,
+`UserRegistrationService#findRejectedRegistrations`, `DiscordRegistrationAdminController`,
+`ApprovalDecision#REOPENED`, `AdminDiscordRegistrationsPageController`, `discord-registrations.js`,
+`V233__allow_reopened_user_approval_decision.sql` · **Decision:** ADR-0140
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the

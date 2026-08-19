@@ -32,7 +32,15 @@ import java.util.UUID;
  *     null} when none was captured; shown alongside the name to anchor the decision to an in-server
  *     identity. This admin-only queue is the only DTO that carries it
  * @param registeredAt when the registration first appeared (the user row's creation time)
+ * @param decidedAt when an admin last decided this registration, i.e. the rejection time for a row
+ *     in the rejected list (REQ-SEC-034); {@code null} for a row awaiting a decision, including one
+ *     just reopened — reopening clears the stale decision stamp
  * @param version optimistic-lock version, echoed back on approve/reject
  */
 public record PendingRegistrationDto(
-    UUID id, String username, String serverNickname, Instant registeredAt, Long version) {}
+    UUID id,
+    String username,
+    String serverNickname,
+    Instant registeredAt,
+    Instant decidedAt,
+    Long version) {}

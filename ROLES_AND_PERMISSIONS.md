@@ -147,7 +147,11 @@ convention `cleanup…ForGuest` is structurally enforced by the ArchUnit rule
 > Such users are routed in the frontend to the account-status page until,
 > under `/admin/discord-registrations`, an admin approves them (then `ACTIVE`), **links** the
 > registration onto an existing account (REQ-SEC-026 — for a member who already had an account but
-> registered anew via Discord), or rejects them (`REJECTED`, stays without access). Roles/units are
+> registered anew via Discord), or rejects them (`REJECTED`, stays without access). A rejection is
+> **reversible**: the same page lists the rejected registrations and an admin can **reopen** one back
+> to `PENDING` (REQ-SEC-034, ADR-0140), after which it is decided again through the ordinary approve
+> path. Reopening is admin-only and audited, and is refused for any account that is not `REJECTED` —
+> an `ACTIVE` member can never be pushed back into the queue and stripped of access. Roles/units are
 > assigned **manually** after approval (Track 1).
 >
 > **The two non-approved states share that route but not its copy.** `PENDING` is told an

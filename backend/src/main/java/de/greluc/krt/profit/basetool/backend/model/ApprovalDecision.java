@@ -27,7 +27,8 @@ package de.greluc.krt.profit.basetool.backend.model;
  * into {@link ApprovalStatus#ACTIVE} / {@link ApprovalStatus#REJECTED}; {@link #LINKED} is recorded
  * on the surviving <em>existing</em> account and does not change its status (it was already {@link
  * ApprovalStatus#ACTIVE}) — it captures that a Discord registration was linked into it
- * (REQ-SEC-026).
+ * (REQ-SEC-026); {@link #REOPENED} undoes a rejection by returning the account to {@link
+ * ApprovalStatus#PENDING} (REQ-SEC-034).
  */
 public enum ApprovalDecision {
 
@@ -42,5 +43,17 @@ public enum ApprovalDecision {
    * was moved to this (surviving) account and the throwaway Discord-registered account removed. The
    * row is written against the surviving account's id; its status is unchanged (REQ-SEC-026).
    */
-  LINKED
+  LINKED,
+
+  /**
+   * An admin reopened a rejected registration: the account moved back from {@link
+   * ApprovalStatus#REJECTED} to {@link ApprovalStatus#PENDING} so it re-enters the approval queue
+   * and can be decided again through the normal approve/reject path (REQ-SEC-034).
+   *
+   * <p>Deliberately its own value rather than a reuse of {@link #APPROVED}: a reopen grants no
+   * access — the account is pending, not active — so recording it as an approval would make the
+   * audit trail claim an access grant that never happened. The reversal and the subsequent
+   * re-decision are two separate rows.
+   */
+  REOPENED
 }

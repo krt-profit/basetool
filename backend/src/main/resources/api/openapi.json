@@ -29846,6 +29846,103 @@
         }
       }
     },
+    "/api/v1/admin/registrations/{id}/reopen" : {
+      "post" : {
+        "tags" : [ "discord-registration-admin-controller" ],
+        "summary" : "Reopen a rejected registration back into the approval queue.",
+        "operationId" : "reopen",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReopenRegistrationRequest"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "The now-pending registration.",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PendingRegistrationDto"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/registrations/{id}/reject" : {
       "post" : {
         "tags" : [ "discord-registration-admin-controller" ],
@@ -51864,10 +51961,20 @@
     "/api/v1/admin/registrations" : {
       "get" : {
         "tags" : [ "discord-registration-admin-controller" ],
-        "operationId" : "listPending",
+        "summary" : "List registrations awaiting a decision, or the rejected ones.",
+        "operationId" : "list_10",
+        "parameters" : [ {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "PENDING", "REJECTED" ]
+          }
+        } ],
         "responses" : {
           "200" : {
-            "description" : "OK",
+            "description" : "Registrations in that status, oldest first.",
             "headers" : {
               "ETag" : {
                 "description" : "Entity Tag for conditional requests",
@@ -51893,9 +52000,6 @@
               }
             }
           },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
-          },
           "400" : {
             "description" : "Bad Request",
             "content" : {
@@ -51906,8 +52010,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Unauthorized",
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -51916,8 +52020,11 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "401" : {
+            "description" : "Unauthorized",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -59923,7 +60030,7 @@
         },
         "required" : [ "version" ]
       },
-      "RejectRegistrationRequest" : {
+      "ReopenRegistrationRequest" : {
         "type" : "object",
         "properties" : {
           "reason" : {
@@ -59953,6 +60060,24 @@
           "registeredAt" : {
             "type" : "string",
             "format" : "date-time"
+          },
+          "decidedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "RejectRegistrationRequest" : {
+        "type" : "object",
+        "properties" : {
+          "reason" : {
+            "type" : "string",
+            "maxLength" : 1000,
+            "minLength" : 0
           },
           "version" : {
             "type" : "integer",

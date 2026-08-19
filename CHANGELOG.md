@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Eine irrtümlich abgelehnte Registrierung kann wieder geöffnet werden.** Unter `/admin/discord-registrations` listet eine zweite Tabelle die abgelehnten Registrierungen samt Zeitpunkt der Ablehnung; ein Admin holt eine davon per „Wiederöffnen“ zurück in die Warteschlange und gibt sie anschließend wie gewohnt frei. Bisher war eine Ablehnung endgültig — rückgängig machen ließ sie sich nur mit einem direkten Eingriff in die Datenbank oder durch Löschen des Kontos. Die Wiederöffnung wird protokolliert und ist für bereits freigegebene Konten gesperrt (REQ-SEC-034, ADR-0140).
+
 ### Fixed
 
 - **Abgelehnte Registrierungen sahen weiter „Freigabe ausstehend".** Wartende und abgelehnte Konten landeten auf derselben Seite, und die zeigte unabhängig vom Status die Wartemeldung — abgelehnte Nutzer warteten deshalb auf eine Freigabe, die nie kommt, und meldeten das als hängende Freigabe. Die Seite unterscheidet jetzt: Abgelehnte sehen einen Ablehnungshinweis ohne automatische Freischaltung und den Verweis auf einen Administrator im Discord, Wartende die unveränderte Wartemeldung, und ein bereits freigegebenes Konto wird direkt ins Tool geleitet. Fällt die Ablehnung, während die Seite offen ist, wechselt der Text ohne Neuladen; danach wird nicht mehr auf eine Freigabe geprüft (REQ-SEC-017).

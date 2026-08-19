@@ -368,6 +368,13 @@ groups:
           description: "{{ $labels.application }} is rejecting requests via the rate limiter at an elevated rate."
 
       # Registration approvals (Discord) and bank booking requests waiting too long.
+      #
+      # Triage note (REQ-SEC-034, ADR-0140): an admin can reopen a rejected registration back into
+      # this queue. The gauge measures from the registration's CREATION time, so a reopened
+      # months-old rejection reports that full age immediately rather than "just queued". That is
+      # deliberate -- reopen-then-decide within minutes never survives the 10m `for`, and a reopened
+      # row left sitting IS overdue -- but do not read a sudden multi-week age as a stuck queue
+      # without checking user_approval_event for a recent REOPENED row.
       - alert: RegistrationApprovalOverdue
         expr: basetool_registration_pending_oldest_age_seconds > 172800
         for: 10m

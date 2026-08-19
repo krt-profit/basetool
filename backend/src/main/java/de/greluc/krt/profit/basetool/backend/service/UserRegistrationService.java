@@ -55,6 +55,12 @@ import org.springframework.transaction.annotation.Transactional;
  * two optimistic-locked, audited decisions ({@link #approveUser} / {@link #rejectUser} on top of
  * the shared {@link #decide}).
  *
+ * <p>It also owns the reversal of an erroneous rejection (REQ-SEC-034): {@link
+ * #findRejectedRegistrations()} makes a rejected row findable and {@link #reopenRegistration}
+ * returns it to the queue as PENDING. The reversal is deliberately a separate action rather than a
+ * widening of {@link #decide}, so the "only a still-PENDING registration may be decided" invariant
+ * that protects an active member's authorities stays exactly as narrow as it is.
+ *
  * <p>It also owns the shared entry side of the lifecycle: {@link #stampNewPendingRegistration}, the
  * fail-safe PENDING stamping that both Keycloak reconciliation sync paths apply to a brand-new
  * non-admin registration. That is the one place the {@code app.registration.require-approval} gate
@@ -137,6 +143,85 @@ public class UserRegistrationService {
   @NotNull
   public List<User> findPendingRegistrations() {
     return userRepository.findByApprovalStatusOrderByCreatedAtAsc(ApprovalStatus.PENDING);
+  }
+
+  /**
+   * Returns the registrations an admin has rejected (status {@link ApprovalStatus#REJECTED}),
+   * oldest first. This is the read surface that makes an erroneous rejection findable at all: the
+   * approval queue itself is PENDING-only, so before this existed an admin had no way to see a
+   * rejected row — let alone reverse it — without querying the database directly (REQ-SEC-034).
+   *
+   * <p>Ordered oldest-first to match {@link #findPendingRegistrations()} rather than
+   * newest-rejection-first: both lists are small (rejections are rare in a squadron-sized realm)
+   * and one ordering across the page keeps the two tables readable side by side.
+   *
+   * @return the rejected registrations, oldest registration first
+   */
+  @NotNull
+  public List<User> findRejectedRegistrations() {
+    return userRepository.findByApprovalStatusOrderByCreatedAtAsc(ApprovalStatus.REJECTED);
+  }
+
+  /**
+   * Reopens a rejected registration: moves it from {@link ApprovalStatus#REJECTED} back to {@link
+   * ApprovalStatus#PENDING} so it re-enters the approval queue and can be decided again through the
+   * normal {@link #approveUser}/{@link #rejectUser} path. This is the supported reversal of an
+   * erroneous rejection (REQ-SEC-034); without it the only recoveries were a manual production
+   * {@code UPDATE} (which bypasses the audit trail) or deleting the account outright (which
+   * destroys its data and history).
+   *
+   * <p><strong>Deliberately not a REJECTED → ACTIVE shortcut.</strong> Routing the reversal back
+   * through PENDING keeps the "only a still-PENDING registration may be decided" invariant in
+   * {@link #decide} intact — the guard that stops an already-ACTIVE member from being silently
+   * stripped of their authorities by a re-decision. The admin therefore performs two explicit acts,
+   * and the audit records both.
+   *
+   * <p>The previous decision stamp ({@code approvedAt} / {@code approvedById}) is <em>cleared</em>
+   * so the row is indistinguishable from a fresh pending registration: a PENDING row still carrying
+   * a decision stamp would render a decision time for an undecided account. Nothing is lost — who
+   * rejected it and when survives in {@code user_approval_event}, which is the history of record.
+   *
+   * <p>No notification fires. The rejection mail (REQ-NOTIF-014) announces a verdict and a reopen
+   * is not one, and the new-registration admin mail (REQ-NOTIF-012) would page the whole admin body
+   * about a months-old registration that the acting admin is already looking at.
+   *
+   * @param userId the rejected registration to reopen
+   * @param reason optional free-text note recorded in the audit (e.g. why the rejection was wrong);
+   *     may be {@code null}
+   * @param version the optimistic-lock version echoed back from the rejected list; {@code null}
+   *     bypasses the check
+   * @param adminId the acting admin's id (for the audit row)
+   * @return the now-pending user (with its bumped version)
+   * @throws NotFoundException when the user is unknown
+   * @throws BusinessConflictException when the registration is not {@link ApprovalStatus#REJECTED}
+   *     — a PENDING row needs no reopening and an ACTIVE member must never be pushed back into the
+   *     queue, which would strip their access
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   */
+  @Transactional
+  @NotNull
+  public User reopenRegistration(
+      @NotNull UUID userId,
+      @Nullable String reason,
+      @Nullable Long version,
+      @NotNull UUID adminId) {
+    User user =
+        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+    OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, userId);
+    if (user.getApprovalStatus() != ApprovalStatus.REJECTED) {
+      throw new BusinessConflictException(
+          "Only a rejected registration can be reopened; current status is "
+              + user.getApprovalStatus());
+    }
+    user.setApprovalStatus(ApprovalStatus.PENDING);
+    user.setApprovedAt(null);
+    user.setApprovedById(null);
+    // saveAndFlush so the bumped @Version reaches the response for the no-reload admin queue.
+    User saved = userRepository.saveAndFlush(user);
+    userApprovalEventRepository.save(
+        new UserApprovalEvent(userId, ApprovalDecision.REOPENED, reason, adminId));
+    log.info("Registration {} reopened by admin {} (REJECTED -> PENDING)", userId, adminId);
+    return saved;
   }
 
   /**
