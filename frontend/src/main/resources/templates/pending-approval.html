@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title th:text="#{pendingApproval.title} + ' - ' + ${appTitle}">Freigabe ausstehend - Profit Basetool</title>
+    <title th:text="(${registrationRejected} ? #{pendingApproval.rejected.title} : #{pendingApproval.title}) + ' - ' + ${appTitle}">Freigabe ausstehend - Profit Basetool</title>
     <th:block th:fragment="extraLinks"></th:block>
 </head>
 <body>
@@ -17,11 +17,26 @@
 <main>
     <div id="pending-approval" class="hud-box krtm-max-width-640px-margin-3rem-auto-text-align-4453"
          th:data-status-url="@{/pending-approval/status}" th:data-home-url="@{/}">
-        <h1 th:text="#{pendingApproval.title}">Freigabe ausstehend</h1>
-        <p th:text="#{pendingApproval.message}">Dein Account wurde erstellt und wartet auf die Freigabe durch einen Administrator. Du kannst das Tool erst nutzen, sobald ein Administrator deinen Zugang freigegeben hat.</p>
-        <p class="krtm-font-weight-700-5db7" th:text="#{pendingApproval.patience}">Die Freigabe erfolgt manuell und kann 1 bis 2 Tage dauern. Bitte habe so lange etwas Geduld.</p>
-        <p class="krtm-color-var-color-gray-2-font-size-0-9rem-cdef" th:text="#{pendingApproval.help}">Sobald du freigeschaltet bist, geht es hier automatisch weiter.</p>
-        <p id="pending-approval-approved" class="krtm-font-weight-700-5db7" hidden th:text="#{pendingApproval.approved}">Freigabe erteilt. Du wirst weitergeleitet.</p>
+        <!--
+          A rejected caller gets the rejection block only: the waiting copy is not merely hidden but
+          absent, so no amount of CSS, a stale cache or a broken script can put "waiting for an
+          administrator" back in front of someone whose decision has already been made. A pending
+          caller gets both blocks with the rejection one hidden, which is what lets the poll swap
+          them in place when a decision lands while the page is open.
+        -->
+        <div id="pending-approval-waiting" th:if="${!registrationRejected}">
+            <h1 th:text="#{pendingApproval.title}">Freigabe ausstehend</h1>
+            <p th:text="#{pendingApproval.message}">Dein Account wurde erstellt und wartet auf die Freigabe durch einen Administrator. Du kannst das Tool erst nutzen, sobald ein Administrator deinen Zugang freigegeben hat.</p>
+            <p class="krtm-font-weight-700-5db7" th:text="#{pendingApproval.patience}">Die Freigabe erfolgt manuell und kann 1 bis 2 Tage dauern. Bitte habe so lange etwas Geduld.</p>
+            <p class="krtm-color-var-color-gray-2-font-size-0-9rem-cdef" th:text="#{pendingApproval.help}">Sobald du freigeschaltet bist, geht es hier automatisch weiter.</p>
+            <p id="pending-approval-approved" class="krtm-font-weight-700-5db7" hidden th:text="#{pendingApproval.approved}">Freigabe erteilt. Du wirst weitergeleitet.</p>
+        </div>
+        <div id="pending-approval-rejected" th:hidden="${!registrationRejected}">
+            <h1 th:text="#{pendingApproval.rejected.title}">Registrierung abgelehnt</h1>
+            <p th:text="#{pendingApproval.rejected.message}">Deine Registrierung wurde von einem Administrator abgelehnt. Du kannst das Tool damit nicht nutzen.</p>
+            <p class="krtm-font-weight-700-5db7" th:text="#{pendingApproval.rejected.noAutoUnlock}">Es erfolgt keine automatische Freischaltung.</p>
+            <p class="krtm-color-var-color-gray-2-font-size-0-9rem-cdef" th:text="#{pendingApproval.rejected.contact}">Wenn du das für einen Irrtum hältst, wende dich an einen Administrator im DAS-KARTELL-Discord.</p>
+        </div>
         <form th:action="@{/logout}" method="post" class="krtm-margin-top-1-5rem-1d30">
             <button type="submit" class="btn btn-outline" th:text="#{nav.logout}">Abmelden</button>
         </form>
@@ -30,8 +45,9 @@
 <!--
   Polls the approval status and forwards into the tool as soon as an admin approves (REQ-SEC-017),
   so the waiting page heals itself instead of requiring a logout/login round trip. Deferred: it
-  self-initialises and only runs on this page.
+  self-initialises and only runs on this page. Not rendered at all for an already-rejected caller —
+  REJECTED is terminal, so there is nothing left to poll for.
 -->
-<script th:src="@{/js/pending-approval.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:if="${!registrationRejected}" th:src="@{/js/pending-approval.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

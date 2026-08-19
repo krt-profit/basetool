@@ -19,14 +19,20 @@
  */
 
 /*
- * Self-healing waiting page (REQ-SEC-017). Polls the caller's own approval status and sends them
- * into the tool the moment an admin approves, so an approval propagates live instead of only on the
- * next login — the frontend half of the same fix that stopped BackendRoleSyncFilter from pinning a
- * PENDING verdict for the session's whole 720h lifetime.
+ * Self-healing waiting page (REQ-SEC-017). Polls the caller's own approval status and reacts to
+ * whichever verdict lands, so a decision propagates live instead of only on the next login — the
+ * frontend half of the same fix that stopped BackendRoleSyncFilter from pinning a PENDING verdict
+ * for the session's whole 720h lifetime.
+ *
+ * ACTIVE forwards into the tool. REJECTED is terminal (the backend refuses to decide anything but a
+ * still-PENDING registration), so the poll stops AND swaps the waiting copy for the rejection copy
+ * in place: stopping alone would leave a rejected member reading "waiting for an administrator"
+ * indefinitely, which is exactly the bug this page had. The server renders the same swap directly
+ * for a caller who is already REJECTED when the page loads, and then omits this script entirely.
  *
  * The poll deliberately outlives the filter's approval re-check interval, so every tick is a genuine
  * backend read. It pauses while the tab is hidden (a waiting page sits in a background tab for
- * hours) and stops for good on REJECTED, which is terminal — there is nothing left to wait for.
+ * hours).
  *
  * URLs and user-facing text come from the template via data-* attributes / rendered markup, so this
  * file carries neither a hardcoded path nor a hardcoded string.
@@ -51,6 +57,8 @@
         return;
     }
     const approvedNotice = document.getElementById('pending-approval-approved');
+    const waitingBlock = document.getElementById('pending-approval-waiting');
+    const rejectedBlock = document.getElementById('pending-approval-rejected');
 
     /** @type {number | null} */
     let timer = null;
@@ -73,6 +81,19 @@
         window.location.assign(homeUrl);
     }
 
+    function onRejected() {
+        stopped = true;
+        window.clearTimeout(timer ?? undefined);
+        // Both blocks are in the DOM already (the template renders the pair and hides one), so this
+        // is a pure visibility swap — no fetch, no reload, and no user-facing string in this file.
+        if (waitingBlock) {
+            waitingBlock.hidden = true;
+        }
+        if (rejectedBlock) {
+            rejectedBlock.hidden = false;
+        }
+    }
+
     function poll() {
         fetch(statusUrl, {
             credentials: 'same-origin',
@@ -90,7 +111,7 @@
                     return;
                 }
                 if (status === STATE_REJECTED) {
-                    stopped = true;
+                    onRejected();
                     return;
                 }
                 schedule();
