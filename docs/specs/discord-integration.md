@@ -319,15 +319,44 @@ new PENDING registration (REQ-NOTIF-012), keyed off the PENDING transition itsel
   cannot be used until an admin approves the account, and sets the expectation that approval is
   manual and may take 1–2 days (`pendingApproval.message` / `pendingApproval.patience` in the
   default/de/en bundles).
+- [x] **`PENDING` and `REJECTED` share the route but never the copy.** `BackendRoleSyncFilter`
+  sends both to `/pending-approval` because both are equally access-less — that equivalence is
+  access control, and it must not reach the text. `PendingApprovalPageController` therefore re-reads
+  the caller's own status for the render and picks the copy from it: `REJECTED` gets the rejection
+  block (`pendingApproval.rejected.*` — declined, **no** automatic unlock, contact an admin on
+  Discord), `PENDING` gets the waiting block, and `ACTIVE` — reachable only via a stale bookmark or
+  a tab left open across the approval — is redirected to `/` rather than shown a waiting page for an
+  approval it already holds. **That redirect MUST first clear the session's cached approval verdict**
+  (`BackendRoleSyncFilter.forgetApprovalVerdict`): the page is reachable only because the filter
+  believes the caller is not approved, and it serves that belief from the session for a full
+  re-check interval without a backend read — so redirecting while it survives bounces the browser
+  between `/` and `/pending-approval` at full speed into the browser's redirect cap, rather than
+  merely slowly. Clearing it puts the filter back on its never-read path, where a successful read
+  admits the caller and a failed one yields "not pending", so neither outcome can loop. A rejected
+  render omits the waiting block from the document entirely
+  rather than hiding it, so no cache or broken script can put the waiting promise back on screen.
+  An **unreadable backend renders the waiting copy**: the fail-safe direction here is the opposite
+  of the authority gate's, because telling a still-pending member they were declined is the worse
+  error. Rejection is terminal (`UserRegistrationService` answers a decision on anything but a
+  still-`PENDING` row with a `409`), so the waiting copy shown to a rejected user promised an
+  approval that could no longer arrive — a rejection from 2026-06-29 was still being reported as a
+  stuck approval weeks later. With `app.mail.enabled=false` in production the REQ-NOTIF-014
+  rejection mail that would otherwise close the loop never goes out either, which leaves this page
+  as the rejected user's only channel. The admin's free-text reason is deliberately **not** shown
+  (owner decision, 2026-08-19): it stays an audit/e-mail payload, so no read path exposes it here.
 - [x] **An approval reaches the waiting member without any re-login.** The waiting page polls
   `GET /pending-approval/status` (exempt from the waiting-page redirect) every 20 s and forwards to
-  the tool as soon as the status turns `ACTIVE`; the poll pauses while the tab is hidden and stops
-  on the terminal `REJECTED`. Independently of the page being open, `BackendRoleSyncFilter` expires
-  a non-terminal verdict after 15 s (REQ-SEC-013, ADR-0122), so a member who simply returns later is
-  let straight in. The page therefore promises automatic forwarding (`pendingApproval.help`) instead
-  of instructing a re-login, and confirms it (`pendingApproval.approved`) before redirecting.
+  the tool as soon as the status turns `ACTIVE`; the poll pauses while the tab is hidden. On the
+  terminal `REJECTED` it stops **and swaps the waiting block for the rejection block in place** —
+  both are rendered for a pending caller precisely so this needs no reload — because stopping alone
+  would freeze the waiting promise on screen, which is the same defect one interaction later.
+  Independently of the page being open, `BackendRoleSyncFilter` expires a non-terminal verdict after
+  15 s (REQ-SEC-013, ADR-0122), so a member who simply returns later is let straight in. The page
+  therefore promises automatic forwarding (`pendingApproval.help`) instead of instructing a
+  re-login, and confirms it (`pendingApproval.approved`) before redirecting. A caller already
+  `REJECTED` at page load is served no poll script at all.
 
-**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (gate) + `UserServiceApprovalTest` (approve/reject + 409) + `UserServiceDiscordSyncTest` (new credential ⇒ PENDING, new admin ⇒ ACTIVE) + `UserServiceSyncTest` (scheduled-sync fail-safe) + `UserServiceDeleteTest` (approval-audit cleanup precedes the user delete) + `BackendRoleSyncFilterTest` (verdict expiry + poll-path exemption) + `PendingApprovalPageControllerTest` (status poll) + `PendingApprovalAccessFilterTest` (backend `/api/**` gate, incl. the percent-encoded-prefix bypass) · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `PendingApprovalAccessFilter`, `UserService.deleteUser`, `UserApprovalEventRepository` / `UserRepository.clearApprovedBy` (delete-time FK cleanup), `DiscordRegistrationAdminController`, `BackendRoleSyncFilter` (waiting-page route), `PendingApprovalPageController`, `pending-approval.html`, `pending-approval.js`, `messages*.properties` (`pendingApproval.*`) · **Issues:** #724, post-approval double re-login · **ADR:** ADR-0122
+**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (gate) + `UserServiceApprovalTest` (approve/reject + 409) + `UserServiceDiscordSyncTest` (new credential ⇒ PENDING, new admin ⇒ ACTIVE) + `UserServiceSyncTest` (scheduled-sync fail-safe) + `UserServiceDeleteTest` (approval-audit cleanup precedes the user delete) + `BackendRoleSyncFilterTest` (verdict expiry + poll-path exemption + `forgetApprovalVerdict`) + `PendingApprovalPageControllerTest` (status poll + the per-state render branch, incl. the unreadable-backend fallback and the redirect-loop regression) + `PendingApprovalRenderMvcTest` (the rendered page for all three states: which block exists, which is visible, which copy it carries, and whether the poll is wired) + `PendingApprovalAccessFilterTest` (backend `/api/**` gate, incl. the percent-encoded-prefix bypass) · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `PendingApprovalAccessFilter`, `UserService.deleteUser`, `UserApprovalEventRepository` / `UserRepository.clearApprovedBy` (delete-time FK cleanup), `DiscordRegistrationAdminController`, `BackendRoleSyncFilter` (waiting-page route), `PendingApprovalPageController`, `pending-approval.html`, `pending-approval.js`, `messages*.properties` (`pendingApproval.*`) · **Issues:** #724, post-approval double re-login · **ADR:** ADR-0122
 
 ### REQ-NOTIF-012 — Admins notified on new PENDING registration
 

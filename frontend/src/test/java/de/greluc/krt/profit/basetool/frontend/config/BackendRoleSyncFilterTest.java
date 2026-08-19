@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -508,6 +509,36 @@ class BackendRoleSyncFilterTest {
         1L,
         null,
         false);
+  }
+
+  @Test
+  void forgetApprovalVerdict_dropsBothVerdictAttributes() {
+    // The seam PendingApprovalPageController uses to break the redirect loop: it sends an ACTIVE
+    // caller off the waiting page, but that page is only reachable because this filter believes the
+    // caller is NOT approved — and it serves that belief from the session for a full recheck
+    // interval without a backend read. Leaving either attribute behind leaves the two disagreeing,
+    // and the browser bounces between "/" and "/pending-approval" at full speed.
+    BackendRoleSyncFilter.forgetApprovalVerdict(session);
+
+    verify(session).removeAttribute(APPROVAL_STATE_FLAG);
+    verify(session).removeAttribute(APPROVAL_CHECKED_AT_FLAG);
+  }
+
+  @Test
+  void forgetApprovalVerdict_leavesTheRoleSyncStampAlone() {
+    // Only the approval verdict is stale; discarding the role-sync stamp too would buy an extra
+    // /api/v1/users/me read per redirect for nothing.
+    BackendRoleSyncFilter.forgetApprovalVerdict(session);
+
+    verify(session, never()).removeAttribute(ROLES_SYNCED_AT_FLAG);
+    verify(session, never()).removeAttribute(SYNCED_AUTHORITIES_FLAG);
+  }
+
+  @Test
+  void forgetApprovalVerdict_withoutASession_isANoOp() {
+    // getSession(false) yields null for a session-less request; there is no verdict to forget.
+    assertThatCode(() -> BackendRoleSyncFilter.forgetApprovalVerdict(null))
+        .doesNotThrowAnyException();
   }
 
   /** An epoch-millis stamp young enough that neither refresh interval has elapsed. */
