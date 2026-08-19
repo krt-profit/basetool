@@ -134,6 +134,47 @@ recorded, reversible operator lever — see [`INGEST_KEYCLOAK_SETUP.md`](../INGE
 and any future **public** client (native/mobile) must be sender-constrained via DPoP instead,
 since RFC 9700 requires public-client refresh tokens to be either rotated or bound.
 
+## Verifying the binding actually holds
+
+`scripts/verify-dpop-binding.py` is the companion to the provisioning script, and the split between
+them matters: the provisioning script asserts the client's **configuration** — the profile exists,
+the executor is right, `dpop.bound.access.tokens` is false — while this one measures the realm's
+**behaviour**. A correct configuration that does not produce a bound refresh token is exactly the
+failure nobody would notice, because everything keeps working.
+
+It performs a real login and four token calls, and expects: a grant with the key, a grant on
+refresh with the same key, a **refusal** with no proof at all, and a **refusal** with a different
+key. It also checks the split the backend depends on — `cnf.jkt` present on the refresh token,
+absent on the access token, because Spring Security's bearer filter rejects a bound access token
+outright.
+
+```bash
+python scripts/verify-dpop-binding.py --issuer http://127.0.0.1:18080/realms/iri --username test-member --password test-member-pw
+```
+
+Exit code 0 means all four matched. Measured on the test realm 2026-08-19:
+
+```
+ok   1. code exchange, with the key      HTTP 200  GRANTED  Bearer
+     access token  cnf.jkt = <none>
+     refresh token cnf.jkt = ZqFS5YCd…
+ok   2. refresh, with the same key       HTTP 200  GRANTED  Bearer
+ok   3. refresh, NO proof at all         HTTP 400  REFUSED  invalid_dpop_proof: DPoP proof is missing
+ok   4. refresh, with a DIFFERENT key    HTTP 400  REFUSED  invalid_grant: DPoP confirmation doesn't match DPoP proof
+```
+
+Run it against a **test** realm — it needs a password and creates a session. Requires `requests`
+and `cryptography`.
+
+The issuer above assumes the test stack was started with `docker-compose.android.yml` layered on
+top, which pins `KC_HOSTNAME` to `127.0.0.1`. Without it the test override sets the hostname to
+`host.docker.internal`, Keycloak emits its endpoints under that name, and the login redirect
+leaves for a host the script never asked for:
+
+```bash
+docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.android.yml --profile dev up -d keycloak-dev
+```
+
 ## Runbook — provisioning the mobile client `basetool-android`
 
 `scripts/provision-keycloak-mobile-client.py` creates the client and the refresh-token-only DPoP
