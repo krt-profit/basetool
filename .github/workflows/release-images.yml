@@ -15,23 +15,60 @@ name: Release Images
 #   - workflow_dispatch      -> manual rebuild from the Actions UI.
 #
 # Topology — distributed multi-arch build:
-#   1. `build` matrix (4 jobs, fully parallel): one job per (module, platform).
-#      Each runs natively on the matching architecture's runner — linux/amd64
-#      on the regular `ubuntu-latest` fleet, linux/arm64 on GitHub's free
-#      public-repo `ubuntu-24.04-arm` fleet — and pushes the resulting image
-#      to GHCR **by digest** only (no tag). The previous all-in-one matrix
-#      went through qemu-aarch64 emulation for the arm64 stage and was
-#      ~3-6x slower than amd64 because every javac / Gradle / AppCDS JVM
-#      invocation ran translated. With native runners both architectures
-#      finish in roughly the same wall time.
-#   2. `merge` matrix (2 jobs, one per module): downloads the per-arch digest
-#      artifacts, assembles a multi-arch OCI image index via
-#      `docker buildx imagetools create`, applies all of metadata-action's
-#      tags to the index, then cosign-signs the manifest digest. The
-#      attestation manifests (SLSA provenance, SPDX SBOM) attached to each
-#      per-arch image flow through `imagetools create` automatically, so
-#      the merged index keeps the same audit trail the previous single-job
-#      build had — no separate `cosign attest` step needed.
+#   0. `plan` (1 job): decides whether this run has to build at all. See
+#      REQ-OPS-021 / ADR-0137 — a release fires this workflow TWICE for one
+#      commit (the release commit on `main`, then the `v*` tag), and the
+#      concurrency group below serialises the pair, so the tag run used to
+#      spend a second full pipeline reproducing images that already existed.
+#      On a tag push `plan` resolves `:sha-<short>` for all three app images,
+#      cosign-verifies each against this workflow's main-branch identity, and
+#      asserts the index really carries both linux/amd64 and linux/arm64. Only
+#      if EVERY check passes does it emit `reuse=true`; anything else — a
+#      missing tag, a failed signature, a one-armed index, a
+#      `workflow_dispatch` rebuild, a main-branch push — falls back to a full
+#      build. Fail-safe by construction: the doubt case is always "build".
+#   1. `build` matrix (6 jobs, fully parallel): one job per (module, platform),
+#      skipped entirely when `plan` said reuse. Each runs natively on the
+#      matching architecture's runner — linux/amd64 on the regular
+#      `ubuntu-latest` fleet, linux/arm64 on GitHub's free public-repo
+#      `ubuntu-24.04-arm` fleet — and pushes the resulting image to GHCR
+#      **by digest** only (no tag). The previous all-in-one matrix went
+#      through qemu-aarch64 emulation for the arm64 stage and was ~3-6x
+#      slower than amd64 because every javac / Gradle / AppCDS JVM invocation
+#      ran translated. With native runners both architectures finish in
+#      roughly the same wall time.
+#   2. `merge` matrix (3 jobs, one per module): assembles a multi-arch OCI
+#      image index via `docker buildx imagetools create`, applies all of
+#      metadata-action's tags to the index, then cosign-signs the manifest
+#      digest. The source references are the per-arch digest artifacts from
+#      `build`, or — on a reuse run — the single already-signed index digest
+#      `plan` verified. The attestation manifests (SLSA provenance, SPDX SBOM)
+#      attached to each per-arch image flow through `imagetools create`
+#      automatically, so the merged index keeps the same audit trail the
+#      previous single-job build had — no separate `cosign attest` step needed.
+#   3. `scan` matrix (6 jobs): Trivy per (module, platform), fanned out in
+#      parallel with `merge` instead of sitting inside `build`. Two reasons.
+#      It takes ~35s off the time-to-signed-image, because `merge` no longer
+#      waits behind a scan whose result it does not consume. And it breaks a
+#      failure coupling that could cost a release: a hard failure of the Trivy
+#      action or of the SARIF upload used to fail the whole `build` job, which
+#      skipped `merge` — no tags, no signature — over a scan that is explicitly
+#      advisory (`exit-code: 0`). Skipped on a reuse run: the digest carries
+#      the SARIF the main run already uploaded under the same categories.
+#
+# Deliberately NO BuildKit layer cache (`cache-from` / `cache-to`). Measured on
+# runs 32235454225 and 32227895058: `type=gha,mode=max` cost 40-246s of cache
+# EXPORT per build job while the dependency layer re-ran anyway in 11 of 12
+# jobs. The reason is the repository-wide Actions-cache quota: the six
+# `mode=max` scopes wrote ~5.3 GB, and with CodeQL, the ci.yml Gradle caches and
+# the Trivy DB the repo sat at 10.5 GB against GitHub's 10 GB hard limit, so
+# LRU eviction removed each run's blobs before the next run could read them
+# (run 32235454225 imported the cache manifest and reused zero layers). The
+# cost landed exactly where the benefit was absent — the one job that DID hit
+# the cache exported in 4s, the misses exported for minutes. Dropping the cache
+# takes the critical-path job from ~7:36 to ~3:30 and hands 5.3 GB back to the
+# other workflows. A build cache is semantically transparent, so its removal
+# cannot change the produced artifact — only make it fresher.
 #
 # What this workflow guarantees about the resulting images:
 #   1. Built from a clean GitHub checkout — `.dockerignore` blocks production
@@ -53,9 +90,12 @@ name: Release Images
 #      urgent), but the `promote.yml` workflow re-checks before flipping
 #      the :stable tag — that is the production gate. Both architectures
 #      are scanned natively on their own runner (one Trivy run per
-#      (module, platform) pair, four SARIF uploads total, distinct
+#      (module, platform) pair, six SARIF uploads total, distinct
 #      categories per arch so they show up as independent alert streams
-#      in the Security tab).
+#      in the Security tab). A reuse run scans nothing because it builds
+#      nothing: the digest it re-tags is the one the main-branch run already
+#      scanned and uploaded under those very categories, so the coverage
+#      claim is per DIGEST, not per run.
 
 on:
   push:
@@ -97,8 +137,183 @@ env:
   IMAGE_OWNER: ${{ github.repository_owner }}
 
 jobs:
+  # Decide whether this run has to build the three app images at all, or whether
+  # it may re-tag the already-built, already-signed index the main-branch run
+  # produced for the very same commit (REQ-OPS-021, ADR-0137).
+  #
+  # Why this exists: a release fires this workflow twice for ONE commit — the
+  # release commit lands on `main`, then release-publish.yml tags that same merge
+  # commit `vX.Y.Z`. The `release-images-${{ github.sha }}` concurrency group
+  # serialises the pair on purpose (see its comment above), so the two pipelines
+  # ADD UP: v1.5.53 spent 6:56 on the main run and another 11:40 on the tag run
+  # to produce bit-equivalent images. The tag run's only real product is the set
+  # of semver tags, and `imagetools create` applies those to an existing digest
+  # without moving a single layer — which is exactly what promote.yml already
+  # does for `:stable`.
+  #
+  # Reuse is gated on several independent conditions, ALL of which must hold. The
+  # decision defaults to "build" and only ever moves to "reuse" on a complete
+  # positive result, so every failure mode — registry hiccup, unsigned image,
+  # half-pushed index, unexpected tag shape — degrades to today's behaviour
+  # rather than to a bad release.
+  plan:
+    name: Plan (rebuild or reuse)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    outputs:
+      # 'true' only when every gate below passed. Consumers must compare against
+      # the literal 'true' and treat everything else (including the empty string
+      # a failed job leaves behind) as "build".
+      reuse: ${{ steps.decide.outputs.reuse }}
+      # JSON object module -> verified index digest, e.g.
+      # {"backend":"sha256:…","frontend":"sha256:…","ingest":"sha256:…"}.
+      # `{}` when not reusing. The merge job re-tags THIS digest — the one that
+      # was verified — so no window opens between the check and the use.
+      digests: ${{ steps.decide.outputs.digests }}
+      # The `:sha-<short>` tag the reuse candidate was resolved from, surfaced
+      # for the step summary and for debugging a reuse that did not happen.
+      source_tag: ${{ steps.source-tag.outputs.version }}
+
+    steps:
+      # Derive the `:sha-<short>` tag through metadata-action itself rather than
+      # slicing `github.sha` by hand. The merge job below writes that tag with
+      # the same action and the same `type=sha,prefix=sha-,format=short` rule;
+      # deriving it twice from one implementation means the reuse lookup and the
+      # tag it looks up cannot drift if the action ever changes its short-sha
+      # width. With a single tag rule configured, `outputs.version` IS that tag.
+      - name: Derive the :sha-<short> tag of the source images
+        id: source-tag
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-backend
+          tags: type=sha,prefix=sha-,format=short
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Decide
+        id: decide
+        env:
+          SOURCE_TAG: ${{ steps.source-tag.outputs.version }}
+          REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool
+        run: |
+          set -euo pipefail
+
+          # Record the decision and stop. Every exit from this script goes
+          # through here, so `reuse` and `digests` are always both written — a
+          # job that emitted only one of them would leave the merge job reading
+          # an empty `digests` while `reuse` said true.
+          #   $1 = true|false   $2 = digests JSON   $3 = human-readable reason
+          decide() {
+            printf 'reuse=%s\n' "$1" >> "$GITHUB_OUTPUT"
+            printf 'digests=%s\n' "$2" >> "$GITHUB_OUTPUT"
+            if [ "$1" = true ]; then verdict='reuse existing images'; else verdict='full build'; fi
+            {
+              echo "### Build plan"
+              echo ""
+              echo "| Field | Value |"
+              echo "|---|---|"
+              echo "| Decision | ${verdict} |"
+              echo "| Source tag | \`${SOURCE_TAG}\` |"
+              echo "| Reason | ${3} |"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "plan: reuse=$1 (${3})"
+            exit 0
+          }
+
+          # Gate 1 — only the PUSH of a version tag is a reuse candidate.
+          # A main-branch push is the run that produces the source images in the
+          # first place. `workflow_dispatch` is deliberately excluded even on a
+          # tag: "Run workflow" is the documented manual kick for a release whose
+          # images are missing or suspect (see release-publish.yml), and an
+          # operator who reaches for it wants a REBUILD, not a re-tag.
+          if [ "$EVENT_NAME" != "push" ] || [ "$REF_TYPE" != "tag" ]; then
+            decide false '{}' "not a version-tag push (event=${EVENT_NAME}, ref_type=${REF_TYPE})"
+          fi
+
+          # Gate 2 — the derived tag must actually look like a short-sha tag.
+          # Cheap insurance against a metadata-action change silently handing us
+          # something else: an empty string would resolve to the implicit
+          # `:latest`, and re-tagging THAT as a release would be a spectacular
+          # way to ship the wrong image.
+          case "$SOURCE_TAG" in
+            sha-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*) ;;
+            *) decide false '{}' "unexpected source tag shape '${SOURCE_TAG}'" ;;
+          esac
+
+          digests='{}'
+          for module in backend frontend ingest; do
+            image="${IMAGE_PREFIX}-${module}"
+
+            # Gate 3 — the source index must exist. Missing means the main-branch
+            # run never got here (failed, cancelled, or the tag sits on a commit
+            # that never landed on main).
+            #
+            # stderr of these three probes is deliberately NOT swallowed. The
+            # `decide` line says WHICH gate refused; the tool's own message says
+            # why, and without it a registry blip and a genuinely absent (or
+            # unsigned) image produce byte-identical operator-facing output —
+            # the failure mode promote.yml's verify step was fixed for.
+            if ! digest=$(docker buildx imagetools inspect "${image}:${SOURCE_TAG}" \
+                            --format '{{.Manifest.Digest}}') || [ -z "$digest" ]; then
+              decide false '{}' "no ${image}:${SOURCE_TAG} in the registry"
+            fi
+
+            # Gate 4 — the index must carry BOTH architectures. `imagetools
+            # create` happily re-tags a single-arch index, and a release that
+            # silently dropped linux/arm64 would only surface on the host at
+            # `docker pull` time. `--raw` rather than a Go template because the
+            # template context for an index has differed across buildx versions
+            # while the raw OCI JSON has not. The `select` also drops the
+            # attestation manifests, which carry platform `unknown/unknown`.
+            raw=$(docker buildx imagetools inspect "${image}@${digest}" --raw || true)
+            for want in amd64 arm64; do
+              if ! printf '%s' "$raw" | jq -e --arg a "$want" \
+                   '[.manifests[]? | select(.platform.os == "linux" and .platform.architecture == $a)] | length > 0' \
+                   >/dev/null 2>&1; then
+                decide false '{}' "${image}@${digest} has no linux/${want} child"
+              fi
+            done
+
+            # Gate 5 — the digest must carry this workflow's own keyless
+            # signature, minted on the MAIN branch. Pinned to `refs/heads/main`
+            # rather than promote.yml's wider `(heads/main|tags/v.+)`: the only
+            # legitimate producer of a reuse candidate is the main-branch run of
+            # this very commit, so anything else — a tag-run signature included —
+            # means the provenance is not what this optimisation assumes and the
+            # run should simply build. This is the same supply-chain seam
+            # promote.yml (REQ-OPS-002) and scripts/deploy.sh (REQ-OPS-015) stand
+            # on; reuse must not widen it.
+            if ! cosign verify "${image}@${digest}" \
+                 --certificate-identity-regexp "https://github.com/${REPO}/\.github/workflows/release-images\.yml@refs/heads/main" \
+                 --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+                 >/dev/null; then
+              decide false '{}' "no valid main-branch signature on ${image}@${digest}"
+            fi
+
+            digests=$(jq -cn --argjson d "$digests" --arg m "$module" --arg v "$digest" '$d + {($m): $v}')
+            echo "reuse candidate ok: ${image}:${SOURCE_TAG} -> ${digest}"
+          done
+
+          decide true "$digests" "all three app images exist, are dual-arch and carry the main-branch run's signature"
+
   build:
     name: Build (${{ matrix.module }} / ${{ matrix.platform }})
+    needs: plan
+    # Skipped wholesale on a reuse run. `!= 'true'` rather than `== 'false'` so a
+    # plan job that died without writing its output still builds.
+    if: needs.plan.outputs.reuse != 'true'
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 30
 
@@ -222,14 +437,14 @@ jobs:
           # its full canonical name so the imagetools merge can resolve it
           # consistently across both per-arch jobs.
           outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }},push-by-digest=true,name-canonical=true,push=true
-          # GitHub Actions cache backend. `mode=max` caches all build stages
-          # including the multi-stage `build` layer (Gradle dependency
-          # download), which is the slowest part of the build. Scoped per
-          # (module, platform) so the four parallel build jobs do not
-          # invalidate each other — amd64 and arm64 layers have different
-          # base images and library binaries and must not share cache keys.
-          cache-from: type=gha,scope=${{ matrix.module }}-${{ env.PLATFORM_PAIR }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.module }}-${{ env.PLATFORM_PAIR }}
+          # No `cache-from` / `cache-to` on purpose — see the "Deliberately NO
+          # BuildKit layer cache" paragraph in the file header for the measured
+          # reasoning. Short version: `type=gha,mode=max` spent 40-246s per job
+          # exporting a cache that GitHub's 10 GB per-repo quota evicted before
+          # the next run could read it, so the dependency layer re-ran anyway in
+          # 11 of 12 measured jobs. Before adding a cache back, check
+          # `gh api repos/{owner}/{repo}/actions/cache/usage` — if the repo is at
+          # the quota, a new cache consumer only makes every other one worse.
           # `mode=max` provenance records every build step's command and
           # parameters in the SLSA attestation; the default `mode=min` only
           # records the final manifest. Max is verbose but auditable. The
@@ -265,56 +480,147 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-      # Trivy scans the per-arch image by its exact digest — the per-arch
-      # job runs on the matching native runner (arm64 image is scanned by
-      # an arm64 runner), so no QEMU emulation is needed inside Trivy
-      # either. `exit-code: 0` is deliberate: we do NOT block the push on
-      # findings (a CVE-bearing image is preferable to a missing image
-      # when a hotfix is urgent). The findings show up in the Security tab
-      # and the `promote.yml` workflow re-runs this check as a gate before
-      # flipping :stable.
+  # Trivy, fanned out per (module, platform) alongside `merge` rather than tacked
+  # onto the end of `build`. Two reasons, both about the scan's relationship to
+  # the release rather than about the scan itself:
+  #
+  #   1. Latency. `merge` needs the per-arch digests and nothing else, yet it
+  #      used to wait for a ~30s scan plus a ~7s SARIF upload in every build job
+  #      first. Scanning in parallel takes that off the path to a signed image.
+  #   2. Blast radius. `exit-code: 0` says the scan is advisory — but that only
+  #      covers Trivy FINDING something. A hard failure of the action itself (DB
+  #      download, registry blip) or of the SARIF upload failed the whole build
+  #      job, which skipped `merge` for every module: no tags, no signature, a
+  #      release lost to an advisory step. In its own job it can fail loudly and
+  #      redly without touching the images.
+  #
+  # Kept on the matching native runner per platform, exactly as before, so the
+  # per-arch Trivy DB caches stay warm and nothing about the scan itself changes.
+  scan:
+    name: Scan (${{ matrix.module }} / ${{ matrix.platform }})
+    needs: [plan, build]
+    # `always()` because this job must still run when a SIBLING build cell
+    # failed — the cells that did succeed have images worth scanning, which is
+    # the behaviour the in-build scan had for free. Restricted to runs that
+    # actually built: a reuse run re-tags a digest the main-branch run already
+    # scanned under these very categories, so re-scanning it would add nothing
+    # but a duplicate alert stream. `needs.build.result` is 'skipped' on a reuse
+    # run and when `plan` itself failed, which is exactly when we want no scan.
+    if: ${{ always() && needs.plan.outputs.reuse != 'true' && contains(fromJSON('["success", "failure"]'), needs.build.result) }}
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [backend, frontend, ingest]
+        platform: [linux/amd64, linux/arm64]
+        include:
+          - platform: linux/amd64
+            runs-on: ubuntu-latest
+          - platform: linux/arm64
+            runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Resolve platform pair
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
+
+      # Required: the basetool-* packages are private, and Trivy pulls the image
+      # it scans straight from GHCR. It reads the credentials out of
+      # `~/.docker/config.json`, which is exactly what login-action writes — the
+      # same implicit dependency the scan had while it lived in the build job
+      # (which logged in for the push). Without this the scan fails on a 401,
+      # which is why it is not "just" a convenience step.
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # `continue-on-error` because the artifact is absent exactly when this
+      # cell's build failed, and that is not this job's failure to report — the
+      # build job already reported it. The next step turns "no artifact" into a
+      # clean skip instead of a second, louder error pointing at the scan.
+      - name: Download digest
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: digest-${{ matrix.module }}-${{ env.PLATFORM_PAIR }}
+          path: /tmp/digest
+
+      # The build job materialises the digest as a zero-byte file NAMED after
+      # the digest (job outputs do not survive matrix expansion), so the value
+      # is the filename with the `sha256:` prefix restored.
+      - name: Resolve image digest
+        id: digest
+        run: |
+          set -euo pipefail
+          name=$(find /tmp/digest -maxdepth 1 -type f -printf '%f\n' 2>/dev/null | head -n 1 || true)
+          if [ -z "$name" ]; then
+            echo "::warning::no digest artifact for ${{ matrix.module }}/${{ matrix.platform }} — its build did not produce an image; skipping the scan"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "ref=${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@sha256:${name}" >> "$GITHUB_OUTPUT"
+
+      # Trivy scans the per-arch image by its exact digest — this job runs on
+      # the matching native runner (the arm64 image is scanned by an arm64
+      # runner), so no QEMU emulation is needed inside Trivy either.
+      # `exit-code: 0` is deliberate: we do NOT block the push on findings (a
+      # CVE-bearing image is preferable to a missing image when a hotfix is
+      # urgent). The findings show up in the Security tab and the `promote.yml`
+      # workflow re-runs this check as a gate before flipping :stable.
       #
       # `TRIVY_PLATFORM` is required because `provenance: mode=max` + `sbom: true`
       # cause buildkit to push an OCI index (image manifest + provenance manifest
-      # + SBOM manifest) rather than a bare image manifest, and `outputs.digest`
-      # points at that index. Trivy's default child-selection inside an OCI
-      # index is hardcoded to `linux/amd64`, which works coincidentally on the
-      # amd64 runner (the index's per-arch image happens to be linux/amd64) but
-      # fails on the arm64 runner with `no child with platform linux/amd64 in
-      # index ...`. Setting `TRIVY_PLATFORM` to the matrix platform pins the
+      # + SBOM manifest) rather than a bare image manifest, and the exported
+      # digest points at that index. Trivy's default child-selection inside an
+      # OCI index is hardcoded to `linux/amd64`, which works coincidentally on
+      # the amd64 runner (the index's per-arch image happens to be linux/amd64)
+      # but fails on the arm64 runner with `no child with platform linux/amd64
+      # in index ...`. Setting `TRIVY_PLATFORM` to the matrix platform pins the
       # selection to the matching child explicitly so the scan stays consistent
       # regardless of buildkit's index-vs-manifest output decision.
       - name: Run Trivy vulnerability scan
+        if: steps.digest.outputs.found == 'true'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
           TRIVY_PLATFORM: ${{ matrix.platform }}
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@${{ steps.build.outputs.digest }}
+          image-ref: ${{ steps.digest.outputs.ref }}
           format: sarif
           output: trivy-${{ matrix.module }}-${{ env.PLATFORM_PAIR }}.sarif
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '0'
 
-      # `always()` so findings still reach the Security tab when a later step
-      # fails, but gated on the build having produced an image: when an earlier
-      # step dies (the v1.5.26 backend/amd64 builder boot, run 30615321686) the
-      # scan never runs, and an unconditional upload then adds its own
-      # `Path does not exist: trivy-*.sarif` error on top — a second, louder
-      # failure that points at the scan instead of at the actual cause.
       - name: Upload Trivy SARIF to GitHub Security
-        if: always() && steps.build.outcome == 'success'
+        if: steps.digest.outputs.found == 'true'
         uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           sarif_file: trivy-${{ matrix.module }}-${{ env.PLATFORM_PAIR }}.sarif
           # Distinct category per (module, platform) so GitHub's Security
-          # tab treats the four scans as independent alert streams instead
+          # tab treats the six scans as independent alert streams instead
           # of overwriting each other.
           category: trivy-${{ matrix.module }}-${{ env.PLATFORM_PAIR }}
 
   merge:
     name: Merge & sign (${{ matrix.module }})
-    needs: build
+    needs: [plan, build]
+    # `always()` is needed only because `build` is legitimately SKIPPED on a
+    # reuse run, and a skipped dependency would otherwise skip this job too. The
+    # two guards behind it keep the original semantics intact: `plan` must have
+    # succeeded, and on a building run every build cell must have succeeded —
+    # a partial build must not produce tags, exactly as `needs: build` enforced
+    # before. `fail-fast: false` on the build matrix means one failed cell shows
+    # up here as `needs.build.result == 'failure'`, which this expression
+    # rejects.
+    if: ${{ always() && needs.plan.result == 'success' && (needs.plan.outputs.reuse == 'true' || needs.build.result == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -324,7 +630,11 @@ jobs:
         module: [backend, frontend, ingest]
 
     steps:
+      # Nothing to download on a reuse run — the source is the single verified
+      # index digest `plan` handed over, not a pair of freshly built per-arch
+      # digests.
       - name: Download per-arch digests
+        if: needs.plan.outputs.reuse != 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: /tmp/digests/${{ matrix.module }}
@@ -373,38 +683,84 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
 
       # `imagetools create` assembles an OCI image index from N source
-      # references and applies one or more tags to it. We feed it every
-      # per-arch digest collected from the build matrix; the source refs
-      # are themselves OCI indexes (image manifest + provenance manifest
-      # + SBOM manifest), so the final merged index inherits the
-      # attestation chain intact — no separate `cosign attest` step
-      # needed for provenance / SBOM. metadata-action exports its `tags`
-      # output as JSON via the `DOCKER_METADATA_OUTPUT_JSON` env var; the
-      # jq expression below transforms each tag string into a `-t <tag>`
-      # CLI argument.
+      # references and applies one or more tags to it. It is a pure registry-side
+      # manifest operation: no layer is pulled, rebuilt or re-pushed. The source
+      # refs are themselves OCI indexes (image manifest + provenance manifest +
+      # SBOM manifest), so the resulting index inherits the attestation chain
+      # intact — no separate `cosign attest` step needed for provenance / SBOM.
+      # metadata-action exports its `tags` output as JSON via the
+      # `DOCKER_METADATA_OUTPUT_JSON` env var; the jq expression below transforms
+      # each tag string into a `-t <tag>` CLI argument.
+      #
+      # Two source shapes, one command:
+      #   build run — the two per-arch digests this run just pushed, which
+      #               `create` assembles into a fresh multi-arch index.
+      #   reuse run — the single already-merged, already-signed index digest
+      #               `plan` verified, which `create` simply re-tags. This is
+      #               byte-for-byte the operation promote.yml performs for
+      #               `:stable`, so the release tags end up pointing at the exact
+      #               digest the main-branch run built, scanned and signed.
       - name: Create multi-arch manifest
-        working-directory: /tmp/digests/${{ matrix.module }}
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}
+          REUSE: ${{ needs.plan.outputs.reuse }}
+          REUSED_DIGEST: ${{ fromJSON(needs.plan.outputs.digests || '{}')[matrix.module] }}
+          DIGEST_DIR: /tmp/digests/${{ matrix.module }}
+          MODULE: ${{ matrix.module }}
         run: |
           set -eu
+
+          # Collect the source references into "$@" so they survive as separate
+          # CLI arguments without another round of word-splitting below.
+          if [ "$REUSE" = "true" ]; then
+            if [ -z "$REUSED_DIGEST" ]; then
+              echo "::error::reuse was requested but plan handed over no digest for ${MODULE}" >&2
+              exit 1
+            fi
+            set -- "${IMAGE}@${REUSED_DIGEST}"
+            echo "re-tagging verified digest ${REUSED_DIGEST}"
+          else
+            cd "$DIGEST_DIR"
+            # One file per (module, platform) cell of the build matrix. Asserting
+            # the count guards against publishing a silently single-arch index if
+            # an artifact ever goes missing — that defect would otherwise only
+            # surface on the host, at `docker pull` time, on one architecture.
+            # Update this number together with the `platform` matrix.
+            count=$(find . -maxdepth 1 -type f | wc -l)
+            if [ "$count" -ne 2 ]; then
+              echo "::error::expected 2 per-arch digests for ${MODULE}, found ${count}" >&2
+              find . -maxdepth 1 -type f -print >&2
+              exit 1
+            fi
+            # One `image@sha256:<digest>` argument per digest file. Built by a
+            # loop rather than by word-splitting a `printf`, so a registry path
+            # is never interpreted as a printf format string and nothing depends
+            # on IFS.
+            set --
+            for f in *; do
+              [ -f "$f" ] || continue
+              set -- "$@" "${IMAGE}@sha256:${f}"
+            done
+          fi
+
           # Retried because the failure mode is transient and the operation is
           # idempotent: re-tagging the same source digests yields the same index.
           # GHCR answers a contended push with `error writing layer blob:
           # not_found` (seen on run 30930709770), which a second attempt clears.
           for attempt in 1 2 3; do
-            # Intentional word-splitting: each $(...) must expand into MULTIPLE
-            # separate CLI arguments — `-t tagA -t tagB ...` from the jq output
-            # and N `image@sha256:...` source refs from the printf. Quoting would
-            # collapse each into a single argument and break the manifest merge.
+            # Intentional word-splitting on the jq output only: it must expand
+            # into `-t tagA -t tagB ...`, whereas the source refs are already
+            # separate arguments in "$@".
             # shellcheck disable=SC2046
             if docker buildx imagetools create \
               $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-              $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@sha256:%s ' *); then
+              "$@"; then
               exit 0
             fi
-            echo "::warning::manifest merge attempt ${attempt} failed for ${{ matrix.module }}; retrying"
+            echo "::warning::manifest merge attempt ${attempt} failed for ${MODULE}; retrying"
             sleep $((attempt * 10))
           done
-          echo "::error::could not create the merged manifest for ${{ matrix.module }}" >&2
+          echo "::error::could not create the merged manifest for ${MODULE}" >&2
           exit 1
 
       # Resolve the manifest digest of the newly-tagged index. Cosign signs
@@ -458,6 +814,16 @@ jobs:
       # Sigstore Fulcio cert and writes the signature to the Rekor
       # transparency log.
       #
+      # Runs unconditionally, reuse run included. On a reuse run the digest
+      # already carries the main-branch run's signature — `plan` verified
+      # exactly that before allowing the reuse — so this second signature is
+      # strictly redundant. It is kept because signing is idempotent, costs ~5s,
+      # and buys an invariant worth more than those seconds: *every* digest a
+      # release tag points at was signed by the run that applied the tag. That
+      # holds even if a future edit loosens a gate in `plan`, and it means a
+      # release tag never depends on a signature this run did not itself
+      # witness.
+      #
       # Retry wrapper: the keyless path is a network round-trip to the
       # Sigstore public-good services (Fulcio cert issuance + Rekor log
       # upload). Those shared services intermittently return transient
@@ -488,6 +854,36 @@ jobs:
           done
           echo "::error::cosign sign failed after ${attempts} attempts for ${IMAGE}" >&2
           exit 1
+
+      # Makes the build-vs-reuse decision legible on the run page next to the
+      # digest it produced, so "why was this release so fast?" is answerable
+      # without reading the plan job's log.
+      - name: Summarise
+        env:
+          MODULE: ${{ matrix.module }}
+          DIGEST: ${{ steps.inspect.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+          REUSE: ${{ needs.plan.outputs.reuse }}
+          SOURCE_TAG: ${{ needs.plan.outputs.source_tag }}
+        run: |
+          set -eu
+          if [ "$REUSE" = "true" ]; then
+            origin="reused \`${SOURCE_TAG}\` (built by the main-branch run of this commit)"
+          else
+            origin="built by this run"
+          fi
+          {
+            echo "### basetool-${MODULE}"
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Origin | ${origin} |"
+            echo "| Digest | \`${DIGEST}\` |"
+            echo ""
+            echo '```'
+            echo "${TAGS}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # The host-configuration bundle: a `FROM scratch` image (docker/config/Dockerfile)
   # carrying only the compose file + the bind-mounted maintenance/theme trees. It

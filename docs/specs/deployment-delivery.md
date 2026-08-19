@@ -611,6 +611,65 @@ and its measured revisions in [ADR-0085](../adr/0085-scale-user-sync-and-stack-c
   round-number bump, or "to be safe", without a measurement.
 - The sum of limits is recomputed and recorded whenever any limit changes.
 
+### REQ-OPS-021 — One build per commit; the release tag re-tags what main already produced
+
+A release fires `release-images.yml` **twice for one commit**: the release PR merges to `main`, then
+`release-publish.yml` tags that same merge commit `vX.Y.Z`. Both pushes are wanted — the first
+produces `:edge` / `:sha-<short>`, the second the semver tags — and the
+`release-images-${github.sha}` concurrency group serialises them so they cannot contend for the same
+GHCR packages. Serialised, the two pipelines **add up**: v1.5.53 spent 6:56 on the main run and a
+further 11:40 on the tag run to produce bit-equivalent images.
+
+A commit is therefore built **once**. The tag run resolves the `:sha-<short>` index the main-branch
+run pushed and applies the semver tags to that digest with `docker buildx imagetools create` — a
+registry-side manifest operation that moves no layer, and the same operation `promote.yml` performs
+for `:stable` (REQ-OPS-002). The release tags then point at the exact digest that was built, scanned
+and signed on `main`, which is a **stronger** guarantee than two independent builds of one source
+tree: `:1.5.53` and `:sha-<short>` can no longer be two different images.
+
+Reuse is an optimisation, never a weakening of the supply chain. It applies only when **every** gate
+passes, and the doubt case is always a full build:
+
+1. the run is the **push** of a version tag (`workflow_dispatch` always rebuilds — it is the
+   documented manual kick for a release whose images are missing or suspect);
+2. the derived source tag has the expected `sha-<hex>` shape;
+3. all three app images resolve under that tag in GHCR;
+4. each resolved index carries **both** `linux/amd64` and `linux/arm64` children;
+5. each digest cosign-verifies against this workflow's identity pinned to `refs/heads/main` —
+   deliberately narrower than promote.yml's `(heads/main|tags/v.+)`, because the only legitimate
+   producer of a reuse candidate is the main-branch run of that commit.
+
+The digest is **re-signed** by the tag run even though gate 5 already proved it is signed, so the
+invariant "every digest a release tag points at was signed by the run that applied the tag" holds
+independently of the gates. Trivy is **not** re-run: the scan is per digest, and that digest was
+scanned by the main run under the same SARIF categories. The `basetool-config` and
+`basetool-keycloak-spi` bundles are rebuilt on both runs — they are seconds-scale `FROM scratch`
+images off the critical path, and leaving them alone keeps the reuse logic confined to the three
+app images.
+
+The image build carries **no BuildKit layer cache**. `cache-to: type=gha,mode=max` wrote ~5.3 GB per
+release across six scopes; with CodeQL, the `ci.yml` Gradle caches and the Trivy DB the repository
+sat at 10.5 GB against GitHub's 10 GB per-repo limit, so LRU eviction removed each run's blobs before
+the next run could read them. Measured across twelve build jobs, the dependency layer re-ran in
+eleven of them while cache export still cost 40–246 s per job — the cost landed exactly where the
+benefit was absent. A build cache is semantically transparent, so removing it cannot change the
+produced artifact.
+
+**Acceptance**
+
+- [ ] A `plan` job decides build-vs-reuse before any build job starts, and emits `reuse=true` only
+  when all five gates above pass; every other outcome, including its own failure, yields a full build.
+- [ ] On a reuse run the `merge` job re-tags the digest `plan` **verified** (no second resolution
+  between check and use) and signs it; `build` and `scan` are skipped.
+- [ ] A `workflow_dispatch` run always builds, on any ref.
+- [ ] `release-images.yml` declares no `cache-from` / `cache-to` for the app images. Before any cache
+  is reintroduced, `gh api repos/{owner}/{repo}/actions/cache/usage` is checked against the 10 GB
+  limit — at the quota, a new cache consumer only degrades every existing one.
+- [ ] Trivy runs in its own job, not inside `build`: a failure of the scan action or of the SARIF
+  upload must not skip `merge` and cost the release its tags and signature.
+
+**Enforced by:** `.github/workflows/release-images.yml` (`plan`, `build`, `scan`, `merge`) · **Decision:** [ADR-0137](../adr/0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md)
+
 ## Out of scope
 
 - The deploy script (`deploy.sh`) and the systemd units themselves are **not** delivered via
