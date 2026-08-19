@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.52](https://github.com/krt-profit/basetool/releases/tag/v1.5.52) - 2026-08-19
+
 ### Changed
 
 - **Gastmodus der App gestrichen — die anonymen Schreibpfade bleiben dauerhaft zu.** Die öffentliche API-Allowlist hielt `POST /api/v1/orders/items`, die Gast-Teilnehmer-Mutationen und die redigierten Browsing-Zwillinge für den Gastmodus der Android-App in Reserve. Der Modus entfällt (jeder Nutzer meldet sich an), also werden diese Pfade auf dem `api`-vhost nie freigeschaltet. Für die Weboberfläche ändert sich nichts — sie erreicht das Backend intern.
