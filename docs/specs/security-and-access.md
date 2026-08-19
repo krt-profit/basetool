@@ -1394,7 +1394,10 @@ client while the policy is attached.
 - [x] In the authorization-code flow the token response is `token_type: Bearer`, the access token
   carries no `cnf`, and the refresh token carries `cnf.jkt` (verified against Keycloak 26.7,
   2026-08-17).
-- [x] A refresh presented without a proof, or with a different key, is refused.
+- [x] A refresh presented without a proof, or with a different key, is refused — re-measurable with
+  `scripts/verify-dpop-binding.py`, which drives the authorization-code flow the app uses and fails
+  the run unless the refusals carry `invalid_dpop_proof` and `invalid_grant` respectively
+  (2026-08-19, Keycloak 26.7).
 - [x] The binding survives refresh-token rotation.
 - [x] A client in the same realm without the marker role is unaffected.
 - [x] The provisioning script merges by name, preserving foreign client policies, and applies
@@ -1402,7 +1405,8 @@ client while the policy is attached.
 - [x] Verification fails loudly when `dpop.bound.access.tokens` is flipped on, when the marker role
   is missing, or when the policy is present but unscoped.
 
-**Enforced by:** `provision-keycloak-mobile-client.test.sh` · **Code:**
+**Enforced by:** `provision-keycloak-mobile-client.test.sh` (configuration) and
+`scripts/verify-dpop-binding.py` (behaviour) · **Code:**
 `scripts/provision-keycloak-mobile-client.py` · **Decision:**
 [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md) · **Measurements:**
 [`ANDROID_API_EXPOSURE_PLAN.md`](../ANDROID_API_EXPOSURE_PLAN.md) section 7
