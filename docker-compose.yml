@@ -478,7 +478,10 @@ x-backend: &backend-template
         # JVM threads count as tasks toward this ceiling; 2048 is generous headroom over Tomcat +
         # Hikari + scheduler + GC/JIT threads, so it is a runaway ceiling, not a limit hit under load.
         pids: 2048
-  environment:
+  # Anchored so the dev-profile service can merge this map and override single keys. A service that
+  # merges `<<: *backend-template` and then declares its own `environment:` REPLACES this map wholly
+  # (YAML merge does not deep-merge), which is why backend-dev re-merges `*backend-env` explicitly.
+  environment: &backend-env
     SPRING_PROFILES_ACTIVE: prod
     SERVER_PORT: 11261
     SPRING_DATASOURCE_URL: jdbc:postgresql://db-backend:15432/${POSTGRES_DB:?POSTGRES_DB must be set in .env}
@@ -759,7 +762,8 @@ x-frontend: &frontend-template
         cpus: '2.0'
         # JVM thread ceiling — generous headroom (see the backend template).
         pids: 2048
-  environment:
+  # Anchored for frontend-dev to merge and override — see the note on x-backend's `environment`.
+  environment: &frontend-env
     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
     SERVER_PORT: 18081
     KEYCLOAK_ISSUER_URI: https://keycloak.profit-base.online/realms/iri
@@ -840,7 +844,8 @@ x-ingest: &ingest-template
         cpus: '1.5'
         # JVM thread ceiling — generous headroom (see the backend template).
         pids: 2048
-  environment:
+  # Anchored for ingest-dev to merge and override — see the note on x-backend's `environment`.
+  environment: &ingest-env
     SPRING_PROFILES_ACTIVE: prod
     SERVER_PORT: 11262
     KEYCLOAK_ISSUER_URI: https://keycloak.profit-base.online/realms/iri
@@ -960,6 +965,11 @@ services:
   redis-dev:
     <<: *redis-template
     profiles: ["dev"]
+    # Per-project named volume — see the note on db-backend-dev. The prod `redis` service re-lists
+    # its data volume next to the read-only ACL mount; the dev service needs no ACL file at all,
+    # because only prod overrides the command to add `--aclfile`.
+    volumes:
+      - redis-dev-data:/data
     ports:
       - "127.0.0.1:6379:6379"
     networks:
@@ -983,6 +993,18 @@ services:
   db-backend-dev:
     <<: *db-backend-template
     profiles: ["dev"]
+    # A per-project NAMED volume, not the anchor's /var/iri/db-backend host bind. The bind is a fixed
+    # absolute path, so every worktree and every compose project on the machine wrote into the SAME
+    # cluster — and because `--volumes` only removes named volumes, the documented
+    # `down --volumes` teardown could not reset it. The practical failure is a confusing one: a stack
+    # started with a fresh .env.test hits `password authentication failed`, because PGDATA was
+    # initialised by an earlier stack with different credentials and initdb never re-runs on a
+    # non-empty directory. A named volume is scoped to the compose project, so two worktrees no
+    # longer share a database, and `down --volumes` genuinely resets it. Safe for Postgres (unlike
+    # the app log dirs, which use tmpfs): the image ships nothing at this path for Docker to seed the
+    # volume from, and the entrypoint chowns PGDATA as root before dropping to `postgres`.
+    volumes:
+      - db-backend-dev-data:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:15432:15432"
     networks:
@@ -1000,6 +1022,9 @@ services:
   db-keycloak-dev:
     <<: *db-keycloak-template
     profiles: ["dev"]
+    # Per-project named volume — see the note on db-backend-dev.
+    volumes:
+      - db-keycloak-dev-data:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:15433:15433"
     networks:
@@ -1125,6 +1150,32 @@ services:
   backend-dev:
     <<: *backend-template
     profiles: ["dev"]
+    # Run the `dev` SPRING profile, which the x-backend anchor pins to `prod`. Without this the
+    # dev stack loads application-prod.yml, which moves Actuator to the internal-only management
+    # port 11271 (ADR-0134) — and since the management-port HEALTHCHECK override lives on the PROD
+    # `backend` service only, this container keeps the image's 11261 probe, gets a 404 and never
+    # turns healthy. frontend-dev and ingest-dev both gate on `service_healthy` here, so the whole
+    # `--profile dev` stack stops at that point. SPRING_DATASOURCE_* is supplied as an ENVIRONMENT
+    # variable above and therefore still outranks the hardcoded URL in application-dev.yml, so the
+    # database stays the one POSTGRES_DB names.
+    environment:
+      <<: *backend-env
+      SPRING_PROFILES_ACTIVE: dev
+    # Log to tmpfs, not to the anchor's /var/iri/backend/log production host layout. A developer
+    # machine has no such path, so Docker creates it root-owned; the container runs as uid 10001,
+    # Logback's appender gets "logs/backend.log (Permission denied)", and because that happens during
+    # Spring Boot's logging initialisation the container EXITS rather than degrading — the stack then
+    # reports an unhealthy service whose real cause is buried in an appender stack trace. A named
+    # volume does not fix it (Docker seeds one from the image, and the images ship those log files
+    # root-owned); tmpfs starts genuinely empty, needs no chown and disappears with the container.
+    # Same fix and same reasoning as docker-compose.test.yml (#1596). Prod is unaffected: the prod
+    # services keep the bind, and the host directory there is pre-chowned to 10001.
+    volumes:
+      - type: tmpfs
+        target: /app/logs
+        tmpfs:
+          mode: 0o777
+      - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
     ports:
       - "127.0.0.1:11261:11261"
     depends_on:
@@ -1199,6 +1250,21 @@ services:
   frontend-dev:
     <<: *frontend-template
     profiles: ["dev"]
+    # Same reason as backend-dev: the prod profile would move Actuator to 18091 (ADR-0090) and leave
+    # the image's 18081 probe answering 404. REDIS_HOST comes with it because only application-
+    # prod.yml hardcodes `redis` — application-dev.yml reads ${REDIS_HOST:localhost}, and inside the
+    # container `localhost` is the JVM itself, not the redis-dev service.
+    environment:
+      <<: *frontend-env
+      SPRING_PROFILES_ACTIVE: dev
+      REDIS_HOST: redis
+    # tmpfs logs — see the note on backend-dev.
+    volumes:
+      - type: tmpfs
+        target: /app/logs
+        tmpfs:
+          mode: 0o777
+      - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
     ports:
       - "127.0.0.1:18081:18081"
     depends_on:
@@ -1262,6 +1328,19 @@ services:
   ingest-dev:
     <<: *ingest-template
     profiles: ["dev"]
+    # Same reason as backend-dev: the prod profile would move Actuator to 11272 (ADR-0090) and leave
+    # the image's 11262 probe answering 404. REDIS_HOST/BACKEND_URL/FRONTEND_URL already come from
+    # the anchor as environment variables, so they survive the profile switch unchanged.
+    environment:
+      <<: *ingest-env
+      SPRING_PROFILES_ACTIVE: dev
+    # tmpfs logs — see the note on backend-dev.
+    volumes:
+      - type: tmpfs
+        target: /app/logs
+        tmpfs:
+          mode: 0o777
+      - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
     ports:
       - "127.0.0.1:11262:11262"
     depends_on:
@@ -1386,6 +1465,17 @@ services:
 # single-purpose host, so collision risk is nil. The three NPM-facing bridges
 # (net-proxy-frontend/-keycloak/-ingest) are grouped in .3/.4/.7 so the admin
 # allow-list is a short, explicit list of their gateways.
+# Data volumes for the DEV-profile stateful services only. The prod services deliberately keep their
+# /var/iri/* host binds: on the production host those paths are provisioned, pre-chowned and backed
+# up, and a named volume would move the database somewhere the backup does not look. Dev is the
+# opposite case — nothing backs a developer machine's throwaway stack up, and what it needs instead
+# is isolation between worktrees plus a teardown that actually tears down. Compose prefixes these
+# with the project name, so each project gets its own and `down --volumes` removes them.
+volumes:
+  db-backend-dev-data:
+  db-keycloak-dev-data:
+  redis-dev-data:
+
 networks:
   # Explicit `name:` (below and on net-redis-frontend) so the separate docker-compose.monitoring.yml
   # project can reference these as `external` by a deterministic name: the postgres/redis exporters

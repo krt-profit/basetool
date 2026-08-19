@@ -205,7 +205,58 @@ docker compose --env-file .env.test \
     -f docker-compose.yml -f docker-compose.test.yml --profile dev down --volumes
 ```
 
-The exact `keytool` and realm-rewrite recipes (and why real artifacts must never be substituted) are in the *Testing* section of [CLAUDE.md](CLAUDE.md); `.gitignore` already excludes `.env.*`, `keystore.p12` and `realm-export.json`.
+The dev-profile Postgres and Redis services keep their data in **named volumes**, which Compose prefixes with the project name — so two worktrees do not share a database, and `down --volumes` genuinely resets the stack. (The prod services keep their `/var/iri/*` host binds, which are provisioned and backed up on the production host.) If a stack ever refuses to start with `password authentication failed`, the data directory was initialised by an earlier run with different credentials: `down --volumes` and start again, since `initdb` never re-runs on a non-empty directory.
+
+`.gitignore` already excludes `.env.*`, `keystore.p12` and `realm-export.json`, so none of the three artifacts below can be committed by accident. **Never substitute the production `.env`, `keystore.p12` or `realm-export.json`** — the reasoning is in the *Testing* section of [CLAUDE.md](CLAUDE.md).
+
+**1. Throwaway keystore.** One self-signed cert covering every service alias the stack dials over TLS. The password is arbitrary but must match `SERVER_SSL_KEY_STORE_PASSWORD` in `.env.test`:
+
+```bash
+keytool -genkeypair -alias basetool -keyalg RSA -keysize 2048 -validity 30 \
+    -storetype PKCS12 -keystore keystore.p12 -storepass throwaway-test-pw \
+    -dname "CN=basetool-test, OU=test, O=test, L=test, S=test, C=DE" \
+    -ext "SAN=dns:localhost,dns:backend,dns:frontend,dns:ingest,dns:keycloak,ip:127.0.0.1"
+```
+
+**2. `.env.test`.** Every variable the base compose marks required, with throwaway values:
+
+```bash
+SERVER_SSL_KEY_STORE_PASSWORD=throwaway-test-pw
+IRI_KEYSTORE_HOST_PATH=./keystore.p12
+POSTGRES_DB=krt_basetool
+POSTGRES_USER=basetool_test
+POSTGRES_PASSWORD=throwaway-test-pw
+KC_POSTGRES_DB=keycloak_test
+KC_POSTGRES_USER=keycloak_test
+KC_POSTGRES_PASSWORD=throwaway-test-pw
+KC_BOOTSTRAP_ADMIN_USERNAME=test-admin
+KC_BOOTSTRAP_ADMIN_PASSWORD=throwaway-test-pw
+KEYCLOAK_ADMIN_CLIENT_SECRET=throwaway-test-secret
+REDIS_PASSWORD=throwaway-test-pw
+IRI_BASETOOL_VERSION=stable
+```
+
+**3. `realm-export.json`.** Keycloak imports it on first boot (`start-dev --import-realm`). Derive it from an existing export by rewriting every secret and replacing the user list — never by copying one in unchanged:
+
+```bash
+python - <<'PY'
+import json, pathlib
+realm = json.loads(pathlib.Path("realm-export-source.json").read_text(encoding="utf-8"))
+for client in realm.get("clients", []):
+    if client.get("secret"):
+        client["secret"] = "throwaway-test-secret"
+realm["users"] = [{
+    "username": "test-admin", "enabled": True, "emailVerified": True,
+    "credentials": [{"type": "password", "value": "test-admin-pw", "temporary": False}],
+}]
+realm.pop("smtpServer", None)
+pathlib.Path("realm-export.json").write_text(json.dumps(realm, indent=2), encoding="utf-8")
+PY
+```
+
+If you only need the stack to *start* (health checks, a UI smoke test that does not log in), a minimal realm is enough — `{"realm": "iri", "enabled": true, "sslRequired": "none", "clients": [...], "users": [...]}` with the two clients `basetool-backend` and `backend-service`, the latter with `serviceAccountsEnabled: true` and its secret matching `KEYCLOAK_ADMIN_CLIENT_SECRET`.
+
+`POSTGRES_DB` is not free-form: the backend's `application-dev.yml` names `krt_basetool`, and although the compose-supplied `SPRING_DATASOURCE_URL` environment variable overrides that, keeping the two aligned avoids a confusing "database does not exist" on first boot.
 
 ---
 

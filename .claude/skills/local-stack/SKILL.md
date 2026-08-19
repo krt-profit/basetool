@@ -24,3 +24,12 @@ The backend serves HTTPS with a self-signed cert (`keystore.p12`, password `chan
 **Never use production / real credentials in a local stack** — this is the hard rule from the
 root `CLAUDE.md` Testing section. Always source `.env.test` (never `.env`), point Docker Compose
 at `--env-file .env.test`, and tear the stack down with `down --volumes` after the verification.
+
+The dev-profile Postgres/Redis data lives in project-prefixed **named volumes**, so worktrees do not
+share a database and `down --volumes` really does reset it. A stack that fails with
+`password authentication failed` is running against a data directory some earlier run initialised
+with different credentials — tear it down with `--volumes` rather than editing `.env.test` to match.
+The `*-dev` services also run the **`dev`** Spring profile, which is load-bearing: under `prod` they
+would serve Actuator on an internal-only management port while the image's `HEALTHCHECK` keeps
+probing the app port, so the container answers 404 to its own probe and stays `unhealthy` forever
+(ADR-0090/ADR-0134).
