@@ -2714,21 +2714,26 @@ public final class BackendSeeder {
   }
 
   /**
-   * Locates the throwaway {@code keystore.p12} that {@link E2eStackExtension} generated, by walking
-   * up from the working directory (the e2e tests run with the {@code frontend} module as CWD; the
-   * keystore sits at the repository root).
+   * Locates the committed test keystore under {@code docker/test-tls/} (ADR-0139) by walking up
+   * from the working directory, since the e2e tests run with the {@code frontend} module as CWD
+   * while the file sits under the repository root. It is the same store the compose stack mounts at
+   * {@code /run/secrets/keystore.p12}, so the certificate trusted here is by construction the one
+   * the backend serves. Nothing generates a keystore any more, so a miss means the repository
+   * checkout is incomplete rather than that an earlier step failed to run.
    *
-   * @return the path to the e2e keystore
-   * @throws IllegalStateException if no {@code keystore.p12} is found up to the filesystem root
+   * @return the path to the committed test keystore
+   * @throws IllegalStateException if the keystore is not found up to the filesystem root
    */
   private static Path locateKeystore() {
     for (Path p = Paths.get("").toAbsolutePath(); p != null; p = p.getParent()) {
-      Path candidate = p.resolve("keystore.p12");
+      Path candidate =
+          p.resolve("docker").resolve("test-tls").resolve("basetool-test-keystore.p12");
       if (Files.exists(candidate)) {
         return candidate;
       }
     }
     throw new IllegalStateException(
-        "keystore.p12 not found walking up from " + Paths.get("").toAbsolutePath());
+        "docker/test-tls/basetool-test-keystore.p12 not found walking up from "
+            + Paths.get("").toAbsolutePath());
   }
 }

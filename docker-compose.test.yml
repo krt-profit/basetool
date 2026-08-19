@@ -1,10 +1,19 @@
 # Override for spinning up the dev stack with test-only credentials from
 # .env.test. The base docker-compose.yml hardcodes the production-facing
-# KEYCLOAK_ISSUER_URI (https://keycloak.profit-base.online/realms/iri) into both
-# x-backend and x-frontend templates; this file points everything at the
-# locally-imported `iri` realm on the host-mapped Keycloak port 18080
-# instead, using host.docker.internal so that the same URL works both
+# KEYCLOAK_ISSUER_URI (https://keycloak.profit-base.online/realms/iri) into all
+# three of the x-backend, x-frontend and x-ingest templates; this file points
+# everything at the locally-imported `iri` realm on the host-mapped Keycloak
+# port 18080 instead, using host.docker.internal so that the same URL works both
 # inside containers and from the host browser on Docker Desktop.
+#
+# SPRING_PROFILES_ACTIVE is pinned to `dev` for all three apps here as well.
+# The base file already does this on its own `*-dev` services, so these lines
+# are belt-and-braces rather than load-bearing — but they are worth keeping
+# explicit, because the failure they prevent is silent: under the prod profile
+# Actuator moves onto an internal-only management port (ADR-0090/ADR-0134)
+# while the image's HEALTHCHECK keeps probing the app port, so the container
+# answers 404 to its own probe and stays `unhealthy` forever without logging
+# anything wrong.
 #
 # Usage:
 #   docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml \
@@ -139,7 +148,27 @@ services:
 
   ingest-dev:
     environment:
+      # Matches backend-dev and frontend-dev above — see the profile note in this file's header.
+      # This service was the one exception: it declared no `environment:` at all, so it inherited
+      # SPRING_PROFILES_ACTIVE: prod from the x-ingest anchor and bound Actuator to the management
+      # port 11272 while the image went on probing 11262 — a gateway that started perfectly and sat
+      # `unhealthy` forever.
+      SPRING_PROFILES_ACTIVE: dev
+      # The committed test keystore's password. Pinned here rather than read from
+      # .env.test so every test stack opens the same file with the same value.
       SERVER_SSL_KEY_STORE_PASSWORD: basetool-test
+      # Same reason as backend-dev: the base template points at the PRODUCTION realm, and the JWKS
+      # fetch that would follow is an outbound call from a developer machine to prod. Tokens carry
+      # the issuer the browser saw (localhost:18080), so this is also the only value that can
+      # validate them. The fetch is lazy, so an unreachable Keycloak does not block start-up.
+      KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/realms/iri
+      # The base template defaults this to https://profit-base.online — the gateway hands it to the
+      # desktop extractor as the "open the pre-filled page" target, so in an isolated stack it would
+      # send a developer's browser to PRODUCTION. Pin it to this stack's own frontend.
+      FRONTEND_URL: http://localhost:18081
+    # Resolvable on platforms that do not ship the alias (Linux); a no-op on Docker Desktop.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes: !override
       - type: tmpfs
         target: /app/logs

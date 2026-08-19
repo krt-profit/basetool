@@ -83,8 +83,10 @@ management:
     # request bodies into a Loki stream retained for 744 h. So the write is not merely gated here,
     # it does not exist: `read-only` keeps GET /actuator/loggers (the whole diagnostic value during
     # an incident) and leaves the write operation unregistered.
-    # The backend is deliberately the OTHER shape and that asymmetry is intentional: it configures
-    # no management port at all, so its /actuator/loggers rides the ordinary 11261 connector behind
+    # The backend is deliberately the OTHER shape and that asymmetry is intentional. Since ADR-0134
+    # it has a management port too (11271), so the difference is no longer whether one exists: its
+    # ManagementPortSecurityConfig scopes the permit-all chain to an enumerated READ surface rather
+    # than to /actuator/**, so /actuator/loggers selects that chain not at all and falls through to
     # SecurityConfig's filter chain, where the mutator CAN carry an identity check and is gated on
     # ROLE_ADMIN instead of being removed. Full runtime control stays available in dev/test/e2e,
     # which set no management port and never load this file.

@@ -410,6 +410,34 @@ scrape (epic #936, ADR-0072). The endpoint is **never public**:
 > `ManagementPortSecurityConfig`, `application-prod.yml`, `docker-compose.yml` (healthcheck
 > override), `monitoring/prometheus/prometheus.yml`
 
+**"Dev/test/e2e are unchanged" is a claim about the compose stacks, not just about the YAML files,
+and it has to be kept true on purpose.** A service running the `prod` Spring profile serves
+`/actuator/**` on the management port *only*, so the app-port `HEALTHCHECK` baked into the image
+answers `404` and the container can never become healthy. Nothing about that is loud: the app does
+not crash and logs no error, it simply sits `unhealthy` forever while everything with a
+`condition: service_healthy` on it waits. Two things therefore move together for every service in
+every stack — **the effective Spring profile and the effective probe**. A prod-profile service needs
+the compose `healthcheck` override onto its management port (the `backend` / `frontend` / `ingest`
+services each carry one); a dev-profile service needs its profile to actually *be* `dev`, because it
+inherits the image's app-port probe and no override corrects it.
+
+The trap is inheritance. The `x-backend` / `x-frontend` / `x-ingest` anchors carry
+`SPRING_PROFILES_ACTIVE: prod`, and a service that merges an anchor and then declares its own
+`environment:` **replaces that map wholesale** — YAML merge does not deep-merge — so for a long time
+the `*-dev` services declared no `environment:` at all and silently ran the prod profile. Every one
+of them was therefore probing the wrong port: `ingest-dev` in the isolated test stack sat
+permanently `unhealthy`, and in the plain `--profile dev` stack all three did, which also meant
+`frontend-dev` and `ingest-dev` never started at all because both gate on
+`backend-dev: condition: service_healthy`.
+
+Both halves are fixed in `docker-compose.yml`: each template's `environment` map is anchored
+(`&backend-env` / `&frontend-env` / `&ingest-env`), and each `*-dev` service re-merges it and
+overrides `SPRING_PROFILES_ACTIVE: dev` (plus `REDIS_HOST: redis` for `frontend-dev`, whose dev
+profile reads `${REDIS_HOST:localhost}` where only `application-prod.yml` hardcodes the alias).
+`docker-compose.test.yml` keeps its own explicit pins on top. **A new `*-dev` service must do the
+same** — merging the anchor without re-declaring the profile reintroduces exactly this failure, and
+it is invisible until something waits on the container's health.
+
 - Each module guards exactly this path with a **dedicated `SecurityFilterChain`**
   (`MonitoringScrapeSecurityConfig`, ordered before the main chain) using HTTP basic auth
   against a single in-memory scrape identity fed by the `MONITORING_SCRAPE_USER` /
@@ -1771,12 +1799,14 @@ needed.
 
 The **read** is available in all three modules on every profile. The **write** is not, and "unreachable
 from a public connector" is not a sufficient statement of its posture — it says nothing about the
-connector the endpoint actually lives on. The write posture is therefore stated per module, and it
-differs because the connectors differ:
+connector the endpoint actually lives on. The write posture is therefore stated per module. Since
+ADR-0134 all three modules serve prod Actuator on an internal-only management port, so what the
+posture now turns on is **how wide the permit-all chain on that port is** — and whether the module
+has an identity to gate a write on at all:
 
-- **`frontend` + `ingest`, prod — the mutator does not exist.** In prod these two move their Actuator
-  to the internal-only management port (frontend `18091`, ingest `11272`), which is served by an
-  unauthenticated permit-all chain (ADR-0090) because the port is reachable only from
+- **`frontend` + `ingest`, prod — the mutator does not exist.** In prod these two serve Actuator on
+  the internal-only management port (frontend `18091`, ingest `11272`) behind an
+  unauthenticated permit-all chain (ADR-0090), because the port is reachable only from
   `net-monitoring-scrape` and `localhost`. That chain matches `/actuator/**` by **path** and cannot
   distinguish a read operation from a write one, so exposing `loggers` there exposed the level change
   too: anything on the monitoring plane could set `ROOT` to `TRACE`, at which point Spring Security,
@@ -1784,13 +1814,18 @@ differs because the connectors differ:
   fix removes the operation rather than gating it — `management.endpoint.loggers.access: read-only` in
   each `application-prod.yml`, so the write is never registered and there is nothing for the
   permit-all chain to guard. `GET /actuator/loggers` still answers on the management port.
-- **`backend` — the mutator survives, gated on `ROLE_ADMIN`.** The backend sets **no**
-  `management.server.port`: its Actuator rides the ordinary `11261` app connector, which is not
-  host-published, sits only on internal Docker networks and — decisively — is covered by the module's
-  *main* security chain. `SecurityConfig` therefore requires `ROLE_ADMIN` on
-  `POST /actuator/loggers/**` (placed after the `/actuator/health` `permitAll()`, before
-  `anyRequest().authenticated()`), while `GET` falls through to the authenticated catch-all. The gate
-  does **not** ride the role hierarchy: `OFFICER` is refused like any other non-admin.
+- **`backend`, prod — the mutator survives, gated on `ROLE_ADMIN`.** Since ADR-0134 the backend has a
+  management port too (`11271`), so the difference is no longer *whether* there is one — it is how
+  wide the chain on it is. The backend's `ManagementPortSecurityConfig` scopes its `securityMatcher`
+  to an enumerated read surface (`/actuator/health`, `/actuator/health/**`, `/actuator/prometheus`,
+  `/actuator/info`) instead of `/actuator/**`, so `POST /actuator/loggers/**` selects that chain not
+  at all and falls through to the module's *main* chain. `SecurityConfig` requires `ROLE_ADMIN` on it
+  (placed after the `/actuator/health` `permitAll()`, before `anyRequest().authenticated()`), while
+  `GET` falls through to the authenticated catch-all. The gate does **not** ride the role hierarchy: `OFFICER` is
+  refused like any other non-admin. This is why the backend can keep a write the other two must
+  delete: it is a resource server with an identity to gate on, and its permit-all chain is narrow
+  enough that the mutator never reaches it. Widening that matcher to `/actuator/**` would silently
+  un-gate the write — `ManagementPortIsolationTest` asserts it stays 401/403 on the management port.
 - **dev / test / e2e — unchanged, full control.** No management port is configured, the
   `application-prod.yml` files are never loaded, so all three modules keep the runtime write. The
   backend's `ROLE_ADMIN` matcher lives in `SecurityConfig` and is profile-independent, so it applies
