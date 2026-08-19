@@ -32,3 +32,17 @@ services:
     # beside the loopback binding and the two would collide on the same host port.
     ports: !override
       - "11261:11261"
+    environment:
+      # The split-horizon this file creates, made explicit. KC_HOSTNAME above pins Keycloak's
+      # advertised issuer to 127.0.0.1 so the emulator (via adb reverse) and the tokens it receives
+      # agree -- but the backend must VALIDATE those tokens, and 127.0.0.1 inside its container is
+      # itself. Without the key URL below it cannot resolve a decoder at all and answers every
+      # authenticated request with 500 (JwtDecoderInitializationException), which reads like an
+      # application fault and is a topology one.
+      KEYCLOAK_ISSUER_URI: http://127.0.0.1:18080/realms/iri
+      KEYCLOAK_JWK_SET_URI: http://keycloak:18080/realms/iri/protocol/openid-connect/certs
+      # Belt and braces: the named variable above only reaches a decoder in images built after
+      # jwk-set-uri was added to application-dev.yml. Spring's own relaxed-binding name works on
+      # every image including the published :stable, so a developer pulling the release tag is
+      # not left debugging a 500 that has nothing to do with their code.
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:18080/realms/iri/protocol/openid-connect/certs

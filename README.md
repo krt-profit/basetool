@@ -195,7 +195,7 @@ The multi-squadron / multi-OrgUnit rollout is long complete; its current model i
 
 ### Running the local test stack
 
-For UI verification in a worktree without exposing any production secret. Use an isolated `.env.test`, a locally generated `keystore.p12` (throwaway password), and a stripped `realm-export.json`, driven through the `docker-compose.test.yml` override:
+For UI verification in a worktree without exposing any production secret. Use an isolated `.env.test` and a stripped `realm-export.json`, driven through the `docker-compose.test.yml` override:
 
 ```bash
 docker compose --env-file .env.test \
@@ -205,7 +205,9 @@ docker compose --env-file .env.test \
     -f docker-compose.yml -f docker-compose.test.yml --profile dev down --volumes
 ```
 
-The exact `keytool` and realm-rewrite recipes (and why real artifacts must never be substituted) are in the *Testing* section of [CLAUDE.md](CLAUDE.md); `.gitignore` already excludes `.env.*`, `keystore.p12` and `realm-export.json`.
+**The TLS material is not something you generate.** [`docker/test-tls/`](docker/test-tls/README.md) carries a committed keystore that every test stack, every CI run and the Android dev build share, so there is nothing to create and no CA to install on an emulator. It is bound by a hardcoded path rather than through `IRI_KEYSTORE_HOST_PATH`, which still selects the *production* keystore — a test stack must not be one typo away from mounting it. Why publishing it is safe, and the one price it costs: [ADR-0139](docs/adr/0139-shared-committed-tls-material-for-the-test-stack.md).
+
+The realm-rewrite recipe (and why real artifacts must never be substituted) is in the *Testing* section of [CLAUDE.md](CLAUDE.md); `.gitignore` already excludes `.env.*`, `keystore.p12` and `realm-export.json`.
 
 ---
 
