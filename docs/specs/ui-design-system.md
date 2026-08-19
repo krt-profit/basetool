@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-08-05.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-08-19.
 > **Owner area:** UI · **Related ADRs:** none yet · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)).
@@ -500,10 +500,63 @@ Binding details:
 **Code:** `fragments/fankit.html`, `index.html`, `.krt-fankit-*` in `styles.css`,
 `fankit.*` in the three message bundles · **Related:** REQ-UI-009.
 
+### REQ-UI-019 — The app wears the Basetool mark; the org mark stays on org surfaces
+
+The Basetool has its **own** logo family (design skill `assets/basetool-*`), derived from the two
+parent marks: the DAS KARTELL wedge tilted to a rising course line, with the Profit division's
+yield bars growing towards it inside the orbit ring. It is the app's identity, so app surfaces wear
+it. The DAS KARTELL mark (`krt.*`) keeps the surfaces where the *organisation*, not the tool, is
+the subject.
+
+Binding placement:
+
+|                                    Surface                                    |                               Asset                               |
+|-------------------------------------------------------------------------------|-------------------------------------------------------------------|
+| Page header brand link (all templates)                                        | `logos/basetool-logo.svg`                                         |
+| Browser tab                                                                   | `logos/basetool-favicon.svg` + `-32.png` + `-16.png`              |
+| iOS home screen / pinned site                                                 | `logos/basetool-appicon-512.png`                                  |
+| Keycloak login theme                                                          | `img/basetool-logo.svg`                                           |
+| Generated PDF exports (handover protocol, bank statement, three-month report) | `krt.png` / `krt.svg` — **org mark**, unchanged                   |
+| Fan Kit compliance band                                                       | `made-by-the-community.png` — CIG artwork, untouched (REQ-UI-018) |
+
+Binding details:
+
+- **The favicon is a reduced glyph, not a scaled logo.** Below ~32 px the ring and the star stop
+  carrying, so the favicon drops both and keeps wedge + bars. The PNG rasters ship at their exact
+  pixel sizes; a browser resampling one large raster into a 16 px tab slot turns the wedge to mush.
+  Order in `<head>`: SVG first (what every current engine picks), PNG fallbacks after.
+- **`apple-touch-icon` uses the opaque 512 px app icon**, not the favicon glyph — iOS composites its
+  own rounded mask and ignores transparency, so a flat glyph would land on a white plate.
+- **The header mark is decorative** (`alt=""`). The `.logo-text` wordmark sits inside the same link
+  and already names the app at every breakpoint; giving the image an alt as well makes a screen
+  reader announce the name twice. The same holds for the Keycloak login, where the `<h1>` does it.
+- **`height="50"` on the header mark is the whole box, padding included.** The SVG's 240×240
+  viewBox carries roughly 30 % breathing room by design — that is the mark's specified presentation,
+  not slack to be cropped. Do not fork a tightened copy of the asset to "fill" the box.
+- **The mark renders only in `#E77E23`, white or black** (REQ-UI-002). `basetool-logo-white.svg` is
+  the white variant for print/overlay; no other recolour exists.
+- The sibling apps draw from the same family — the SC Extractor's desktop icon from
+  `basetool-extractor-*`, the Android launcher icon from `basetool-appicon-512.png`. Their
+  integration is governed in their own repos; only the shared source of truth (the design skill) is
+  common.
+
+**Acceptance**
+
+- [ ] Every rendered page carries `logos/basetool-logo.svg` in the header brand link.
+- [ ] `<head>` links the SVG favicon, both PNG rasters and the touch icon.
+- [ ] No app page references `logos/krt.webp` or `logos/krt-favicon.webp`.
+- [ ] Every referenced brand asset actually ships under `META-INF/resources/logos/`.
+
+**Enforced by:** `BrandMarkRenderMvcTest` · **Code:** `fragments/head.html`, the `.brand` link in
+every page template, `META-INF/resources/logos/basetool-*`,
+`keycloak-theme/krt-theme/login/login.ftl` · **Related:** REQ-UI-002, REQ-UI-018.
+
 ## Out of scope
 
-Brand assets/logos themselves (managed in the design skill `assets/`), and the desktop SC
-Extractor's GUI design (see [`docs/DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACTOR.md)).
+The brand assets themselves — their artwork, variants and rasters — are authored and versioned in
+the design skill `assets/`; this spec governs only *where the app applies them* (REQ-UI-019). The
+desktop SC Extractor's GUI design lives in
+[`docs/DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACTOR.md).
 
 **Material-amount input fields** (SCU/PIECE precision, positivity, the `.`/`,` separator) are
 cross-cutting (inventory, orders, refinery), so their rules live in their own spec —
