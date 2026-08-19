@@ -87,7 +87,15 @@ class ExternalContractTest {
               "get",
               Set.of("canSeeBlueprintOverview", "canViewJobOrders", "canViewOwnJobOrders")),
           new ContractOperation(
-              "/api/v1/users/me/registration-status", "get", Set.of("approvalStatus")));
+              "/api/v1/users/me/registration-status", "get", Set.of("approvalStatus")),
+          // ADR-0138: the app renders the wording from here instead of shipping a copy in the APK,
+          // so a field dropped from this response blanks a legal document on a build nobody can
+          // redeploy. `sections` is the field that matters most -- rename it and the terms screen
+          // shows a heading and nothing else.
+          new ContractOperation(
+              "/api/v1/terms/document",
+              "get",
+              Set.of("version", "title", "intro", "sections", "lastUpdated")));
 
   @Test
   @DisplayName("every operation a shipped client depends on is still served, with the same verb")

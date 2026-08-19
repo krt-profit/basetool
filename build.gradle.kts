@@ -489,7 +489,11 @@ subprojects {
 // document, and bumping it is itself an announcement that the terms changed.
 tasks.register("generateTermsVersion") {
   description = "Regenerates the committed Terms-of-Use version from the German message bundle."
-  val bundle = rootProject.file("frontend/src/main/resources/messages_de.properties")
+  // Backend-owned since the document became an API resource: the digest has to hash the text
+  // that is actually SERVED. Left pointing at the frontend it would have kept hashing a bundle
+  // no longer carrying the terms, producing a stable version for wording that had changed --
+  // a gate that never re-prompts, with nothing to show it had stopped working.
+  val bundle = rootProject.file("backend/src/main/resources/messages_de.properties")
   val target = rootProject.file("backend/src/main/resources/terms-version.properties")
   // The escape hatch for a purely cosmetic edit (a typo, a reflow): pinning the
   // version leaves every existing acceptance valid instead of re-prompting the
@@ -500,7 +504,11 @@ tasks.register("generateTermsVersion") {
   doLast {
     val version = override ?: termsVersionDigest(bundle)
     target.parentFile.mkdirs()
-    target.writeText("basetool.terms.version=" + version + System.lineSeparator(), Charsets.UTF_8)
+    // A literal LF, not System.lineSeparator(): Spotless normalises .properties to LF, so a CRLF
+    // written here leaves every Windows run of this task with a red spotlessPropertiesCheck for a
+    // file whose CONTENT is correct — a "format violation" reported against the one artifact
+    // nobody edits by hand, and the build's only hint is to run a 25-minute spotlessApply.
+    target.writeText("basetool.terms.version=" + version + "\n", Charsets.UTF_8)
     logger.lifecycle("Terms-of-Use version: $version -> ${target.relativeTo(rootDir)}")
   }
 }

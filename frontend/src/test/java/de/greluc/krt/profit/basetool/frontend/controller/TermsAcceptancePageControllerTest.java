@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -27,13 +29,18 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.TermsClauseDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.TermsDocumentDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.TermsSectionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TermsStatusDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,6 +70,9 @@ class TermsAcceptancePageControllerTest {
 
   @MockitoBean private BackendApiClient backendApiClient;
 
+  /** Backend endpoint serving the wording the gate asks about (ADR-0138). */
+  private static final String DOCUMENT_URI = "/api/v1/terms/document";
+
   @MockitoBean
   private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
       clientRegistrationRepository;
@@ -72,6 +82,71 @@ class TermsAcceptancePageControllerTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    // Stubbed for every test rather than per case: the gate cannot render without the wording,
+    // so leaving it out would fail each test for a reason unrelated to what it asserts.
+    when(backendApiClient.get(eq(DOCUMENT_URI), eq(TermsDocumentDto.class))).thenReturn(document());
+  }
+
+  /**
+   * The wording the backend serves, trimmed to what the gate has to prove it renders.
+   *
+   * @return a one-section document with a bulleted clause
+   */
+  private static TermsDocumentDto document() {
+    return new TermsDocumentDto(
+        "v1",
+        "Nutzungsbedingungen",
+        "Diese Nutzungsbedingungen regeln die Nutzung des Profit Basetool.",
+        List.of(
+            new TermsSectionDto(
+                "4. Pflichten der Nutzer",
+                List.of(
+                    new TermsClauseDto(
+                        "Der Nutzer verpflichtet sich zu Folgendem:",
+                        List.of("Keine technischen Eingriffe."))))),
+        "Stand dieser Nutzungsbedingungen: 05.08.2026");
+  }
+
+  /**
+   * The gate shows the wording it is asking about.
+   *
+   * <p>The point of the whole move: a gate that rendered from its own copy could ask for consent to
+   * text other than the one the acceptance is recorded against, and no other test would notice.
+   */
+  @Test
+  @WithMockUser
+  void rendersTheWordingServedByTheBackend() throws Exception {
+    when(backendApiClient.get(eq(STATUS_URI), eq(TermsStatusDto.class)))
+        .thenReturn(new TermsStatusDto(false, "v1"));
+
+    mockMvc
+        .perform(get("/terms/accept"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("4. Pflichten der Nutzer")))
+        .andExpect(content().string(containsString("Keine technischen Eingriffe.")));
+  }
+
+  /**
+   * A gate whose wording cannot be read is an error, not an emptier gate.
+   *
+   * <p>Deliberately the opposite tolerance from the status read above: a stale "not accepted" costs
+   * one extra click, but consent to a text that was never displayed is not consent at all.
+   */
+  @Test
+  @WithMockUser
+  void failsWhenTheWordingCannotBeRead() throws Exception {
+    when(backendApiClient.get(eq(STATUS_URI), eq(TermsStatusDto.class)))
+        .thenReturn(new TermsStatusDto(false, "v1"));
+    when(backendApiClient.get(eq(DOCUMENT_URI), eq(TermsDocumentDto.class)))
+        .thenThrow(new BackendServiceException("backend down", null, 503));
+
+    mockMvc
+        .perform(get("/terms/accept"))
+        // The error page, not the gate. Asserted on the resolved view rather than on the
+        // status: the advice renders error/error and MockMvc reports the pre-dispatch 200,
+        // so a status assertion here would pass for a gate that rendered perfectly fine.
+        .andExpect(view().name("error/error"))
+        .andExpect(content().string(not(containsString("4. Pflichten der Nutzer"))));
   }
 
   /** A user who has not consented sees the gate. */

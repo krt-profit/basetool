@@ -507,6 +507,16 @@ public class SecurityConfig {
                     // carries @PreAuthorize("isAuthenticated()"), so requiring a token here costs
                     // nothing. Ordering matters — Spring Security takes the FIRST matching rule, so
                     // this must stay above the /api/v1/materials/** entry.
+                    // ADR-0138 / REQ-SEC-028: the Terms-of-Use WORDING is anonymous, while
+                    // /api/v1/terms/status and /acceptance below it stay authenticated. A document
+                    // everyone must be able to read before agreeing to anything cannot require
+                    // having agreed, and the identical text is already world-readable at /terms on
+                    // the web frontend, so this publishes nothing new -- it stops the app from
+                    // needing its own drifting copy. Ordering matters: Spring Security takes the
+                    // FIRST matching rule, so this exact path must stay above any broader
+                    // /api/v1/terms rule and above the authenticated catch-all.
+                    .requestMatchers(HttpMethod.GET, "/api/v1/terms/document")
+                    .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/materials/matrix")
                     .authenticated()
                     .requestMatchers(

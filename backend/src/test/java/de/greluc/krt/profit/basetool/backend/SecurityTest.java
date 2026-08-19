@@ -264,4 +264,36 @@ class SecurityTest {
                         .jwt(jwt)))
         .andExpect(status().isOk());
   }
+
+  /**
+   * The Terms-of-Use wording is readable without a token (ADR-0138, REQ-SEC-028).
+   *
+   * <p>Pinned here rather than left to the SecurityConfig entry, because the whole design depends
+   * on it: the public {@code /terms} page fetches this anonymously, and the Android app has to be
+   * able to show the wording before the member has agreed to anything. Should the rule be reordered
+   * behind the authenticated catch-all, the page and the app both go blank while every other test
+   * stays green.
+   */
+  @Test
+  void termsDocumentIsReadableAnonymously() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/terms/document"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.title").exists())
+        .andExpect(jsonPath("$.version").isNotEmpty())
+        .andExpect(jsonPath("$.sections").isArray());
+  }
+
+  /**
+   * Consent itself stays behind authentication.
+   *
+   * <p>The counterpart to the test above, and the reason the two live in separate controllers:
+   * opening the wording must not open the record of who agreed to it. A permitAll that had been
+   * written one path segment too short -- {@code /api/v1/terms/**} -- would pass the test above and
+   * fail this one.
+   */
+  @Test
+  void termsStatusStaysAuthenticated() throws Exception {
+    mockMvc.perform(get("/api/v1/terms/status")).andExpect(status().isUnauthorized());
+  }
 }
