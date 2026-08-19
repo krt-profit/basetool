@@ -43,6 +43,31 @@ services:
       KC_DB_USERNAME: ${KC_POSTGRES_USER}
       KC_DB_PASSWORD: ${KC_POSTGRES_PASSWORD}
 
+# ---------------------------------------------------------------------------
+# Log destinations.
+#
+# The base compose bind-mounts the PRODUCTION host layout — /var/iri/<svc>/log — which does not
+# exist on a developer machine and is not writable by the containers' unprivileged UID (10001).
+# Logback then fails to open its appender, and because that happens during Spring Boot's logging
+# initialisation it takes the whole start-up with it: the container restarts in a loop and the
+# stack reports "backend-dev is unhealthy" with the actual cause buried under a stack trace about
+# an appender.
+#
+# tmpfs instead, and NOT a named volume — which was the first fix and did not work. Docker populates
+# a fresh named volume from the image's content at that path, ownership included, and the images ship
+# /app/logs/backend.log and backend-error.log owned by root. The container then owns the directory
+# but not the files inside it, so it can create new ones and cannot APPEND to those two, which is
+# exactly what Logback does (openFile(..., append=true)). Production is unaffected because the host
+# log directory is pre-chowned to uid 10001 and its files were written by the service itself.
+#
+# A tmpfs starts genuinely empty, copies nothing from the image and needs no chown. Logs in a test
+# stack are throwaway anyway — nothing here ships them to Loki — and the mount disappears with the
+# container, which suits a stack documented to end in `down --volumes`.
+#
+# `!override` and not a plain list: Compose MERGES volume lists across files, so an added entry
+# would sit beside the production bind rather than replace it, and the broken mount would still be
+# there. Each list therefore repeats the keystore mount the base declares.
+# ---------------------------------------------------------------------------
   backend-dev:
     environment:
       SPRING_PROFILES_ACTIVE: dev
@@ -69,6 +94,12 @@ services:
     # platforms that don't ship the alias by default (Linux). On Docker
     # Desktop (Mac/Windows) the alias is already present; the extra_hosts
     # entry is a no-op there.
+    volumes: !override
+      - type: tmpfs
+        target: /app/logs
+        tmpfs:
+          mode: 0o777
+      - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -89,3 +120,19 @@ services:
       BACKEND_URL: https://backend:11261
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+    volumes: !override
+      - type: tmpfs
+        target: /app/logs
+        tmpfs:
+          mode: 0o777
+      - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+
+  ingest-dev:
+    # Present only for the log mount: the base binds the production host layout, which a developer
+    # machine has neither. Every other setting the gateway needs is already right for this stack.
+    volumes: !override
+      - type: tmpfs
+        target: /app/logs
+        tmpfs:
+          mode: 0o777

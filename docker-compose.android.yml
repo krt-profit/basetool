@@ -19,3 +19,16 @@ services:
     # would be added beside the base's 127.0.0.1 binding and the two collide on the same host port.
     ports: !override
       - "18080:18080"
+
+  backend-dev:
+    # Same restriction, same fix as Keycloak above, and it cost a debugging round to find because it
+    # does not look like a networking problem from the app: the base compose publishes the backend as
+    # 127.0.0.1:11261, the emulator reaches the host only as 10.0.2.2, and a connection there simply
+    # times out. `ping 10.0.2.2` answers, the host's own browser loads https://localhost:11261 — and
+    # OkHttp still reports SocketTimeoutException after 10 s, which the app can only classify as
+    # ApiError.Network, i.e. "you are offline".
+    #
+    # !override for the reason given above: Compose MERGES port lists, so an added entry would sit
+    # beside the loopback binding and the two would collide on the same host port.
+    ports: !override
+      - "11261:11261"
