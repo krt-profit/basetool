@@ -1,0 +1,21 @@
+# Extra override for driving the Android emulator against the local Keycloak.
+#
+# docker-compose.test.yml sets KC_HOSTNAME=host.docker.internal, which containers and the host
+# browser both resolve. The Android emulator resolves neither: it reaches the host only as
+# 10.0.2.2, and Keycloak's emitted issuer and redirect URLs have to match what the device can
+# actually open. Passed IN ADDITION to the test override, and only for app work — with this in
+# effect the web frontend's own login no longer resolves the issuer from inside its container.
+services:
+  keycloak-dev:
+    environment:
+      KC_HOSTNAME: 127.0.0.1
+      KC_HOSTNAME_PORT: "18080"
+      KC_HOSTNAME_STRICT: "false"
+    # The base compose publishes Keycloak as 127.0.0.1:18080. An app on the emulator cannot open a
+    # TCP connection to that through 10.0.2.2 — measured: ping to 10.0.2.2 answers, the browser had
+    # loaded the same URL, and OkHttp still timed out after 10 s on every attempt. Publishing on all
+    # interfaces removes the loopback restriction. Throwaway test realm on a dev machine only.
+    # !override, not a plain list: Compose MERGES port lists across files, so a second entry
+    # would be added beside the base's 127.0.0.1 binding and the two collide on the same host port.
+    ports: !override
+      - "18080:18080"
