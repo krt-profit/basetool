@@ -35,11 +35,13 @@ import org.junit.jupiter.api.Test;
  * Keeps the committed Terms-of-Use version honest (REQ-SEC-028).
  *
  * <p>The version is a digest of the terms wording, and it is <strong>committed</strong> to {@code
- * backend/src/main/resources/terms-version.properties} rather than generated during the build. That
- * is not a stylistic choice: generating it made the backend build read a <em>frontend</em> source
- * file, and the backend Docker image copies only {@code frontend/build.gradle.kts} for layer
- * caching — so the image build died with "Input file does not exist" while every local build stayed
- * green. A committed artifact removes the cross-module build-time dependency entirely.
+ * backend/src/main/resources/terms-version.properties} rather than generated during the build. The
+ * original reason was a cross-module read: the digest hashed a <em>frontend</em> source file, and
+ * the backend Docker image copies only {@code frontend/build.gradle.kts} for layer caching, so the
+ * image build died with "Input file does not exist" while every local build stayed green. That
+ * particular hazard is gone — the wording moved into this module's own bundle with ADR-0138 — but
+ * the artifact stays committed, because a generated one would still have to be produced before the
+ * image is assembled and there is nothing to gain from re-acquiring that coupling.
  *
  * <p>What a committed artifact loses is the guarantee that it matches the text, which is the whole
  * point of deriving it. This test is that guarantee: it re-derives the digest from the German
@@ -49,9 +51,15 @@ import org.junit.jupiter.api.Test;
  */
 class TermsVersionParityTest {
 
-  /** The authoritative wording; path is relative to the backend module directory. */
-  private static final Path BUNDLE =
-      Path.of("../frontend/src/main/resources/messages_de.properties");
+  /**
+   * The authoritative wording; path is relative to the backend module directory.
+   *
+   * <p>This module's own bundle since ADR-0138. It has to be the bundle the document endpoint
+   * serves: pointed anywhere else, the digest would keep hashing text nobody reads, and a wording
+   * change would ship with an unchanged version — a consent gate that never re-prompts and gives no
+   * sign it has stopped working.
+   */
+  private static final Path BUNDLE = Path.of("src/main/resources/messages_de.properties");
 
   /** The committed artifact {@link TermsVersionProvider} reads at runtime. */
   private static final Path COMMITTED = Path.of("src/main/resources/terms-version.properties");

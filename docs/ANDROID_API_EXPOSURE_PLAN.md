@@ -126,6 +126,14 @@ added for the web app would otherwise become internet-reachable the day it merge
 The terms/consent endpoints (`/api/v1/terms/**`) and the registration-status read are on the
 allowlist from day one; the app's terms gate and `PENDING_APPROVAL` handling depend on them.
 
+One of them is **anonymous**, and it is the single exception to everything this section says about
+the anonymous surface: `GET /api/v1/terms/document` serves the Terms-of-Use wording without a token
+(ADR-0138). It grows nothing — the identical text is already world-readable at `/terms` on the web
+frontend, and a document everybody must read before agreeing to anything cannot require having
+agreed. The consent *record* is unaffected: `/status` and `/acceptance` stay authenticated. Note
+that the allowlist entry must be the exact path, not a `/api/v1/terms` prefix, or the vhost would
+expose the record along with the document.
+
 **The anonymous write paths stay closed permanently.** They were held in reserve for the app's
 guest mode, and guest mode was **dropped** (owner decision, 2026-08-18; recorded as Q8 in the app
 repo's `ANDROID_APP_PLAN.md`): every user of the app signs in. Nothing on the app's side will ever

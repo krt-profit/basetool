@@ -29,7 +29,7 @@
         <p class="terms-accept-changed" th:text="#{termsAccept.changedHint}">Haben sich die Bedingungen geändert, wird diese Seite erneut angezeigt.</p>
 
         <div class="terms-accept-scroll" tabindex="0" th:aria-label="#{termsAccept.scrollRegion}">
-            <th:block th:replace="~{fragments/terms-body :: termsBody}" />
+            <th:block th:replace="~{fragments/terms-body :: termsBody(${terms})}" />
         </div>
 
         <p id="terms-accept-error" class="terms-accept-error" hidden th:text="#{termsAccept.error}">Die Bestätigung konnte nicht gespeichert werden. Bitte versuche es erneut.</p>

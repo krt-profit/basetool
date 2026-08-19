@@ -35730,6 +35730,103 @@
         }
       }
     },
+    "/api/v1/terms/document" : {
+      "get" : {
+        "tags" : [ "Terms of Use" ],
+        "summary" : "The Terms-of-Use wording in force",
+        "description" : "Returns the document as structured sections, together with the version digest an acceptance would be recorded against. Anonymous: the text must be readable before anyone can agree to it.",
+        "operationId" : "document",
+        "responses" : {
+          "200" : {
+            "description" : "The wording in force",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TermsDocumentDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/terminals" : {
       "get" : {
         "tags" : [ "terminal-controller" ],
@@ -60614,6 +60711,57 @@
           },
           "parentName" : {
             "type" : "string"
+          }
+        }
+      },
+      "TermsClauseDto" : {
+        "type" : "object",
+        "properties" : {
+          "text" : {
+            "type" : "string"
+          },
+          "bullets" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "TermsDocumentDto" : {
+        "type" : "object",
+        "properties" : {
+          "version" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "intro" : {
+            "type" : "string"
+          },
+          "sections" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/TermsSectionDto"
+            }
+          },
+          "lastUpdated" : {
+            "type" : "string"
+          }
+        }
+      },
+      "TermsSectionDto" : {
+        "type" : "object",
+        "properties" : {
+          "heading" : {
+            "type" : "string"
+          },
+          "clauses" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/TermsClauseDto"
+            }
           }
         }
       },

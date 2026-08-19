@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
-    <title th:text="${appTitle} + ' - ' + #{terms.title}">Profit Basetool - Nutzungsbedingungen</title>
+    <title th:text="${appTitle} + ' - ' + ${terms.title}">Profit Basetool - Nutzungsbedingungen</title>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
@@ -21,8 +21,8 @@
 </header>
 <main>
     <div class="hud-box mt-2">
-        <h1 th:text="#{terms.title}">Nutzungsbedingungen</h1>
-        <th:block th:replace="~{fragments/terms-body :: termsBody}" />
+        <h1 th:text="${terms.title}">Nutzungsbedingungen</h1>
+        <th:block th:replace="~{fragments/terms-body :: termsBody(${terms})}" />
     </div>
 </main>
 </body>

@@ -1132,8 +1132,11 @@ continued use as acceptance — which leaves no evidence of who agreed to which 
 actually needed when a clause is enforced against someone (REQ-SEC-027).
 
 **The version is derived from the wording, never declared.** The root Gradle task
-`generateTermsVersion` hashes every `terms.*` entry of the German bundle into the **committed**
-`backend/src/main/resources/terms-version.properties`, which the backend reads at startup.
+`generateTermsVersion` hashes every `terms.*` entry of the **backend's** German bundle into the
+**committed** `backend/src/main/resources/terms-version.properties`, which the backend reads at
+startup. It hashed the *frontend* bundle until the wording moved server-side (ADR-0138); the digest
+must hash the text that is actually served, or a wording change ships with an unchanged version and
+the gate quietly stops re-prompting.
 Committed rather than build-generated because generating it made the backend build read a frontend
 source file, which the backend Docker image's context does not carry (ADR-0127); drift is caught by
 `TermsVersionParityTest`, so forgetting to regenerate fails CI rather than shipping a stale
@@ -1274,6 +1277,31 @@ Six invariants that must survive any rewrite:
   therefore sends the marker, offers its response to `krtTermsGate.check` before touching the body,
   rejects `res.redirected` explicitly, and disarms its own timer on any answer that is not the
   payload it asked for.
+
+**The wording itself is a backend resource, and it is readable without a token** (ADR-0138). `GET
+/api/v1/terms/document` returns the text as structured data — title, intro, ordered sections, each
+with its paragraphs and bullets — together with the version an acceptance would be recorded against.
+Both clients render from it: the web frontend's public `/terms` page and its consent gate, and the
+Android app's terms screen. Before it existed the wording lived in the frontend's message bundle and
+the app could not reach it at all, leaving only a copy in the APK (which drifts from the version
+being accepted) or a trip to a browser mid-consent.
+
+Anonymous, deliberately: **a text everybody must read before agreeing to anything cannot require
+having agreed.** The public `/terms` page is reachable with no session and must stay so, and the
+identical wording is already served to the world there — this publishes the same bytes through a
+different door. The *record* of consent is not opened with it: `/status` and `/acceptance` stay
+authenticated, and the two live in separate controllers so the split is visible rather than hidden
+as a method-level override. A `permitAll` written one segment short — `/api/v1/terms/**` — would
+open the record too, so `SecurityTest` pins both halves.
+
+**The key convention is the schema.** `terms.h1_4` *is* the declaration that a fourth section
+exists; `TermsDocumentService` walks the numbering and stops at the first gap. A clause added to the
+bundle therefore reaches both clients with no code change — and a gap truncates the document
+silently, which is why `TermsDocumentStructureTest` fails the build when a `terms.*` key is not
+reachable by the walk, and when a translation's shape differs from the German original.
+
+The endpoint is part of the frozen external contract set (REQ-API-009, ADR-0136): a field dropped
+from this response blanks a legal document on a build nobody can redeploy.
 
 **Acceptance**
 
