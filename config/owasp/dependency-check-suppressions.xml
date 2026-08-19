@@ -120,10 +120,10 @@
     netty-codec-http3 4.2.0.Alpha1 - 4.2.12 (fixed 4.2.13.Final). The
     netty 4.1.x line does not contain the HTTP/3 codec at all - it lives
     in the 4.2+ line - so ANY 4.1.x jar is outside the affected range;
-    the broad cpe:2.3:a:netty:netty match flags them anyway. Our 4.1.135
+    the broad cpe:2.3:a:netty:netty match flags them anyway. Our 4.1.136.Final
     jars additionally sit only on the keycloak-spi compile classpath
     (Keycloak server internals, container-provided at runtime); the app
-    modules resolve netty 4.2.15.Final, which is above the fixed version.
+    modules resolve netty 4.2.17.Final, which is above the fixed version.
   -->
   <suppress>
     <notes>False positive: CPE confusion. CVE-2026-42582 affects netty-codec-http3 in the 4.2.0-4.2.12 range; the netty 4.1.x line ships no HTTP/3 codec, and these jars are Keycloak-container-provided compile-time deps anyway.</notes>
@@ -207,12 +207,18 @@
     "Eclipse Vert.x" product out onto the plain io.vertx:vertx-core / vertx-grpc*
     coordinates; CVE-2026-15076's vulnerable class actually lives in
     io.vertx:vertx-web-client, which is not on any classpath in this build at all.
-    Confirmed via `./gradlew :keycloak-spi:dependencyInsight`: vertx-core 4.5.28 and
-    the vertx-grpc* jars are dragged in ONLY by
-    org.keycloak:keycloak-services:26.7.0 -> keycloak-config-api -> Quarkus
-    (quarkus-vertx / quarkus-grpc-common / quarkus-opentelemetry) on the
-    keycloak-spi module's compileOnly classpath. They are absent from every
-    basetool RUNTIME classpath (backend / frontend / ingest / keycloak-spi
+
+    Re-verified on 2026-08-19 against Keycloak 26.7.2, which moved these transitives:
+    vertx-core and the vertx-grpc* jars now resolve to 4.5.31 - ABOVE the fixed
+    4.5.30, so those coordinates have left the affected range entirely. What keeps
+    this suppression load-bearing is io.vertx:vertx-codegen, still selected at
+    4.5.26 (pulled by smallrye-mutiny-vertx-core -> quarkus-vertx), which the
+    4.5.29-and-earlier CPE range still covers. Confirmed via
+    `./gradlew :keycloak-spi:dependencyInsight`: every one of these jars is dragged
+    in ONLY by org.keycloak:keycloak-services:26.7.2 -> keycloak-config-api ->
+    Quarkus (quarkus-vertx / quarkus-grpc-common / quarkus-opentelemetry) on the
+    keycloak-spi module's compileOnly classpath, and vertx-codegen is absent from
+    every basetool RUNTIME classpath (backend / frontend / ingest / keycloak-spi
     runtimeClasspath all report "No dependencies matching"). At runtime the SPI
     runs inside the Keycloak (Quarkus) container, which supplies its own
     Red Hat-patched Vert.x, so nothing we ship can reach the vulnerable HttpClient
@@ -220,75 +226,10 @@
     genuinely-vulnerable Vert.x ever entering a real classpath still fails the gate.
   -->
   <suppress>
-    <notes>False positive: build-time-only + CPE expansion. CVE-2026-15075 (vertx-core HttpClient cross-origin redirect header leak) and CVE-2026-15076 (vertx-web-client WebClientSession cross-domain cookie injection, whose vulnerable class is not even on the classpath) affect Eclipse Vert.x 4.5.29 and earlier. Our vertx-core / vertx-grpc* 4.5.28 jars are compileOnly transitives of keycloak-services 26.7.0 (via Quarkus) on the keycloak-spi module only, absent from every basetool runtime classpath and container-provided by Keycloak at runtime.</notes>
+    <notes>False positive: build-time-only + CPE expansion. CVE-2026-15075 (vertx-core HttpClient cross-origin redirect header leak) and CVE-2026-15076 (vertx-web-client WebClientSession cross-domain cookie injection, whose vulnerable class is not even on the classpath) affect Eclipse Vert.x 4.5.29 and earlier. Under Keycloak 26.7.2 our vertx-core / vertx-grpc* jars resolve to 4.5.31, above the 4.5.30 fix; the only coordinate still inside the affected range is vertx-codegen 4.5.26. All of them are compileOnly transitives of keycloak-services 26.7.2 (via Quarkus) on the keycloak-spi module only, absent from every basetool runtime classpath and container-provided by Keycloak at runtime (re-verified 2026-08-19).</notes>
     <packageUrl regex="true">^pkg:maven/io\.vertx/vertx-.*@4\.5\..*$</packageUrl>
     <cve>CVE-2026-15075</cve>
     <cve>CVE-2026-15076</cve>
-  </suppress>
-
-  <!--
-    Same build-time-only pattern as the Vert.x suppression above, for the July 2026 Netty CVE
-    batch fixed in 4.1.136.Final/4.2.16.Final (CVE-2026-56820 OCSP CertificateID-mismatch replay
-    bypass, CVE-2026-56819 HTTP/2 codec memory leak, CVE-2026-55833 SPDY header-decoding DoS,
-    CVE-2026-56816/-56817/-56745/-56746/-55831/-55851/-44891 from the same release). Unlike the
-    2026-42582 suppression above (which argues the 4.1.x line structurally lacks the affected
-    HTTP/3 codec), this batch genuinely affects both the 4.1.x and 4.2.x Netty lines - the real,
-    shipped 4.2.x occurrence is fixed by the `netty.version` BOM override in build.gradle.kts.
-    This suppression covers only the 4.1.135.Final jars, confirmed via
-    `./gradlew :keycloak-spi:dependencyInsight` to be compileOnly/testImplementation transitives
-    of keycloak-services 26.7.0 (via Quarkus/Vert.x) on the keycloak-spi module, absent from
-    every basetool runtime classpath (including `:keycloak-spi:runtimeClasspath` itself) - the
-    real Keycloak container supplies its own Netty at runtime. CVE-scoped and pinned to the 4.1.x
-    line so a genuinely-vulnerable 4.1.x Netty ever entering a real classpath still fails the gate.
-  -->
-  <suppress>
-    <notes>False positive: build-time-only. The July 2026 Netty CVE batch (CVE-2026-56820, CVE-2026-56819, CVE-2026-55833, CVE-2026-56816, CVE-2026-56817, CVE-2026-56745, CVE-2026-56746, CVE-2026-55831, CVE-2026-55851, CVE-2026-44891 - fixed in 4.1.136.Final/4.2.16.Final) genuinely affects the 4.1.x line too, but our 4.1.135.Final jars are compileOnly/testImplementation transitives of keycloak-services 26.7.0 (via Quarkus/Vert.x) on the keycloak-spi module only, confirmed absent from every basetool runtime classpath; Keycloak supplies its own Netty at runtime. The real, shipped 4.2.15.Final line is fixed via the netty.version BOM override in build.gradle.kts.</notes>
-    <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@4\.1\.135\.Final$</packageUrl>
-    <cve>CVE-2026-56820</cve>
-    <cve>CVE-2026-56819</cve>
-    <cve>CVE-2026-55833</cve>
-    <cve>CVE-2026-56816</cve>
-    <cve>CVE-2026-56817</cve>
-    <cve>CVE-2026-56745</cve>
-    <cve>CVE-2026-56746</cve>
-    <cve>CVE-2026-55831</cve>
-    <cve>CVE-2026-55851</cve>
-    <cve>CVE-2026-44891</cve>
-  </suppress>
-
-  <!--
-    August 2026 Netty batch, same situation as the July batch directly above and suppressed on the
-    same grounds - but re-verified rather than assumed, because the argument only holds while two
-    facts stay true:
-
-      1. The SHIPPED line is not affected. Dependency-Check flagged only the `4.1.135.Final` jars
-         in this batch; the `4.2.17.Final` jars are on the very same scanned classpaths and were
-         NOT flagged, so 4.2.17 is outside the affected range. If a future batch flags the 4.2.x
-         jars too, this suppression must NOT be extended - bump `netty.version` instead.
-      2. The 4.1.x jars never reach a runtime classpath. Re-confirmed on 2026-08-09 by running
-         `dependencyInsight` against the `runtimeClasspath` configuration for the dependency
-         `io.netty:netty-common` in all four modules (see the note element below for the exact
-         invocation, which cannot be spelled here because XML comments forbid double hyphens):
-         backend, frontend and ingest all resolve 4.2.17.Final ("selected by rule", i.e. the BOM
-         override), and `:keycloak-spi:runtimeClasspath` contains no Netty at all. The 4.1.135
-         jars are compileOnly transitives of keycloak-services 26.7.1 via Quarkus/Vert.x, and the
-         real Keycloak container supplies its own Netty.
-
-    Pinned to the exact 4.1.135.Final coordinate and scoped per-CVE, so any other 4.1.x Netty
-    entering a real classpath still fails the gate.
-  -->
-  <suppress>
-    <notes>False positive: build-time-only. The August 2026 Netty CVE batch affects the 4.1.x line, but our 4.1.135.Final jars are compileOnly transitives of keycloak-services 26.7.1 (via Quarkus/Vert.x) on the keycloak-spi module only. Re-verified 2026-08-09 with `./gradlew :&lt;module&gt;:dependencyInsight --configuration runtimeClasspath --dependency io.netty:netty-common` across backend/frontend/ingest/keycloak-spi: the first three resolve 4.2.17.Final via the BOM override and keycloak-spi's runtimeClasspath carries no Netty at all. The shipped 4.2.17.Final line is not flagged by this batch.</notes>
-    <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@4\.1\.135\.Final$</packageUrl>
-    <cve>CVE-2026-56821</cve>
-    <cve>CVE-2026-56822</cve>
-    <cve>CVE-2026-59898</cve>
-    <cve>CVE-2026-59899</cve>
-    <cve>CVE-2026-59900</cve>
-    <cve>CVE-2026-59901</cve>
-    <cve>CVE-2026-59919</cve>
-    <cve>CVE-2026-59920</cve>
-    <cve>CVE-2026-59921</cve>
   </suppress>
 
   <!--

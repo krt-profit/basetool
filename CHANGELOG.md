@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Keycloak auf 26.7.2 angehoben (Sicherheitsupdate).** Das Patch-Release schließt sieben Schwachstellen im Anmeldedienst — darunter eine Übernahme fremder Konten ohne Anmeldung über den Passwort-Zurücksetzen-Ablauf, eine Übernahme über einen vorhersagbaren Verknüpfungs-Hash beim Verbinden von Konten und die Preisgabe rotierter Client-Geheimnisse über die Verwaltungsschnittstelle. Keine Funktions- oder Konfigurationsänderung: Das gepinnte Container-Image (`quay.io/keycloak/keycloak:26.7`-Digest, weiterhin JDK 21) und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit; die Discord-Anmeldung und -Kontoverknüpfung laufen unverändert weiter. **Deploy-Hinweis:** Eine geänderte Keycloak-Image-Pinnung ist operator-gated — der Deploy wendet sie nicht selbständig an, sondern muss einmal mit `deploy.sh --force` durchgesetzt werden; der Keycloak-Container startet dabei neu.
+
 ## [v1.5.53](https://github.com/krt-profit/basetool/releases/tag/v1.5.53) - 2026-08-19
 
 ### Changed
