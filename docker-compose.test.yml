@@ -14,13 +14,16 @@
 # test-admin / test-admin-pw (defined in realm-export.json).
 #
 # Prerequisites in the worktree (all gitignored):
-#   .env.test                            — credentials (incl. IRI_KEYSTORE_HOST_PATH)
+#   .env.test                            — credentials
 #   realm-export.json                    — Keycloak realm dump with test-admin user
-#   ./keystore.p12                       — generated with the password from
-#                                          .env.test (matching SAN: localhost,
-#                                          backend, frontend). Bind-mounted via
-#                                          IRI_KEYSTORE_HOST_PATH into the
-#                                          containers at /run/secrets/keystore.p12.
+#
+# The TLS material is NOT a prerequisite any more: docker/test-tls/ carries a
+# committed keystore, shared by every test stack and by the Android dev build, so
+# there is nothing to generate and no CA to install by hand. It is bind-mounted
+# below at /run/secrets/keystore.p12 with a hardcoded path rather than through
+# IRI_KEYSTORE_HOST_PATH — that variable still selects the PRODUCTION keystore in
+# the base file, and a test stack must never be one typo away from mounting it.
+# See docker/test-tls/README.md and ADR-0139.
 #
 # This file is intentionally not auto-loaded (no `.override.yml` name) — it
 # has to be passed explicitly so the production-targeted `docker compose up`
@@ -71,6 +74,9 @@ services:
   backend-dev:
     environment:
       SPRING_PROFILES_ACTIVE: dev
+      # The committed test keystore's password. Pinned here rather than read from
+      # .env.test so every test stack opens the same file with the same value.
+      SERVER_SSL_KEY_STORE_PASSWORD: basetool-test
       # Disable the notification Redis fan-out for the test/e2e stack. The base compose anchor
       # force-enables it (APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED:-true) for every backend service, but
       # this is a single-instance stack: there is no peer replica to fan out to, so the fan-out is a
@@ -99,13 +105,16 @@ services:
         target: /app/logs
         tmpfs:
           mode: 0o777
-      - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+      - ./docker/test-tls/basetool-test-keystore.p12:/run/secrets/keystore.p12:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
   frontend-dev:
     environment:
       SPRING_PROFILES_ACTIVE: dev
+      # The committed test keystore's password. Pinned here rather than read from
+      # .env.test so every test stack opens the same file with the same value.
+      SERVER_SSL_KEY_STORE_PASSWORD: basetool-test
       KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/realms/iri
       # application-prod.yml hardcodes `spring.data.redis.host: redis`, but
       # application-dev.yml (activated by the SPRING_PROFILES_ACTIVE override
@@ -126,13 +135,16 @@ services:
         target: /app/logs
         tmpfs:
           mode: 0o777
-      - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+      - ./docker/test-tls/basetool-test-keystore.p12:/run/secrets/keystore.p12:ro
 
   ingest-dev:
-    # Present only for the log mount: the base binds the production host layout, which a developer
-    # machine has neither. Every other setting the gateway needs is already right for this stack.
+    environment:
+      SERVER_SSL_KEY_STORE_PASSWORD: basetool-test
     volumes: !override
       - type: tmpfs
         target: /app/logs
         tmpfs:
           mode: 0o777
+      # Restores the mount `!override` dropped: the gateway serves HTTPS on 11262 like the other
+      # two, so replacing its volume list without repeating the keystore left it unable to start.
+      - ./docker/test-tls/basetool-test-keystore.p12:/run/secrets/keystore.p12:ro
