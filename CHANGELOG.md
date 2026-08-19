@@ -2,10 +2,14 @@
 
 ## [Unreleased]
 
+## [v1.5.54](https://github.com/krt-profit/basetool/releases/tag/v1.5.54) - 2026-08-19
+
 ### Changed
 
 - **Der Image-Bau eines Releases läuft nur noch einmal statt zweimal.** Release-Commit und `v*`-Tag zeigen auf denselben Commit, also übernimmt der Tag-Lauf jetzt die bereits gebauten, gescannten und signierten Images des main-Laufs und hängt nur die Versions-Tags daran — nach cosign-Prüfung, sonst wird regulär gebaut. Für den Betrieb heißt das: `:1.5.x` und `:sha-<kurz>` sind ab sofort derselbe Digest. Zusätzlich entfällt der Docker-Layer-Cache, der mehr Zeit kostete als er sparte. Ein Release dauert damit rund 5 statt 12:45 Minuten (REQ-OPS-021, ADR-0137).
+
 - **Keycloak auf 26.7.2 angehoben (Sicherheitsupdate).** Das Patch-Release schließt sieben Schwachstellen im Anmeldedienst — darunter eine Übernahme fremder Konten ohne Anmeldung über den Passwort-Zurücksetzen-Ablauf, eine Übernahme über einen vorhersagbaren Verknüpfungs-Hash beim Verbinden von Konten und die Preisgabe rotierter Client-Geheimnisse über die Verwaltungsschnittstelle. Keine Funktions- oder Konfigurationsänderung: Das gepinnte Container-Image (`quay.io/keycloak/keycloak:26.7`-Digest, weiterhin JDK 21) und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit; die Discord-Anmeldung und -Kontoverknüpfung laufen unverändert weiter. **Deploy-Hinweis:** Eine geänderte Keycloak-Image-Pinnung ist operator-gated — der Deploy wendet sie nicht selbständig an, sondern muss einmal mit `deploy.sh --force` durchgesetzt werden; der Keycloak-Container startet dabei neu.
+
 - **Die Nutzungsbedingungen stehen jetzt an genau einer Stelle.** Der Text lag bisher im Sprachbundle der Weboberfläche; er liegt jetzt im Backend und wird über eine eigene Schnittstelle ausgeliefert, aus der sowohl die Webseite `/terms` als auch die Zustimmungsschranke rendern — und künftig die Android-App. Damit kann keine Fassung mehr von der abweichen, für die die Zustimmung gespeichert wird. Am Wortlaut ändert sich nichts, die gespeicherten Zustimmungen bleiben gültig, und die Seite sieht unverändert aus. Der Link zur Datenschutzerklärung steht jetzt unter dem Dokument statt mitten im Datenschutz-Absatz (ADR-0138, REQ-SEC-028).
 
 ## [v1.5.53](https://github.com/krt-profit/basetool/releases/tag/v1.5.53) - 2026-08-19
