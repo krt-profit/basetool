@@ -30,8 +30,11 @@ import de.greluc.krt.profit.basetool.backend.model.dto.ReopenRegistrationRequest
 import de.greluc.krt.profit.basetool.backend.service.UserRegistrationService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -82,6 +85,12 @@ public class DiscordRegistrationAdminController {
    */
   @GetMapping
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  @Operation(summary = "List registrations awaiting a decision, or the rejected ones.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Registrations in that status, oldest first."),
+    @ApiResponse(responseCode = "400", description = "Unsupported status requested."),
+    @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
+  })
   public List<PendingRegistrationDto> list(
       @RequestParam(name = "status", required = false)
           @Nullable
@@ -153,6 +162,15 @@ public class DiscordRegistrationAdminController {
    */
   @PostMapping("/{id}/reopen")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  @Operation(summary = "Reopen a rejected registration back into the approval queue.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "The now-pending registration."),
+    @ApiResponse(responseCode = "403", description = "Caller is not an administrator."),
+    @ApiResponse(responseCode = "404", description = "No such registration."),
+    @ApiResponse(
+        responseCode = "409",
+        description = "The registration is not rejected, or the supplied version is stale.")
+  })
   public PendingRegistrationDto reopen(
       @PathVariable UUID id,
       @AuthenticationPrincipal Jwt jwt,
