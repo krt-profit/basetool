@@ -700,6 +700,14 @@ because it mints one deployment record per promotion — the durable answer to *
 been on testing since when*. Adding the reviewer later is a repository setting, not a workflow
 change.
 
+A non-production environment usually sits behind a NAT that does not hairpin, so the **public**
+Keycloak name resolves to a WAN address its own containers cannot reach. Backend, frontend and
+ingest load the OIDC metadata from that name at startup, so they never become healthy and the
+health gate rolls the deploy back — a failure that looks like a broken image and is a
+name-resolution problem. `IRI_KEYCLOAK_HOST_ALIAS` supplies a Docker `extra_hosts` entry that
+points the name at the host's own reverse proxy; its default, `localhost:127.0.0.1`, is a no-op,
+so production is untouched.
+
 Because a non-production environment runs the **same promoted config bundle** under a different
 domain, the two public-identity values `docker-compose.yml` bakes in are variables with
 production defaults: `IRI_KEYCLOAK_HOSTNAME` (Keycloak's `KC_HOSTNAME`) and
@@ -719,6 +727,8 @@ configured one.
   so one deployment record is minted per run.
 - [ ] `IRI_KEYCLOAK_HOSTNAME` and `IRI_KEYCLOAK_ISSUER_URI` unset ⇒ the rendered compose is
   byte-identical to the pre-change production values.
+- [ ] `IRI_KEYCLOAK_HOST_ALIAS` unset ⇒ the only `extra_hosts` entry is `localhost:127.0.0.1`,
+  which resolves to what `localhost` already resolves to.
 - [ ] No production credential, realm export or Discord application is reused by a
   non-production environment (`CLAUDE.md`: never use production credentials in test stacks).
 

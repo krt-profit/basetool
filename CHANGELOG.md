@@ -6,6 +6,8 @@
 
 - **Testversionen lassen sich über eine eigene Aktion „Promote to testing" ausliefern.** Sie hängt — wie die Produktions-Promotion — ein zusätzliches Tag `:testing` an einen bereits gebauten, signierten Digest, ohne neu zu bauen; ein Testhost mit `deploy.sh --tag testing` zieht ihn beim nächsten Timer-Lauf. Signaturprüfung und der Gleichschritt aller fünf Artefakte sind identisch zur Produktion, nur die Reviewer-Freigabe entfällt (REQ-OPS-022).
 
+- **Neue optionale Umgebungsvariable `IRI_KEYCLOAK_HOST_ALIAS`.** Hinter einem NAT ohne Hairpin zeigt der öffentliche Keycloak-Name auf die WAN-Adresse, die die eigenen Container nicht erreichen — Backend, Frontend und Ingest holen dort beim Start ihre OIDC-Metadaten und werden nie gesund, worauf das Health-Gate die Auslieferung zurückrollt. Die Variable trägt einen `extra_hosts`-Eintrag nach, der den Namen auf den lokalen Reverse Proxy zeigen lässt; ungesetzt ist sie wirkungslos (REQ-OPS-022).
+
 - **Zwei neue optionale Umgebungsvariablen für Umgebungen unter eigener Domain: `IRI_KEYCLOAK_HOSTNAME` und `IRI_KEYCLOAK_ISSUER_URI`.** Damit läuft dasselbe ausgelieferte Config-Bundle unter einem anderen Hostnamen, was bisher an zwei fest verdrahteten Werten scheiterte. Beide sind entweder zusammen zu setzen oder gar nicht; ungesetzt greifen unverändert die Produktionswerte (REQ-OPS-022).
 
 ### Fixed

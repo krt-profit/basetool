@@ -415,6 +415,15 @@ x-backend: &backend-template
   # docker-compose.build.yml as an override to add `build:` back in.
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-backend:${IRI_BASETOOL_VERSION:-stable}
   restart: always
+  # Lets a non-production host resolve the PUBLIC Keycloak name to its own reverse proxy
+  # instead of chasing it out to the internet. The three apps load the OIDC metadata from
+  # KEYCLOAK_ISSUER_URI at startup, so that name has to resolve to something that answers —
+  # and on a host behind a NAT that does not hairpin, the public address does not.
+  # Format is Docker's own `name:ip`, e.g. `keycloak.basetool.greluc.me:10.98.0.11`.
+  # The default is a no-op: `localhost` already resolves to 127.0.0.1, so production —
+  # which sets nothing — gets an entry that changes nothing (REQ-OPS-022).
+  extra_hosts:
+    - "${IRI_KEYCLOAK_HOST_ALIAS:-localhost:127.0.0.1}"
   # Reap orphaned zombie processes. The container runs the JVM as PID 1 (Dockerfile ENTRYPOINT
   # `exec java`), and a bare JVM does NOT reap children reparented to it. The Docker HEALTHCHECK runs
   # BusyBox `wget --no-check-certificate https://...` every 30s, and BusyBox wget forks an
@@ -676,6 +685,9 @@ x-frontend: &frontend-template
   # rebuilds happen via docker-compose.build.yml.
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-frontend:${IRI_BASETOOL_VERSION:-stable}
   restart: always
+  # See the backend template — same reason, same no-op default (REQ-OPS-022).
+  extra_hosts:
+    - "${IRI_KEYCLOAK_HOST_ALIAS:-localhost:127.0.0.1}"
   # Zombie-reaping init (tini) as PID 1 — see x-backend: the wget-HTTPS healthcheck forks an
   # `ssl_client` TLS helper that reparents to the JVM (PID 1) and, unreaped, accumulates one
   # `<defunct>` per 30s probe until the `pids` cap is exhausted (the 2026-07-12 native-thread-OOM).
@@ -811,6 +823,9 @@ x-ingest: &ingest-template
   # IRI_BASETOOL_VERSION rationale; local rebuilds use docker-compose.build.yml.
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-ingest:${IRI_BASETOOL_VERSION:-stable}
   restart: always
+  # See the backend template — same reason, same no-op default (REQ-OPS-022).
+  extra_hosts:
+    - "${IRI_KEYCLOAK_HOST_ALIAS:-localhost:127.0.0.1}"
   # Zombie-reaping init (tini) as PID 1 — see x-backend: the wget-HTTPS healthcheck forks an
   # `ssl_client` TLS helper that reparents to the JVM (PID 1) and, unreaped, accumulates one
   # `<defunct>` per 30s probe until the `pids: 2048` cap is exhausted. This gateway is where the
