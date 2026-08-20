@@ -765,8 +765,9 @@
         <div id="order-aggregated-results" class="mt-2" th:unless="${requesterView}"><th:block th:fragment="aggregatedSection">
         <h3 class="section-title" th:text="#{orders.detail.aggregated.title}">Aggregierte Materialien</h3>
         <div class="table-responsive">
-        <!-- Claim columns (Phase 5, #345) appear only for public SK orders (backend populates
-             openAmount; null on private squadron orders). -->
+        <!-- The claim column (Phase 5, #345) appears only for public SK orders, detected by the
+             backend populating openAmount (null on private squadron orders). Unlike the MATERIAL
+             table this view renders NO "Offen" column - see the claim cell below for why. -->
         <table class="data-table"
                th:with="showClaims=${order.aggregatedMaterials != null and !order.aggregatedMaterials.isEmpty() and order.aggregatedMaterials[0].openAmount != null}">
             <thead>
@@ -776,7 +777,6 @@
                 <th th:text="#{orders.detail.aggregated.amount}">Gesamtmenge</th>
                 <th th:text="#{orders.detail.aggregated.stock}">Vorhanden</th>
                 <th th:if="${showClaims}" th:text="#{orders.detail.claims}">Eingetragen</th>
-                <th th:if="${showClaims}" th:text="#{orders.detail.open}">Offen</th>
             </tr>
             </thead>
             <tbody>
@@ -803,43 +803,45 @@
                 </td>
                 <!-- "Vorhanden": the linked-inventory stock earmarked to this order for the material
                      at or above the bucket's quality floor (agg.currentStock). The gap to
-                     Gesamtmenge is the still-to-procure amount, distinct from the claim "Offen"
-                     (Σ-claims) below. -->
+                     Gesamtmenge is the still-to-procure amount. -->
                 <td th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
                     <span th:case="'PIECE'" th:text="|${agg.currentStock != null ? #numbers.formatInteger(agg.currentStock, 1) : '0'} #{material.quantity.piece}|"></span>
                     <span th:case="*" th:text="|${agg.currentStock != null ? #numbers.formatDecimal(agg.currentStock, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                 </td>
-                <td th:if="${showClaims}" data-claim-control>
-                    <span th:if="${agg.claims == null or agg.claims.isEmpty()}" class="text-muted">&#8212;</span>
-                    <span th:each="c : ${agg.claims}" class="claim-chip krtm-display-inline-block-margin-0-0-35rem-0-25re-632d"
-                          th:title="${c.claimingOrgUnit != null ? c.claimingOrgUnit.name : ''}">
-                        <strong th:text="${c.claimingOrgUnit != null ? c.claimingOrgUnit.shorthand : '?'}">SQ</strong>:
-                        <span th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
-                            <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(c.amount, 1)} #{material.quantity.piece}|"></span>
-                            <span th:case="*" th:text="|${#numbers.formatDecimal(c.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
-                        </span>
-                        <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-icon btn-claim-edit" data-claim-control data-trigger="claim-edit"
-                                th:title="#{orders.claim.edit}"
-                                th:aria-label="#{orders.claim.edit}"
-                                th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
-                                th:data-quality="${agg.qualityRequirement}"
-                                th:data-material-name="${agg.material != null ? agg.material.name() : ''}"
-                                th:data-quantity-type="${agg.material != null ? agg.material.quantityType() : 'SCU'}"
-                                th:data-open="${agg.openAmount}"
-                                th:data-claim-id="${c.id}"
-                                th:data-squadron-id="${c.claimingOrgUnit != null ? c.claimingOrgUnit.id : ''}"
-                                th:data-squadron-name="${c.claimingOrgUnit != null ? c.claimingOrgUnit.shorthand : ''}"
-                                th:data-amount="${c.amount}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
-                    </span>
-                </td>
+                <!-- The claim cell carries the existing Eintragungen AND the "Eintragen" action;
+                     this table deliberately has no "Offen" column. The claim base is the FULL order
+                     requirement (MaterialClaimService.requiredByBucket - a supply commitment is
+                     against the whole order), while "Gesamtmenge" here is the OUTSTANDING demand of
+                     the not-yet-manufactured units (REQ-ORDERS-025). Rendered side by side the two
+                     contradicted each other: once production was booked, "Offen" exceeded
+                     "Gesamtmenge" in the same row. The claimable remainder still gates the write and
+                     is shown as the claim modal's max hint, fed by data-open. -->
                 <td th:if="${showClaims}" data-claim-control>
                     <div class="claim-open-cell">
-                        <span class="claim-open-amount" th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
-                            <span th:case="'PIECE'" th:text="|${agg.openAmount != null ? #numbers.formatInteger(agg.openAmount, 1) : '0'} #{material.quantity.piece}|"></span>
-                            <span th:case="*" th:text="|${agg.openAmount != null ? #numbers.formatDecimal(agg.openAmount, 1, 'NONE', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
+                        <span class="claim-chips">
+                            <span th:if="${agg.claims == null or agg.claims.isEmpty()}" class="text-muted">&#8212;</span>
+                            <span th:each="c : ${agg.claims}" class="claim-chip krtm-display-inline-block-margin-0-0-35rem-0-25re-632d"
+                                  th:title="${c.claimingOrgUnit != null ? c.claimingOrgUnit.name : ''}">
+                                <strong th:text="${c.claimingOrgUnit != null ? c.claimingOrgUnit.shorthand : '?'}">SQ</strong>:
+                                <span th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
+                                    <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(c.amount, 1)} #{material.quantity.piece}|"></span>
+                                    <span th:case="*" th:text="|${#numbers.formatDecimal(c.amount, 1, 'NONE', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
+                                </span>
+                                <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-icon btn-claim-edit" data-claim-control data-trigger="claim-edit"
+                                        th:title="#{orders.claim.edit}"
+                                        th:aria-label="#{orders.claim.edit}"
+                                        th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
+                                        th:data-quality="${agg.qualityRequirement}"
+                                        th:data-material-name="${agg.material != null ? agg.material.name() : ''}"
+                                        th:data-quantity-type="${agg.material != null ? agg.material.quantityType() : 'SCU'}"
+                                        th:data-open="${agg.openAmount}"
+                                        th:data-claim-id="${c.id}"
+                                        th:data-squadron-id="${c.claimingOrgUnit != null ? c.claimingOrgUnit.id : ''}"
+                                        th:data-squadron-name="${c.claimingOrgUnit != null ? c.claimingOrgUnit.shorthand : ''}"
+                                        th:data-amount="${c.amount}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
+                            </span>
                         </span>
                         <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-claim-add krtm-padding-0-2rem-0-5rem-min-height-auto-font-s-ae33" data-claim-control data-trigger="claim-add"
-                               
                                 th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
                                 th:data-quality="${agg.qualityRequirement}"
                                 th:data-material-name="${agg.material != null ? agg.material.name() : ''}"

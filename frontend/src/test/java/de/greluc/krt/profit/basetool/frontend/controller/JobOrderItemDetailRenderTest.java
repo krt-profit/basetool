@@ -1329,4 +1329,79 @@ class JobOrderItemDetailRenderTest {
     verify(backendApiClient, never())
         .get(eq("/api/v1/orders/" + orderId + "/item-stock"), anyTypeRef());
   }
+
+  @Test
+  void itemOrderDetail_AggregatedTable_DropsOpenColumnButKeepsTheClaimAction() throws Exception {
+    // Given: a public SK item order whose single line is half manufactured (2 of 4 made). The
+    // aggregated row therefore carries the OUTSTANDING demand as totalQuantity (6 SCU) while the
+    // claim base stays the FULL requirement (openAmount 12 SCU, nothing claimed yet). Rendered as a
+    // column that put an "Offen" of 12 next to a "Gesamtmenge" of 6 in the same row, which reads as
+    // a contradiction - so the column is gone. The claim action and the data-open max it feeds into
+    // the modal must survive the removal, otherwise SK squadrons can no longer sign up at all.
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    MaterialDto agricium = material("Agricium", "SCU");
+    JobOrderItemDto line =
+        new JobOrderItemDto(
+            UUID.randomUUID(),
+            new GameItemReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "WEAPON"),
+            new BlueprintReferenceDto(UUID.randomUUID(), "A03 Sniper Rifle", "wiki-a03"),
+            4,
+            2,
+            0,
+            null,
+            List.of(new JobOrderItemMaterialDto(UUID.randomUUID(), agricium, 12.0, "NONE", 1L)),
+            false,
+            1L);
+    JobOrderDto order =
+        new JobOrderDto(
+            orderId,
+            23,
+            null,
+            null,
+            "Handle",
+            null,
+            1,
+            "OPEN",
+            "ITEM",
+            true,
+            List.of(),
+            List.of(line),
+            List.of(new AggregatedMaterialDto(agricium, "NONE", 6.0, 0.0, List.of(), 12.0)),
+            List.of(),
+            List.of(),
+            List.of(),
+            Instant.now(),
+            1L,
+            false);
+    when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
+        .thenReturn(order);
+
+    // When
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // Then: no open-amount cell anywhere on the page. An ITEM order never renders the MATERIAL
+    // requirement table, so this marker class can only originate from the aggregated table -
+    // asserting on the word "Offen" would false-positive on the OPEN status label and the
+    // "Offene Materialmenge" KPI tile, which both legitimately stay.
+    assertThat(html).as("no claim open-amount cell").doesNotContain("claim-open-amount");
+
+    // Then: the claim column itself and its action survive, with the full-requirement remainder
+    // still handed to the modal as the max.
+    assertThat(html).as("claims column header (de)").contains("Eingetragen");
+    assertThat(html).as("claim chips container").contains("claim-chips");
+    assertThat(html).as("claim add action").contains("btn-claim-add");
+    assertThat(html)
+        .as("claimable remainder still fed to the modal")
+        .contains("data-open=\"12.0\"");
+  }
 }

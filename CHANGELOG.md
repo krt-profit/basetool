@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die Spalte „Offen“ ist aus den *Aggregierten Materialien* eines Item-Auftrags verschwunden.** Sie zeigte den Eintragungs-Rest auf Basis des **vollen** Auftragsbedarfs, während „Gesamtmenge“ daneben nur den Bedarf der **noch nicht hergestellten** Einheiten meint — sobald Herstellung gebucht war, stand dort mehr „offen“ als überhaupt „gebraucht“ (bei Auftrag #75: 71,52 SCU offen gegen 56,2 SCU Gesamtmenge, ohne eine einzige Eintragung). Der „Eintragen“-Knopf sitzt jetzt in der Spalte „Eingetragen“; die maximal eintragbare Menge steht unverändert im Eintragen-Dialog. Bei Material-Aufträgen bleibt „Offen“ wie bisher (REQ-ORDERS-026).
 ### Fixed
 
 - **Start- und Endzeit im Teilnehmer-Dialog eines Einsatzes liefen aus ihrer Spalte.** Datums- und Uhrzeitfeld haben eine feste Breite, die nebeneinander nicht in den 600 Pixel breiten Dialog passte: Die Uhrzeit ragte rund 13 Pixel über ihre Spalte hinaus, der Abstand zwischen „Startzeit“ und „Endzeit“ schrumpfte auf 3 Pixel und das Endzeit-Feld klebte am Dialogrand. Passt ein Paar nicht mehr neben das andere, rückt es jetzt in die nächste Zeile — mit dem gleichen Abstand wie alle übrigen Felder (REQ-UI-013).
