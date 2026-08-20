@@ -226,15 +226,25 @@ carve-out rests on frontend and backend deploying atomically; that premise does 
 the carve-out does not apply to this set (ADR-0136).
 
 **The set** is enumerated in `ExternalContractTest` and grows **one app phase at a time**, in the
-same change as the vhost allow-list that exposes those paths. As of the app's phase 1 it is:
+same change as the vhost allow-list that exposes those paths — and **only as an operation is
+actually consumed**. Freezing an endpoint the client does not yet read would buy the backend a
+constraint for nothing and record a guess about which fields matter.
 
 |                 Operation                  |                 Response fields a client may rely on                 |
 |--------------------------------------------|----------------------------------------------------------------------|
 | `GET /api/v1/terms/status`                 | `accepted`, `currentVersion`                                         |
 | `POST /api/v1/terms/acceptance`            | `accepted`, `currentVersion`                                         |
+| `GET /api/v1/terms/document`               | `version`, `title`, `intro`, `sections`, `lastUpdated`               |
 | `GET /api/v1/me/active-org-unit`           | `orgUnitId`                                                          |
 | `GET /api/v1/me/capabilities`              | `canSeeBlueprintOverview`, `canViewJobOrders`, `canViewOwnJobOrders` |
 | `GET /api/v1/users/me/registration-status` | `approvalStatus`                                                     |
+| `GET /api/v1/users/me/memberships`         | `orgUnitId`, `orgUnitName`, `orgUnitShorthand`, `kind`               |
+
+`GET /api/v1/users/me/memberships` is the app's org-unit switcher (phase 2) and is a **me-scoped
+twin** of `GET /api/v1/users/{id}/memberships`, added rather than reusing the sibling: the vhost is
+a default-deny allow-list, and a path able to name *another* user should never need to be on it.
+`isProfitEligible` is deliberately absent from the frozen fields — the app does not read it, and
+adding it later is one more deliberate edit.
 
 **Frozen means**, for an operation in the set: it keeps its path and verb; its response keeps every
 field it had; its request accepts everything it accepted before (a new **required** field is a

@@ -386,6 +386,45 @@ public class UserController {
   }
 
   /**
+   * Lists the org units the <em>calling</em> user is a direct member of, as picker-optimised {@link
+   * OrgUnitMembershipOptionDto} rows — the me-scoped twin of {@code GET /{id}/memberships}, with
+   * the identical shape and the identical {@code allKinds} semantics.
+   *
+   * <p>It exists because the org-unit switcher of a shipped client needs exactly this and nothing
+   * else. The web sidebar builds the same list from two calls ({@code GET /me} to resolve the
+   * principal's id, then {@code GET /{id}/memberships}), which is acceptable inside the data centre
+   * and is two round trips on a phone. More importantly, the id-taking path would have to be
+   * reachable from the public API vhost for the app to use it, and that vhost is a default-deny
+   * allow-list precisely so that a path able to name <em>another</em> user never has to be on it.
+   * This one is resolved from the JWT and cannot name anybody else.
+   *
+   * <p>Access policy: every authenticated caller, matching {@code GET /me/org-unit-ids} rather than
+   * the role-gated {@code /{id}/memberships}. An account with no memberships gets an empty list
+   * rather than a 403 — the switcher renders on the app's shell, and a 403 there would break the
+   * frame around every screen for a member whose only fault is having no unit yet. The response
+   * carries no PII: org-unit names, shorthands and kinds only, and only for the caller's own units.
+   *
+   * @param jwt caller's JWT — never {@code null} thanks to the {@code @PreAuthorize}.
+   * @param allKinds when {@code true} the response spans <strong>all four</strong> org-unit kinds
+   *     (Staffel + SK + Bereich + Organisationsleitung); the default ({@code false}) keeps the
+   *     Staffel/SK-only shape the switcher uses. Mirrors the sibling endpoint's parameter so the
+   *     two cannot drift apart in meaning.
+   * @return picker-friendly option DTOs, sorted as the sibling endpoint sorts them; never {@code
+   *     null}, possibly empty.
+   */
+  @GetMapping("/me/memberships")
+  @PreAuthorize("isAuthenticated()")
+  @Transactional(readOnly = true)
+  public List<OrgUnitMembershipOptionDto> getMyMemberships(
+      @AuthenticationPrincipal Jwt jwt,
+      @RequestParam(required = false, defaultValue = "false") boolean allKinds) {
+    UUID callerId = userService.getUserIdFromJwt(jwt);
+    return allKinds
+        ? orgUnitMembershipQueryService.listDirectMembershipOptions(callerId)
+        : orgUnitMembershipQueryService.listOptionsForUser(callerId);
+  }
+
+  /**
    * Returns the org-unit ids the calling user is a <em>direct</em> member of, across every kind
    * (Staffel / SK / Bereich / Organisationsleitung), with no leadership cascade. The home-page
    * upcoming-missions grid uses it to flag a mission whose owning org unit the caller is directly

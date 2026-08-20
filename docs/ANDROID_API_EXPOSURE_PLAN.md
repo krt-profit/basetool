@@ -126,6 +126,14 @@ added for the web app would otherwise become internet-reachable the day it merge
 The terms/consent endpoints (`/api/v1/terms/**`) and the registration-status read are on the
 allowlist from day one; the app's terms gate and `PENDING_APPROVAL` handling depend on them.
 
+**Phase 2 adds `GET /api/v1/users/me/memberships`** — the org-unit switcher's options. It is a new
+endpoint rather than the existing `GET /api/v1/users/{id}/memberships`, and the reason is this
+section's own principle: the id-taking sibling can name *another* user, so allow-listing it would
+put an enumeration surface on the public vhost to serve a screen that only ever asks about the
+caller. The new one resolves the caller from the JWT and cannot be pointed anywhere else. Note the
+allowlist entry must again be the **exact path** — `/api/v1/users/me/**` as a prefix would expose
+the payout preference, the blueprint-sharing flag and the description write along with it.
+
 One of them is **anonymous**, and it is the single exception to everything this section says about
 the anonymous surface: `GET /api/v1/terms/document` serves the Terms-of-Use wording without a token
 (ADR-0138). It grows nothing — the identical text is already world-readable at `/terms` on the web
