@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Zeitfelder auf der Einsatzseite standen zu eng und liefen aus ihrer Spalte.** Datums- und Uhrzeitfeld haben eine feste Breite, die nebeneinander weder in den Teilnehmer-Dialog noch in die dreispaltige Zeitzeile des Verwaltungs-Tabs passte: Die Uhrzeit ragte 13 bis 15 Pixel über ihre Spalte hinaus, benachbarte Spalten stießen fast zusammen und das letzte Feld klebte am Rand. Passt ein Paar nicht mehr neben das andere, rückt es jetzt in die nächste Zeile — mit dem gleichen Abstand wie alle übrigen Felder (REQ-UI-013).
+
 ## [v1.5.55](https://github.com/krt-profit/basetool/releases/tag/v1.5.55) - 2026-08-19
 
 ### Added

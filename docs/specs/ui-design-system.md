@@ -213,6 +213,24 @@ leaves a class-hidden element hidden. Setting a non-empty display (`el.style.dis
 works (inline beats a non-`!important` class), and a pure JS filter loop that both hides and reveals
 rows via `el.style.display` (no class) is fine; only the reveal-over-class case is the trap.
 
+**A fixed-width control in a multi-column `.form-row` declares its real floor.** A `.form-row`
+splits its width evenly and its per-column floor is generic (`.form-row > .form-group` declares
+250px on mission-detail). A control that cannot shrink below more than that silently spills out of
+its column: it eats the row's column gap and overruns the container's padding, and because nothing
+clips it the overflow reads as "the spacing is wrong" rather than as a broken layout. The
+`.datetime-split-group` is the case in the codebase — its date and time parts are fixed-width and
+non-shrinkable (10.5rem + `--space-2` + 7rem = an **18rem** floor) — and it bit on both mission
+surfaces: two groups in the 600px `.krt-modal--wide` participant modal got ~275px each (time part
+~13px over, "Endzeit" 3px from the modal border), and the three groups of the mission Verwaltung
+form shared 852px (~14.7px over each, adjacent columns 1.3px apart).
+
+Such a control declares its true minimum (`min-width: min(18rem, 100%)`) so the row **wraps** onto
+full-width lines instead of overflowing — where there is room the groups stay side by side, otherwise
+they fall onto their own line — and the `min()` keeps a narrow (mobile) container shrinking rather
+than overflowing in turn. A wrapped line keeps the standard field rhythm (`row-gap: 0`; the
+`.form-group` margin does the spacing) instead of stacking the row gap on top of it. The rule must
+out-specify the page-level `.form-row > .form-group` floor, which is declared later in the cascade.
+
 **Acceptance**
 
 - [ ] A new/migrated `.krt-modal-overlay` modal renders through `modal-wrapper :: modal(...)` with
@@ -226,6 +244,9 @@ rows via `el.style.display` (no class) is fine; only the reveal-over-class case 
 - [ ] A modal a script opens with an inline `style.display = 'flex'` still closes via
   `close-modal-display` (the shared handlers clear the inline `display` on both open and close, so the
   visibility class always wins) — e.g. the `delete-operation-modal` Cancel button.
+- [ ] No control renders wider than its column: a fixed-width control in a multi-column `.form-row`
+  declares its true `min-width` and wraps onto its own full-width line instead of overrunning the
+  column gap and the container padding (`.krt-modal-body` and the mission Verwaltung form alike).
 
 **Enforced by:** per-screen render MvcTest (shell + single-projection assertion) + e2e smoke.
 
