@@ -282,16 +282,18 @@ The frontend hand-mirrors the backend's DTOs as its own records (no shared modul
 
 ### Configuration (common env vars)
 
-| Variable                                | Description                                                                                | Default                                          |
-|:----------------------------------------|:-------------------------------------------------------------------------------------------|:-------------------------------------------------|
-| `KEYCLOAK_ISSUER_URI`                   | URL of the Keycloak realm.                                                                 | `https://keycloak.profit-base.online/realms/iri` |
-| `BACKEND_URL`                           | (Frontend) backend API URL; override to `http://localhost:11261` when running from Gradle. | `https://backend:11261`                          |
-| `IRI_BASETOOL_VERSION`                  | Image tag pulled by the production compose stack.                                          | `stable`                                         |
-| `IRI_KEYSTORE_HOST_PATH`                | Host path of `keystore.p12`, bind-mounted read-only into backend + frontend.               | `./keystore.p12`                                 |
-| `REDIS_PASSWORD`                        | Password for the Redis session store.                                                      | *(required)*                                     |
-| `HOST_IP`                               | Deployment host IP the compose stack binds outbound services to.                           | *(required)*                                     |
-| `APP_LOGGING_STRUCTURED_ENABLED`        | Enables the JSON (Logstash) log appender.                                                  | `false` (dev/test), `true` (prod)                |
-| `APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS` | Requests slower than this are logged at WARN (`Slow request …`) by all three modules.      | `2000`                                           |
+| Variable                                | Description                                                                                                      | Default                                          |
+|:----------------------------------------|:-----------------------------------------------------------------------------------------------------------------|:-------------------------------------------------|
+| `KEYCLOAK_ISSUER_URI`                   | URL of the Keycloak realm.                                                                                       | `https://keycloak.profit-base.online/realms/iri` |
+| `BACKEND_URL`                           | (Frontend) backend API URL; override to `http://localhost:11261` when running from Gradle.                       | `https://backend:11261`                          |
+| `IRI_BASETOOL_VERSION`                  | Image tag pulled by the compose stack (`testing` on a non-production host).                                      | `stable`                                         |
+| `IRI_KEYCLOAK_HOSTNAME`                 | Public Keycloak hostname (`KC_HOSTNAME`). Only for a non-production domain; set with the next var or not at all. | `keycloak.profit-base.online`                    |
+| `IRI_KEYCLOAK_ISSUER_URI`               | Issuer the three apps validate against. Must match `IRI_KEYCLOAK_HOSTNAME` (REQ-OPS-022).                        | `https://keycloak.profit-base.online/realms/iri` |
+| `IRI_KEYSTORE_HOST_PATH`                | Host path of `keystore.p12`, bind-mounted read-only into backend + frontend.                                     | `./keystore.p12`                                 |
+| `REDIS_PASSWORD`                        | Password for the Redis session store.                                                                            | *(required)*                                     |
+| `HOST_IP`                               | Deployment host IP the compose stack binds outbound services to.                                                 | *(required)*                                     |
+| `APP_LOGGING_STRUCTURED_ENABLED`        | Enables the JSON (Logstash) log appender.                                                                        | `false` (dev/test), `true` (prod)                |
+| `APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS` | Requests slower than this are logged at WARN (`Slow request …`) by all three modules.                            | `2000`                                           |
 
 The complete set — Keycloak JWKS, Discord login/precheck, SMTP, and the monitoring scrape/tracing gates — lives in `.env.example` and the specs under [`docs/specs/`](docs/specs/INDEX.md). Type-safe settings live in `@ConfigurationProperties` classes with `@Validated`, so misconfiguration is caught at startup.
 

@@ -521,6 +521,51 @@ You see the result in `/var/log/iri-deploy.log` (`tail -n 100`), or off-host in
 Grafana → Explore → Loki with `{app="ops-deploy"}`. `journalctl -u
 iri-deploy.service` will **not** show it — see the note under *First deploy*.
 
+### Promoting to testing
+
+The PVE testing stack (`basetool.greluc.me`) is fed by its own tag and its own
+workflow (REQ-OPS-022). Nothing reaches it on a `main` merge either:
+
+```bash
+gh workflow run promote-testing.yml -f version=sha-abc1234
+```
+
+(or *Actions → Promote to testing → Run workflow*)
+
+It accepts any tag `release-images.yml` produced — a `sha-<short>` from a main
+merge, a semver from a release, or `stable` when you want the testing stack to
+mirror what production currently runs in order to reproduce something.
+
+Same signature gate, same lock-step matrix, same re-tag-not-rebuild mechanics as
+the production path. **One difference:** the `testing` environment carries no
+required reviewer, so the run does not stop for approval. That is deliberate — the
+reviewer on `production` separates *may fire a workflow* from *may change
+production*, and a stack with no production data and no users has nothing for that
+seam to protect. The environment reference stays because it still records one
+deployment per promotion, which is how you answer "which version has been on
+testing since when".
+
+The testing host runs the identical `deploy.sh` on the identical timer, with one
+line of override:
+
+```ini
+# /etc/systemd/system/iri-deploy.service.d/override.conf
+[Service]
+ExecStart=
+ExecStart=/var/iri/code/scripts/deploy.sh --tag testing
+```
+
+Signature verification, digest pinning, the health gate and auto-rollback all
+behave exactly as they do in production — the only thing that changed is which tag
+is resolved.
+
+> A testing environment serves the app under its own domain from the **same**
+> promoted config bundle. That works because `IRI_KEYCLOAK_HOSTNAME` and
+> `IRI_KEYCLOAK_ISSUER_URI` override the two public-identity values baked into
+> `docker-compose.yml`. **Set both or neither** — a half-set pair fails every
+> request with `issuer does not match`, which reads like a token bug and is in fact
+> a configuration one. Production sets neither and is unaffected.
+
 ### Forcing an immediate run
 
 ```bash

@@ -70,6 +70,10 @@ build nor the promotion — a Trivy finding is surfaced, not enforced, at any st
 
 **Enforced by:** `.github/workflows/release-images.yml` · `.github/workflows/promote.yml` (`environment`, cosign gate) · **Runbook:** `docs/deployment.md` → *Promoting to production*
 
+> Non-production environments are fed by their own channel and their own tag — see
+> [REQ-OPS-022](#req-ops-022--non-production-environments-are-fed-by-their-own-promotion-channel).
+> `:stable` remains the only tag production reads.
+
 ### REQ-OPS-003 — Digest pin + health gate + auto-rollback
 
 `deploy.sh` resolves `:stable` to concrete, immutable digests, applies them via a compose
@@ -669,6 +673,58 @@ produced artifact.
   upload must not skip `merge` and cost the release its tags and signature.
 
 **Enforced by:** `.github/workflows/release-images.yml` (`plan`, `build`, `scan`, `merge`) · **Decision:** [ADR-0137](../adr/0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md)
+
+### REQ-OPS-022 — Non-production environments are fed by their own promotion channel
+
+A non-production environment (today: the PVE testing stack) is delivered by the **same
+mechanism** as production, over a **separate tag**. `promote-testing.yml` re-tags an
+already-built digest to `:testing`; the host runs `deploy.sh --tag testing` on the standard
+timer. Nothing reaches such an environment on a `main` merge — the operator decides what gets
+tested, the same principle REQ-OPS-002 applies to production.
+
+Two properties are **identical** to the production path and must stay that way:
+
+1. **Provenance.** The cosign identity is the same regexp pinned to
+   `release-images.yml@refs/(heads/main|tags/v.+)`. An image built off an arbitrary feature
+   branch is not promotable to testing either. A rehearsal that accepts weaker provenance is a
+   rehearsal of something else.
+2. **Lock-step.** The three app images, `basetool-config` and `basetool-keycloak-spi` move
+   together with `fail-fast: true`, so compose, provider JAR and images never skew.
+
+Exactly one property differs, deliberately: the `approve` job binds the `testing` environment
+**without a required reviewer**. On `production` the reviewer separates "may fire a workflow"
+(`actions:write`) from "may change production" — a stolen or over-scoped PAT can start the run
+but cannot approve it. A testing environment holds no production data and serves no users, so
+that seam protects nothing and only adds friction. The environment reference itself stays,
+because it mints one deployment record per promotion — the durable answer to *which version has
+been on testing since when*. Adding the reviewer later is a repository setting, not a workflow
+change.
+
+Because a non-production environment runs the **same promoted config bundle** under a different
+domain, the two public-identity values `docker-compose.yml` bakes in are variables with
+production defaults: `IRI_KEYCLOAK_HOSTNAME` (Keycloak's `KC_HOSTNAME`) and
+`IRI_KEYCLOAK_ISSUER_URI` (validated by backend, frontend and ingest). Unset, both resolve to
+the production values, so production behaviour is unchanged. `KC_HOSTNAME_STRICT` stays `true`
+in every environment — Keycloak keeps rejecting requests under any name other than the
+configured one.
+
+**Acceptance**
+
+- [ ] `promote-testing.yml` is `workflow_dispatch`-only, writes **only** the `:testing` tag, and
+  never touches `:stable`.
+- [ ] Its concurrency group is distinct from `promote-stable`, so a testing promotion neither
+  queues behind nor cancels a production one.
+- [ ] It cosign-verifies against the **same** release-images identity regexp as `promote.yml`.
+- [ ] The `approve` job declares `environment: testing` on its own single job (not the matrix),
+  so one deployment record is minted per run.
+- [ ] `IRI_KEYCLOAK_HOSTNAME` and `IRI_KEYCLOAK_ISSUER_URI` unset ⇒ the rendered compose is
+  byte-identical to the pre-change production values.
+- [ ] No production credential, realm export or Discord application is reused by a
+  non-production environment (`CLAUDE.md`: never use production credentials in test stacks).
+
+**Enforced by:** `.github/workflows/promote-testing.yml` · `docker-compose.yml`
+(`KC_HOSTNAME`, `KEYCLOAK_ISSUER_URI`) · `.env.example` · **Runbook:** `docs/deployment.md` →
+*Promoting to testing*
 
 ## Out of scope
 

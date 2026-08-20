@@ -289,7 +289,12 @@ x-keycloak: &keycloak-template
         # working thread set, so it is a runaway ceiling rather than a limit hit under normal load.
         pids: 2048
   environment:
-    KC_HOSTNAME: keycloak.profit-base.online
+    # The public hostname Keycloak stamps into issuer URLs, redirect validation and its own
+    # absolute links. Overridable so a non-production environment (the PVE testing stack) can run
+    # the SAME promoted config bundle under its own domain; the default is production, so an .env
+    # that does not set it behaves exactly as before. KC_HOSTNAME_STRICT stays "true" — Keycloak
+    # must keep rejecting requests arriving under any other name, whichever name that is.
+    KC_HOSTNAME: ${IRI_KEYCLOAK_HOSTNAME:-keycloak.profit-base.online}
     KC_HOSTNAME_STRICT: "true"
     KC_HEALTH_ENABLED: "true"
     # Keep the root log level at INFO but mute io.vertx.core.net.impl.ConnectionBase, which logs an
@@ -487,7 +492,12 @@ x-backend: &backend-template
     SPRING_DATASOURCE_URL: jdbc:postgresql://db-backend:15432/${POSTGRES_DB:?POSTGRES_DB must be set in .env}
     SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
-    KEYCLOAK_ISSUER_URI: https://keycloak.profit-base.online/realms/iri
+    # Must resolve to the SAME issuer string Keycloak stamps into its tokens, i.e. it has to track
+    # KC_HOSTNAME above — a mismatch fails JWT validation on every request with a confusing
+    # "issuer does not match" rather than an obvious configuration error. Both default to
+    # production, so an .env that sets neither is unchanged; a non-production environment sets
+    # both. The frontend and ingest templates below carry the same variable for the same reason.
+    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-https://keycloak.profit-base.online/realms/iri}
     # JWT audience enforcement (security review, audit L-1). Empty by default, so a stack whose realm
     # does not stamp aud — a hand-rolled local test realm — stays off. The E2E suite is the exception
     # and runs ENFORCED: its realm stamps aud=basetool-backend and E2eStackExtension sets this var,
@@ -766,7 +776,8 @@ x-frontend: &frontend-template
   environment: &frontend-env
     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
     SERVER_PORT: 18081
-    KEYCLOAK_ISSUER_URI: https://keycloak.profit-base.online/realms/iri
+    # Tracks KC_HOSTNAME — see the rationale on the backend template's KEYCLOAK_ISSUER_URI.
+    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-https://keycloak.profit-base.online/realms/iri}
     BACKEND_URL: https://backend:11261
     REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
     # Monitoring plane (epic #936, REQ-OBS-005/-009) — see the backend template for the full
@@ -848,7 +859,8 @@ x-ingest: &ingest-template
   environment: &ingest-env
     SPRING_PROFILES_ACTIVE: prod
     SERVER_PORT: 11262
-    KEYCLOAK_ISSUER_URI: https://keycloak.profit-base.online/realms/iri
+    # Tracks KC_HOSTNAME — see the rationale on the backend template's KEYCLOAK_ISSUER_URI.
+    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-https://keycloak.profit-base.online/realms/iri}
     BACKEND_URL: https://backend:11261
     # Public frontend URL the extractor's browser is sent to (…?handoff=<id>). Override per
     # deployment in .env; the local dev stack should point this at http://localhost:18081.
