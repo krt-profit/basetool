@@ -507,8 +507,11 @@ and search for it.
 - Lives in the page chrome **outside** the swapped `#krt-bp-list` fragment, so it is unaffected by
   every batch-add / import / remove re-render (REQ-FE-005). It carries no state and triggers no
   mutation, so there is nothing to live-update and nothing to audit.
-- Label and tooltip come from the message bundles like every other user-visible string
-  (`personalInventory.blueprints.extractor.button` / `.title`, DE + EN).
+- Label and tooltip come from the **shared** bundle keys `scExtractor.download.button` /
+  `.title` (DE + EN) rather than a page-scoped key: the refinery create page carries the same
+  control next to its screenshot import (`REQ-REFINERY-019`,
+  [`refinery-screenshot-import.md`](refinery-screenshot-import.md)), and the two must not
+  drift apart in wording or target URL.
 
 **Acceptance criteria:**
 
