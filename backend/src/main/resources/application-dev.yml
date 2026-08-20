@@ -16,13 +16,11 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:https://keycloak.profit-base.online/realms/iri}
-          # Same escape hatch prod has (application-prod.yml), and dev needs it for a reason prod
-          # does not have: the Android emulator can only reach Keycloak under a host name the
-          # BACKEND cannot resolve. With KC_HOSTNAME pinned so the app's tokens carry
-          # iss=http://127.0.0.1:18080/..., the backend would have to fetch keys from 127.0.0.1 --
-          # which inside the container is itself. Empty (the default) keeps deriving the key URL
-          # from issuer-uri, i.e. nothing changes for a stack without that split.
-          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
+          # NOTE: do NOT add `jwk-set-uri` here. Spring's own key must be either absent or a real
+          # URL -- an empty value is not "unset": Boot binds it as PRESENT-but-empty, takes the
+          # jwk-set-uri branch of the resource-server auto-configuration and fails the context with
+          # `jwkSetUri cannot be empty`, so the backend never boots. The split-horizon escape hatch
+          # lives under `app.security.jwt.jwk-set-uri` below, which is blank-safe by design.
 
 # SC Wiki catalogue sync. The per-sync feature flags default to false in code
 # (ScWikiProperties -- "ships dark"); enabled here so each scheduler step actually
@@ -40,3 +38,20 @@ krt:
     manufacturer-sync-enabled: true
     sync-all-items: true
     reconcile-uuidless-by-name: true
+
+# Split-horizon JWKS, the dev twin of the prod knob in application-prod.yml (REQ-SEC-024).
+# Dev needs it for a reason prod does not have: the Android emulator can only reach Keycloak under
+# a host name the BACKEND cannot resolve. With KC_HOSTNAME pinned so the app's tokens carry
+# iss=http://127.0.0.1:18080/..., the backend would have to fetch keys from 127.0.0.1 -- which
+# inside its container is itself (see docker-compose.android.yml).
+#
+# This is `app.security.jwt.*`, NOT `spring.security.oauth2.resourceserver.jwt.*`. The two look
+# interchangeable and are not: this one is read by SecurityConfig#resourceServerJwtDecoder, whose
+# @ConditionalOnExpression leaves the bean absent while the value is blank, so an unset variable
+# keeps Boot's issuer-location decoder exactly as before. It also routes the split-horizon case
+# through the hardened decoder (keycloak-trust bundle + the full JWS algorithm set) instead of
+# Boot's RS256-only `withJwkSetUri` default.
+app:
+  security:
+    jwt:
+      jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
