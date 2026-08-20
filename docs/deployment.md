@@ -101,6 +101,45 @@ without making it world-readable.
 
 Docker Engine ≥ 23.x is required for `docker compose up --wait`.
 
+> **On Debian the package names differ, and one of them is a trap.** Verified on Debian 13
+> (trixie) while bootstrapping the testing host:
+>
+> |               |         Ubuntu         |                                   Debian 13                                   |
+> |---------------|------------------------|-------------------------------------------------------------------------------|
+> | Compose v2    | `docker-compose-v2`    | **`docker-compose`** (2.26.1 — the same Go binary, installed as a CLI plugin) |
+> | Docker client | comes with `docker.io` | **`docker-cli`, a separate package**                                          |
+>
+> The second one bites: `docker-cli` is only a *Recommends* of `docker.io`, so the
+> `--no-install-recommends` above silently leaves it out. `docker.io` reports as installed,
+> `docker.service` starts — and `docker` is not on `$PATH`. Add `docker-cli` explicitly.
+
+**buildx must be ≥ 0.14.** `deploy.sh` resolves every tag to a digest with
+`docker buildx imagetools inspect --format '{{.Manifest.Digest}}'`. Older buildx — including the
+**0.13.1 that Debian 13 ships** — ignores `--format` and prints the full human-readable manifest
+instead. `deploy.sh` then appends that entire blob after `image@`, and the failure surfaces as
+
+```
+FATAL: … SIGNATURE VERIFICATION FAILED for one or more artifacts
+```
+
+which points at cosign and the registry when nothing is wrong with either. Check with
+`docker buildx version`; if it is below 0.14, install a current binary as a CLI plugin — it takes
+precedence over the distribution package without removing it:
+
+```bash
+BX=v0.36.1
+arch=$(dpkg --print-architecture)
+cd /tmp
+curl -fsSLo "buildx-${BX}.linux-${arch}" "https://github.com/docker/buildx/releases/download/${BX}/buildx-${BX}.linux-${arch}"
+curl -fsSLo buildx-checksums.txt "https://github.com/docker/buildx/releases/download/${BX}/checksums.txt"
+# Note the `*` — the checksum file uses binary-mode notation, so a `grep " buildx-…"` finds nothing.
+grep " \*buildx-${BX}.linux-${arch}\$" buildx-checksums.txt | sha256sum -c -
+sudo install -d /usr/local/lib/docker/cli-plugins
+sudo install -m 0755 "buildx-${BX}.linux-${arch}" /usr/local/lib/docker/cli-plugins/docker-buildx
+rm -f "buildx-${BX}.linux-${arch}" buildx-checksums.txt
+docker buildx version
+```
+
 **cosign** is required for the host-side signature gate (REQ-OPS-015 — `deploy.sh`
 verifies every image before it runs it). It is not in Ubuntu's default repos, so
 install the pinned release binary and verify its checksum before installing:
@@ -181,6 +220,20 @@ sudo mkdir -p /etc/iri                 # token
 sudo chown -R 10001:10001 /var/iri/backend/log /var/iri/frontend/log /var/iri/ingest/log
 sudo chown -R deploy:docker /var/lib/iri /var/iri/code
 
+# Keycloak (Quarkus image) runs as uid 1000 and is started with
+# `--log-file=/var/log/keycloak/keycloak.log`. Without this it logs
+# "LogManager error of type OPEN_FAILURE ... Permission denied" at boot, keeps running
+# on console logging only, and the file log everyone expects is silently absent.
+sudo chown -R 1000:1000 /var/iri/keycloak/log
+
+# Redis runs as uid 999 inside the official image and writes its AOF + snapshot into
+# this bind mount. Its entrypoint would normally chown /data itself, but the service
+# also mounts users.acl read-only from the same directory, and a `:ro` mount cannot be
+# chowned — so the fix-up does not happen and redis dies at startup with
+# "Can't open or create append-only dir appendonlydir: Permission denied".
+# The health gate then rolls the whole deploy back, which reads like an app problem.
+sudo chown -R 999:999 /var/iri/redis
+
 # Docker config dir for the deploy user. `docker login` writes its
 # credentials.json into $DOCKER_CONFIG (default $HOME/.docker), and the
 # deploy user has no $HOME because it was created with --no-create-home in
@@ -233,6 +286,19 @@ sudo nano /var/iri/code/.env
 Fill in every `CHANGE_ME`. `IRI_KEYSTORE_HOST_PATH` should point at
 `/var/iri/secrets/keystore.p12`. Leave `IRI_BASETOOL_VERSION` unset (the
 default `stable` is what the deploy script wants).
+
+> **If you copied `.env.example` off a Windows machine, check the line endings.**
+> `deploy.sh` reads `IRI_KEYSTORE_HOST_PATH` back out of this file with `grep`/`cut`, so a
+> CRLF file hands it a path with a trailing carriage return and the pre-flight aborts with
+> `required file missing: /var/iri/secrets/keystore.p12` — for a file that is sitting right
+> there with correct ownership. `.gitattributes` pins the file to LF since 2026-08-20, but an
+> older clone still has CRLF in its working tree:
+>
+> ```bash
+> file /var/iri/code/.env          # must NOT say "with CRLF line terminators"
+> sudo sed -i "s/$(printf '
+> ')\$//" /var/iri/code/.env
+> ```
 
 #### 5.2 PKCS12 keystore
 
@@ -305,6 +371,33 @@ The token file is owner-only readable. The deploy user uses `cat` against
 it (via the systemd unit), nothing else touches it. The optional `.expiry`
 sidecar holds only the (non-secret) rotation date.
 
+#### 5.5 Files that must exist before the first deploy
+
+Three paths are bind-mounted **as files**. Docker does not fail on a missing source — it
+silently creates a **directory** at that path, and the container then dies in a way that
+does not mention the mount at all:
+
+|               Path                |                        Consequence if missing                        |
+|-----------------------------------|----------------------------------------------------------------------|
+| `/var/iri/redis/users.acl`        | redis exits at startup; the health gate rolls the whole deploy back  |
+| `/var/iri/code/realm-export.json` | Keycloak fails to read the import path                               |
+| `/var/iri/secrets/keystore.p12`   | caught by the pre-flight (`require_file`), so this one fails cleanly |
+
+Create the first two before the first deploy — `users.acl` per
+[`MONITORING_ROLLOUT_RUNBOOK.md` §4.2](MONITORING_ROLLOUT_RUNBOOK.md) (**with** its `default`
+line), the realm export per §5.3 above. If a run already created directories, remove them
+before retrying:
+
+```bash
+for f in /var/iri/redis/users.acl /var/iri/code/realm-export.json; do
+  [ -d "$f" ] && sudo rmdir "$f" && echo "removed stray directory: $f"
+done
+```
+
+> Note that `--aclfile` is unconditional in the `prod` profile — `users.acl` is required even
+> when the monitoring stack is **not** deployed. In that case the file holds the `default`
+> line alone; the `monitoring` user is only needed once `redis-exporter` runs.
+
 ### 6. Install the systemd timer
 
 ```bash
@@ -328,6 +421,27 @@ systemctl list-timers iri-deploy.timer
 ```
 
 ### 7. First deploy
+
+> **The very first deploy has no rollback anchor.** `deploy.sh` restores the *previous* digest
+> pin when the health gate trips — and on a fresh host there is none, so a failed first run ends
+> with
+>
+> ```
+> health check failed within 180s — rolling back
+> no previous pin available — manual intervention required
+> ```
+>
+> That is not a second fault: it means the rollback had nothing to roll back to. Fix the cause,
+> then re-run. The failed attempt also records a backoff for that target, so the retry needs
+> `--force`:
+>
+> ```bash
+> sudo -u deploy /var/iri/code/scripts/deploy.sh --tag <tag> --force
+> ```
+>
+> A `WARN: could not write deploy textfile metric` on a host without the monitoring stack is
+> cosmetic — `deploy.sh` writes a Prometheus textfile that nothing collects here. Silence it with
+> `sudo install -d -o deploy -g docker /var/iri/monitoring/textfile`.
 
 The timer's first firing is `OnBootSec=5min` after install. To not wait:
 
