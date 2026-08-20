@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.hamcrest.Matchers.anEmptyMap;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
@@ -190,6 +191,37 @@ class RefineryOrderCreateImportRenderTest {
         // clears); pin that the page loads it. Auto-submit itself is exercised by the e2e suite.
         .andExpect(content().string(containsString("/js/refinery-orders-create.js")))
         .andExpect(content().string(containsString("</html>")));
+  }
+
+  @Test
+  void createPage_rendersScExtractorReleaseLink_besideTheImportButton() throws Exception {
+    // covers REQ-REFINERY-019 — the import bar carries a link to the desktop SC Extractor's latest
+    // release next to the import trigger it feeds, opened in a new tab with a safe rel. It must
+    // render INSIDE the upload form, because .import-extract-bar puts the flex row on the form.
+    mockMvc
+        .perform(get("/refinery-orders/create").with(oidcLogin()))
+        .andExpect(status().isOk())
+        .andExpect(view().name("refinery-orders-create"))
+        .andExpect(content().string(containsString("data-testid=\"refinery-extractor-link\"")))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "href=\"https://github.com/krt-profit/basetool-sc-extractor/releases/latest\"")))
+        .andExpect(content().string(containsString("rel=\"noopener noreferrer\"")))
+        .andExpect(
+            result -> {
+              String html = result.getResponse().getContentAsString();
+              int form = html.indexOf("<form id=\"refineryImportForm\"");
+              int link = html.indexOf("id=\"refineryExtractorLink\"");
+              int formEnd = html.indexOf("</form>", form);
+              assertTrue(
+                  form >= 0 && link > form && link < formEnd,
+                  "extractor link must render inside the import form, which owns the flex row");
+              assertTrue(
+                  html.indexOf("data-testid=\"refinery-import-button\"") < link,
+                  "extractor link must follow the import button it accompanies");
+            });
   }
 
   @Test

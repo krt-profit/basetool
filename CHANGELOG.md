@@ -8,6 +8,12 @@
 
 - **Zwei neue optionale Umgebungsvariablen für Umgebungen unter eigener Domain: `IRI_KEYCLOAK_HOSTNAME` und `IRI_KEYCLOAK_ISSUER_URI`.** Damit läuft dasselbe ausgelieferte Config-Bundle unter einem anderen Hostnamen, was bisher an zwei fest verdrahteten Werten scheiterte. Beide sind entweder zusammen zu setzen oder gar nicht; ungesetzt greifen unverändert die Produktionswerte (REQ-OPS-022).
 
+## [v1.5.57](https://github.com/krt-profit/basetool/releases/tag/v1.5.57) - 2026-08-20
+
+### Added
+
+- **Beide Import-Seiten verlinken jetzt den Basetool SC Extractor.** Auf „Meine Blueprints“ neben „JSON importieren“ und auf „Neuer Raffinerieauftrag“ neben „Aus Screenshot-Extract importieren (JSON)“ führt ein Knopf direkt zum neuesten Release der Desktop-App, die genau diese Dateien erzeugt — wer sie noch nicht hat, musste sie bisher außerhalb des Tools suchen. Der Link öffnet sich in einem neuen Tab; die Blueprint-Liste bzw. ein bereits vorausgefülltes Auftragsformular bleibt stehen (REQ-INV-038, REQ-REFINERY-019).
+
 ## [v1.5.56](https://github.com/krt-profit/basetool/releases/tag/v1.5.56) - 2026-08-20
 
 ### Changed
