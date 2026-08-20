@@ -6,6 +6,8 @@
 
 - **Start- und Endzeit im Teilnehmer-Dialog eines Einsatzes liefen aus ihrer Spalte.** Datums- und Uhrzeitfeld haben eine feste Breite, die nebeneinander nicht in den 600 Pixel breiten Dialog passte: Die Uhrzeit ragte rund 13 Pixel über ihre Spalte hinaus, der Abstand zwischen „Startzeit“ und „Endzeit“ schrumpfte auf 3 Pixel und das Endzeit-Feld klebte am Dialogrand. Passt ein Paar nicht mehr neben das andere, rückt es jetzt in die nächste Zeile — mit dem gleichen Abstand wie alle übrigen Felder (REQ-UI-013).
 
+- **Der Dev- und E2E-Stack startete sein Backend nicht mehr.** Seit v1.5.55 setzte das Dev-Profil den JWKS-Schlüssel unter Springs eigenem Namensraum mit leerem Standardwert; Spring wertet leer nicht als „nicht gesetzt", sondern bricht den Start mit `jwkSetUri cannot be empty` ab. Der Backend-Container wurde nie gesund, damit kam der gesamte E2E-Stack nicht hoch und jeder Testlauf scheiterte an der Stack-Bereitstellung statt an seiner eigenen Prüfung. Der Schalter liegt jetzt wie in der Produktion auf `app.security.jwt.jwk-set-uri`, wo leer wieder „aus" bedeutet. Produktion war nie betroffen (REQ-SEC-024).
+
 ## [v1.5.55](https://github.com/krt-profit/basetool/releases/tag/v1.5.55) - 2026-08-19
 
 ### Added
