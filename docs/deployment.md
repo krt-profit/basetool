@@ -220,6 +220,13 @@ sudo mkdir -p /etc/iri                 # token
 sudo chown -R 10001:10001 /var/iri/backend/log /var/iri/frontend/log /var/iri/ingest/log
 sudo chown -R deploy:docker /var/lib/iri /var/iri/code
 
+# deploy.sh stages the promoted keycloak-spi JAR into this directory, so the deploy user
+# must own it. Left out, docker creates it root-owned on the first `up` (it is a bind-mount
+# source) and the deploy fails at the very last step with
+# "install: cannot create regular file '.../keycloak-spi.jar': Permission denied" —
+# after every container is already healthy, which makes it look like a post-success glitch.
+sudo install -d -o deploy -g docker /var/iri/code/keycloak/providers
+
 # Keycloak (Quarkus image) runs as uid 1000 and is started with
 # `--log-file=/var/log/keycloak/keycloak.log`. Without this it logs
 # "LogManager error of type OPEN_FAILURE ... Permission denied" at boot, keeps running
