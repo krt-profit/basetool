@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.58](https://github.com/krt-profit/basetool/releases/tag/v1.5.58) - 2026-08-20
+
 ### Added
 
 - **Testversionen lassen sich über eine eigene Aktion „Promote to testing" ausliefern.** Sie hängt — wie die Produktions-Promotion — ein zusätzliches Tag `:testing` an einen bereits gebauten, signierten Digest, ohne neu zu bauen; ein Testhost mit `deploy.sh --tag testing` zieht ihn beim nächsten Timer-Lauf. Signaturprüfung und der Gleichschritt aller fünf Artefakte sind identisch zur Produktion, nur die Reviewer-Freigabe entfällt (REQ-OPS-022).
