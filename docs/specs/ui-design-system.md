@@ -213,6 +213,27 @@ leaves a class-hidden element hidden. Setting a non-empty display (`el.style.dis
 works (inline beats a non-`!important` class), and a pure JS filter loop that both hides and reveals
 rows via `el.style.display` (no class) is fine; only the reveal-over-class case is the trap.
 
+**A fixed-width control in a multi-column `.form-row` declares its real floor.** A `.form-row`
+splits its width evenly and its per-column floor is generic (`.form-row > .form-group` declares
+250px on mission-detail). A control that cannot shrink below more than that silently spills out of
+its column: it eats the row's column gap and overruns the container's padding, and because nothing
+clips it the overflow reads as "the spacing is wrong" rather than as a broken layout. The
+`.datetime-split-group` is the case in the codebase — its date and time parts are fixed-width and
+non-shrinkable (10.5rem + `--space-2` + 7rem = an **18rem** floor). The measured defect is the
+participant edit modal: two groups in the 600px `.krt-modal--wide` frame get ~275px each, so the
+time part overflows by ~13px and "Endzeit" sits 3px from the modal border — at every desktop width
+from 1280px up. The mission Verwaltung form is the other multi-column user of the widget and is
+**not** affected today: its row keeps two groups per line at ≥18rem each across 1280–1800px, both
+before and after this rule. The rule is stated for the widget rather than scoped to the modal, so
+it also covers a future narrower row there.
+
+Such a control declares its true minimum (`min-width: min(18rem, 100%)`) so the row **wraps** onto
+full-width lines instead of overflowing — where there is room the groups stay side by side, otherwise
+they fall onto their own line — and the `min()` keeps a narrow (mobile) container shrinking rather
+than overflowing in turn. A wrapped line keeps the standard field rhythm (`row-gap: 0`; the
+`.form-group` margin does the spacing) instead of stacking the row gap on top of it. The rule must
+out-specify the page-level `.form-row > .form-group` floor, which is declared later in the cascade.
+
 **Acceptance**
 
 - [ ] A new/migrated `.krt-modal-overlay` modal renders through `modal-wrapper :: modal(...)` with
@@ -226,8 +247,21 @@ rows via `el.style.display` (no class) is fine; only the reveal-over-class case 
 - [ ] A modal a script opens with an inline `style.display = 'flex'` still closes via
   `close-modal-display` (the shared handlers clear the inline `display` on both open and close, so the
   visibility class always wins) — e.g. the `delete-operation-modal` Cancel button.
+- [ ] No control renders wider than its column: a fixed-width control in a multi-column `.form-row`
+  declares its true `min-width` and wraps onto its own full-width line instead of overrunning the
+  column gap and the container padding — verified by measurement at several desktop widths, since
+  whether a column falls below the floor depends on how many items the row keeps per line.
 
 **Enforced by:** per-screen render MvcTest (shell + single-projection assertion) + e2e smoke.
+The fits-the-column rule is guarded by `MissionDatetimeSplitLayoutE2eTest`, which measures the
+rendered rectangles of every date/time part against its own column on both mission surfaces, at
+each of 1280 / 1440 / 1600 / 1800px. Two properties of that test are load-bearing. It compares
+bounding boxes rather than `scrollWidth`/`clientWidth`, because the overflow lands inside the
+container's right padding and the scrollable overflow region does not account for it — the broken
+layout reported `scrollWidth === clientWidth` and would have passed the bug straight through. And
+it sweeps widths rather than picking one, because a single viewport proved nothing: against the
+unfixed stylesheet the modal check fails at every swept width while the Verwaltung check passes at
+all of them, so the latter is a forward-looking invariant, not a reproduction.
 
 ### REQ-UI-009 — Responsive across four device classes
 
