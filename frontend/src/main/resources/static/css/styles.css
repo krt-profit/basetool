@@ -1041,11 +1041,17 @@ tbody tr:nth-child(even):hover {
 }
 
 /*
- * SK-order claim tables (orders-detail): the open-amount and its "Eintragen"
+ * SK-order claim tables (orders-detail): the cell content and its "Eintragen"
  * action share one flex row so every button's left edge lines up down the
- * column no matter how wide the amount text is (SCU decimals vs. piece counts
- * differ in width). The amount grows to fill, pushing each button to the same
+ * column no matter how wide the content is (SCU decimals vs. piece counts
+ * differ in width). The content grows to fill, pushing each button to the same
  * offset; the gap replaces the button's former left margin.
+ *
+ * Two fillers exist because the two order kinds put the action in different
+ * columns: the MATERIAL table keeps its "Offen" open-amount
+ * (.claim-open-amount), while the aggregated ITEM table dropped that column and
+ * hosts the action next to the claim chips (.claim-chips) instead - there,
+ * "Offen" contradicted the manufacturing-reduced "Gesamtmenge" (REQ-ORDERS-026).
  */
 .claim-open-cell {
     display: flex;
@@ -1053,7 +1059,8 @@ tbody tr:nth-child(even):hover {
     gap: 0.5rem;
 }
 
-.claim-open-cell .claim-open-amount {
+.claim-open-cell .claim-open-amount,
+.claim-open-cell .claim-chips {
     flex: 1 1 auto;
 }
 

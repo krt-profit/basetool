@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die Spalte „Offen“ ist aus den *Aggregierten Materialien* eines Item-Auftrags verschwunden.** Sie zeigte den Eintragungs-Rest auf Basis des **vollen** Auftragsbedarfs, während „Gesamtmenge“ daneben nur den Bedarf der **noch nicht hergestellten** Einheiten meint — sobald Herstellung gebucht war, stand dort mehr „offen“ als überhaupt „gebraucht“ (bei Auftrag #75: 71,52 SCU offen gegen 56,2 SCU Gesamtmenge, ohne eine einzige Eintragung). Der „Eintragen“-Knopf sitzt jetzt in der Spalte „Eingetragen“; die maximal eintragbare Menge steht unverändert im Eintragen-Dialog. Bei Material-Aufträgen bleibt „Offen“ wie bisher (REQ-ORDERS-026).
+
 ## [v1.5.55](https://github.com/krt-profit/basetool/releases/tag/v1.5.55) - 2026-08-19
 
 ### Added
