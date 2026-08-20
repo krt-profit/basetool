@@ -34,3 +34,17 @@
 Dockerfile text eol=lf
 *.sh text eol=lf
 .editorconfig text eol=lf
+
+# `.env.example` is copied verbatim onto a Linux host as the starting point for
+# `.env` (deployment runbook §5.1). deploy.sh then reads IRI_KEYSTORE_HOST_PATH
+# back out of that file with grep/cut, so a CRLF checkout hands it a path with a
+# trailing carriage return — and the pre-flight aborts with
+# "required file missing: /var/iri/secrets/keystore.p12" for a file that is
+# plainly sitting right there. Cost an hour of looking at permissions on the
+# wrong file. Same class of drift the block above exists to prevent.
+.env.example text eol=lf
+
+# Keycloak theme templates ship in the basetool-config bundle and are read by
+# FreeMarker inside the container; LF everywhere keeps the bundle byte-stable
+# regardless of which platform built it.
+*.ftl text eol=lf

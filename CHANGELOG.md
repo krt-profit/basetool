@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- **Eine aus einem Windows-Klon kopierte `.env` ließ das Deployment mit einer irreführenden Meldung abbrechen.** `.env.example` hatte keine `eol=lf`-Regel, wurde also mit CRLF ausgecheckt; `deploy.sh` liest den Keystore-Pfad mit `grep`/`cut` daraus und bekam ihn mit angehängtem Wagenrücklauf — der Abbruch lautete dann `required file missing` für eine Datei, die vorhanden war. `.gitattributes` deckt jetzt `.env.example` und `*.ftl` mit ab.
+
 - **Das Deployment-Runbook verlangte für den GHCR-Pull-Token einen Fine-grained PAT — den GHCR gar nicht annimmt.** GitHub Packages unterstützt ausschließlich klassische Tokens; wer der Anleitung folgte, landete bei einem `denied` beim `docker login`, ohne dass am Token etwas falsch war. §5.4 nennt jetzt den Classic PAT mit `read:packages`, den nötigen SSO-Freigabeschritt und den Preis dieser Token-Art (kontoweiter Lesezugriff statt Repo-Beschränkung).
 
 ## [v1.5.57](https://github.com/krt-profit/basetool/releases/tag/v1.5.57) - 2026-08-20
