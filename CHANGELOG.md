@@ -6,7 +6,17 @@
 
 - **Testversionen lassen sich über eine eigene Aktion „Promote to testing" ausliefern.** Sie hängt — wie die Produktions-Promotion — ein zusätzliches Tag `:testing` an einen bereits gebauten, signierten Digest, ohne neu zu bauen; ein Testhost mit `deploy.sh --tag testing` zieht ihn beim nächsten Timer-Lauf. Signaturprüfung und der Gleichschritt aller fünf Artefakte sind identisch zur Produktion, nur die Reviewer-Freigabe entfällt (REQ-OPS-022).
 
+- **Zwei neue optionale Umgebungsvariablen `IRI_TRUSTSTORE_HOST_PATH` und `IRI_EXTRA_JAVA_OPTS`.** Steht vor dem Issuer ein selbstsigniertes Zertifikat, scheitert der Start von Backend, Frontend und Ingest an `PKIX path building failed` — die OIDC-Metadaten werden gegen den JVM-Standard-Truststore geprüft, den die SSL-Bundles des Projekts nicht abdecken. Die Variablen hängen einen eigenen Truststore ein; ungesetzt sind beide wirkungslos (REQ-OPS-022).
+
+- **Neue optionale Umgebungsvariable `IRI_KEYCLOAK_HOST_ALIAS`.** Hinter einem NAT ohne Hairpin zeigt der öffentliche Keycloak-Name auf die WAN-Adresse, die die eigenen Container nicht erreichen — Backend, Frontend und Ingest holen dort beim Start ihre OIDC-Metadaten und werden nie gesund, worauf das Health-Gate die Auslieferung zurückrollt. Die Variable trägt einen `extra_hosts`-Eintrag nach, der den Namen auf den lokalen Reverse Proxy zeigen lässt; ungesetzt ist sie wirkungslos (REQ-OPS-022).
+
 - **Zwei neue optionale Umgebungsvariablen für Umgebungen unter eigener Domain: `IRI_KEYCLOAK_HOSTNAME` und `IRI_KEYCLOAK_ISSUER_URI`.** Damit läuft dasselbe ausgelieferte Config-Bundle unter einem anderen Hostnamen, was bisher an zwei fest verdrahteten Werten scheiterte. Beide sind entweder zusammen zu setzen oder gar nicht; ungesetzt greifen unverändert die Produktionswerte (REQ-OPS-022).
+
+### Fixed
+
+- **Eine aus einem Windows-Klon kopierte `.env` ließ das Deployment mit einer irreführenden Meldung abbrechen.** `.env.example` hatte keine `eol=lf`-Regel, wurde also mit CRLF ausgecheckt; `deploy.sh` liest den Keystore-Pfad mit `grep`/`cut` daraus und bekam ihn mit angehängtem Wagenrücklauf — der Abbruch lautete dann `required file missing` für eine Datei, die vorhanden war. `.gitattributes` deckt jetzt `.env.example` und `*.ftl` mit ab.
+
+- **Das Deployment-Runbook verlangte für den GHCR-Pull-Token einen Fine-grained PAT — den GHCR gar nicht annimmt.** GitHub Packages unterstützt ausschließlich klassische Tokens; wer der Anleitung folgte, landete bei einem `denied` beim `docker login`, ohne dass am Token etwas falsch war. §5.4 nennt jetzt den Classic PAT mit `read:packages`, den nötigen SSO-Freigabeschritt und den Preis dieser Token-Art (kontoweiter Lesezugriff statt Repo-Beschränkung).
 
 ## [v1.5.57](https://github.com/krt-profit/basetool/releases/tag/v1.5.57) - 2026-08-20
 

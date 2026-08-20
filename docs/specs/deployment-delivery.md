@@ -700,6 +700,30 @@ because it mints one deployment record per promotion — the durable answer to *
 been on testing since when*. Adding the reviewer later is a repository setting, not a workflow
 change.
 
+A non-production environment usually sits behind a NAT that does not hairpin, so the **public**
+Keycloak name resolves to a WAN address its own containers cannot reach. Backend, frontend and
+ingest load the OIDC metadata from that name at startup, so they never become healthy and the
+health gate rolls the deploy back — a failure that looks like a broken image and is a
+name-resolution problem. `IRI_KEYCLOAK_HOST_ALIAS` supplies a Docker `extra_hosts` entry that
+points the name at the host's own reverse proxy; its default, `localhost:127.0.0.1`, is a no-op,
+so production is untouched.
+
+Resolving the name is not the same as trusting what answers on it. That metadata fetch runs on a
+plain `RestTemplate` and therefore validates against the **JVM default trust store** — the
+`backend-trust` / `keycloak-trust` SSL bundles cover the inter-service WebClients only. An
+environment whose proxy presents a self-signed certificate fails with `PKIX path building failed`
+at exactly the same point. `IRI_TRUSTSTORE_HOST_PATH` mounts a trust store at
+`/run/secrets/truststore.p12` and `IRI_EXTRA_JAVA_OPTS` appends the `javax.net.ssl.trustStore*`
+switches that select it. Both default to no-ops: the mount resolves to the same file as the
+keystore, and with no extra options nothing reads it.
+
+That trust store **must be built as a copy of the JVM's own anchors plus the environment's
+certificate**, not from the keystore. Two reasons, both load-bearing: `-Djavax.net.ssl.trustStore`
+*replaces* the default anchors rather than adding to them, so a bare keystore would leave the app
+unable to verify any public certificate; and a file holding no private key can carry the throwaway
+`changeit` password, which is what keeps the keystore password — which protects a private key —
+off the command line where `ps` would show it.
+
 Because a non-production environment runs the **same promoted config bundle** under a different
 domain, the two public-identity values `docker-compose.yml` bakes in are variables with
 production defaults: `IRI_KEYCLOAK_HOSTNAME` (Keycloak's `KC_HOSTNAME`) and
@@ -719,6 +743,12 @@ configured one.
   so one deployment record is minted per run.
 - [ ] `IRI_KEYCLOAK_HOSTNAME` and `IRI_KEYCLOAK_ISSUER_URI` unset ⇒ the rendered compose is
   byte-identical to the pre-change production values.
+- [ ] `IRI_KEYCLOAK_HOST_ALIAS` unset ⇒ the only `extra_hosts` entry is `localhost:127.0.0.1`,
+  which resolves to what `localhost` already resolves to.
+- [ ] `IRI_EXTRA_JAVA_OPTS` unset ⇒ `JAVA_TOOL_OPTIONS` is character-identical to before, and the
+  truststore mount points at the same file as the keystore mount (read, but never consulted).
+- [ ] The documented trust store recipe starts from `$JAVA_HOME/lib/security/cacerts`, so selecting
+  it does not strip the public anchors; the keystore password appears in no process argument.
 - [ ] No production credential, realm export or Discord application is reused by a
   non-production environment (`CLAUDE.md`: never use production credentials in test stacks).
 

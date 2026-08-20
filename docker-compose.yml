@@ -415,6 +415,15 @@ x-backend: &backend-template
   # docker-compose.build.yml as an override to add `build:` back in.
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-backend:${IRI_BASETOOL_VERSION:-stable}
   restart: always
+  # Lets a non-production host resolve the PUBLIC Keycloak name to its own reverse proxy
+  # instead of chasing it out to the internet. The three apps load the OIDC metadata from
+  # KEYCLOAK_ISSUER_URI at startup, so that name has to resolve to something that answers —
+  # and on a host behind a NAT that does not hairpin, the public address does not.
+  # Format is Docker's own `name:ip`, e.g. `keycloak.basetool.greluc.me:10.98.0.11`.
+  # The default is a no-op: `localhost` already resolves to 127.0.0.1, so production —
+  # which sets nothing — gets an entry that changes nothing (REQ-OPS-022).
+  extra_hosts:
+    - "${IRI_KEYCLOAK_HOST_ALIAS:-localhost:127.0.0.1}"
   # Reap orphaned zombie processes. The container runs the JVM as PID 1 (Dockerfile ENTRYPOINT
   # `exec java`), and a bare JVM does NOT reap children reparented to it. The Docker HEALTHCHECK runs
   # BusyBox `wget --no-check-certificate https://...` every 30s, and BusyBox wget forks an
@@ -568,7 +577,7 @@ x-backend: &backend-template
     # InitialRAMPercentage drops 50 -> 35 (717M): it must stay below the 57% max (1167M), and 717M sits
     # just above the 670M this JVM actually commits, so startup no longer pre-commits ~350M of heap the
     # service never touches. Keep Initial < Max on any change — an inverted pair fails the JVM start.
-    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=57.0 -XX:InitialRAMPercentage=35.0
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=57.0 -XX:InitialRAMPercentage=35.0 ${IRI_EXTRA_JAVA_OPTS:-}
   volumes:
     - /var/iri/backend/log:/app/logs
     # Production cert is on the host, never in the image. Default points at the
@@ -577,6 +586,14 @@ x-backend: &backend-template
     # `.env` overrides this to `/var/iri/secrets/keystore.p12`. The path is
     # resolved relative to the directory containing docker-compose.yml.
     - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+    # Trust anchors for OUTBOUND TLS (REQ-OPS-022). Spring Security fetches the OIDC metadata
+    # from KEYCLOAK_ISSUER_URI at startup with a plain RestTemplate, which uses the JVM DEFAULT
+    # trust store — NOT the SSL bundle above, which only covers the backend WebClient. Where the
+    # issuer sits behind a self-signed certificate, startup dies with "PKIX path building failed"
+    # and the health gate rolls the deploy back.
+    # Unset, this resolves to the SAME file as the keystore mount above, and with
+    # IRI_EXTRA_JAVA_OPTS empty nothing reads it — production is therefore unaffected.
+    - ${IRI_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
 
 x-redis: &redis-template
   # Same digest pin policy as the Postgres images. Refresh with
@@ -676,6 +693,9 @@ x-frontend: &frontend-template
   # rebuilds happen via docker-compose.build.yml.
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-frontend:${IRI_BASETOOL_VERSION:-stable}
   restart: always
+  # See the backend template — same reason, same no-op default (REQ-OPS-022).
+  extra_hosts:
+    - "${IRI_KEYCLOAK_HOST_ALIAS:-localhost:127.0.0.1}"
   # Zombie-reaping init (tini) as PID 1 — see x-backend: the wget-HTTPS healthcheck forks an
   # `ssl_client` TLS helper that reparents to the JVM (PID 1) and, unreaped, accumulates one
   # `<defunct>` per 30s probe until the `pids` cap is exhausted (the 2026-07-12 native-thread-OOM).
@@ -795,10 +815,18 @@ x-frontend: &frontend-template
     # max (at the old 50 it would be 640M == the max, an inverted/equal pair that makes the JVM refuse
     # to start or clamp), and sitting just under the measured commit avoids pre-committing dead
     # memory. See the JVM CONTAINER SIZING block above for the measured derivation.
-    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0 -XX:InitialRAMPercentage=35.0
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0 -XX:InitialRAMPercentage=35.0 ${IRI_EXTRA_JAVA_OPTS:-}
   volumes:
     - /var/iri/frontend/log:/app/logs
     - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+    # Trust anchors for OUTBOUND TLS (REQ-OPS-022). Spring Security fetches the OIDC metadata
+    # from KEYCLOAK_ISSUER_URI at startup with a plain RestTemplate, which uses the JVM DEFAULT
+    # trust store — NOT the SSL bundle above, which only covers the backend WebClient. Where the
+    # issuer sits behind a self-signed certificate, startup dies with "PKIX path building failed"
+    # and the health gate rolls the deploy back.
+    # Unset, this resolves to the SAME file as the keystore mount above, and with
+    # IRI_EXTRA_JAVA_OPTS empty nothing reads it — production is therefore unaffected.
+    - ${IRI_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
 
 x-ingest: &ingest-template
   # The desktop one-click ingest gateway (epic #639, ADR-0018) — the ONLY new internet-reachable
@@ -811,6 +839,9 @@ x-ingest: &ingest-template
   # IRI_BASETOOL_VERSION rationale; local rebuilds use docker-compose.build.yml.
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-ingest:${IRI_BASETOOL_VERSION:-stable}
   restart: always
+  # See the backend template — same reason, same no-op default (REQ-OPS-022).
+  extra_hosts:
+    - "${IRI_KEYCLOAK_HOST_ALIAS:-localhost:127.0.0.1}"
   # Zombie-reaping init (tini) as PID 1 — see x-backend: the wget-HTTPS healthcheck forks an
   # `ssl_client` TLS helper that reparents to the JVM (PID 1) and, unreaped, accumulates one
   # `<defunct>` per 30s probe until the `pids: 2048` cap is exhausted. This gateway is where the
@@ -932,9 +963,17 @@ x-ingest: &ingest-template
     # above. InitialRAMPercentage stays 50 (256M): still below the 60% max (307M) — keep Initial < Max,
     # an inverted pair makes the JVM refuse to start — and it happens to match the 248M this service
     # actually commits, so the container pre-commits almost exactly what it needs.
-    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=60.0 -XX:InitialRAMPercentage=50.0
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=60.0 -XX:InitialRAMPercentage=50.0 ${IRI_EXTRA_JAVA_OPTS:-}
   volumes:
     - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+    # Trust anchors for OUTBOUND TLS (REQ-OPS-022). Spring Security fetches the OIDC metadata
+    # from KEYCLOAK_ISSUER_URI at startup with a plain RestTemplate, which uses the JVM DEFAULT
+    # trust store — NOT the SSL bundle above, which only covers the backend WebClient. Where the
+    # issuer sits behind a self-signed certificate, startup dies with "PKIX path building failed"
+    # and the health gate rolls the deploy back.
+    # Unset, this resolves to the SAME file as the keystore mount above, and with
+    # IRI_EXTRA_JAVA_OPTS empty nothing reads it — production is therefore unaffected.
+    - ${IRI_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
     # Log dir mounted like backend/frontend (host dir pre-chowned to uid 10001) so the gateway can
     # write logs/ingest.{log,json} and Alloy can tail logs/ingest.json for Loki (REQ-OBS-007).
     - /var/iri/ingest/log:/app/logs

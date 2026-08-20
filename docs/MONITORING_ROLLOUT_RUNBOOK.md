@@ -392,24 +392,49 @@ GRANT pg_monitor TO monitoring;
 
 ### 4.2 Redis ACL file `/var/iri/redis/users.acl`
 
-A dedicated **read-only monitoring** user. **Do NOT add a `default` user line** — omitting it leaves
-the existing `--requirepass` governing the `default` user the apps use. The monitoring user must be
-able to run only introspection commands and **must not** be able to read arbitrary keys: the session
-store holds OAuth2 **refresh tokens**.
+Two entries: the `default` user the apps authenticate as, and a dedicated **read-only monitoring**
+user. The monitoring user must be able to run only introspection commands and **must not** be able to
+read arbitrary keys: the session store holds OAuth2 **refresh tokens**.
 
+> ⚠️ **The `default` line is mandatory — an earlier revision of this section said the opposite.**
+> It claimed that omitting `default` leaves `--requirepass` in charge. It does not. Once
+> `--aclfile` is in play the file becomes the source of truth for **every** user including
+> `default`, and a file without a `default` entry makes Redis reset it to `nopass ~* &* +@all` at
+> load — silently overriding `--requirepass` and leaving the whole session store, refresh tokens
+> included, readable and writable with **no authentication** on the internal network. Production
+> shipped exactly that until it was caught on 2026-07-10; the rationale now lives next to the
+> `redis` service in `docker-compose.yml`. If you provisioned this file from the old wording,
+> check it before anything else:
+>
+> ```bash
+> sudo grep -c '^user default ' /var/iri/redis/users.acl   # must be 1, not 0
+> ```
+>
 > **This file MUST exist before the deploy that adds `--aclfile`.** If Redis starts with `--aclfile`
 > pointing at a missing/invalid file, prod Redis fails to start, the deploy health-gate trips, and the
 > app deploy rolls back. Create the file now.
 
 ```bash
 sudo mkdir -p /var/iri/redis
-# Canonical oliver006/redis_exporter monitoring ACL (README). Replace REDIS_EXPORTER_PASSWORD with the
-# real password (same value goes into .env as REDIS_EXPORTER_PASSWORD).
-sudo tee /var/iri/redis/users.acl >/dev/null <<'EOF'
+# `default` MUST come first and MUST carry the same password as REDIS_PASSWORD in .env —
+# read it straight out of the file so it cannot drift and does not enter shell history.
+# Then the canonical oliver006/redis_exporter monitoring ACL (README).
+sudo sh -c 'printf "user default on >%s ~* \&* +@all\n" \
+    "$(grep -E "^REDIS_PASSWORD=" /var/iri/code/.env | cut -d= -f2-)" \
+    > /var/iri/redis/users.acl'
+sudo tee -a /var/iri/redis/users.acl >/dev/null <<'EOF'
 user monitoring on >REDIS_EXPORTER_PASSWORD -@all +@connection +@read +client +config|get +info +latency +slowlog +memory +cluster|info +cluster|slots +cluster|nodes +xinfo +pfcount -keys sanitize-payload
 EOF
 sudo chmod 640 /var/iri/redis/users.acl
+
+# The file is bind-mounted read-only into the container, so the redis process must be able to
+# read it as its own uid — and it cannot chown a `:ro` mount to fix that itself.
+sudo chown -R 999:999 /var/iri/redis
 ```
+
+> **Rotating `REDIS_PASSWORD` now means editing two places.** The `default` line in this file and
+> `REDIS_PASSWORD` in `.env` must stay identical; changing only one locks every app out of the
+> session store at the next restart.
 
 Then replace the placeholder with the actual password (kept out of shell history via a heredoc edit):
 

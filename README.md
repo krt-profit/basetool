@@ -289,6 +289,9 @@ The frontend hand-mirrors the backend's DTOs as its own records (no shared modul
 | `IRI_BASETOOL_VERSION`                  | Image tag pulled by the compose stack (`testing` on a non-production host).                                      | `stable`                                         |
 | `IRI_KEYCLOAK_HOSTNAME`                 | Public Keycloak hostname (`KC_HOSTNAME`). Only for a non-production domain; set with the next var or not at all. | `keycloak.profit-base.online`                    |
 | `IRI_KEYCLOAK_ISSUER_URI`               | Issuer the three apps validate against. Must match `IRI_KEYCLOAK_HOSTNAME` (REQ-OPS-022).                        | `https://keycloak.profit-base.online/realms/iri` |
+| `IRI_KEYCLOAK_HOST_ALIAS`               | `name:ip` entry so the apps resolve the public Keycloak name to the local proxy where NAT does not hairpin.      | `localhost:127.0.0.1` (no-op)                    |
+| `IRI_EXTRA_JAVA_OPTS`                   | Appended to `JAVA_TOOL_OPTIONS`; used to select a non-default trust store where the issuer is self-signed.       | *(empty)*                                        |
+| `IRI_TRUSTSTORE_HOST_PATH`              | Host path mounted at `/run/secrets/truststore.p12`. Build it from the JVM anchors plus your cert.                | same file as the keystore                        |
 | `IRI_KEYSTORE_HOST_PATH`                | Host path of `keystore.p12`, bind-mounted read-only into backend + frontend.                                     | `./keystore.p12`                                 |
 | `REDIS_PASSWORD`                        | Password for the Redis session store.                                                                            | *(required)*                                     |
 | `HOST_IP`                               | Deployment host IP the compose stack binds outbound services to.                                                 | *(required)*                                     |
