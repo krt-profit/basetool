@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der Dev- und E2E-Stack startete sein Backend nicht mehr.** Seit v1.5.55 setzte das Dev-Profil den JWKS-Schlüssel unter Springs eigenem Namensraum mit leerem Standardwert; Spring wertet leer nicht als „nicht gesetzt", sondern bricht den Start mit `jwkSetUri cannot be empty` ab. Der Backend-Container wurde nie gesund, damit kam der gesamte E2E-Stack nicht hoch und jeder Testlauf scheiterte an der Stack-Bereitstellung statt an seiner eigenen Prüfung. Der Schalter liegt jetzt wie in der Produktion auf `app.security.jwt.jwk-set-uri`, wo leer wieder „aus" bedeutet. Produktion war nie betroffen (REQ-SEC-024).
+
 ## [v1.5.55](https://github.com/krt-profit/basetool/releases/tag/v1.5.55) - 2026-08-19
 
 ### Added
