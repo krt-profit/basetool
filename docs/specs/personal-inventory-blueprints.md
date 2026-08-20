@@ -21,8 +21,9 @@ previous table layout is preserved.
 
 The page head keeps the greeting plus a facts subtitle ("N Blueprints · M mit Notiz") and carries
 a compact **add bar**: the typeahead search (staged selections render as compact chips under the
-bar; the "Hinzufügen" CTA stays disabled until something is staged) and the **JSON import**
-button. The PI tabs (Items | Blueprints) render as a `.tab-nav` with a `.tab-count`.
+bar; the "Hinzufügen" CTA stays disabled until something is staged), the **JSON import**
+button and the **SC Extractor release link** (REQ-INV-038). The PI tabs (Items | Blueprints)
+render as a `.tab-nav` with a `.tab-count`.
 
 The collection renders as `.master-detail`: left a filterable `.master-list` (one input doubles
 as instant client-side row filter and — on submit — the existing `?q=` server filter), one
@@ -485,3 +486,39 @@ removable owned blueprints of **every** user at once — a maintenance/reset too
 [`PersonalBlueprintRepository#deleteAllRemovable`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
 [`AdminPersonalBlueprintsPageController#deleteAllUsers`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/controller/AdminPersonalBlueprintsPageController.java),
 [`admin-personal-blueprints-purge.js`](../../frontend/src/main/resources/static/js/admin-personal-blueprints-purge.js).
+
+### REQ-INV-038 — SC Extractor release link in the add bar
+
+The JSON import (REQ-INV-021) consumes an export the member has to produce with the desktop
+**Basetool SC Extractor** first, so the add bar carries the way to obtain that tool directly next
+to the import trigger it feeds — a member who has no extractor yet no longer has to leave the tool
+and search for it.
+
+- Renders as `<a id="krt-bp-extractor-link" class="btn btn-ghost">` with the `#krt-icon-download`
+  glyph, placed **immediately after** the "JSON importieren" button and before the delete-all
+  danger control, so import and "get the importer" read as one pair.
+- Targets GitHub's canonical latest-release redirect
+  `https://github.com/krt-profit/basetool-sc-extractor/releases/latest`, so it never has to be
+  bumped per release. The URL is hardcoded in the template, matching the existing external-link
+  pattern of [`fragments/footer.html`](../../frontend/src/main/resources/templates/fragments/footer.html)
+  (handbook / repository links) — no configuration property, no backend round-trip.
+- Opens in a new tab (`target="_blank"` with `rel="noopener noreferrer"`), so the collection, the
+  staged selection and any open detail pane survive the click.
+- Lives in the page chrome **outside** the swapped `#krt-bp-list` fragment, so it is unaffected by
+  every batch-add / import / remove re-render (REQ-FE-005). It carries no state and triggers no
+  mutation, so there is nothing to live-update and nothing to audit.
+- Label and tooltip come from the **shared** bundle keys `scExtractor.download.button` /
+  `.title` (DE + EN) rather than a page-scoped key: the refinery create page carries the same
+  control next to its screenshot import (`REQ-REFINERY-019`,
+  [`refinery-screenshot-import.md`](refinery-screenshot-import.md)), and the two must not
+  drift apart in wording or target URL.
+
+**Acceptance criteria:**
+
+- [ ] The Blueprints page renders the link in the add bar directly after the JSON import button,
+  pointing at the extractor repository's `releases/latest` URL.
+- [ ] The link opens in a new tab and carries `rel="noopener noreferrer"`.
+- [ ] After an in-place list re-render the link is still present and unchanged.
+
+**Code links:** [`personal-inventory-blueprints.html`](../../frontend/src/main/resources/templates/personal-inventory-blueprints.html),
+[`PersonalInventoryBlueprintsPageControllerMvcTest`](../../frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/controller/PersonalInventoryBlueprintsPageControllerMvcTest.java).

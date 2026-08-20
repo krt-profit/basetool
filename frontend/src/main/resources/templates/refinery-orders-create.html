@@ -197,6 +197,21 @@
             <form id="refineryImportForm" class="no-track" th:action="@{/refinery-orders/import}" method="post" enctype="multipart/form-data">
                 <input type="file" id="refineryImportFile" name="file" accept=".json,application/json" hidden data-trigger="rfc-import-file" data-testid="refinery-import-file">
                 <button type="button" class="btn btn-outline" data-trigger="rfc-import-pick" data-testid="refinery-import-button" th:text="#{refineryImport.button}">Aus Screenshot-Extract importieren (JSON)</button>
+                <!-- The extract consumed above is produced by the desktop Basetool SC
+                     Extractor, so the way to obtain it sits next to the import trigger it
+                     feeds (REQ-REFINERY-019, twin of the Blueprints add bar's REQ-INV-038).
+                     It lives INSIDE the form because .import-extract-bar puts the flex row on
+                     the form, not the bar - a sibling of the form would drop out of the row.
+                     Points at GitHub's canonical "latest release" redirect and opens in a new
+                     tab, so a draft already flashed onto this page is never discarded. -->
+                <a id="refineryExtractorLink" class="btn btn-ghost"
+                   href="https://github.com/krt-profit/basetool-sc-extractor/releases/latest"
+                   target="_blank" rel="noopener noreferrer"
+                   data-testid="refinery-extractor-link"
+                   th:title="#{scExtractor.download.title}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-download"/></svg>
+                    <span th:text="#{scExtractor.download.button}">SC Extractor laden</span>
+                </a>
                 <span class="text-muted import-extract-help" th:text="#{refineryImport.help}">JSON-Datei aus dem Basetool SC Extractor wählen – das Formular wird vorbefüllt.</span>
             </form>
         </div>

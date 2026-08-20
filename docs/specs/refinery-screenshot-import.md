@@ -375,6 +375,41 @@ backend matching (REQ-REFINERY-004), the issue model (REQ-REFINERY-009), and cru
 saved exclusively through `POST /api/v1/refinery-orders` after the user reviews it. Direct
 ingest must never persist a refinery order without that human review-and-save step.
 
+### REQ-REFINERY-019 — SC Extractor release link in the create page's import bar
+
+The screenshot import (REQ-REFINERY-013) consumes an extract the user has to produce with the
+desktop **Basetool SC Extractor** first, so the import bar on `/refinery-orders/create` carries the
+way to obtain that tool directly next to the import trigger it feeds. This is the refinery-side twin
+of the Blueprints add bar's `REQ-INV-038`
+([`personal-inventory-blueprints.md`](personal-inventory-blueprints.md)); both surfaces share one
+message key and one URL.
+
+- Renders as `<a id="refineryExtractorLink" class="btn btn-ghost" data-testid="refinery-extractor-link">`
+  with the `#krt-icon-download` glyph, placed **immediately after** the
+  `refinery-import-button` trigger and before the `.import-extract-help` hint.
+- It renders **inside** `#refineryImportForm`, not as a sibling of the form: `.import-extract-bar`
+  puts the flex row on the *form*, so an element outside it drops out of the row. The anchor
+  submits nothing and reads nothing from the form.
+- Targets GitHub's canonical latest-release redirect
+  `https://github.com/krt-profit/basetool-sc-extractor/releases/latest`, hardcoded in the template
+  (same external-link pattern as `fragments/footer.html`) — no configuration property.
+- Opens in a new tab (`target="_blank"` with `rel="noopener noreferrer"`), so a draft already
+  flashed onto the page (REQ-REFINERY-014) is never discarded by the click.
+- Sits outside the swapped `#refineryImportFormContainer` fragment, alongside the file picker
+  (REQ-REFINERY-013), so the in-place import twin's re-render leaves it untouched.
+- Label and tooltip come from the shared bundle keys `scExtractor.download.button` / `.title`
+  (DE + EN), **not** from a page-scoped key — the same control exists on the Blueprints page.
+
+**Acceptance criteria:**
+
+- [ ] The create page renders the link inside the import form, directly after the import button,
+  pointing at the extractor repository's `releases/latest` URL.
+- [ ] The link opens in a new tab and carries `rel="noopener noreferrer"`.
+- [ ] After an in-place import re-render the link is still present and unchanged.
+
+**Enforced by:** `RefineryOrderCreateImportRenderTest#createPage_rendersScExtractorReleaseLink_besideTheImportButton`
+· **Code:** [`refinery-orders-create.html`](../../frontend/src/main/resources/templates/refinery-orders-create.html)
+
 ## Traceability
 
 - `RefineryImportServiceTest`, `RefineryImportControllerTest`,
@@ -397,7 +432,7 @@ ingest must never persist a refinery order without that human review-and-save st
 ## Out of scope
 
 - The desktop extractor's internals ([#436](https://github.com/krt-profit/basetool/issues/436),
-  shipped) — they live in the `basetool-bp-extractor` repo; this spec only governs the
+  shipped) — they live in the `basetool-sc-extractor` repo; this spec only governs the
   cross-repo contract and the basetool-side import behaviour.
 - Direct one-click ingest (the former deferred Phase 4, #437) is now its own epic #639,
   specced in [`desktop-ingest.md`](desktop-ingest.md) (`REQ-INGEST-*`, ADR-0018) and

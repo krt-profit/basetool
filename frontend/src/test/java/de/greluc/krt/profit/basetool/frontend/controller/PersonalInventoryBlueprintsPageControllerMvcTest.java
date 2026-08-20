@@ -182,6 +182,48 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
 
   @Test
   @WithMockUser
+  void view_rendersScExtractorReleaseLink_besideTheJsonImportTrigger() throws Exception {
+    // covers REQ-INV-038 — the add bar carries a link to the desktop SC Extractor's latest release
+    // next to the JSON import trigger it feeds, opened in a new tab with a safe rel.
+    PersonalBlueprintDto bp =
+        new PersonalBlueprintDto(
+            UUID.randomUUID(),
+            "arclight pistol",
+            "Arclight Pistol",
+            null,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            null,
+            true,
+            0L,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-01-01T00:00:00Z"));
+    PageResponse<PersonalBlueprintDto> page =
+        new PageResponse<>(List.of(bp), 0, 200, 1, 1, List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
+
+    mockMvc
+        .perform(get("/personal-inventory/blueprints"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("id=\"krt-bp-extractor-link\"")))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "href=\"https://github.com/krt-profit/basetool-sc-extractor/releases/latest\"")))
+        .andExpect(content().string(containsString("rel=\"noopener noreferrer\"")))
+        // The link belongs to the page chrome, not the swapped collection fragment, so it must sit
+        // ahead of the swap target in the document.
+        .andExpect(
+            result -> {
+              String html = result.getResponse().getContentAsString();
+              assertTrue(
+                  html.indexOf("krt-bp-extractor-link") < html.indexOf("id=\"krt-bp-list\""),
+                  "extractor link must render in the add bar, above the swapped collection list");
+            });
+  }
+
+  @Test
+  @WithMockUser
   void view_rendersCraftableOnlyFilter_nextToRefineryToggle() throws Exception {
     // covers REQ-INV-019 — the "show only craftable" view filter renders as a toggle inside the
     // craftability toolbar, alongside the refinery fold-in toggle, so a user can narrow the list to
