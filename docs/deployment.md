@@ -269,16 +269,30 @@ sudo install -m 0640 -o deploy -g docker /path/to/realm-export.json /var/iri/cod
 
 #### 5.4 GHCR pull token
 
-Generate a fine-grained PAT in GitHub:
-- Repository access: `krt-profit/basetool` only
-- Permissions: `Packages: Read` (no other scopes)
-- Expiry: 90 days (recommended — bounds leak exposure; fine-grained PATs must
-expire. A classic PAT can be non-expiring, but a token that never expires is
-valid forever if leaked, so prefer an expiry + rotation.)
+**This has to be a classic PAT.** GitHub Packages — the Container registry included —
+[supports only classic personal access tokens](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry):
+*"GitHub Packages only supports authentication using a personal access token (classic)."*
+A fine-grained token carries no scope that grants `ghcr.io` pull access, so `docker login`
+fails with `denied` however its permissions are set. (An earlier revision of this runbook
+said fine-grained — it was wrong, and the production host has always run a classic token.)
+
+Generate at *Settings → Developer settings → Personal access tokens → **Tokens (classic)***:
+- Scope: **`read:packages`** and nothing else — not `write:packages`, not `repo`
+- Expiration: 90 days. A classic PAT *can* be set to never expire; don't. A token that
+never expires is valid forever once leaked, and `deploy.sh` can warn ahead of a known
+expiry (see the `.expiry` sidecar below) but cannot warn about a leak.
+- If the organisation enforces SAML SSO, authorise the token for the org after creating it
+(*Configure SSO* next to the token), or every pull fails with `denied`.
+
+> A classic token's `read:packages` is **account-wide** — it can read every package the
+> account can see, not only this repository's. That is genuinely broader than a
+> repository-scoped fine-grained token would be, and there is no way around it while GHCR
+> refuses fine-grained tokens. Compensate with the short expiry above, and keep the file
+> `0600 deploy:deploy` so only the deploy user can read it.
 
 ```bash
-# Fine-grained PATs are prefixed `github_pat_` (NOT the classic `ghp_`).
-sudo install -m 0600 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token <<< 'github_pat_xxxxxxxx'
+# Classic PATs are prefixed `ghp_`. A fine-grained `github_pat_` token cannot pull from ghcr.io.
+sudo install -m 0600 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token <<< 'ghp_xxxxxxxx'
 
 # OPTIONAL, only if the token EXPIRES: record its expiry date so the deploy loop
 # warns ~2 weeks ahead instead of failing on expiry day (deploy.sh emits

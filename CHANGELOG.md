@@ -8,6 +8,10 @@
 
 - **Zwei neue optionale Umgebungsvariablen für Umgebungen unter eigener Domain: `IRI_KEYCLOAK_HOSTNAME` und `IRI_KEYCLOAK_ISSUER_URI`.** Damit läuft dasselbe ausgelieferte Config-Bundle unter einem anderen Hostnamen, was bisher an zwei fest verdrahteten Werten scheiterte. Beide sind entweder zusammen zu setzen oder gar nicht; ungesetzt greifen unverändert die Produktionswerte (REQ-OPS-022).
 
+### Fixed
+
+- **Das Deployment-Runbook verlangte für den GHCR-Pull-Token einen Fine-grained PAT — den GHCR gar nicht annimmt.** GitHub Packages unterstützt ausschließlich klassische Tokens; wer der Anleitung folgte, landete bei einem `denied` beim `docker login`, ohne dass am Token etwas falsch war. §5.4 nennt jetzt den Classic PAT mit `read:packages`, den nötigen SSO-Freigabeschritt und den Preis dieser Token-Art (kontoweiter Lesezugriff statt Repo-Beschränkung).
+
 ## [v1.5.57](https://github.com/krt-profit/basetool/releases/tag/v1.5.57) - 2026-08-20
 
 ### Added
