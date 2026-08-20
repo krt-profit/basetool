@@ -69,8 +69,9 @@ class ExternalContractTest {
   private record ContractOperation(String path, String method, Set<String> responseFields) {}
 
   /**
-   * The contract set as of the app's phase 1 (auth, terms gate, pending-approval screen, settings)
-   * — exactly the paths the API vhost allow-lists today.
+   * The contract set: the app's phase 1 (auth, terms gate, pending-approval screen, settings) plus
+   * what each later phase adds as it is actually consumed — exactly the paths the API vhost
+   * allow-lists.
    *
    * <p>Recorded from the generated document rather than hand-written, so the baseline is what the
    * server actually serves and not what someone believed it served.
@@ -95,7 +96,17 @@ class ExternalContractTest {
           new ContractOperation(
               "/api/v1/terms/document",
               "get",
-              Set.of("version", "title", "intro", "sections", "lastUpdated")));
+              Set.of("version", "title", "intro", "sections", "lastUpdated")),
+          // Phase 2, first entry: the app's org-unit switcher. It exists as a me-scoped endpoint
+          // rather than reusing GET /{id}/memberships precisely so that the public vhost never has
+          // to allow-list a path able to name another user. `isProfitEligible` is deliberately NOT
+          // frozen -- the app does not read it, and freezing a field nobody consumes buys the
+          // backend a constraint for nothing. Adding it later is one more deliberate edit, which
+          // is the process working rather than a gap.
+          new ContractOperation(
+              "/api/v1/users/me/memberships",
+              "get",
+              Set.of("orgUnitId", "orgUnitName", "orgUnitShorthand", "kind")));
 
   @Test
   @DisplayName("every operation a shipped client depends on is still served, with the same verb")
@@ -144,6 +155,10 @@ class ExternalContractTest {
   /**
    * Collects the property names of an operation's 2xx response body schema.
    *
+   * <p>Follows the schema's {@code $ref}, or — for a list endpoint — the {@code $ref} of its {@code
+   * items}. Without the second case every array-returning operation resolves to nothing, and an
+   * entry recording no fields would then pass this guard while proving nothing.
+   *
    * @param document the parsed API document
    * @param operation the contract operation to resolve
    * @return the property names, or an empty set when the response carries no body schema
@@ -161,7 +176,15 @@ class ExternalContractTest {
         continue;
       }
       for (Map.Entry<String, JsonNode> mediaType : content.properties()) {
-        JsonNode ref = mediaType.getValue().path("schema").get("$ref");
+        JsonNode schemaNode = mediaType.getValue().path("schema");
+        // A list endpoint's schema is `{"type": "array", "items": {"$ref": ...}}` — the fields a
+        // client reads are the ITEM's. Following only the top-level $ref made this helper return
+        // nothing for every array response, which for an operation with no recorded fields would
+        // have passed vacuously: the guard would have looked green while seeing nothing at all.
+        JsonNode ref = schemaNode.get("$ref");
+        if (ref == null) {
+          ref = schemaNode.path("items").get("$ref");
+        }
         if (ref == null) {
           continue;
         }

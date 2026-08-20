@@ -274,12 +274,20 @@ Paste it into the proxy host's **Advanced** field:
 # Matching the raw form would give the edge and the application two different views of the same
 # request, which is the class of bug REQ-SEC-029 exists to prevent.
 #
-# Grow this list one app phase at a time. Today it carries exactly what the app's phase 1 (auth,
-# terms gate, pending-approval screen, settings) calls, and nothing else.
+# Grow this list one app phase at a time, together with the REQ-API-009 contract set and the
+# ExternalContractTest entry — opening a family to the app and freezing its shape are the same
+# decision seen from two sides.
+#
+# EXACT paths under /api/v1/users/me, never the prefix: /api/v1/users/me/** would carry the payout
+# preference, the blueprint-sharing flag and the description write along with the reads the app
+# actually makes.
 set $krt_api_allowed 0;
 if ($uri ~ "^/api/v1/terms/")  { set $krt_api_allowed 1; }   # terms status + acceptance
 if ($uri ~ "^/api/v1/me/")     { set $krt_api_allowed 1; }   # active-org-unit, capabilities
 if ($uri = "/api/v1/users/me/registration-status") { set $krt_api_allowed 1; }
+# Phase 2 — the org-unit switcher. Deliberately NOT /api/v1/users/{id}/memberships: that one can
+# name another user, and this vhost is default-deny so that such a path never has to be on it.
+if ($uri = "/api/v1/users/me/memberships") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- Actuator: second layer --------------------------------------------------

@@ -63,7 +63,10 @@ changing it is still free.
 
 **The guard is honest about its reach.** `ExternalContractTest` reads the committed `openapi.json`
 — the artifact REQ-API-007 already keeps in sync — and catches a vanished operation, a changed verb
-and a dropped response field. It does **not** compare types, nullability or enum values. A field
+and a dropped response field. It follows the response schema's `$ref` **or, for a list endpoint,
+the `$ref` of its `items`**; that second case was added when phase 2 put the first array-returning
+operation in the set, and without it every list endpoint resolved to no fields at all — an entry
+recording none would then have passed while proving nothing. It does **not** compare types, nullability or enum values. A field
 that turns from string to object, or an enum that loses a constant, passes it and still breaks an
 old build. The real answer is a schema diff of the contract subset against the previous release
 tag, and that is the next step this ADR names rather than one it pretends to have taken.
