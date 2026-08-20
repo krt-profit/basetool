@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die Freigabe-Limits stehen in der Kontoansicht der Bank jetzt sichtbar über der Konto-Info.** Sie steckten bisher in der standardmäßig zugeklappten Kachel „Konto-Info", die sich nach jeder Buchung wieder schließt — ein Bankmitarbeiter musste also erst aufklappen, um die Grenzen zu sehen, gegen die er bucht. Sind Limits eingerichtet, zeigt die Kontoansicht sie jetzt als eigene Kachel; die Anzeige bleibt für alle schreibgeschützt, eingerichtet werden Limits weiterhin nur in der Org-Einheits-Bank (REQ-BANK-041).
+
+- **Die Sichtbarkeits-Einstellung eines Kontos benennt die Zielgruppe genauer.** Bei Staffel- und Bereichskonten heißt die Zeile jetzt „Alle Mitglieder der Org-Einheit" statt „Alle Mitglieder" — passend zum gleichnamigen Freigabe-Limit, denn die Freigabe greift nur für Mitglieder der besitzenden Org-Einheit. Bei Sonderkonten bleibt es „Alle Mitglieder", weil dort tatsächlich alle KRT-Mitglieder gemeint sind (REQ-BANK-035).
+
 ## [v1.5.55](https://github.com/krt-profit/basetool/releases/tag/v1.5.55) - 2026-08-19
 
 ### Added
