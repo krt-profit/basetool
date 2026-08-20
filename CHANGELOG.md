@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **„Meine Blueprints“ verlinkt jetzt den Basetool SC Extractor.** Neben „JSON importieren“ führt ein Knopf direkt zum neuesten Release der Desktop-App, die genau diese Export-Datei erzeugt — wer sie noch nicht hat, musste sie bisher außerhalb des Tools suchen. Der Link öffnet sich in einem neuen Tab, die Blueprint-Liste bleibt stehen (REQ-INV-038).
+
 ## [v1.5.56](https://github.com/krt-profit/basetool/releases/tag/v1.5.56) - 2026-08-20
 
 ### Changed

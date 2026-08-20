@@ -48,6 +48,18 @@
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-upload"/></svg>
                     <span th:text="#{personalInventory.blueprints.import.button}">JSON importieren</span>
                 </button>
+                <!-- Companion to the JSON import: the export consumed above is produced by the
+                     desktop Basetool SC Extractor, so the way to obtain it sits right next to the
+                     import trigger. Points at GitHub's canonical "latest release" redirect (the
+                     same hardcoded-external-link pattern the footer uses), opened in a new tab so
+                     the collection stays put (REQ-INV-038). -->
+                <a id="krt-bp-extractor-link" class="btn btn-ghost"
+                   href="https://github.com/krt-profit/basetool-sc-extractor/releases/latest"
+                   target="_blank" rel="noopener noreferrer"
+                   th:title="#{personalInventory.blueprints.extractor.title}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-download"/></svg>
+                    <span th:text="#{personalInventory.blueprints.extractor.button}">SC Extractor laden</span>
+                </a>
                 <!-- One-click clear of the caller's own (removable) blueprints (REQ-INV-023). Hidden
                      while the caller owns nothing removable (defaults stay non-removable); JS re-toggles
                      it on every list swap. Opens the danger confirm modal below. -->
