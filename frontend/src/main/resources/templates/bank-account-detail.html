@@ -86,10 +86,20 @@
         </div>
     </div>
 
-    <!-- Collapsible Konto-Info tile (REQ-BANK-017): account info + read-only approval limits as one
-         tile ABOVE the full-width booking history, collapsed by default — side by side there is not
-         enough horizontal room. Lives inside accountBody so a peer's limit write swaps it in on
-         refresh; a re-render resets it to collapsed, which matches the default. -->
+    <!-- Read-only approval-limit display (REQ-BANK-041): its OWN always-visible tile, deliberately
+         NOT inside the collapsed Konto-Info tile below. The backend assembles this surface's limits
+         with canEdit=false for every viewer, so the block renders for a plain Bankmitarbeiter too
+         whenever a limit is configured — and a bank employee books against exactly those ceilings,
+         so hiding them behind a tile that starts collapsed (and re-collapses on every accountBody
+         swap) buried the one figure they need. Configuring limits still happens exclusively in the
+         org-unit bank settings (REQ-BANK-041). -->
+    <th:block
+        th:replace="~{fragments/bank-approval-limits :: limitsDisplay(${detail.approvalLimits()})}"></th:block>
+
+    <!-- Collapsible Konto-Info tile (REQ-BANK-017): the account's master data as one tile ABOVE the
+         full-width booking history, collapsed by default — side by side there is not enough
+         horizontal room. Lives inside accountBody so a peer's write swaps it in on refresh; a
+         re-render resets it to collapsed, which matches the default. -->
     <div class="bank-panel mt-2" data-testid="bank-info-panel">
         <button type="button" class="bank-panel-head bank-collapse-head" data-trigger="bank-info-collapse"
                 aria-expanded="false" aria-controls="bank-info-body" data-testid="bank-info-toggle">
@@ -123,12 +133,6 @@
                 <span class="bank-kv-key" th:text="#{bank.detail.info.created}">Angelegt</span>
                 <span class="bank-kv-value"><span class="utc-time" th:text="${acct.createdAt()}">2026-01-15T10:00:00Z</span></span>
             </div>
-            <!-- Approval limits (REQ-BANK-041): read-only here for every viewer, now inside the
-                 Konto-Info tile. The backend always assembles them with canEdit=false, so the display
-                 block renders whenever a limit is set; configuring limits happens in the org-unit
-                 bank settings. -->
-            <th:block
-                th:replace="~{fragments/bank-approval-limits :: limitsDisplay(${detail.approvalLimits()})}"></th:block>
         </div>
     </div>
 

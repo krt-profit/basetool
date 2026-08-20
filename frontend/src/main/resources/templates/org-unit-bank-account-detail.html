@@ -200,9 +200,16 @@
                     </div>
                 </div>
 
-                <!-- All members -->
+                <!-- All members. The label names the audience the bucket actually admits, mirroring
+                     the approval-limit tier (REQ-BANK-035/-041): on an ORG_UNIT / AREA account the
+                     grant matches only a member of the OWNING org unit, so it reads "Alle Mitglieder
+                     der Org-Einheit"; on a Sonderkonto (SPECIAL, no owning unit) the same bucket
+                     admits every KRT member, so it keeps the org-wide "Alle Mitglieder". -->
                 <div th:if="${settings.allMembersSupported()}" class="vis-row">
-                    <span class="v-label" th:text="#{bank.orgUnit.settings.visibility.allMembers}">Alle Mitglieder der Org-Einheit</span>
+                    <span class="v-label" data-testid="org-unit-vis-all-members-label"
+                          th:text="${settings.type() == 'SPECIAL'}
+                                   ? #{bank.orgUnit.settings.visibility.allMembers}
+                                   : #{bank.orgUnit.settings.visibility.allMembers.orgUnit}">Alle Mitglieder der Org-Einheit</span>
                     <span class="vis-state">
                         <span th:if="${settings.allMembersGranted()}" class="chip chip--success"
                               th:text="#{bank.orgUnit.settings.visibility.granted}">Freigegeben</span>

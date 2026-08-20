@@ -580,9 +580,11 @@ in `messages.properties` / `_de` / `_en` under new `bank.*`, `admin.bank.*` and
 > Notiz + Begründung columns; a booking that carries a reason and/or note becomes an **expandable
 > row** — a leading chevron (`.bank-chevron`, rotated on `aria-expanded`) marks it, and clicking the
 > row (or the `.bank-row-toggle` keyboard control) reveals an inline **detail sub-row** with the
-> Begründung **first**, then the Notiz. On the bank-staff detail the **Konto-Info** panel (plus the
-> read-only approval limits) becomes a **collapsible tile above** the now full-width history
+> Begründung **first**, then the Notiz. On the bank-staff detail the **Konto-Info** panel becomes a
+> **collapsible tile above** the now full-width history
 > (`.bank-collapse-head`, collapsed by default) — there is not enough horizontal room side by side.
+> (**Superseded in part (owner decision):** the read-only approval limits were originally nested
+> *inside* that tile and are now their own always-visible tile above it — see REQ-BANK-041.)
 > Both toggles are CSP-safe, document-delegated in `bank.js` (survive the `krtFetch` fragment swap),
 > and every new string is a `bank.*` key (`bank.detail.toggleDetails`, the renamed
 > `bank.booking.counterparty` = "Quell-/Zielkonto").
@@ -1388,6 +1390,17 @@ users who would not otherwise see it, via additive `bank_account_view_grant` row
 > member), distinct from the `ALL_MEMBERS` bucket which on an AREA account means only the Bereich's
 > **direct** members (the Bereichsleitung). The new value extends the shared `BankAccountViewGranteeKind`
 > enum, so it applies to visibility grants **and** approval limits alike (V202).
+>
+> **Amended (owner decision) — the all-members bucket is labelled by the audience it actually admits.**
+> The `ALL_MEMBERS` row of the Sichtbarkeit editor now picks its label from the account type instead
+> of using one string for every account. On an `ORG_UNIT` / `AREA` account the grant matches only a
+> member of the account's **owning** org unit, so it reads "Alle Mitglieder der Org-Einheit"
+> (`bank.orgUnit.settings.visibility.allMembers.orgUnit`) — the same wording the approval-limit tier
+> of REQ-BANK-041 carries. On a **Sonderkonto** (`SPECIAL`, no owning unit) the very same bucket
+> admits **every KRT member**, so it keeps the org-wide "Alle Mitglieder"
+> (`bank.orgUnit.settings.visibility.allMembers`). The two keys stay separate — a single shared
+> string cannot be correct for both audiences, which is exactly why REQ-BANK-041 gave the limit tier
+> its own key in the first place.
 
 A grant grants *view* only — booking stays a bank-staff surface (REQ-BANK-008/-010). View grants are
 distinct from the bank-staff capability `bank_account_grant`. Toggling a grant is an idempotent
@@ -1399,7 +1412,7 @@ configurable (Staffel/SK/Bereich/Sonderkonto), without being the responsible hol
 (always all-members) and `CARTEL_BANK` (internal) audiences stay fixed (REQ-BANK-037) — there is nothing
 to configure there, not even for an admin.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (canView per type: oversight / membership-role grant / all-members / individual / global-role for SPECIAL; admin override), `OrgUnitBankPageControllerMvcTest` · **Code:** `model/BankAccountViewGrant`, `repository/BankAccountViewGrantRepository`, `service/OrgUnitBankAccessService`, `controller/OrgUnitBankController`, `db/migration/V189`, frontend `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` (canView per type: oversight / membership-role grant / all-members / individual / global-role for SPECIAL; admin override), `OrgUnitBankPageControllerMvcTest`, `OrgUnitBankVisibilityAudienceLabelMvcTest` (the all-members label names the org unit on ORG_UNIT/AREA and stays org-wide on SPECIAL) · **Code:** `model/BankAccountViewGrant`, `repository/BankAccountViewGrantRepository`, `service/OrgUnitBankAccessService`, `controller/OrgUnitBankController`, `db/migration/V189`, frontend `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
 ### REQ-BANK-036 — Balance target ("Kontostandsziel")
 
@@ -1604,8 +1617,10 @@ matches both `MEMBERSHIP_ROLE` and `ALL_MEMBERS` and receives the *larger* of th
 all-members value acts as a **floor** under every role tier rather than as a fallback below them.
 `ALL_MEMBERS` binds **only an actual member of the account's owning org unit** — hence its UI label
 **"Alle Mitglieder der Org-Einheit"** (`bank.approvalLimit.tier.allMembers`, a key of its own: the
-visibility editor's `ALL_MEMBERS` bucket keeps the plain "Alle Mitglieder" label because on a
-`SPECIAL` account it means *all KRT members*, and the two must not share a string). An outsider
+visibility editor's `ALL_MEMBERS` bucket carries the plain "Alle Mitglieder" label wherever it means
+*all KRT members* — a `SPECIAL` account — and the two must not share a string. Since the REQ-BANK-035
+amendment the visibility bucket picks the org-unit wording on `ORG_UNIT`/`AREA` accounts from its own
+third key, so the labels now agree wherever the audiences do). An outsider
 holding only a per-user view grant is request-eligible (REQ-BANK-039) but matches no membership
 tier, so they fall through to *approval required* unless they hold their own `USER` limit.
 (Resolution mirrors the visibility model's
@@ -1623,6 +1638,12 @@ account-detail page, alongside the visibility settings). The **bank-staff accoun
 never offers the editor: the backend assembles that surface's limits with `canEdit = false`
 unconditionally (`BankAccountService#getAccountDetail`). Limits are thus shown read-only in both
 account-detail surfaces to everyone who may open them, and set/cleared only in the org-unit bank.
+**"Every viewer" explicitly includes a plain Bankmitarbeiter** — they book against exactly these
+ceilings, so the box carries **no management-only gate** on that surface, and it renders as its
+**own always-visible tile** above the collapsible Konto-Info panel rather than nested inside it
+(amending the REQ-BANK-017 placement): the Konto-Info tile is `hidden` by default and re-collapses
+on every `accountBody` swap, which buried the one figure the employee needs behind a click they had
+no reason to make.
 Setting/clearing a limit is audited (`APPROVAL_LIMIT_SET` / `APPROVAL_LIMIT_CLEARED`).
 
 **Two-step approval.** When a request exceeds the requester's limit — **or when no limit applies to
@@ -1677,7 +1698,10 @@ all), `createBookingRequest_byResponsibleHolderAboveConfiguredLimit_stillNeedsNo
 confirm gate 409 + audit; pre-fill is UI-only), `OrgUnitBankControllerTest`,
 `BankAccountServiceTest` (the bank-staff detail surface assembles limits read-only — `canEdit`
 forced `false` even for management,
-`getAccountDetail_assemblesApprovalLimitsReadOnlyEvenForManagement`) · **Code:**
+`getAccountDetail_assemblesApprovalLimitsReadOnlyEvenForManagement`),
+`BankAccountDetailLimitsMvcTest` (the read-only box renders for `BANK_EMPLOYEE` and for
+`BANK_MANAGEMENT` alike, outside the collapsed Konto-Info tile, and survives the `accountBody`
+swap) · **Code:**
 `model/BankAccountApprovalLimit`,
 `repository/BankAccountApprovalLimitRepository`, `service/BankApprovalLimitService`,
 `service/OrgUnitBankAccessService`, `service/BankBookingRequestService`, `db/migration/V193`, frontend
