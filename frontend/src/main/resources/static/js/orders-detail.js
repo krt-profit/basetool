@@ -943,10 +943,12 @@ function _serializeEditForm() {
 })();
 
 // Re-render the material section in place (#575) after a claim create/edit/withdraw OR an
-// inventory unlink. The "Offen" open-amount + the per-row stock/status cells are backend-derived
-// and not returned per write, so a partial DOM patch would desync them — re-pull the whole table
-// fragment instead. MATERIAL orders render the requirement table on #order-materials-results,
-// ITEM orders the aggregated table on #order-aggregated-results; swap whichever exists.
+// inventory unlink. The MATERIAL table's "Offen" open-amount, the claim buttons' data-open max
+// (both tables — the aggregated ITEM table carries the remainder only there, having no "Offen"
+// column) and the per-row stock/status cells are backend-derived and not returned per write, so a
+// partial DOM patch would desync them — re-pull the whole table fragment instead. MATERIAL orders
+// render the requirement table on #order-materials-results, ITEM orders the aggregated table on
+// #order-aggregated-results; swap whichever exists.
 function _refreshMaterialsSection(orderId, broadcastOpts) {
     // Route through the order live-sync seam so a local claim/edit/unlink re-render also broadcasts
     // materials/aggregated to peers viewing this order (REQ-FE-015). The seam swaps whichever of the

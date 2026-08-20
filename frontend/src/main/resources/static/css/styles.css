@@ -1041,11 +1041,17 @@ tbody tr:nth-child(even):hover {
 }
 
 /*
- * SK-order claim tables (orders-detail): the open-amount and its "Eintragen"
+ * SK-order claim tables (orders-detail): the cell content and its "Eintragen"
  * action share one flex row so every button's left edge lines up down the
- * column no matter how wide the amount text is (SCU decimals vs. piece counts
- * differ in width). The amount grows to fill, pushing each button to the same
+ * column no matter how wide the content is (SCU decimals vs. piece counts
+ * differ in width). The content grows to fill, pushing each button to the same
  * offset; the gap replaces the button's former left margin.
+ *
+ * Two fillers exist because the two order kinds put the action in different
+ * columns: the MATERIAL table keeps its "Offen" open-amount
+ * (.claim-open-amount), while the aggregated ITEM table dropped that column and
+ * hosts the action next to the claim chips (.claim-chips) instead - there,
+ * "Offen" contradicted the manufacturing-reduced "Gesamtmenge" (REQ-ORDERS-026).
  */
 .claim-open-cell {
     display: flex;
@@ -1053,7 +1059,8 @@ tbody tr:nth-child(even):hover {
     gap: 0.5rem;
 }
 
-.claim-open-cell .claim-open-amount {
+.claim-open-cell .claim-open-amount,
+.claim-open-cell .claim-chips {
     flex: 1 1 auto;
 }
 
@@ -1225,6 +1232,43 @@ tbody tr:nth-child(even):hover {
     width: 7rem;
     min-width: 7rem;
     max-width: 7rem;
+}
+
+/*
+ * Both parts above are fixed-width and non-shrinkable, so a .datetime-split-group
+ * cannot render narrower than 10.5rem + --space-2 + 7rem = 18rem. A multi-column
+ * `.form-row` hands out a smaller per-column floor (`.form-row > .form-group` on
+ * mission-detail declares 250px), and wherever a column actually lands below 18rem
+ * the parts simply spill out of it -- swallowing the row's column gap and overrunning
+ * the container's padding. Measured case: the two groups in the 600px .krt-modal--wide
+ * participant modal get ~275px each, so the time part overflows by ~13px and "Endzeit"
+ * ends up 3px from the modal border, at every desktop width.
+ *
+ * Declaring the real floor makes the row WRAP instead of overflow: where there is
+ * room the groups stay side by side, otherwise they fall onto their own full-width
+ * line. min() caps the floor at the line width so a narrow (mobile) container still
+ * shrinks rather than overflowing. The `.form-group` qualifier is what outranks the
+ * page-level `.form-row > .form-group` floor, which is declared later in the cascade.
+ *
+ * The rule is deliberately NOT scoped to .krt-modal: it states the widget's real
+ * minimum, so any multi-column row gets it. On the mission Verwaltung form -- the
+ * other multi-column user of this widget -- it is a no-op today: that row already
+ * keeps two groups per line at >= 18rem each across 1280-1800px, measured, and it
+ * did so before this rule too. It is guarding against a future narrower row there,
+ * not fixing a present defect.
+ */
+.form-row > .form-group.datetime-split-group {
+    min-width: min(18rem, 100%);
+}
+
+/*
+ * A wrapped datetime line must keep the standard field rhythm: .form-group already
+ * carries margin-bottom: 1.25rem, so the row's own gap would stack on top of it and
+ * open a 36px hole between "Startzeit" and "Endzeit". Zero the ROW gap only -- the
+ * column gap that separates two side-by-side groups stays untouched.
+ */
+.form-row:has(> .form-group.datetime-split-group) {
+    row-gap: 0;
 }
 
 @media (width <= 768px) {

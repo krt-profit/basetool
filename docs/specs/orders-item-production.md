@@ -265,14 +265,26 @@ Items* section rather than a separate production section. Requesters/read-only v
 status columns without the chevron, demand sub-row or button.
 
 **Aggregierte-Materialien-Spalten.** The *Aggregierte Materialien* pane lists, per material+quality
-bucket, *Material*, *Qualität*, *Gesamtmenge* (required), **_Vorhanden_**, and — for SK-public
-orders only — the claim columns *Eingetragen* (Σ claims) and *Offen* (`totalQuantity − Σ claims`).
-*Vorhanden* sits **between *Gesamtmenge* and *Eingetragen*** and shows the linked-inventory stock
-earmarked to the order for that material at or above the bucket's quality floor
-(`AggregatedMaterialDto.currentStock`, the same value the order-overview list renders as collection
-progress); it is always shown (strict-staffel and SK-public orders alike). The gap
-*Gesamtmenge − Vorhanden* is the still-to-procure amount and is distinct from the claim *Offen*,
-which is the amount squadrons have not yet signed up (eingetragen) for.
+bucket, *Material*, *Qualität*, *Gesamtmenge* (the outstanding requirement), **_Vorhanden_**, and —
+for SK-public orders only — the single claim column *Eingetragen* (Σ claims), which also hosts the
+*Eintragen* action. *Vorhanden* sits **between *Gesamtmenge* and *Eingetragen*** and shows the
+linked-inventory stock earmarked to the order for that material at or above the bucket's quality
+floor (`AggregatedMaterialDto.currentStock`, the same value the order-overview list renders as
+collection progress); it is always shown (strict-staffel and SK-public orders alike). The gap
+*Gesamtmenge − Vorhanden* is the still-to-procure amount.
+
+**This pane renders no *Offen* column** — unlike the MATERIAL requirement table, which keeps its
+*Offen* (`amount − Σ claims`). The two figures do not share a base here: `AggregatedMaterialDto`'s
+`openAmount` is `MaterialClaimService.requiredByBucket() − Σ claims`, i.e. derived from the **full**
+order requirement (a supply commitment is against the whole order, see `REQ-ORDERS-025` above),
+while *Gesamtmenge* is the **outstanding** demand of the not-yet-manufactured units. Side by side in
+one row they contradicted each other: as soon as production was booked, *Offen* exceeded
+*Gesamtmenge* — observed on a live order at `Offen` 71.52 SCU against a `Gesamtmenge` of 56.2 SCU
+with zero Eintragungen, which reads as "more open than is needed at all". On a MATERIAL order no
+such gap exists (`amount` is not manufacturing-reduced), so that table is unaffected. The claimable
+remainder is **not** dropped from the contract: `openAmount` still travels in the DTO, still gates
+the write server-side (no overclaim), and is still surfaced to the user as the claim modal's
+`Maximal verfügbar:` hint, fed by the `data-open` attribute on the *Eintragen* / edit controls.
 
 **Acceptance**
 
@@ -283,6 +295,9 @@ which is the amount squadrons have not yet signed up (eingetragen) for.
   and never sums SCU and pieces together.
 - [ ] The claims KPI tile renders only for an SK-public order (claims supported); a strict-staffel
   order omits it.
+- [ ] The *Aggregierte Materialien* pane of an SK-public order renders *Eingetragen* but **no**
+  *Offen* column, and the *Eintragen* action sits inside *Eingetragen*; the claim modal still offers
+  the full-requirement remainder as its maximum. The MATERIAL requirement table keeps its *Offen*.
 - [ ] The *Bestellte Items* tab shows the chevron/demand sub-row and the *Herstellung erfassen*
   button only for a LOGISTICIAN+ editor of an `ITEM` order; a read-only or requester viewer sees only
   the plain status columns (no separate *Herstellung* tab exists).
