@@ -577,7 +577,7 @@ x-backend: &backend-template
     # InitialRAMPercentage drops 50 -> 35 (717M): it must stay below the 57% max (1167M), and 717M sits
     # just above the 670M this JVM actually commits, so startup no longer pre-commits ~350M of heap the
     # service never touches. Keep Initial < Max on any change — an inverted pair fails the JVM start.
-    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=57.0 -XX:InitialRAMPercentage=35.0
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=57.0 -XX:InitialRAMPercentage=35.0 ${IRI_EXTRA_JAVA_OPTS:-}
   volumes:
     - /var/iri/backend/log:/app/logs
     # Production cert is on the host, never in the image. Default points at the
@@ -586,6 +586,14 @@ x-backend: &backend-template
     # `.env` overrides this to `/var/iri/secrets/keystore.p12`. The path is
     # resolved relative to the directory containing docker-compose.yml.
     - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+    # Trust anchors for OUTBOUND TLS (REQ-OPS-022). Spring Security fetches the OIDC metadata
+    # from KEYCLOAK_ISSUER_URI at startup with a plain RestTemplate, which uses the JVM DEFAULT
+    # trust store — NOT the SSL bundle above, which only covers the backend WebClient. Where the
+    # issuer sits behind a self-signed certificate, startup dies with "PKIX path building failed"
+    # and the health gate rolls the deploy back.
+    # Unset, this resolves to the SAME file as the keystore mount above, and with
+    # IRI_EXTRA_JAVA_OPTS empty nothing reads it — production is therefore unaffected.
+    - ${IRI_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
 
 x-redis: &redis-template
   # Same digest pin policy as the Postgres images. Refresh with
@@ -807,10 +815,18 @@ x-frontend: &frontend-template
     # max (at the old 50 it would be 640M == the max, an inverted/equal pair that makes the JVM refuse
     # to start or clamp), and sitting just under the measured commit avoids pre-committing dead
     # memory. See the JVM CONTAINER SIZING block above for the measured derivation.
-    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0 -XX:InitialRAMPercentage=35.0
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0 -XX:InitialRAMPercentage=35.0 ${IRI_EXTRA_JAVA_OPTS:-}
   volumes:
     - /var/iri/frontend/log:/app/logs
     - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+    # Trust anchors for OUTBOUND TLS (REQ-OPS-022). Spring Security fetches the OIDC metadata
+    # from KEYCLOAK_ISSUER_URI at startup with a plain RestTemplate, which uses the JVM DEFAULT
+    # trust store — NOT the SSL bundle above, which only covers the backend WebClient. Where the
+    # issuer sits behind a self-signed certificate, startup dies with "PKIX path building failed"
+    # and the health gate rolls the deploy back.
+    # Unset, this resolves to the SAME file as the keystore mount above, and with
+    # IRI_EXTRA_JAVA_OPTS empty nothing reads it — production is therefore unaffected.
+    - ${IRI_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
 
 x-ingest: &ingest-template
   # The desktop one-click ingest gateway (epic #639, ADR-0018) — the ONLY new internet-reachable
@@ -947,9 +963,17 @@ x-ingest: &ingest-template
     # above. InitialRAMPercentage stays 50 (256M): still below the 60% max (307M) — keep Initial < Max,
     # an inverted pair makes the JVM refuse to start — and it happens to match the 248M this service
     # actually commits, so the container pre-commits almost exactly what it needs.
-    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=60.0 -XX:InitialRAMPercentage=50.0
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=60.0 -XX:InitialRAMPercentage=50.0 ${IRI_EXTRA_JAVA_OPTS:-}
   volumes:
     - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+    # Trust anchors for OUTBOUND TLS (REQ-OPS-022). Spring Security fetches the OIDC metadata
+    # from KEYCLOAK_ISSUER_URI at startup with a plain RestTemplate, which uses the JVM DEFAULT
+    # trust store — NOT the SSL bundle above, which only covers the backend WebClient. Where the
+    # issuer sits behind a self-signed certificate, startup dies with "PKIX path building failed"
+    # and the health gate rolls the deploy back.
+    # Unset, this resolves to the SAME file as the keystore mount above, and with
+    # IRI_EXTRA_JAVA_OPTS empty nothing reads it — production is therefore unaffected.
+    - ${IRI_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
     # Log dir mounted like backend/frontend (host dir pre-chowned to uid 10001) so the gateway can
     # write logs/ingest.{log,json} and Alloy can tail logs/ingest.json for Loki (REQ-OBS-007).
     - /var/iri/ingest/log:/app/logs
