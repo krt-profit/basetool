@@ -293,6 +293,13 @@ if ($uri = "/api/v1/users/me/registration-status") { set $krt_api_allowed 1; }
 # Phase 2 — the org-unit switcher. Deliberately NOT /api/v1/users/{id}/memberships: that one can
 # name another user, and this vhost is default-deny so that such a path never has to be on it.
 if ($uri = "/api/v1/users/me/memberships") { set $krt_api_allowed 1; }
+# Phase 2 — the Einsatz list. EXACT path, not the /api/v1/missions/ prefix: this allow-list matches
+# on the path and cannot see the verb, so a prefix would open every write under the family
+# (create, update, delete, participants, finance entries) the day it is pasted. The backend's
+# @PreAuthorize would still refuse them, but the vhost exists so that a second layer does not have
+# to be the only one. The app consumes /search alone today; the detail path joins this list when
+# the detail screen actually ships — one app phase at a time, as the note above says.
+if ($uri = "/api/v1/missions/search") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- Actuator: second layer --------------------------------------------------
@@ -317,6 +324,34 @@ proxy_set_header Forwarded         "";
 # families are opened, never globally.
 client_max_body_size 256k;
 ```
+
+### D.3a Growing the allow-list after the vhost is live
+
+**The block above is the source of truth; NPM holds a copy.** Adding a path here changes nothing in
+production until the whole Advanced block is pasted back into the proxy host and saved — there is no
+reconcile job and no drift alarm for it, so an app release whose new screen 404s against a vhost that
+was never updated is a failure mode with no signal at all.
+
+The safe order, and the reason for it:
+
+1. Merge the path here **and** into the `REQ-API-009` contract set + `ExternalContractTest` in the
+   same PR. Opening a family to the app and freezing its shape are the same decision seen from two
+   sides.
+2. Paste the block into **Clients → the proxy host → Advanced**, save.
+3. Verify from outside, not from the host — a hairpinned request does not prove what a phone sees:
+
+   ```bash
+   curl -s -o /dev/null -w '%{http_code}
+   ```
+
+' https://api.profit-base.online/api/v1/missions/search
+
+```
+
+**401 is the pass.** It means the path reached the backend and was refused for want of a token.
+**404 means the allow-list still denies it** — the paste did not take. Any 2xx would mean an
+unauthenticated read, which is a different and much worse problem.
+4. A path that is no longer consumed comes back **out** on the same terms.
 
 The edge per-IP rate limiter needs no entry here: `docker/maintenance/nginx/server_proxy.conf` is
 included into **every** proxy host's server block, so the 20 r/s (burst 80) safety net of
