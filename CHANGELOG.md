@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.5.61](https://github.com/krt-profit/basetool/releases/tag/v1.5.61) - 2026-08-21
+
 ### Changed
 
 - **Die Einsatzsuche der API gehört jetzt zum eingefrorenen Vertrag für ausgelieferte Clients.** `GET /api/v1/missions/search` steht im REQ-API-009-Vertragssatz und auf der Allowlist des API-vhosts, damit die Android-App sie erreicht — als exakter Pfad, nicht als Präfix, weil die Allowlist die HTTP-Methode nicht sieht. Der Vertrags-Guard prüft bei paginierten Antworten jetzt beide Ebenen; bisher hätte er nur den Umschlag eingefroren und ein entferntes Zeilenfeld wäre unbemerkt durchgegangen. Der vhost braucht dafür einen manuellen Konfigurationsschritt (Runbook § D.3a).
