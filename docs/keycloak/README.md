@@ -278,8 +278,9 @@ script clamps and says so rather than failing.
   policy not attached — nothing to detach
 [2/5] client 'basetool-android' (prod redirect URIs)
   create clients — client created
-[3/5] marker role, audience mapper, offline_access
+[3/5] marker role, realm-role scope, audience mapper, offline_access
   create clients/<uuid>/roles — marker role created
+  create clients/<uuid>/scope-mappings/realm — realm roles granted to the client scope: KRT Member, Officer, Bank Employee, Bank Management
   create clients/<uuid>/protocol-mappers/models — audience mapper created
   delete clients/<uuid>/optional-client-scopes/<id> — offline_access withheld
 [4/5] client profile 'krt-mobile-dpop'
@@ -291,17 +292,38 @@ script clamps and says so rather than failing.
   the client and its refresh-only DPoP policy are in the intended state
 ```
 
-**The trap you will hit later.** Once the policy is attached, Keycloak refuses *every* admin edit
-to that client — including one made in the Admin Console, and including changes as harmless as the
-description:
+**The trap you will hit later.** Once the policy is attached, Keycloak refuses every write to the
+**client representation itself** — `PUT clients/{id}`, whether it comes from the script or from the
+Admin Console, and including changes as harmless as the description:
 
 ```
 Invalid client metadata: DPoP token is disabled [invalid_client_metadata]
 ```
 
-That message names DPoP for no apparent reason and does not mention the policy. The supported route
-is detach → edit → re-attach, which is exactly what re-running the script does: it detaches first,
-writes the client, and attaches again. Edit through the script rather than the console.
+That message names DPoP for no apparent reason and does not mention the policy. For that kind of
+edit the supported route is detach → edit → re-attach, which is exactly what re-running the script
+does.
+
+**But the lock is narrower than it looks, and assuming otherwise costs real work.** The policy hooks
+the client-update path only. The client's **sub-resources** are untouched by it — measured against
+Keycloak 26.7 with the policy attached (2026-08-21):
+
+|           Write, policy attached           |               Result                |
+|--------------------------------------------|-------------------------------------|
+| `PUT clients/{id}`                         | refused — `invalid_client_metadata` |
+| `POST clients/{id}/scope-mappings/realm`   | **succeeds**                        |
+| `DELETE clients/{id}/scope-mappings/realm` | **succeeds**                        |
+
+So a **role-scope change needs none of this machinery**: no detach, no re-attach, no script, and no
+`basetool-provisioner` — it is four clicks in the Admin Console (Clients → `basetool-android` →
+Client scopes → `basetool-android-dedicated` → Scope → Assign role), and the Console's own
+**Evaluate** tab renders the resulting token so the change can be verified without kcadm at all.
+That matters because the service account is deliberately deleted after every procedure: reading
+this section as "any edit needs the full dance" means re-creating a `manage-realm` identity by hand
+for a change that never needed one.
+
+Leave **Full scope allowed** off while doing it. Turning it on is the one Console switch that
+quietly undoes REQ-SEC-035 — it would hand the app every realm role including `Admin`.
 
 **Rollback.** Remove the two entries by name and, if the client itself should go, delete it. Both
 client-policy endpoints replace the whole realm-global list, so read the current list first and
