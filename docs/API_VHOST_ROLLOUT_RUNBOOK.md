@@ -1,5 +1,10 @@
 > **Doc type:** Living spec — the operator procedure for exposing `/api/v1` on its own public
-> vhost. Last reviewed: 2026-08-18.
+> vhost. Last reviewed: 2026-08-21.
+> **Status: phases A–G were executed on 2026-08-21** (D3/D4/D5). The vhost is live and the
+> audience gate is closed; the nightly `edge-deny-probe` sees `/actuator` answering 404 on the host
+> from outside the network. The procedure below stays as written — it is what a rebuild, a host
+> move or a second environment repeats, and phase F's "merging is not enabling" warning applies
+> again every time the monitoring config changes.
 > **Owner area:** OPS · **Related:** [ADR-0135](adr/0135-public-api-vhost-not-a-gateway.md),
 > [`ANDROID_API_EXPOSURE_PLAN.md`](ANDROID_API_EXPOSURE_PLAN.md) items **D3/D4/D5**,
 > [`MONITORING_ROLLOUT_RUNBOOK.md` Appendix C](MONITORING_ROLLOUT_RUNBOOK.md),
