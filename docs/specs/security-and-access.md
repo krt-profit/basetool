@@ -1428,8 +1428,11 @@ this policy.
 
 Realm changes implementing this MUST merge into the two client-policy lists rather than replacing
 them — both endpoints replace the realm-global list wholesale — and MUST apply the client
-configuration **before** attaching the policy, because Keycloak refuses every admin update to a
-client while the policy is attached.
+configuration **before** attaching the policy, because Keycloak refuses every write to the client
+**representation** (`PUT clients/{id}`) while the policy is attached. The lock stops there: the
+client's sub-resources, role scope mappings among them, stay writable with the policy in place
+(measured, Keycloak 26.7, 2026-08-21), so a REQ-SEC-035 scope change needs neither the detach dance
+nor the provisioning service account.
 
 **Acceptance**
 
