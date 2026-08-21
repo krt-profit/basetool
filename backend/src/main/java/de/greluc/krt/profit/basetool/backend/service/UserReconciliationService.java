@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.PartialRoleScopeProperties;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.time.Instant;
 import java.util.Collection;
@@ -104,6 +105,7 @@ public class UserReconciliationService {
   private final ApplicationEventPublisher eventPublisher;
   private final UserRegistrationService userRegistrationService;
   private final UserService userService;
+  private final PartialRoleScopeProperties partialRoleScopeProperties;
 
   /**
    * Reconciles the local user record with the supplied JWT — creates the row on first login,
@@ -115,12 +117,18 @@ public class UserReconciliationService {
    * default to "Guest" when the JWT carries none so an unconfigured Keycloak doesn't lock everyone
    * out.
    *
+   * <p>Roles are the one field this does not always write. A client whose realm-role claim is
+   * deliberately incomplete (REQ-SEC-036) leaves the stored set untouched, and the returned {@link
+   * ReconciledUser#effectiveRoles()} then carries the token's roles rather than the row's -- see
+   * the role branch below for why replacing the set from such a claim is a data loss rather than a
+   * narrowing.
+   *
    * @param jwt validated JWT from the resource server
-   * @return the managed (created or updated) user
+   * @return the managed (created or updated) user together with the roles authorising this request
    */
   @Transactional
   @NotNull
-  public User syncUser(@NotNull Jwt jwt) {
+  public ReconciledUser syncUser(@NotNull Jwt jwt) {
     final UUID finalUserId = userService.getUserIdFromJwt(jwt);
     String username = jwt.getClaimAsString("preferred_username");
 
@@ -188,13 +196,46 @@ public class UserReconciliationService {
       changed = true;
     }
 
-    // Sync Roles
+    // Sync Roles.
+    //
+    // The token's claim is authoritative for MOST clients and for none of them unconditionally.
+    // A client provisioned with `fullScopeAllowed: false` and a narrowed scope mints a token that
+    // describes a deliberately smaller member than the real one: the mobile client withholds
+    // `Admin` on purpose (REQ-SEC-035). Because this write REPLACES the stored set rather than
+    // merging into it, persisting such a claim lets whichever client a member happened to use last
+    // decide what the database says they are -- an administrator who opens the app would have
+    // `Admin` removed from their row, and every consumer that reads roles outside a request
+    // (scheduled tasks, notification targeting, roster views) would see the narrower set until
+    // their next web request put it back.
+    //
+    // So for a partial-scope client the stored set is left ALONE and the token's roles are used for
+    // this request only. The stored set stays maintained by the clients whose claim is complete and
+    // by the daily Admin-API pass (`syncUser(KeycloakUserDto)`), which reads the realm directly and
+    // is unaffected by any client's scope -- so the row still converges even for a member who only
+    // ever uses the app. REQ-SEC-036.
     Set<String> keycloakRoles = extractRolesFromJwt(jwt);
     Set<Role> localRoles = mapRoles(keycloakRoles);
+    final boolean roleClaimIsPartial =
+        partialRoleScopeProperties.isPartialRoleScopeClient(jwt.getClaimAsString("azp"));
 
-    if (!user.getRoles().equals(localRoles)) {
-      user.setRoles(localRoles);
-      changed = true;
+    // A brand-new row is an exception in the safe direction: there is no stored set to protect, and
+    // the alternative is persisting a member with no roles at all. The next complete-claim login or
+    // Admin-API pass widens it.
+    final boolean mayPersistRoles = !roleClaimIsPartial || created;
+
+    if (mayPersistRoles) {
+      if (!user.getRoles().equals(localRoles)) {
+        user.setRoles(localRoles);
+        changed = true;
+      }
+    } else if (!user.getRoles().equals(localRoles)) {
+      // REQ-OBS-004: the id, never the username -- preferred_username can be a real callsign.
+      log.debug(
+          "Role claim from partial-scope client not persisted for user {} (stored {} roles, token"
+              + " carried {})",
+          user.getId(),
+          user.getRoles().size(),
+          localRoles.size());
     }
 
     // Persist the Discord account link (auto-link, REQ-DATA-006) from the IdP-mapped token claim.
@@ -258,10 +299,10 @@ public class UserReconciliationService {
         eventPublisher.publishEvent(
             new DiscordRegistrationPendingEvent(saved.getId(), saved.getUsername()));
       }
-      return saved;
+      return new ReconciledUser(saved, localRoles);
     }
 
-    return user;
+    return new ReconciledUser(user, localRoles);
   }
 
   /**
@@ -527,6 +568,35 @@ public class UserReconciliationService {
    * @param droppedNames how many supplied Keycloak role names matched no local role
    */
   private record RoleMapping(@NotNull Set<Role> roles, boolean guestFallback, int droppedNames) {}
+
+  /**
+   * What one authentication reconciled: the managed row, and the roles that authorise <em>this</em>
+   * request.
+   *
+   * <p>The two are the same set for every client whose token carries the member's whole role list,
+   * and deliberately differ for a partial-scope one (REQ-SEC-036): there the row keeps the roles it
+   * had and {@link #effectiveRoles()} carries only what the token actually presented. Splitting
+   * them is what lets the mobile client be denied admin authority without its narrower view of the
+   * member being written down as the truth.
+   *
+   * @param user the created or updated {@code app_user} row; never {@code null}
+   * @param effectiveRoles the roles this request is authorised with -- the token's, mapped onto the
+   *     local catalogue, with the {@code Guest} fallback already applied; never {@code null}
+   */
+  public record ReconciledUser(@NotNull User user, @NotNull Set<Role> effectiveRoles) {
+
+    /**
+     * A reconciliation whose effective roles are simply the stored ones -- the shape every
+     * complete-claim client produces.
+     *
+     * @param user the row whose stored roles are also the effective ones
+     * @return the pair, with {@code effectiveRoles} taken from {@code user}
+     */
+    @NotNull
+    public static ReconciledUser of(@NotNull User user) {
+      return new ReconciledUser(user, user.getRoles());
+    }
+  }
 
   /**
    * Normalises a raw Discord guild-nickname claim for storage: trims it, maps blank/empty to {@code
