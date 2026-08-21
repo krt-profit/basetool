@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Spring Boot auf 4.1.1 angehoben (Wartungs-Release).** Es bringt unter anderem Spring Framework 7.0.9, Spring Security 7.1.1, Hibernate 7.4.5, Tomcat 11.0.24, Netty 4.2.17.Final und den PostgreSQL-Treiber 42.7.13 mit; die drei temporären CVE-Overrides für Tomcat, Netty und den PostgreSQL-Treiber entfallen damit, weil Spring Boot genau diese Versionen jetzt selbst ausliefert. Rein intern, keine Auswirkung auf die Oberfläche.
+
 ## [v1.5.58](https://github.com/krt-profit/basetool/releases/tag/v1.5.58) - 2026-08-20
 
 ### Added

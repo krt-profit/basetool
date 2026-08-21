@@ -186,50 +186,17 @@ subprojects {
       systemProperty("spring.profiles.active", "dev")
     }
 
-    // Security override for a Spring-Boot-BOM-managed transitive (so it lives here, not in
-    // versions.properties, which refreshVersions only owns for directly-declared coordinates).
-    // The Boot 4 BOM pins the PostgreSQL JDBC driver to 42.7.11, which is vulnerable to
-    // CVE-2026-54291 (CVSS >= 7.0): a `channelBinding=require` SCRAM handshake can be silently
-    // downgraded from SCRAM-SHA-256-PLUS to plain SCRAM-SHA-256 - losing the MITM protection the
-    // setting promises - when the server certificate's signature algorithm carries no
-    // tls-server-end-point channel-binding hash (Ed25519/Ed448/PQC). Fixed in 42.7.12. Overriding
-    // the Boot BOM `postgresql.version` property is the conflict-free path: io.spring.dependency-
-    // management emits the managed version as a `{strictly ...}` constraint, so a competing plain
-    // Gradle constraint would collide instead of winning. Remove once the Boot BOM ships
-    // >= 42.7.12 (the OWASP dependencyCheckAggregate gate will keep this honest either way).
-    // Boot 4.1.0 still manages 42.7.11, so the override stays; tracked forward to the current
-    // 42.7.x patch (42.7.13) rather than frozen at the minimum the CVE fix required.
-    extra["postgresql.version"] = "42.7.13"
-
-    // Second security override in the same vein: the Boot 4 BOM pins the embedded Tomcat to
-    // 11.0.23, which is flagged by CVE-2026-59083 (the RewriteValve decodes `+` to a space while
-    // rewriting a URI, so a security-constraint URL match can be bypassed in some configurations)
-    // and CVE-2026-59084 (EncryptInterceptor hardening). Apache rates both "Low", but the
-    // NVD/CISA auto-score is 9.1 CRITICAL, so both trip the `failBuildOnCVSS = 7.0` gate below.
-    // Both are fixed in 11.0.24 (affects 11.0.0-M1 to 11.0.23) — the latest 11.0.x on Maven
-    // Central and still on the 11.0.x line the Boot 4.1 BOM expects, so no 11.1.x jump. Same
-    // conflict-free mechanism as the PostgreSQL override: io.spring.dependency-management emits the
-    // Boot BOM `tomcat.version` property as a `{strictly ...}` constraint. Remove once the Boot BOM
-    // ships >= 11.0.24 (the OWASP dependencyCheckAggregate gate keeps this honest either way).
-    // Boot 4.1.0 still manages 11.0.22, so the override stays. This is the SINGLE owner of the pin:
-    // gradle.properties used to carry a competing (lower) `tomcat.version` that this line silently
-    // overrode — see the note there.
-    extra["tomcat.version"] = "11.0.24"
-
-    // Third security override in the same vein: the Boot 4.1 BOM pins Netty (via its
-    // `netty-bom` import) to 4.2.15.Final, which carries a July 2026 batch of CVEs including
-    // CVE-2026-56820 (OcspClient does not validate that the CertificateID in an OCSP response
-    // matches the requested CertificateID, allowing a replay/revocation-check bypass),
-    // CVE-2026-56819 (memory leak in the HTTP/2 codec) and CVE-2026-55833 (SPDY header-decoding
-    // DoS via compression-amplified CPU exhaustion) - all >= 7.0 CVSS. This Netty line is on
-    // real runtime classpaths (reactor-netty's WebClient in frontend, Lettuce's Redis client),
-    // unlike the keycloak-spi module's compile-only 4.1.x line (see the suppression file for
-    // that one - Quarkus/Vert.x pin it independently and it is never shipped). Fixed in
-    // 4.2.16.Final, released 2026-07-06 - same conflict-free `{strictly ...}` mechanism as the
-    // PostgreSQL/Tomcat overrides above. Remove once the Boot BOM ships >= 4.2.16.Final (the
-    // OWASP dependencyCheckAggregate gate keeps this honest either way). Boot 4.1.0 still manages
-    // 4.2.15.Final, so the override stays; tracked forward to the current 4.2.17.Final.
-    extra["netty.version"] = "4.2.17.Final"
+    // No Boot-BOM version override is needed on 4.1.1. This block used to carry three security
+    // overrides — PostgreSQL 42.7.13 (CVE-2026-54291 SCRAM channel-binding downgrade), Tomcat
+    // 11.0.24 (CVE-2026-59083 RewriteValve `+` decoding, CVE-2026-59084 EncryptInterceptor) and
+    // Netty 4.2.17.Final (CVE-2026-56820 OCSP CertificateID, CVE-2026-56819 HTTP/2 leak,
+    // CVE-2026-55833 SPDY decode DoS) — and the Boot 4.1.1 BOM now manages exactly those three
+    // versions itself, so all three `extra[...]` lines were dropped with the 4.1.0 -> 4.1.1 bump.
+    // When a future CVE needs pinning again, override the Boot BOM property right here (NOT in
+    // gradle.properties, whose value is loaded first and would be silently overridden, and not as
+    // a plain Gradle constraint): io.spring.dependency-management emits every managed version as a
+    // `{strictly ...}` constraint, so a competing constraint collides instead of winning. The
+    // OWASP `dependencyCheckAggregate` gate keeps the absence of an override honest either way.
   }
 
   // JaCoCo coverage. Both modules want the same setup: emit XML + CSV + HTML
