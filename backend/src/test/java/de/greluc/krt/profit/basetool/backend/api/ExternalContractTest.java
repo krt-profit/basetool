@@ -106,7 +106,37 @@ class ExternalContractTest {
           new ContractOperation(
               "/api/v1/users/me/memberships",
               "get",
-              Set.of("orgUnitId", "orgUnitName", "orgUnitShorthand", "kind")));
+              Set.of("orgUnitId", "orgUnitName", "orgUnitShorthand", "kind")),
+          // Phase 2, the Einsatz list. `/search` rather than the plain `/missions`: the app's chip
+          // row filters by text, status and date range, and the plain list takes only paging -- so
+          // filtering would have to happen on a page the server had already truncated. Deliberately
+          // the ONLY missions path in the set: the detail screen is not built yet, and opening a
+          // family before a client consumes it is exactly what ADR-0135 tells the allow-list not to
+          // do.
+          //
+          // Both levels are frozen. The envelope's `totalElements` is what the list states as its
+          // count, and the row fields are what a member actually reads; `size`, `sort`,
+          // `calendarLink` and `version` are left out because the app does not consume them, and
+          // freezing a field nobody reads buys the backend a constraint for nothing.
+          new ContractOperation(
+              "/api/v1/missions/search",
+              "get",
+              Set.of(
+                  "content",
+                  "page",
+                  "totalElements",
+                  "totalPages",
+                  "id",
+                  "name",
+                  "status",
+                  "meetingTime",
+                  "plannedStartTime",
+                  "actualStartTime",
+                  "plannedEndTime",
+                  "isInternal",
+                  "operation",
+                  "owningSquadron",
+                  "meetingPoint")));
 
   @Test
   @DisplayName("every operation a shipped client depends on is still served, with the same verb")
@@ -159,6 +189,12 @@ class ExternalContractTest {
    * items}. Without the second case every array-returning operation resolves to nothing, and an
    * entry recording no fields would then pass this guard while proving nothing.
    *
+   * <p>For a <strong>paged</strong> response it additionally descends into {@code content}'s item
+   * schema, so the recorded set spans the envelope and the rows. Stopping at the envelope would
+   * freeze {@code totalElements} and leave every field a member actually reads unguarded — dropping
+   * {@code name} from the row would break the Einsatz list in the field while this guard stayed
+   * green.
+   *
    * @param document the parsed API document
    * @param operation the contract operation to resolve
    * @return the property names, or an empty set when the response carries no body schema
@@ -193,10 +229,32 @@ class ExternalContractTest {
         JsonNode schemaProperties = schema == null ? null : schema.get("properties");
         if (schemaProperties != null) {
           properties.addAll(schemaProperties.propertyNames());
+          properties.addAll(pagedRowProperties(document, schemaProperties));
         }
       }
     }
     return properties;
+  }
+
+  /**
+   * Collects the property names of a paged envelope's row schema.
+   *
+   * <p>A {@code PageResponse} carries the rows under {@code content}; those properties are the ones
+   * a client reads item by item, and they are invisible to a resolver that stops at the envelope.
+   *
+   * @param document the parsed API document
+   * @param envelopeProperties the properties of the already-resolved response schema
+   * @return the row property names, or an empty set when the schema is not a paged envelope
+   */
+  private static Set<String> pagedRowProperties(JsonNode document, JsonNode envelopeProperties) {
+    JsonNode itemRef = envelopeProperties.path("content").path("items").get("$ref");
+    if (itemRef == null) {
+      return Set.of();
+    }
+    String rowName = itemRef.asString().substring(itemRef.asString().lastIndexOf('/') + 1);
+    JsonNode rowSchema = document.get("components").get("schemas").get(rowName);
+    JsonNode rowProperties = rowSchema == null ? null : rowSchema.get("properties");
+    return rowProperties == null ? Set.of() : new TreeSet<>(rowProperties.propertyNames());
   }
 
   /**

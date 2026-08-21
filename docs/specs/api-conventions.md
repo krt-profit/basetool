@@ -230,15 +230,16 @@ same change as the vhost allow-list that exposes those paths — and **only as a
 actually consumed**. Freezing an endpoint the client does not yet read would buy the backend a
 constraint for nothing and record a guess about which fields matter.
 
-|                 Operation                  |                 Response fields a client may rely on                 |
-|--------------------------------------------|----------------------------------------------------------------------|
-| `GET /api/v1/terms/status`                 | `accepted`, `currentVersion`                                         |
-| `POST /api/v1/terms/acceptance`            | `accepted`, `currentVersion`                                         |
-| `GET /api/v1/terms/document`               | `version`, `title`, `intro`, `sections`, `lastUpdated`               |
-| `GET /api/v1/me/active-org-unit`           | `orgUnitId`                                                          |
-| `GET /api/v1/me/capabilities`              | `canSeeBlueprintOverview`, `canViewJobOrders`, `canViewOwnJobOrders` |
-| `GET /api/v1/users/me/registration-status` | `approvalStatus`                                                     |
-| `GET /api/v1/users/me/memberships`         | `orgUnitId`, `orgUnitName`, `orgUnitShorthand`, `kind`               |
+|                 Operation                  |                                                                                            Response fields a client may rely on                                                                                            |
+|--------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `GET /api/v1/terms/status`                 | `accepted`, `currentVersion`                                                                                                                                                                                               |
+| `POST /api/v1/terms/acceptance`            | `accepted`, `currentVersion`                                                                                                                                                                                               |
+| `GET /api/v1/terms/document`               | `version`, `title`, `intro`, `sections`, `lastUpdated`                                                                                                                                                                     |
+| `GET /api/v1/me/active-org-unit`           | `orgUnitId`                                                                                                                                                                                                                |
+| `GET /api/v1/me/capabilities`              | `canSeeBlueprintOverview`, `canViewJobOrders`, `canViewOwnJobOrders`                                                                                                                                                       |
+| `GET /api/v1/users/me/registration-status` | `approvalStatus`                                                                                                                                                                                                           |
+| `GET /api/v1/users/me/memberships`         | `orgUnitId`, `orgUnitName`, `orgUnitShorthand`, `kind`                                                                                                                                                                     |
+| `GET /api/v1/missions/search`              | envelope `content`, `page`, `totalElements`, `totalPages`; row `id`, `name`, `status`, `meetingTime`, `plannedStartTime`, `actualStartTime`, `plannedEndTime`, `isInternal`, `operation`, `owningSquadron`, `meetingPoint` |
 
 `GET /api/v1/users/me/memberships` is the app's org-unit switcher (phase 2) and is a **me-scoped
 twin** of `GET /api/v1/users/{id}/memberships`, added rather than reusing the sibling: the vhost is
@@ -261,6 +262,9 @@ a subset of this set, and the two move together.
 - [x] Every listed operation exists in the committed `openapi.json` with its recorded verb, and no
   recorded response field has disappeared (`ExternalContractTest`).
 - [x] The set cannot be emptied to make the guard pass — its floor is asserted.
+- [x] A **paged** entry freezes both levels: the guard descends into `content`'s item schema, so
+  dropping a field a member actually reads cannot pass while only the envelope is checked. Verified
+  by removing the descent — three failures.
 - [ ] Type, nullability and enum changes are caught. **Open** — needs a schema diff of the contract
   subset against the previous release tag; the current guard sees structure, not types (ADR-0136).
 - [ ] A sunset can actually retire old builds. **Open** — depends on the minimum-app-version gate
