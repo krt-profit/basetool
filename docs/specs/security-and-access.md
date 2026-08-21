@@ -1636,6 +1636,56 @@ from the original registration.
 `ApprovalDecision#REOPENED`, `AdminDiscordRegistrationsPageController`, `discord-registrations.js`,
 `V233__allow_reopened_user_approval_decision.sql` · **Decision:** ADR-0140
 
+### REQ-SEC-035 — The mobile client's scope MUST carry the member realm roles, and MUST NOT carry `Admin`
+
+The Keycloak client `basetool-android` runs with `fullScopeAllowed: false`, so the realm roles its
+tokens carry are exactly the ones mapped onto its client scope. That list MUST be
+`KRT Member`, `Officer`, `Bank Employee`, `Bank Management`, and it MUST NOT contain `Admin`.
+
+Neither half is a matter of taste.
+
+**Why the member roles must be there.** The backend does not read the token's roles for
+authorization directly: `UserReconciliationService#syncUser` **replaces** the account's local role
+set from `realm_access.roles` on every authentication, falling back to `Guest` when the claim
+carries none, and `CustomJwtGrantedAuthoritiesConverter` then derives the request's authorities from
+that stored set. A client with no scope mappings therefore does not merely narrow what the app may
+do — it rewrites the member's row in the database, for the web app too. Measured on the test stack
+before this requirement existed: an account holding `Admin` + `Officer` + `KRT Member` was left
+holding `Guest` alone after one app login.
+
+**Why `Admin` must not be.** The admin area is permanently web-only, but `ADMIN` is not just a menu.
+`RequestScopeResolver#currentScopePredicate` grants an admin without an active-org-unit header
+`adminAllScope` — every org unit at once — and honours an admin's pin to a unit they do not belong
+to. The app has no screen designed around either. Withholding the role keeps that scope rule out of
+a client that cannot express it.
+
+**The residual this leaves.** Because the replacement is wholesale, an administrator who uses the
+app leaves their stored role set without `Admin` until their next request from the web client
+restores it. Per-request authorization is unaffected in both directions — each request's authorities
+are derived from the set written in that same call — but any consumer that reads roles outside a
+request (scheduled tasks, notification targeting, roster views) sees whichever client spoke last.
+This is tracked separately; it is narrower than the `Guest` demotion it replaces, not introduced by
+it.
+
+**Acceptance**
+
+- [x] The provisioning script grants the four member roles and takes back anything else on the
+  client scope, converging in both directions, so a role added by hand in the Admin Console does not
+  survive the next run.
+- [x] `--verify-only` fails when a member role is missing and when `Admin` is present, and each
+  message names the consequence rather than the symptom.
+- [x] Keycloak's own scope evaluation for the client returns `['KRT Member']` for a plain member and
+  `['KRT Member', 'Officer']` for an account that also holds `Admin` (measured against the test
+  stack's `iri` realm, Keycloak 26.7, 2026-08-21).
+- [x] The realm is checked for the role names before granting: a rename upstream fails the run
+  loudly instead of silently leaving the scope empty.
+
+**Enforced by:** `provision-keycloak-mobile-client.test.sh` section 7 · **Code:**
+`scripts/provision-keycloak-mobile-client.py` (`MEMBER_REALM_ROLES`, `FORBIDDEN_REALM_ROLE`,
+`upsert_realm_role_scope`), `UserReconciliationService#syncUser`,
+`CustomJwtGrantedAuthoritiesConverter` · **Decision:**
+[ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md)
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the
