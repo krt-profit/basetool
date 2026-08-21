@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.PartialRoleScopeProperties;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -94,6 +95,15 @@ class UserReconciliationServiceTest {
   private UserRegistrationService userRegistrationService;
   private UserReconciliationService userReconciliationService;
 
+  /**
+   * A real instance rather than a mock: it holds a list and answers one pure predicate, so stubbing
+   * it would only restate the production logic under test. Left empty by default so every
+   * pre-existing case keeps the complete-claim behaviour it was written for; the REQ-SEC-036 cases
+   * populate it explicitly.
+   */
+  private final PartialRoleScopeProperties partialRoleScopeProperties =
+      new PartialRoleScopeProperties();
+
   private static final UUID USER_ID = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
 
   @BeforeEach
@@ -114,7 +124,8 @@ class UserReconciliationServiceTest {
             defaultBlueprintProvisioningService,
             eventPublisher,
             userRegistrationService,
-            userService);
+            userService,
+            partialRoleScopeProperties);
     // The identity seam stays in UserService; reconciliation delegates the JWT-subject parse to it.
     lenient()
         .when(userService.getUserIdFromJwt(any(Jwt.class)))
@@ -184,7 +195,7 @@ class UserReconciliationServiceTest {
           .thenReturn(Optional.of(role(99L, "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(jwt);
+      User result = userReconciliationService.syncUser(jwt).user();
 
       assertEquals(USER_ID, result.getId());
       assertEquals("alice", result.getUsername());
@@ -210,7 +221,7 @@ class UserReconciliationServiceTest {
           .thenReturn(Optional.of(role(99L, "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(jwt);
+      User result = userReconciliationService.syncUser(jwt).user();
 
       assertSame(existing, result, "must reuse the looked-up legacy user");
     }
@@ -236,7 +247,7 @@ class UserReconciliationServiceTest {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
       when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
 
-      User result = userReconciliationService.syncUser(jwt);
+      User result = userReconciliationService.syncUser(jwt).user();
 
       assertSame(existing, result);
       verify(userRepository, never()).save(any(User.class));
@@ -294,7 +305,7 @@ class UserReconciliationServiceTest {
           .thenReturn(Optional.of(role(99L, "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(jwt);
+      User result = userReconciliationService.syncUser(jwt).user();
 
       // Even though every JWT claim is null and every field stays null,
       // changed==true via the role-sync block (empty Keycloak roles -> Guest)
@@ -352,7 +363,7 @@ class UserReconciliationServiceTest {
           .thenReturn(Optional.of(codeRole("GUEST", "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(discordJwt(true, List.of()));
+      User result = userReconciliationService.syncUser(discordJwt(true, List.of())).user();
 
       assertEquals(ApprovalStatus.PENDING, result.getApprovalStatus());
       assertEquals(DISCORD_ID, result.getDiscordUserId());
@@ -366,7 +377,7 @@ class UserReconciliationServiceTest {
           .thenReturn(Optional.of(codeRole("ADMIN", "Admin")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(discordJwt(true, List.of("Admin")));
+      User result = userReconciliationService.syncUser(discordJwt(true, List.of("Admin"))).user();
 
       assertEquals(ApprovalStatus.ACTIVE, result.getApprovalStatus());
       verify(eventPublisher, never()).publishEvent(any());
@@ -388,7 +399,7 @@ class UserReconciliationServiceTest {
           .thenReturn(Optional.of(codeRole("GUEST", "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(discordJwt(true, List.of()));
+      User result = userReconciliationService.syncUser(discordJwt(true, List.of())).user();
 
       assertEquals(USER_ID, result.getId());
       assertEquals(ApprovalStatus.PENDING, result.getApprovalStatus());
@@ -411,7 +422,7 @@ class UserReconciliationServiceTest {
           .thenReturn(Optional.of(codeRole("GUEST", "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(discordJwt(false, List.of()));
+      User result = userReconciliationService.syncUser(discordJwt(false, List.of())).user();
 
       assertEquals(ApprovalStatus.PENDING, result.getApprovalStatus());
       org.junit.jupiter.api.Assertions.assertNull(result.getDiscordUserId());
@@ -428,7 +439,7 @@ class UserReconciliationServiceTest {
           .thenReturn(Optional.of(codeRole("ADMIN", "Admin")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(discordJwt(false, List.of("Admin")));
+      User result = userReconciliationService.syncUser(discordJwt(false, List.of("Admin"))).user();
 
       assertEquals(ApprovalStatus.ACTIVE, result.getApprovalStatus());
       verify(eventPublisher, never()).publishEvent(any());
@@ -446,7 +457,7 @@ class UserReconciliationServiceTest {
           .thenReturn(Optional.of(codeRole("ADMIN", "Admin")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(discordJwt(false, List.of("Admin")));
+      User result = userReconciliationService.syncUser(discordJwt(false, List.of("Admin"))).user();
 
       assertEquals(ApprovalStatus.ACTIVE, result.getApprovalStatus());
       verify(eventPublisher, never()).publishEvent(any());
@@ -463,7 +474,7 @@ class UserReconciliationServiceTest {
           .thenReturn(Optional.of(codeRole("GUEST", "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(discordJwt(false, List.of()));
+      User result = userReconciliationService.syncUser(discordJwt(false, List.of())).user();
 
       assertEquals(ApprovalStatus.ACTIVE, result.getApprovalStatus());
       verify(eventPublisher, never()).publishEvent(any());
@@ -488,7 +499,7 @@ class UserReconciliationServiceTest {
               .claim("discord_guild_nickname", "  Vanguard Pilot  ")
               .build();
 
-      User result = userReconciliationService.syncUser(jwt);
+      User result = userReconciliationService.syncUser(jwt).user();
 
       assertEquals("Vanguard Pilot", result.getDiscordGuildNickname());
     }
@@ -502,7 +513,7 @@ class UserReconciliationServiceTest {
           .thenReturn(Optional.of(codeRole("GUEST", "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(discordJwt(true, List.of()));
+      User result = userReconciliationService.syncUser(discordJwt(true, List.of())).user();
 
       org.junit.jupiter.api.Assertions.assertNull(result.getDiscordGuildNickname());
     }
@@ -518,6 +529,196 @@ class UserReconciliationServiceTest {
         builder.claim("discord_user_id", DISCORD_ID);
       }
       return builder.build();
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // REQ-SEC-036 - a partial-scope client's role claim is not authoritative
+  // ---------------------------------------------------------------
+
+  /**
+   * The mobile client runs with {@code fullScopeAllowed: false} and withholds {@code Admin} on
+   * purpose (REQ-SEC-035), so its tokens describe a deliberately smaller member than the real one.
+   * Since this reconciliation REPLACES the stored role set rather than merging into it, persisting
+   * that description would let whichever client a member used last decide what the database says
+   * they are.
+   *
+   * <p>These cases pin both halves, because either alone is a defect: the row must survive the
+   * partial claim, and the request must still be authorised by it.
+   */
+  @Nested
+  class PartialRoleScopeTests {
+
+    private static final String MOBILE_CLIENT = "basetool-android";
+
+    /** Lists the mobile client, which every case in this class assumes is configured as partial. */
+    @BeforeEach
+    void listTheMobileClient() {
+      partialRoleScopeProperties.setClientIds(List.of(MOBILE_CLIENT));
+    }
+
+    /**
+     * Builds a token for {@code azp} carrying exactly {@code realmRoles}.
+     *
+     * @param azp the authorized-party claim naming the client that requested the token
+     * @param realmRoles the realm-role names the client's scope let through
+     * @return the token
+     */
+    private Jwt tokenFrom(String azp, List<String> realmRoles) {
+      return newJwt(
+          USER_ID.toString(),
+          Map.of(
+              "preferred_username",
+              "alice",
+              "azp",
+              azp,
+              "realm_access",
+              Map.of("roles", realmRoles)));
+    }
+
+    /**
+     * An administrator opening the app keeps {@code Admin} in the database.
+     *
+     * <p>This is the regression that motivated the requirement. Measured on the test stack before
+     * the guard existed, an account holding Admin + Officer + KRT Member was left holding {@code
+     * Guest} alone after one app login - and the same mechanism, once the client's scope carried
+     * the member roles, still stripped {@code Admin} specifically.
+     */
+    @Test
+    void doesNotOverwriteTheStoredRoles_whenTheClaimComesFromAPartialScopeClient() {
+      User existing = newUser(USER_ID, "alice");
+      existing.setVersion(1L);
+      Role admin = role(1L, "Admin");
+      Role member = role(2L, "KRT Member");
+      existing.setRoles(new HashSet<>(Set.of(admin, member)));
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+      when(roleRepository.findByNameIgnoreCase("KRT Member")).thenReturn(Optional.of(member));
+
+      userReconciliationService.syncUser(tokenFrom(MOBILE_CLIENT, List.of("KRT Member")));
+
+      assertEquals(
+          Set.of("Admin", "KRT Member"),
+          roleNames(existing.getRoles()),
+          "the stored role set must survive a claim that could not have carried Admin");
+    }
+
+    /**
+     * The request is nevertheless authorised with the token's roles, not the row's.
+     *
+     * <p>Without this the guard would be worse than the defect: the row keeps {@code Admin}
+     * precisely because the app path stopped overwriting it, so authorising from the row would hand
+     * the app the very authority its client scope withholds.
+     */
+    @Test
+    void returnsTheTokensRolesAsEffective_whenTheClaimIsPartial() {
+      User existing = newUser(USER_ID, "alice");
+      existing.setVersion(1L);
+      existing.setRoles(new HashSet<>(Set.of(role(1L, "Admin"), role(2L, "KRT Member"))));
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+      when(roleRepository.findByNameIgnoreCase("KRT Member"))
+          .thenReturn(Optional.of(role(2L, "KRT Member")));
+
+      UserReconciliationService.ReconciledUser reconciled =
+          userReconciliationService.syncUser(tokenFrom(MOBILE_CLIENT, List.of("KRT Member")));
+
+      assertEquals(
+          Set.of("KRT Member"),
+          roleNames(reconciled.effectiveRoles()),
+          "the request must carry only what the token presented");
+    }
+
+    /**
+     * A client that is NOT listed still replaces the stored set - including shrinking it.
+     *
+     * <p>The complement that keeps the guard honest: one that stopped every role removal would mean
+     * a demotion in Keycloak never reached the database, which is its own privilege defect.
+     */
+    @Test
+    void stillReplacesTheStoredRoles_whenTheClaimComesFromAnOrdinaryClient() {
+      User existing = newUser(USER_ID, "alice");
+      existing.setVersion(1L);
+      existing.setRoles(new HashSet<>(Set.of(role(1L, "Admin"), role(2L, "KRT Member"))));
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+      when(roleRepository.findByNameIgnoreCase("KRT Member"))
+          .thenReturn(Optional.of(role(2L, "KRT Member")));
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      userReconciliationService.syncUser(tokenFrom("basetool-frontend", List.of("KRT Member")));
+
+      assertEquals(
+          Set.of("KRT Member"),
+          roleNames(existing.getRoles()),
+          "a complete claim must still be able to remove a role");
+    }
+
+    /**
+     * A first-ever login through the app does persist its roles.
+     *
+     * <p>There is no stored set to protect on a brand-new row, and the alternative is writing a
+     * member with no roles at all - which the Guest fallback would then stand in for permanently.
+     * The next complete-claim login or Admin-API pass widens it.
+     */
+    @Test
+    void persistsTheRoles_whenThePartialClaimCreatesTheRow() {
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+      when(userRepository.findByUsername("alice")).thenReturn(Optional.empty());
+      when(roleRepository.findByNameIgnoreCase("KRT Member"))
+          .thenReturn(Optional.of(role(2L, "KRT Member")));
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      UserReconciliationService.ReconciledUser reconciled =
+          userReconciliationService.syncUser(tokenFrom(MOBILE_CLIENT, List.of("KRT Member")));
+
+      assertEquals(
+          Set.of("KRT Member"),
+          roleNames(reconciled.user().getRoles()),
+          "a new row must not be created role-less");
+    }
+
+    /**
+     * A token with no {@code azp} is never treated as partial.
+     *
+     * <p>An absent claim must fail towards the established behaviour, not towards the exception:
+     * treating "unknown client" as partial would quietly stop every role change from any issuer
+     * that omits the claim.
+     */
+    @Test
+    void treatsAMissingAzpAsAnOrdinaryClient() {
+      User existing = newUser(USER_ID, "alice");
+      existing.setVersion(1L);
+      existing.setRoles(new HashSet<>(Set.of(role(1L, "Admin"))));
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+      when(roleRepository.findByNameIgnoreCase("KRT Member"))
+          .thenReturn(Optional.of(role(2L, "KRT Member")));
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      Jwt noAzp =
+          newJwt(
+              USER_ID.toString(),
+              Map.of(
+                  "preferred_username",
+                  "alice",
+                  "realm_access",
+                  Map.of("roles", List.of("KRT Member"))));
+
+      userReconciliationService.syncUser(noAzp);
+
+      assertEquals(Set.of("KRT Member"), roleNames(existing.getRoles()));
+    }
+
+    /**
+     * Collapses a role set to its names, so a failure message names the roles rather than printing
+     * entity identity hashes.
+     *
+     * @param roles the roles to name
+     * @return their names
+     */
+    private Set<String> roleNames(java.util.Collection<Role> roles) {
+      return roles.stream().map(Role::getName).collect(java.util.stream.Collectors.toSet());
     }
   }
 
@@ -776,7 +977,7 @@ class UserReconciliationServiceTest {
     when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(role(99L, "Guest")));
     when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    User result = userReconciliationService.syncUser(jwt);
+    User result = userReconciliationService.syncUser(jwt).user();
 
     assertEquals(1, result.getRoles().size());
     assertEquals("Guest", result.getRoles().iterator().next().getName());

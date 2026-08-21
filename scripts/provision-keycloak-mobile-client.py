@@ -83,6 +83,31 @@ SESSION_IDLE_SECONDS = 30 * 24 * 3600
 SESSION_MAX_SECONDS = 180 * 24 * 3600
 ACCESS_TOKEN_LIFESPAN_SECONDS = 300
 
+# The realm roles the app's token may carry.
+#
+# `fullScopeAllowed` below is false, so this list is the whole of it: a realm role that is not
+# named here never reaches the app. That matters more than it looks, because the backend does not
+# read the token's roles directly — `UserReconciliationService` REPLACES the local role set from
+# `realm_access.roles` on every login, and falls back to `Guest` when the claim carries none. A
+# client with `fullScopeAllowed: false` and no scope mappings therefore does not merely narrow the
+# app's rights; it demotes every member who logs in through it to Guest, in the database, for the
+# web app too. Measured on the test stack before this list existed: a fresh app login as an account
+# holding Admin + Officer + KRT Member left it holding `Guest` alone.
+#
+# `Guest` itself is deliberately absent: it is what the backend assigns when the claim is empty, so
+# listing it would buy nothing. `Admin` is absent for a stronger reason — see below.
+MEMBER_REALM_ROLES = ["KRT Member", "Officer", "Bank Employee", "Bank Management"]
+
+# The role the app must NOT carry, asserted rather than merely omitted.
+#
+# The admin area is web-only permanently (app decision, 2026-08-17), but ADMIN is not just a menu:
+# `RequestScopeResolver.currentScopePredicate()` gives an admin WITHOUT an active-org-unit header
+# `adminAllScope = true` — every org unit at once — and honours an admin's pin to any unit, not only
+# to one they belong to. The app has no screen built for either. Carrying ADMIN into it would hand
+# the app a scope rule nothing there is designed around, silently, the first time an administrator
+# installs it.
+FORBIDDEN_REALM_ROLE = "Admin"
+
 
 class KcadmError(RuntimeError):
     """A kcadm invocation failed; carries the command and Keycloak's own message."""
@@ -136,11 +161,16 @@ class Kcadm:
         self._run([verb, path, "-r", self.realm, "-f", "-"], stdin=body)
         print(f"  {verb} {path} — {what}")
 
-    def delete(self, path: str, what: str) -> None:
+    def delete(self, path: str, what: str, payload: dict | list | None = None) -> None:
+        """Delete `path`, optionally with a body — scope mappings are removed by naming them."""
         if self.dry_run:
             print(f"  [dry-run] delete {path} — {what}")
             return
-        self._run(["delete", path, "-r", self.realm])
+        if payload is None:
+            self._run(["delete", path, "-r", self.realm])
+        else:
+            self._run(["delete", path, "-r", self.realm, "-f", "-"],
+                      stdin=json.dumps(payload, indent=2, sort_keys=True))
         print(f"  delete {path} — {what}")
 
 
@@ -354,6 +384,39 @@ def upsert_audience_mapper(kc: Kcadm, client_uuid: str) -> None:
     }, "audience mapper created")
 
 
+def upsert_realm_role_scope(kc: Kcadm, client_uuid: str) -> None:
+    """Grant exactly [MEMBER_REALM_ROLES] to the client's scope, and take back anything else.
+
+    Converges in both directions on purpose. Granting is what makes the app usable at all; taking
+    back is what keeps `FORBIDDEN_REALM_ROLE` from being added by hand in the Admin Console and
+    surviving the next provisioning run, which is precisely how a scope grows without a decision.
+    """
+    assigned = kc.get(f"clients/{client_uuid}/scope-mappings/realm") or []
+    assigned_names = {role.get("name") for role in assigned}
+
+    missing = [name for name in MEMBER_REALM_ROLES if name not in assigned_names]
+    if missing:
+        available = {role.get("name"): role for role in (kc.get("roles") or [])}
+        unknown = [name for name in missing if name not in available]
+        if unknown:
+            raise KcadmError(
+                f"the realm has no role(s) {unknown}. The app's token would carry nothing for them "
+                f"and every holder would be reconciled onto the Guest fallback. Check the realm's "
+                f"role names before re-running."
+            )
+        kc.write("create", f"clients/{client_uuid}/scope-mappings/realm",
+                 [{"id": available[name]["id"], "name": name} for name in missing],
+                 f"realm roles granted to the client scope: {', '.join(missing)}")
+    else:
+        print(f"  realm-role scope already carries {len(MEMBER_REALM_ROLES)} member roles")
+
+    surplus = [role for role in assigned if role.get("name") not in MEMBER_REALM_ROLES]
+    if surplus:
+        names = ", ".join(sorted(role.get("name") or "?" for role in surplus))
+        kc.write("delete", f"clients/{client_uuid}/scope-mappings/realm", surplus,
+                 f"realm roles taken back off the client scope: {names}")
+
+
 def drop_offline_access(kc: Kcadm, client_uuid: str) -> None:
     """Remove the `offline_access` optional scope Keycloak assigns by default.
 
@@ -369,8 +432,15 @@ def drop_offline_access(kc: Kcadm, client_uuid: str) -> None:
     print("  offline_access already absent")
 
 
-def verify(kc: Kcadm) -> list[str]:
-    """Assert the live state matches the intent. Returns a list of problems; empty means good."""
+def verify(kc: Kcadm, profile: str = "prod") -> list[str]:
+    """Assert the live state matches the intent. Returns a list of problems; empty means good.
+
+    :param profile: which redirect-URI set the realm was provisioned with. The loopback
+        wildcard the `test` profile installs is deliberate -- a native app cannot know its
+        loopback port in advance -- so it is only a problem on `prod`. Without this the
+        script flagged a URI it had just written itself, and `--verify-only` could never
+        come back clean against a test stack.
+    """
     problems: list[str] = []
 
     client = find_client(kc)
@@ -389,12 +459,27 @@ def verify(kc: Kcadm) -> list[str]:
         problems.append("direct access grants are enabled")
     if client.get("publicClient") is not True:
         problems.append("client is not public")
-    if any("*" in uri for uri in client.get("redirectUris") or []):
+    if profile == "prod" and any("*" in uri for uri in client.get("redirectUris") or []):
         problems.append("a redirect URI contains a wildcard")
 
     roles = kc.get(f"clients/{client['id']}/roles") or []
     if not any(role.get("name") == MARKER_ROLE for role in roles):
         problems.append(f"marker role '{MARKER_ROLE}' is missing — the policy matches nothing")
+
+    scope = {role.get("name") for role in (kc.get(f"clients/{client['id']}/scope-mappings/realm") or [])}
+    for name in MEMBER_REALM_ROLES:
+        if name not in scope:
+            problems.append(
+                f"realm role '{name}' is not on the client scope — with fullScopeAllowed off the "
+                f"token carries no roles, and every member who signs in through the app is "
+                f"reconciled onto the Guest fallback in the database"
+            )
+    if FORBIDDEN_REALM_ROLE in scope:
+        problems.append(
+            f"realm role '{FORBIDDEN_REALM_ROLE}' IS on the client scope — an administrator using "
+            f"the app would get admin scoping (all org units without a pin), which no screen there "
+            f"is built for"
+        )
 
     profiles = read_list(kc, "client-policies/profiles", "profiles")
     profile = next((p for p in profiles if p.get("name") == PROFILE_NAME), None)
@@ -451,7 +536,7 @@ def main() -> int:
 
     try:
         if args.verify_only:
-            problems = verify(kc)
+            problems = verify(kc, args.profile)
         else:
             print(f"[1/5] detaching '{POLICY_NAME}' so the client is editable")
             was_attached = detach_policy(kc)
@@ -464,8 +549,9 @@ def main() -> int:
                       "them.")
                 return 0
 
-            print("[3/5] marker role, audience mapper, offline_access")
+            print("[3/5] marker role, realm-role scope, audience mapper, offline_access")
             upsert_marker_role(kc, client_uuid)
+            upsert_realm_role_scope(kc, client_uuid)
             upsert_audience_mapper(kc, client_uuid)
             drop_offline_access(kc, client_uuid)
 
@@ -485,7 +571,7 @@ def main() -> int:
             if args.dry_run:
                 print("\n[dry-run] nothing was written.")
                 return 0
-            problems = verify(kc)
+            problems = verify(kc, args.profile)
     except KcadmError as error:
         print(f"\nFAILED: {error}", file=sys.stderr)
         print("The client may be left without its policy — it is then unbound, not half-bound. "

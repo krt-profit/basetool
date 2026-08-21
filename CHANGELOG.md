@@ -2,9 +2,17 @@
 
 ## [Unreleased]
 
+## [v1.5.59](https://github.com/krt-profit/basetool/releases/tag/v1.5.59) - 2026-08-21
+
 ### Changed
 
 - **Spring Boot auf 4.1.1 angehoben (Wartungs-Release).** Es bringt unter anderem Spring Framework 7.0.9, Spring Security 7.1.1, Hibernate 7.4.5, Tomcat 11.0.24, Netty 4.2.17.Final und den PostgreSQL-Treiber 42.7.13 mit; die drei temporären CVE-Overrides für Tomcat, Netty und den PostgreSQL-Treiber entfallen damit, weil Spring Boot genau diese Versionen jetzt selbst ausliefert. Rein intern, keine Auswirkung auf die Oberfläche.
+
+### Fixed
+
+- **Eine Anmeldung über die Android-App entzog Administratoren ihre Admin-Rolle in der Datenbank.** Der Rollensatz wurde bei jeder Anmeldung aus dem Token überschrieben, und das App-Token führt `Admin` bewusst nicht mit — bis zur nächsten Web-Anfrage sahen Hintergrundjobs, Benachrichtigungsregeln und Mitgliederlisten den verkürzten Satz. Tokens von Clients mit absichtlich unvollständigem Rollen-Scope schreiben jetzt gar keine Rollen mehr; die Anfrage selbst wird weiterhin nur mit den Rollen aus dem Token autorisiert, die App bekommt also nach wie vor keine Administrationsrechte. Neue optionale Umgebungsvariable `APP_SECURITY_PARTIAL_ROLE_SCOPE_CLIENT_IDS` (REQ-SEC-036).
+
+- **Der Keycloak-Client der Android-App gab gar keine Rollen mit, wodurch jede Anmeldung über die App das Konto auf `Gast` zurücksetzte** — auch für die Weboberfläche, weil der Rollensatz bei jeder Anmeldung aus dem Token überschrieben wird. Das Provisionierungsskript vergibt jetzt die vier Mitgliedsrollen (KRT Member, Officer, Bank Employee, Bank Management) und nimmt alles andere wieder weg; `Admin` bleibt bewusst draußen, da die App keine Administrationsansichten hat (REQ-SEC-035). Das Produktionsrealm braucht dafür einen erneuten Skriptlauf, bevor die App ausgeliefert wird.
 
 ## [v1.5.58](https://github.com/krt-profit/basetool/releases/tag/v1.5.58) - 2026-08-20
 

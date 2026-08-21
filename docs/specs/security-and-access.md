@@ -1428,8 +1428,11 @@ this policy.
 
 Realm changes implementing this MUST merge into the two client-policy lists rather than replacing
 them — both endpoints replace the realm-global list wholesale — and MUST apply the client
-configuration **before** attaching the policy, because Keycloak refuses every admin update to a
-client while the policy is attached.
+configuration **before** attaching the policy, because Keycloak refuses every write to the client
+**representation** (`PUT clients/{id}`) while the policy is attached. The lock stops there: the
+client's sub-resources, role scope mappings among them, stay writable with the policy in place
+(measured, Keycloak 26.7, 2026-08-21), so a REQ-SEC-035 scope change needs neither the detach dance
+nor the provisioning service account.
 
 **Acceptance**
 
@@ -1635,6 +1638,127 @@ from the original registration.
 `UserRegistrationService#findRejectedRegistrations`, `DiscordRegistrationAdminController`,
 `ApprovalDecision#REOPENED`, `AdminDiscordRegistrationsPageController`, `discord-registrations.js`,
 `V233__allow_reopened_user_approval_decision.sql` · **Decision:** ADR-0140
+
+### REQ-SEC-035 — The mobile client's scope MUST carry the member realm roles, and MUST NOT carry `Admin`
+
+The Keycloak client `basetool-android` runs with `fullScopeAllowed: false`, so the realm roles its
+tokens carry are exactly the ones mapped onto its client scope. That list MUST be
+`KRT Member`, `Officer`, `Bank Employee`, `Bank Management`, and it MUST NOT contain `Admin`.
+
+Neither half is a matter of taste.
+
+**Why the member roles must be there.** The backend does not read the token's roles for
+authorization directly: `UserReconciliationService#syncUser` **replaces** the account's local role
+set from `realm_access.roles` on every authentication, falling back to `Guest` when the claim
+carries none, and `CustomJwtGrantedAuthoritiesConverter` then derives the request's authorities from
+that stored set. A client with no scope mappings therefore does not merely narrow what the app may
+do — it rewrites the member's row in the database, for the web app too. Measured on the test stack
+before this requirement existed: an account holding `Admin` + `Officer` + `KRT Member` was left
+holding `Guest` alone after one app login.
+
+**Why `Admin` must not be.** The admin area is permanently web-only, but `ADMIN` is not just a menu.
+`RequestScopeResolver#currentScopePredicate` grants an admin without an active-org-unit header
+`adminAllScope` — every org unit at once — and honours an admin's pin to a unit they do not belong
+to. The app has no screen designed around either. Withholding the role keeps that scope rule out of
+a client that cannot express it.
+
+**The residual this left, and where it went.** Withholding a role only narrows the app if the
+narrowing is not written down. Because `syncUser` replaced the stored set wholesale, an
+administrator who opened the app had `Admin` removed from their row until their next web request put
+it back — the same mechanism as the `Guest` demotion above, just smaller. That is closed by
+[REQ-SEC-036](#req-sec-036--a-clients-role-claim-is-authoritative-only-if-its-scope-is-complete):
+the app's claim no longer writes to the database at all, and the request is authorised from the
+token instead of from the row.
+
+**Acceptance**
+
+- [x] The provisioning script grants the four member roles and takes back anything else on the
+  client scope, converging in both directions, so a role added by hand in the Admin Console does not
+  survive the next run.
+- [x] `--verify-only` fails when a member role is missing and when `Admin` is present, and each
+  message names the consequence rather than the symptom.
+- [x] Keycloak's own scope evaluation for the client returns `['KRT Member']` for a plain member and
+  `['KRT Member', 'Officer']` for an account that also holds `Admin` (measured against the test
+  stack's `iri` realm, Keycloak 26.7, 2026-08-21).
+- [x] The realm is checked for the role names before granting: a rename upstream fails the run
+  loudly instead of silently leaving the scope empty.
+
+**Enforced by:** `provision-keycloak-mobile-client.test.sh` section 7 · **Code:**
+`scripts/provision-keycloak-mobile-client.py` (`MEMBER_REALM_ROLES`, `FORBIDDEN_REALM_ROLE`,
+`upsert_realm_role_scope`), `UserReconciliationService#syncUser`,
+`CustomJwtGrantedAuthoritiesConverter` · **Decision:**
+[ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md)
+
+### REQ-SEC-036 — A client's role claim is authoritative only if its scope is complete
+
+`UserReconciliationService#syncUser(Jwt)` mirrors a member's realm roles into `app_user` on **every**
+authentication, and it does so by **replacement**: `user.setRoles(mapRoles(realm_access.roles))`.
+That is correct only while every client's token carries the member's whole role list. It stopped
+being correct the moment one client was deliberately given less.
+
+A client whose Keycloak scope is narrowed — `fullScopeAllowed: false` plus a partial scope mapping,
+which is exactly the mobile client under REQ-SEC-035 — mints a token describing a **smaller member
+than the real one**. Persisting that description lets whichever client a member happened to use last
+decide what the database says they are.
+
+**The rule.** A token from a configured *partial-scope client* MUST NOT write the account's role set.
+The stored set is left exactly as it was, and the request is authorised from the **token's** roles
+rather than from the row.
+
+Both halves are load-bearing and each is a defect without the other:
+
+- Persisting the partial claim is the data loss this requirement exists to stop.
+- Authorising from the row instead of the token would be **worse than the original defect**: the row
+  keeps `Admin` precisely because the app path no longer overwrites it, so reading roles back off it
+  would hand the app the authority REQ-SEC-035 withholds — silently, and only for administrators.
+
+**Matched on `azp`**, a claim inside a Keycloak-signed token that a client cannot set — the same
+handle `IngestGatewayProperties` already uses for the far more dangerous on-behalf-of decision, so
+this adds no new trust. Configured under `app.security.partial-role-scope.client-ids`.
+
+**Empty is the unsafe end here**, the reverse of the ingest gateway's list. There, empty means
+"nobody may act for another member". Here, empty resumes overwriting stored roles from partial
+tokens. The default therefore names the client known to be partial rather than shipping blank.
+
+**A brand-new row is the one exception**, in the safe direction: there is no stored set to protect,
+and the alternative is persisting a member with no roles at all, which the `Guest` fallback would
+then stand in for permanently.
+
+**The stored set still converges.** It is maintained by every client whose claim is complete and by
+the daily Admin-API pass (`syncUser(KeycloakUserDto)`), which reads the realm directly and is
+unaffected by any client's scope — so even a member who only ever uses the app has their row
+corrected within a day.
+
+**Monitoring.** Deliberately no new metric. The only quantity that varies is how much the
+partial-scope client is used, and `basetool_api_client_requests_total{client_id="basetool-android"}`
+already carries it (REQ-OBS-018); the guard itself is a pure function of static configuration, so a
+counter would restate the config rather than observe anything. The non-persisted claim is logged at
+DEBUG with the account's UUID and the two set sizes — never the username (REQ-OBS-004).
+
+**Acceptance**
+
+- [x] A partial-scope client's token leaves the stored role set untouched, `Admin` included
+  (`UserReconciliationServiceTest.PartialRoleScopeTests`).
+- [x] The same request is authorised with the token's roles, not the row's — a row holding `Admin`
+  plus a token carrying only `KRT Member` yields no `ROLE_ADMIN`
+  (`CustomJwtGrantedAuthoritiesConverterTest`).
+- [x] An ordinary client still **replaces** the set, shrinking included: a guard that blocked every
+  role removal would mean a Keycloak demotion never reached the database, which is its own privilege
+  defect.
+- [x] A first login through a partial-scope client persists its roles rather than creating a
+  role-less row.
+- [x] A token with no `azp` is treated as an ordinary client — an absent claim fails towards the
+  established behaviour, not towards the exception.
+- [x] The database-only `assembleFor(User)` keeps its contract for the ingest gateway's
+  acting-member path (ADR-0129), which has no token to read.
+- [x] Each half was verified by removing it: the persistence guard and the authorisation source each
+  have a test that fails without them.
+
+**Enforced by:** `UserReconciliationServiceTest.PartialRoleScopeTests`,
+`CustomJwtGrantedAuthoritiesConverterTest` · **Code:** `PartialRoleScopeProperties`,
+`UserReconciliationService#syncUser(Jwt)` (`ReconciledUser`),
+`CustomJwtGrantedAuthoritiesConverter#assembleFor(User, Collection)` · **Configuration:**
+`app.security.partial-role-scope.client-ids`
 
 ## Out of scope
 

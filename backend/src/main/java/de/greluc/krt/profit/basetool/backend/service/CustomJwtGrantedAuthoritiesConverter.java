@@ -23,6 +23,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
@@ -209,7 +210,8 @@ public class CustomJwtGrantedAuthoritiesConverter
     ObjectOptimisticLockingFailureException lastLockingFailure = null;
     for (int attempt = 1; attempt <= MAX_SYNC_ATTEMPTS; attempt++) {
       try {
-        User user = userReconciliationService.syncUser(jwt);
+        UserReconciliationService.ReconciledUser reconciled =
+            userReconciliationService.syncUser(jwt);
 
         // Epic #720, Track 1 / REQ-SEC-017: a PENDING (or REJECTED) registration is granted NO
         // authorities. The ENTIRE assembly below — realm roles, permissions, membership-derived
@@ -217,7 +219,13 @@ public class CustomJwtGrantedAuthoritiesConverter
         // ROLE_PENDING_APPROVAL. ROLE_GUEST is deliberately NOT carried: a pending user is routed
         // to
         // the "waiting for approval" surface, not given the guest read surface.
-        return assembleFor(user);
+        //
+        // Authorise with the roles the TOKEN presented, not with the row's. The two are the same
+        // set for every client whose claim is complete; they differ for a partial-scope client,
+        // which is exactly the point (REQ-SEC-036). Reading the row here instead would hand an
+        // administrator using the mobile app the ADMIN authority its token deliberately withheld
+        // -- the row still holds Admin precisely because that path no longer overwrites it.
+        return assembleFor(reconciled.user(), reconciled.effectiveRoles());
       } catch (ObjectOptimisticLockingFailureException e) {
         lastLockingFailure = e;
         int attemptsLeft = MAX_SYNC_ATTEMPTS - attempt;
@@ -266,6 +274,29 @@ public class CustomJwtGrantedAuthoritiesConverter
    *     registration
    */
   public Collection<GrantedAuthority> assembleFor(@NonNull User user) {
+    return assembleFor(user, user.getRoles());
+  }
+
+  /**
+   * Assembles a member's authorities from a role set that may differ from the one stored on {@code
+   * user}.
+   *
+   * <p>The split exists for partial-scope clients (REQ-SEC-036). Their tokens carry a deliberately
+   * narrowed role list which {@link UserReconciliationService#syncUser(Jwt)} refuses to write down;
+   * the request must still be authorised with that narrower list, so the caller passes it here
+   * explicitly rather than the converter reading it back off the row it just declined to change.
+   *
+   * <p>Everything else about the assembly is unchanged and still database-derived: the approval
+   * short-circuit, the per-role permissions, and every org-unit-derived authority. Only *which*
+   * roles seed it is parameterised.
+   *
+   * @param user the member whose approval status and memberships to read
+   * @param roles the roles to authorise with; the stored set for every ordinary client
+   * @return the authorities, or the lone {@code ROLE_PENDING_APPROVAL} for a non-approved
+   *     registration
+   */
+  public Collection<GrantedAuthority> assembleFor(
+      @NonNull User user, @NonNull Collection<Role> roles) {
     // Epic #720, Track 1 / REQ-SEC-017: a PENDING (or REJECTED) registration is granted NO
     // authorities. The ENTIRE assembly below — realm roles, permissions, membership-derived flat
     // roles, contextual + cascaded authorities — is short-circuited to a single
@@ -276,7 +307,7 @@ public class CustomJwtGrantedAuthoritiesConverter
     }
 
     Collection<GrantedAuthority> authorities =
-        user.getRoles().stream()
+        roles.stream()
             .flatMap(
                 role -> {
                   Stream<GrantedAuthority> roleAuth =
