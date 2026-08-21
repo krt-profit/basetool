@@ -59,6 +59,17 @@ JSON
   echo '[]' >"${state}/roles.json"
   echo '[]' >"${state}/mappers.json"
   echo '[]' >"${state}/optional-scopes.json"
+  # The realm's own roles, as `kcadm get roles` would serve them, and what the client's scope
+  # already holds. The pre-existing Admin mapping is the interesting part: the provisioner has to
+  # take it back, or a hand-edit in the Admin Console survives every later run.
+  cat >"${state}/realm-roles.json" <<'JSON'
+[{"id":"r-krt","name":"KRT Member"},{"id":"r-off","name":"Officer"},
+ {"id":"r-adm","name":"Admin"},{"id":"r-gue","name":"Guest"},
+ {"id":"r-bem","name":"Bank Employee"},{"id":"r-bmg","name":"Bank Management"}]
+JSON
+  cat >"${state}/scope-mappings.json" <<'JSON'
+[{"id":"r-adm","name":"Admin"}]
+JSON
 
   # The stub is Python rather than a shell script on purpose: the provisioner spawns it through
   # subprocess, and a shebanged shell script is not directly executable on a Windows developer
@@ -94,6 +105,11 @@ def save(name, value):
 def read_target(request_path):
     if request_path.startswith("realms/"):
         return "realm.json"
+    if request_path == "roles":
+        # The REALM's roles, not a client's — the two paths differ only by prefix.
+        return "realm-roles.json"
+    if request_path.endswith("/scope-mappings/realm"):
+        return "scope-mappings.json"
     if request_path.endswith("/roles"):
         return "roles.json"
     if request_path.endswith("/protocol-mappers/models"):
@@ -122,6 +138,8 @@ elif verb in ("create", "update"):
         with (state / "client-writes.json").open("a", encoding="utf-8") as sink:
             sink.write(json.dumps(body, indent=2, sort_keys=True))
         save("clients.json", [{**body, "id": body.get("id", STUB_UUID)}])
+    elif path.endswith("/scope-mappings/realm"):
+        save("scope-mappings.json", load("scope-mappings.json") + body)
     elif path.endswith("/roles"):
         save("roles.json", load("roles.json") + [body])
     elif path.endswith("/protocol-mappers/models"):
@@ -130,7 +148,11 @@ elif verb in ("create", "update"):
         sys.exit(f"stub: unexpected {verb} {path}")
 
 elif verb == "delete":
-    if path.rsplit("/", 2)[-2] == "optional-client-scopes":
+    if path.endswith("/scope-mappings/realm"):
+        removed = {role["name"] for role in json.loads(sys.stdin.read())}
+        save("scope-mappings.json",
+             [role for role in load("scope-mappings.json") if role["name"] not in removed])
+    elif path.rsplit("/", 2)[-2] == "optional-client-scopes":
         save("optional-scopes.json", [])
 else:
     sys.exit(f"stub: unexpected verb {verb}")
@@ -283,6 +305,51 @@ rc=0
 run_provisioner "$state" --verify-only >/dev/null || rc=$?
 if [[ $rc -eq 0 ]]; then pass "the intended state verifies clean"; else
   fail "the intended state verifies clean" "exit was ${rc}"; fi
+rm -rf "$state"
+
+# ---------------------------------------------------------------------------
+echo "7. the client scope carries the member roles, and never Admin"
+# ---------------------------------------------------------------------------
+# The failure this pins is not "the app has fewer rights". `fullScopeAllowed` is off, so a client
+# with no scope mappings sends a token with NO realm roles at all — and the backend replaces the
+# local role set from that claim on every login, falling back to Guest. Measured on the test stack
+# before this existed: an account holding Admin + Officer + KRT Member came out holding Guest.
+state="$(mktemp -d)"
+make_stub "$state"
+run_provisioner "$state" >/dev/null
+scope="$(cat "${state}/scope-mappings.json")"
+assert_contains "$scope" '"KRT Member"' "KRT Member reaches the app"
+assert_contains "$scope" '"Officer"' "Officer reaches the app"
+assert_contains "$scope" '"Bank Employee"' "Bank Employee reaches the app"
+assert_contains "$scope" '"Bank Management"' "Bank Management reaches the app"
+# The pre-existing Admin mapping the stub seeded models a hand-edit in the Admin Console.
+assert_not_contains "$scope" '"Admin"' "a hand-added Admin mapping is taken back"
+
+# A second run must not re-add or re-remove anything.
+before="$scope"
+run_provisioner "$state" >/dev/null
+if [[ "$before" == "$(cat "${state}/scope-mappings.json")" ]]; then
+  pass "the client scope is unchanged by a second run"
+else
+  fail "the client scope is unchanged by a second run"
+fi
+
+# Verification has to catch a scope somebody emptied, and one somebody widened.
+echo '[]' >"${state}/scope-mappings.json"
+rc=0
+output="$(run_provisioner "$state" --verify-only)" || rc=$?
+if [[ $rc -ne 0 ]]; then pass "an empty client scope is reported as a failure"; else
+  fail "an empty client scope is reported as a failure" "exit was 0"; fi
+assert_contains "$output" "reconciled onto the Guest fallback" "the message names the consequence"
+
+echo '[{"id":"r-krt","name":"KRT Member"},{"id":"r-off","name":"Officer"},
+      {"id":"r-bem","name":"Bank Employee"},{"id":"r-bmg","name":"Bank Management"},
+      {"id":"r-adm","name":"Admin"}]' >"${state}/scope-mappings.json"
+rc=0
+output="$(run_provisioner "$state" --verify-only)" || rc=$?
+if [[ $rc -ne 0 ]]; then pass "an Admin mapping is reported as a failure"; else
+  fail "an Admin mapping is reported as a failure" "exit was 0"; fi
+assert_contains "$output" "no screen there" "the message says why Admin is withheld"
 rm -rf "$state"
 
 # ---------------------------------------------------------------------------

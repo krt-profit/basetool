@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der Keycloak-Client der Android-App gab gar keine Rollen mit, wodurch jede Anmeldung über die App das Konto auf `Gast` zurücksetzte** — auch für die Weboberfläche, weil der Rollensatz bei jeder Anmeldung aus dem Token überschrieben wird. Das Provisionierungsskript vergibt jetzt die vier Mitgliedsrollen (KRT Member, Officer, Bank Employee, Bank Management) und nimmt alles andere wieder weg; `Admin` bleibt bewusst draußen, da die App keine Administrationsansichten hat (REQ-SEC-035). Das Produktionsrealm braucht dafür einen erneuten Skriptlauf, bevor die App ausgeliefert wird.
+
 ### Changed
 
 - **Spring Boot auf 4.1.1 angehoben (Wartungs-Release).** Es bringt unter anderem Spring Framework 7.0.9, Spring Security 7.1.1, Hibernate 7.4.5, Tomcat 11.0.24, Netty 4.2.17.Final und den PostgreSQL-Treiber 42.7.13 mit; die drei temporären CVE-Overrides für Tomcat, Netty und den PostgreSQL-Treiber entfallen damit, weil Spring Boot genau diese Versionen jetzt selbst ausliefert. Rein intern, keine Auswirkung auf die Oberfläche.
