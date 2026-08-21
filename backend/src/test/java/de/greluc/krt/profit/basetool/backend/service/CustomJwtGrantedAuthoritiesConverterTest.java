@@ -36,8 +36,10 @@ import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.service.UserReconciliationService.ReconciledUser;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority;
 import java.time.Instant;
@@ -129,7 +131,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   void leavesANonGatewayCallerOnTheOrdinaryMemberPath() {
     ingestGatewayProperties.setClientIds(List.of("test-ingest-gateway"));
     when(jwt.getClaimAsString("azp")).thenReturn("basetool-frontend");
-    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
 
@@ -138,6 +140,62 @@ class CustomJwtGrantedAuthoritiesConverterTest {
             .map(GrantedAuthority::getAuthority)
             .anyMatch(CustomJwtGrantedAuthoritiesConverter.GATEWAY_AUTHORITY::equals));
     verify(userReconciliationService).syncUser(jwt);
+  }
+
+  /**
+   * REQ-SEC-036 - the request is authorised by the roles the TOKEN carried, not by the row's.
+   *
+   * <p>The two are the same set for every client whose claim is complete. They differ for a
+   * partial-scope client, and this is the case that makes the split worth its cost: because that
+   * path deliberately no longer overwrites the stored roles, the row an administrator's app request
+   * loads still holds {@code Admin}. Reading the roles back off it here would hand the app exactly
+   * the authority its Keycloak client scope was configured to withhold - a guard that made the
+   * problem worse than the defect it replaced.
+   */
+  @Test
+  void authorisesWithTheEffectiveRolesRatherThanTheStoredOnes() {
+    User admin = userWithNoRoles();
+    admin.setRoles(Set.of(namedRole("Admin"), namedRole("KRT Member")));
+
+    when(userReconciliationService.syncUser(jwt))
+        .thenReturn(new ReconciledUser(admin, Set.of(namedRole("KRT Member"))));
+
+    Collection<String> authorities =
+        converter.convert(jwt).stream().map(GrantedAuthority::getAuthority).toList();
+
+    assertTrue(authorities.contains("ROLE_KRT_MEMBER"), "the token's role must authorise");
+    assertFalse(
+        authorities.contains("ROLE_ADMIN"),
+        "the row still holds Admin because the app path no longer overwrites it - it must not"
+            + " leak into the authorities");
+  }
+
+  /**
+   * The database-only overload keeps its contract, which the ingest gateway's acting-member path
+   * depends on (ADR-0129): with no token in hand it must still assemble from the stored set.
+   */
+  @Test
+  void assembleForAUserAloneStillReadsTheStoredRoles() {
+    User user = userWithNoRoles();
+    user.setRoles(Set.of(namedRole("Admin")));
+
+    Collection<String> authorities =
+        converter.assembleFor(user).stream().map(GrantedAuthority::getAuthority).toList();
+
+    assertTrue(authorities.contains("ROLE_ADMIN"));
+  }
+
+  /**
+   * A role with only a name, which is all the authority mapping reads.
+   *
+   * @param name the role's display name
+   * @return the role, with no permissions attached
+   */
+  private static Role namedRole(String name) {
+    Role role = new Role();
+    role.setName(name);
+    role.setPermissions(Set.of());
+    return role;
   }
 
   private User userWithNoRoles() {
@@ -159,7 +217,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     // and serve the second from the cache — no second syncUser / membership read.
     when(jwt.getSubject()).thenReturn("sub-1");
     when(jwt.getIssuedAt()).thenReturn(Instant.ofEpochSecond(1_700_000_000L));
-    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
     Collection<GrantedAuthority> first = converter.convert(jwt);
@@ -177,7 +235,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     when(jwt.getSubject()).thenReturn("sub-1");
     when(jwt.getIssuedAt())
         .thenReturn(Instant.ofEpochSecond(1_700_000_000L), Instant.ofEpochSecond(1_700_000_300L));
-    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
     converter.convert(jwt);
@@ -191,7 +249,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     // An unkeyable token (missing issuedAt) must never be cached — always recompute, never risk
     // serving a stale result under a degenerate key (#1141).
     when(jwt.getSubject()).thenReturn("sub-1");
-    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
     converter.convert(jwt);
@@ -202,7 +260,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void plainStaffelMember_getsNoLeadershipRolesAndNoCascade() {
-    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
     OrgUnitMembership plain = membership(DESCENDANT_STAFFEL_ID, OrgUnitKind.SQUADRON);
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(plain));
     when(orgUnitCascadeService.cascadedOfficerReach(any())).thenReturn(Set.of());
@@ -217,7 +275,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void bereichsleiter_getsFlatRolesAndCascadedContextualAuthorities() {
-    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
     OrgUnitMembership lead = membership(BEREICH_ID, OrgUnitKind.BEREICH);
     lead.setRole(MembershipRole.BEREICHSLEITER);
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(lead));
@@ -238,7 +296,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void olMember_getsFlatRolesAndContextualAuthoritiesForEveryReachedUnit() {
-    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
     UUID olId = UUID.randomUUID();
     OrgUnitMembership ol = membership(olId, OrgUnitKind.ORGANISATIONSLEITUNG);
     ol.setRole(MembershipRole.OL_MEMBER);
@@ -263,7 +321,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     // unit. The cascade service yields nothing for a squadron rank (verified in
     // OrgUnitCascadeService
     // tests), so the only reach is the own-squadron contextual minted by the per-row loop.
-    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
     UUID squadronId = UUID.randomUUID();
     OrgUnitMembership lead = membership(squadronId, OrgUnitKind.SQUADRON);
     lead.setRole(MembershipRole.STAFFELLEITER);
@@ -292,7 +350,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     // ROLE_GUEST is not carried.
     User pending = userWithNoRoles();
     pending.setApprovalStatus(ApprovalStatus.PENDING);
-    when(userReconciliationService.syncUser(jwt)).thenReturn(pending);
+    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(pending));
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
 
@@ -307,7 +365,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     // A REJECTED account is treated like PENDING — no authorities, routed to the waiting page.
     User rejected = userWithNoRoles();
     rejected.setApprovalStatus(ApprovalStatus.REJECTED);
-    when(userReconciliationService.syncUser(jwt)).thenReturn(rejected);
+    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(rejected));
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
 
@@ -318,7 +376,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void memberlessUser_getsNoMembershipDerivedAuthorities() {
-    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
     // No memberships → the converter short-circuits before consulting the cascade.
     lenient().when(orgUnitCascadeService.cascadedOfficerReach(any())).thenReturn(Set.of());
@@ -337,7 +395,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     // that rethrew immediately (no retry) would deny a legitimate concurrent login.
     when(userReconciliationService.syncUser(jwt))
         .thenThrow(new ObjectOptimisticLockingFailureException(User.class, USER_ID))
-        .thenReturn(userWithNoRoles());
+        .thenReturn(ReconciledUser.of(userWithNoRoles()));
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
