@@ -1781,10 +1781,21 @@ The anonymous surface, complete:
 | `GET /api/v1/missions/search` | the public home page (`/`, `permitAll`) renders its upcoming-Einsatz tiles from this very endpoint | `PLANNED` + `ACTIVE`, **non-internal** rows only, through the outsider redaction in `MissionController#searchMissions`                                                                 |
 | `GET /api/v1/missions/{id}`   | the same public surface, one Einsatz deep                                                          | the redacted DTO of ADR-0034 — no description, no owner, no managers, participants without payout preference or comment; an **internal** or **terminal** Einsatz is refused with `403` |
 
-Everything else on the list is me-scoped and answers `401` without a token — the Finanzen
-endpoints among them (`isAuthenticated() and isMemberOrAbove() and canSeeMission`), which is
-why a mission's money is reachable from the app and not from the internet even though the
-mission itself is.
+Everything else on the list is refused without a token — the Finanzen endpoints among them
+(`isAuthenticated() and isMemberOrAbove() and canSeeMission`), which is why a mission's money is
+reachable from the app and not from the internet even though the mission itself is.
+
+**The refusal is not one status, and the split follows the layer that produces it.** The me-scoped
+paths are `authenticated()` in the filter chain, so they never reach a controller and the entry
+point answers `401`. The Finanzen paths sit under `GET /api/v1/missions/**`, which is `permitAll`
+in that chain — the request is dispatched, `@PreAuthorize` refuses it at the method seam, and
+`GlobalExceptionHandler` renders that refusal as `403`. Nothing upgrades it to `401`:
+`ExceptionTranslationFilter`, the component that would substitute the entry point for an anonymous
+caller, never sees an exception the MVC advice has already handled. Both are closed to the
+internet; only the number differs, and it differs *because* authorization lives at the method seam
+in this project rather than in the matcher list. `ApiVhostAnonymousSurfaceTest` pins both, since
+the statuses are what an operator verifies the vhost against
+([`API_VHOST_ROLLOUT_RUNBOOK.md`](../API_VHOST_ROLLOUT_RUNBOOK.md) § D.3a).
 
 **The missions family is additionally read-only on this vhost.** `/api/v1/missions/<uuid>`
 answers `PUT` and `DELETE` as well as `GET`, and an allow-list that matches on the path cannot
