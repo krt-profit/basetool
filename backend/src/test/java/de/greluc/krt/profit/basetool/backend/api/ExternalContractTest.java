@@ -26,6 +26,7 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -188,6 +189,158 @@ class ExternalContractTest {
               "/api/v1/missions/{missionId}/finance-entries/summary",
               "get",
               Set.of("total", "incomeSum", "incomeCount", "expenseSum", "expenseCount")));
+
+  /**
+   * Enum constants a shipped client cannot survive a change to, keyed {@code Schema.property}.
+   *
+   * <p><strong>Only REQUIRED enum properties are here, and that is the whole point.</strong> The
+   * Android client parses with kotlinx.serialization and {@code coerceInputValues}, which turns an
+   * unrecognised constant into {@code null} — but only where the property is nullable. A required
+   * one has nowhere to go, so an unknown value fails the **entire response**, not the field.
+   *
+   * <p>Measured on the app before this guard existed: a single unknown {@code JobTypeDto.archetype}
+   * made the whole mission-detail response unparseable. The list endpoint has no nested enums and
+   * kept working, so the member would have seen a list whose every row failed to open — on an APK
+   * in the field that cannot be redeployed. The client cannot defend itself either:
+   * openapi-generator's {@code enumUnknownDefaultCase} is a no-op for kotlinx_serialization, and
+   * the app does not even read this field. It is required purely to parse.
+   *
+   * <p>So the defence has to be here, and it is a release-ordering one: adding a constant fails
+   * this build, which forces the app to ship a build that knows it <em>before</em> the server
+   * starts sending it.
+   *
+   * <p>Nullable enums are deliberately absent. They degrade to {@code null} — an objective loses
+   * its kind badge, not its screen — and freezing them would make this fire on harmless additions,
+   * which is how a guard gets widened until it means nothing.
+   */
+  private static final Map<String, Set<String>> FROZEN_REQUIRED_ENUMS =
+      Map.of("JobTypeDto.archetype", Set.of("CREW", "MISSION"));
+
+  @Test
+  @DisplayName("no enum a shipped client must parse has gained or lost a constant")
+  void theContractRequiredEnumsAreFrozen() throws IOException {
+    JsonNode document = openapi();
+    Map<String, Set<String>> actual = requiredEnumsReachableFromTheContract(document);
+
+    assertThat(actual)
+        .as(
+            "a REQUIRED enum reachable from the contract set changed. An unknown constant does not"
+                + " cost the field, it fails the WHOLE response for a client that parses it"
+                + " strictly — every screen built on that operation goes dark on an installed app"
+                + " that cannot be redeployed. Ship an app build that knows the constant first,"
+                + " then add it here in the same PR that adds it to the enum")
+        .isEqualTo(FROZEN_REQUIRED_ENUMS);
+  }
+
+  /**
+   * Collects every required enum property reachable from the contract set's response schemas.
+   *
+   * <p>Walks the schema graph transitively, because a client parses the whole payload and not just
+   * the fields it reads: an enum four levels down inside a participant's job type is as fatal as
+   * one on the root object. Array properties are followed through their {@code items}, since the
+   * item's own {@code required} list is what decides whether an element can be parsed at all.
+   *
+   * @param document the parsed API document
+   * @return {@code Schema.property} to its sorted constants; empty when nothing qualifies
+   */
+  private static Map<String, Set<String>> requiredEnumsReachableFromTheContract(JsonNode document) {
+    JsonNode schemas = document.get("components").get("schemas");
+    Map<String, Set<String>> found = new TreeMap<>();
+    Set<String> visited = new TreeSet<>();
+    for (ContractOperation operation : CONTRACT) {
+      for (String root : responseSchemaNames(document, operation)) {
+        walkSchema(schemas, root, visited, found);
+      }
+    }
+    return found;
+  }
+
+  /**
+   * Names the schemas an operation's 2xx responses resolve to.
+   *
+   * @param document the parsed API document
+   * @param operation the contract operation
+   * @return the schema names, following an array response through its {@code items}
+   */
+  private static Set<String> responseSchemaNames(JsonNode document, ContractOperation operation) {
+    JsonNode responses =
+        document.get("paths").get(operation.path()).get(operation.method()).get("responses");
+    Set<String> names = new TreeSet<>();
+    for (Map.Entry<String, JsonNode> response : responses.properties()) {
+      if (!response.getKey().startsWith("2")) {
+        continue;
+      }
+      JsonNode content = response.getValue().get("content");
+      if (content == null) {
+        continue;
+      }
+      for (Map.Entry<String, JsonNode> mediaType : content.properties()) {
+        JsonNode schema = mediaType.getValue().path("schema");
+        String name = schemaName(schema);
+        if (name == null) {
+          name = schemaName(schema.path("items"));
+        }
+        if (name != null) {
+          names.add(name);
+        }
+      }
+    }
+    return names;
+  }
+
+  /**
+   * Visits one schema and everything it reaches, recording its required enum properties.
+   *
+   * @param schemas the document's schema catalogue
+   * @param name the schema to visit
+   * @param visited names already walked, so a cyclic graph terminates
+   * @param found the accumulator, keyed {@code Schema.property}
+   */
+  private static void walkSchema(
+      JsonNode schemas, String name, Set<String> visited, Map<String, Set<String>> found) {
+    if (name == null || !visited.add(name)) {
+      return;
+    }
+    JsonNode schema = schemas.get(name);
+    if (schema == null) {
+      return;
+    }
+    Set<String> required = new TreeSet<>();
+    JsonNode requiredNode = schema.get("required");
+    if (requiredNode != null) {
+      requiredNode.forEach(entry -> required.add(entry.asString()));
+    }
+    JsonNode properties = schema.get("properties");
+    if (properties == null) {
+      return;
+    }
+    for (Map.Entry<String, JsonNode> property : properties.properties()) {
+      JsonNode value = property.getValue();
+      if ("array".equals(value.path("type").asString(""))) {
+        walkSchema(schemas, schemaName(value.path("items")), visited, found);
+        continue;
+      }
+      String target = schemaName(value);
+      JsonNode enumNode = target != null ? schemas.path(target).get("enum") : value.get("enum");
+      if (enumNode != null && required.contains(property.getKey())) {
+        Set<String> constants = new TreeSet<>();
+        enumNode.forEach(entry -> constants.add(entry.asString()));
+        found.put(name + "." + property.getKey(), constants);
+      }
+      walkSchema(schemas, target, visited, found);
+    }
+  }
+
+  /**
+   * Reads a schema node's {@code $ref} target name.
+   *
+   * @param node the schema node
+   * @return the referenced schema's name, or {@code null} when the node is not a reference
+   */
+  private static String schemaName(JsonNode node) {
+    JsonNode ref = node == null ? null : node.get("$ref");
+    return ref == null ? null : ref.asString().substring(ref.asString().lastIndexOf('/') + 1);
+  }
 
   @Test
   @DisplayName("every operation a shipped client depends on is still served, with the same verb")

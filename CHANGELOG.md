@@ -4,6 +4,10 @@
 
 ### Changed
 
+- **Eine neue Enum-Konstante kann eine ausgelieferte App nicht mehr unbemerkt lahmlegen.** Jede *pflichtige* Enum-Eigenschaft, die von einer Vertragsoperation aus erreichbar ist, ist konstantenweise eingefroren; eine Erweiterung lässt jetzt den Backend-Build scheitern. Grund: ein streng parsender Client verliert bei einer unbekannten Konstante nicht das Feld, sondern die **ganze Antwort** — gemessen an der Android-App machte ein einzelner unbekannter `JobTypeDto.archetype` die komplette Einsatz-Detailantwort unlesbar, während die Liste weiterlief. Die Reihenfolge „App-Build zuerst, dann Konstante“ wird damit erzwungen statt gehofft (REQ-API-009).
+
+### Changed
+
 - **Einsatzdetail und Finanzen sind für ausgelieferte Clients eingefroren und auf dem API-vhost freigeschaltet.** `GET /api/v1/missions/{id}` sowie die beiden Finanz-Lesepfade stehen im REQ-API-009-Vertragssatz. Die vhost-Einträge sind UUID-förmig und **verankert**, weil unterhalb von `{id}` fast nur Schreibpfade liegen; zusätzlich weist der vhost jede Nicht-`GET`-Anfrage unterhalb von `/api/v1/missions` mit 405 ab, da eine pfadbasierte Allowlist die Methode nicht sieht und `/missions/{id}` auch `PUT` und `DELETE` beantwortet. Braucht wieder einen manuellen Konfigurationsschritt (Runbook § D.3a).
 
 ### Changed

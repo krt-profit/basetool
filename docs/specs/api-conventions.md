@@ -268,8 +268,14 @@ a subset of this set, and the two move together.
 - [x] A **paged** entry freezes both levels: the guard descends into `content`'s item schema, so
   dropping a field a member actually reads cannot pass while only the envelope is checked. Verified
   by removing the descent — three failures.
-- [ ] Type, nullability and enum changes are caught. **Open** — needs a schema diff of the contract
-  subset against the previous release tag; the current guard sees structure, not types (ADR-0136).
+- [x] **Enum** changes are caught, for the ones that can actually break a shipped client: every
+  **required** enum property reachable from a contract response is frozen constant-by-constant
+  (`theContractRequiredEnumsAreFrozen`). Adding one fails this build, which forces the release
+  order — an app build that knows the constant ships *before* the server starts sending it.
+  Nullable enums are deliberately not frozen: a strict client coerces an unknown one to `null`, so
+  an objective loses its kind badge rather than its screen, and freezing them would make the guard
+  fire on harmless additions until it means nothing. Verified by adding a constant: three failures.
+- [ ] Type and nullability changes are caught. **Open** — needs a schema diff of the contract
 - [ ] A sunset can actually retire old builds. **Open** — depends on the minimum-app-version gate
   (exposure plan item A5), which is therefore a prerequisite for the first `/api/v2`.
 
