@@ -588,6 +588,58 @@ A SIGHUP is not enough here, for the inode reason above.
 
 ---
 
+---
+
+## Phase H — the phase-2 allow-list, in one paste
+
+Every read-only screen of the Android app is built and its paths are in the block of § D.3. The
+vhost still serves only what was pasted before them, so **the app's new screens answer 404 against
+production until this is done**. Nothing else is outstanding: no deploy, no restart, no Keycloak
+change.
+
+This is the whole procedure.
+
+### 1. Merge the stack
+
+The server-side PRs land in order; each one's base retargets itself as the one below it merges. Once
+`main` carries them, the block in § D.3 above is the one to copy.
+
+### 2. Paste the block
+
+Nginx Proxy Manager → **Hosts → Proxy Hosts → `api.profit-base.online` → Advanced**. Replace the
+whole custom-config field with the block from § D.3, and save. Partial pastes are the failure this
+step has already produced once: in August the read-only guard from a block arrived while three
+allow-list lines from the *same* block did not, and the app's Einsatz detail answered 404 with
+nothing anywhere reporting it.
+
+### 3. Verify from outside, not from the host
+
+A hairpinned request does not prove what a phone sees.
+
+```bash
+for p in /api/v1/missions/search /api/v1/operations/search /api/v1/orders /api/v1/inventory/aggregated /api/v1/org-units/bank/balances /api/v1/hangar/my-ships /api/v1/notifications /api/v1/announcement /api/v1/users/me; do printf '%-42s ' "$p"; curl -s -o /dev/null -w '%{http_code}' "https://api.profit-base.online$p"; echo; done
+```
+
+Expected, per § D.3a's table: **200** for `/missions/search`, **401** for every other line above. A
+**404** anywhere means the paste did not take — that path is missing from the block.
+
+Then one write, which must be refused by the vhost rather than by the backend:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}' -X POST https://api.profit-base.online/api/v1/orders; echo
+```
+
+Expected **405**. This one matters more than it looks: the same path answers a `POST` that is
+`permitAll` by design — the public request form — so only the verb separates it from the queue read.
+
+### 4. Let the nightly probe take over
+
+`edge-deny-probe` asserts the whole table every night from a GitHub runner, which is the only
+vantage point outside the host. From the merge until the paste it will be **red, and correctly so**:
+it is reporting exactly the state step 2 fixes. If you paste the same day, you will not see it.
+
+---
+
 ## Phase G — flip the audience enforcement (D5, release gate)
 
 **This gate must close before the app is released**, not later. Until it is flipped, the backend

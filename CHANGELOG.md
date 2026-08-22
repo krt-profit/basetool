@@ -4,6 +4,10 @@
 
 ### Changed
 
+- **Der nächtliche Edge-Probe deckt jetzt die vollständige Phase-2-Allowlist ab**, inklusive der einen Stelle, an der nur das Verb zwei Oberflächen trennt: `POST /api/v1/orders` ist der öffentliche Antragsweg und muss auf dem API-vhost mit 405 abgewiesen werden. Dazu steht im Runbook jetzt eine Schritt-für-Schritt-Anleitung für den einen verbleibenden manuellen Schritt (Phase H).
+
+### Changed
+
 - **Die letzten Phase-2-Lesepfade sind eingefroren und für den API-vhost vorbereitet:** Lager-Baum, Auftragswarteschlange samt Detail und die Org-Bank (Salden, Kontodetail, Buchungen). Alles als exakte Pfade, und die schreibende Hälfte bleibt draußen — bei `/api/v1/orders` trennt nur das Verb den öffentlichen Antragsweg von der Warteschlangenansicht, weshalb der Read-Only-Schutz des vhosts diese Familie jetzt mit abdeckt.
 - **Die Hangar-Lesepfade sind eingefroren und für den API-vhost vorbereitet.** Die eigene Schiffsliste und die Aggregation über die aktive Org-Einheit stehen im REQ-API-009-Vertragssatz — als exakte Pfade, denn dieselbe Familie trägt die Schiffe *aller* Mitglieder, die Admin-Ansicht und die Schreibverben. Der Vertrags-Guard prüft jetzt auch verschachtelte Objekte, nicht nur Listen: bisher war bei einem Schiff nur `shipType` eingefroren, nicht dessen `name` — also genau das, was auf der Karte steht.
 - **Die Ankündigung ist für ausgelieferte Clients eingefroren und für den API-vhost vorbereitet.** `GET /api/v1/announcement` steht im REQ-API-009-Vertragssatz — einschließlich der 204-Antwort, wenn es nichts anzukündigen gibt: ein Client, der die leere Antwort als Fehler liest, zeigt eine Störung, wo „kein Banner" richtig wäre. Der Pfad ist exakt freigeschaltet, nicht als Präfix, weil darunter die Admin-Ansicht und der Schreibpfad derselben Zeile liegen.

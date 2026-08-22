@@ -98,11 +98,22 @@ jobs:
             probe GET "$p" 401
           done
 
-          # Only paths the vhost ALREADY serves are asserted here. A path joins this list in the
-          # change that pastes it into the proxy host, never in the change that merely writes it
-          # into the runbook -- otherwise every merge opens a window in which the nightly run is
-          # red for a paste that has not happened yet, which is how a red run stops being read.
-          # Phase 2's Operationen reads join when the block is pasted (runbook § D.3a).
+          # Phase 2's remaining reads. These join together with the paste that opens them
+          # (runbook § Phase H): between merging this and pasting the block, the run is red and
+          # correctly so -- it is reporting exactly the state the paste fixes.
+          for p in /api/v1/operations/search /api/v1/orders /api/v1/inventory/aggregated \
+                   /api/v1/inventory/all/grouped /api/v1/org-units/bank/balances \
+                   /api/v1/hangar/my-ships /api/v1/hangar/squadron-overview \
+                   /api/v1/notifications /api/v1/notifications/unread-count \
+                   /api/v1/notifications/stream /api/v1/announcement /api/v1/users/me; do
+            probe GET "$p" 401
+          done
+
+          # The one where only the VERB separates two surfaces: this path also answers a POST that
+          # is permitAll by design (the public request form), and the vhost's read-only guard is
+          # what keeps it off this host.
+          probe POST /api/v1/orders 405
+
 
           # Default deny.
           probe GET /api/v1/definitely-not-allow-listed 404
