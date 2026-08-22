@@ -191,6 +191,40 @@ class ExternalContractTest {
               "/api/v1/missions/{missionId}/finance-entries/summary",
               "get",
               Set.of("total", "incomeSum", "incomeCount", "expenseSum", "expenseCount")),
+          // Phase 2, the dashboard's announcement band. `content` is the whole point of the
+          // operation, and the endpoint answers 204 when there is nothing to announce -- a
+          // no-content answer the client must read as "no banner", never as a failure. That
+          // distinction lives in the client (`ApiReader.getOptional`), because a schema cannot
+          // express "and sometimes there is no body".
+          new ContractOperation("/api/v1/announcement", "get", Set.of("content", "updatedAt")),
+          // Phase 2, the notification inbox. `params` is frozen as a field but its CONTENT is
+          // not a contract this guard can hold: the app renders each notification from
+          // `notifications.type.<TYPE>` with those named placeholders substituted, so a renamed
+          // placeholder changes a sentence the server never sees. The client's answer is to fall
+          // back to the generic wording when a placeholder cannot be filled -- a defence that
+          // belongs there, because no schema check can express it.
+          new ContractOperation(
+              "/api/v1/notifications",
+              "get",
+              Set.of(
+                  "content",
+                  "page",
+                  "totalElements",
+                  "totalPages",
+                  "id",
+                  "type",
+                  "params",
+                  "entityType",
+                  "entityId",
+                  "read",
+                  "createdAt")),
+          new ContractOperation("/api/v1/notifications/unread-count", "get", Set.of("count")),
+          // The push channel. Its response is a stream, not a schema, so the field assertion here
+          // is vacuous by nature -- what this entry is worth is the OTHER guard: the path and verb
+          // must keep existing. The event NAMES (`connected`, `notification`, `heartbeat`,
+          // `replaced`) are the real contract and are pinned in the app's spec, since nothing in
+          // this document describes them.
+          new ContractOperation("/api/v1/notifications/stream", "get", Set.of()),
           // Phase 2, the caller's own record. The app needs exactly one field of it: its own
           // backend user id. An Operation's payout rows are keyed by that id -- not by the
           // Keycloak `sub` the app holds, and not by a name -- so "Dein Anteil" cannot be found

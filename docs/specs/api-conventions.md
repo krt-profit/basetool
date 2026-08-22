@@ -247,6 +247,10 @@ constraint for nothing and record a guess about which fields matter.
 | `GET /api/v1/operations/search`                            | envelope `content`, `page`, `totalElements`, `totalPages`; row `id`, `name`, `status`                                                                                                                                                                                                                                                       |
 | `GET /api/v1/operations/{id}`                              | `id`, `name`, `description`, `status`, `payoutPreliminary`                                                                                                                                                                                                                                                                                  |
 | `GET /api/v1/operations/{id}/finance-summary`              | `operationId`, `totalSum`, `truncated`; row `missionId`, `missionName`, `totalSum`                                                                                                                                                                                                                                                          |
+| `GET /api/v1/announcement`                                 | `content`, `updatedAt` — **and a `204` with no body at all when nothing is announced**                                                                                                                                                                                                                                                      |
+| `GET /api/v1/notifications`                                | envelope `content`, `page`, `totalElements`, `totalPages`; row `id`, `type`, `params`, `entityType`, `entityId`, `read`, `createdAt`                                                                                                                                                                                                        |
+| `GET /api/v1/notifications/unread-count`                   | `count`                                                                                                                                                                                                                                                                                                                                     |
+| `GET /api/v1/notifications/stream`                         | *(a stream, not a schema — the frozen part is the path, the verb and the event names)*                                                                                                                                                                                                                                                      |
 | `GET /api/v1/operations/{id}/payouts`                      | `totalDonations`; row `participantId`, `participantName`, `payoutPreference`, `shareAmount`, `donatedAmount`, `payoutAmount`, `paidOut`                                                                                                                                                                                                     |
 
 `GET /api/v1/users/me` is frozen for a single field. An Operation's payout rows are keyed by the
@@ -254,6 +258,26 @@ constraint for nothing and record a guess about which fields matter.
 `displayName` when set and `username` otherwise and therefore cannot be matched reliably. Without
 `id` the app cannot tell a member which of eighteen payout rows is theirs. The rest of the
 response — email, roles, rank, memberships — stays unfrozen because the app does not read it.
+
+`GET /api/v1/announcement` answers **`204 No Content`** when there is nothing to announce, and
+that is part of its contract even though no schema can say so. A client that treated the empty body
+as a parse failure would show an error where the correct rendering is "no banner"; the app reads it
+through a dedicated optional-read path for that reason. Changing the endpoint to answer `200` with
+an empty object instead would break every client that already special-cases the `204`.
+
+`GET /api/v1/notifications/stream` is in the set for what the *other* guard proves: the path and
+verb must keep existing. Its body is a Server-Sent-Event stream, so the response-field assertion is
+vacuous by nature, and the real contract is the **event names** — `connected`, `notification`,
+`heartbeat`, `replaced`. Nothing in `openapi.json` describes them, so they are pinned in the app's
+own spec instead of being left to a schema check that cannot see them. Its response carries
+`X-Accel-Buffering: no`, which is what keeps an nginx from holding a trickling stream in a buffer;
+the guarantee travels with the endpoint rather than depending on a vhost's defaults.
+
+`params` on a notification is frozen as a **field**, and its content deliberately is not. The app
+renders each notification from `notifications.type.<TYPE>` with those named placeholders
+substituted, so a renamed placeholder changes a sentence no schema check can see. The client's
+defence is to fall back to the generic wording when a placeholder cannot be filled — which belongs
+there, not here.
 
 The Operationen entries freeze `truncated` and `payoutPreliminary` deliberately. Both are fields
 that qualify a number rather than carry one: `truncated` says the per-mission roll-up is capped

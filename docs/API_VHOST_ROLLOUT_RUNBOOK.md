@@ -318,6 +318,16 @@ if ($uri = "/api/v1/operations/search") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/finance-summary$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/payouts$") { set $krt_api_allowed 1; }
+# Phase 2 - the notification inbox, its badge count and its push stream. EXACT paths: the
+# family's mutating half (`/read-all`, `/read`, `/{id}`, `/{id}/read`) is a POST and two
+# DELETEs, and the read-only guard below refuses them by verb as well.
+if ($uri = "/api/v1/notifications") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/notifications/unread-count") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/notifications/stream") { set $krt_api_allowed 1; }
+# Phase 2 - the dashboard's announcement band. EXACT path: /api/v1/announcement/admin is
+# the admin read of the same row and /api/v1/announcement itself also answers PUT, so a
+# prefix would carry both onto a vhost that exists to keep them off it.
+if ($uri = "/api/v1/announcement") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- The missions and operations families are READ-ONLY on this vhost ---------
@@ -332,7 +342,7 @@ if ($krt_api_allowed = 0) { return 404; }
 # the harder half: this guard is verb-blind by design, so opening one write means naming it
 # explicitly rather than widening the family.
 set $krt_readonly_family "";
-if ($uri ~ "^/api/v1/(missions|operations)") { set $krt_readonly_family "R"; }
+if ($uri ~ "^/api/v1/(missions|operations|notifications|announcement)") { set $krt_readonly_family "R"; }
 if ($request_method !~ "^(GET|HEAD)$") { set $krt_readonly_family "${krt_readonly_family}W"; }
 if ($krt_readonly_family = "RW") { return 405; }
 
@@ -401,6 +411,10 @@ The safe order, and the reason for it:
    | `/api/v1/terms/acceptance` (POST)                 | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/me/active-org-unit`                      | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/me/capabilities`                         | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/announcement`                            | **401**                                                             | no chain matcher makes it public                                                                         |
+   | `/api/v1/notifications`                           | **401**                                                             | me-scoped inbox                                                                                          |
+   | `/api/v1/notifications/unread-count`              | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/notifications/stream`                    | **401**                                                             | me-scoped SSE                                                                                            |
    | `/api/v1/users/me`                                | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/users/me/registration-status`            | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/users/me/memberships`                    | **401**                                                             | me-scoped                                                                                                |
