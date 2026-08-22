@@ -1775,12 +1775,22 @@ endpoint answers exactly as cheerfully as an authenticated one.
 
 The anonymous surface, complete:
 
-|           Operation           |                                        Why it is anonymous                                         |                                             What an anonymous caller gets                                              |
-|-------------------------------|----------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
-| `GET /api/v1/terms/document`  | ADR-0138 — wording everyone must read *before* agreeing cannot require having agreed               | the same text already world-readable at `/terms`                                                                       |
-| `GET /api/v1/missions/search` | the public home page (`/`, `permitAll`) renders its upcoming-Einsatz tiles from this very endpoint | `PLANNED` + `ACTIVE`, **non-internal** rows only, through the outsider redaction in `MissionController#searchMissions` |
+|           Operation           |                                        Why it is anonymous                                         |                                                                             What an anonymous caller gets                                                                              |
+|-------------------------------|----------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `GET /api/v1/terms/document`  | ADR-0138 — wording everyone must read *before* agreeing cannot require having agreed               | the same text already world-readable at `/terms`                                                                                                                                       |
+| `GET /api/v1/missions/search` | the public home page (`/`, `permitAll`) renders its upcoming-Einsatz tiles from this very endpoint | `PLANNED` + `ACTIVE`, **non-internal** rows only, through the outsider redaction in `MissionController#searchMissions`                                                                 |
+| `GET /api/v1/missions/{id}`   | the same public surface, one Einsatz deep                                                          | the redacted DTO of ADR-0034 — no description, no owner, no managers, participants without payout preference or comment; an **internal** or **terminal** Einsatz is refused with `403` |
 
-Everything else on the list is me-scoped and answers `401` without a token.
+Everything else on the list is me-scoped and answers `401` without a token — the Finanzen
+endpoints among them (`isAuthenticated() and isMemberOrAbove() and canSeeMission`), which is
+why a mission's money is reachable from the app and not from the internet even though the
+mission itself is.
+
+**The missions family is additionally read-only on this vhost.** `/api/v1/missions/<uuid>`
+answers `PUT` and `DELETE` as well as `GET`, and an allow-list that matches on the path cannot
+tell them apart, so the vhost refuses every non-`GET` under `/api/v1/missions` with `405`
+before the request reaches the backend. `@PreAuthorize` would refuse them too; the point is
+that it does not have to be the only thing that does.
 
 **The mission search publishes more than the home page does, and that is accepted rather than
 overlooked.** Each row is redacted identically, but the page caps itself at seven days and fifty

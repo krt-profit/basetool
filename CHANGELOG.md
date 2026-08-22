@@ -4,6 +4,10 @@
 
 ### Changed
 
+- **Einsatzdetail und Finanzen sind für ausgelieferte Clients eingefroren und auf dem API-vhost freigeschaltet.** `GET /api/v1/missions/{id}` sowie die beiden Finanz-Lesepfade stehen im REQ-API-009-Vertragssatz. Die vhost-Einträge sind UUID-förmig und **verankert**, weil unterhalb von `{id}` fast nur Schreibpfade liegen; zusätzlich weist der vhost jede Nicht-`GET`-Anfrage unterhalb von `/api/v1/missions` mit 405 ab, da eine pfadbasierte Allowlist die Methode nicht sieht und `/missions/{id}` auch `PUT` und `DELETE` beantwortet. Braucht wieder einen manuellen Konfigurationsschritt (Runbook § D.3a).
+
+### Changed
+
 - **Die anonyme Oberfläche des API-vhosts ist jetzt vollständig aufgezählt statt beiläufig.** Zwei Endpunkte antworten dort bewusst ohne Token — der Nutzungsbedingungstext und die Einsatzsuche, deren gastredigierte Zeilen die öffentliche Startseite ohnehin anzeigt. Beide stehen mit Begründung in REQ-SEC-037. Die Prüfanweisung im Rollout-Runbook nannte pauschal „401 ist bestanden“ und schlug deshalb bei genau diesen Pfaden falschen Alarm; sie liest den erwarteten Status jetzt aus einer Tabelle pro Pfad.
 
 ## [v1.5.61](https://github.com/krt-profit/basetool/releases/tag/v1.5.61) - 2026-08-21

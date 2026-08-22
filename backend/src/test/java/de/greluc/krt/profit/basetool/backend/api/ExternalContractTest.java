@@ -136,7 +136,58 @@ class ExternalContractTest {
                   "isInternal",
                   "operation",
                   "owningSquadron",
-                  "meetingPoint")));
+                  "meetingPoint")),
+          // Phase 2, the Einsatz detail. Anonymous by design like the search above it, and
+          // redacted for an outsider by MissionGuestRedactor (ADR-0034): no description, no owner,
+          // no managers, and each participant loses their payout preference and comment. An
+          // internal or terminal Einsatz is refused outright with 403. What is frozen here is what
+          // the app reads for its seven tabs -- the counters and the four planning collections
+          // among them, since a tab whose collection vanished would render as an empty screen with
+          // no error anywhere.
+          new ContractOperation(
+              "/api/v1/missions/{id}",
+              "get",
+              Set.of(
+                  "id",
+                  "name",
+                  "description",
+                  "status",
+                  "meetingTime",
+                  "plannedStartTime",
+                  "actualStartTime",
+                  "plannedEndTime",
+                  "isInternal",
+                  "meetingPoint",
+                  "operation",
+                  "owningSquadron",
+                  "partyLeadUser",
+                  "partyLeadGuestName",
+                  "registeredParticipants",
+                  "checkedInParticipants",
+                  "participants",
+                  "assignedUnits",
+                  "steps",
+                  "objectives",
+                  "frequencies")),
+          // The Finanzen tab. Unlike the two above it this one is NOT anonymous:
+          // `isAuthenticated() and isMemberOrAbove() and canSeeMission(#missionId)`, so it answers
+          // 401 without a token and 403 to a guest (REQ-SEC-037).
+          new ContractOperation(
+              "/api/v1/missions/{missionId}/finance-entries",
+              "get",
+              Set.of(
+                  "content",
+                  "page",
+                  "totalElements",
+                  "totalPages",
+                  "id",
+                  "type",
+                  "amount",
+                  "note")),
+          new ContractOperation(
+              "/api/v1/missions/{missionId}/finance-entries/summary",
+              "get",
+              Set.of("total", "incomeSum", "incomeCount", "expenseSum", "expenseCount")));
 
   @Test
   @DisplayName("every operation a shipped client depends on is still served, with the same verb")
