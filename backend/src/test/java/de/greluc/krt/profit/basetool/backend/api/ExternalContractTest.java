@@ -199,6 +199,107 @@ class ExternalContractTest {
               "/api/v1/missions/{missionId}/finance-entries/summary",
               "get",
               Set.of("total", "incomeSum", "incomeCount", "expenseSum", "expenseCount")),
+          // Phase 2, the Lager tree. Two reads, one per level: the aggregate is the group
+          // row a member sees first, and the grouped read fills a group they opened. Neither is
+          // `/inventory/all`, which is the flat entry list -- a tree that fetched every leaf to
+          // draw its roots would pull the whole warehouse to show a dozen headings.
+          new ContractOperation(
+              "/api/v1/inventory/aggregated",
+              "get",
+              Set.of(
+                  "content",
+                  "page",
+                  "totalElements",
+                  "totalPages",
+                  "material",
+                  "amount",
+                  "quality",
+                  "maxQuality",
+                  "name",
+                  "quantityType")),
+          new ContractOperation(
+              "/api/v1/inventory/all/grouped",
+              "get",
+              Set.of(
+                  "material",
+                  "totalAmount",
+                  "averageQuality",
+                  "maxQuality",
+                  "stacks",
+                  "user",
+                  "location",
+                  "personal",
+                  "entryCount")),
+          // Phase 2, the Aufträge queue and one order in full. `redacted` is frozen because it is
+          // the field that tells the screen it is looking at a reduced order (REQ-ORDERS-023): a
+          // requester sees their own order without the parts that are not theirs, and a client
+          // that stopped seeing the flag would present the gaps as the whole truth.
+          new ContractOperation(
+              "/api/v1/orders",
+              "get",
+              Set.of(
+                  "content",
+                  "page",
+                  "totalElements",
+                  "totalPages",
+                  "id",
+                  "displayId",
+                  "status",
+                  "priority",
+                  "type",
+                  "createdAt",
+                  "materials",
+                  "redacted")),
+          new ContractOperation(
+              "/api/v1/orders/{id}",
+              "get",
+              Set.of(
+                  "id",
+                  "displayId",
+                  "status",
+                  "priority",
+                  "type",
+                  "comment",
+                  "createdAt",
+                  "materials",
+                  "aggregatedMaterials",
+                  "assignees",
+                  "handovers",
+                  "redacted",
+                  "requestingOrgUnit",
+                  "responsibleOrgUnit")),
+          // Phase 2, the org bank a member may see. `/org-units/bank/**`, never
+          // `/bank/accounts/**`: the latter is the bank-employee surface and lists every account.
+          new ContractOperation(
+              "/api/v1/org-units/bank/balances",
+              "get",
+              Set.of(
+                  "accountId",
+                  "accountNo",
+                  "accountName",
+                  "balance",
+                  "delta30d",
+                  "sparkline",
+                  "orgUnitName")),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}",
+              "get",
+              Set.of(
+                  "detail", "account", "delta30d", "bookingCount", "name", "accountNo", "balance")),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/transactions",
+              "get",
+              Set.of(
+                  "content",
+                  "page",
+                  "totalElements",
+                  "totalPages",
+                  "postingId",
+                  "type",
+                  "amount",
+                  "note",
+                  "createdAt",
+                  "holderHandle")),
           // Phase 2, the member's own hangar. The row's `shipType` and `location` are nested
           // objects whose `name` is what the card actually shows, which is why the guard now
           // descends into a referenced schema and not only into an array's items.

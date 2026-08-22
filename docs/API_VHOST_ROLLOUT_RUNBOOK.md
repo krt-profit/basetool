@@ -333,6 +333,20 @@ if ($uri = "/api/v1/announcement") { set $krt_api_allowed 1; }
 # create/update/delete verbs. Only the caller's own list and the org aggregate belong here.
 if ($uri = "/api/v1/hangar/my-ships") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/hangar/squadron-overview") { set $krt_api_allowed 1; }
+# Phase 2 - the Lager tree. Two levels, two exact paths. NOT /api/v1/inventory/all, which
+# is the flat entry list, and not the booking paths beside them.
+if ($uri = "/api/v1/inventory/aggregated") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/inventory/all/grouped") { set $krt_api_allowed 1; }
+# Phase 2 - the Auftraege queue and one order. The queue path is EXACT: the same path
+# answers POST, and that POST is permitAll in the chain (the public request form). The
+# read-only guard below refuses it here, and the allow-list never names it.
+if ($uri = "/api/v1/orders") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+# Phase 2 - the org bank a member may see. /org-units/bank/**, never /bank/accounts/**:
+# the latter is the bank-employee surface and lists every account in the organisation.
+if ($uri = "/api/v1/org-units/bank/balances") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/transactions$") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- The missions and operations families are READ-ONLY on this vhost ---------
@@ -347,7 +361,7 @@ if ($krt_api_allowed = 0) { return 404; }
 # the harder half: this guard is verb-blind by design, so opening one write means naming it
 # explicitly rather than widening the family.
 set $krt_readonly_family "";
-if ($uri ~ "^/api/v1/(missions|operations|notifications|announcement|hangar)") { set $krt_readonly_family "R"; }
+if ($uri ~ "^/api/v1/(missions|operations|notifications|announcement|hangar|inventory|orders|org-units)") { set $krt_readonly_family "R"; }
 if ($request_method !~ "^(GET|HEAD)$") { set $krt_readonly_family "${krt_readonly_family}W"; }
 if ($krt_readonly_family = "RW") { return 405; }
 
@@ -416,6 +430,13 @@ The safe order, and the reason for it:
    | `/api/v1/terms/acceptance` (POST)                 | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/me/active-org-unit`                      | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/me/capabilities`                         | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/inventory/aggregated`                    | **401**                                                             | chain requires a member role                                                                             |
+   | `/api/v1/inventory/all/grouped`                   | **401**                                                             | same                                                                                                     |
+   | `/api/v1/orders`                                  | **401**                                                             | `isAuthenticated()`; the `POST` on the same path is refused by the read-only guard                       |
+   | `/api/v1/orders/<uuid>`                           | **401**                                                             | `isAuthenticated()` + scope                                                                              |
+   | `/api/v1/org-units/bank/balances`                 | **401**                                                             | me-scoped to the accounts the caller may see                                                             |
+   | `/api/v1/org-units/bank/accounts/<uuid>`          | **401**                                                             | same                                                                                                     |
+   | `/api/v1/org-units/bank/accounts/<uuid>/transactions` | **401**                                                         | same                                                                                                     |
    | `/api/v1/hangar/my-ships`                         | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/hangar/squadron-overview`                | **401**                                                             | scoped to the active org unit                                                                            |
    | `/api/v1/announcement`                            | **401**                                                             | no chain matcher makes it public                                                                         |
