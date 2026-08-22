@@ -1807,6 +1807,14 @@ that does. Under operations the write that matters is `PUT
 opening it means naming that one path rather than widening the family, because the guard is
 verb-blind by design.
 
+**The notification stream is on the allow-list, and it is the entry that would cost the most if it
+were wrong.** An SSE endpoint reachable without a token would not leak one response but hold a
+connection open and feed it another member's events for as long as it lived. It is me-scoped
+(`@PreAuthorize("isAuthenticated()")` on the controller, recipient resolved from the JWT `sub`), so
+it answers `401` — asserted, like every other row, by `ApiVhostAnonymousSurfaceTest`. The mutating
+half of the family (`POST /read-all`, `DELETE /read`, `DELETE /{id}`, `POST /{id}/read`) is off the
+list *and* refused by the read-only guard, which covers `notifications` as well.
+
 **The four Operationen reads answer `401`, not the `403` their Einsatz neighbours give.** Nothing
 in the chain's matcher list names `/api/v1/operations/**`, so they fall through to
 `anyRequest().authenticated()` and are refused before the dispatch, where the entry point writes
