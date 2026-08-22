@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die anonyme Oberfläche des API-vhosts ist jetzt vollständig aufgezählt statt beiläufig.** Zwei Endpunkte antworten dort bewusst ohne Token — der Nutzungsbedingungstext und die Einsatzsuche, deren gastredigierte Zeilen die öffentliche Startseite ohnehin anzeigt. Beide stehen mit Begründung in REQ-SEC-037. Die Prüfanweisung im Rollout-Runbook nannte pauschal „401 ist bestanden“ und schlug deshalb bei genau diesen Pfaden falschen Alarm; sie liest den erwarteten Status jetzt aus einer Tabelle pro Pfad.
+
 ## [v1.5.61](https://github.com/krt-profit/basetool/releases/tag/v1.5.61) - 2026-08-21
 
 ### Changed

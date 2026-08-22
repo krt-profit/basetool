@@ -1760,6 +1760,68 @@ DEBUG with the account's UUID and the two set sizes — never the username (REQ-
 `CustomJwtGrantedAuthoritiesConverter#assembleFor(User, Collection)` · **Configuration:**
 `app.security.partial-role-scope.client-ids`
 
+### REQ-SEC-037 — The public API vhost's anonymous surface is enumerated, not incidental
+
+The vhost is a default-deny allow-list (ADR-0135), and every path on it **inherits whatever
+authentication the backend requires of that path**. That is deliberately not uniform: most of the
+API is `authenticated()`, and a few operations are `permitAll` because something already public
+depends on them. Allow-listing therefore decides *reachability*, never *authorisation* — and the two
+are easy to conflate, because the list looks like a security control and is only half of one.
+
+**Each path admitted to the allow-list MUST have its anonymous status stated when it is added.** A
+path that turns out anonymous when nobody intended it is the failure this exists to prevent, and it
+is not catchable afterwards: nothing in CI can see what the vhost serves, and an unauthenticated
+endpoint answers exactly as cheerfully as an authenticated one.
+
+The anonymous surface, complete:
+
+|           Operation           |                                        Why it is anonymous                                         |                                             What an anonymous caller gets                                              |
+|-------------------------------|----------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
+| `GET /api/v1/terms/document`  | ADR-0138 — wording everyone must read *before* agreeing cannot require having agreed               | the same text already world-readable at `/terms`                                                                       |
+| `GET /api/v1/missions/search` | the public home page (`/`, `permitAll`) renders its upcoming-Einsatz tiles from this very endpoint | `PLANNED` + `ACTIVE`, **non-internal** rows only, through the outsider redaction in `MissionController#searchMissions` |
+
+Everything else on the list is me-scoped and answers `401` without a token.
+
+**The mission search publishes more than the home page does, and that is accepted rather than
+overlooked.** Each row is redacted identically, but the page caps itself at seven days and fifty
+rows while the API takes an arbitrary `start`/`end` and pages through the whole result — so the
+reachable *window* is larger, and JSON is a friendlier scraping target than rendered HTML.
+Requiring a token was considered and rejected: the home page consumes this endpoint
+**anonymously** through the frontend's own client, so authenticating it would blank the tiles for
+every visitor who is not logged in. The rows carry no member identity, and the edge per-IP limiter
+(REQ-SEC-023, 20 r/s burst 80, keyed per IPv4 and per IPv6 `/64`) applies to this host like every
+other, which bounds enumeration without adding a control.
+
+**`permitAll` in the filter chain is not the whole rule.** `/api/v1/missions/**` is `permitAll`
+there, and `POST /api/v1/missions` is nonetheless refused to an anonymous caller by
+`@PreAuthorize("isAuthenticated()")` on the method — this project puts authorization at the method
+seam by design. Auditing the filter chain alone therefore *over*-reports the anonymous surface;
+both layers have to be read together, which is why the table above lists operations rather than
+matchers.
+
+**Acceptance**
+
+- [x] Every allow-listed path has a recorded expected status without a token, and the rollout
+  runbook's verification step reads from that table rather than assuming one answer for all of them
+  (§ D.3a). The previous single-number check raised a false alarm the first time it was run against
+  a `permitAll` path.
+- [x] Both anonymous operations are named, each with the already-public surface it mirrors.
+- [x] `POST /api/v1/missions` was checked specifically: `permitAll` in the chain,
+  `isAuthenticated()` at the method, so an anonymous create is refused — and it is not on the
+  allow-list either.
+- [x] The edge rate limiter covers this host without a per-host entry:
+  `docker/maintenance/nginx/server_proxy.conf` is included into every proxy host's server block.
+- [ ] A check that fails when an allow-listed path becomes anonymous without the table moving.
+  **Open, and honestly hard** — the vhost's configuration lives in NPM's database, so nothing in CI
+  can read it. The nightly `edge-deny-probe` workflow is the only vantage point that could assert
+  it from outside.
+
+**Enforced by:** review at the moment a path is added — deliberately a documented obligation rather
+than a test, for the reason in the open item above · **Code:** `SecurityConfig` (filter chain),
+`MissionController#searchMissions` (outsider redaction), `HomeController#home` (the anonymous
+consumer) · **Decision:** [ADR-0135](../adr/0135-public-api-vhost-not-a-gateway.md),
+[ADR-0138](../adr/0138-terms-wording-is-a-backend-resource.md)
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the

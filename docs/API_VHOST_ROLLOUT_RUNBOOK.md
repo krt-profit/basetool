@@ -338,19 +338,34 @@ The safe order, and the reason for it:
    same PR. Opening a family to the app and freezing its shape are the same decision seen from two
    sides.
 2. Paste the block into **Clients → the proxy host → Advanced**, save.
-3. Verify from outside, not from the host — a hairpinned request does not prove what a phone sees:
+3. Verify from outside, not from the host — a hairpinned request does not prove what a phone
+   sees:
 
    ```bash
-   curl -s -o /dev/null -w '%{http_code}
+   curl -s -o /dev/null -w '%{http_code}' https://api.profit-base.online/api/v1/missions/search; echo
    ```
 
-' https://api.profit-base.online/api/v1/missions/search
+   **The expected status is per path, not one number for all of them.** An allow-listed path
+   inherits whatever the backend requires of it, and that is deliberately not uniform — two are
+   anonymous by design (REQ-SEC-037). Reading "401 is the pass" off a `permitAll` path produces a
+   false alarm, which is exactly what happened the first time this step was run.
 
-```
+   |                  Path                  | Without a token |                                                   Why                                                    |
+   |----------------------------------------|-----------------|----------------------------------------------------------------------------------------------------------|
+   | `/api/v1/terms/document`               | **200**         | anonymous by design (ADR-0138): wording that must be read *before* agreeing cannot require having agreed |
+   | `/api/v1/missions/search`              | **200**         | anonymous by design: the public home page already renders its guest-redacted rows                        |
+   | `/api/v1/terms/status`                 | **401**         | me-scoped                                                                                                |
+   | `/api/v1/terms/acceptance` (POST)      | **401**         | me-scoped                                                                                                |
+   | `/api/v1/me/active-org-unit`           | **401**         | me-scoped                                                                                                |
+   | `/api/v1/me/capabilities`              | **401**         | me-scoped                                                                                                |
+   | `/api/v1/users/me/registration-status` | **401**         | me-scoped                                                                                                |
+   | `/api/v1/users/me/memberships`         | **401**         | me-scoped                                                                                                |
+   | anything not on the list               | **404**         | default deny                                                                                             |
 
-**401 is the pass.** It means the path reached the backend and was refused for want of a token.
-**404 means the allow-list still denies it** — the paste did not take. Any 2xx would mean an
-unauthenticated read, which is a different and much worse problem.
+   A **404 where the table names a status** means the paste did not take. A **200 where the table
+   says 401** is the serious one — an unauthenticated read of member data. A **401 where the table
+   says 200** means the backend's rule moved under the vhost, which is worth knowing too.
+
 4. A path that is no longer consumed comes back **out** on the same terms.
 
 The edge per-IP rate limiter needs no entry here: `docker/maintenance/nginx/server_proxy.conf` is
