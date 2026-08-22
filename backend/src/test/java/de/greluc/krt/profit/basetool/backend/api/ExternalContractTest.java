@@ -172,7 +172,9 @@ class ExternalContractTest {
                   "frequencies")),
           // The Finanzen tab. Unlike the two above it this one is NOT anonymous:
           // `isAuthenticated() and isMemberOrAbove() and canSeeMission(#missionId)`, so it answers
-          // 401 without a token and 403 to a guest (REQ-SEC-037).
+          // 403 to an anonymous caller and to a guest alike -- not 401, because the chain is
+          // permitAll here and the refusal happens at the method seam (REQ-SEC-037, pinned by
+          // ApiVhostAnonymousSurfaceTest).
           new ContractOperation(
               "/api/v1/missions/{missionId}/finance-entries",
               "get",

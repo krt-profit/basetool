@@ -4,6 +4,10 @@
 
 ### Changed
 
+- **Die Rollout-Prüfung des API-vhosts nannte für die beiden Finanz-Lesepfade den falschen Status.** Ohne Token antworten sie mit **403**, nicht mit 401: unterhalb von `/api/v1/missions/**` ist die Filterkette `permitAll`, die Abweisung entsteht erst an der Methode und wird dort als 403 gerendert. Beide Pfade sind unverändert dicht — nur die Zahl in der Prüftabelle war falsch, und ein neuer Test hält sie jetzt fest (REQ-SEC-037, Runbook § D.3a).
+
+### Changed
+
 - **Eine neue Enum-Konstante kann eine ausgelieferte App nicht mehr unbemerkt lahmlegen.** Jede *pflichtige* Enum-Eigenschaft, die von einer Vertragsoperation aus erreichbar ist, ist konstantenweise eingefroren; eine Erweiterung lässt jetzt den Backend-Build scheitern. Grund: ein streng parsender Client verliert bei einer unbekannten Konstante nicht das Feld, sondern die **ganze Antwort** — gemessen an der Android-App machte ein einzelner unbekannter `JobTypeDto.archetype` die komplette Einsatz-Detailantwort unlesbar, während die Liste weiterlief. Die Reihenfolge „App-Build zuerst, dann Konstante“ wird damit erzwungen statt gehofft (REQ-API-009).
 
 ### Changed

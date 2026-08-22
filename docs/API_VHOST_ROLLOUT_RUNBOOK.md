@@ -372,8 +372,8 @@ The safe order, and the reason for it:
    | `/api/v1/missions/search`                         | **200**                                                             | anonymous by design: the public home page already renders its guest-redacted rows                        |
    | `/api/v1/missions/<uuid>`                         | **200** for a non-internal, non-terminal Einsatz, **403** otherwise | anonymous by design, redacted per ADR-0034                                                               |
    | `/api/v1/missions/<uuid>` with `PUT`/`DELETE`     | **405**                                                             | the family is read-only on this vhost                                                                    |
-   | `/api/v1/missions/<uuid>/finance-entries`         | **401**                                                             | member-or-above **and** `canSeeMission`                                                                  |
-   | `/api/v1/missions/<uuid>/finance-entries/summary` | **401**                                                             | member-or-above **and** `canSeeMission`                                                                  |
+   | `/api/v1/missions/<uuid>/finance-entries`         | **403**                                                             | member-or-above **and** `canSeeMission`, refused at the method seam — see below                          |
+   | `/api/v1/missions/<uuid>/finance-entries/summary` | **403**                                                             | member-or-above **and** `canSeeMission`, refused at the method seam — see below                          |
    | `/api/v1/terms/status`                            | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/terms/acceptance` (POST)                 | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/me/active-org-unit`                      | **401**                                                             | me-scoped                                                                                                |
@@ -382,9 +382,20 @@ The safe order, and the reason for it:
    | `/api/v1/users/me/memberships`                    | **401**                                                             | me-scoped                                                                                                |
    | anything not on the list                          | **404**                                                             | default deny                                                                                             |
 
+   **Two refusals, two numbers, and the difference is structural rather than a policy gap.** The
+   me-scoped paths are `authenticated()` in the filter chain, so Spring Security turns them away
+   before the dispatch and the entry point writes `401`. The Finanzen paths sit under `GET
+   /api/v1/missions/**`, which is `permitAll` in that same chain — the request reaches the
+   controller, `@PreAuthorize` refuses it there, and `GlobalExceptionHandler` renders the refusal as
+   `403`. Nothing upgrades it to `401`, because `ExceptionTranslationFilter` — the one component
+   that would — never sees an exception the MVC advice has already handled. Both callers are
+   refused identically; only the number differs, and it is the number an operator reads off this
+   table. `ApiVhostAnonymousSurfaceTest` pins both statuses so the table cannot drift from the code
+   again.
+
    A **404 where the table names a status** means the paste did not take. A **200 where the table
-   says 401** is the serious one — an unauthenticated read of member data. A **401 where the table
-   says 200** means the backend's rule moved under the vhost, which is worth knowing too.
+   names a refusal** is the serious one — an unauthenticated read of member data. A **refusal where
+   the table says 200** means the backend's rule moved under the vhost, which is worth knowing too.
 
 4. A path that is no longer consumed comes back **out** on the same terms.
 
