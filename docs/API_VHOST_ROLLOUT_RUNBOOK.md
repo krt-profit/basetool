@@ -328,6 +328,11 @@ if ($uri = "/api/v1/notifications/stream") { set $krt_api_allowed 1; }
 # the admin read of the same row and /api/v1/announcement itself also answers PUT, so a
 # prefix would carry both onto a vhost that exists to keep them off it.
 if ($uri = "/api/v1/announcement") { set $krt_api_allowed 1; }
+# Phase 2 - the Hangar. EXACT paths again: the family also carries /hangar/ships (a
+# permission-gated read of EVERY member's ships), /hangar/users/{id}/ships (admin) and the
+# create/update/delete verbs. Only the caller's own list and the org aggregate belong here.
+if ($uri = "/api/v1/hangar/my-ships") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/hangar/squadron-overview") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- The missions and operations families are READ-ONLY on this vhost ---------
@@ -342,7 +347,7 @@ if ($krt_api_allowed = 0) { return 404; }
 # the harder half: this guard is verb-blind by design, so opening one write means naming it
 # explicitly rather than widening the family.
 set $krt_readonly_family "";
-if ($uri ~ "^/api/v1/(missions|operations|notifications|announcement)") { set $krt_readonly_family "R"; }
+if ($uri ~ "^/api/v1/(missions|operations|notifications|announcement|hangar)") { set $krt_readonly_family "R"; }
 if ($request_method !~ "^(GET|HEAD)$") { set $krt_readonly_family "${krt_readonly_family}W"; }
 if ($krt_readonly_family = "RW") { return 405; }
 
@@ -411,6 +416,8 @@ The safe order, and the reason for it:
    | `/api/v1/terms/acceptance` (POST)                 | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/me/active-org-unit`                      | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/me/capabilities`                         | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/hangar/my-ships`                         | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/hangar/squadron-overview`                | **401**                                                             | scoped to the active org unit                                                                            |
    | `/api/v1/announcement`                            | **401**                                                             | no chain matcher makes it public                                                                         |
    | `/api/v1/notifications`                           | **401**                                                             | me-scoped inbox                                                                                          |
    | `/api/v1/notifications/unread-count`              | **401**                                                             | me-scoped                                                                                                |

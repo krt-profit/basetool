@@ -247,6 +247,8 @@ constraint for nothing and record a guess about which fields matter.
 | `GET /api/v1/operations/search`                            | envelope `content`, `page`, `totalElements`, `totalPages`; row `id`, `name`, `status`                                                                                                                                                                                                                                                       |
 | `GET /api/v1/operations/{id}`                              | `id`, `name`, `description`, `status`, `payoutPreliminary`                                                                                                                                                                                                                                                                                  |
 | `GET /api/v1/operations/{id}/finance-summary`              | `operationId`, `totalSum`, `truncated`; row `missionId`, `missionName`, `totalSum`                                                                                                                                                                                                                                                          |
+| `GET /api/v1/hangar/my-ships`                              | envelope `content`, `page`, `totalElements`, `totalPages`; row `id`, `name`, `shipType`, `insurance`, `location`, `fitted`; nested `manufacturer` |
+| `GET /api/v1/hangar/squadron-overview`                     | envelope as above; row `shipType`, `count`, `fittedCount` |
 | `GET /api/v1/announcement`                                 | `content`, `updatedAt` — **and a `204` with no body at all when nothing is announced**                                                                                                                                                                                                                                                      |
 | `GET /api/v1/notifications`                                | envelope `content`, `page`, `totalElements`, `totalPages`; row `id`, `type`, `params`, `entityType`, `entityId`, `read`, `createdAt`                                                                                                                                                                                                        |
 | `GET /api/v1/notifications/unread-count`                   | `count`                                                                                                                                                                                                                                                                                                                                     |
@@ -258,6 +260,11 @@ constraint for nothing and record a guess about which fields matter.
 `displayName` when set and `username` otherwise and therefore cannot be matched reliably. Without
 `id` the app cannot tell a member which of eighteen payout rows is theirs. The rest of the
 response — email, roles, rank, memberships — stays unfrozen because the app does not read it.
+
+`GET /api/v1/hangar/my-ships` freezes the row and the **names inside its nested objects**, because
+`shipType.name` and `location.name` are what the card shows. `owner` is deliberately left out: it is
+a full user record — email, roles, rank — always the caller's own on this endpoint, so the app has no
+reason to read it, and freezing it would oblige the backend to keep sending a payload nobody wants.
 
 `GET /api/v1/announcement` answers **`204 No Content`** when there is nothing to announce, and
 that is part of its contract even though no schema can say so. A client that treated the empty body
@@ -307,11 +314,14 @@ a subset of this set, and the two move together.
 - [x] Every listed operation exists in the committed `openapi.json` with its recorded verb, and no
   recorded response field has disappeared (`ExternalContractTest`).
 - [x] The set cannot be emptied to make the guard pass — its floor is asserted.
-- [x] An entry freezes every level a client parses: the guard descends into the item schema of
-  **every array property**, so both a page's `content` rows and an embedded list such as an
-  operation's `payouts` are covered. Freezing only the list name would freeze the list and nothing
-  in it — a renamed `shareAmount` would reach a device with the guard green. Verified by removing
-  the descent (three failures) and by recording a row field that does not exist (one).
+- [x] An entry freezes every level a client parses: the guard descends **one level** into every
+  referenced schema — an array's items and a plain nested object alike. That covers a page's
+  `content` rows, an embedded list such as an operation's `payouts`, and a nested object such as a
+  ship's `shipType`, whose `name` is the whole point of the row. Freezing only the container name
+  would freeze the container and nothing in it — a renamed `shareAmount` would reach a device with
+  the guard green. Verified by removing the descent (three failures) and by recording a nested
+  field that does not exist (one). One level, not transitive: a deeper walk would let a recorded
+  name be satisfied by an unrelated schema and the guard would read as stronger than it is.
 - [x] **Enum** changes are caught, for the ones that can actually break a shipped client: every
   **required** enum property reachable from a contract response is frozen constant-by-constant
   (`theContractRequiredEnumsAreFrozen`). Adding one fails this build, which forces the release
