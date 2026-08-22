@@ -130,6 +130,33 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * The last of phase 2: the Lager tree, the Auftrag queue and the org bank.
+   *
+   * <p>The bank rows are the ones that would matter most — balances and a transaction ledger with
+   * member handles on it — and `/api/v1/orders` is the subtle one: the **same path** answers a
+   * `POST` that is `permitAll` by design, so only the verb separates a public request form from a
+   * queue read. The vhost's read-only guard is the second half of that, and this asserts the first.
+   *
+   * @param path the allow-listed read
+   * @throws Exception if the request could not be performed
+   */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "/api/v1/inventory/aggregated",
+        "/api/v1/inventory/all/grouped",
+        "/api/v1/orders",
+        "/api/v1/orders/00000000-0000-4000-8000-00000000cafe",
+        "/api/v1/org-units/bank/balances",
+        "/api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe",
+        "/api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/transactions"
+      })
+  @WithAnonymousUser
+  void shouldRefuseAnonymousRemainingPhaseTwoReadsWithUnauthorized(String path) throws Exception {
+    mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
+  }
+
+  /**
    * The two hangar reads are me-scoped and org-scoped respectively. The first is the one that would
    * hurt: it answers with the caller's own ships **and** their user record, so an anonymous 200
    * would hand out an email address along with a fleet list.

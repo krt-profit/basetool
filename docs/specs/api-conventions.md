@@ -247,6 +247,13 @@ constraint for nothing and record a guess about which fields matter.
 | `GET /api/v1/operations/search`                            | envelope `content`, `page`, `totalElements`, `totalPages`; row `id`, `name`, `status`                                                                                                                                                                                                                                                       |
 | `GET /api/v1/operations/{id}`                              | `id`, `name`, `description`, `status`, `payoutPreliminary`                                                                                                                                                                                                                                                                                  |
 | `GET /api/v1/operations/{id}/finance-summary`              | `operationId`, `totalSum`, `truncated`; row `missionId`, `missionName`, `totalSum`                                                                                                                                                                                                                                                          |
+| `GET /api/v1/inventory/aggregated`                         | envelope; row `material`, `amount`, `quality`, `maxQuality`; nested `name`, `quantityType` |
+| `GET /api/v1/inventory/all/grouped`                        | `material`, `totalAmount`, `averageQuality`, `maxQuality`, `stacks`; nested `user`, `location`, `personal`, `entryCount` |
+| `GET /api/v1/orders`                                       | envelope; row `id`, `displayId`, `status`, `priority`, `type`, `createdAt`, `materials`, `redacted` |
+| `GET /api/v1/orders/{id}`                                  | as the row, plus `comment`, `aggregatedMaterials`, `assignees`, `handovers`, `requestingOrgUnit`, `responsibleOrgUnit` |
+| `GET /api/v1/org-units/bank/balances`                      | `accountId`, `accountNo`, `accountName`, `balance`, `delta30d`, `sparkline`, `orgUnitName` |
+| `GET /api/v1/org-units/bank/accounts/{id}`                 | `detail`, `delta30d`, `bookingCount`; nested `account.name`, `account.accountNo`, `account.balance` |
+| `GET /api/v1/org-units/bank/accounts/{id}/transactions`    | envelope; row `postingId`, `type`, `amount`, `note`, `createdAt`, `holderHandle` |
 | `GET /api/v1/hangar/my-ships`                              | envelope `content`, `page`, `totalElements`, `totalPages`; row `id`, `name`, `shipType`, `insurance`, `location`, `fitted`; nested `manufacturer` |
 | `GET /api/v1/hangar/squadron-overview`                     | envelope as above; row `shipType`, `count`, `fittedCount` |
 | `GET /api/v1/announcement`                                 | `content`, `updatedAt` — **and a `204` with no body at all when nothing is announced**                                                                                                                                                                                                                                                      |
@@ -260,6 +267,16 @@ constraint for nothing and record a guess about which fields matter.
 `displayName` when set and `username` otherwise and therefore cannot be matched reliably. Without
 `id` the app cannot tell a member which of eighteen payout rows is theirs. The rest of the
 response — email, roles, rank, memberships — stays unfrozen because the app does not read it.
+
+`redacted` on a job order is frozen for the same class of reason as `truncated` and
+`payoutPreliminary`: it qualifies the rest of the payload rather than carrying content. A requester
+sees their own order with the parts that are not theirs removed (REQ-ORDERS-023), and a client that
+stopped seeing the flag would present the gaps as the whole order.
+
+`GET /api/v1/orders` is on the list as an **exact** path, and it is the one entry where the verb is
+the only thing separating two different surfaces: the same path answers a `POST` that is `permitAll`
+by design (the public request form). The vhost's read-only guard refuses that verb before it
+arrives; the allow-list never names it.
 
 `GET /api/v1/hangar/my-ships` freezes the row and the **names inside its nested objects**, because
 `shipType.name` and `location.name` are what the card shows. `owner` is deliberately left out: it is
