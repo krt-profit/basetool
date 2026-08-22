@@ -130,6 +130,20 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * The announcement is not anonymous either, despite having no {@code @PreAuthorize} of its own:
+   * nothing in the matcher list names it, so it falls through to {@code
+   * anyRequest().authenticated()}. Worth pinning precisely because the absence of an annotation
+   * reads like "public" to anyone auditing the controller alone.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousAnnouncementWithUnauthorized() throws Exception {
+    mockMvc.perform(get("/api/v1/announcement")).andExpect(status().isUnauthorized());
+  }
+
+  /**
    * The inbox, its badge count and its push stream are me-scoped, and the stream is the one worth
    * asserting: an SSE endpoint that answered an anonymous caller would hold a connection open and
    * feed it another member's events for as long as it lived.
