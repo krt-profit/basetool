@@ -300,7 +300,23 @@ if ($uri = "/api/v1/users/me/memberships") { set $krt_api_allowed 1; }
 # to be the only one. The app consumes /search alone today; the detail path joins this list when
 # the detail screen actually ships — one app phase at a time, as the note above says.
 if ($uri = "/api/v1/missions/search") { set $krt_api_allowed 1; }
+# Phase 2 - the Einsatz detail and its Finanzen tab. UUID-shaped and $-ANCHORED, because the
+# family below `{id}` is dense with writes: /join, /participants/**, /steps/**, /units/**,
+# /objectives/**, /party-lead, /owner, ... An unanchored prefix would admit every one of them.
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/finance-entries$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/finance-entries/summary$") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
+
+# --- The missions family is READ-ONLY on this vhost ---------------------------
+# Anchoring keeps the sub-paths out, but `/api/v1/missions/<uuid>` itself also answers PUT and
+# DELETE, and the allow-list matches on the path alone - it cannot see the verb. The backend's
+# @PreAuthorize refuses both; this vhost exists so that it does not have to be the only layer.
+# Two flags because nginx cannot nest `if`; the concatenation is the standard idiom.
+set $krt_mission_write "";
+if ($uri ~ "^/api/v1/missions") { set $krt_mission_write "M"; }
+if ($request_method !~ "^(GET|HEAD)$") { set $krt_mission_write "${krt_mission_write}W"; }
+if ($krt_mission_write = "MW") { return 405; }
 
 # --- Actuator: second layer --------------------------------------------------
 # The backend already serves no Actuator on 11261 since ADR-0134 (it moved to the internal-only
@@ -350,17 +366,21 @@ The safe order, and the reason for it:
    anonymous by design (REQ-SEC-037). Reading "401 is the pass" off a `permitAll` path produces a
    false alarm, which is exactly what happened the first time this step was run.
 
-   |                  Path                  | Without a token |                                                   Why                                                    |
-   |----------------------------------------|-----------------|----------------------------------------------------------------------------------------------------------|
-   | `/api/v1/terms/document`               | **200**         | anonymous by design (ADR-0138): wording that must be read *before* agreeing cannot require having agreed |
-   | `/api/v1/missions/search`              | **200**         | anonymous by design: the public home page already renders its guest-redacted rows                        |
-   | `/api/v1/terms/status`                 | **401**         | me-scoped                                                                                                |
-   | `/api/v1/terms/acceptance` (POST)      | **401**         | me-scoped                                                                                                |
-   | `/api/v1/me/active-org-unit`           | **401**         | me-scoped                                                                                                |
-   | `/api/v1/me/capabilities`              | **401**         | me-scoped                                                                                                |
-   | `/api/v1/users/me/registration-status` | **401**         | me-scoped                                                                                                |
-   | `/api/v1/users/me/memberships`         | **401**         | me-scoped                                                                                                |
-   | anything not on the list               | **404**         | default deny                                                                                             |
+   |                       Path                        |                           Without a token                           |                                                   Why                                                    |
+   |---------------------------------------------------|---------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
+   | `/api/v1/terms/document`                          | **200**                                                             | anonymous by design (ADR-0138): wording that must be read *before* agreeing cannot require having agreed |
+   | `/api/v1/missions/search`                         | **200**                                                             | anonymous by design: the public home page already renders its guest-redacted rows                        |
+   | `/api/v1/missions/<uuid>`                         | **200** for a non-internal, non-terminal Einsatz, **403** otherwise | anonymous by design, redacted per ADR-0034                                                               |
+   | `/api/v1/missions/<uuid>` with `PUT`/`DELETE`     | **405**                                                             | the family is read-only on this vhost                                                                    |
+   | `/api/v1/missions/<uuid>/finance-entries`         | **401**                                                             | member-or-above **and** `canSeeMission`                                                                  |
+   | `/api/v1/missions/<uuid>/finance-entries/summary` | **401**                                                             | member-or-above **and** `canSeeMission`                                                                  |
+   | `/api/v1/terms/status`                            | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/terms/acceptance` (POST)                 | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/me/active-org-unit`                      | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/me/capabilities`                         | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/users/me/registration-status`            | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/users/me/memberships`                    | **401**                                                             | me-scoped                                                                                                |
+   | anything not on the list                          | **404**                                                             | default deny                                                                                             |
 
    A **404 where the table names a status** means the paste did not take. A **200 where the table
    says 401** is the serious one — an unauthenticated read of member data. A **401 where the table
