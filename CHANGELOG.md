@@ -4,6 +4,11 @@
 
 ### Changed
 
+- **Die Operationen-Lesepfade sind für ausgelieferte Clients eingefroren und für den API-vhost vorbereitet.** `GET /api/v1/operations/search`, `/{id}`, `/{id}/finance-summary` und `/{id}/payouts` stehen im REQ-API-009-Vertragssatz; der Vertrags-Guard prüft jetzt auch die Zeilen **eingebetteter** Listen, vorher war nur der Listenname eingefroren und ein umbenanntes `shareAmount` wäre unbemerkt durchgegangen. Die Operationen-Familie ist auf dem vhost ebenfalls schreibgeschützt (405). Braucht wieder einen manuellen Konfigurationsschritt (Runbook § D.3a).
+- **Der nächtliche Edge-Probe prüft jetzt die komplette Statustabelle des API-vhosts von außen.** Bisher konnte niemand feststellen, ob ein Pfad überhaupt freigeschaltet wurde — die Allowlist liegt in der NPM-Datenbank, und ein nie eingefügter Pfad antwortet mit 404 wie ein absichtlich gesperrter. Genau das hatte zuletzt einen leeren Einsatz-Detailbildschirm verursacht. Der Lauf schlägt in beide Richtungen an: 2xx, wo eine Abweisung stehen muss, und 404, wo ein Status stehen muss.
+
+### Changed
+
 - **Die Rollout-Prüfung des API-vhosts nannte für die beiden Finanz-Lesepfade den falschen Status.** Ohne Token antworten sie mit **403**, nicht mit 401: unterhalb von `/api/v1/missions/**` ist die Filterkette `permitAll`, die Abweisung entsteht erst an der Methode und wird dort als 403 gerendert. Beide Pfade sind unverändert dicht — nur die Zahl in der Prüftabelle war falsch, und ein neuer Test hält sie jetzt fest (REQ-SEC-037, Runbook § D.3a).
 
 ### Changed

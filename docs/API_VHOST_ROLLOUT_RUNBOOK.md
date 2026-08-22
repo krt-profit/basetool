@@ -306,17 +306,31 @@ if ($uri = "/api/v1/missions/search") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/finance-entries$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/finance-entries/summary$") { set $krt_api_allowed 1; }
+# Phase 2 - the Operationen segment of the same screen, its detail, the Finanz-Rollup and the
+# payout rows. Anchored like the Einsatz detail and for a sharper reason: below `{id}` sits
+# `/payouts/paid-out`, a PUT that marks a member as paid. `/payouts$` is the read; the write is a
+# different path and stays off this list until phase 3 ships the manager toggle.
+if ($uri = "/api/v1/operations/search") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/finance-summary$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/payouts$") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
-# --- The missions family is READ-ONLY on this vhost ---------------------------
-# Anchoring keeps the sub-paths out, but `/api/v1/missions/<uuid>` itself also answers PUT and
-# DELETE, and the allow-list matches on the path alone - it cannot see the verb. The backend's
-# @PreAuthorize refuses both; this vhost exists so that it does not have to be the only layer.
-# Two flags because nginx cannot nest `if`; the concatenation is the standard idiom.
-set $krt_mission_write "";
-if ($uri ~ "^/api/v1/missions") { set $krt_mission_write "M"; }
-if ($request_method !~ "^(GET|HEAD)$") { set $krt_mission_write "${krt_mission_write}W"; }
-if ($krt_mission_write = "MW") { return 405; }
+# --- The missions and operations families are READ-ONLY on this vhost ---------
+# Anchoring keeps the sub-paths out, but `/api/v1/missions/<uuid>` and `/api/v1/operations/<uuid>`
+# themselves also answer PUT and DELETE, and the allow-list matches on the path alone - it cannot
+# see the verb. The backend's @PreAuthorize refuses them; this vhost exists so that it does not
+# have to be the only layer. Two flags because nginx cannot nest `if`; the concatenation is the
+# standard idiom.
+#
+# Phase 3 brings the first legitimate write - PUT /api/v1/operations/<uuid>/payouts/paid-out for a
+# mission manager. It needs a carve-out HERE as well as an allow-list entry, and the carve-out is
+# the harder half: this guard is verb-blind by design, so opening one write means naming it
+# explicitly rather than widening the family.
+set $krt_readonly_family "";
+if ($uri ~ "^/api/v1/(missions|operations)") { set $krt_readonly_family "R"; }
+if ($request_method !~ "^(GET|HEAD)$") { set $krt_readonly_family "${krt_readonly_family}W"; }
+if ($krt_readonly_family = "RW") { return 405; }
 
 # --- Actuator: second layer --------------------------------------------------
 # The backend already serves no Actuator on 11261 since ADR-0134 (it moved to the internal-only
@@ -374,6 +388,11 @@ The safe order, and the reason for it:
    | `/api/v1/missions/<uuid>` with `PUT`/`DELETE`     | **405**                                                             | the family is read-only on this vhost                                                                    |
    | `/api/v1/missions/<uuid>/finance-entries`         | **403**                                                             | member-or-above **and** `canSeeMission`, refused at the method seam — see below                          |
    | `/api/v1/missions/<uuid>/finance-entries/summary` | **403**                                                             | member-or-above **and** `canSeeMission`, refused at the method seam — see below                          |
+   | `/api/v1/operations/search`                       | **401**                                                             | `isAuthenticated()`, and no chain matcher makes it public                                                |
+   | `/api/v1/operations/<uuid>`                       | **401**                                                             | `isAuthenticated()` + `canSeeOperation`                                                                  |
+   | `/api/v1/operations/<uuid>/finance-summary`       | **401**                                                             | `isAuthenticated()` + `canSeeOperation`                                                                  |
+   | `/api/v1/operations/<uuid>/payouts`               | **401**                                                             | `isAuthenticated()` + `canSeeOperation`                                                                  |
+   | `/api/v1/operations/<uuid>` with `PUT`/`DELETE`   | **405**                                                             | the family is read-only on this vhost                                                                    |
    | `/api/v1/terms/status`                            | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/terms/acceptance` (POST)                 | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/me/active-org-unit`                      | **401**                                                             | me-scoped                                                                                                |
@@ -397,7 +416,11 @@ The safe order, and the reason for it:
    names a refusal** is the serious one — an unauthenticated read of member data. A **refusal where
    the table says 200** means the backend's rule moved under the vhost, which is worth knowing too.
 
-4. A path that is no longer consumed comes back **out** on the same terms.
+4. Add the new paths to the nightly `edge-deny-probe` workflow's allow-list step **once the paste
+   is in**, not before — it asserts this table from outside every night, and an entry added ahead
+   of the paste makes the run red for a change that has not happened yet.
+
+5. A path that is no longer consumed comes back **out** on the same terms.
 
 The edge per-IP rate limiter needs no entry here: `docker/maintenance/nginx/server_proxy.conf` is
 included into **every** proxy host's server block, so the 20 r/s (burst 80) safety net of

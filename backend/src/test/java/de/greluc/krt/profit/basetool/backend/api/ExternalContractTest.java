@@ -190,7 +190,46 @@ class ExternalContractTest {
           new ContractOperation(
               "/api/v1/missions/{missionId}/finance-entries/summary",
               "get",
-              Set.of("total", "incomeSum", "incomeCount", "expenseSum", "expenseCount")));
+              Set.of("total", "incomeSum", "incomeCount", "expenseSum", "expenseCount")),
+          // Phase 2, the Operationen segment of the same screen. The row is deliberately thin:
+          // OperationDto carries no mission or participant count, and the owner decided against
+          // adding them rather than spend aggregate queries on a list that has documented itself
+          // as cheap ("the bulk endpoints have no reason to spend the extra count query").
+          new ContractOperation(
+              "/api/v1/operations/search",
+              "get",
+              Set.of("content", "page", "totalElements", "totalPages", "id", "name", "status")),
+          // The Operation detail. `payoutPreliminary` is frozen because it is authoritative HERE
+          // and nowhere else -- the app reads it to say that the payout figures may still
+          // rebalance, and a screen that silently stopped saying so would present a provisional
+          // number as final.
+          new ContractOperation(
+              "/api/v1/operations/{id}",
+              "get",
+              Set.of("id", "name", "description", "status", "payoutPreliminary")),
+          // The Finanz-Rollup. `truncated` is frozen for the same reason ADR-0104 exists: it is
+          // the field that tells the member the per-mission list is not all of it, and losing it
+          // turns a capped list into one that looks complete.
+          new ContractOperation(
+              "/api/v1/operations/{id}/finance-summary",
+              "get",
+              Set.of(
+                  "operationId", "totalSum", "missions", "truncated", "missionId", "missionName")),
+          // The Auszahlungen tab. Read-only in this phase: the app renders each participant's
+          // share and whether it has been paid, and the manager toggle behind it is phase 3.
+          new ContractOperation(
+              "/api/v1/operations/{id}/payouts",
+              "get",
+              Set.of(
+                  "totalDonations",
+                  "payouts",
+                  "participantId",
+                  "participantName",
+                  "payoutPreference",
+                  "shareAmount",
+                  "donatedAmount",
+                  "payoutAmount",
+                  "paidOut")));
 
   /**
    * Enum constants a shipped client cannot survive a change to, keyed {@code Schema.property}.
@@ -395,11 +434,11 @@ class ExternalContractTest {
    * items}. Without the second case every array-returning operation resolves to nothing, and an
    * entry recording no fields would then pass this guard while proving nothing.
    *
-   * <p>For a <strong>paged</strong> response it additionally descends into {@code content}'s item
-   * schema, so the recorded set spans the envelope and the rows. Stopping at the envelope would
-   * freeze {@code totalElements} and leave every field a member actually reads unguarded — dropping
-   * {@code name} from the row would break the Einsatz list in the field while this guard stayed
-   * green.
+   * <p>It additionally descends into the item schema of <strong>every array property</strong>, so
+   * the recorded set spans the envelope and the rows it carries. That covers a paged response's
+   * {@code content} — stopping at the envelope would freeze {@code totalElements} and leave every
+   * field a member actually reads unguarded — and equally an embedded list such as an operation's
+   * {@code payouts}, whose rows are parsed one by one exactly like a page's are.
    *
    * @param document the parsed API document
    * @param operation the contract operation to resolve
@@ -435,7 +474,7 @@ class ExternalContractTest {
         JsonNode schemaProperties = schema == null ? null : schema.get("properties");
         if (schemaProperties != null) {
           properties.addAll(schemaProperties.propertyNames());
-          properties.addAll(pagedRowProperties(document, schemaProperties));
+          properties.addAll(arrayRowProperties(document, schemaProperties));
         }
       }
     }
@@ -443,24 +482,39 @@ class ExternalContractTest {
   }
 
   /**
-   * Collects the property names of a paged envelope's row schema.
+   * Collects the property names of every row schema a response's array properties carry.
    *
-   * <p>A {@code PageResponse} carries the rows under {@code content}; those properties are the ones
-   * a client reads item by item, and they are invisible to a resolver that stops at the envelope.
+   * <p>A {@code PageResponse} carries its rows under {@code content}, and a roll-up carries its
+   * per-mission or per-participant rows under a named list. Both are read item by item, and both
+   * are invisible to a resolver that stops at the top-level object — an operation entry that froze
+   * only {@code payouts} would freeze the *list*, not the shape of anything in it, and a renamed
+   * {@code shareAmount} would reach a device with this guard green.
+   *
+   * <p>The names land in one flat set together with the envelope's, which is the shape this guard
+   * has always had. That makes a recorded field satisfiable by a same-named field on another schema
+   * in the same response — accepted, because the alternative is a per-schema contract record and
+   * the failure it would add precision to (two schemas in one response sharing a field name where
+   * only one of them keeps it) is not the break this guard exists for.
    *
    * @param document the parsed API document
-   * @param envelopeProperties the properties of the already-resolved response schema
-   * @return the row property names, or an empty set when the schema is not a paged envelope
+   * @param objectProperties the properties of the already-resolved response schema
+   * @return the row property names, or an empty set when no property is an array of objects
    */
-  private static Set<String> pagedRowProperties(JsonNode document, JsonNode envelopeProperties) {
-    JsonNode itemRef = envelopeProperties.path("content").path("items").get("$ref");
-    if (itemRef == null) {
-      return Set.of();
+  private static Set<String> arrayRowProperties(JsonNode document, JsonNode objectProperties) {
+    Set<String> rows = new TreeSet<>();
+    for (Map.Entry<String, JsonNode> property : objectProperties.properties()) {
+      JsonNode itemRef = property.getValue().path("items").get("$ref");
+      if (itemRef == null) {
+        continue;
+      }
+      String rowName = itemRef.asString().substring(itemRef.asString().lastIndexOf('/') + 1);
+      JsonNode rowSchema = document.get("components").get("schemas").get(rowName);
+      JsonNode rowProperties = rowSchema == null ? null : rowSchema.get("properties");
+      if (rowProperties != null) {
+        rows.addAll(rowProperties.propertyNames());
+      }
     }
-    String rowName = itemRef.asString().substring(itemRef.asString().lastIndexOf('/') + 1);
-    JsonNode rowSchema = document.get("components").get("schemas").get(rowName);
-    JsonNode rowProperties = rowSchema == null ? null : rowSchema.get("properties");
-    return rowProperties == null ? Set.of() : new TreeSet<>(rowProperties.propertyNames());
+    return rows;
   }
 
   /**

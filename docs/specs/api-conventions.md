@@ -243,6 +243,17 @@ constraint for nothing and record a guess about which fields matter.
 | `GET /api/v1/missions/{id}`                                | `id`, `name`, `description`, `status`, `meetingTime`, `plannedStartTime`, `actualStartTime`, `plannedEndTime`, `isInternal`, `meetingPoint`, `operation`, `owningSquadron`, `partyLeadUser`, `partyLeadGuestName`, `registeredParticipants`, `checkedInParticipants`, `participants`, `assignedUnits`, `steps`, `objectives`, `frequencies` |
 | `GET /api/v1/missions/{missionId}/finance-entries`         | envelope `content`, `page`, `totalElements`, `totalPages`; row `id`, `type`, `amount`, `note`                                                                                                                                                                                                                                               |
 | `GET /api/v1/missions/{missionId}/finance-entries/summary` | `total`, `incomeSum`, `incomeCount`, `expenseSum`, `expenseCount`                                                                                                                                                                                                                                                                           |
+| `GET /api/v1/operations/search`                            | envelope `content`, `page`, `totalElements`, `totalPages`; row `id`, `name`, `status`                                                                                                                                                                                                                                                       |
+| `GET /api/v1/operations/{id}`                              | `id`, `name`, `description`, `status`, `payoutPreliminary`                                                                                                                                                                                                                                                                                  |
+| `GET /api/v1/operations/{id}/finance-summary`              | `operationId`, `totalSum`, `truncated`; row `missionId`, `missionName`, `totalSum`                                                                                                                                                                                                                                                          |
+| `GET /api/v1/operations/{id}/payouts`                      | `totalDonations`; row `participantId`, `participantName`, `payoutPreference`, `shareAmount`, `donatedAmount`, `payoutAmount`, `paidOut`                                                                                                                                                                                                     |
+
+The Operationen entries freeze `truncated` and `payoutPreliminary` deliberately. Both are fields
+that qualify a number rather than carry one: `truncated` says the per-mission roll-up is capped
+(ADR-0104), `payoutPreliminary` says the payout figures may still rebalance because a mission of
+the operation has no `actualEndTime` yet. A screen that silently stopped showing either would
+present a partial list as complete and a provisional figure as final — the failure mode is a member
+trusting a number, which is worse than a missing field.
 
 `GET /api/v1/users/me/memberships` is the app's org-unit switcher (phase 2) and is a **me-scoped
 twin** of `GET /api/v1/users/{id}/memberships`, added rather than reusing the sibling: the vhost is
@@ -265,9 +276,11 @@ a subset of this set, and the two move together.
 - [x] Every listed operation exists in the committed `openapi.json` with its recorded verb, and no
   recorded response field has disappeared (`ExternalContractTest`).
 - [x] The set cannot be emptied to make the guard pass — its floor is asserted.
-- [x] A **paged** entry freezes both levels: the guard descends into `content`'s item schema, so
-  dropping a field a member actually reads cannot pass while only the envelope is checked. Verified
-  by removing the descent — three failures.
+- [x] An entry freezes every level a client parses: the guard descends into the item schema of
+  **every array property**, so both a page's `content` rows and an embedded list such as an
+  operation's `payouts` are covered. Freezing only the list name would freeze the list and nothing
+  in it — a renamed `shareAmount` would reach a device with the guard green. Verified by removing
+  the descent (three failures) and by recording a row field that does not exist (one).
 - [x] **Enum** changes are caught, for the ones that can actually break a shipped client: every
   **required** enum property reachable from a contract response is frozen constant-by-constant
   (`theContractRequiredEnumsAreFrozen`). Adding one fails this build, which forces the release

@@ -25,6 +25,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithAnonymousUser;
@@ -62,6 +64,9 @@ class ApiVhostAnonymousSurfaceTest {
 
   /** A well-formed id that matches no Einsatz; authorization is refused before the lookup. */
   private static final String ABSENT_MISSION = "00000000-0000-4000-8000-00000000dead";
+
+  /** A well-formed id that matches no Operation, for the same reason. */
+  private static final String ABSENT_OPERATION = "00000000-0000-4000-8000-00000000beef";
 
   @Autowired private WebApplicationContext context;
 
@@ -122,5 +127,27 @@ class ApiVhostAnonymousSurfaceTest {
   @WithAnonymousUser
   void shouldRefuseAnonymousMembershipsWithUnauthorized() throws Exception {
     mockMvc.perform(get("/api/v1/users/me/memberships")).andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The four Operationen reads answer {@code 401}, not the {@code 403} their Einsatz neighbours
+   * give: no chain matcher names {@code /api/v1/operations/**}, so they fall through to {@code
+   * anyRequest().authenticated()} and are refused before the dispatch. Same family, same phase,
+   * different number — which is exactly why the runbook's table is per path.
+   *
+   * @param path the allow-listed Operationen read
+   * @throws Exception if the request could not be performed
+   */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "/api/v1/operations/search",
+        "/api/v1/operations/" + ABSENT_OPERATION,
+        "/api/v1/operations/" + ABSENT_OPERATION + "/finance-summary",
+        "/api/v1/operations/" + ABSENT_OPERATION + "/payouts"
+      })
+  @WithAnonymousUser
+  void shouldRefuseAnonymousOperationReadsWithUnauthorized(String path) throws Exception {
+    mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
   }
 }
