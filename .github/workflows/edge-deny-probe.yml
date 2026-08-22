@@ -64,3 +64,64 @@ jobs:
           https://api.profit-base.online/actuator/health
           TARGETS
           exit $fail
+
+      - name: API vhost allow-list must answer the statuses REQ-SEC-037 records
+        run: |
+          # The counterpart to the runbook's manual § D.3a check, run nightly from outside.
+          #
+          # This is the only vantage point that can see it. The allow-list lives in NPM's admin
+          # database, so no PR and no in-repo test can read it -- and the failure it produces has
+          # no other signal at all: a path that was never pasted answers 404 exactly like a path
+          # that was never meant to be there, and the app's screen simply goes blank. That is not
+          # hypothetical. A half-applied paste shipped a mission-detail 404 while the read-only
+          # guard from the same block was live, and it was found by hand.
+          #
+          # Failing in the other direction matters more: a path that starts answering 2xx where
+          # this table says a refusal is an unauthenticated read of member data.
+          base=https://api.profit-base.online
+          fail=0
+          probe() { # verb path expected
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -X "$1" "$base$2" || true)
+            echo "$1 $2 -> HTTP ${code:-000} (expected $3)"
+            if [ "$code" != "$3" ]; then
+              echo "::error::$1 $2 answered ${code:-000}, expected $3 — the vhost allow-list drifted from REQ-SEC-037 / runbook § D.3a, or the backend's rule for that path moved."
+              fail=1
+            fi
+          }
+
+          # Anonymous by design (ADR-0138, ADR-0034).
+          probe GET /api/v1/terms/document 200
+          probe GET /api/v1/missions/search 200
+
+          # Me-scoped: refused before the dispatch, so the entry point answers 401.
+          for p in /api/v1/terms/status /api/v1/me/active-org-unit /api/v1/me/capabilities                    /api/v1/users/me/registration-status /api/v1/users/me/memberships; do
+            probe GET "$p" 401
+          done
+
+          # Only paths the vhost ALREADY serves are asserted here. A path joins this list in the
+          # change that pastes it into the proxy host, never in the change that merely writes it
+          # into the runbook -- otherwise every merge opens a window in which the nightly run is
+          # red for a paste that has not happened yet, which is how a red run stops being read.
+          # Phase 2's Operationen reads join when the block is pasted (runbook § D.3a).
+
+          # Default deny.
+          probe GET /api/v1/definitely-not-allow-listed 404
+
+          # The id-dependent rows need a real Einsatz. The anonymous search returns only PLANNED
+          # and ACTIVE non-internal rows, so any id it yields is one the detail must answer 200 for
+          # -- no hardcoded UUID to rot, and no assumption about which Einsatz exists today.
+          id=$(curl -s --max-time 20 "$base/api/v1/missions/search?page=0&size=1"                  | jq -r '.content[0].id // empty')
+          if [ -z "$id" ]; then
+            echo "::notice::No anonymous Einsatz row today — the detail, Finanzen and read-only rows were NOT checked. Not a pass; they were skipped."
+          else
+            probe GET "/api/v1/missions/$id" 200
+            # Refused at the method seam, which renders 403 rather than 401 -- the chain is
+            # permitAll under /api/v1/missions/**. See REQ-SEC-037.
+            probe GET "/api/v1/missions/$id/finance-entries" 403
+            probe GET "/api/v1/missions/$id/finance-entries/summary" 403
+            # The family is read-only on this vhost: the guard is verb-blind and returns 405
+            # before the request reaches the backend.
+            probe PUT "/api/v1/missions/$id" 405
+            probe DELETE "/api/v1/missions/$id" 405
+          fi
+          exit $fail

@@ -1797,11 +1797,21 @@ in this project rather than in the matcher list. `ApiVhostAnonymousSurfaceTest` 
 the statuses are what an operator verifies the vhost against
 ([`API_VHOST_ROLLOUT_RUNBOOK.md`](../API_VHOST_ROLLOUT_RUNBOOK.md) § D.3a).
 
-**The missions family is additionally read-only on this vhost.** `/api/v1/missions/<uuid>`
-answers `PUT` and `DELETE` as well as `GET`, and an allow-list that matches on the path cannot
-tell them apart, so the vhost refuses every non-`GET` under `/api/v1/missions` with `405`
-before the request reaches the backend. `@PreAuthorize` would refuse them too; the point is
-that it does not have to be the only thing that does.
+**The missions and operations families are additionally read-only on this vhost.**
+`/api/v1/missions/<uuid>` and `/api/v1/operations/<uuid>` answer `PUT` and `DELETE` as well as
+`GET`, and an allow-list that matches on the path cannot tell them apart, so the vhost refuses
+every non-`GET` under either prefix with `405` before the request reaches the backend.
+`@PreAuthorize` would refuse them too; the point is that it does not have to be the only thing
+that does. Under operations the write that matters is `PUT
+/api/v1/operations/<uuid>/payouts/paid-out`, which marks a member as paid — phase 3 opens it, and
+opening it means naming that one path rather than widening the family, because the guard is
+verb-blind by design.
+
+**The four Operationen reads answer `401`, not the `403` their Einsatz neighbours give.** Nothing
+in the chain's matcher list names `/api/v1/operations/**`, so they fall through to
+`anyRequest().authenticated()` and are refused before the dispatch, where the entry point writes
+`401`. Same family of screen, same phase, different number — which is why the rollout table is per
+path and `ApiVhostAnonymousSurfaceTest` pins each one.
 
 **The mission search publishes more than the home page does, and that is accepted rather than
 overlooked.** Each row is redacted identically, but the page caps itself at seven days and fifty
@@ -1832,10 +1842,17 @@ matchers.
   allow-list either.
 - [x] The edge rate limiter covers this host without a per-host entry:
   `docker/maintenance/nginx/server_proxy.conf` is included into every proxy host's server block.
-- [ ] A check that fails when an allow-listed path becomes anonymous without the table moving.
-  **Open, and honestly hard** — the vhost's configuration lives in NPM's database, so nothing in CI
-  can read it. The nightly `edge-deny-probe` workflow is the only vantage point that could assert
-  it from outside.
+- [x] A check that fails when an allow-listed path becomes anonymous without the table moving.
+  The nightly `edge-deny-probe` workflow asserts the whole table from outside — the only vantage
+  point that can, since the allow-list lives in NPM's database where no PR and no in-repo test can
+  read it. It catches both directions: a `2xx` where the table names a refusal is an
+  unauthenticated read of member data, and a `404` where it names a status means the block was
+  never pasted — the failure that otherwise has no signal at all, and that shipped a blank
+  mission-detail screen once already. The id-dependent rows take their id from the anonymous search
+  rather than a hardcoded UUID, and say so loudly when there is no row to take.
+- [x] The backend half is pinned in CI too: `ApiVhostAnonymousSurfaceTest` asserts the status each
+  allow-listed path gives an anonymous caller, so the table cannot drift from the code even between
+  nightly runs.
 
 **Enforced by:** review at the moment a path is added — deliberately a documented obligation rather
 than a test, for the reason in the open item above · **Code:** `SecurityConfig` (filter chain),
