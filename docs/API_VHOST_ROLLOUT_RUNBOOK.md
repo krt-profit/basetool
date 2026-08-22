@@ -290,6 +290,10 @@ set $krt_api_allowed 0;
 if ($uri ~ "^/api/v1/terms/")  { set $krt_api_allowed 1; }   # terms status + acceptance
 if ($uri ~ "^/api/v1/me/")     { set $krt_api_allowed 1; }   # active-org-unit, capabilities
 if ($uri = "/api/v1/users/me/registration-status") { set $krt_api_allowed 1; }
+# Phase 2 - the caller's own record, for its `id` alone: an Operation's payout rows are keyed by
+# the backend user id, so "Dein Anteil" cannot be located without it. EXACT path again, never the
+# /api/v1/users/ prefix, which would reach every other member's record.
+if ($uri = "/api/v1/users/me") { set $krt_api_allowed 1; }
 # Phase 2 — the org-unit switcher. Deliberately NOT /api/v1/users/{id}/memberships: that one can
 # name another user, and this vhost is default-deny so that such a path never has to be on it.
 if ($uri = "/api/v1/users/me/memberships") { set $krt_api_allowed 1; }
@@ -397,6 +401,7 @@ The safe order, and the reason for it:
    | `/api/v1/terms/acceptance` (POST)                 | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/me/active-org-unit`                      | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/me/capabilities`                         | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/users/me`                                | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/users/me/registration-status`            | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/users/me/memberships`                    | **401**                                                             | me-scoped                                                                                                |
    | anything not on the list                          | **404**                                                             | default deny                                                                                             |

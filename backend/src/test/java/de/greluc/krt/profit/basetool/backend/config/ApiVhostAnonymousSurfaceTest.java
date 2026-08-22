@@ -130,6 +130,18 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * The caller's own record is me-scoped as well — and it is the one allow-listed path that carries
+   * an email address, so an anonymous 200 here would be a different order of leak.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousOwnRecordWithUnauthorized() throws Exception {
+    mockMvc.perform(get("/api/v1/users/me")).andExpect(status().isUnauthorized());
+  }
+
+  /**
    * The four Operationen reads answer {@code 401}, not the {@code 403} their Einsatz neighbours
    * give: no chain matcher names {@code /api/v1/operations/**}, so they fall through to {@code
    * anyRequest().authenticated()} and are refused before the dispatch. Same family, same phase,

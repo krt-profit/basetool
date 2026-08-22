@@ -191,6 +191,13 @@ class ExternalContractTest {
               "/api/v1/missions/{missionId}/finance-entries/summary",
               "get",
               Set.of("total", "incomeSum", "incomeCount", "expenseSum", "expenseCount")),
+          // Phase 2, the caller's own record. The app needs exactly one field of it: its own
+          // backend user id. An Operation's payout rows are keyed by that id -- not by the
+          // Keycloak `sub` the app holds, and not by a name -- so "Dein Anteil" cannot be found
+          // without it. Only `id` is frozen: the response also carries the caller's email, roles
+          // and rank, and freezing what the client does not read would buy the backend a
+          // constraint for nothing.
+          new ContractOperation("/api/v1/users/me", "get", Set.of("id")),
           // Phase 2, the Operationen segment of the same screen. The row is deliberately thin:
           // OperationDto carries no mission or participant count, and the owner decided against
           // adding them rather than spend aggregate queries on a list that has documented itself
