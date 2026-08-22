@@ -32,6 +32,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -73,7 +74,16 @@ public class NotificationController {
    * the frontend falls back to polling if the stream is unavailable. The recipient is the JWT
    * {@code sub}, so a caller only ever streams their own notifications.
    *
+   * <p><strong>{@code X-Accel-Buffering: no} is part of the response, not decoration.</strong> An
+   * nginx with response buffering on holds a trickling body in its buffers, and an SSE stream is
+   * exactly that: a few bytes every twenty seconds. The events then arrive late, in bursts, or —
+   * for a client that gives up first — not at all, and the failure looks like "push does not work
+   * on this network" rather than like a proxy setting. nginx honours this header per response, so
+   * the guarantee travels with the endpoint instead of depending on a vhost's defaults; the API
+   * vhost the Android app uses is a second proxy host whose defaults nobody verified.
+   *
    * @param recipientSub the caller's id, resolved from the JWT subject claim
+   * @param response the servlet response, used only to set the no-buffering header
    * @return the SSE emitter registered for the caller
    */
   @GetMapping("/stream")
@@ -82,7 +92,8 @@ public class NotificationController {
     @ApiResponse(responseCode = "200", description = "SSE stream opened."),
     @ApiResponse(responseCode = "401", description = "Authentication required.")
   })
-  public SseEmitter stream(@CurrentUserId UUID recipientSub) {
+  public SseEmitter stream(@CurrentUserId UUID recipientSub, HttpServletResponse response) {
+    response.setHeader("X-Accel-Buffering", "no");
     return streamService.subscribe(recipientSub);
   }
 
