@@ -130,6 +130,21 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * The two hangar reads are me-scoped and org-scoped respectively. The first is the one that would
+   * hurt: it answers with the caller's own ships **and** their user record, so an anonymous 200
+   * would hand out an email address along with a fleet list.
+   *
+   * @param path the allow-listed hangar read
+   * @throws Exception if the request could not be performed
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"/api/v1/hangar/my-ships", "/api/v1/hangar/squadron-overview"})
+  @WithAnonymousUser
+  void shouldRefuseAnonymousHangarReadsWithUnauthorized(String path) throws Exception {
+    mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
+  }
+
+  /**
    * The announcement is not anonymous either, despite having no {@code @PreAuthorize} of its own:
    * nothing in the matcher list names it, so it falls through to {@code
    * anyRequest().authenticated()}. Worth pinning precisely because the absence of an annotation

@@ -61,6 +61,14 @@ class ExternalContractTest {
   private static final String OPENAPI_RESOURCE = "/api/openapi.json";
 
   /**
+   * How far into a response's schema graph the field guard looks.
+   *
+   * <p>Two: a paged response spends the first level on its own rows, so a row's nested object — a
+   * ship's {@code shipType}, whose {@code name} is the whole point of the card — needs the second.
+   */
+  private static final int MAX_NESTING = 2;
+
+  /**
    * One frozen operation: path, verb, and the response fields a shipped client may rely on.
    *
    * @param path the {@code /api/v1} path exactly as it appears in the document
@@ -191,6 +199,40 @@ class ExternalContractTest {
               "/api/v1/missions/{missionId}/finance-entries/summary",
               "get",
               Set.of("total", "incomeSum", "incomeCount", "expenseSum", "expenseCount")),
+          // Phase 2, the member's own hangar. The row's `shipType` and `location` are nested
+          // objects whose `name` is what the card actually shows, which is why the guard now
+          // descends into a referenced schema and not only into an array's items.
+          //
+          // `owner` is deliberately NOT frozen. It is a full user record -- email, roles, rank --
+          // and on this endpoint it is always the caller's own, so the app has no reason to read
+          // it. Freezing it would oblige the backend to keep sending a payload nobody wants.
+          new ContractOperation(
+              "/api/v1/hangar/my-ships",
+              "get",
+              Set.of(
+                  "content",
+                  "page",
+                  "totalElements",
+                  "totalPages",
+                  "id",
+                  "name",
+                  "shipType",
+                  "insurance",
+                  "location",
+                  "fitted",
+                  "manufacturer")),
+          // The org-unit half of the same screen: one row per ship type with its counts.
+          new ContractOperation(
+              "/api/v1/hangar/squadron-overview",
+              "get",
+              Set.of(
+                  "content",
+                  "page",
+                  "totalElements",
+                  "totalPages",
+                  "shipType",
+                  "count",
+                  "fittedCount")),
           // Phase 2, the dashboard's announcement band. `content` is the whole point of the
           // operation, and the endpoint answers 204 when there is nothing to announce -- a
           // no-content answer the client must read as "no banner", never as a failure. That
@@ -515,7 +557,7 @@ class ExternalContractTest {
         JsonNode schemaProperties = schema == null ? null : schema.get("properties");
         if (schemaProperties != null) {
           properties.addAll(schemaProperties.propertyNames());
-          properties.addAll(arrayRowProperties(document, schemaProperties));
+          properties.addAll(nestedProperties(document, schemaProperties));
         }
       }
     }
@@ -523,13 +565,21 @@ class ExternalContractTest {
   }
 
   /**
-   * Collects the property names of every row schema a response's array properties carry.
+   * Collects the property names of the schemas a response's properties reference.
    *
-   * <p>A {@code PageResponse} carries its rows under {@code content}, and a roll-up carries its
-   * per-mission or per-participant rows under a named list. Both are read item by item, and both
-   * are invisible to a resolver that stops at the top-level object — an operation entry that froze
-   * only {@code payouts} would freeze the *list*, not the shape of anything in it, and a renamed
-   * {@code shareAmount} would reach a device with this guard green.
+   * <p>Descends **two levels** into the schemas a response references — an array's items and a
+   * plain nested object alike. Two, because a paged response spends the first on its own rows: the
+   * envelope references the row, and the row references the object whose field the screen shows. A
+   * {@code PageResponse} carries its rows under {@code content}, a roll-up carries its
+   * per-participant rows under a named list, and a ship carries its {@code shipType} as an object
+   * whose {@code name} is the whole point of the row. All three are invisible to a resolver that
+   * stops at the top-level object: an entry that froze only {@code payouts} would freeze the *list*
+   * and nothing in it, and a renamed {@code shareAmount} would reach a device with this guard
+   * green.
+   *
+   * <p>Two levels, not the whole graph. The deeper the walk, the more a recorded name could be
+   * satisfied by an unrelated schema somewhere far from the field it was recorded for, and the
+   * guard would read as stronger than it is.
    *
    * <p>The names land in one flat set together with the envelope's, which is the shape this guard
    * has always had. That makes a recorded field satisfiable by a same-named field on another schema
@@ -539,23 +589,43 @@ class ExternalContractTest {
    *
    * @param document the parsed API document
    * @param objectProperties the properties of the already-resolved response schema
-   * @return the row property names, or an empty set when no property is an array of objects
+   * @return the referenced schemas' property names, or an empty set when nothing is referenced
    */
-  private static Set<String> arrayRowProperties(JsonNode document, JsonNode objectProperties) {
-    Set<String> rows = new TreeSet<>();
+  private static Set<String> nestedProperties(JsonNode document, JsonNode objectProperties) {
+    Set<String> nested = new TreeSet<>();
+    collectNested(document, objectProperties, MAX_NESTING, nested);
+    return nested;
+  }
+
+  /**
+   * Adds the properties of every schema {@code objectProperties} references, down to {@code depth}.
+   *
+   * @param document the parsed API document
+   * @param objectProperties the properties to descend from
+   * @param depth how many further levels to follow; zero stops the walk
+   * @param into the accumulator
+   */
+  private static void collectNested(
+      JsonNode document, JsonNode objectProperties, int depth, Set<String> into) {
+    if (depth <= 0 || objectProperties == null) {
+      return;
+    }
     for (Map.Entry<String, JsonNode> property : objectProperties.properties()) {
-      JsonNode itemRef = property.getValue().path("items").get("$ref");
-      if (itemRef == null) {
+      JsonNode ref = property.getValue().path("items").get("$ref");
+      if (ref == null) {
+        ref = property.getValue().get("$ref");
+      }
+      if (ref == null) {
         continue;
       }
-      String rowName = itemRef.asString().substring(itemRef.asString().lastIndexOf('/') + 1);
-      JsonNode rowSchema = document.get("components").get("schemas").get(rowName);
-      JsonNode rowProperties = rowSchema == null ? null : rowSchema.get("properties");
-      if (rowProperties != null) {
-        rows.addAll(rowProperties.propertyNames());
+      String name = ref.asString().substring(ref.asString().lastIndexOf('/') + 1);
+      JsonNode schema = document.get("components").get("schemas").get(name);
+      JsonNode properties = schema == null ? null : schema.get("properties");
+      if (properties != null) {
+        into.addAll(properties.propertyNames());
+        collectNested(document, properties, depth - 1, into);
       }
     }
-    return rows;
   }
 
   /**
