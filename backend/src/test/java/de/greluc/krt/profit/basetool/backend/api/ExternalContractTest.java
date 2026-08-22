@@ -191,6 +191,12 @@ class ExternalContractTest {
               "/api/v1/missions/{missionId}/finance-entries/summary",
               "get",
               Set.of("total", "incomeSum", "incomeCount", "expenseSum", "expenseCount")),
+          // Phase 2, the dashboard's announcement band. `content` is the whole point of the
+          // operation, and the endpoint answers 204 when there is nothing to announce -- a
+          // no-content answer the client must read as "no banner", never as a failure. That
+          // distinction lives in the client (`ApiReader.getOptional`), because a schema cannot
+          // express "and sometimes there is no body".
+          new ContractOperation("/api/v1/announcement", "get", Set.of("content", "updatedAt")),
           // Phase 2, the notification inbox. `params` is frozen as a field but its CONTENT is
           // not a contract this guard can hold: the app renders each notification from
           // `notifications.type.<TYPE>` with those named placeholders substituted, so a renamed
