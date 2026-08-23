@@ -592,6 +592,12 @@ A SIGHUP is not enough here, for the inode reason above.
 
 ## Phase H — the phase-2 allow-list, in one paste
 
+> **Done: 2026-08-23.** Pasted by @greluc and verified from outside the host in the same session:
+> `200` for `/api/v1/missions/search`, `401` for the eight authenticated phase-2 reads
+> (`/operations/search`, `/orders`, `/inventory/aggregated`, `/org-units/bank/balances`,
+> `/hangar/my-ships`, `/notifications`, `/announcement`, `/users/me`) and `405` for
+> `POST /api/v1/orders`. The steps stay here because the next phase repeats them.
+
 Every read-only screen of the Android app is built and its paths are in the block of § D.3. The
 vhost still serves only what was pasted before them, so **the app's new screens answer 404 against
 production until this is done**. Nothing else is outstanding: no deploy, no restart, no Keycloak
