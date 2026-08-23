@@ -400,6 +400,49 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * Booking money against an Einsatz, and confirming a payout — both refused without a token.
+   *
+   * <p>The finance writes are the first paths on this allow-list that live outside every prefix the
+   * read-only guard names, so the vhost admits every verb on them and the chain is the only thing
+   * standing between an anonymous caller and a booked expense.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousFinanceWritesWithUnauthorized() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/finance-entries")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"missionId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"participantId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"type\":\"INCOME\",\"amount\":1}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/finance-entries/" + ABSENT_OPERATION)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"type\":\"INCOME\",\"amount\":1,\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(delete("/api/v1/finance-entries/" + ABSENT_OPERATION).with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/operations/" + ABSENT_OPERATION + "/payouts/paid-out")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"participantKey\":\"x\",\"paidOut\":true}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
    * The order's assignee edge and its status change, refused without a token.
    *
    * <p>The status one is the entry worth having: it is the first path on this allow-list whose
