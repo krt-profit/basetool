@@ -248,6 +248,24 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * The two Beförderung reads are refused without a token (REQ-SEC-037).
+   *
+   * <p>Me-scoped by construction — both paths end in {@code /my} and the member is resolved from
+   * the token — so there is no id an anonymous caller could substitute. Asserted anyway, because
+   * the rule is that every allow-listed path has its status pinned, not that obvious ones may be
+   * assumed.
+   *
+   * @param path the allow-listed promotion read
+   * @throws Exception if the request could not be performed
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"/api/v1/promotion/evaluations/my", "/api/v1/promotion/eligibility/my"})
+  @WithAnonymousUser
+  void shouldRefuseAnonymousPromotionReadsWithUnauthorized(String path) throws Exception {
+    mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
+  }
+
+  /**
    * The caller's own record is me-scoped as well — and it is the one allow-listed path that carries
    * an email address, so an anonymous 200 here would be a different order of leak.
    *
