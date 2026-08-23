@@ -19,8 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +33,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -237,5 +242,58 @@ class ApiVhostAnonymousSurfaceTest {
   @WithAnonymousUser
   void shouldRefuseAnonymousOperationReadsWithUnauthorized(String path) throws Exception {
     mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * Phase 3's reads on the member's own stock, and the picker behind its editor.
+   *
+   * @param path the allow-listed personal-inventory read
+   * @throws Exception if the request could not be performed
+   */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "/api/v1/personal-inventory",
+        "/api/v1/personal-inventory/" + ABSENT_OPERATION,
+        "/api/v1/uex/locations/search"
+      })
+  @WithAnonymousUser
+  void shouldRefuseAnonymousPersonalInventoryReadsWithUnauthorized(String path) throws Exception {
+    mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The first <em>writes</em> the vhost admits, refused the same way when nobody is signed in.
+   *
+   * <p>Worth its own case rather than folding into the read above: the allow-list opens these two
+   * paths for every verb the backend serves, so the question "what does an anonymous POST get" is
+   * now a real one. It must be the same {@code 401} — a write that answered anything softer would
+   * mean the vhost had opened a path whose method-level guard does not hold.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousPersonalInventoryWritesWithUnauthorized() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/personal-inventory")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"name\":\"x\",\"quantity\":1,\"locationUexId\":1,\"locationType\":\"CITY\"}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/personal-inventory/" + ABSENT_OPERATION)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"name\":\"x\",\"quantity\":1,\"locationUexId\":1,\"locationType\":\"CITY\","
+                        + "\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(delete("/api/v1/personal-inventory/" + ABSENT_OPERATION).with(csrf()))
+        .andExpect(status().isUnauthorized());
   }
 }

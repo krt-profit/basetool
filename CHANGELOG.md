@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Die App darf jetzt schreiben — der erste Schritt.** „Mein Inventar" (eigener Bestand: anlegen, ändern, löschen) ist am API-vhost freigegeben und im eingefrorenen Client-Vertrag festgehalten. Freigeschaltet wird der Weg zur Produktion gesammelt am Ende von Phase 3 (Runbook, Phase I).
+
+- **Der Vertragstest prüft jetzt auch die Anfrageseite.** Ein Pflichtfeld, das eine Schreib-Schnittstelle neu verlangt, ist für jede bereits ausgelieferte App ein 400 — der Test lässt das nicht mehr durch (REQ-API-009, ADR-0136).
+
 ### Changed
 
 - **Der nächtliche Edge-Probe deckt jetzt die vollständige Phase-2-Allowlist ab**, inklusive der einen Stelle, an der nur das Verb zwei Oberflächen trennt: `POST /api/v1/orders` ist der öffentliche Antragsweg und muss auf dem API-vhost mit 405 abgewiesen werden. Dazu steht im Runbook jetzt eine Schritt-für-Schritt-Anleitung für den einen verbleibenden manuellen Schritt (Phase H).

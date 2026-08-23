@@ -347,6 +347,15 @@ if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-f
 if ($uri = "/api/v1/org-units/bank/balances") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/transactions$") { set $krt_api_allowed 1; }
+# Phase 3 - "Mein Inventar", the member's own stock. The FIRST writes on this vhost: the two
+# paths below answer POST / PUT / DELETE as well as GET, and the read-only guard further down
+# names them explicitly rather than opening the family. Me-scoped by the service - neither path
+# can name another member - so nothing here widens who a caller can reach.
+if ($uri = "/api/v1/personal-inventory") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/personal-inventory/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+# Phase 3 - the location picker behind that editor. Read-only, and deliberately NOT the
+# /api/v1/locations family beside it, which carries the org's own places and their writes.
+if ($uri = "/api/v1/uex/locations/search") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- The missions and operations families are READ-ONLY on this vhost ---------
@@ -361,9 +370,21 @@ if ($krt_api_allowed = 0) { return 404; }
 # the harder half: this guard is verb-blind by design, so opening one write means naming it
 # explicitly rather than widening the family.
 set $krt_readonly_family "";
-if ($uri ~ "^/api/v1/(missions|operations|notifications|announcement|hangar|inventory|orders|org-units)") { set $krt_readonly_family "R"; }
+if ($uri ~ "^/api/v1/(missions|operations|notifications|announcement|hangar|inventory|orders|org-units|uex)") { set $krt_readonly_family "R"; }
 if ($request_method !~ "^(GET|HEAD)$") { set $krt_readonly_family "${krt_readonly_family}W"; }
 if ($krt_readonly_family = "RW") { return 405; }
+
+# --- Phase 3: the writes that ARE allowed, named one at a time ----------------------------------
+# "Mein Inventar" is the first family on this vhost that accepts a write. It is NOT in the
+# read-only list above, so no carve-out is needed here - the allow-list admits the two paths and
+# every verb the backend serves on them. That is deliberate and it is the pattern for the rest of
+# phase 3: a family is either read-only-by-default (listed above, writes named as exceptions) or
+# it is a write family in its own right (admitted by path, gated by the backend's @PreAuthorize).
+#
+# Which of the two a family gets is decided by what else lives under its prefix. /personal-inventory
+# has exactly two paths and both are me-scoped, so the prefix carries nothing that must stay out.
+# /missions does: PUT /missions/<uuid> edits an Einsatz for everyone, and phase 3 opens only the
+# signup and check-in beneath it - those get named exceptions and the family stays read-only.
 
 # --- Actuator: second layer --------------------------------------------------
 # The backend already serves no Actuator on 11261 since ADR-0134 (it moved to the internal-only
@@ -436,6 +457,9 @@ The safe order, and the reason for it:
    | `/api/v1/orders/<uuid>`                               | **401**                                                             | `isAuthenticated()` + scope                                                                              |
    | `/api/v1/org-units/bank/balances`                     | **401**                                                             | me-scoped to the accounts the caller may see                                                             |
    | `/api/v1/org-units/bank/accounts/<uuid>`              | **401**                                                             | same                                                                                                     |
+   | `/api/v1/personal-inventory`                          | **401**                                                             | me-scoped; the same path answers POST, which is 401 anonymously too                                      |
+   | `/api/v1/personal-inventory/<uuid>`                   | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
+   | `/api/v1/uex/locations/search`                        | **401**                                                             | `isAuthenticated()`                                                                                      |
    | `/api/v1/org-units/bank/accounts/<uuid>/transactions` | **401**                                                             | same                                                                                                     |
    | `/api/v1/hangar/my-ships`                             | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/hangar/squadron-overview`                    | **401**                                                             | scoped to the active org unit                                                                            |
@@ -637,6 +661,44 @@ Expected **405**. This one matters more than it looks: the same path answers a `
 `edge-deny-probe` asserts the whole table every night from a GitHub runner, which is the only
 vantage point outside the host. From the merge until the paste it will be **red, and correctly so**:
 it is reporting exactly the state step 2 fixes. If you paste the same day, you will not see it.
+
+---
+
+## Phase I — the phase-3 writes, in one paste at the end
+
+**Not yet.** Phase 3 opens the app's first write paths, and the owner decided (2026-08-23) that they
+reach production as **one** paste when the phase is complete, rather than six. Each slice therefore
+lands its allow-list lines in § D.3 above and its expected statuses in the table below, and nothing
+is pasted until the last one is merged.
+
+**The nightly probe is deliberately NOT extended as the slices land.** Adding a phase-3 path to
+`edge-deny-probe` before the paste would make it red for the length of the whole phase — days of an
+alarm that reports a state nobody intends to fix yet, which is how a red bar stops meaning anything.
+The probe gains every row below in the same PR that carries the paste instruction, and the run right
+after the paste is the one that proves it.
+
+### What the paste must contain
+
+Everything in § D.3, which by then carries all six slices. The lines below are what phase 3 adds, in
+merge order, so the block can be reviewed against this list rather than diffed by eye.
+
+|     Slice     |                            Paths added                            |         Verbs          |
+|---------------|-------------------------------------------------------------------|------------------------|
+| Mein Inventar | `/api/v1/personal-inventory`, `/api/v1/personal-inventory/<uuid>` | GET, POST, PUT, DELETE |
+| Mein Inventar | `/api/v1/uex/locations/search`                                    | GET                    |
+
+### What to expect afterwards
+
+Anonymously, from outside the host — the same shape as Phase H's check:
+
+|                Path                 | Without a token |
+|-------------------------------------|-----------------|
+| `/api/v1/personal-inventory`        | **401**         |
+| `/api/v1/personal-inventory/<uuid>` | **401**         |
+| `/api/v1/uex/locations/search`      | **401**         |
+
+A **405** on any of these would be the read-only guard swallowing a write the phase is supposed to
+open: `/personal-inventory` must NOT be in the guard's family list, and `uex` must be.
 
 ---
 
