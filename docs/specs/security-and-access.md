@@ -1827,6 +1827,30 @@ that does. Under operations the write that matters is `PUT
 opening it means naming that one path rather than widening the family, because the guard is
 verb-blind by design.
 
+**The live-sync bridge adds a second stream and the vhost's first client-driven publish**
+(ADR-0143, REQ-FE-019). Both are `isAuthenticated()` on the controller, so both answer `401`, and
+neither is anonymous. They are worth stating rather than filing under "everything else" because
+each is unusual for a different reason.
+
+`GET /api/v1/live-sync/stream` is the second long-lived SSE endpoint on this vhost, and it carries
+the notification stream's hazard in a wider shape: an untokened stream would not leak one response
+but hold a connection open and feed it *other members' rooms* for as long as it lived. What crosses
+it is only a room name and opaque section keys — never data — so the leak would be "resource X
+changed", which is exactly why each room is gated on the read it provokes rather than on membership
+alone. A stream naming several topics opens with the ones the caller may join and **drops the
+rest**, so a partially-authorized request is a partially-populated stream and never an accidentally
+complete one. When nothing is accepted it is `403`, not `401`: the caller authenticated fine, they
+simply may not enter any of the rooms they asked for.
+
+`POST /api/v1/live-sync/changed` is the vhost's first path where an ordinary member makes *other*
+members re-fetch. That reads worse than it is, and the reason is the same one ADR-0094 accepted for
+browser tabs: the frame carries nothing, and every receiver re-fetches through its own authorized
+read, so the whole reachable effect is making people reload things they are already allowed to
+load. The bound is not authorization but rate — per-subject and per-room token buckets, both
+answering `429`, both to be dropped rather than retried by a client. The path is on the allow-list
+by name, and the `live-sync` family is **not** given a read-only exception wholesale: `/stream` is a
+`GET` and `/changed` is the one `POST` admitted.
+
 **The notification stream is on the allow-list, and it is the entry that would cost the most if it
 were wrong.** An SSE endpoint reachable without a token would not leak one response but hold a
 connection open and feed it another member's events for as long as it lived. It is me-scoped
@@ -1865,6 +1889,10 @@ matchers.
   (§ D.3a). The previous single-number check raised a false alarm the first time it was run against
   a `permitAll` path.
 - [x] Both anonymous operations are named, each with the already-public surface it mirrors.
+- [x] The two live-sync paths were checked specifically: `isAuthenticated()` at the controller, so
+  neither is anonymous; the stream's partial-authorization answer (`403` only when *no* topic was
+  accepted) and the publish path's `429` are pinned in `LiveSyncControllerTest`, and both paths get
+  their row in `ApiVhostAnonymousSurfaceTest` and in the nightly probe.
 - [x] `POST /api/v1/missions` was checked specifically: `permitAll` in the chain,
   `isAuthenticated()` at the method, so an anonymous create is refused — and it is not on the
   allow-list either.

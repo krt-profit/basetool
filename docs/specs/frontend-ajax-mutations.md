@@ -1554,6 +1554,86 @@ Convert them when opting a file in.
 > `// @ts-check` · **ADR:** ADR-0125, ADR-0130 ·
 > **Issues:** —
 
+### REQ-FE-019 — The same live sync reaches the native app, in both directions
+
+REQ-FE-010 promises that *on any surface where several users can see the same state, a peer's change
+propagates to the others without a manual reload*. REQ-FE-015 delivers that promise for browser
+tabs. The native app is a peer on those same surfaces and was outside it entirely, which cost the
+promise twice over: a browser edit never reached the app, and — the worse half — an **app write left
+every open browser stale**, breaking live sync on surfaces where it had been working.
+
+The bridge (ADR-0143) closes both directions over the channel REQ-FE-015 already uses,
+`basetool:livesync:changed`, with its payload unchanged (`{v, topic, sections, origin}`). Nothing in
+the frontend is modified: it keeps publishing and consuming exactly as it did, and simply now has a
+peer that is not a frontend instance.
+
+**Receiving — `GET /api/v1/live-sync/stream?topics=…`.** One SSE stream per screen, its topic set
+named in the URL and fixed for the stream's life; a navigation closes it and opens another. The URL
+*is* the subscription, so there is no subscribe protocol to fall out of sync after a reconnect.
+Three events: `subscribed` once, naming the topics that were **accepted**; `changed` per frame; and
+the same keep-alive heartbeat the notification stream sends, for the same proxy and NAT reasons.
+
+**A topic the caller may not join is dropped from the set, not made fatal** — and the accepted list
+is the first thing the client is told. A client must be able to distinguish "this room is live and
+quiet" from "this room will never speak", because the two are identical on the wire and only the
+second one means the screen has to poll. A stream where *nothing* was accepted is `403`.
+
+**Emitting — `POST /api/v1/live-sync/changed`.** The app announces its own writes the way a tab
+does, and the backend relays locally and then onto the shared channel. `202`, because the frame is a
+signal and not a transaction: the mutation it follows has already committed, and a client that
+treated a failure here as a failed write would show an error for a change that is in the database. A
+`429` is to be **dropped, not retried** — the buckets exist to bound the re-fetch herd, and a retry
+defeats the bound it just hit.
+
+**The bounds are REQ-FE-015's, unchanged**: per-subject burst 40 / refill 20 per second, per-topic
+burst 200 / refill 100 per second, and receiver-side coalescing of 400 ms for a per-resource room
+and 1500 ms for a global one, full-jittered. Frames consumed from Redis bypass the per-topic bucket
+— they were already accepted where they originated.
+
+**Authorization is the real read, not a proxy for it.** Each room's gate is the gate of the fetch it
+provokes (`ownerScopeService.canSeeMission`, `canSeeJobOrder`, `canViewJobOrders`, …), asked
+synchronously of the backend's own data. There is no fail-open branch, because unlike the frontend's
+authorizer there is no indeterminate verdict to resolve; a check that throws refuses the room.
+
+**No presence crosses.** ADR-0094 fails the `mission` class closed precisely because a web subscribe
+emits an editor-presence snapshot — pseudonymous ids and callsigns. This bridge emits `changed` and
+nothing else, subscribes to no presence channel, and offers no way to ask for one, which is why the
+mission room may be joined here at all. App members are therefore invisible as editor dots and see
+none; ADR-0126's gossip is deliberately not bridged.
+
+**Two registries, one gate.** The backend holds its own copy of the topic classes and section
+whitelists, because the modules share no code. Drift between them produces this bridge's worst
+failure shape — nothing throws, nothing logs, a screen just stops updating — so
+`LiveSyncTopicRegistryParityTest` reads the frontend's `LiveSyncTopicClass` source and fails the
+build when the backend names a prefix or a section the frontend does not. The frontend's staff-only
+rooms (`bank` without an id, `members`, `org-structure`) are asserted **absent** from the backend
+registry: the admin area is web-only permanently, so a room there would have no reader.
+
+**Acceptance**
+
+- [x] The published payload is field-for-field what a frontend instance sends (`RedisLiveSyncFanoutTest`).
+- [x] A frontend frame is delivered to app streams; an own-origin frame is skipped
+  (`RedisLiveSyncFanoutTest`).
+- [x] A frame naming a room this backend does not serve is dropped and counted, not fatal
+  (`RedisLiveSyncFanoutTest`).
+- [x] A refused topic is dropped and the stream still opens; nothing accepted is `403`
+  (`LiveSyncControllerTest`).
+- [x] Too many topics is refused rather than truncated (`LiveSyncControllerTest`).
+- [x] Local delivery precedes the fan-out, so a Redis outage costs peers only
+  (`LiveSyncRelayServiceTest`).
+- [x] Both buckets bound what they are meant to, and one member's flood does not cost another theirs
+  (`LiveSyncRelayServiceTest`).
+- [x] Each room's gate is its own read's gate; a throwing check refuses
+  (`LiveSyncSubscriptionAuthorizerTest`).
+- [x] The backend registry is a subset of the frontend's, staff rooms excluded
+  (`LiveSyncTopicRegistryParityTest`).
+
+> **Code:** `backend/…/controller/LiveSyncController`, `backend/…/service/LiveSyncStreamService`,
+> `LiveSyncRelayService`, `LiveSyncSubscriptionAuthorizer`, `RedisLiveSyncFanout`,
+> `LocalLiveSyncFanout`, `LiveSyncRedisConfig`, `backend/…/support/LiveSyncTopic`,
+> `LiveSyncTopicClass`, `LiveSyncAuthorization` · **ADR:** ADR-0143 (ADR-0094 unchanged) ·
+> **App side:** `basetool-android` `REQ-APP-SYNC-*`
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract
@@ -1566,7 +1646,13 @@ Convert them when opting a file in.
 - Live-collaboration features beyond the section-refresh sync of REQ-FE-010/-015
   (operational-transform text co-editing, server-pushed conflict resolution). Cross-replica fan-out
   via Redis pub/sub moved **in scope** with REQ-FE-015 / ADR-0094, and cross-replica **presence
-  dots** followed in #1237 / ADR-0126.
+  dots** followed in #1237 / ADR-0126. The native app moved in scope with REQ-FE-019 / ADR-0143 for
+  `changed` frames only — **editor presence stays web-only**, deliberately, because it is the one
+  part of the socket that carries cross-user identity data.
+- A server-side trigger interceptor that publishes `changed` from the mutation itself rather than
+  from the client. Strictly better and strictly more expensive; unchanged as the not-taken option
+  since ADR-0031, and REQ-FE-019's publish endpoint would become redundant rather than wrong if it
+  ever lands.
 - Backend business-logic changes beyond adding JSON proxy endpoints that reuse existing backend
   APIs/DTOs.
 
