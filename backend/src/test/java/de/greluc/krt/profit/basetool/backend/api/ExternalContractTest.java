@@ -577,7 +577,72 @@ class ExternalContractTest {
               "get",
               Set.of(
                   "content", "page", "totalElements", "totalPages", "id", "name", "manufacturer")),
-          new ContractOperation("/api/v1/locations/home-locations", "get", Set.of("id", "name")));
+          new ContractOperation("/api/v1/locations/home-locations", "get", Set.of("id", "name")),
+          // Phase 3, the Lager's three bookings. Every one of them carries `version`, and the two
+          // that move stock carry `amount` — the pair that decides what actually happens to a
+          // member's material, which is why they are the required fields the contract freezes.
+          // The entry level of the Lager tree, added in phase 3: a member cannot book out what they
+          // cannot select, and the two levels phase 2 read stop at the stack. `version` is frozen
+          // here for the same reason as on my-ships — every booking echoes it.
+          new ContractOperation(
+              "/api/v1/inventory/all/stack/entries",
+              "get",
+              Set.of(
+                  "content",
+                  "page",
+                  "totalElements",
+                  "totalPages",
+                  "id",
+                  "material",
+                  "location",
+                  "amount",
+                  "quality",
+                  "personal",
+                  "note",
+                  "user")),
+          new ContractOperation(
+              "/api/v1/inventory",
+              "post",
+              Set.of("id", "material", "location", "amount", "quality", "personal"),
+              Set.of("amount", "locationId")),
+          // The book-out's `type` is DISCARD / TRANSFER / SELL. It is an enum on the REQUEST, which
+          // the required-enum guard does not reach — that one walks responses — so the wording is
+          // pinned here and in the app's spec instead.
+          new ContractOperation(
+              "/api/v1/inventory/{id}/book-out",
+              "post",
+              Set.of("id", "material", "location", "amount", "personal"),
+              Set.of("amount", "version")),
+          new ContractOperation(
+              "/api/v1/inventory/{id}/personal-rebook",
+              "post",
+              Set.of("id", "material", "location", "amount", "personal"),
+              Set.of("amount", "version")),
+          new ContractOperation(
+              "/api/v1/inventory/{id}/note", "put", Set.of("id", "note"), Set.of("version")),
+          // The four pickers the booking form needs. `quantityType` is frozen on the material
+          // because it is the unit every amount on the screen is expressed in — SCU or units — and
+          // a number without its unit is not a quantity.
+          new ContractOperation(
+              "/api/v1/materials/search",
+              "get",
+              Set.of(
+                  "content", "page", "totalElements", "totalPages", "id", "name", "quantityType")),
+          new ContractOperation(
+              "/api/v1/locations/search",
+              "get",
+              Set.of("content", "page", "totalElements", "totalPages", "id", "name")),
+          // `effectiveName` and not `username`: it is what the web app renders and what the member
+          // recognises. The rest of the record — email, roles, permissions — is deliberately not
+          // frozen, because the picker must not read it.
+          new ContractOperation(
+              "/api/v1/users/search",
+              "get",
+              Set.of("content", "page", "totalElements", "totalPages", "id", "effectiveName")),
+          new ContractOperation(
+              "/api/v1/materials/{id}/terminals",
+              "get",
+              Set.of("terminalId", "terminalName", "priceSell")));
 
   /**
    * Enum constants a shipped client cannot survive a change to, keyed {@code Schema.property}.

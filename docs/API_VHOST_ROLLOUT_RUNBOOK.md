@@ -375,6 +375,20 @@ if ($uri ~ "^/api/v1/hangar/ships/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[
 # PUT on /{id}/visibility, which the read-only guard refuses by verb.
 if ($uri = "/api/v1/ship-types") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/locations/home-locations") { set $krt_api_allowed 1; }
+# Phase 3 - the Lager's three bookings. EXACT paths: the /inventory prefix also carries
+# /inventory/all (every member's entries), the two bulk endpoints and the allocation family, none
+# of which this vhost admits. The per-entry paths are gated by canEditInventoryItem, which is what
+# keeps a member to their own stock and their unit's.
+if ($uri = "/api/v1/inventory") { set $krt_api_allowed 1; }
+# Phase 3 - the entry level of the tree. A member cannot book out what they cannot select, and the
+# two levels phase 2 admitted stop at the stack. Read-only, and NOT /inventory/all beside it.
+if ($uri = "/api/v1/inventory/all/stack/entries") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/inventory/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(book-out|personal-rebook|note)$") { set $krt_api_allowed 1; }
+# Phase 3 - the four pickers the booking form needs. All reads.
+if ($uri = "/api/v1/materials/search") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/locations/search") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/users/search") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/materials/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/terminals$") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- The missions and operations families are READ-ONLY on this vhost ---------
@@ -389,7 +403,7 @@ if ($krt_api_allowed = 0) { return 404; }
 # the harder half: this guard is verb-blind by design, so opening one write means naming it
 # explicitly rather than widening the family.
 set $krt_readonly_family "";
-if ($uri ~ "^/api/v1/(missions|operations|notifications|announcement|hangar|inventory|orders|org-units|uex|blueprints|ship-types|locations)") { set $krt_readonly_family "R"; }
+if ($uri ~ "^/api/v1/(missions|operations|notifications|announcement|hangar|inventory|orders|org-units|uex|blueprints|ship-types|locations|materials|users)") { set $krt_readonly_family "R"; }
 if ($request_method !~ "^(GET|HEAD)$") { set $krt_readonly_family "${krt_readonly_family}W"; }
 # Named exceptions: the writes phase 3 opens INSIDE a read-only family. Each one clears the verdict
 # before it is judged, which is the only shape nginx allows - it cannot nest `if`, so an exception
@@ -401,6 +415,10 @@ if ($request_method !~ "^(GET|HEAD)$") { set $krt_readonly_family "${krt_readonl
 # backend serves on it - which for these is POST, PUT and DELETE, each gated by @PreAuthorize.
 if ($uri = "/api/v1/hangar/ships") { set $krt_readonly_family ""; }
 if ($uri ~ "^/api/v1/hangar/ships/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_readonly_family ""; }
+# /inventory stays in the family because the prefix also carries /inventory/all, the two bulk
+# endpoints and the allocation family. Only the three per-entry bookings and the create are named.
+if ($uri = "/api/v1/inventory") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/inventory/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(book-out|personal-rebook|note)$") { set $krt_readonly_family ""; }
 if ($krt_readonly_family = "RW") { return 405; }
 
 # --- Which family gets which shape ---------------------------------------------------------------
@@ -497,6 +515,15 @@ The safe order, and the reason for it:
    | `/api/v1/hangar/ships/<uuid>`                         | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
    | `/api/v1/ship-types`                                  | **200**                                                             | anonymous by design: `permitAll` game data the public web frontend already renders (REQ-SEC-037)         |
    | `/api/v1/locations/home-locations`                    | **403**                                                             | `permitAll` chain + method guard — refused at the method seam, like the Finanzen paths                   |
+   | `/api/v1/inventory` (POST)                            | **401**                                                             | chain requires a member role                                                                             |
+   | `/api/v1/inventory/all/stack/entries`                 | **401**                                                             | chain requires a member role                                                                             |
+   | `/api/v1/inventory/<uuid>/book-out`                   | **401**                                                             | same, plus `canEditInventoryItem`                                                                        |
+   | `/api/v1/inventory/<uuid>/personal-rebook`            | **401**                                                             | same                                                                                                     |
+   | `/api/v1/inventory/<uuid>/note`                       | **401**                                                             | same                                                                                                     |
+   | `/api/v1/materials/search`                            | **200**                                                             | anonymous by design: `permitAll` catalogue, like `/ship-types` (REQ-SEC-037)                             |
+   | `/api/v1/locations/search`                            | **200**                                                             | same catalogue family                                                                                    |
+   | `/api/v1/users/search`                                | **401**                                                             | member records; `isAuthenticated()` and role-gated                                                       |
+   | `/api/v1/materials/<uuid>/terminals`                  | **200**                                                             | same catalogue family                                                                                    |
    | `/api/v1/org-units/bank/accounts/<uuid>/transactions` | **401**                                                             | same                                                                                                     |
    | `/api/v1/hangar/my-ships`                             | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/hangar/squadron-overview`                    | **401**                                                             | scoped to the active org unit                                                                            |
@@ -744,33 +771,40 @@ after the paste is the one that proves it.
 Everything in § D.3, which by then carries all six slices. The lines below are what phase 3 adds, in
 merge order, so the block can be reviewed against this list rather than diffed by eye.
 
-|     Slice     |                                   Paths added                                    |         Verbs          |
-|---------------|----------------------------------------------------------------------------------|------------------------|
-| Mein Inventar | `/api/v1/personal-inventory`, `/api/v1/personal-inventory/<uuid>`                | GET, POST, PUT, DELETE |
-| Mein Inventar | `/api/v1/uex/locations/search`                                                   | GET                    |
-| Blueprints    | `/api/v1/personal-blueprints`, `/api/v1/personal-blueprints/<uuid>`              | GET, POST, PUT, DELETE |
-| Blueprints    | `/api/v1/personal-blueprints/craftability`, `/api/v1/blueprints/products/search` | GET                    |
-| Hangar        | `/api/v1/hangar/ships`, `/api/v1/hangar/ships/<uuid>`                            | POST, PUT, DELETE      |
-| Hangar        | `/api/v1/ship-types`, `/api/v1/locations/home-locations`                         | GET                    |
+|     Slice     |                                                     Paths added                                                      |         Verbs          |
+|---------------|----------------------------------------------------------------------------------------------------------------------|------------------------|
+| Mein Inventar | `/api/v1/personal-inventory`, `/api/v1/personal-inventory/<uuid>`                                                    | GET, POST, PUT, DELETE |
+| Mein Inventar | `/api/v1/uex/locations/search`                                                                                       | GET                    |
+| Blueprints    | `/api/v1/personal-blueprints`, `/api/v1/personal-blueprints/<uuid>`                                                  | GET, POST, PUT, DELETE |
+| Blueprints    | `/api/v1/personal-blueprints/craftability`, `/api/v1/blueprints/products/search`                                     | GET                    |
+| Hangar        | `/api/v1/hangar/ships`, `/api/v1/hangar/ships/<uuid>`                                                                | POST, PUT, DELETE      |
+| Hangar        | `/api/v1/ship-types`, `/api/v1/locations/home-locations`                                                             | GET                    |
+| Lager         | `/api/v1/inventory`, `/api/v1/inventory/<uuid>/{book-out,personal-rebook,note}`                                      | POST, PUT              |
+| Lager         | `/api/v1/materials/search`, `/api/v1/locations/search`, `/api/v1/users/search`, `/api/v1/materials/<uuid>/terminals` | GET                    |
 
 ### What to expect afterwards
 
 Anonymously, from outside the host — the same shape as Phase H's check:
 
-|                    Path                    |                Without a token                 |
-|--------------------------------------------|------------------------------------------------|
-| `/api/v1/personal-inventory`               | **401**                                        |
-| `/api/v1/personal-inventory/<uuid>`        | **401**                                        |
-| `/api/v1/uex/locations/search`             | **401**                                        |
-| `/api/v1/personal-blueprints`              | **401**                                        |
-| `/api/v1/personal-blueprints/<uuid>`       | **401**                                        |
-| `/api/v1/personal-blueprints/craftability` | **401**                                        |
-| `/api/v1/blueprints/products/search`       | **401**                                        |
-| `/api/v1/hangar/ships`                     | **401**                                        |
-| `/api/v1/hangar/ships/<uuid>`              | **401**                                        |
-| `/api/v1/ship-types`                       | **200** — anonymous by design, see REQ-SEC-037 |
-| `/api/v1/locations/home-locations`         | **403** — method-seam refusal, not a `401`     |
-| `POST /api/v1/hangar/import/fleetview`     | **405** — still refused, and that is the point |
+|                    Path                    |                         Without a token                         |
+|--------------------------------------------|-----------------------------------------------------------------|
+| `/api/v1/personal-inventory`               | **401**                                                         |
+| `/api/v1/personal-inventory/<uuid>`        | **401**                                                         |
+| `/api/v1/uex/locations/search`             | **401**                                                         |
+| `/api/v1/personal-blueprints`              | **401**                                                         |
+| `/api/v1/personal-blueprints/<uuid>`       | **401**                                                         |
+| `/api/v1/personal-blueprints/craftability` | **401**                                                         |
+| `/api/v1/blueprints/products/search`       | **401**                                                         |
+| `/api/v1/hangar/ships`                     | **401**                                                         |
+| `/api/v1/hangar/ships/<uuid>`              | **401**                                                         |
+| `/api/v1/ship-types`                       | **200** — anonymous by design, see REQ-SEC-037                  |
+| `/api/v1/locations/home-locations`         | **403** — method-seam refusal, not a `401`                      |
+| `/api/v1/inventory/<uuid>/book-out`        | **401**                                                         |
+| `/api/v1/users/search`                     | **401**                                                         |
+| `/api/v1/materials/search`                 | **200** — anonymous catalogue, see REQ-SEC-037                  |
+| `/api/v1/locations/search`                 | **200** — same                                                  |
+| `POST /api/v1/inventory/all`               | **404** — the every-member list is not on the allow-list at all |
+| `POST /api/v1/hangar/import/fleetview`     | **405** — still refused, and that is the point                  |
 
 A **405** on any of these would be the read-only guard swallowing a write the phase is supposed to
 open: `/personal-inventory` and `/personal-blueprints` must NOT be in the guard's family list, while

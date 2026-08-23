@@ -278,6 +278,15 @@ constraint for nothing and record a guess about which fields matter.
 | `DELETE /api/v1/hangar/ships/{id}`                         | *(204, no body)*                                                                                                                                                                                                                                                                                                                            |
 | `GET /api/v1/ship-types`                                   | envelope; row `id`, `name`, `manufacturer` — **anonymous** (REQ-SEC-037)                                                                                                                                                                                                                                                                    |
 | `GET /api/v1/locations/home-locations`                     | `id`, `name`                                                                                                                                                                                                                                                                                                                                |
+| `POST /api/v1/inventory`                                   | `id`, `material`, `location`, `amount`, `quality`, `personal` — **request** requires `amount`, `locationId`                                                                                                                                                                                                                                 |
+| `GET /api/v1/inventory/all/stack/entries`                  | envelope; row `id`, `material`, `location`, `amount`, `quality`, `personal`, `note`, `user`                                                                                                                                                                                                                                                 |
+| `POST /api/v1/inventory/{id}/book-out`                     | as above — **request** requires `amount`, `version`; its `type` is `DISCARD` / `TRANSFER` / `SELL`                                                                                                                                                                                                                                          |
+| `POST /api/v1/inventory/{id}/personal-rebook`              | as above — **request** requires `amount`, `version`                                                                                                                                                                                                                                                                                         |
+| `PUT /api/v1/inventory/{id}/note`                          | `id`, `note` — **request** requires `version`                                                                                                                                                                                                                                                                                               |
+| `GET /api/v1/materials/search`                             | envelope; row `id`, `name`, `quantityType` — **anonymous** (REQ-SEC-037)                                                                                                                                                                                                                                                                    |
+| `GET /api/v1/locations/search`                             | envelope; row `id`, `name` — **anonymous**                                                                                                                                                                                                                                                                                                  |
+| `GET /api/v1/users/search`                                 | envelope; row `id`, `effectiveName` — **not** anonymous                                                                                                                                                                                                                                                                                     |
+| `GET /api/v1/materials/{id}/terminals`                     | `terminalId`, `terminalName`, `priceSell` — **anonymous**                                                                                                                                                                                                                                                                                   |
 
 **Frozen has a request side, and phase 3 is where it starts to bite.** A write operation in the set
 may not gain a **required** request field. An old build sends the payload it was written against, so
@@ -290,6 +299,16 @@ must be mandatory goes to `/api/v2`.
 `PUT /api/v1/personal-inventory/{id}` requires `version` and is the first entry to record that: it
 is the optimistic lock, echoed from the read, and a concurrent edit answers `409 OPTIMISTIC_LOCK`
 instead of overwriting. `POST` has no `version` because there is nothing yet to conflict with.
+
+`quantityType` on a material is frozen because it is the unit every amount on the Lager screen is
+expressed in — SCU or units — and a number without its unit is not a quantity. `effectiveName` on a
+member is frozen instead of `username`: it is what the web app renders and what a member recognises,
+and the rest of that record — email, roles, permissions — is deliberately left unfrozen because the
+picker must not read it.
+
+The book-out's `type` (`DISCARD` / `TRANSFER` / `SELL`) is an enum on the **request**, which the
+required-enum guard does not reach: that guard walks responses. It is pinned in this table and in
+the app's spec instead.
 
 `GET /api/v1/hangar/my-ships` gained `version` in phase 3. A read-only client had no use for it; a
 writing one cannot save without it, and adding a field to a frozen set is the direction that is
