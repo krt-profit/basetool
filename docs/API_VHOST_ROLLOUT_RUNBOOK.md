@@ -815,16 +815,15 @@ it is reporting exactly the state step 2 fixes. If you paste the same day, you w
 
 ## Phase I — the phase-3 writes, in one paste at the end
 
-**Not yet.** Phase 3 opens the app's first write paths, and the owner decided (2026-08-23) that they
-reach production as **one** paste when the phase is complete, rather than six. Each slice therefore
-lands its allow-list lines in § D.3 above and its expected statuses in the table below, and nothing
-is pasted until the last one is merged.
+**Now.** Phase 3 opens the app's first write paths, and the owner decided (2026-08-23) that they
+reach production as **one** paste when the phase is complete, rather than seven. All seven slices
+are merged, so this is that paste — the § D.3 block below goes to production in one edit.
 
-**The nightly probe is deliberately NOT extended as the slices land.** Adding a phase-3 path to
-`edge-deny-probe` before the paste would make it red for the length of the whole phase — days of an
-alarm that reports a state nobody intends to fix yet, which is how a red bar stops meaning anything.
-The probe gains every row below in the same PR that carries the paste instruction, and the run right
-after the paste is the one that proves it.
+**The nightly probe was deliberately NOT extended as the slices landed.** Adding a phase-3 path to
+`edge-deny-probe` before the paste would have made it red for the length of the whole phase — days
+of an alarm reporting a state nobody intended to fix yet, which is how a red bar stops meaning
+anything. It gains every row below in **this** PR, and the run right after the paste is the one that
+proves it.
 
 ### What the paste must contain
 
@@ -841,35 +840,101 @@ merge order, so the block can be reviewed against this list rather than diffed b
 | Hangar        | `/api/v1/ship-types`, `/api/v1/locations/home-locations`                                                             | GET                    |
 | Lager         | `/api/v1/inventory`, `/api/v1/inventory/<uuid>/{book-out,personal-rebook,note}`                                      | POST, PUT              |
 | Lager         | `/api/v1/materials/search`, `/api/v1/locations/search`, `/api/v1/users/search`, `/api/v1/materials/<uuid>/terminals` | GET                    |
+| Lager         | `/api/v1/inventory/all/stack/entries`                                                                                | GET                    |
+| Aufträge      | `/api/v1/orders/<uuid>/assignees/<uuid>`, `…/note`                                                                   | POST, PUT, DELETE      |
+| Aufträge      | `/api/v1/orders/<uuid>/status`                                                                                       | PUT                    |
+| Einsatz       | `/api/v1/missions/<uuid>/join`                                                                                       | POST                   |
+| Einsatz       | `/api/v1/missions/<uuid>/participants/<uuid>/slim` and its `check-in`, `check-out`, `payout-preference` siblings     | POST, PUT, DELETE      |
+| Einsatz-Geld  | `/api/v1/finance-entries`, `/api/v1/finance-entries/<uuid>`                                                          | POST, PUT, DELETE      |
+| Einsatz-Geld  | `/api/v1/operations/<uuid>/payouts/paid-out`                                                                         | PUT                    |
+| Bank          | `/api/v1/org-units/bank/accounts/<uuid>/settings`                                                                    | GET                    |
+| Bank          | `…/balance-target`, `…/visibility/role/<code>`, `…/visibility/all-members/<bool>`                                    | POST, PUT, DELETE      |
 
 ### What to expect afterwards
 
 Anonymously, from outside the host — the same shape as Phase H's check:
 
-|                    Path                    |                         Without a token                         |
-|--------------------------------------------|-----------------------------------------------------------------|
-| `/api/v1/personal-inventory`               | **401**                                                         |
-| `/api/v1/personal-inventory/<uuid>`        | **401**                                                         |
-| `/api/v1/uex/locations/search`             | **401**                                                         |
-| `/api/v1/personal-blueprints`              | **401**                                                         |
-| `/api/v1/personal-blueprints/<uuid>`       | **401**                                                         |
-| `/api/v1/personal-blueprints/craftability` | **401**                                                         |
-| `/api/v1/blueprints/products/search`       | **401**                                                         |
-| `/api/v1/hangar/ships`                     | **401**                                                         |
-| `/api/v1/hangar/ships/<uuid>`              | **401**                                                         |
-| `/api/v1/ship-types`                       | **200** — anonymous by design, see REQ-SEC-037                  |
-| `/api/v1/locations/home-locations`         | **403** — method-seam refusal, not a `401`                      |
-| `/api/v1/inventory/<uuid>/book-out`        | **401**                                                         |
-| `/api/v1/users/search`                     | **401**                                                         |
-| `/api/v1/materials/search`                 | **200** — anonymous catalogue, see REQ-SEC-037                  |
-| `/api/v1/locations/search`                 | **200** — same                                                  |
-| `POST /api/v1/inventory/all`               | **404** — the every-member list is not on the allow-list at all |
-| `POST /api/v1/hangar/import/fleetview`     | **405** — still refused, and that is the point                  |
+|                     Path                     |                                  Without a token                                  |
+|----------------------------------------------|-----------------------------------------------------------------------------------|
+| `/api/v1/personal-inventory`                 | **401**                                                                           |
+| `/api/v1/personal-inventory/<uuid>`          | **401**                                                                           |
+| `/api/v1/uex/locations/search`               | **401**                                                                           |
+| `/api/v1/personal-blueprints`                | **401**                                                                           |
+| `/api/v1/personal-blueprints/<uuid>`         | **401**                                                                           |
+| `/api/v1/personal-blueprints/craftability`   | **401**                                                                           |
+| `/api/v1/blueprints/products/search`         | **401**                                                                           |
+| `/api/v1/hangar/ships`                       | **401**                                                                           |
+| `/api/v1/hangar/ships/<uuid>`                | **401**                                                                           |
+| `/api/v1/ship-types`                         | **200** — anonymous by design, see REQ-SEC-037                                    |
+| `/api/v1/locations/home-locations`           | **403** — method-seam refusal, not a `401`                                        |
+| `/api/v1/inventory/<uuid>/book-out`          | **401**                                                                           |
+| `/api/v1/users/search`                       | **401**                                                                           |
+| `/api/v1/materials/search`                   | **200** — anonymous catalogue, see REQ-SEC-037                                    |
+| `/api/v1/locations/search`                   | **200** — same                                                                    |
+| `POST /api/v1/inventory/all`                 | **404** — the every-member list is not on the allow-list at all                   |
+| `/api/v1/orders/<uuid>/assignees/<uuid>`     | **401**                                                                           |
+| `/api/v1/orders/<uuid>/status`               | **401** — and **403** for an authenticated member without LOGISTICIAN             |
+| `/api/v1/missions/<uuid>/join`               | **401**                                                                           |
+| `…/participants/<uuid>/check-in/slim`        | **404** — the guard resolves the row before it judges the caller, see REQ-SEC-037 |
+| `/api/v1/finance-entries`                    | **401**                                                                           |
+| `/api/v1/operations/<uuid>/payouts/paid-out` | **401**                                                                           |
+| `…/bank/accounts/<uuid>/settings`            | **401**                                                                           |
+| `…/bank/accounts/<uuid>/balance-target`      | **401**                                                                           |
+| `POST /api/v1/bank/deposits`                 | **404** — the bank-employee surface is not on the allow-list at all               |
+| `POST /api/v1/orders`                        | **405** — the public request form stays refused on this vhost                     |
+| `POST /api/v1/hangar/import/fleetview`       | **405** — still refused, and that is the point                                    |
 
 A **405** on any of these would be the read-only guard swallowing a write the phase is supposed to
 open: `/personal-inventory` and `/personal-blueprints` must NOT be in the guard's family list, while
 `uex` and `blueprints` must — the picker and the location search are reads, and the catalogue behind
 them has writes this vhost never admits.
+
+A **404** where a **401** is listed means the path did not match the allow-list — a typo in the
+regex, most likely a `<uuid>` group that lost a brace. A **401** where a **404** is listed on
+`/inventory/all` or `/bank/deposits` means the opposite: something was admitted that should not have
+been, and that one is worth stopping for.
+
+### Doing it — step by step
+
+Everything below runs on the production host and is yours to execute; nothing here is automated and
+nothing in this repo reaches that host.
+
+1. **Open the vhost's Advanced tab.** Nginx Proxy Manager → *Hosts → Proxy Hosts* →
+   `api.profit-base.online` → *Advanced*.
+
+2. **Replace the whole custom-configuration block** with § D.3 of this document, exactly as it
+   stands after this PR. Not a merge of the old and the new: the block is written to be pasted
+   whole, and hand-merging is how the read-only guard ends up with two `set $krt_readonly_family ""`
+   lines that disagree.
+
+3. **Save.** NPM tests the configuration before it writes it — a syntax error is refused here rather
+   than taking the vhost down. If it refuses, nothing has changed yet; the old block is still live.
+
+4. **Check the paste from your own shell**, before trusting the nightly probe:
+
+   ```powershell
+   foreach ($p in '/api/v1/personal-inventory','/api/v1/hangar/ships','/api/v1/inventory','/api/v1/orders/00000000-0000-4000-8000-00000000cafe/status','/api/v1/missions/00000000-0000-4000-8000-00000000cafe/join','/api/v1/finance-entries','/api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/settings','/api/v1/ship-types','/api/v1/materials/search') { '{0,-78} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' "https://api.profit-base.online$p") }
+   ```
+
+   Expected: `401` for the first seven, `200` for `ship-types` and `materials/search`. Anything else
+   is in the table above.
+
+5. **Check that what should still be refused, is:**
+
+   ```powershell
+   foreach ($p in '/api/v1/bank/deposits','/api/v1/inventory/all','/api/v1/hangar/import/fleetview') { '{0,-46} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' -X POST "https://api.profit-base.online$p") }
+   ```
+
+   Expected: `404`, `404`, `405`. A `401` here would mean a path was admitted that should not have
+   been.
+
+6. **Run the probe once by hand** rather than waiting for the night:
+   *Actions → Edge deny probe → Run workflow*. It must come back green; it now carries every path of
+   this phase.
+
+If step 4 or 5 disagrees with the table, put the previous block back — it is in this file's git
+history — and say what you saw. Nothing in the app breaks while the old block is live: the phase-3
+paths simply stay unreachable from outside, which is where they have been all along.
 
 ---
 

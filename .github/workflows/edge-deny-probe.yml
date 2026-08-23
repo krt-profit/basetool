@@ -115,6 +115,51 @@ jobs:
           probe POST /api/v1/orders 405
 
 
+          # Phase 3's writes. Same rule as phase 2's reads above: these join with the ONE paste
+          # that opens them (runbook § Phase I), so between merging this and pasting the block the
+          # run is red and correctly so. A UUID that exists nowhere is deliberate -- what is being
+          # asserted is the chain's refusal, which happens before any row is looked up.
+          nil=00000000-0000-4000-8000-00000000cafe
+          for p in /api/v1/personal-inventory /api/v1/personal-blueprints \
+                   /api/v1/personal-blueprints/craftability /api/v1/blueprints/products/search \
+                   /api/v1/uex/locations/search /api/v1/hangar/ships /api/v1/inventory \
+                   /api/v1/users/search /api/v1/inventory/all/stack/entries \
+                   /api/v1/finance-entries "/api/v1/org-units/bank/accounts/$nil/settings"; do
+            probe GET "$p" 401
+          done
+
+          # Anonymous by design, and the reason REQ-SEC-037 exists: these are catalogues the public
+          # web frontend already renders. A 401 here is not a security problem but a broken picker.
+          probe GET /api/v1/ship-types 200
+          probe GET /api/v1/materials/search 200
+          probe GET /api/v1/locations/search 200
+          probe GET "/api/v1/materials/$nil/terminals" 401
+
+          # Refused at the method seam, which renders 403 rather than 401.
+          probe GET /api/v1/locations/home-locations 403
+
+          # The writes themselves. Each must reach the backend and be refused there -- a 405 would
+          # mean the read-only guard swallowed a write this phase is supposed to open, and a 404
+          # that the allow-list line never matched.
+          probe POST "/api/v1/inventory/$nil/book-out" 401
+          probe POST "/api/v1/orders/$nil/assignees/$nil" 401
+          probe PUT "/api/v1/orders/$nil/status" 401
+          probe POST "/api/v1/missions/$nil/join" 401
+          probe PUT "/api/v1/operations/$nil/payouts/paid-out" 401
+          probe PUT "/api/v1/org-units/bank/accounts/$nil/balance-target" 401
+
+          # The four participant writes are the exception on this whole list: canAccessParticipant
+          # resolves the row BEFORE it judges the caller, because a guest sign-up is editable by
+          # the anonymous creator holding its capability token (REQ-SEC-018). An unknown row is
+          # therefore 404 to everybody, and a 401 here would mean that rule changed.
+          probe POST "/api/v1/missions/$nil/participants/$nil/check-in/slim" 404
+
+          # Still refused, and that is the point: the bank-employee surface and the every-member
+          # inventory list are not on the allow-list at all, and the imports are phase 4.
+          probe POST /api/v1/bank/deposits 404
+          probe POST /api/v1/inventory/all 404
+          probe POST /api/v1/hangar/import/fleetview 405
+
           # Default deny.
           probe GET /api/v1/definitely-not-allow-listed 404
 
