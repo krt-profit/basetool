@@ -80,3 +80,9 @@ __pycache__/
 ### Release-notes local progress tracker (never commit) ###
 /.release-notes-state.json
 ssh Befehle.txt
+
+# Scratch files from local verification runs. One of these carried a test-stack access
+# token into a commit once; the rule is that nothing secret lands in the repo, and the cheapest
+# way to keep it is to make `git add -A` unable to pick them up.
+*.tmp
+.ui.xml
