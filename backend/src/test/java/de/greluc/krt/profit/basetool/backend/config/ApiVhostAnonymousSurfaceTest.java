@@ -258,7 +258,8 @@ class ApiVhostAnonymousSurfaceTest {
         "/api/v1/uex/locations/search",
         "/api/v1/personal-blueprints",
         "/api/v1/personal-blueprints/craftability",
-        "/api/v1/blueprints/products/search"
+        "/api/v1/blueprints/products/search",
+        "/api/v1/inventory/all/stack/entries"
       })
   @WithAnonymousUser
   void shouldRefuseAnonymousPersonalInventoryReadsWithUnauthorized(String path) throws Exception {

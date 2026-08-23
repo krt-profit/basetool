@@ -380,6 +380,9 @@ if ($uri = "/api/v1/locations/home-locations") { set $krt_api_allowed 1; }
 # of which this vhost admits. The per-entry paths are gated by canEditInventoryItem, which is what
 # keeps a member to their own stock and their unit's.
 if ($uri = "/api/v1/inventory") { set $krt_api_allowed 1; }
+# Phase 3 - the entry level of the tree. A member cannot book out what they cannot select, and the
+# two levels phase 2 admitted stop at the stack. Read-only, and NOT /inventory/all beside it.
+if ($uri = "/api/v1/inventory/all/stack/entries") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/inventory/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(book-out|personal-rebook|note)$") { set $krt_api_allowed 1; }
 # Phase 3 - the four pickers the booking form needs. All reads.
 if ($uri = "/api/v1/materials/search") { set $krt_api_allowed 1; }
@@ -513,6 +516,7 @@ The safe order, and the reason for it:
    | `/api/v1/ship-types`                                  | **200**                                                             | anonymous by design: `permitAll` game data the public web frontend already renders (REQ-SEC-037)         |
    | `/api/v1/locations/home-locations`                    | **403**                                                             | `permitAll` chain + method guard — refused at the method seam, like the Finanzen paths                   |
    | `/api/v1/inventory` (POST)                            | **401**                                                             | chain requires a member role                                                                             |
+   | `/api/v1/inventory/all/stack/entries`                 | **401**                                                             | chain requires a member role                                                                             |
    | `/api/v1/inventory/<uuid>/book-out`                   | **401**                                                             | same, plus `canEditInventoryItem`                                                                        |
    | `/api/v1/inventory/<uuid>/personal-rebook`            | **401**                                                             | same                                                                                                     |
    | `/api/v1/inventory/<uuid>/note`                       | **401**                                                             | same                                                                                                     |

@@ -581,6 +581,25 @@ class ExternalContractTest {
           // Phase 3, the Lager's three bookings. Every one of them carries `version`, and the two
           // that move stock carry `amount` — the pair that decides what actually happens to a
           // member's material, which is why they are the required fields the contract freezes.
+          // The entry level of the Lager tree, added in phase 3: a member cannot book out what they
+          // cannot select, and the two levels phase 2 read stop at the stack. `version` is frozen
+          // here for the same reason as on my-ships — every booking echoes it.
+          new ContractOperation(
+              "/api/v1/inventory/all/stack/entries",
+              "get",
+              Set.of(
+                  "content",
+                  "page",
+                  "totalElements",
+                  "totalPages",
+                  "id",
+                  "material",
+                  "location",
+                  "amount",
+                  "quality",
+                  "personal",
+                  "note",
+                  "user")),
           new ContractOperation(
               "/api/v1/inventory",
               "post",
