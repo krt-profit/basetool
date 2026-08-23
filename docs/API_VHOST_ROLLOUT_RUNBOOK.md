@@ -356,6 +356,16 @@ if ($uri ~ "^/api/v1/personal-inventory/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F
 # Phase 3 - the location picker behind that editor. Read-only, and deliberately NOT the
 # /api/v1/locations family beside it, which carries the org's own places and their writes.
 if ($uri = "/api/v1/uex/locations/search") { set $krt_api_allowed 1; }
+# Phase 3 - the Blueprints half of "Mein Inventar". Writes again, and me-scoped again: the two
+# paths below carry only the caller's own owned-blueprint rows. NOT the /overview family beside
+# them, which lists who else owns what, and NOT the /import pair, which is phase 4.
+if ($uri = "/api/v1/personal-blueprints") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/personal-blueprints/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+# Phase 3 - the craftability read behind the chip, and the product picker behind "hinzufuegen".
+# EXACT paths: /personal-blueprints/{id}/recipe and /blueprints/** carry the whole catalogue and
+# stay off this vhost until something actually reads them.
+if ($uri = "/api/v1/personal-blueprints/craftability") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/blueprints/products/search") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- The missions and operations families are READ-ONLY on this vhost ---------
@@ -370,7 +380,7 @@ if ($krt_api_allowed = 0) { return 404; }
 # the harder half: this guard is verb-blind by design, so opening one write means naming it
 # explicitly rather than widening the family.
 set $krt_readonly_family "";
-if ($uri ~ "^/api/v1/(missions|operations|notifications|announcement|hangar|inventory|orders|org-units|uex)") { set $krt_readonly_family "R"; }
+if ($uri ~ "^/api/v1/(missions|operations|notifications|announcement|hangar|inventory|orders|org-units|uex|blueprints)") { set $krt_readonly_family "R"; }
 if ($request_method !~ "^(GET|HEAD)$") { set $krt_readonly_family "${krt_readonly_family}W"; }
 if ($krt_readonly_family = "RW") { return 405; }
 
@@ -460,6 +470,10 @@ The safe order, and the reason for it:
    | `/api/v1/personal-inventory`                          | **401**                                                             | me-scoped; the same path answers POST, which is 401 anonymously too                                      |
    | `/api/v1/personal-inventory/<uuid>`                   | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
    | `/api/v1/uex/locations/search`                        | **401**                                                             | `isAuthenticated()`                                                                                      |
+   | `/api/v1/personal-blueprints`                         | **401**                                                             | me-scoped; POST likewise                                                                                 |
+   | `/api/v1/personal-blueprints/<uuid>`                  | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
+   | `/api/v1/personal-blueprints/craftability`            | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/blueprints/products/search`                  | **401**                                                             | `isAuthenticated()`                                                                                      |
    | `/api/v1/org-units/bank/accounts/<uuid>/transactions` | **401**                                                             | same                                                                                                     |
    | `/api/v1/hangar/my-ships`                             | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/hangar/squadron-overview`                    | **401**                                                             | scoped to the active org unit                                                                            |
@@ -707,23 +721,31 @@ after the paste is the one that proves it.
 Everything in § D.3, which by then carries all six slices. The lines below are what phase 3 adds, in
 merge order, so the block can be reviewed against this list rather than diffed by eye.
 
-|     Slice     |                            Paths added                            |         Verbs          |
-|---------------|-------------------------------------------------------------------|------------------------|
-| Mein Inventar | `/api/v1/personal-inventory`, `/api/v1/personal-inventory/<uuid>` | GET, POST, PUT, DELETE |
-| Mein Inventar | `/api/v1/uex/locations/search`                                    | GET                    |
+|     Slice     |                                   Paths added                                    |         Verbs          |
+|---------------|----------------------------------------------------------------------------------|------------------------|
+| Mein Inventar | `/api/v1/personal-inventory`, `/api/v1/personal-inventory/<uuid>`                | GET, POST, PUT, DELETE |
+| Mein Inventar | `/api/v1/uex/locations/search`                                                   | GET                    |
+| Blueprints    | `/api/v1/personal-blueprints`, `/api/v1/personal-blueprints/<uuid>`              | GET, POST, PUT, DELETE |
+| Blueprints    | `/api/v1/personal-blueprints/craftability`, `/api/v1/blueprints/products/search` | GET                    |
 
 ### What to expect afterwards
 
 Anonymously, from outside the host — the same shape as Phase H's check:
 
-|                Path                 | Without a token |
-|-------------------------------------|-----------------|
-| `/api/v1/personal-inventory`        | **401**         |
-| `/api/v1/personal-inventory/<uuid>` | **401**         |
-| `/api/v1/uex/locations/search`      | **401**         |
+|                    Path                    | Without a token |
+|--------------------------------------------|-----------------|
+| `/api/v1/personal-inventory`               | **401**         |
+| `/api/v1/personal-inventory/<uuid>`        | **401**         |
+| `/api/v1/uex/locations/search`             | **401**         |
+| `/api/v1/personal-blueprints`              | **401**         |
+| `/api/v1/personal-blueprints/<uuid>`       | **401**         |
+| `/api/v1/personal-blueprints/craftability` | **401**         |
+| `/api/v1/blueprints/products/search`       | **401**         |
 
 A **405** on any of these would be the read-only guard swallowing a write the phase is supposed to
-open: `/personal-inventory` must NOT be in the guard's family list, and `uex` must be.
+open: `/personal-inventory` and `/personal-blueprints` must NOT be in the guard's family list, while
+`uex` and `blueprints` must — the picker and the location search are reads, and the catalogue behind
+them has writes this vhost never admits.
 
 ---
 

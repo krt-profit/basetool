@@ -487,7 +487,66 @@ class ExternalContractTest {
           new ContractOperation(
               "/api/v1/uex/locations/search",
               "get",
-              Set.of("uexId", "type", "name", "starSystemName", "parentName")));
+              Set.of("uexId", "type", "name", "starSystemName", "parentName")),
+          // Phase 3, the Blueprints half of the same screen. `removable` is frozen because it
+          // qualifies the row rather than describing it: an entry the server will not let go of
+          // must not be offered a delete action that answers 409 (same class as `redacted` and
+          // `truncated`).
+          new ContractOperation(
+              "/api/v1/personal-blueprints",
+              "get",
+              Set.of(
+                  "content",
+                  "page",
+                  "totalElements",
+                  "totalPages",
+                  "id",
+                  "productKey",
+                  "productName",
+                  "acquiredAt",
+                  "note",
+                  "removable",
+                  "version")),
+          new ContractOperation(
+              "/api/v1/personal-blueprints",
+              "post",
+              Set.of("id", "productKey", "productName", "version"),
+              Set.of("productKey")),
+          // Only `version` is required on the update: the note and the date are both optional, and
+          // an app that sends one without the other must keep working.
+          new ContractOperation(
+              "/api/v1/personal-blueprints/{id}",
+              "put",
+              Set.of("id", "productKey", "productName", "note", "acquiredAt", "version"),
+              Set.of("version")),
+          new ContractOperation("/api/v1/personal-blueprints/{id}", "delete", Set.of()),
+          // The craftability chip. `limitingMaterialName` is what turns "N Materialien fehlen"
+          // into a sentence a member can act on, and `craftableWithRefinery` is the second answer
+          // the same question has once refining is allowed for — dropping either would leave the
+          // chip stating a bare boolean.
+          new ContractOperation(
+              "/api/v1/personal-blueprints/craftability",
+              "get",
+              Set.of(
+                  "blueprintId",
+                  "recipeResolved",
+                  "craftable",
+                  "craftableWithRefinery",
+                  "limitingMaterialName",
+                  "limitingMaterialNameWithRefinery",
+                  "materials",
+                  "materialName",
+                  "requiredScu",
+                  "availableScu",
+                  "missingScu",
+                  "quantityType")),
+          // The product picker behind "Blueprint hinzufügen". `ownedByCurrentUser` is frozen
+          // because it is what keeps the picker from offering a duplicate the server would then
+          // refuse.
+          new ContractOperation(
+              "/api/v1/blueprints/products/search",
+              "get",
+              Set.of("productKey", "name", "manufacturerName", "ownedByCurrentUser")));
 
   /**
    * Enum constants a shipped client cannot survive a change to, keyed {@code Schema.property}.
