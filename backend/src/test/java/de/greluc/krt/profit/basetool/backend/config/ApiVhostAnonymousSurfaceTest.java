@@ -255,7 +255,10 @@ class ApiVhostAnonymousSurfaceTest {
       strings = {
         "/api/v1/personal-inventory",
         "/api/v1/personal-inventory/" + ABSENT_OPERATION,
-        "/api/v1/uex/locations/search"
+        "/api/v1/uex/locations/search",
+        "/api/v1/personal-blueprints",
+        "/api/v1/personal-blueprints/craftability",
+        "/api/v1/blueprints/products/search"
       })
   @WithAnonymousUser
   void shouldRefuseAnonymousPersonalInventoryReadsWithUnauthorized(String path) throws Exception {
@@ -272,6 +275,73 @@ class ApiVhostAnonymousSurfaceTest {
    *
    * @throws Exception if the request could not be performed
    */
+  /**
+   * The ship-type catalogue is <strong>anonymous</strong>, and phase 3 puts it on the vhost.
+   *
+   * <p>Not an oversight and not a leak: `/api/v1/ship-types/**` is `permitAll` in the chain, the
+   * rows are game data (hull names and manufacturers) that the public web frontend already renders
+   * without a session, and the editor behind it needs the list before a member has picked anything.
+   * It is recorded here because REQ-SEC-037 requires every anonymous path on the allow-list to be
+   * stated deliberately — the failure that rule exists to prevent is a path that turns out
+   * anonymous when nobody intended it.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldServeTheShipTypeCatalogueAnonymously() throws Exception {
+    mockMvc.perform(get("/api/v1/ship-types")).andExpect(status().isOk());
+  }
+
+  /**
+   * The home-location list is refused with {@code 403}, not {@code 401}.
+   *
+   * <p>Same shape as the Finanzen paths: `/api/v1/locations/**` is `permitAll` in the filter chain,
+   * so the request is dispatched and the method-level guard refuses it — which
+   * `GlobalExceptionHandler` renders as `403`, and nothing upgrades to `401` because the MVC advice
+   * has already handled it. The number is what the runbook's table has to say, or the paste
+   * verification reports a difference that is not one.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousHomeLocationsWithForbidden() throws Exception {
+    mockMvc.perform(get("/api/v1/locations/home-locations")).andExpect(status().isForbidden());
+  }
+
+  /**
+   * The Hangar's own-ship writes, which phase 3 opens on the vhost.
+   *
+   * <p>The reads beside them were already covered; what is new is that the vhost now lets these
+   * verbs through, so the method gate is the only thing between an anonymous caller and somebody
+   * else's hangar.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousShipWritesWithUnauthorized() throws Exception {
+    String body = "{\"insurance\":\"LTI\",\"shipTypeId\":\"" + ABSENT_OPERATION + "\"}";
+    mockMvc
+        .perform(
+            post("/api/v1/hangar/ships")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/hangar/ships/" + ABSENT_OPERATION)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(delete("/api/v1/hangar/ships/" + ABSENT_OPERATION).with(csrf()))
+        .andExpect(status().isUnauthorized());
+  }
+
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousPersonalInventoryWritesWithUnauthorized() throws Exception {

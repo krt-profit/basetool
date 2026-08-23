@@ -337,7 +337,11 @@ class ExternalContractTest {
                   "insurance",
                   "location",
                   "fitted",
-                  "manufacturer")),
+                  "manufacturer",
+                  // Added in phase 3: the app now edits these rows, and the edit echoes the
+                  // version it read. A read-only client had no use for it; a writing one cannot
+                  // save without it.
+                  "version")),
           // The org-unit half of the same screen: one row per ship type with its counts.
           new ContractOperation(
               "/api/v1/hangar/squadron-overview",
@@ -546,7 +550,34 @@ class ExternalContractTest {
           new ContractOperation(
               "/api/v1/blueprints/products/search",
               "get",
-              Set.of("productKey", "name", "manufacturerName", "ownedByCurrentUser")));
+              Set.of("productKey", "name", "manufacturerName", "ownedByCurrentUser")),
+          // Phase 3, the Hangar's own ships. The write path is /hangar/ships, NOT
+          // /hangar/users/{id}/ships: the second one names a member and is the admin surface,
+          // which this contract set has no reason to carry.
+          //
+          // The request requires `insurance` and `shipTypeId` and nothing else. `version` is
+          // deliberately NOT required by the schema — a create has none — but the app sends it on
+          // every update, and freezing the required list as it stands is what stops the server
+          // from making a field mandatory that a shipped build does not send.
+          new ContractOperation(
+              "/api/v1/hangar/ships",
+              "post",
+              Set.of("id", "name", "shipType", "insurance", "location", "fitted", "version"),
+              Set.of("insurance", "shipTypeId")),
+          new ContractOperation(
+              "/api/v1/hangar/ships/{id}",
+              "put",
+              Set.of("id", "name", "shipType", "insurance", "location", "fitted", "version"),
+              Set.of("insurance", "shipTypeId")),
+          new ContractOperation("/api/v1/hangar/ships/{id}", "delete", Set.of()),
+          // The two pickers the editor needs. `manufacturer` is frozen on the ship type because it
+          // is what tells two similarly named hulls apart in a list of hundreds.
+          new ContractOperation(
+              "/api/v1/ship-types",
+              "get",
+              Set.of(
+                  "content", "page", "totalElements", "totalPages", "id", "name", "manufacturer")),
+          new ContractOperation("/api/v1/locations/home-locations", "get", Set.of("id", "name")));
 
   /**
    * Enum constants a shipped client cannot survive a change to, keyed {@code Schema.property}.
