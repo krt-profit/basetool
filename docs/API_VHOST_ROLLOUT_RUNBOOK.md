@@ -382,6 +382,11 @@ if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a
 # paths below answer POST / PUT / DELETE as well as GET, and the read-only guard further down
 # names them explicitly rather than opening the family. Me-scoped by the service - neither path
 # can name another member - so nothing here widens who a caller can reach.
+# Phase 4: the app's live-sync bridge (ADR-0143, REQ-FE-019). Two paths and no prefix wildcard --
+# `live-sync` is NOT in the read-only family list below, so the POST is admitted by being named
+# here and nothing else under the stem is reachable at all.
+if ($uri = "/api/v1/live-sync/stream") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/live-sync/changed") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/personal-inventory") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/personal-inventory/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
 # Phase 3 - the location picker behind that editor. Read-only, and deliberately NOT the
@@ -937,6 +942,49 @@ history — and say what you saw. Nothing in the app breaks while the old block 
 paths simply stay unreachable from outside, which is where they have been all along.
 
 ---
+
+## Phase J — the phase-4 paths, in one paste at the end
+
+**Not yet.** Phase 4 gives the app live parity and three more areas, and it follows phase 3's rule
+(owner decision, 2026-08-23): its paths reach production as **one** paste when the phase is
+complete, not once per slice. Each slice lands its allow-list lines in § D.3 above and its expected
+statuses in the table below; nothing is pasted until the last one is merged, and the nightly probe
+gains its rows in the same PR as the paste instruction so it never reports a state nobody intends to
+fix yet.
+
+**If Phase I has not been applied yet, apply it after this phase closes and it covers both.** The
+§ D.3 block is pasted *whole*, so the copy in this repo is always the complete current intent —
+phase 2's reads, phase 3's writes and phase 4's paths together. If Phase I has already been applied,
+this phase is a re-paste of the same block, which is safe and is the only supported way to update
+it.
+
+### What the paste must contain
+
+|   Slice   |            Paths            |   Verbs   |
+|-----------|-----------------------------|-----------|
+| Live-Sync | `/api/v1/live-sync/stream`  | GET (SSE) |
+| Live-Sync | `/api/v1/live-sync/changed` | POST      |
+
+`live-sync` is deliberately **not** in the read-only family list, so it needs no carve-out: the two
+paths are admitted by being named, and nothing else under the stem is reachable at all. That is the
+opposite choice from `/hangar` or `/inventory`, and it is available here only because the family is
+two endpoints rather than a surface with an admin half hiding in it.
+
+### What to expect afterwards
+
+|               Path               | Anonymous status |
+|----------------------------------|------------------|
+| `GET /api/v1/live-sync/stream`   | **401**          |
+| `POST /api/v1/live-sync/changed` | **401**          |
+
+Two things worth knowing before reading a result. The stream answers `403`, not `401`, for an
+*authenticated* caller none of whose topics were accepted — the caller authenticated fine, they
+simply may not enter any room they asked for. And `GET /api/v1/live-sync/stream` **without** the
+`topics` parameter is a `400` even with a valid token, so verify it with one: a bare probe of the
+path tells you the allow-list matched and nothing else.
+
+A **404** on either path means the block was never pasted, which is the failure with no other
+signal — the app keeps working and simply never goes live.
 
 ## Phase G — flip the audience enforcement (D5, release gate)
 

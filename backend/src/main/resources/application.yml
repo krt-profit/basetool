@@ -262,6 +262,21 @@ app:
       # another; a Redis outage degrades to local-only + the polling fallback (REQ-NOTIF-006).
       enabled: ${APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED:false}
       channel: ${APP_NOTIFICATIONS_REDIS_FANOUT_CHANNEL:basetool:notify:published}
+  live-sync:
+    # The native app's live-sync bridge (ADR-0143). The SSE stream and the /changed endpoint are
+    # always on; only the crossing to the web is switched here.
+    sse:
+      heartbeat-interval: ${APP_LIVE_SYNC_SSE_HEARTBEAT_INTERVAL:PT20S}
+    redis-fanout:
+      # Off by default: the bridge then relays only what this backend instance itself accepted, so a
+      # test slice or a single container without Redis starts and behaves sanely (ADR-0084). Prod
+      # turns it on (application-prod.yml), which is what makes an app write refresh open browsers
+      # and a browser edit reach the app.
+      enabled: ${APP_LIVE_SYNC_REDIS_FANOUT_ENABLED:false}
+      # THE FRONTEND'S CHANNEL, deliberately. Both modules publish and consume the same payload
+      # here; pointing this at a channel of its own would sever web-to-app propagation while every
+      # health signal stayed green.
+      channel: ${APP_LIVE_SYNC_REDIS_FANOUT_CHANNEL:basetool:livesync:changed}
   default-blueprints:
     provisioning:
       # One-time seed of the starter default blueprints + idempotent backfill/sweep that keeps the

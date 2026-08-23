@@ -1,0 +1,111 @@
+# promtool unit test for AppLiveSyncBridgeSilent (ADR-0143, REQ-FE-019, REQ-OBS-011).
+#
+# The bridge's failure mode has no other signal: both halves keep working alone, every health check
+# stays green, no request fails, and a browser edit simply never reaches a phone. The rule is the
+# only thing that can say so, which makes its silent-when-it-should-fire cases the ones worth
+# pinning.
+#
+# The trap this locks is the third conjunct. Micrometer creates a counter lazily on first
+# increment, so a backend that has consumed nothing *ever* exposes no
+# `basetool_livesync_redis_consumed_total` series at all — the comparison then drops out of the
+# vector and, without `or vector(0)`, the rule is silent in exactly the total-failure case it
+# exists for. That is the first test below, and it is the whole reason this file exists.
+#
+#   - FIRES when the series is entirely absent (fan-out off, or wrong channel) while the web
+#     publishes and app streams are open;
+#   - FIRES when the series exists but has flatlined;
+#   - SILENT when frames are arriving;
+#   - SILENT when no app stream is open — a quiet night must not page anybody;
+#   - SILENT when the web is not publishing either — there is nothing to bridge.
+#
+# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
+#   docker run --rm -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.13.2 promtool test rules tests/applivesyncbridgesilent_test.yml
+
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  # THE case. The backend has never consumed a single frame, so Micrometer never created the
+  # counter and the series does not exist. Without `or vector(0)` this test fails.
+  - name: fires - consumed series entirely absent while the web publishes to open app streams
+    interval: 1m
+    input_series:
+      - series: 'basetool_livesync_redis_published_total{job="basetool-frontend"}'
+        values: "0+6x120"
+      - series: "basetool_livesync_streams"
+        values: "4x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: AppLiveSyncBridgeSilent
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "App live-sync bridge silent (web changes are not reaching the app)"
+              description: "The web frontend has been publishing live-sync changed frames for 30 minutes and the backend has consumed none, while app live-sync streams are open — so a browser edit never reaches the app and an app write never reaches a browser, with no error on either side. Check app.live-sync.redis-fanout.enabled on the backend (must be true in prod), that its channel is the frontend's basetool:livesync:changed and not a channel of its own, and the Redis default-user ACL (`&*` for PUBLISH/SUBSCRIBE)."
+
+  # The other shape of the same fault: the bridge worked once, so the series exists, and then the
+  # channel drifted. A flat counter is as silent as an absent one.
+  - name: fires - consumed counter exists but has flatlined
+    interval: 1m
+    input_series:
+      - series: 'basetool_livesync_redis_published_total{job="basetool-frontend"}'
+        values: "0+6x120"
+      - series: 'basetool_livesync_redis_consumed_total{job="basetool-backend"}'
+        values: "17x120"
+      - series: "basetool_livesync_streams"
+        values: "2x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: AppLiveSyncBridgeSilent
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "App live-sync bridge silent (web changes are not reaching the app)"
+              description: "The web frontend has been publishing live-sync changed frames for 30 minutes and the backend has consumed none, while app live-sync streams are open — so a browser edit never reaches the app and an app write never reaches a browser, with no error on either side. Check app.live-sync.redis-fanout.enabled on the backend (must be true in prod), that its channel is the frontend's basetool:livesync:changed and not a channel of its own, and the Redis default-user ACL (`&*` for PUBLISH/SUBSCRIBE)."
+
+  # The healthy case.
+  - name: silent - frames are crossing
+    interval: 1m
+    input_series:
+      - series: 'basetool_livesync_redis_published_total{job="basetool-frontend"}'
+        values: "0+6x120"
+      - series: 'basetool_livesync_redis_consumed_total{job="basetool-backend"}'
+        values: "0+5x120"
+      - series: "basetool_livesync_streams"
+        values: "3x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: AppLiveSyncBridgeSilent
+        exp_alerts: []
+
+  # Nobody has the app open. The bridge may well be broken, but there is nobody to tell and no
+  # reason to wake anyone at 03:00 — this is why the stream gauge is a conjunct and not a footnote.
+  - name: silent - no app stream is open
+    interval: 1m
+    input_series:
+      - series: 'basetool_livesync_redis_published_total{job="basetool-frontend"}'
+        values: "0+6x120"
+      - series: "basetool_livesync_streams"
+        values: "0x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: AppLiveSyncBridgeSilent
+        exp_alerts: []
+
+  # An idle web: nothing is being published, so consuming nothing is the correct answer.
+  - name: silent - the web is not publishing either
+    interval: 1m
+    input_series:
+      - series: 'basetool_livesync_redis_published_total{job="basetool-frontend"}'
+        values: "42x120"
+      - series: "basetool_livesync_streams"
+        values: "5x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: AppLiveSyncBridgeSilent
+        exp_alerts: []

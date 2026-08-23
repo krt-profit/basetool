@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Änderungen aus der App und aus dem Browser sehen sich jetzt gegenseitig.** Das Backend hat einen Live-Sync-Strom für die App bekommen und hängt am selben Redis-Kanal wie die Weboberfläche: eine Bearbeitung im Browser erscheint in der App ohne manuelles Neuladen, und eine Buchung in der App aktualisiert jede offene Browser-Ansicht. Vorher war beides blind füreinander. Bearbeiter-Punkte bleiben absichtlich der Weboberfläche vorbehalten (ADR-0143, REQ-FE-019).
+
 - **Die Schreibpfade der App sind am öffentlichen API-Endpunkt freigegeben.** Eine Änderung an der Edge-Konfiguration schaltet alle Phase-3-Pfade gemeinsam frei; die nächtliche Prüfung deckt sie ab diesem Zeitpunkt mit ab (REQ-SEC-037, REQ-OBS-012).
 
 - **Die Kontoeinstellungen der Kartellbank sind für die App freigegeben und eingefroren.** Zielsaldo setzen und die Sichtbarkeit eines Kontos regeln — nur für die verantwortliche Kontoinhaberin. Die Bankangestellten-Oberfläche (Ein- und Auszahlungen, Überweisungen) bleibt ausgeschlossen (REQ-API-009, REQ-SEC-037).

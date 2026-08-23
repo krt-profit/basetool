@@ -650,6 +650,168 @@ public final class MetricNames {
    */
   public static final String TAG_TERMS_VERSION = "terms_version";
 
+  /**
+   * Gauge {@code basetool_livesync_streams} — app live-sync SSE streams currently open, summed
+   * across all members (ADR-0143). The app opens one per screen, so this tracks how many members
+   * are looking at a live surface right now; a value that climbs without a matching member count is
+   * the first sign that streams are not being retired.
+   */
+  public static final String LIVESYNC_STREAMS = "basetool.livesync.streams";
+
+  /**
+   * Counter {@code basetool_livesync_streams_evicted_total} — bumped when a member's oldest live-
+   * sync stream is dropped because they reached the per-member cap. Non-zero in normal use only if
+   * a client leaks streams on navigation.
+   */
+  public static final String LIVESYNC_STREAMS_EVICTED = "basetool.livesync.streams.evicted";
+
+  /**
+   * Counter {@code basetool_livesync_send_failures_total} — tags {@code event} ({@link #TAG_EVENT})
+   * and {@code cause} ({@link #TAG_CAUSE}); a frame that could not be written to a stream, which
+   * also retires it.
+   */
+  public static final String LIVESYNC_SEND_FAILURES = "basetool.livesync.send.failures";
+
+  /**
+   * Counter {@code basetool_livesync_delivered_total} — tag {@code topic_class}; {@code changed}
+   * frames written into a room, counted once per frame rather than once per receiver.
+   */
+  public static final String LIVESYNC_DELIVERED = "basetool.livesync.delivered";
+
+  /**
+   * Counter {@code basetool_livesync_subscribe_total} — tags {@code topic_class}, {@code outcome}
+   * ({@link #OUTCOME_ALLOWED} / {@link #OUTCOME_DENIED}) and {@code reason}; the verdict of an app
+   * live-sync subscribe (ADR-0143).
+   *
+   * <p><strong>Deliberately the same name, tags and values the frontend uses</strong> for the same
+   * verdict on {@code /ws/sync}. The two are separated by the {@code job} label, so a dashboard can
+   * show either half or both, and nobody has to learn a second vocabulary for one concept. It also
+   * means the panels and rules already built around this series cover the app the day it ships.
+   *
+   * <p>On a denial {@code reason} separates the two paths that both read as denied: the room's own
+   * read refused the caller ({@link #SUBSCRIBE_DENY_AUTHZ}) and the check itself threw ({@link
+   * #SUBSCRIBE_DENY_CHECK_FAILED}, which fails closed). Without the split a database wobble reads
+   * exactly like members hitting permission boundaries. Micrometer needs a uniform tag-key set per
+   * meter, so the allowed series carries {@link #REASON_NONE}.
+   */
+  public static final String LIVESYNC_SUBSCRIBE = "basetool.livesync.subscribe";
+
+  /**
+   * Counter {@code basetool_livesync_invalid_topic_total} (unlabelled) — a subscribe or a publish
+   * naming a topic that does not parse against this backend's registry.
+   *
+   * <p>Unlabelled for the reason the frontend's counter of the same name is: the topic belongs to
+   * no class, and inflating the bounded {@code topic_class} set with an {@code unknown} sentinel
+   * would cost every other query its clean vocabulary (REQ-OBS-011). A sustained stream is the
+   * signature of client/server topic-vocabulary skew — an app build asking for a room this server
+   * no longer knows.
+   */
+  public static final String LIVESYNC_INVALID_TOPIC = "basetool.livesync.invalid.topic";
+
+  /**
+   * Counter {@code basetool_livesync_publish_accepted_total} — tag {@code topic_class}; client
+   * {@code changed} frames taken and relayed.
+   */
+  public static final String LIVESYNC_PUBLISH_ACCEPTED = "basetool.livesync.publish.accepted";
+
+  /**
+   * Counter {@code basetool_livesync_publish_rejected_total} — tags {@code reason} ({@link
+   * #REASON_NO_SECTIONS} / {@link #REASON_SUBJECT_BUCKET} / {@link #REASON_TOPIC_BUCKET}) and
+   * {@code topic_class}; client frames refused before they were relayed.
+   */
+  public static final String LIVESYNC_PUBLISH_REJECTED = "basetool.livesync.publish.rejected";
+
+  /**
+   * Counter {@code basetool_livesync_redis_published_total} — tag {@code topic_class}; frames this
+   * instance put on the shared channel for the web frontend and peer replicas.
+   */
+  public static final String LIVESYNC_REDIS_PUBLISHED = "basetool.livesync.redis.published";
+
+  /**
+   * Counter {@code basetool_livesync_redis_consumed_total} — tag {@code topic_class}; frames taken
+   * off the shared channel and delivered to this instance's streams. Zero while browsers are active
+   * means the bridge is not actually bridging.
+   */
+  public static final String LIVESYNC_REDIS_CONSUMED = "basetool.livesync.redis.consumed";
+
+  /**
+   * Counter {@code basetool_livesync_redis_errors_total} — tag {@code op} ({@link #OP_PUBLISH} /
+   * {@link #OP_CONSUME}); a swallowed fan-out failure. A frame for a room this backend does not
+   * serve is not an error and is counted under {@link #LIVESYNC_REDIS_SKIPPED} instead.
+   */
+  public static final String LIVESYNC_REDIS_ERRORS = "basetool.livesync.redis.errors";
+
+  /**
+   * {@link #TAG_EVENT} value: the once-per-stream event naming the topics that were accepted. A
+   * failure to send it means the client never learns which rooms are live.
+   */
+  public static final String LIVESYNC_EVENT_SUBSCRIBED = "subscribed";
+
+  /** {@link #TAG_EVENT} value: a relayed change signal. */
+  public static final String LIVESYNC_EVENT_CHANGED = "changed";
+
+  /** {@link #TAG_EVENT} value: the keep-alive that holds an idle stream open through a proxy. */
+  public static final String LIVESYNC_EVENT_HEARTBEAT = "heartbeat";
+
+  /**
+   * Counter {@code basetool_livesync_redis_skipped_total} — tag {@code reason}; a frame taken off
+   * the shared channel and deliberately not delivered.
+   *
+   * <p>Separate from {@link #LIVESYNC_REDIS_ERRORS} on purpose, and the distinction is the point:
+   * the frontend's staff rooms ride the same channel, so this backend sees a steady trickle of
+   * frames for rooms it does not serve. Counting those as errors would put a permanent non-zero
+   * rate under the series {@code LiveSyncRedisFanoutBroken} watches and teach everyone to ignore
+   * it.
+   */
+  public static final String LIVESYNC_REDIS_SKIPPED = "basetool.livesync.redis.skipped";
+
+  /**
+   * {@link #TAG_REASON} value on {@link #LIVESYNC_REDIS_SKIPPED}: a room this backend does not
+   * serve.
+   */
+  public static final String REASON_UNKNOWN_TOPIC = "unknown_topic";
+
+  /** {@link #TAG_OUTCOME} value on {@link #LIVESYNC_SUBSCRIBE}: the room was opened. */
+  public static final String OUTCOME_ALLOWED = "allowed";
+
+  /** {@link #TAG_OUTCOME} value on {@link #LIVESYNC_SUBSCRIBE}: the room was refused. */
+  public static final String OUTCOME_DENIED = "denied";
+
+  /**
+   * {@link #TAG_REASON} placeholder on an {@link #OUTCOME_ALLOWED} subscribe. Micrometer rejects a
+   * meter whose series disagree on their tag keys, so the allowed series needs a value here.
+   */
+  public static final String REASON_NONE = "none";
+
+  /** Subscribe-deny reason: the room's own read refused this caller. */
+  public static final String SUBSCRIBE_DENY_AUTHZ = "authz";
+
+  /**
+   * Subscribe-deny reason: the check threw, and the room was refused rather than admitted on an
+   * exception. Distinct from {@link #SUBSCRIBE_DENY_AUTHZ} because a rising rate here is an
+   * infrastructure signal, not a permissions one.
+   */
+  public static final String SUBSCRIBE_DENY_CHECK_FAILED = "check_failed";
+
+  /**
+   * {@link #TAG_REASON} value on {@link #LIVESYNC_PUBLISH_REJECTED}: every section the client named
+   * was outside the topic class's whitelist, so the frame would have carried nothing.
+   */
+  public static final String REASON_NO_SECTIONS = "no_known_sections";
+
+  /** {@link #TAG_REASON} value: the emitting member's own token bucket was empty. */
+  public static final String REASON_SUBJECT_BUCKET = "subject_bucket";
+
+  /** {@link #TAG_REASON} value: the room's aggregate token bucket was empty. */
+  public static final String REASON_TOPIC_BUCKET = "topic_bucket";
+
+  /**
+   * Tag key: the live-sync room class a measurement belongs to (ADR-0143). Bounded by the {@code
+   * LiveSyncTopicClass} enum, one value per constant, distinct even where two classes share a wire
+   * prefix so the Auftrags-queue and one Auftrag never fold into one series (REQ-OBS-011).
+   */
+  public static final String TAG_TOPIC_CLASS = "topic_class";
+
   private MetricNames() {
     // Constants holder — not instantiable.
   }

@@ -96,6 +96,14 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
   private static final PathPattern SSE_CONNECT =
       PathPatternParser.defaultInstance.parse("/api/v1/notifications/stream");
 
+  /**
+   * The app's live-sync stream (ADR-0143), counted for the same reason {@link #SSE_CONNECT} is: it
+   * is a GET, so the write-only default would skip it, and opening a stream costs an authorization
+   * read per named topic — cheap once per screen, worth bounding when a client loops.
+   */
+  private static final PathPattern LIVE_SYNC_CONNECT =
+      PathPatternParser.defaultInstance.parse("/api/v1/live-sync/stream");
+
   /** Correlation id echoed onto the problem body, matching the other filter-level problems. */
   private static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
 
@@ -157,7 +165,9 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
     if (!API_SCOPE.matches(path)) {
       return true;
     }
-    return !isWrite(request.getMethod()) && !SSE_CONNECT.matches(path);
+    return !isWrite(request.getMethod())
+        && !SSE_CONNECT.matches(path)
+        && !LIVE_SYNC_CONNECT.matches(path);
   }
 
   @Override

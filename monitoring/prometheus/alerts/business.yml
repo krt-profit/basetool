@@ -1061,6 +1061,38 @@ groups:
           summary: "Redis live-sync/notification fan-out publish errors (cross-replica delivery degraded)"
           description: "The live-sync and/or notification Redis fan-out has failed to publish for 10 minutes — cross-replica live delivery is silently degraded to single-instance (a viewer on one replica stops seeing another replica's changes/notifications; same-replica delivery still works, no user-facing error). Check Redis reachability from the app replicas and the basetool:livesync:changed / basetool:notify:published pub/sub channels (default-user ACL `&*`)."
 
+      # (ADR-0143, REQ-FE-019, REQ-OBS-011) The app live-sync bridge stopped bridging.
+      #
+      # This is the one failure the bridge cannot show any other way. Both halves keep working
+      # alone: the frontend relays browser-to-browser, the backend relays app-to-app, every health
+      # check is green, no request fails — and a browser edit simply never reaches a phone while a
+      # phone's write never reaches a browser. Nobody reports it, because from either side it looks
+      # like the other side did not change anything.
+      #
+      # The causes are all configuration, which is why it is worth a rule rather than a dashboard:
+      # app.live-sync.redis-fanout.enabled left off in prod, the channel overridden to something
+      # the frontend does not use, or the backend's Redis ACL missing PUBLISH/SUBSCRIBE (`&*`).
+      #
+      # Three conjuncts, each load-bearing. There must be something to bridge (the frontend is
+      # actually publishing), someone to bridge it to (an app stream is open — otherwise a quiet
+      # night would fire this every time), and nothing arriving. The `or vector(0)` on the last one
+      # is not decoration: Micrometer creates a counter lazily on first increment, so a backend
+      # that has consumed nothing *ever* exposes no series at all, the comparison drops out of the
+      # vector, and the rule would be silent in exactly the total-failure case it exists for.
+      - alert: AppLiveSyncBridgeSilent
+        expr: |
+          (sum(rate(basetool_livesync_redis_published_total{job="basetool-frontend"}[30m])) > 0)
+          and on()
+          (sum(basetool_livesync_streams) > 0)
+          and on()
+          ((sum(rate(basetool_livesync_redis_consumed_total{job="basetool-backend"}[30m])) or vector(0)) == 0)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "App live-sync bridge silent (web changes are not reaching the app)"
+          description: "The web frontend has been publishing live-sync changed frames for 30 minutes and the backend has consumed none, while app live-sync streams are open — so a browser edit never reaches the app and an app write never reaches a browser, with no error on either side. Check app.live-sync.redis-fanout.enabled on the backend (must be true in prod), that its channel is the frontend's basetool:livesync:changed and not a channel of its own, and the Redis default-user ACL (`&*` for PUBLISH/SUBSCRIBE)."
+
       # (#1238, REQ-OBS-011) Live-sync relay drops. Every drop branch of the relay means a peer did
       # NOT get an update it should have had: a throttled or topic-throttled `changed` frame, a write
       # to a broken socket, a subscribe refused at the per-session topic cap, or a subscribe that

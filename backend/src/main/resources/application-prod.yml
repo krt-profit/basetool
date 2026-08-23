@@ -130,6 +130,11 @@ app:
   notifications:
     redis-fanout:
       enabled: ${APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED:true}
+  live-sync:
+    redis-fanout:
+      # On in prod: without it the app and the web frontend each see only their own writes
+      # (ADR-0143).
+      enabled: ${APP_LIVE_SYNC_REDIS_FANOUT_ENABLED:true}
   logging:
     # Enables the JSON/LogstashEncoder appender defined in logback-spring.xml for the prod profile.
     structured-enabled: true

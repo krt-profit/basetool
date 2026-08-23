@@ -211,6 +211,43 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * The app's live-sync bridge is refused without a token in both directions (ADR-0143,
+   * REQ-SEC-037).
+   *
+   * <p>The stream is the second long-lived SSE endpoint on this vhost and carries the notification
+   * stream's hazard in a wider shape: an untokened stream would hold a connection open and feed it
+   * <em>other members' rooms</em> for as long as it lived.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousLiveSyncStreamWithUnauthorized() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/live-sync/stream").param("topics", "inventory"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The publish half is refused too, and it is the one allow-listed path on which an ordinary
+   * member makes <em>other</em> members re-fetch — bounded by rate rather than by authorization,
+   * because the frame carries no data (ADR-0143).
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousLiveSyncPublishWithUnauthorized() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/live-sync/changed")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"topic\":\"inventory\",\"sections\":[\"stock\"]}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
    * The caller's own record is me-scoped as well — and it is the one allow-listed path that carries
    * an email address, so an anonymous 200 here would be a different order of leak.
    *

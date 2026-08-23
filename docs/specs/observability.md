@@ -1094,6 +1094,41 @@ transaction per pass) rather than per-scrape.
   degrades cross-replica push). These emit only where the fan-out is enabled (prod); a sustained
   `publish` error stream drives the `LiveSyncRedisFanoutBroken` alert (below).
 
+The app live-sync bridge (ADR-0143, REQ-FE-019) adds a second family on the **backend**, and the
+naming is a deliberate choice rather than an accident. Where the concept is the same as the
+frontend's, the metric is the same: `basetool_livesync_subscribe_total{topic_class,outcome,reason}`,
+`basetool_livesync_invalid_topic_total`, and the three
+`basetool_livesync_redis_{published,consumed,errors}_total` series. The two are separated by `job`,
+so a dashboard shows either half or both and nobody learns a second vocabulary for one thing — and
+the panels and rules already built around those series covered the app the day it shipped. The one
+place that mattered got an explicit split: the *Live-sync subscribe outcomes* panel now groups by
+`job` as well, because "which client is being refused" is the only question anyone asks of it when
+something is wrong, and folding web and app would have thrown exactly that away.
+
+Backend-only, because they have no frontend counterpart: `basetool_livesync_streams` (open app SSE
+streams, unlabelled — one per screen, so it reads as "members on a live surface"),
+`basetool_livesync_streams_evicted_total`, `basetool_livesync_send_failures_total{event,cause}`
+(same bounded `cause` triple as the notification stream), `basetool_livesync_delivered_total`,
+`basetool_livesync_publish_{accepted,rejected}_total` (the client-published half, with `reason`
+separating a client bug from either bucket doing its job), and
+`basetool_livesync_redis_skipped_total{reason}`.
+
+That last one is a distinction worth stating, because merging it would have been the easy mistake:
+the frontend's staff-only rooms ride the same Redis channel, so this backend sees a **steady**
+trickle of frames for rooms it does not serve. Counting those under `…redis_errors_total` would
+have left a permanent non-zero rate beneath the series `LiveSyncRedisFanoutBroken` watches, and a
+warning that is always slightly on is a warning nobody reads.
+
+`AppLiveSyncBridgeSilent` is the rule the bridge actually needs. Its failure has no other signal —
+both halves keep relaying among themselves, every health check stays green, nothing 5xx's, and a
+browser edit merely never reaches a phone while a phone's write never reaches a browser. Three
+conjuncts: the frontend is publishing, an app stream is open (so a quiet night cannot page anyone),
+and the backend has consumed nothing for 30 minutes. The `or vector(0)` on the third is load-bearing
+and is pinned by `monitoring/prometheus/tests/applivesyncbridgesilent_test.yml`: Micrometer creates
+a counter lazily, so a backend that has consumed nothing *ever* exposes no series, the comparison
+drops out of the vector, and without it the rule would be silent in precisely the total-failure case
+it exists for.
+
 **Frontend.** `basetool_mission_presence_missions` gauge (missions with a live editor tracked in
 **this JVM** — it deliberately stayed local-only when presence became cross-instance in #1237, so
 summing it across replicas still answers "who is editing here"; unlabelled),

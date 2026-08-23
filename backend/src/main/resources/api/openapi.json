@@ -73,6 +73,9 @@
     "name" : "Rank Requirements",
     "description" : "Manage rank promotion requirements."
   }, {
+    "name" : "Live sync",
+    "description" : "Real-time change signals for the native app."
+  }, {
     "name" : "Blueprint Products",
     "description" : "User-facing blueprint product search (#327)."
   }, {
@@ -25892,6 +25895,94 @@
         }
       }
     },
+    "/api/v1/live-sync/changed" : {
+      "post" : {
+        "tags" : [ "Live sync" ],
+        "summary" : "Announce a change so other viewers of the same room re-fetch.",
+        "operationId" : "changed",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LiveSyncChangedRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "202" : {
+            "description" : "Signal relayed."
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Signal rate exceeded; drop the frame."
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/job-types" : {
       "get" : {
         "tags" : [ "job-type-controller" ],
@@ -47041,6 +47132,114 @@
         }
       }
     },
+    "/api/v1/live-sync/stream" : {
+      "get" : {
+        "tags" : [ "Live sync" ],
+        "summary" : "Subscribe to live change signals for a set of topics (Server-Sent Events).",
+        "operationId" : "stream_1",
+        "parameters" : [ {
+          "name" : "topics",
+          "in" : "query",
+          "description" : "Comma-separated topics, e.g. `missions,mission:<uuid>`.",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "SSE stream opened.",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SseEmitter"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
     "/api/v1/leitung/view" : {
       "get" : {
         "tags" : [ "leitung-controller" ],
@@ -59376,6 +59575,32 @@
           }
         },
         "required" : [ "productKey", "quantity" ]
+      },
+      "LiveSyncChangedRequest" : {
+        "type" : "object",
+        "description" : "Announces that a live-sync room's regions changed, so peers re-fetch them.",
+        "properties" : {
+          "topic" : {
+            "type" : "string",
+            "description" : "The live-sync room that changed.",
+            "example" : "mission:8f14e45f-ceea-467a-9c5b-5f1f52a3a1c2",
+            "maxLength" : 80,
+            "minLength" : 0
+          },
+          "sections" : {
+            "type" : "array",
+            "description" : "The regions of the room that changed.",
+            "example" : [ "crew" ],
+            "items" : {
+              "type" : "string",
+              "maxLength" : 64,
+              "minLength" : 0
+            },
+            "maxItems" : 16,
+            "minItems" : 0
+          }
+        },
+        "required" : [ "sections", "topic" ]
       },
       "InventoryAllocationInput" : {
         "type" : "object",

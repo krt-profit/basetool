@@ -808,7 +808,23 @@ class ExternalContractTest {
           new ContractOperation(
               "/api/v1/materials/{id}/terminals",
               "get",
-              Set.of("terminalId", "terminalName", "priceSell")));
+              Set.of("terminalId", "terminalName", "priceSell")),
+          // Phase 4, the live-sync bridge (ADR-0143). Like the notification stream above, the
+          // response is a stream rather than a schema, so the field assertion is vacuous and the
+          // path-and-verb guard is the whole point. The event NAMES (`subscribed`, `changed`,
+          // `heartbeat`) and the frame shape are the real contract; they are pinned in the app's
+          // REQ-APP-SYNC spec and in LiveSyncStreamServiceTest, since nothing in this document
+          // describes them.
+          //
+          // The TOPIC vocabulary is a contract too, and a nastier one: renaming a room or a section
+          // key breaks a shipped client silently -- it keeps streaming and simply never hears about
+          // that screen again. That half cannot live here, because the topics appear in no OpenAPI
+          // schema; it is held by LiveSyncTopicRegistryParityTest against the frontend's registry.
+          new ContractOperation("/api/v1/live-sync/stream", "get", Set.of()),
+          // The publish half. Frozen for its request fields rather than its response: it answers
+          // 202 with no body, and what a shipped client must keep being able to SEND is the frame.
+          new ContractOperation(
+              "/api/v1/live-sync/changed", "post", Set.of(), Set.of("topic", "sections")));
 
   /**
    * Query parameters a shipped client addresses these operations by, keyed {@code method path}.
@@ -891,7 +907,10 @@ class ExternalContractTest {
               "get /api/v1/locations/search",
               Set.of("search:string", "page:integer", "size:integer")),
           Map.entry(
-              "get /api/v1/users/search", Set.of("query:string", "page:integer", "size:integer")));
+              "get /api/v1/users/search", Set.of("query:string", "page:integer", "size:integer")),
+          // The live-sync stream's whole subscription protocol is this one parameter (ADR-0143).
+          // Losing it would not degrade the stream, it would silently open every client on nothing.
+          Map.entry("get /api/v1/live-sync/stream", Set.of("topics:string")));
 
   @Test
   @DisplayName("the query parameters a shipped client asks with still exist, with their types")

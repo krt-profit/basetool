@@ -2030,9 +2030,9 @@
       },
       "targets": [
         {
-          "expr": "sum by (topic_class, outcome) (rate(basetool_livesync_subscribe_total[1h])) * 3600",
+          "expr": "sum by (job, topic_class, outcome) (rate(basetool_livesync_subscribe_total[1h])) * 3600",
           "refId": "A",
-          "legendFormat": "{{topic_class}} {{outcome}}",
+          "legendFormat": "{{job}} · {{topic_class}} · {{outcome}}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -2752,6 +2752,131 @@
           "expr": "sum by (reason) (rate(basetool_auth_failures_total[1h])) * 3600",
           "refId": "A",
           "legendFormat": "{{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 184
+      },
+      "type": "timeseries",
+      "title": "App live-sync streams (open)",
+      "description": "Open app live-sync SSE streams (ADR-0143). The app holds one per screen, so this tracks how many members are on a live surface. Evictions should sit at zero: a non-zero rate means a client is leaking streams on navigation rather than a member using four devices.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(basetool_livesync_streams)",
+          "legendFormat": "open streams",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(basetool_livesync_streams_evicted_total[1h])) * 3600",
+          "legendFormat": "evicted at the per-member cap/h",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 54,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 184
+      },
+      "type": "timeseries",
+      "title": "App live-sync publish outcomes/hour",
+      "description": "What the app announces after its own writes, and what was refused (ADR-0143). `no_known_sections` is a client bug; the two bucket reasons are the re-fetch-herd bounds doing their job. `consumed but not served` is the frontend's staff rooms crossing the shared channel — expected at a low steady rate, which is why it is not counted as an error.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (topic_class) (rate(basetool_livesync_publish_accepted_total[1h])) * 3600",
+          "legendFormat": "accepted · {{topic_class}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (reason) (rate(basetool_livesync_publish_rejected_total[1h])) * 3600",
+          "legendFormat": "rejected · {{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "refId": "C",
+          "expr": "sum by (reason) (rate(basetool_livesync_redis_skipped_total[1h])) * 3600",
+          "legendFormat": "consumed but not served · {{reason}}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
