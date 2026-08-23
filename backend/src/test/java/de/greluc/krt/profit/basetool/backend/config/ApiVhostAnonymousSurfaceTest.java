@@ -443,6 +443,38 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * The account-settings reads and writes, refused without a token.
+   *
+   * <p>What a caller may change on an account is stated in the settings answer rather than in the
+   * chain — `canSetTarget`, `canConfigureVisibility` — so the chain's only job here is to refuse an
+   * anonymous one, and that is what this pins.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousAccountSettingsWithUnauthorized() throws Exception {
+    String account = "/api/v1/org-units/bank/accounts/" + ABSENT_OPERATION;
+    mockMvc.perform(get(account + "/settings")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put(account + "/balance-target")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(post(account + "/visibility/role/OFFICER").with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(delete(account + "/visibility/role/OFFICER").with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(put(account + "/visibility/all-members/true").with(csrf()))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
    * The order's assignee edge and its status change, refused without a token.
    *
    * <p>The status one is the entry worth having: it is the first path on this allow-list whose

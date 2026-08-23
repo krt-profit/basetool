@@ -325,6 +325,13 @@ if ($uri ~ "^/api/v1/finance-entries/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4
 # The payout confirmation. /operations stays a read-only family: the prefix carries the whole
 # Operation edit surface, and only this one path is named.
 if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/payouts/paid-out$") { set $krt_api_allowed 1; }
+# Phase 3 - the only bank writes a member has: the settings of an account they are responsible for.
+# /api/v1/bank/** stays off the list entirely - deposits, withdrawals and transfers are the
+# bank-employee surface and the app does not carry it.
+if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/settings$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/balance-target$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/visibility/role/[A-Za-z0-9_-]{1,64}$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/visibility/all-members/(true|false)$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/finance-entries/summary$") { set $krt_api_allowed 1; }
 # Phase 2 - the Operationen segment of the same screen, its detail, the Finanz-Rollup and the
 # payout rows. Anchored like the Einsatz detail and for a sharper reason: below `{id}` sits
@@ -455,6 +462,10 @@ if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a
 # /operations stays in the family because the prefix carries the whole Operation edit surface.
 # Only the payout confirmation is named.
 if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/payouts/paid-out$") { set $krt_readonly_family ""; }
+# /org-units stays in the family: the prefix carries the org-unit admin surface as well. Only the
+# three account-settings writes are named.
+if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/balance-target$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/visibility/(role/[A-Za-z0-9_-]{1,64}|all-members/(true|false))$") { set $krt_readonly_family ""; }
 if ($krt_readonly_family = "RW") { return 405; }
 
 # --- Which family gets which shape ---------------------------------------------------------------
@@ -548,6 +559,9 @@ The safe order, and the reason for it:
    | `/api/v1/finance-entries`                             | **401**                                                             | `isAuthenticated()` + member-or-above + `canSeeMission` on the body's mission                            |
    | `/api/v1/finance-entries/<uuid>`                      | **401**                                                             | `isAuthenticated()`; owner-vs-admin is decided at the service seam                                       |
    | `/api/v1/operations/<uuid>/payouts/paid-out`          | **401**                                                             | `hasRole(MISSION_MANAGER)` + scope; taking a confirmation back additionally needs OFFICER or ADMIN       |
+   | `…/org-units/bank/accounts/<uuid>/settings`           | **401**                                                             | `isAuthenticated()`; what the caller may change is stated in the answer, not in the chain                |
+   | `…/bank/accounts/<uuid>/balance-target`               | **401**                                                             | `isAuthenticated()` + the responsible-holder seam                                                        |
+   | `…/bank/accounts/<uuid>/visibility/…`                 | **401**                                                             | same                                                                                                     |
    | `/api/v1/org-units/bank/balances`                     | **401**                                                             | me-scoped to the accounts the caller may see                                                             |
    | `/api/v1/org-units/bank/accounts/<uuid>`              | **401**                                                             | same                                                                                                     |
    | `/api/v1/personal-inventory`                          | **401**                                                             | me-scoped; the same path answers POST, which is 401 anonymously too                                      |
