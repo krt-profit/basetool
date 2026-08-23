@@ -552,6 +552,12 @@ x-backend: &backend-template
     REDIS_PORT: ${REDIS_PORT:-6379}
     REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED: ${APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED:-true}
+    # The app's live-sync bridge (ADR-0143). Defaults ON here for the same reason the
+    # notification fan-out does: this file describes a stack that HAS a Redis, and the
+    # property's own default is off so a bare bootRun or a test slice without one still
+    # starts. Note the channel is the FRONTEND's -- the bridge works by both modules speaking
+    # on one wire, so overriding it severs web-to-app propagation while every signal stays green.
+    APP_LIVE_SYNC_REDIS_FANOUT_ENABLED: ${APP_LIVE_SYNC_REDIS_FANOUT_ENABLED:-true}
     # Monitoring plane (epic #936, REQ-OBS-005/-009). Every value defaults OFF/empty so dev, test,
     # e2e and a prod host without the monitoring stack stay inert: /actuator/prometheus denies every
     # request until MONITORING_SCRAPE_* is set, and tracing exports nothing until
