@@ -1016,10 +1016,10 @@ Phase I yet, doing this once covers both.
    allow-list matched:
 
    ```powershell
-   foreach ($p in '/api/v1/live-sync/stream?topics=inventory','/api/v1/live-sync/changed') { '{0,-52} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' "https://api.profit-base.online$p") }
+   foreach ($p in '/api/v1/live-sync/stream?topics=inventory','/api/v1/live-sync/changed','/api/v1/promotion/evaluations/my','/api/v1/promotion/eligibility/my') { '{0,-52} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' "https://api.profit-base.online$p") }
    ```
 
-   Expected: `401` for both. A `404` means the block was never pasted — the failure with no other
+   Expected: `401` for all four. A `404` means the block was never pasted — the failure with no other
    signal, because the app keeps working and simply never goes live.
 
 5. **Check that phase 2's and phase 3's paths still answer as they did**, since you replaced the
