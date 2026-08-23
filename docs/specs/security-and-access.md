@@ -1795,6 +1795,16 @@ authenticated member without `LOGISTICIAN` gets `403`. `GET /api/v1/locations/ho
 behaves the same way for the same reason. Both are pinned in `ApiVhostAnonymousSurfaceTest` with
 the status they actually answer, because both were first written down with the wrong one.
 
+**And one family on the list is reachable anonymously by design, without being *anonymous*.** The
+four participant writes — `…/participants/{id}/slim` and its `check-in`, `check-out` and
+`payout-preference` siblings — are guarded by `canAccessParticipant`, which **resolves the row
+before it judges the caller**: a *guest* sign-up is editable by the anonymous creator presenting
+the per-row capability token minted at sign-up (REQ-SEC-018, header `X-Guest-Edit-Token`). So an
+anonymous caller is a legitimate one on these paths, the refusal for a row they may not touch is
+`403` rather than `401`, and an unknown row answers `404` to everybody. They are not in the
+anonymous-surface table above because nothing is *served* anonymously: the capability token is a
+credential, and without it every one of them refuses. Pinned in `ApiVhostAnonymousSurfaceTest`.
+
 **The refusal is not one status, and the split follows the layer that produces it.** The me-scoped
 paths are `authenticated()` in the filter chain, so they never reach a controller and the entry
 point answers `401`. The Finanzen paths sit under `GET /api/v1/missions/**`, which is `permitAll`

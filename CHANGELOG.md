@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Die eigene Einsatz-Teilnahme ist für die App freigegeben und eingefroren.** Anmelden, abmelden, ein- und auschecken sowie die Auszahlungspräferenz — jeweils nur für den eigenen Eintrag. Die Einsatzplanung (Einheiten, Crews, Ablauf) bleibt ausgeschlossen (REQ-API-009, REQ-SEC-037).
+
 - **Auftrags-Zuweisung und Statuswechsel sind für die App freigegeben und eingefroren.** Sich selbst auf einen Auftrag setzen, wieder herunternehmen, die eigene Notiz dazu und — für Logistiker — der Statuswechsel. Die Übergaben, die Produktionsmeldungen und die übrige Bearbeitung bleiben ausgeschlossen (REQ-API-009, REQ-SEC-037).
 
 - **Der eingefrorene API-Vertrag deckt jetzt auch Query-Parameter und Pflicht-Enums in Anfragen ab.** Ein umbenannter Parameter oder eine umbenannte Enum-Konstante brach eine ausgelieferte App bisher, ohne den Build zu brechen (REQ-API-009).
