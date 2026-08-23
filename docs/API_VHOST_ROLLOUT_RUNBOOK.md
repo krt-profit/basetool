@@ -616,12 +616,29 @@ nothing anywhere reporting it.
 
 A hairpinned request does not prove what a phone sees.
 
+**PowerShell** — the shell this is actually run from. The `bash` loop below is a parse error there
+(`Missing opening '(' after keyword 'for'`), which is how this step failed the first time it was
+handed over:
+
+```powershell
+foreach ($p in '/api/v1/missions/search','/api/v1/operations/search','/api/v1/orders','/api/v1/inventory/aggregated','/api/v1/org-units/bank/balances','/api/v1/hangar/my-ships','/api/v1/notifications','/api/v1/announcement','/api/v1/users/me') { '{0,-42} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' "https://api.profit-base.online$p") }
+```
+
+`curl.exe`, not `curl`: PowerShell 5.1 aliases the name to `Invoke-WebRequest`, which does not take
+these flags. PowerShell 7 dropped the alias, so both work there — spelling it out makes the line
+safe in either.
+
+The same thing from a POSIX shell (WSL, Git Bash, a runner):
+
 ```bash
 for p in /api/v1/missions/search /api/v1/operations/search /api/v1/orders /api/v1/inventory/aggregated /api/v1/org-units/bank/balances /api/v1/hangar/my-ships /api/v1/notifications /api/v1/announcement /api/v1/users/me; do printf '%-42s ' "$p"; curl -s -o /dev/null -w '%{http_code}' "https://api.profit-base.online$p"; echo; done
 ```
 
 Expected, per § D.3a's table: **200** for `/missions/search`, **401** for every other line above. A
-**404** anywhere means the paste did not take — that path is missing from the block.
+**404** anywhere means the paste did not take — that path is missing from the block. **404 on every
+line means the block has not been pasted at all**, which is also what the write check below reports
+as a 404 instead of a 405: default-deny answers an unknown path, and an unpasted allow-list makes
+every phase-2 path unknown.
 
 Then one write, which must be refused by the vhost rather than by the backend:
 
@@ -629,8 +646,10 @@ Then one write, which must be refused by the vhost rather than by the backend:
 curl -s -o /dev/null -w '%{http_code}' -X POST https://api.profit-base.online/api/v1/orders; echo
 ```
 
-Expected **405**. This one matters more than it looks: the same path answers a `POST` that is
-`permitAll` by design — the public request form — so only the verb separates it from the queue read.
+Expected **405**. A **404** here means step 2 has not happened yet: the read-only guard cannot
+refuse a verb on a path the allow-list has never admitted. This check matters more than it looks —
+the same path answers a `POST` that is `permitAll` by design (the public request form), so only the
+verb separates it from the queue read.
 
 ### 4. Let the nightly probe take over
 
