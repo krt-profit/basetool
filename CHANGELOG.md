@@ -12,6 +12,10 @@
 
 ### Changed
 
+- **Die SpotBugs-Gradle-Plugin-Version wurde auf 6.5.11 angehoben.** Reiner Bugfix-Bump ohne bekannte Sicherheitslücke, im Rahmen des routinemäßigen Abhängigkeits-Audits.
+
+### Changed
+
 - **Der nächtliche Edge-Probe deckt jetzt die vollständige Phase-2-Allowlist ab**, inklusive der einen Stelle, an der nur das Verb zwei Oberflächen trennt: `POST /api/v1/orders` ist der öffentliche Antragsweg und muss auf dem API-vhost mit 405 abgewiesen werden. Dazu steht im Runbook jetzt eine Schritt-für-Schritt-Anleitung für den einen verbleibenden manuellen Schritt (Phase H).
 
 ### Changed
