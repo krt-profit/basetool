@@ -190,10 +190,46 @@ class ExternalContractTest {
                   "registeredParticipants",
                   "checkedInParticipants",
                   "participants",
+                  // Phase 3 widened this: the app now acts on the caller's OWN participant row,
+                  // and `user` is the only thing that says which row that is. A name cannot decide
+                  // it — the server sends `displayName` when a member set one and `username`
+                  // otherwise — and `startTime` is what "checked in" means on the wire.
+                  "user",
+                  "startTime",
+                  "payoutPreference",
                   "assignedUnits",
                   "steps",
                   "objectives",
                   "frequencies")),
+          // Phase 3, the four things a member does to their own participation. `join` answers with
+          // the whole Einsatz because it creates the row; the three slim ones answer with the row
+          // alone, which is the point of them — the detail is large and a check-in changes one
+          // timestamp.
+          //
+          // The leave is the slim DELETE and not the legacy full one: both exist, the legacy pair
+          // is `@ApiDeprecation`-marked with a sunset, and freezing a deprecated path would be a
+          // promise the backend has already announced it will not keep.
+          new ContractOperation(
+              "/api/v1/missions/{id}/join",
+              "post",
+              Set.of("id", "participants", "user", "registeredParticipants")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/participants/{participantId}/slim", "delete", Set.of()),
+          new ContractOperation(
+              "/api/v1/missions/{id}/participants/{participantId}/check-in/slim",
+              "post",
+              Set.of("id", "user", "startTime")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/participants/{participantId}/check-out/slim",
+              "post",
+              Set.of("id", "user", "endTime")),
+          // PAYOUT / DONATE, and the request half is where the app's own copy of those two words
+          // lives. Required on the request, so the enum guard covers it.
+          new ContractOperation(
+              "/api/v1/missions/{id}/participants/{participantId}/payout-preference/slim",
+              "put",
+              Set.of("id", "payoutPreference"),
+              Set.of("preference")),
           // The Finanzen tab. Unlike the two above it this one is NOT anonymous:
           // `isAuthenticated() and isMemberOrAbove() and canSeeMission(#missionId)`, so it answers
           // 403 to an anonymous caller and to a guest alike -- not 401, because the chain is
@@ -866,7 +902,9 @@ class ExternalContractTest {
           "PersonalInventoryItemUpdateRequest.locationType",
           Set.of("CITY", "SPACE_STATION"),
           "UpdateJobOrderStatusDto.status",
-          Set.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED"));
+          Set.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED"),
+          "UpdatePayoutPreferenceRequest.preference",
+          Set.of("PAYOUT", "DONATE"));
 
   @Test
   @DisplayName("no enum a shipped client must parse has gained or lost a constant")

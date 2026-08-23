@@ -346,6 +346,60 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * Joining an Einsatz is refused without a token.
+   *
+   * <p>Worth pinning because the Einsatz list and the Einsatz itself ARE anonymous on this vhost —
+   * the public home page renders from them — so this is a write one path segment away from a read
+   * that answers everybody.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousJoinWithUnauthorized() throws Exception {
+    mockMvc
+        .perform(post("/api/v1/missions/" + ABSENT_OPERATION + "/join").with(csrf()))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The four participant writes resolve the row <strong>before</strong> they judge the caller, so
+   * an anonymous request against a row that does not exist answers {@code 404}.
+   *
+   * <p>That is not the usual shape and it is deliberate on the backend's side: {@code
+   * canAccessParticipant} looks the participant up first, because a <strong>guest</strong> sign-up
+   * is editable by the anonymous creator presenting the per-row capability token minted at sign-up
+   * (REQ-SEC-018). An anonymous caller is a legitimate one here, and the refusal for a row they may
+   * not touch is {@code 403} rather than {@code 401}.
+   *
+   * <p>What this pins is that nothing is written and no success is returned. The status is written
+   * down in REQ-SEC-037 as well, so the vhost's allow-list entry is never read as "authenticated
+   * only" — it is the one entry on the list that is not.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousParticipationWritesOnAnAbsentRow() throws Exception {
+    String participant =
+        "/api/v1/missions/" + ABSENT_OPERATION + "/participants/" + ABSENT_OPERATION;
+    mockMvc.perform(delete(participant + "/slim").with(csrf())).andExpect(status().isNotFound());
+    mockMvc
+        .perform(post(participant + "/check-in/slim").with(csrf()))
+        .andExpect(status().isNotFound());
+    mockMvc
+        .perform(post(participant + "/check-out/slim").with(csrf()))
+        .andExpect(status().isNotFound());
+    mockMvc
+        .perform(
+            put(participant + "/payout-preference/slim")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"preference\":\"PAYOUT\"}"))
+        .andExpect(status().isNotFound());
+  }
+
+  /**
    * The order's assignee edge and its status change, refused without a token.
    *
    * <p>The status one is the entry worth having: it is the first path on this allow-list whose
