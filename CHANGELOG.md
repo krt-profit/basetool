@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Der Hangar der App darf schreiben.** Eigene Schiffe anlegen, ändern und löschen sind am API-vhost freigegeben und eingefroren, dazu die beiden Auswahllisten (Schiffstypen, Heimatorte). Die Importe und die Admin-Sicht auf fremde Hangars bleiben ausgeschlossen (REQ-API-009, REQ-SEC-037).
+
 - **Die Blueprints der App sind am API-vhost freigegeben und eingefroren.** Eigene Blueprints lesen, hinzufügen, Notiz ändern und löschen, dazu die Baubarkeits-Abfrage und die Produktsuche dahinter. Der Datei-Import bleibt Phase 4 (REQ-API-009).
 
 - **Die App darf jetzt schreiben — der erste Schritt.** „Mein Inventar" (eigener Bestand: anlegen, ändern, löschen) ist am API-vhost freigegeben und im eingefrorenen Client-Vertrag festgehalten. Freigeschaltet wird der Weg zur Produktion gesammelt am Ende von Phase 3 (Runbook, Phase I).

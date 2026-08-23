@@ -273,6 +273,11 @@ constraint for nothing and record a guess about which fields matter.
 | `DELETE /api/v1/personal-blueprints/{id}`                  | *(204, no body)*                                                                                                                                                                                                                                                                                                                            |
 | `GET /api/v1/personal-blueprints/craftability`             | `blueprintId`, `recipeResolved`, `craftable`, `craftableWithRefinery`, `limitingMaterialName`, `limitingMaterialNameWithRefinery`; row `materialName`, `requiredScu`, `availableScu`, `missingScu`, `quantityType`                                                                                                                          |
 | `GET /api/v1/blueprints/products/search`                   | `productKey`, `name`, `manufacturerName`, `ownedByCurrentUser`                                                                                                                                                                                                                                                                              |
+| `POST /api/v1/hangar/ships`                                | `id`, `name`, `shipType`, `insurance`, `location`, `fitted`, `version` — **request** requires `insurance`, `shipTypeId`                                                                                                                                                                                                                     |
+| `PUT /api/v1/hangar/ships/{id}`                            | as the create; the app additionally sends `version`, which the schema does not demand                                                                                                                                                                                                                                                       |
+| `DELETE /api/v1/hangar/ships/{id}`                         | *(204, no body)*                                                                                                                                                                                                                                                                                                                            |
+| `GET /api/v1/ship-types`                                   | envelope; row `id`, `name`, `manufacturer` — **anonymous** (REQ-SEC-037)                                                                                                                                                                                                                                                                    |
+| `GET /api/v1/locations/home-locations`                     | `id`, `name`                                                                                                                                                                                                                                                                                                                                |
 
 **Frozen has a request side, and phase 3 is where it starts to bite.** A write operation in the set
 may not gain a **required** request field. An old build sends the payload it was written against, so
@@ -285,6 +290,14 @@ must be mandatory goes to `/api/v2`.
 `PUT /api/v1/personal-inventory/{id}` requires `version` and is the first entry to record that: it
 is the optimistic lock, echoed from the read, and a concurrent edit answers `409 OPTIMISTIC_LOCK`
 instead of overwriting. `POST` has no `version` because there is nothing yet to conflict with.
+
+`GET /api/v1/hangar/my-ships` gained `version` in phase 3. A read-only client had no use for it; a
+writing one cannot save without it, and adding a field to a frozen set is the direction that is
+always safe.
+
+The Hangar's write path is `/hangar/ships`, **not** `/hangar/users/{id}/ships`. The second one names
+a member and is the admin surface; this contract set has no reason to carry it, and the vhost never
+admits it.
 
 `removable` on an owned blueprint is frozen for the same reason as `redacted` and `truncated`: it
 qualifies the row rather than describing it. A row the server will not release must not be offered a
