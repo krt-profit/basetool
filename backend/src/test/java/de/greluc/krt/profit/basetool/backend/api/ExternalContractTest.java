@@ -251,6 +251,37 @@ class ExternalContractTest {
               "/api/v1/missions/{missionId}/finance-entries/summary",
               "get",
               Set.of("total", "incomeSum", "incomeCount", "expenseSum", "expenseCount")),
+          // Phase 3, booking money against an Einsatz. The write paths are
+          // `/api/v1/finance-entries`
+          // — NOT under `/missions` — so they are their own family on the vhost rather than an
+          // exception to the read-only guard on that one.
+          //
+          // `participant` and `version` join the read for the same reason the assignee edge did on
+          // an order: the app may only edit the caller's own entry, and both halves of that
+          // sentence need a field. The nested participant is stripped of PII by the controller on
+          // the create response, so what is frozen here is the id and nothing else about them.
+          new ContractOperation(
+              "/api/v1/finance-entries",
+              "post",
+              Set.of("id", "missionId", "participant", "type", "amount", "note", "version"),
+              Set.of("amount", "missionId", "participantId", "type")),
+          // The update requires `version` where the create cannot have one, and that asymmetry is
+          // the optimistic lock: an entry is edited against the copy the client read.
+          new ContractOperation(
+              "/api/v1/finance-entries/{entryId}",
+              "put",
+              Set.of("id", "missionId", "participant", "type", "amount", "note", "version"),
+              Set.of("amount", "type", "version")),
+          new ContractOperation("/api/v1/finance-entries/{entryId}", "delete", Set.of()),
+          // The payout confirmation. Two roles in one gate: MISSION_MANAGER may mark a share paid
+          // out, and only an OFFICER or ADMIN may take that back — the app offers the first and
+          // lets the server refuse the second, because it cannot know which of the two the caller
+          // is from `/users/me` alone.
+          new ContractOperation(
+              "/api/v1/operations/{id}/payouts/paid-out",
+              "put",
+              Set.of("participantKey", "paidOut", "paidOutAt", "paidOutByName"),
+              Set.of("participantKey")),
           // Phase 2, the Lager tree. Two reads, one per level: the aggregate is the group
           // row a member sees first, and the grouped read fills a group they opened. Neither is
           // `/inventory/all`, which is the flat entry list -- a tree that fetched every leaf to
@@ -483,7 +514,8 @@ class ExternalContractTest {
           // Still not the roles or the permissions set: the app asks one yes/no question and this
           // is the field that answers it. Freezing the rest would buy the backend a constraint on
           // a payload nobody reads.
-          new ContractOperation("/api/v1/users/me", "get", Set.of("id", "isLogistician")),
+          new ContractOperation(
+              "/api/v1/users/me", "get", Set.of("id", "isLogistician", "isMissionManager")),
           // Phase 2, the Operationen segment of the same screen. The row is deliberately thin:
           // OperationDto carries no mission or participant count, and the owner decided against
           // adding them rather than spend aggregate queries on a list that has documented itself
@@ -904,7 +936,11 @@ class ExternalContractTest {
           "UpdateJobOrderStatusDto.status",
           Set.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED"),
           "UpdatePayoutPreferenceRequest.preference",
-          Set.of("PAYOUT", "DONATE"));
+          Set.of("PAYOUT", "DONATE"),
+          "MissionFinanceEntryCreateDto.type",
+          Set.of("INCOME", "EXPENSE"),
+          "MissionFinanceEntryUpdateDto.type",
+          Set.of("INCOME", "EXPENSE"));
 
   @Test
   @DisplayName("no enum a shipped client must parse has gained or lost a constant")

@@ -316,6 +316,15 @@ if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/join$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/participants/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/slim$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/participants/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(check-in|check-out|payout-preference)/slim$") { set $krt_api_allowed 1; }
+# Phase 3 - booking money against an Einsatz. A family of its own: the write paths are
+# /api/v1/finance-entries, NOT under /missions, so nothing in the read-only guard's prefix list
+# matches them and every verb the backend serves is admitted. That is the same shape
+# /personal-inventory has, and it is safe for the same reason - the whole prefix is the feature.
+if ($uri = "/api/v1/finance-entries") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/finance-entries/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+# The payout confirmation. /operations stays a read-only family: the prefix carries the whole
+# Operation edit surface, and only this one path is named.
+if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/payouts/paid-out$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/finance-entries/summary$") { set $krt_api_allowed 1; }
 # Phase 2 - the Operationen segment of the same screen, its detail, the Finanz-Rollup and the
 # payout rows. Anchored like the Einsatz detail and for a sharper reason: below `{id}` sits
@@ -443,6 +452,9 @@ if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-f
 # crews, steps, objectives, the mission itself. Only the caller's own participation is named.
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/join$") { set $krt_readonly_family ""; }
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/participants/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(/(check-in|check-out|payout-preference))?/slim$") { set $krt_readonly_family ""; }
+# /operations stays in the family because the prefix carries the whole Operation edit surface.
+# Only the payout confirmation is named.
+if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/payouts/paid-out$") { set $krt_readonly_family ""; }
 if ($krt_readonly_family = "RW") { return 405; }
 
 # --- Which family gets which shape ---------------------------------------------------------------
@@ -533,6 +545,9 @@ The safe order, and the reason for it:
    | `/api/v1/missions/<uuid>/participants/<uuid>/slim`    | **401**                                                             | `canAccessParticipant` — the caller's own row, or a mission manager's                                    |
    | `…/participants/<uuid>/check-in/slim`                 | **401**                                                             | same                                                                                                     |
    | `…/participants/<uuid>/payout-preference/slim`        | **401**                                                             | same                                                                                                     |
+   | `/api/v1/finance-entries`                             | **401**                                                             | `isAuthenticated()` + member-or-above + `canSeeMission` on the body's mission                            |
+   | `/api/v1/finance-entries/<uuid>`                      | **401**                                                             | `isAuthenticated()`; owner-vs-admin is decided at the service seam                                       |
+   | `/api/v1/operations/<uuid>/payouts/paid-out`          | **401**                                                             | `hasRole(MISSION_MANAGER)` + scope; taking a confirmation back additionally needs OFFICER or ADMIN       |
    | `/api/v1/org-units/bank/balances`                     | **401**                                                             | me-scoped to the accounts the caller may see                                                             |
    | `/api/v1/org-units/bank/accounts/<uuid>`              | **401**                                                             | same                                                                                                     |
    | `/api/v1/personal-inventory`                          | **401**                                                             | me-scoped; the same path answers POST, which is 401 anonymously too                                      |
