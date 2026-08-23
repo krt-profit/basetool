@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Die Kontoeinstellungen der Kartellbank sind für die App freigegeben und eingefroren.** Zielsaldo setzen und die Sichtbarkeit eines Kontos regeln — nur für die verantwortliche Kontoinhaberin. Die Bankangestellten-Oberfläche (Ein- und Auszahlungen, Überweisungen) bleibt ausgeschlossen (REQ-API-009, REQ-SEC-037).
+
 - **Einsatz-Finanzen und die Auszahlungsbestätigung sind für die App freigegeben und eingefroren.** Einnahmen und Ausgaben zu einem Einsatz buchen, ändern und löschen, dazu die Bestätigung einer Auszahlung durch den Einsatzleiter (REQ-API-009, REQ-SEC-037).
 
 - **Die eigene Einsatz-Teilnahme ist für die App freigegeben und eingefroren.** Anmelden, abmelden, ein- und auschecken sowie die Auszahlungspräferenz — jeweils nur für den eigenen Eintrag. Die Einsatzplanung (Einheiten, Crews, Ablauf) bleibt ausgeschlossen (REQ-API-009, REQ-SEC-037).

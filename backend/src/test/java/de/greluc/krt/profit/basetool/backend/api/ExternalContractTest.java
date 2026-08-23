@@ -418,6 +418,51 @@ class ExternalContractTest {
               "get",
               Set.of(
                   "detail", "account", "delta30d", "bookingCount", "name", "accountNo", "balance")),
+          // Phase 3, the only bank writes a member has: the settings of an account they are
+          // responsible for. Deliberately NOT `/api/v1/bank/**` — deposits, withdrawals and
+          // transfers are all `hasRole(BANK_EMPLOYEE)` and belong to the bank-employee surface the
+          // app does not carry (REQ-APP-BANK-001).
+          //
+          // `canSetTarget` and `canConfigureVisibility` are the two fields that make this slice
+          // work at all: the server states what the caller may do, so the app offers exactly that
+          // and guesses at no role. Losing either would leave the app either hiding a control a
+          // holder is entitled to, or offering one that answers 403.
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/settings",
+              "get",
+              Set.of(
+                  "accountId",
+                  "accountName",
+                  "balanceTarget",
+                  "version",
+                  "canSetTarget",
+                  "canConfigureVisibility",
+                  "visibilityConfigurable",
+                  "allMembersSupported",
+                  "availableRoleCodes",
+                  "grantedRoleCodes",
+                  "allMembersGranted")),
+          // The target is version-echoed and the target itself is optional: clearing it is sending
+          // no target at all, which is why only `version` is required.
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/balance-target",
+              "put",
+              Set.of("accountId", "balanceTarget", "version", "canSetTarget"),
+              Set.of("version")),
+          // Visibility is addressed entirely by its path — a role bucket by code, the all-members
+          // switch by a boolean path segment — so neither carries a body to freeze.
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}",
+              "post",
+              Set.of("accountId", "grantedRoleCodes", "version")),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}",
+              "delete",
+              Set.of("accountId", "grantedRoleCodes", "version")),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/visibility/all-members/{enabled}",
+              "put",
+              Set.of("accountId", "allMembersGranted", "version")),
           new ContractOperation(
               "/api/v1/org-units/bank/accounts/{id}/transactions",
               "get",
