@@ -342,6 +342,14 @@ if ($uri = "/api/v1/inventory/all/grouped") { set $krt_api_allowed 1; }
 # read-only guard below refuses it here, and the allow-list never names it.
 if ($uri = "/api/v1/orders") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+# Phase 3 - the two things a member does to an order they can see: put their own name on it and
+# write the note that says which part they take. Plus the status change, which is LOGISTICIAN-only
+# in the chain. The assignee paths name a SECOND uuid - the member - and that is deliberate: the
+# backend refuses anyone but yourself unless you are a Logistician, so the vhost does not need to
+# tell them apart.
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/assignees/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/assignees/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/note$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/status$") { set $krt_api_allowed 1; }
 # Phase 2 - the org bank a member may see. /org-units/bank/**, never /bank/accounts/**:
 # the latter is the bank-employee surface and lists every account in the organisation.
 if ($uri = "/api/v1/org-units/bank/balances") { set $krt_api_allowed 1; }
@@ -419,6 +427,11 @@ if ($uri ~ "^/api/v1/hangar/ships/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[
 # endpoints and the allocation family. Only the three per-entry bookings and the create are named.
 if ($uri = "/api/v1/inventory") { set $krt_readonly_family ""; }
 if ($uri ~ "^/api/v1/inventory/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(book-out|personal-rebook|note)$") { set $krt_readonly_family ""; }
+# /orders stays in the family because the prefix also carries the public request form (POST
+# /api/v1/orders, permitAll in the chain), the handovers, the production reports and the whole
+# Logistician edit surface. Only the assignee edge and the status change are named.
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/assignees/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(/note)?$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/status$") { set $krt_readonly_family ""; }
 if ($krt_readonly_family = "RW") { return 405; }
 
 # --- Which family gets which shape ---------------------------------------------------------------
@@ -502,6 +515,9 @@ The safe order, and the reason for it:
    | `/api/v1/inventory/all/grouped`                       | **401**                                                             | same                                                                                                     |
    | `/api/v1/orders`                                      | **401**                                                             | `isAuthenticated()`; the `POST` on the same path is refused by the read-only guard                       |
    | `/api/v1/orders/<uuid>`                               | **401**                                                             | `isAuthenticated()` + scope                                                                              |
+   | `/api/v1/orders/<uuid>/assignees/<uuid>`              | **401**                                                             | `isAuthenticated()` + scope; self-assignment is open to every member, anyone else needs LOGISTICIAN      |
+   | `/api/v1/orders/<uuid>/assignees/<uuid>/note`         | **401**                                                             | same, and locked on the assignee edge's own version                                                      |
+   | `/api/v1/orders/<uuid>/status`                        | **401**                                                             | `hasRole(LOGISTICIAN)` + per-order scope; a member without the role gets **403** once authenticated      |
    | `/api/v1/org-units/bank/balances`                     | **401**                                                             | me-scoped to the accounts the caller may see                                                             |
    | `/api/v1/org-units/bank/accounts/<uuid>`              | **401**                                                             | same                                                                                                     |
    | `/api/v1/personal-inventory`                          | **401**                                                             | me-scoped; the same path answers POST, which is 401 anonymously too                                      |

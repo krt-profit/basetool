@@ -266,6 +266,12 @@ class ExternalContractTest {
                   "createdAt",
                   "materials",
                   "redacted")),
+          // Phase 3 widened this one rather than adding a second entry: the assignee edge is what
+          // the app now writes to, and it is reached through this response. `note` and `version`
+          // are the edge's own -- the version is NOT the order's, and sending the order's would
+          // 409 every note edit -- and `effectiveName` is the only name a row can show. `user` and
+          // `assignees` are the containers they arrive in; without them the app cannot tell whose
+          // edge it is holding, which is what decides "assign me" from "unassign me".
           new ContractOperation(
               "/api/v1/orders/{id}",
               "get",
@@ -280,10 +286,53 @@ class ExternalContractTest {
                   "materials",
                   "aggregatedMaterials",
                   "assignees",
+                  "user",
+                  "effectiveName",
+                  "note",
+                  "version",
                   "handovers",
                   "redacted",
                   "requestingOrgUnit",
                   "responsibleOrgUnit")),
+          // Phase 3, the two writes any member may make on an order they can see: putting their
+          // own name on it and taking it off again. Self-assignment is open to everyone;
+          // assigning someone else needs LOGISTICIAN, which the app never attempts.
+          //
+          // The response is the whole order, and what the app reads back from it is the refreshed
+          // assignee list plus the version -- the list is redrawn from the answer rather than
+          // guessed at, because the server decides the order of it.
+          new ContractOperation(
+              "/api/v1/orders/{id}/assignees/{userId}",
+              "post",
+              Set.of("id", "assignees", "user", "effectiveName", "note", "version")),
+          new ContractOperation(
+              "/api/v1/orders/{id}/assignees/{userId}",
+              "delete",
+              Set.of("id", "assignees", "user", "effectiveName", "note", "version")),
+          // The assignee's own note -- when they work on it, which part they take. Locked on the
+          // EDGE's version, which is why nothing here is required: a client that has never seen a
+          // version may omit it and take the last write, and a client that has one sends it and
+          // gets a 409 instead of overwriting a colleague.
+          new ContractOperation(
+              "/api/v1/orders/{id}/assignees/{userId}/note",
+              "put",
+              Set.of("id", "assignees", "user", "effectiveName", "note", "version"),
+              Set.of()),
+          new ContractOperation(
+              "/api/v1/orders/{id}/assignees/{userId}/note",
+              "delete",
+              Set.of("id", "assignees", "user", "effectiveName", "note", "version")),
+          // The status change. LOGISTICIAN + per-order scope, so the app offers it only to a
+          // Logistician and names the refusal when the order is outside their slice.
+          //
+          // `status` and `version` are both REQUIRED on the request: dropping either from the
+          // required list would be a widening the app survives, but ADDING a third required field
+          // is what a shipped build cannot send -- which is what this half of the entry guards.
+          new ContractOperation(
+              "/api/v1/orders/{id}/status",
+              "put",
+              Set.of("id", "status", "version"),
+              Set.of("status", "version")),
           // Phase 2, the org bank a member may see. `/org-units/bank/**`, never
           // `/bank/accounts/**`: the latter is the bank-employee surface and lists every account.
           new ContractOperation(
@@ -388,13 +437,17 @@ class ExternalContractTest {
           // `replaced`) are the real contract and are pinned in the app's spec, since nothing in
           // this document describes them.
           new ContractOperation("/api/v1/notifications/stream", "get", Set.of()),
-          // Phase 2, the caller's own record. The app needs exactly one field of it: its own
-          // backend user id. An Operation's payout rows are keyed by that id -- not by the
-          // Keycloak `sub` the app holds, and not by a name -- so "Dein Anteil" cannot be found
-          // without it. Only `id` is frozen: the response also carries the caller's email, roles
-          // and rank, and freezing what the client does not read would buy the backend a
-          // constraint for nothing.
-          new ContractOperation("/api/v1/users/me", "get", Set.of("id")),
+          // Phase 2, the caller's own record. The app needs two fields of it. Its own backend user
+          // id: an Operation's payout rows are keyed by that id -- not by the Keycloak `sub` the
+          // app holds, and not by a name -- so "Dein Anteil" cannot be found without it, and
+          // neither can "assign me to this order". And `isLogistician`, which decides whether the
+          // Auftrag detail offers the status control at all; without it the app would either hide
+          // a control a Logistician is entitled to or offer one that answers 403.
+          //
+          // Still not the roles or the permissions set: the app asks one yes/no question and this
+          // is the field that answers it. Freezing the rest would buy the backend a constraint on
+          // a payload nobody reads.
+          new ContractOperation("/api/v1/users/me", "get", Set.of("id", "isLogistician")),
           // Phase 2, the Operationen segment of the same screen. The row is deliberately thin:
           // OperationDto carries no mission or participant count, and the owner decided against
           // adding them rather than spend aggregate queries on a list that has documented itself
@@ -605,9 +658,9 @@ class ExternalContractTest {
               "post",
               Set.of("id", "material", "location", "amount", "quality", "personal"),
               Set.of("amount", "locationId")),
-          // The book-out's `type` is DISCARD / TRANSFER / SELL. It is an enum on the REQUEST, which
-          // the required-enum guard does not reach — that one walks responses — so the wording is
-          // pinned here and in the app's spec instead.
+          // The book-out's `type` is DISCARD / TRANSFER / SELL. The schema does not mark it
+          // required — a book-out without one defaults server-side — so the required-enum guard
+          // leaves it alone by design, and the wording is pinned in the app's spec instead.
           new ContractOperation(
               "/api/v1/inventory/{id}/book-out",
               "post",
@@ -645,6 +698,133 @@ class ExternalContractTest {
               Set.of("terminalId", "terminalName", "priceSell")));
 
   /**
+   * Query parameters a shipped client addresses these operations by, keyed {@code method path}.
+   *
+   * <p>A response field that disappears is caught by the field guard and a request field that
+   * becomes mandatory by the required-field one. A **query parameter** was caught by neither, and
+   * it is how the app says <em>which</em> rows it wants: rename {@code materialId}, retype {@code
+   * quality} from integer to string, and the installed build asks a question the server no longer
+   * understands. Two of those happened inside one afternoon on the Lager slice — a {@code 400
+   * TYPE_MISMATCH} on a decimal quality, and an omitted {@code owningOrgUnitId} that the server
+   * reads as "the unpooled stack" rather than "any pool" — and neither would have failed a build.
+   *
+   * <p>Frozen as {@code name:type} so a retype is caught as loudly as a rename. Only the parameters
+   * the app actually sends are here, for the same reason only the response fields it reads are:
+   * freezing the rest would buy the backend a constraint nobody is relying on. The assertion is a
+   * subset one — the server may add optional parameters freely.
+   *
+   * <p>Paging and sorting count. A shipped list that cannot ask for page two is as broken as one
+   * that cannot parse a row.
+   */
+  private static final Map<String, Set<String>> FROZEN_QUERY_PARAMS =
+      Map.ofEntries(
+          Map.entry(
+              "get /api/v1/missions/search",
+              Set.of(
+                  "query:string",
+                  "status:array",
+                  "start:string",
+                  "end:string",
+                  "page:integer",
+                  "size:integer",
+                  "sort:string")),
+          Map.entry(
+              "get /api/v1/operations/search",
+              Set.of(
+                  "query:string",
+                  "status:array",
+                  "start:string",
+                  "end:string",
+                  "page:integer",
+                  "size:integer",
+                  "sort:string")),
+          Map.entry("get /api/v1/orders", Set.of("status:array", "page:integer", "size:integer")),
+          Map.entry("get /api/v1/notifications", Set.of("page:integer", "size:integer")),
+          Map.entry(
+              "get /api/v1/org-units/bank/accounts/{id}/transactions",
+              Set.of("page:integer", "size:integer")),
+          Map.entry(
+              "get /api/v1/personal-inventory", Set.of("q:string", "page:integer", "size:integer")),
+          Map.entry("get /api/v1/uex/locations/search", Set.of("q:string", "limit:integer")),
+          Map.entry(
+              "get /api/v1/personal-blueprints",
+              Set.of("q:string", "page:integer", "size:integer")),
+          Map.entry(
+              "get /api/v1/personal-blueprints/craftability", Set.of("includeRefinery:boolean")),
+          Map.entry("get /api/v1/blueprints/products/search", Set.of("q:string", "limit:integer")),
+          Map.entry(
+              "get /api/v1/hangar/my-ships",
+              Set.of("search:string", "page:integer", "size:integer")),
+          Map.entry(
+              "get /api/v1/ship-types", Set.of("page:integer", "size:integer", "sort:string")),
+          Map.entry("get /api/v1/inventory/aggregated", Set.of("page:integer", "size:integer")),
+          Map.entry("get /api/v1/inventory/all/grouped", Set.of("materialIds:array")),
+          // The stack drill-down: five of these together name ONE stack. Dropping any of them does
+          // not widen the answer, it asks a different question.
+          Map.entry(
+              "get /api/v1/inventory/all/stack/entries",
+              Set.of(
+                  "materialId:string",
+                  "locationId:string",
+                  "userId:string",
+                  "quality:integer",
+                  "owningOrgUnitId:string",
+                  "page:integer",
+                  "size:integer")),
+          Map.entry(
+              "get /api/v1/materials/search",
+              Set.of("search:string", "page:integer", "size:integer")),
+          Map.entry(
+              "get /api/v1/locations/search",
+              Set.of("search:string", "page:integer", "size:integer")),
+          Map.entry(
+              "get /api/v1/users/search", Set.of("query:string", "page:integer", "size:integer")));
+
+  @Test
+  @DisplayName("the query parameters a shipped client asks with still exist, with their types")
+  void theContractQueryParametersAreFrozen() throws IOException {
+    JsonNode document = openapi();
+
+    for (Map.Entry<String, Set<String>> frozen : FROZEN_QUERY_PARAMS.entrySet()) {
+      String[] key = frozen.getKey().split(" ", 2);
+      Set<String> declared = queryParameters(document, key[1], key[0]);
+      assertThat(declared)
+          .as(
+              "%s lost a query parameter the app addresses it by, or changed its type. The"
+                  + " installed build keeps sending it: a renamed one is silently ignored and the"
+                  + " member gets the wrong rows, a retyped one comes back 400 and the screen says"
+                  + " it could not load. Neither is fixable without a new APK",
+              frozen.getKey())
+          .containsAll(frozen.getValue());
+    }
+  }
+
+  /**
+   * The query parameters an operation declares, as {@code name:type}.
+   *
+   * @param document the parsed API document
+   * @param path the {@code /api/v1} path
+   * @param method the HTTP verb, lower case
+   * @return the declared query parameters; an array's element type is not part of the key, since a
+   *     client sends the same repeated parameter either way
+   */
+  private static Set<String> queryParameters(JsonNode document, String path, String method) {
+    JsonNode operation = document.get("paths").path(path).path(method);
+    assertThat(operation.isMissingNode())
+        .as("%s %s is in the query-parameter freeze but not in the document", method, path)
+        .isFalse();
+    Set<String> declared = new TreeSet<>();
+    for (JsonNode parameter : operation.path("parameters")) {
+      if (!"query".equals(parameter.path("in").asText())) {
+        continue;
+      }
+      declared.add(
+          parameter.path("name").asText() + ":" + parameter.path("schema").path("type").asText());
+    }
+    return declared;
+  }
+
+  /**
    * Enum constants a shipped client cannot survive a change to, keyed {@code Schema.property}.
    *
    * <p><strong>Only REQUIRED enum properties are here, and that is the whole point.</strong> The
@@ -666,9 +846,27 @@ class ExternalContractTest {
    * <p>Nullable enums are deliberately absent. They degrade to {@code null} — an objective loses
    * its kind badge, not its screen — and freezing them would make this fire on harmless additions,
    * which is how a guard gets widened until it means nothing.
+   *
+   * <p><strong>Requests count as well as responses.</strong> A shipped build sends {@code
+   * type=TRANSFER} and {@code status=IN_PROGRESS} as literal strings; renaming a constant
+   * server-side turns every one of those writes into a 400 that the member reads as "the app is
+   * broken". The failure is quieter than the response one — the screen still loads — and it is just
+   * as unfixable without a new APK, so the same release ordering applies: ship a build that sends
+   * the new constant first.
    */
   private static final Map<String, Set<String>> FROZEN_REQUIRED_ENUMS =
-      Map.of("JobTypeDto.archetype", Set.of("CREW", "MISSION"));
+      Map.of(
+          "JobTypeDto.archetype",
+          Set.of("CREW", "MISSION"),
+          // Both halves of the personal-inventory editor send this one, and it was invisible until
+          // the guard started walking requests: a renamed constant would have turned every save on
+          // an installed build into a 400 while the screen kept loading.
+          "PersonalInventoryItemCreateRequest.locationType",
+          Set.of("CITY", "SPACE_STATION"),
+          "PersonalInventoryItemUpdateRequest.locationType",
+          Set.of("CITY", "SPACE_STATION"),
+          "UpdateJobOrderStatusDto.status",
+          Set.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED"));
 
   @Test
   @DisplayName("no enum a shipped client must parse has gained or lost a constant")
@@ -687,12 +885,16 @@ class ExternalContractTest {
   }
 
   /**
-   * Collects every required enum property reachable from the contract set's response schemas.
+   * Collects every required enum property reachable from the contract set's schemas.
    *
    * <p>Walks the schema graph transitively, because a client parses the whole payload and not just
    * the fields it reads: an enum four levels down inside a participant's job type is as fatal as
    * one on the root object. Array properties are followed through their {@code items}, since the
    * item's own {@code required} list is what decides whether an element can be parsed at all.
+   *
+   * <p>Request bodies are walked alongside responses. The direction of the break differs — a
+   * response enum fails the parse, a request enum fails the write with a 400 — but both are
+   * unfixable on an installed build.
    *
    * @param document the parsed API document
    * @return {@code Schema.property} to its sorted constants; empty when nothing qualifies
@@ -705,8 +907,32 @@ class ExternalContractTest {
       for (String root : responseSchemaNames(document, operation)) {
         walkSchema(schemas, root, visited, found);
       }
+      String request = requestSchemaName(document, operation);
+      if (request != null) {
+        walkSchema(schemas, request, visited, found);
+      }
     }
     return found;
+  }
+
+  /**
+   * Names the schema an operation's JSON request body resolves to.
+   *
+   * @param document the parsed API document
+   * @param operation the contract operation
+   * @return the schema name, or {@code null} for an operation that carries no JSON body
+   */
+  private static String requestSchemaName(JsonNode document, ContractOperation operation) {
+    JsonNode body =
+        document
+            .get("paths")
+            .get(operation.path())
+            .get(operation.method())
+            .path("requestBody")
+            .path("content")
+            .path("application/json")
+            .path("schema");
+    return schemaName(body);
   }
 
   /**

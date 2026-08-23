@@ -1789,6 +1789,12 @@ Everything else on the list is refused without a token — the Finanzen endpoint
 (`isAuthenticated() and isMemberOrAbove() and canSeeMission`), which is why a mission's money is
 reachable from the app and not from the internet even though the mission itself is.
 
+**Refused is not one status.** `PUT /api/v1/orders/{id}/status`, added in phase 3, is the first
+allow-listed path whose chain rule is a *role* rather than a session: anonymous gets `401`, and an
+authenticated member without `LOGISTICIAN` gets `403`. `GET /api/v1/locations/home-locations`
+behaves the same way for the same reason. Both are pinned in `ApiVhostAnonymousSurfaceTest` with
+the status they actually answer, because both were first written down with the wrong one.
+
 **The refusal is not one status, and the split follows the layer that produces it.** The me-scoped
 paths are `authenticated()` in the filter chain, so they never reach a controller and the entry
 point answers `401`. The Finanzen paths sit under `GET /api/v1/missions/**`, which is `permitAll`

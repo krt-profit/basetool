@@ -346,6 +346,39 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * The order's assignee edge and its status change, refused without a token.
+   *
+   * <p>The status one is the entry worth having: it is the first path on this allow-list whose
+   * chain rule is a role rather than a session, so an authenticated member without LOGISTICIAN gets
+   * {@code 403} here where every other write on the list gets {@code 401}. The app gates the
+   * control on {@code isLogistician} for exactly that reason.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousOrderAssignmentWritesWithUnauthorized() throws Exception {
+    String assignee = "/api/v1/orders/" + ABSENT_OPERATION + "/assignees/" + ABSENT_OPERATION;
+    mockMvc.perform(post(assignee).with(csrf())).andExpect(status().isUnauthorized());
+    mockMvc.perform(delete(assignee).with(csrf())).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put(assignee + "/note")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"note\":\"x\"}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc.perform(delete(assignee + "/note").with(csrf())).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/orders/" + ABSENT_OPERATION + "/status")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"IN_PROGRESS\",\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
    * The home-location list is refused with {@code 403}, not {@code 401}.
    *
    * <p>Same shape as the Finanzen paths: `/api/v1/locations/**` is `permitAll` in the filter chain,

@@ -4,6 +4,10 @@
 
 ### Added
 
+- **Auftrags-Zuweisung und Statuswechsel sind für die App freigegeben und eingefroren.** Sich selbst auf einen Auftrag setzen, wieder herunternehmen, die eigene Notiz dazu und — für Logistiker — der Statuswechsel. Die Übergaben, die Produktionsmeldungen und die übrige Bearbeitung bleiben ausgeschlossen (REQ-API-009, REQ-SEC-037).
+
+- **Der eingefrorene API-Vertrag deckt jetzt auch Query-Parameter und Pflicht-Enums in Anfragen ab.** Ein umbenannter Parameter oder eine umbenannte Enum-Konstante brach eine ausgelieferte App bisher, ohne den Build zu brechen (REQ-API-009).
+
 - **Die Lager-Buchungen der App sind freigegeben und eingefroren.** Einbuchen, Ausbuchen (verwerfen, übergeben, verkaufen), persönlich→geteilt umbuchen und die Notiz, dazu die vier Auswahllisten dahinter. Die Sammel-Endpunkte und die Alle-Mitglieder-Liste bleiben ausgeschlossen (REQ-API-009, REQ-SEC-037).
 
 - **Der Hangar der App darf schreiben.** Eigene Schiffe anlegen, ändern und löschen sind am API-vhost freigegeben und eingefroren, dazu die beiden Auswahllisten (Schiffstypen, Heimatorte). Die Importe und die Admin-Sicht auf fremde Hangars bleiben ausgeschlossen (REQ-API-009, REQ-SEC-037).
