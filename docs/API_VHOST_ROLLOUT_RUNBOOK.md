@@ -366,6 +366,15 @@ if ($uri ~ "^/api/v1/personal-blueprints/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-
 # stay off this vhost until something actually reads them.
 if ($uri = "/api/v1/personal-blueprints/craftability") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/blueprints/products/search") { set $krt_api_allowed 1; }
+# Phase 3 - the member's own ships. EXACT paths, and deliberately NOT /hangar/users/<uuid>/ships:
+# that one names a member and is the admin surface. /hangar/ships answers a bulk DELETE with no
+# id as well, which the carve-out below does not open - only the per-ship verbs are named.
+if ($uri = "/api/v1/hangar/ships") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/hangar/ships/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+# Phase 3 - the two pickers the ship editor needs. Read-only families; /ship-types also answers a
+# PUT on /{id}/visibility, which the read-only guard refuses by verb.
+if ($uri = "/api/v1/ship-types") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/locations/home-locations") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- The missions and operations families are READ-ONLY on this vhost ---------
@@ -380,21 +389,31 @@ if ($krt_api_allowed = 0) { return 404; }
 # the harder half: this guard is verb-blind by design, so opening one write means naming it
 # explicitly rather than widening the family.
 set $krt_readonly_family "";
-if ($uri ~ "^/api/v1/(missions|operations|notifications|announcement|hangar|inventory|orders|org-units|uex|blueprints)") { set $krt_readonly_family "R"; }
+if ($uri ~ "^/api/v1/(missions|operations|notifications|announcement|hangar|inventory|orders|org-units|uex|blueprints|ship-types|locations)") { set $krt_readonly_family "R"; }
 if ($request_method !~ "^(GET|HEAD)$") { set $krt_readonly_family "${krt_readonly_family}W"; }
+# Named exceptions: the writes phase 3 opens INSIDE a read-only family. Each one clears the verdict
+# before it is judged, which is the only shape nginx allows - it cannot nest `if`, so an exception
+# has to erase the flag rather than qualify it.
+#
+# /hangar stays in the family above because /hangar/users/<uuid>/ships (the admin surface, which
+# names a member) and the two /import paths (phase 4) live under the same prefix and must keep
+# answering 405. Only the two own-ship paths are named here, and naming a path opens EVERY verb the
+# backend serves on it - which for these is POST, PUT and DELETE, each gated by @PreAuthorize.
+if ($uri = "/api/v1/hangar/ships") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/hangar/ships/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_readonly_family ""; }
 if ($krt_readonly_family = "RW") { return 405; }
 
-# --- Phase 3: the writes that ARE allowed, named one at a time ----------------------------------
-# "Mein Inventar" is the first family on this vhost that accepts a write. It is NOT in the
-# read-only list above, so no carve-out is needed here - the allow-list admits the two paths and
-# every verb the backend serves on them. That is deliberate and it is the pattern for the rest of
-# phase 3: a family is either read-only-by-default (listed above, writes named as exceptions) or
-# it is a write family in its own right (admitted by path, gated by the backend's @PreAuthorize).
+# --- Which family gets which shape ---------------------------------------------------------------
+# Two shapes, and the choice is decided by what else lives under a prefix:
 #
-# Which of the two a family gets is decided by what else lives under its prefix. /personal-inventory
-# has exactly two paths and both are me-scoped, so the prefix carries nothing that must stay out.
-# /missions does: PUT /missions/<uuid> edits an Einsatz for everyone, and phase 3 opens only the
-# signup and check-in beneath it - those get named exceptions and the family stays read-only.
+#   * a WRITE FAMILY - admitted by path, every verb allowed, gated by the backend's @PreAuthorize.
+#     /personal-inventory and /personal-blueprints are these: two me-scoped paths each, and nothing
+#     else under the prefix that has to stay out.
+#   * a READ-ONLY FAMILY with named exceptions - listed in the guard above, writes cleared one path
+#     at a time. /hangar is this, because its prefix also carries the admin surface and the imports.
+#
+# /missions will be the second of the two: PUT /missions/<uuid> edits an Einsatz for everyone, and
+# phase 3 opens only the signup and check-in beneath it.
 
 # --- Actuator: second layer --------------------------------------------------
 # The backend already serves no Actuator on 11261 since ADR-0134 (it moved to the internal-only
@@ -474,6 +493,10 @@ The safe order, and the reason for it:
    | `/api/v1/personal-blueprints/<uuid>`                  | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
    | `/api/v1/personal-blueprints/craftability`            | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/blueprints/products/search`                  | **401**                                                             | `isAuthenticated()`                                                                                      |
+   | `/api/v1/hangar/ships`                                | **401**                                                             | me-scoped; POST likewise                                                                                 |
+   | `/api/v1/hangar/ships/<uuid>`                         | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
+   | `/api/v1/ship-types`                                  | **200**                                                             | anonymous by design: `permitAll` game data the public web frontend already renders (REQ-SEC-037)         |
+   | `/api/v1/locations/home-locations`                    | **403**                                                             | `permitAll` chain + method guard — refused at the method seam, like the Finanzen paths                   |
    | `/api/v1/org-units/bank/accounts/<uuid>/transactions` | **401**                                                             | same                                                                                                     |
    | `/api/v1/hangar/my-ships`                             | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/hangar/squadron-overview`                    | **401**                                                             | scoped to the active org unit                                                                            |
@@ -727,20 +750,27 @@ merge order, so the block can be reviewed against this list rather than diffed b
 | Mein Inventar | `/api/v1/uex/locations/search`                                                   | GET                    |
 | Blueprints    | `/api/v1/personal-blueprints`, `/api/v1/personal-blueprints/<uuid>`              | GET, POST, PUT, DELETE |
 | Blueprints    | `/api/v1/personal-blueprints/craftability`, `/api/v1/blueprints/products/search` | GET                    |
+| Hangar        | `/api/v1/hangar/ships`, `/api/v1/hangar/ships/<uuid>`                            | POST, PUT, DELETE      |
+| Hangar        | `/api/v1/ship-types`, `/api/v1/locations/home-locations`                         | GET                    |
 
 ### What to expect afterwards
 
 Anonymously, from outside the host — the same shape as Phase H's check:
 
-|                    Path                    | Without a token |
-|--------------------------------------------|-----------------|
-| `/api/v1/personal-inventory`               | **401**         |
-| `/api/v1/personal-inventory/<uuid>`        | **401**         |
-| `/api/v1/uex/locations/search`             | **401**         |
-| `/api/v1/personal-blueprints`              | **401**         |
-| `/api/v1/personal-blueprints/<uuid>`       | **401**         |
-| `/api/v1/personal-blueprints/craftability` | **401**         |
-| `/api/v1/blueprints/products/search`       | **401**         |
+|                    Path                    |                Without a token                 |
+|--------------------------------------------|------------------------------------------------|
+| `/api/v1/personal-inventory`               | **401**                                        |
+| `/api/v1/personal-inventory/<uuid>`        | **401**                                        |
+| `/api/v1/uex/locations/search`             | **401**                                        |
+| `/api/v1/personal-blueprints`              | **401**                                        |
+| `/api/v1/personal-blueprints/<uuid>`       | **401**                                        |
+| `/api/v1/personal-blueprints/craftability` | **401**                                        |
+| `/api/v1/blueprints/products/search`       | **401**                                        |
+| `/api/v1/hangar/ships`                     | **401**                                        |
+| `/api/v1/hangar/ships/<uuid>`              | **401**                                        |
+| `/api/v1/ship-types`                       | **200** — anonymous by design, see REQ-SEC-037 |
+| `/api/v1/locations/home-locations`         | **403** — method-seam refusal, not a `401`     |
+| `POST /api/v1/hangar/import/fleetview`     | **405** — still refused, and that is the point |
 
 A **405** on any of these would be the read-only guard swallowing a write the phase is supposed to
 open: `/personal-inventory` and `/personal-blueprints` must NOT be in the guard's family list, while
