@@ -287,10 +287,61 @@ class ApiVhostAnonymousSurfaceTest {
    *
    * @throws Exception if the request could not be performed
    */
+  /**
+   * The catalogues phase 3 admits, and what an anonymous caller gets from each.
+   *
+   * <p>All three are {@code permitAll} game data the public web frontend already renders without a
+   * session — hull names, material names with their units, place names. Recorded per path rather
+   * than as a family, because REQ-SEC-037 asks for the anonymous surface to be enumerated and a
+   * family is not an enumeration.
+   *
+   * @param path the allow-listed catalogue read
+   * @throws Exception if the request could not be performed
+   */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {"/api/v1/ship-types", "/api/v1/materials/search", "/api/v1/locations/search"})
+  @WithAnonymousUser
+  void shouldServeTheCataloguesAnonymously(String path) throws Exception {
+    mockMvc.perform(get(path)).andExpect(status().isOk());
+  }
+
+  /**
+   * The member search is <strong>not</strong> a catalogue.
+   *
+   * <p>It answers with member records, so it is the one picker on the booking form an anonymous
+   * caller may not read.
+   *
+   * @throws Exception if the request could not be performed
+   */
   @Test
   @WithAnonymousUser
-  void shouldServeTheShipTypeCatalogueAnonymously() throws Exception {
-    mockMvc.perform(get("/api/v1/ship-types")).andExpect(status().isOk());
+  void shouldRefuseAnonymousMemberSearch() throws Exception {
+    mockMvc.perform(get("/api/v1/users/search")).andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The Lager's bookings, refused without a token.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousInventoryWritesWithUnauthorized() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/inventory")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":1,\"locationId\":\"" + ABSENT_OPERATION + "\"}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/inventory/" + ABSENT_OPERATION + "/book-out")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":1,\"version\":0}"))
+        .andExpect(status().isUnauthorized());
   }
 
   /**

@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Die Lager-Buchungen der App sind freigegeben und eingefroren.** Einbuchen, Ausbuchen (verwerfen, übergeben, verkaufen), persönlich→geteilt umbuchen und die Notiz, dazu die vier Auswahllisten dahinter. Die Sammel-Endpunkte und die Alle-Mitglieder-Liste bleiben ausgeschlossen (REQ-API-009, REQ-SEC-037).
+
 - **Der Hangar der App darf schreiben.** Eigene Schiffe anlegen, ändern und löschen sind am API-vhost freigegeben und eingefroren, dazu die beiden Auswahllisten (Schiffstypen, Heimatorte). Die Importe und die Admin-Sicht auf fremde Hangars bleiben ausgeschlossen (REQ-API-009, REQ-SEC-037).
 
 - **Die Blueprints der App sind am API-vhost freigegeben und eingefroren.** Eigene Blueprints lesen, hinzufügen, Notiz ändern und löschen, dazu die Baubarkeits-Abfrage und die Produktsuche dahinter. Der Datei-Import bleibt Phase 4 (REQ-API-009).
