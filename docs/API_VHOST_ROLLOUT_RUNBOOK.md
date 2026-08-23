@@ -385,6 +385,11 @@ if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a
 # Phase 4: the app's live-sync bridge (ADR-0143, REQ-FE-019). Two paths and no prefix wildcard --
 # `live-sync` is NOT in the read-only family list below, so the POST is admitted by being named
 # here and nothing else under the stem is reachable at all.
+# Phase 4: Beforderung. Two me-scoped reads and no id in either path, so no uuid group is needed
+# -- and `promotion` is NOT in the read-only family list, which is safe here because these two are
+# the only paths of that stem this vhost admits at all.
+if ($uri = "/api/v1/promotion/evaluations/my") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/promotion/eligibility/my") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/live-sync/stream") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/live-sync/changed") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/personal-inventory") { set $krt_api_allowed 1; }
@@ -960,10 +965,11 @@ it.
 
 ### What the paste must contain
 
-|   Slice   |            Paths            |   Verbs   |
-|-----------|-----------------------------|-----------|
-| Live-Sync | `/api/v1/live-sync/stream`  | GET (SSE) |
-| Live-Sync | `/api/v1/live-sync/changed` | POST      |
+|    Slice    |                                 Paths                                  |   Verbs   |
+|-------------|------------------------------------------------------------------------|-----------|
+| Beförderung | `/api/v1/promotion/evaluations/my`, `/api/v1/promotion/eligibility/my` | GET       |
+| Live-Sync   | `/api/v1/live-sync/stream`                                             | GET (SSE) |
+| Live-Sync   | `/api/v1/live-sync/changed`                                            | POST      |
 
 `live-sync` is deliberately **not** in the read-only family list, so it needs no carve-out: the two
 paths are admitted by being named, and nothing else under the stem is reachable at all. That is the
@@ -972,10 +978,12 @@ two endpoints rather than a surface with an admin half hiding in it.
 
 ### What to expect afterwards
 
-|               Path               | Anonymous status |
-|----------------------------------|------------------|
-| `GET /api/v1/live-sync/stream`   | **401**          |
-| `POST /api/v1/live-sync/changed` | **401**          |
+|                  Path                  | Anonymous status |
+|----------------------------------------|------------------|
+| `GET /api/v1/promotion/evaluations/my` | **401**          |
+| `GET /api/v1/promotion/eligibility/my` | **401**          |
+| `GET /api/v1/live-sync/stream`         | **401**          |
+| `POST /api/v1/live-sync/changed`       | **401**          |
 
 Two things worth knowing before reading a result. The stream answers `403`, not `401`, for an
 *authenticated* caller none of whose topics were accepted — the caller authenticated fine, they
