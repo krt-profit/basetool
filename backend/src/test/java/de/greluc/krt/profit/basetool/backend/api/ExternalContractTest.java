@@ -69,13 +69,29 @@ class ExternalContractTest {
   private static final int MAX_NESTING = 2;
 
   /**
-   * One frozen operation: path, verb, and the response fields a shipped client may rely on.
+   * One frozen operation: path, verb, the response fields a shipped client may rely on, and — for a
+   * write — the request fields the server may demand of it.
    *
    * @param path the {@code /api/v1} path exactly as it appears in the document
    * @param method the HTTP verb, lower case, as OpenAPI spells it
    * @param responseFields response properties that must keep existing; additive change is fine
+   * @param requiredRequestFields the request body's {@code required} list, frozen exactly. Empty
+   *     for an operation with no request body, and for one whose body is entirely optional
    */
-  private record ContractOperation(String path, String method, Set<String> responseFields) {}
+  private record ContractOperation(
+      String path, String method, Set<String> responseFields, Set<String> requiredRequestFields) {
+
+    /**
+     * A read, or a write whose request body carries no required field.
+     *
+     * @param path the {@code /api/v1} path
+     * @param method the HTTP verb, lower case
+     * @param responseFields the frozen response properties
+     */
+    ContractOperation(String path, String method, Set<String> responseFields) {
+      this(path, method, responseFields, Set.of());
+    }
+  }
 
   /**
    * The contract set: the app's phase 1 (auth, terms gate, pending-approval screen, settings) plus
@@ -413,7 +429,65 @@ class ExternalContractTest {
                   "shareAmount",
                   "donatedAmount",
                   "payoutAmount",
-                  "paidOut")));
+                  "paidOut")),
+          // Phase 3, "Mein Inventar" — the first WRITES in the contract set, and the reason the
+          // request-side guard above exists. A member's personal stock is theirs alone: the list
+          // is me-scoped by the service, so no id of anyone else appears in these paths.
+          new ContractOperation(
+              "/api/v1/personal-inventory",
+              "get",
+              Set.of(
+                  "content",
+                  "page",
+                  "totalElements",
+                  "totalPages",
+                  "id",
+                  "name",
+                  "note",
+                  "locationUexId",
+                  "locationType",
+                  "locationName",
+                  "quantity",
+                  "version")),
+          // `locationName` is frozen although the create/update pair does not send it: it is
+          // resolved server-side from the UEX id, and it is the only human-readable form of the
+          // place the member picked. Without it a row can only show a number.
+          new ContractOperation(
+              "/api/v1/personal-inventory",
+              "post",
+              Set.of("id", "name", "quantity", "locationUexId", "locationType", "version"),
+              Set.of("name", "quantity", "locationUexId", "locationType")),
+          new ContractOperation(
+              "/api/v1/personal-inventory/{id}",
+              "get",
+              Set.of(
+                  "id",
+                  "name",
+                  "note",
+                  "locationUexId",
+                  "locationType",
+                  "locationName",
+                  "quantity",
+                  "version")),
+          // `version` is required on the update and on nothing else. It is the optimistic lock:
+          // the client echoes what it read, and a concurrent edit answers 409 instead of
+          // overwriting. A future field added to this body must be optional, or every build in
+          // the field starts failing its saves.
+          new ContractOperation(
+              "/api/v1/personal-inventory/{id}",
+              "put",
+              Set.of("id", "name", "quantity", "locationUexId", "locationType", "version"),
+              Set.of("name", "quantity", "locationUexId", "locationType", "version")),
+          // The delete answers 204 with no body, so there is nothing to freeze but the path and
+          // the verb — which is exactly what an old build needs to keep working.
+          new ContractOperation("/api/v1/personal-inventory/{id}", "delete", Set.of()),
+          // The location picker behind the editor. Cities and space stations in one search, keyed
+          // by the UEX id the two write bodies send. `type` is frozen because it IS the
+          // `locationType` half of that pair — the row carries both halves of what gets saved.
+          new ContractOperation(
+              "/api/v1/uex/locations/search",
+              "get",
+              Set.of("uexId", "type", "name", "starSystemName", "parentName")));
 
   /**
    * Enum constants a shipped client cannot survive a change to, keyed {@code Schema.property}.
@@ -602,6 +676,59 @@ class ExternalContractTest {
               operation.method().toUpperCase(java.util.Locale.ROOT), operation.path())
           .containsAll(operation.responseFields());
     }
+  }
+
+  @Test
+  @DisplayName("no contract request has gained a field an old build does not send")
+  void theContractRequestsKeepTheirRequiredFields() throws IOException {
+    // The mirror image of the response guard, and the half that only matters from phase 3 on: a
+    // *new* required request field is a 400 for every build already in the field, which sends the
+    // payload it was written against. Removing one is safe (the old build keeps sending it), so
+    // this asserts equality in one direction only — nothing added.
+    JsonNode document = openapi();
+
+    for (ContractOperation operation : CONTRACT) {
+      Set<String> required = requiredRequestFields(document, operation);
+      assertThat(required)
+          .as(
+              "%s %s requires a request field the recorded contract does not. A shipped app cannot"
+                  + " learn to send it; add the field as optional, or version the endpoint"
+                  + " (REQ-API-009, ADR-0136)",
+              operation.method().toUpperCase(java.util.Locale.ROOT), operation.path())
+          .containsExactlyInAnyOrderElementsOf(operation.requiredRequestFields());
+    }
+  }
+
+  /**
+   * Reads the {@code required} list of an operation's request body schema.
+   *
+   * <p>Follows the {@code $ref} of the first media type declared, which is how springdoc emits a
+   * single-body operation. An operation with no request body answers an empty set, so a read entry
+   * needs no special case.
+   *
+   * @param document the parsed API document
+   * @param operation the contract operation to resolve
+   * @return the required property names, empty when there is no body or nothing is required
+   */
+  private static Set<String> requiredRequestFields(JsonNode document, ContractOperation operation) {
+    JsonNode body =
+        document.get("paths").get(operation.path()).get(operation.method()).get("requestBody");
+    if (body == null) {
+      return Set.of();
+    }
+    JsonNode content = body.get("content");
+    if (content == null || !content.properties().iterator().hasNext()) {
+      return Set.of();
+    }
+    JsonNode schema = content.properties().iterator().next().getValue().get("schema");
+    String name = schemaName(schema);
+    JsonNode resolved = name == null ? schema : document.get("components").get("schemas").get(name);
+    JsonNode required = resolved == null ? null : resolved.get("required");
+    Set<String> fields = new TreeSet<>();
+    if (required != null) {
+      required.forEach(entry -> fields.add(entry.asString()));
+    }
+    return fields;
   }
 
   @Test

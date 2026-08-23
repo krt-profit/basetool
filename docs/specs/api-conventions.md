@@ -261,6 +261,28 @@ constraint for nothing and record a guess about which fields matter.
 | `GET /api/v1/notifications/unread-count`                   | `count`                                                                                                                                                                                                                                                                                                                                     |
 | `GET /api/v1/notifications/stream`                         | *(a stream, not a schema — the frozen part is the path, the verb and the event names)*                                                                                                                                                                                                                                                      |
 | `GET /api/v1/operations/{id}/payouts`                      | `totalDonations`; row `participantId`, `participantName`, `payoutPreference`, `shareAmount`, `donatedAmount`, `payoutAmount`, `paidOut`                                                                                                                                                                                                     |
+| `GET /api/v1/personal-inventory`                           | envelope; row `id`, `name`, `note`, `locationUexId`, `locationType`, `locationName`, `quantity`, `version`                                                                                                                                                                                                                                  |
+| `POST /api/v1/personal-inventory`                          | `id`, `name`, `quantity`, `locationUexId`, `locationType`, `version` — **request** requires `name`, `quantity`, `locationUexId`, `locationType`                                                                                                                                                                                             |
+| `GET /api/v1/personal-inventory/{id}`                      | as the list row                                                                                                                                                                                                                                                                                                                             |
+| `PUT /api/v1/personal-inventory/{id}`                      | as the create — **request** additionally requires `version`                                                                                                                                                                                                                                                                                 |
+| `DELETE /api/v1/personal-inventory/{id}`                   | *(204, no body — the frozen part is the path and the verb)*                                                                                                                                                                                                                                                                                 |
+| `GET /api/v1/uex/locations/search`                         | `uexId`, `type`, `name`, `starSystemName`, `parentName`                                                                                                                                                                                                                                                                                     |
+
+**Frozen has a request side, and phase 3 is where it starts to bite.** A write operation in the set
+may not gain a **required** request field. An old build sends the payload it was written against, so
+a new `required` entry turns every one of its saves into a `400` — the same class of break as a
+dropped response field, arriving through the other direction. Making a required field optional is
+safe (the old build keeps sending it), which is why `ExternalContractTest` asserts the `required`
+list exactly rather than as a subset: adding is the break, removing is not. A field that genuinely
+must be mandatory goes to `/api/v2`.
+
+`PUT /api/v1/personal-inventory/{id}` requires `version` and is the first entry to record that: it
+is the optimistic lock, echoed from the read, and a concurrent edit answers `409 OPTIMISTIC_LOCK`
+instead of overwriting. `POST` has no `version` because there is nothing yet to conflict with.
+
+`GET /api/v1/uex/locations/search` is in the set as the picker behind that editor, and `type` is
+frozen for a reason worth naming: it is not decoration but the `locationType` half of what the write
+body sends, so the row carries both halves of the saved value.
 
 `GET /api/v1/users/me` is frozen for a single field. An Operation's payout rows are keyed by the
 **backend user id** — not the Keycloak `sub` the app holds, and not a display name, which is

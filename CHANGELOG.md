@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Die App darf jetzt schreiben — der erste Schritt.** „Mein Inventar" (eigener Bestand: anlegen, ändern, löschen) ist am API-vhost freigegeben und im eingefrorenen Client-Vertrag festgehalten. Freigeschaltet wird der Weg zur Produktion gesammelt am Ende von Phase 3 (Runbook, Phase I).
+
+- **Der Vertragstest prüft jetzt auch die Anfrageseite.** Ein Pflichtfeld, das eine Schreib-Schnittstelle neu verlangt, ist für jede bereits ausgelieferte App ein 400 — der Test lässt das nicht mehr durch (REQ-API-009, ADR-0136).
+
 ### Changed
 
 - **Die SpotBugs-Gradle-Plugin-Version wurde auf 6.5.11 angehoben.** Reiner Bugfix-Bump ohne bekannte Sicherheitslücke, im Rahmen des routinemäßigen Abhängigkeits-Audits.
