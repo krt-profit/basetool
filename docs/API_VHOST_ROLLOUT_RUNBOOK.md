@@ -986,6 +986,50 @@ path tells you the allow-list matched and nothing else.
 A **404** on either path means the block was never pasted, which is the failure with no other
 signal — the app keeps working and simply never goes live.
 
+### Doing it — step by step
+
+Everything below runs on the production host and is yours to execute; nothing in this repo reaches
+that host. The steps are Phase I's, because the block is the same block — if you have not applied
+Phase I yet, doing this once covers both.
+
+1. **Open the vhost's Advanced tab.** Nginx Proxy Manager → *Hosts → Proxy Hosts* →
+   `api.profit-base.online` → *Advanced*.
+
+2. **Replace the whole custom-configuration block** with § D.3 of this document as it stands after
+   the last phase-4 PR. Not a merge of the old and the new: the block is written to be pasted
+   whole, and hand-merging is how the read-only guard ends up with two `set $krt_readonly_family ""`
+   lines that disagree.
+
+3. **Save.** NPM tests the configuration before writing it, so a syntax error is refused here rather
+   than taking the vhost down. If it refuses, nothing changed and the old block is still live.
+
+4. **Check the two new paths from your own shell.** The stream needs its `topics` parameter — a
+   bare probe of the path answers `400` even with a valid token and tells you only that the
+   allow-list matched:
+
+   ```powershell
+   foreach ($p in '/api/v1/live-sync/stream?topics=inventory','/api/v1/live-sync/changed') { '{0,-52} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' "https://api.profit-base.online$p") }
+   ```
+
+   Expected: `401` for both. A `404` means the block was never pasted — the failure with no other
+   signal, because the app keeps working and simply never goes live.
+
+5. **Check that phase 2's and phase 3's paths still answer as they did**, since you replaced the
+   whole block:
+
+   ```powershell
+   foreach ($p in '/api/v1/personal-inventory','/api/v1/hangar/ships','/api/v1/inventory','/api/v1/finance-entries','/api/v1/ship-types','/api/v1/materials/search') { '{0,-40} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' "https://api.profit-base.online$p") }
+   ```
+
+   Expected: `401` for the first four, `200` for the last two.
+
+6. **Run the probe once by hand** rather than waiting for the night:
+   *Actions → Edge deny probe → Run workflow*. It must come back green.
+
+If step 4 or 5 disagrees, put the previous block back — it is in this file's git history — and say
+what you saw. Nothing breaks while the old block is live: the phase-4 paths simply stay unreachable
+from outside, which is where they have been all along.
+
 ## Phase G — flip the audience enforcement (D5, release gate)
 
 **This gate must close before the app is released**, not later. Until it is flipped, the backend
