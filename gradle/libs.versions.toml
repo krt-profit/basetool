@@ -16,6 +16,7 @@ owasp-dependencycheck = { id = "org.owasp.dependencycheck", version.ref = "owasp
 [versions]
 
 springBoot = "4.1.1"
+##      ⬆ = "4.2.0-M1"
 springDependencyManagement = "1.1.7"
 cyclonedx = "3.4.1"
 testcontainers = "2.0.5"
