@@ -957,6 +957,14 @@ statuses in the table below; nothing is pasted until the last one is merged, and
 gains its rows in the same PR as the paste instruction so it never reports a state nobody intends to
 fix yet.
 
+**The owner confirmed this on 2026-08-24, with the probe already red.** It was asked directly --
+paste phase I now and get a green run tonight, or hold for one paste -- and the answer was to hold.
+So the nightly `edge-deny-probe` reports 23 phase-3 paths answering `404` where it lists `401`, and
+**that is the correct reading of production, not a defect**: those paths have never been admitted to
+the vhost. Do not investigate that run again, do not "fix" it in the repo, and do not silence the
+block -- the fix is the paste below, and it happens when phase 4 closes. Anything failing that is
+*not* in the phase-3 list is a different matter and does deserve stopping for.
+
 **If Phase I has not been applied yet, apply it after this phase closes and it covers both.** The
 § D.3 block is pasted *whole*, so the copy in this repo is always the complete current intent —
 phase 2's reads, phase 3's writes and phase 4's paths together. If Phase I has already been applied,
