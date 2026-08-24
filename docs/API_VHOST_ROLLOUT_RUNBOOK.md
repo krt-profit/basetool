@@ -341,12 +341,19 @@ if ($uri = "/api/v1/operations/search") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/finance-summary$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/payouts$") { set $krt_api_allowed 1; }
-# Phase 2 - the notification inbox, its badge count and its push stream. EXACT paths: the
-# family's mutating half (`/read-all`, `/read`, `/{id}`, `/{id}/read`) is a POST and two
-# DELETEs, and the read-only guard below refuses them by verb as well.
+# Phase 2 - the notification inbox, its badge count and its push stream. EXACT paths.
 if ($uri = "/api/v1/notifications") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/notifications/unread-count") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/notifications/stream") { set $krt_api_allowed 1; }
+# Phase 5 - the inbox's mutating half, which phase 2 deliberately left off this list. All four
+# are me-scoped: the backend resolves the caller's own notifications and a member cannot name
+# somebody else's row. `/read-all` and `/read` are literal segments beside `{id}`, which is a
+# [0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12} - they cannot collide, so naming the three by name does not admit the family.
+# Each one ALSO needs the carve-out below: this list matches on the path and cannot see the verb.
+if ($uri = "/api/v1/notifications/read-all") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/notifications/read") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/notifications/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/notifications/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/read$") { set $krt_api_allowed 1; }
 # Phase 2 - the dashboard's announcement band. EXACT path: /api/v1/announcement/admin is
 # the admin read of the same row and /api/v1/announcement itself also answers PUT, so a
 # prefix would carry both onto a vhost that exists to keep them off it.
@@ -486,6 +493,14 @@ if ($uri ~ "^/api/v1/inventory/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9
 # Logistician edit surface. Only the assignee edge and the status change are named.
 if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/assignees/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(/note)?$") { set $krt_readonly_family ""; }
 if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/status$") { set $krt_readonly_family ""; }
+# /notifications stays in the family because the prefix also carries /notification-rules, the
+# admin surface that creates and deletes the rules every member's inbox is generated from. Only
+# the four me-scoped inbox mutations are named. Naming a path opens every verb the backend serves
+# on it, which for `/{id}` is GET and DELETE and for the other three is exactly one POST or DELETE.
+if ($uri = "/api/v1/notifications/read-all") { set $krt_readonly_family ""; }
+if ($uri = "/api/v1/notifications/read") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/notifications/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/notifications/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/read$") { set $krt_readonly_family ""; }
 # /missions stays in the family because the prefix carries the whole planning surface - units,
 # crews, steps, objectives, the mission itself. Only the caller's own participation is named.
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/join$") { set $krt_readonly_family ""; }
@@ -622,6 +637,11 @@ The safe order, and the reason for it:
    | `/api/v1/notifications`                               | **401**                                                             | me-scoped inbox                                                                                          |
    | `/api/v1/notifications/unread-count`                  | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/notifications/stream`                        | **401**                                                             | me-scoped SSE                                                                                            |
+   | `/api/v1/notifications/read-all`                      | **401**                                                             | me-scoped write; POST only, phase 5                                                                      |
+   | `/api/v1/notifications/read`                          | **401**                                                             | me-scoped write; DELETE only, phase 5                                                                    |
+   | `/api/v1/notifications/<uuid>`                        | **401**                                                             | me-scoped; GET + DELETE, phase 5                                                                         |
+   | `/api/v1/notifications/<uuid>/read`                   | **401**                                                             | me-scoped write; POST only, phase 5                                                                      |
+   | `/api/v1/notification-rules`                          | **404**                                                             | admin surface, NOT admitted — the four rows above must not have widened the prefix                       |
    | `/api/v1/users/me`                                    | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/users/me/registration-status`                | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/users/me/memberships`                        | **401**                                                             | me-scoped                                                                                                |

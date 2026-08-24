@@ -549,6 +549,26 @@ class ExternalContractTest {
           // `replaced`) are the real contract and are pinned in the app's spec, since nothing in
           // this document describes them.
           new ContractOperation("/api/v1/notifications/stream", "get", Set.of()),
+          // Phase 5, the inbox's mutating half. The app shipped a read-only inbox because these
+          // four were "Phase 3" work that phase 3 never picked up; design chapter 07 specifies a
+          // fully interactive one, so the deferral was a defect rather than a decision.
+          //
+          // Only the DELETE of a single row is a 204. The other three answer with a body, and
+          // `unreadCount` on the two bulk results is the field worth freezing hardest: it is what
+          // lets the badge settle from the same response that changed it. Without it the app would
+          // have to follow every bulk action with a second call to `/unread-count`, and the badge
+          // would disagree with the list for as long as that took.
+          //
+          // `/read` and `/read-all` are literal segments sitting beside `{id}`, which is a UUID --
+          // they cannot collide, and the vhost allow-list relies on exactly that to admit the
+          // three by name without admitting the family or the `/notification-rules` admin surface
+          // next to it.
+          new ContractOperation("/api/v1/notifications/{id}/read", "post", Set.of("id", "read")),
+          new ContractOperation(
+              "/api/v1/notifications/read-all", "post", Set.of("affected", "unreadCount")),
+          new ContractOperation("/api/v1/notifications/{id}", "delete", Set.of()),
+          new ContractOperation(
+              "/api/v1/notifications/read", "delete", Set.of("affected", "unreadCount")),
           // Phase 2, the caller's own record. The app needs two fields of it. Its own backend user
           // id: an Operation's payout rows are keyed by that id -- not by the Keycloak `sub` the
           // app holds, and not by a name -- so "Dein Anteil" cannot be found without it, and

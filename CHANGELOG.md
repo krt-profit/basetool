@@ -4,6 +4,8 @@
 
 ### Added
 
+
+- **Die App darf Benachrichtigungen jetzt auch als gelesen markieren und löschen.** Die vier dafür nötigen Endpunkte sind im eingefrorenen App-Vertrag und auf der API-vhost-Allow-List ergänzt; der Posteingang der App war bis jetzt nur lesend (REQ-API-009).
 - **Raffinerie und Materialbörse sind für die App freigegeben und eingefroren.** Die eigenen Raffinerie-Orders samt Einlagern, dazu Angebote, Gesuche, „Ich kann liefern", Zurückziehen und die beiden Erstellen-Wege. Die Logistik-Sichten der Raffinerie und die Item-Anlage der Börse bleiben ausgeschlossen (REQ-API-009, REQ-SEC-037).
 
 - **Der Server kann jetzt sagen, welche App-Versionen er noch bedient.** Ein neuer Endpunkt nennt die älteste noch unterstützte App-Version; eine ältere App zeigt daraufhin selbst „Update erforderlich" statt an einer Schnittstelle zu scheitern, die es nicht mehr gibt. Voreingestellt ist keine Untergrenze — ein nicht konfigurierter Server sperrt niemanden aus. Der Endpunkt antwortet bewusst ohne Anmeldung, weil eine App, die sich nicht mehr anmelden kann, sonst nie erfährt, warum (REQ-API-010, REQ-SEC-037).
