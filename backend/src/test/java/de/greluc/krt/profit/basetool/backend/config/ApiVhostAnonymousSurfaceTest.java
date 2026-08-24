@@ -267,6 +267,82 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * Phase 4's Raffinerie reads and its booking are refused without a token (REQ-SEC-037).
+   *
+   * <p>All three are {@code hasRole(KRT_MEMBER)}, and the booking is the one that would matter most
+   * if it were not: it creates Lager entries and marks an order stored, and the endpoint does so
+   * whatever its item list contains.
+   *
+   * @param path the allow-listed refinery path
+   * @throws Exception if the request could not be performed
+   */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "/api/v1/refinery-orders/my-orders",
+        "/api/v1/refinery-orders/00000000-0000-4000-8000-00000000cafe"
+      })
+  @WithAnonymousUser
+  void shouldRefuseAnonymousRefineryReadsWithUnauthorized(String path) throws Exception {
+    mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The booking write, refused before it can create anything.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousRefineryStoreWithUnauthorized() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/refinery-orders/00000000-0000-4000-8000-00000000cafe/store")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"items\":[]}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The Materialbörse's four reads are refused without a token (REQ-SEC-037).
+   *
+   * <p>{@code releasable-items} is the sharpest of them: it answers with the <em>caller's own</em>
+   * Lager stacks, so an anonymous {@code 200} would be a different order of leak from an empty
+   * board.
+   *
+   * @param path the allow-listed board path
+   * @throws Exception if the request could not be performed
+   */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "/api/v1/material-exchange/offers",
+        "/api/v1/material-exchange/releasable-items",
+        "/api/v1/material-requests"
+      })
+  @WithAnonymousUser
+  void shouldRefuseAnonymousBoardReadsWithUnauthorized(String path) throws Exception {
+    mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The board's pledge write is refused too — the one path on which an ordinary member makes an
+   * entry of somebody else's carry their name.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousBoardInterestWithUnauthorized() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/material-exchange/offers/00000000-0000-4000-8000-00000000cafe/interest")
+                .with(csrf()))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
    * The served-version floor answers {@code 200} <em>without</em> a token, and that is the point.
    *
    * <p>It is the one anonymous path the API vhost admits (owner decision, 2026-08-24), against a

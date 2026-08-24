@@ -395,6 +395,22 @@ if ($uri = "/api/v1/promotion/eligibility/my") { set $krt_api_allowed 1; }
 # still be able to learn that it is too old. It answers 200 without a token BY DESIGN; a 401 here
 # is the broken state, not the hardened one.
 if ($uri = "/api/v1/app/version-policy") { set $krt_api_allowed 1; }
+# Phase 4: Raffinerie. `refinery-orders` is NOT in the read-only family list, so the booking POST
+# is admitted by being named and nothing else under the stem -- not /all, not /users/<id>, not the
+# create -- is reachable at all. That is the same choice `live-sync` made, and it is available here
+# for the same reason: the app touches three of that controller's eleven paths.
+if ($uri = "/api/v1/refinery-orders/my-orders") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/refinery-orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/refinery-orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/store$") { set $krt_api_allowed 1; }
+# Phase 4: Materialboerse. Same stance -- neither `material-exchange` nor `material-requests` is a
+# read-only family, so every write below is admitted by name. The item creates (/item-offers,
+# /material-requests/item) are deliberately NOT here: the app cannot send a P4K productKey and has
+# no picker for one.
+if ($uri = "/api/v1/material-exchange/offers") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/material-exchange/releasable-items") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/material-exchange/offers/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(interest|deactivate)$") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/material-requests") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/material-requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(interest|deactivate)$") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/live-sync/stream") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/live-sync/changed") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/personal-inventory") { set $krt_api_allowed 1; }
@@ -978,12 +994,18 @@ it.
 
 ### What the paste must contain
 
-|    Slice    |                                 Paths                                  |   Verbs   |
-|-------------|------------------------------------------------------------------------|-----------|
-| Beförderung | `/api/v1/promotion/evaluations/my`, `/api/v1/promotion/eligibility/my` | GET       |
-| Live-Sync   | `/api/v1/live-sync/stream`                                             | GET (SSE) |
-| Live-Sync   | `/api/v1/live-sync/changed`                                            | POST      |
-| App-Gate    | `/api/v1/app/version-policy`                                           | GET       |
+|    Slice    |                                 Paths                                  |    Verbs     |
+|-------------|------------------------------------------------------------------------|--------------|
+| Beförderung | `/api/v1/promotion/evaluations/my`, `/api/v1/promotion/eligibility/my` | GET          |
+| Live-Sync   | `/api/v1/live-sync/stream`                                             | GET (SSE)    |
+| Live-Sync   | `/api/v1/live-sync/changed`                                            | POST         |
+| App-Gate    | `/api/v1/app/version-policy`                                           | GET          |
+| Raffinerie  | `/api/v1/refinery-orders/my-orders`, `/<uuid>`                         | GET          |
+| Raffinerie  | `/api/v1/refinery-orders/<uuid>/store`                                 | POST         |
+| Börse       | `/api/v1/material-exchange/offers`, `/material-requests`               | GET, POST    |
+| Börse       | `/api/v1/material-exchange/releasable-items`                           | GET          |
+| Börse       | `…/offers/<uuid>/interest`, `…/material-requests/<uuid>/interest`      | POST, DELETE |
+| Börse       | `…/offers/<uuid>/deactivate`, `…/material-requests/<uuid>/deactivate`  | POST         |
 
 `live-sync` is deliberately **not** in the read-only family list, so it needs no carve-out: the two
 paths are admitted by being named, and nothing else under the stem is reachable at all. That is the
@@ -992,13 +1014,17 @@ two endpoints rather than a surface with an admin half hiding in it.
 
 ### What to expect afterwards
 
-|                  Path                  | Anonymous status |
-|----------------------------------------|------------------|
-| `GET /api/v1/promotion/evaluations/my` | **401**          |
-| `GET /api/v1/promotion/eligibility/my` | **401**          |
-| `GET /api/v1/live-sync/stream`         | **401**          |
-| `POST /api/v1/live-sync/changed`       | **401**          |
-| `GET /api/v1/app/version-policy`       | **200**          |
+|                       Path                       | Anonymous status |
+|--------------------------------------------------|------------------|
+| `GET /api/v1/promotion/evaluations/my`           | **401**          |
+| `GET /api/v1/promotion/eligibility/my`           | **401**          |
+| `GET /api/v1/live-sync/stream`                   | **401**          |
+| `POST /api/v1/live-sync/changed`                 | **401**          |
+| `GET /api/v1/app/version-policy`                 | **200**          |
+| `GET /api/v1/refinery-orders/my-orders`          | **401**          |
+| `GET /api/v1/material-exchange/offers`           | **401**          |
+| `GET /api/v1/material-requests`                  | **401**          |
+| `GET /api/v1/material-exchange/releasable-items` | **401**          |
 
 **The `200` in that table is not a typo and not a finding.** `version-policy` is the single
 anonymous path this vhost admits (REQ-SEC-037), and a `401` there would mean the gate is broken:
@@ -1036,13 +1062,13 @@ Phase I yet, doing this once covers both.
    allow-list matched:
 
    ```powershell
-   foreach ($p in '/api/v1/live-sync/stream?topics=inventory','/api/v1/live-sync/changed','/api/v1/promotion/evaluations/my','/api/v1/promotion/eligibility/my','/api/v1/app/version-policy') { '{0,-52} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' "https://api.profit-base.online$p") }
+   foreach ($p in '/api/v1/live-sync/stream?topics=inventory','/api/v1/live-sync/changed','/api/v1/promotion/evaluations/my','/api/v1/promotion/eligibility/my','/api/v1/app/version-policy','/api/v1/refinery-orders/my-orders','/api/v1/material-exchange/offers','/api/v1/material-requests','/api/v1/material-exchange/releasable-items') { '{0,-52} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' "https://api.profit-base.online$p") }
    ```
 
-   Expected: `401` for the first four and **`200` for `version-policy`**, which is the one
-   anonymous path on this vhost (REQ-SEC-037) and is meant to answer without a token. A `404`
-   anywhere means the block was never pasted — the failure with no other signal, because the app
-   keeps working and simply never goes live.
+   Expected: `401` for everything except **`version-policy`, which must answer `200`** — it is
+   the one anonymous path on this vhost (REQ-SEC-037) and is meant to answer without a token. A
+   `404` anywhere means the block was never pasted — the failure with no other signal, because the
+   app keeps working and simply never goes live.
 
 5. **Check that phase 2's and phase 3's paths still answer as they did**, since you replaced the
    whole block:

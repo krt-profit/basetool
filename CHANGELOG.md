@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Raffinerie und Materialbörse sind für die App freigegeben und eingefroren.** Die eigenen Raffinerie-Orders samt Einlagern, dazu Angebote, Gesuche, „Ich kann liefern", Zurückziehen und die beiden Erstellen-Wege. Die Logistik-Sichten der Raffinerie und die Item-Anlage der Börse bleiben ausgeschlossen (REQ-API-009, REQ-SEC-037).
+
 - **Der Server kann jetzt sagen, welche App-Versionen er noch bedient.** Ein neuer Endpunkt nennt die älteste noch unterstützte App-Version; eine ältere App zeigt daraufhin selbst „Update erforderlich" statt an einer Schnittstelle zu scheitern, die es nicht mehr gibt. Voreingestellt ist keine Untergrenze — ein nicht konfigurierter Server sperrt niemanden aus. Der Endpunkt antwortet bewusst ohne Anmeldung, weil eine App, die sich nicht mehr anmelden kann, sonst nie erfährt, warum (REQ-API-010, REQ-SEC-037).
 
 - **Änderungen aus der App und aus dem Browser sehen sich jetzt gegenseitig.** Das Backend hat einen Live-Sync-Strom für die App bekommen und hängt am selben Redis-Kanal wie die Weboberfläche: eine Bearbeitung im Browser erscheint in der App ohne manuelles Neuladen, und eine Buchung in der App aktualisiert jede offene Browser-Ansicht. Vorher war beides blind füreinander. Bearbeiter-Punkte bleiben absichtlich der Weboberfläche vorbehalten (ADR-0143, REQ-FE-019).

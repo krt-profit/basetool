@@ -1794,6 +1794,13 @@ an app whose *login* is what the new contract broke, and that app would then sho
 error — telling a member their credentials are wrong when they are not. The exception is one path,
 one verb, and a body with nothing in it worth protecting.
 
+**Phase 4's two feature slices add nine paths and not one anonymous one.** The Raffinerie's three
+(`my-orders`, one order, its booking) and the Materialbörse's six all sit behind
+`hasRole(KRT_MEMBER)` and answer `401` without a token; their statuses are pinned in
+`ApiVhostAnonymousSurfaceTest` like every other allow-listed path. Two families are admitted **by
+name rather than by stem**, which is why the wider surfaces behind them stay unreachable: the app
+touches three of the refinery controller's eleven paths, and neither item-create of the board.
+
 Everything else on the list is refused without a token — the Finanzen endpoints among them
 (`isAuthenticated() and isMemberOrAbove() and canSeeMission`), which is why a mission's money is
 reachable from the app and not from the internet even though the mission itself is.
