@@ -503,7 +503,7 @@ services:
   alertmanager:
     <<: *mon-base
     container_name: alertmanager
-    image: quay.io/prometheus/alertmanager:v0.33.1
+    image: quay.io/prometheus/alertmanager:v0.34.0
     cap_drop: [ALL]
     # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 36MiB = 75% of the 48M limit;
     # measured live heap 7.7 MiB, so the ceiling is ~4.7x actual demand. Preventive, not remedial:
