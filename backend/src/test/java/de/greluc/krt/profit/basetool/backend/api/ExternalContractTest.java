@@ -852,7 +852,17 @@ class ExternalContractTest {
                   "minimumLevel",
                   "requiredCount",
                   "achievedCount",
-                  "satisfied")));
+                  "satisfied")),
+          // Phase 4, the forced-update gate. This one is in the set for an inverted reason: every
+          // other entry is frozen so a shipped app keeps working, and this is frozen so a shipped
+          // app can be told to STOP working. If the server ever renamed `minimumVersionCode`, the
+          // build that most needs the answer -- the one already too old -- would read no floor and
+          // carry on against a contract that no longer exists. It is also the operation an app
+          // calls before it has a token, so it must keep answering when everything else refuses.
+          new ContractOperation(
+              "/api/v1/app/version-policy",
+              "get",
+              Set.of("minimumVersionCode", "latestVersionCode", "releasesUrl")));
 
   /**
    * Query parameters a shipped client addresses these operations by, keyed {@code method path}.

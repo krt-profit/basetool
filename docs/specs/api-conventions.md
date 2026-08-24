@@ -305,6 +305,9 @@ constraint for nothing and record a guess about which fields matter.
 | `PUT …/bank/accounts/{id}/balance-target`                   | as the settings — **request** requires `version` only; sending no target clears it                                                                                                                                                                                                                                                          |
 | `POST`/`DELETE …/bank/accounts/{id}/visibility/role/{code}` | as the settings; addressed entirely by path, no body                                                                                                                                                                                                                                                                                        |
 | `PUT …/bank/accounts/{id}/visibility/all-members/{enabled}` | as the settings; the switch is a path segment                                                                                                                                                                                                                                                                                               |
+| `GET /api/v1/promotion/evaluations/my`                      | `categoryName`, `topicName`, `assignedLevel` — me-scoped; the level is a **field**, not a frozen enum, since the levels are the organisation's to name                                                                                                                                                                                      |
+| `GET /api/v1/promotion/eligibility/my`                      | `fromRank`, `toRank`, `eligible`, `hasConfiguredRules`, `checks`, `topicName`, `categoryName`, `minimumLevel`, `requiredCount`, `achievedCount`, `satisfied` — `hasConfiguredRules` separates "no rules exist" from "you do not meet them"                                                                                                  |
+| `GET /api/v1/app/version-policy`                            | `minimumVersionCode`, `latestVersionCode`, `releasesUrl` — **anonymous** (REQ-SEC-037); frozen so a shipped app can be told to STOP (REQ-API-010)                                                                                                                                                                                           |
 
 **Frozen has three more sides than the response body, and phase 3 is where each starts to bite.**
 
@@ -447,8 +450,57 @@ a subset of this set, and the two move together.
   an objective loses its kind badge rather than its screen, and freezing them would make the guard
   fire on harmless additions until it means nothing. Verified by adding a constant: three failures.
 - [ ] Type and nullability changes are caught. **Open** — needs a schema diff of the contract
-- [ ] A sunset can actually retire old builds. **Open** — depends on the minimum-app-version gate
-  (exposure plan item A5), which is therefore a prerequisite for the first `/api/v2`.
+- [x] A sunset can actually retire old builds — **closed by REQ-API-010** (2026-08-24). The gate
+  the first `/api/v2` was waiting on now exists: the server names a floor and the app refuses to run
+  below it. What that unblocks is narrower than "old builds are gone", and the difference matters
+  when planning a sunset — the floor stops a build from *running*, it does not remove it from
+  anyone's phone, and a member who never opens the app never learns of it.
 
 **Enforced by:** `ExternalContractTest` (backend) ·
 **Related:** ADR-0136, ADR-0135, ADR-0003, REQ-API-001, REQ-API-007, REQ-SEC-027
+
+---
+
+### REQ-API-010 — The server states which app builds it still serves
+
+A frozen contract (REQ-API-009) keeps a shipped build working. It cannot make one **stop**: when an
+operation is genuinely retired, or a defect makes a build unsafe to keep using, something has to
+tell the device. Nothing did — the sunset checkbox of REQ-API-009 sat open for exactly this reason,
+and it is why the first `/api/v2` was blocked on a gate that did not exist.
+
+`GET /api/v1/app/version-policy` answers three values: `minimumVersionCode` (the oldest build still
+served; `0` means no floor), `latestVersionCode` (the newest published, or `0` when unknown) and
+`releasesUrl`. The app compares its own `versionCode` against the floor and, below it, shows the
+non-dismissible „Update erforderlich" screen of design chapter 14.
+
+**Three properties, each of which is the requirement rather than an implementation note.**
+
+- **Anonymous** (owner decision, 2026-08-24). The API vhost opens no anonymous paths as a matter of
+  stance (plan Q8) and this is its single exception. A version gate that answers only after a
+  successful login is silent in the one case it exists for: when the break is in the auth flow, the
+  old build cannot log in, and it would show an authentication error where the design calls for an
+  update wall — telling the member their credentials are wrong, which they are not. It publishes
+  three integers and a public release URL; no caller identity goes in and none comes out. It is
+  enumerated in REQ-SEC-037 like every other anonymous path, and its status is pinned by a test.
+- **The floor and the newest build are two numbers.** Collapsing them makes every release a forced
+  one, because the app could no longer tell "your build is no longer served" from "a newer build
+  exists" — and it only has a wall for the first.
+- **The default floor is `0`.** A server nobody has configured must not refuse every installed
+  build. Locking members out is the expensive direction of a wrong default; serving an old build
+  for one more day is the cheap one.
+
+Configuration (`app.android.*`), not a table: raising the floor is what an operator does at the
+moment a contract breaks, and it has to work without a migration, an admin screen or a deploy.
+
+The operation is itself in the frozen set, for an inverted reason worth stating — every other entry
+is frozen so a shipped app keeps working, this one so a shipped app can be told to stop. A renamed
+`minimumVersionCode` would leave the build that most needs the answer, the one already too old,
+reading "no floor" and carrying on against a contract that no longer exists.
+
+**The CTA is a deviation from the design.** Chapter 14 points its button at a store listing;
+distribution is GitHub Releases plus Obtainium (plan Q1), so `releasesUrl` names the release page
+instead. Recorded here rather than left as a silent difference between design and build.
+
+**Enforced by:** `AppVersionPolicyControllerTest`, `ExternalContractTest`,
+`ApiVhostAnonymousSurfaceTest` (backend) ·
+**Related:** REQ-API-009, REQ-SEC-037, ADR-0136, app issue krt-profit/basetool-android#67
