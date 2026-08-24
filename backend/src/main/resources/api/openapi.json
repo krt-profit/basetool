@@ -43,6 +43,9 @@
     "name" : "Operations",
     "description" : "Operation aggregate: groups multiple missions under one umbrella and exposes aggregated finance and payout views."
   }, {
+    "name" : "App",
+    "description" : "What the Android client needs before it can be trusted to run."
+  }, {
     "name" : "Missions",
     "description" : "Mission management endpoints"
   }, {
@@ -51840,6 +51843,103 @@
         }
       }
     },
+    "/api/v1/app/version-policy" : {
+      "get" : {
+        "tags" : [ "App" ],
+        "summary" : "Which Android builds the server still serves",
+        "description" : "Returns the minimum supported versionCode, the newest published one, and the release page. Anonymous by design: an app too old to authenticate must still be able to learn that it is too old.",
+        "operationId" : "versionPolicy",
+        "responses" : {
+          "200" : {
+            "description" : "The policy in force",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AppVersionPolicyDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/announcement/admin" : {
       "get" : {
         "tags" : [ "announcement-controller" ],
@@ -65253,6 +65353,22 @@
             "items" : {
               "type" : "string"
             }
+          }
+        }
+      },
+      "AppVersionPolicyDto" : {
+        "type" : "object",
+        "properties" : {
+          "minimumVersionCode" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "latestVersionCode" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "releasesUrl" : {
+            "type" : "string"
           }
         }
       },

@@ -390,6 +390,11 @@ if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a
 # the only paths of that stem this vhost admits at all.
 if ($uri = "/api/v1/promotion/evaluations/my") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/promotion/eligibility/my") { set $krt_api_allowed 1; }
+# Phase 4: the served-version floor the forced-update gate reads (REQ-API-010). The ONLY anonymous
+# path on this vhost, decided by the owner on 2026-08-24 -- an app too old to authenticate must
+# still be able to learn that it is too old. It answers 200 without a token BY DESIGN; a 401 here
+# is the broken state, not the hardened one.
+if ($uri = "/api/v1/app/version-policy") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/live-sync/stream") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/live-sync/changed") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/personal-inventory") { set $krt_api_allowed 1; }
@@ -978,6 +983,7 @@ it.
 | Beförderung | `/api/v1/promotion/evaluations/my`, `/api/v1/promotion/eligibility/my` | GET       |
 | Live-Sync   | `/api/v1/live-sync/stream`                                             | GET (SSE) |
 | Live-Sync   | `/api/v1/live-sync/changed`                                            | POST      |
+| App-Gate    | `/api/v1/app/version-policy`                                           | GET       |
 
 `live-sync` is deliberately **not** in the read-only family list, so it needs no carve-out: the two
 paths are admitted by being named, and nothing else under the stem is reachable at all. That is the
@@ -992,6 +998,12 @@ two endpoints rather than a surface with an admin half hiding in it.
 | `GET /api/v1/promotion/eligibility/my` | **401**          |
 | `GET /api/v1/live-sync/stream`         | **401**          |
 | `POST /api/v1/live-sync/changed`       | **401**          |
+| `GET /api/v1/app/version-policy`       | **200**          |
+
+**The `200` in that table is not a typo and not a finding.** `version-policy` is the single
+anonymous path this vhost admits (REQ-SEC-037), and a `401` there would mean the gate is broken:
+the build that most needs to be told it is too old is the one that cannot log in. Check it
+deliberately, and do not "fix" it upward.
 
 Two things worth knowing before reading a result. The stream answers `403`, not `401`, for an
 *authenticated* caller none of whose topics were accepted — the caller authenticated fine, they
@@ -1024,11 +1036,13 @@ Phase I yet, doing this once covers both.
    allow-list matched:
 
    ```powershell
-   foreach ($p in '/api/v1/live-sync/stream?topics=inventory','/api/v1/live-sync/changed','/api/v1/promotion/evaluations/my','/api/v1/promotion/eligibility/my') { '{0,-52} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' "https://api.profit-base.online$p") }
+   foreach ($p in '/api/v1/live-sync/stream?topics=inventory','/api/v1/live-sync/changed','/api/v1/promotion/evaluations/my','/api/v1/promotion/eligibility/my','/api/v1/app/version-policy') { '{0,-52} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' "https://api.profit-base.online$p") }
    ```
 
-   Expected: `401` for all four. A `404` means the block was never pasted — the failure with no other
-   signal, because the app keeps working and simply never goes live.
+   Expected: `401` for the first four and **`200` for `version-policy`**, which is the one
+   anonymous path on this vhost (REQ-SEC-037) and is meant to answer without a token. A `404`
+   anywhere means the block was never pasted — the failure with no other signal, because the app
+   keeps working and simply never goes live.
 
 5. **Check that phase 2's and phase 3's paths still answer as they did**, since you replaced the
    whole block:

@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -263,6 +264,28 @@ class ApiVhostAnonymousSurfaceTest {
   @WithAnonymousUser
   void shouldRefuseAnonymousPromotionReadsWithUnauthorized(String path) throws Exception {
     mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The served-version floor answers {@code 200} <em>without</em> a token, and that is the point.
+   *
+   * <p>It is the one anonymous path the API vhost admits (owner decision, 2026-08-24), against a
+   * stance that opens none (plan Q8), so it gets its own assertion rather than riding along with
+   * the refusals above. A {@code 401} here is not a hardening win but a broken gate: an app too old
+   * to authenticate would then learn nothing and show an authentication error where the design
+   * calls for „Update erforderlich".
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldServeVersionPolicyAnonymously() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/app/version-policy"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.minimumVersionCode").exists())
+        .andExpect(jsonPath("$.latestVersionCode").exists())
+        .andExpect(jsonPath("$.releasesUrl").isNotEmpty());
   }
 
   /**
