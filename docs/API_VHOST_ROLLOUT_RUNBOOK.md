@@ -431,10 +431,14 @@ if ($uri = "/api/v1/uex/locations/search") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/personal-blueprints") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/personal-blueprints/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
 # Phase 3 - the craftability read behind the chip, and the product picker behind "hinzufuegen".
-# EXACT paths: /personal-blueprints/{id}/recipe and /blueprints/** carry the whole catalogue and
-# stay off this vhost until something actually reads them.
+# EXACT paths: /blueprints/** carries the whole catalogue and stays off this vhost.
 if ($uri = "/api/v1/personal-blueprints/craftability") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/blueprints/products/search") { set $krt_api_allowed 1; }
+# Phase 5 - the recipe of ONE owned blueprint, which design ch. 09's tablet master-detail reads.
+# The comment above used to say this path stays off "until something actually reads them"; the
+# Blueprints detail pane now does. Still me-scoped and still a single row: the backend resolves
+# {id} against the caller's own owned blueprints, so it cannot name somebody else's.
+if ($uri ~ "^/api/v1/personal-blueprints/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/recipe$") { set $krt_api_allowed 1; }
 # Phase 3 - the member's own ships. EXACT paths, and deliberately NOT /hangar/users/<uuid>/ships:
 # that one names a member and is the admin surface. /hangar/ships answers a bulk DELETE with no
 # id as well, which the carve-out below does not open - only the per-ship verbs are named.
@@ -616,6 +620,7 @@ The safe order, and the reason for it:
    | `/api/v1/personal-blueprints`                         | **401**                                                             | me-scoped; POST likewise                                                                                 |
    | `/api/v1/personal-blueprints/<uuid>`                  | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
    | `/api/v1/personal-blueprints/craftability`            | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/personal-blueprints/<uuid>/recipe`           | **401**                                                             | me-scoped; GET only, phase 5                                                                             |
    | `/api/v1/blueprints/products/search`                  | **401**                                                             | `isAuthenticated()`                                                                                      |
    | `/api/v1/hangar/ships`                                | **401**                                                             | me-scoped; POST likewise                                                                                 |
    | `/api/v1/hangar/ships/<uuid>`                         | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |

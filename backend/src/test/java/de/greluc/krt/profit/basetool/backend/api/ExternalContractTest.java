@@ -710,6 +710,29 @@ class ExternalContractTest {
               Set.of("id", "productKey", "productName", "note", "acquiredAt", "version"),
               Set.of("version")),
           new ContractOperation("/api/v1/personal-blueprints/{id}", "delete", Set.of()),
+          // Phase 5, the recipe behind one owned blueprint. Design ch. 09 lays the tablet's
+          // Blueprints out as master-detail "with live ingredient quality", and the quality it
+          // means is `minQuality` on each ingredient -- the lowest grade that still satisfies the
+          // requirement. Without this operation the detail pane of that layout has nothing to show.
+          //
+          // Both quantity fields are frozen, and deliberately both: `quantityScu` and
+          // `quantityUnits` are the same amount in two scales, and the app has already been bitten
+          // once by reading a unit figure as SCU (the refinery's 100x stock bug). Freezing the pair
+          // means a client can render the one its column is labelled for instead of converting.
+          new ContractOperation(
+              "/api/v1/personal-blueprints/{id}/recipe",
+              "get",
+              Set.of(
+                  "productName",
+                  "variantCount",
+                  "requirementGroups",
+                  "ingredients",
+                  "kind",
+                  "name",
+                  "quantityScu",
+                  "quantityUnits",
+                  "minQuality",
+                  "quantityType")),
           // The craftability chip. `limitingMaterialName` is what turns "N Materialien fehlen"
           // into a sentence a member can act on, and `craftableWithRefinery` is the second answer
           // the same question has once refining is allowed for — dropping either would leave the
