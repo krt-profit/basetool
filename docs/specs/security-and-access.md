@@ -1827,6 +1827,15 @@ that does. Under operations the write that matters is `PUT
 opening it means naming that one path rather than widening the family, because the guard is
 verb-blind by design.
 
+**Phase 4's Beförderung reads are the least remarkable entries on the list, and that is the point
+of naming them.** `GET /api/v1/promotion/evaluations/my` and `…/eligibility/my` are
+`isAuthenticated()` and me-scoped by construction: both end in `/my`, the member is resolved from
+the token, and there is no id an anonymous caller could substitute. They answer `401`. The rule
+here is that every admitted path has its status recorded when it is added — not that the obvious
+ones may be assumed, because "obvious" is exactly what the one wrong entry always looked like
+beforehand. The officers' matrix (`/promotion/manage`, `/evaluations/all`, `/evaluations/members`)
+is **not** on the list at all: the admin area is web-only permanently.
+
 **The live-sync bridge adds a second stream and the vhost's first client-driven publish**
 (ADR-0143, REQ-FE-019). Both are `isAuthenticated()` on the controller, so both answer `401`, and
 neither is anonymous. They are worth stating rather than filing under "everything else" because

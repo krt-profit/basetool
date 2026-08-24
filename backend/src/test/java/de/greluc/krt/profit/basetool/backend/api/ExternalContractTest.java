@@ -824,7 +824,35 @@ class ExternalContractTest {
           // The publish half. Frozen for its request fields rather than its response: it answers
           // 202 with no body, and what a shipped client must keep being able to SEND is the frame.
           new ContractOperation(
-              "/api/v1/live-sync/changed", "post", Set.of(), Set.of("topic", "sections")));
+              "/api/v1/live-sync/changed", "post", Set.of(), Set.of("topic", "sections")),
+          // Phase 4, Beförderung. The member's own record, me-scoped by construction: neither path
+          // takes an id, which is why neither appears in the query-parameter freeze.
+          //
+          // `hasConfiguredRules` is frozen for a reason that is easy to lose: it is what tells "no
+          // rules exist for this step" apart from "you do not meet them". Drop it and a shipped app
+          // renders an empty requirement list, which reads as a verdict the organisation never
+          // made. `assignedLevel` is frozen as a FIELD but deliberately not as a required enum --
+          // the levels are configured per organisation, the app shows the server's own spelling,
+          // and freezing the constants would bind a vocabulary that is theirs to change.
+          new ContractOperation(
+              "/api/v1/promotion/evaluations/my",
+              "get",
+              Set.of("categoryName", "topicName", "assignedLevel")),
+          new ContractOperation(
+              "/api/v1/promotion/eligibility/my",
+              "get",
+              Set.of(
+                  "fromRank",
+                  "toRank",
+                  "eligible",
+                  "hasConfiguredRules",
+                  "checks",
+                  "topicName",
+                  "categoryName",
+                  "minimumLevel",
+                  "requiredCount",
+                  "achievedCount",
+                  "satisfied")));
 
   /**
    * Query parameters a shipped client addresses these operations by, keyed {@code method path}.

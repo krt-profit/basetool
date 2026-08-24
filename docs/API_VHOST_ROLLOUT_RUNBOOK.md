@@ -385,6 +385,11 @@ if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a
 # Phase 4: the app's live-sync bridge (ADR-0143, REQ-FE-019). Two paths and no prefix wildcard --
 # `live-sync` is NOT in the read-only family list below, so the POST is admitted by being named
 # here and nothing else under the stem is reachable at all.
+# Phase 4: Beforderung. Two me-scoped reads and no id in either path, so no uuid group is needed
+# -- and `promotion` is NOT in the read-only family list, which is safe here because these two are
+# the only paths of that stem this vhost admits at all.
+if ($uri = "/api/v1/promotion/evaluations/my") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/promotion/eligibility/my") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/live-sync/stream") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/live-sync/changed") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/personal-inventory") { set $krt_api_allowed 1; }
@@ -952,6 +957,14 @@ statuses in the table below; nothing is pasted until the last one is merged, and
 gains its rows in the same PR as the paste instruction so it never reports a state nobody intends to
 fix yet.
 
+**The owner confirmed this on 2026-08-24, with the probe already red.** It was asked directly --
+paste phase I now and get a green run tonight, or hold for one paste -- and the answer was to hold.
+So the nightly `edge-deny-probe` reports 23 phase-3 paths answering `404` where it lists `401`, and
+**that is the correct reading of production, not a defect**: those paths have never been admitted to
+the vhost. Do not investigate that run again, do not "fix" it in the repo, and do not silence the
+block -- the fix is the paste below, and it happens when phase 4 closes. Anything failing that is
+*not* in the phase-3 list is a different matter and does deserve stopping for.
+
 **If Phase I has not been applied yet, apply it after this phase closes and it covers both.** The
 § D.3 block is pasted *whole*, so the copy in this repo is always the complete current intent —
 phase 2's reads, phase 3's writes and phase 4's paths together. If Phase I has already been applied,
@@ -960,10 +973,11 @@ it.
 
 ### What the paste must contain
 
-|   Slice   |            Paths            |   Verbs   |
-|-----------|-----------------------------|-----------|
-| Live-Sync | `/api/v1/live-sync/stream`  | GET (SSE) |
-| Live-Sync | `/api/v1/live-sync/changed` | POST      |
+|    Slice    |                                 Paths                                  |   Verbs   |
+|-------------|------------------------------------------------------------------------|-----------|
+| Beförderung | `/api/v1/promotion/evaluations/my`, `/api/v1/promotion/eligibility/my` | GET       |
+| Live-Sync   | `/api/v1/live-sync/stream`                                             | GET (SSE) |
+| Live-Sync   | `/api/v1/live-sync/changed`                                            | POST      |
 
 `live-sync` is deliberately **not** in the read-only family list, so it needs no carve-out: the two
 paths are admitted by being named, and nothing else under the stem is reachable at all. That is the
@@ -972,10 +986,12 @@ two endpoints rather than a surface with an admin half hiding in it.
 
 ### What to expect afterwards
 
-|               Path               | Anonymous status |
-|----------------------------------|------------------|
-| `GET /api/v1/live-sync/stream`   | **401**          |
-| `POST /api/v1/live-sync/changed` | **401**          |
+|                  Path                  | Anonymous status |
+|----------------------------------------|------------------|
+| `GET /api/v1/promotion/evaluations/my` | **401**          |
+| `GET /api/v1/promotion/eligibility/my` | **401**          |
+| `GET /api/v1/live-sync/stream`         | **401**          |
+| `POST /api/v1/live-sync/changed`       | **401**          |
 
 Two things worth knowing before reading a result. The stream answers `403`, not `401`, for an
 *authenticated* caller none of whose topics were accepted — the caller authenticated fine, they
@@ -985,6 +1001,50 @@ path tells you the allow-list matched and nothing else.
 
 A **404** on either path means the block was never pasted, which is the failure with no other
 signal — the app keeps working and simply never goes live.
+
+### Doing it — step by step
+
+Everything below runs on the production host and is yours to execute; nothing in this repo reaches
+that host. The steps are Phase I's, because the block is the same block — if you have not applied
+Phase I yet, doing this once covers both.
+
+1. **Open the vhost's Advanced tab.** Nginx Proxy Manager → *Hosts → Proxy Hosts* →
+   `api.profit-base.online` → *Advanced*.
+
+2. **Replace the whole custom-configuration block** with § D.3 of this document as it stands after
+   the last phase-4 PR. Not a merge of the old and the new: the block is written to be pasted
+   whole, and hand-merging is how the read-only guard ends up with two `set $krt_readonly_family ""`
+   lines that disagree.
+
+3. **Save.** NPM tests the configuration before writing it, so a syntax error is refused here rather
+   than taking the vhost down. If it refuses, nothing changed and the old block is still live.
+
+4. **Check the two new paths from your own shell.** The stream needs its `topics` parameter — a
+   bare probe of the path answers `400` even with a valid token and tells you only that the
+   allow-list matched:
+
+   ```powershell
+   foreach ($p in '/api/v1/live-sync/stream?topics=inventory','/api/v1/live-sync/changed','/api/v1/promotion/evaluations/my','/api/v1/promotion/eligibility/my') { '{0,-52} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' "https://api.profit-base.online$p") }
+   ```
+
+   Expected: `401` for all four. A `404` means the block was never pasted — the failure with no other
+   signal, because the app keeps working and simply never goes live.
+
+5. **Check that phase 2's and phase 3's paths still answer as they did**, since you replaced the
+   whole block:
+
+   ```powershell
+   foreach ($p in '/api/v1/personal-inventory','/api/v1/hangar/ships','/api/v1/inventory','/api/v1/finance-entries','/api/v1/ship-types','/api/v1/materials/search') { '{0,-40} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' "https://api.profit-base.online$p") }
+   ```
+
+   Expected: `401` for the first four, `200` for the last two.
+
+6. **Run the probe once by hand** rather than waiting for the night:
+   *Actions → Edge deny probe → Run workflow*. It must come back green.
+
+If step 4 or 5 disagrees, put the previous block back — it is in this file's git history — and say
+what you saw. Nothing breaks while the old block is live: the phase-4 paths simply stay unreachable
+from outside, which is where they have been all along.
 
 ## Phase G — flip the audience enforcement (D5, release gate)
 
