@@ -153,6 +153,22 @@ class SecurityTest {
     mockMvc.perform(get("/api/v1/materials/matrix")).andExpect(status().isUnauthorized());
   }
 
+  /**
+   * The per-material slice of that same matrix, which the carve-out above was missing.
+   *
+   * <p>Its only consumer is the inventory page's "where can I sell this" suggestion, which is
+   * authenticated — so the reasoning of {@code /materials/matrix} applies unchanged, and leaving it
+   * anonymous published UEX trade prices per material to the internet from the API vhost. The
+   * nightly {@code edge-deny-probe} asserted {@code 401} for it from the day the phase-3 paste
+   * landed and got {@code 200}; the expectation was right and the rule was simply absent.
+   */
+  @Test
+  void materialTerminalPricesAreNotAnonymouslyReachable() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/materials/00000000-0000-4000-8000-00000000cafe/terminals"))
+        .andExpect(status().isUnauthorized());
+  }
+
   @Test
   void theRestOfTheMaterialCatalogStaysAnonymous() throws Exception {
     // The carve-out must be surgical: the anonymous order form's material picker still needs the

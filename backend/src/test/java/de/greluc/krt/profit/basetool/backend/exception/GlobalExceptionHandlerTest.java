@@ -911,6 +911,53 @@ class GlobalExceptionHandlerTest {
   }
 
   // ---------------------------------------------------------------------
+  // A 4xx names the line that refused it
+  // ---------------------------------------------------------------------
+
+  /**
+   * A production {@code 400} on {@code POST /api/v1/missions/{id}/participants/slim} could not be
+   * diagnosed: the log line carried method, URI, status, code and correlation id, and nothing about
+   * which of the 242 {@code BadRequestException} call sites had spoken. The caller had the reason;
+   * the operator did not.
+   *
+   * <p>The message itself stays out of the log — a minority of those call sites interpolate the
+   * rejected value, and a rejected user value must not be persisted (REQ-OBS-004). The frame that
+   * threw carries no runtime data and answers the same question.
+   */
+  @Test
+  void aRefusalNamesTheSourceLineThatProducedIt() {
+    de.greluc.krt.profit.basetool.backend.exception.BadRequestException ex =
+        new de.greluc.krt.profit.basetool.backend.exception.BadRequestException(
+            "A user may belong to at most two Staffeln (REQ-ORG-017)");
+
+    ResponseEntity<ProblemDetail> resp = handler.handleAppException(ex, request);
+
+    // The response is unchanged — this is a logging fix, and the client keeps the reason it had.
+    assertCommon(resp, HttpStatus.BAD_REQUEST, "BAD_REQUEST");
+    assertTrue(
+        resp.getBody().getDetail().contains("at most two Staffeln"),
+        "the caller must still be told why");
+
+    // The frame is this test's own, which is the point: it is wherever the throw happened.
+    java.lang.reflect.Method origin =
+        java.util.Arrays.stream(GlobalExceptionHandler.class.getDeclaredMethods())
+            .filter(m -> "originOf".equals(m.getName()))
+            .findFirst()
+            .orElseThrow();
+    origin.setAccessible(true);
+    Object frame;
+    try {
+      frame = origin.invoke(null, ex);
+    } catch (ReflectiveOperationException e) {
+      throw new AssertionError(e);
+    }
+    assertEquals(
+        "GlobalExceptionHandlerTest.java:" + (ex.getStackTrace()[0].getLineNumber()),
+        frame,
+        "the innermost frame belonging to this application is the one worth logging");
+  }
+
+  // ---------------------------------------------------------------------
   // Disconnected SSE clients — handled, silent, and no response body
   // ---------------------------------------------------------------------
 
