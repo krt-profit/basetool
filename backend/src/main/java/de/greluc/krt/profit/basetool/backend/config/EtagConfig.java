@@ -38,16 +38,26 @@ public class EtagConfig {
    * can autowire it directly into a {@code MockMvc} chain without going through the servlet
    * container's registration.
    *
-   * @return a fresh {@link ShallowEtagHeaderFilter} instance
+   * <p>A {@link StreamAwareShallowEtagHeaderFilter}, not the plain filter: the plain one buffers
+   * every response to compute its ETag and skips the write-back once async processing has started,
+   * which silently swallowed every Server-Sent-Event stream in this application (#1653). The
+   * subclass exists for that reason alone and its Javadoc carries the detail.
+   *
+   * @return a fresh filter instance that leaves the streaming endpoints alone
    */
   @Bean
   public ShallowEtagHeaderFilter shallowEtagFilter() {
-    return new ShallowEtagHeaderFilter();
+    return new StreamAwareShallowEtagHeaderFilter();
   }
 
   /**
    * Registers the filter for the entire URI space at near-highest precedence so the 304 short-
    * circuit happens before any heavier filter (auth, caching, controller dispatch) builds a body.
+   *
+   * <p>The pattern stays {@code /*} on purpose. Narrowing it to the paths that benefit would mean
+   * maintaining a list that has to grow with every new endpoint, and forgetting an entry costs
+   * bandwidth quietly; the streaming exception is a closed set of two and belongs in the filter,
+   * where it can be asserted.
    *
    * @param shallowEtagFilter the filter bean to register
    * @return servlet container registration with URL patterns and order set

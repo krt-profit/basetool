@@ -517,6 +517,17 @@ public class SecurityConfig {
                     // /api/v1/terms rule and above the authenticated catch-all.
                     .requestMatchers(HttpMethod.GET, "/api/v1/terms/document")
                     .permitAll()
+                    // REQ-API-010 / REQ-SEC-037: the served-version floor for the Android
+                    // app, anonymous by owner decision (2026-08-24) and the single exception to
+                    // the vhost's no-anonymous-paths stance (plan Q8). A version gate that only
+                    // answers after a successful login is silent in exactly the case it exists
+                    // for: when the break is in the auth flow, the old build cannot log in and
+                    // would show an authentication error instead of "Update erforderlich".
+                    // It carries three integers and a public release URL -- no caller identity
+                    // goes in and none comes out. Same ordering rule as the line above: it must
+                    // stay ahead of any broader /api/v1/app rule and the authenticated catch-all.
+                    .requestMatchers(HttpMethod.GET, "/api/v1/app/version-policy")
+                    .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/materials/matrix")
                     .authenticated()
                     .requestMatchers(

@@ -549,6 +549,26 @@ class ExternalContractTest {
           // `replaced`) are the real contract and are pinned in the app's spec, since nothing in
           // this document describes them.
           new ContractOperation("/api/v1/notifications/stream", "get", Set.of()),
+          // Phase 5, the inbox's mutating half. The app shipped a read-only inbox because these
+          // four were "Phase 3" work that phase 3 never picked up; design chapter 07 specifies a
+          // fully interactive one, so the deferral was a defect rather than a decision.
+          //
+          // Only the DELETE of a single row is a 204. The other three answer with a body, and
+          // `unreadCount` on the two bulk results is the field worth freezing hardest: it is what
+          // lets the badge settle from the same response that changed it. Without it the app would
+          // have to follow every bulk action with a second call to `/unread-count`, and the badge
+          // would disagree with the list for as long as that took.
+          //
+          // `/read` and `/read-all` are literal segments sitting beside `{id}`, which is a UUID --
+          // they cannot collide, and the vhost allow-list relies on exactly that to admit the
+          // three by name without admitting the family or the `/notification-rules` admin surface
+          // next to it.
+          new ContractOperation("/api/v1/notifications/{id}/read", "post", Set.of("id", "read")),
+          new ContractOperation(
+              "/api/v1/notifications/read-all", "post", Set.of("affected", "unreadCount")),
+          new ContractOperation("/api/v1/notifications/{id}", "delete", Set.of()),
+          new ContractOperation(
+              "/api/v1/notifications/read", "delete", Set.of("affected", "unreadCount")),
           // Phase 2, the caller's own record. The app needs two fields of it. Its own backend user
           // id: an Operation's payout rows are keyed by that id -- not by the Keycloak `sub` the
           // app holds, and not by a name -- so "Dein Anteil" cannot be found without it, and
@@ -690,6 +710,29 @@ class ExternalContractTest {
               Set.of("id", "productKey", "productName", "note", "acquiredAt", "version"),
               Set.of("version")),
           new ContractOperation("/api/v1/personal-blueprints/{id}", "delete", Set.of()),
+          // Phase 5, the recipe behind one owned blueprint. Design ch. 09 lays the tablet's
+          // Blueprints out as master-detail "with live ingredient quality", and the quality it
+          // means is `minQuality` on each ingredient -- the lowest grade that still satisfies the
+          // requirement. Without this operation the detail pane of that layout has nothing to show.
+          //
+          // Both quantity fields are frozen, and deliberately both: `quantityScu` and
+          // `quantityUnits` are the same amount in two scales, and the app has already been bitten
+          // once by reading a unit figure as SCU (the refinery's 100x stock bug). Freezing the pair
+          // means a client can render the one its column is labelled for instead of converting.
+          new ContractOperation(
+              "/api/v1/personal-blueprints/{id}/recipe",
+              "get",
+              Set.of(
+                  "productName",
+                  "variantCount",
+                  "requirementGroups",
+                  "ingredients",
+                  "kind",
+                  "name",
+                  "quantityScu",
+                  "quantityUnits",
+                  "minQuality",
+                  "quantityType")),
           // The craftability chip. `limitingMaterialName` is what turns "N Materialien fehlen"
           // into a sentence a member can act on, and `craftableWithRefinery` is the second answer
           // the same question has once refining is allowed for — dropping either would leave the
@@ -824,7 +867,199 @@ class ExternalContractTest {
           // The publish half. Frozen for its request fields rather than its response: it answers
           // 202 with no body, and what a shipped client must keep being able to SEND is the frame.
           new ContractOperation(
-              "/api/v1/live-sync/changed", "post", Set.of(), Set.of("topic", "sections")));
+              "/api/v1/live-sync/changed", "post", Set.of(), Set.of("topic", "sections")),
+          // Phase 4, Beförderung. The member's own record, me-scoped by construction: neither path
+          // takes an id, which is why neither appears in the query-parameter freeze.
+          //
+          // `hasConfiguredRules` is frozen for a reason that is easy to lose: it is what tells "no
+          // rules exist for this step" apart from "you do not meet them". Drop it and a shipped app
+          // renders an empty requirement list, which reads as a verdict the organisation never
+          // made. `assignedLevel` is frozen as a FIELD but deliberately not as a required enum --
+          // the levels are configured per organisation, the app shows the server's own spelling,
+          // and freezing the constants would bind a vocabulary that is theirs to change.
+          new ContractOperation(
+              "/api/v1/promotion/evaluations/my",
+              "get",
+              Set.of("categoryName", "topicName", "assignedLevel")),
+          new ContractOperation(
+              "/api/v1/promotion/eligibility/my",
+              "get",
+              Set.of(
+                  "fromRank",
+                  "toRank",
+                  "eligible",
+                  "hasConfiguredRules",
+                  "checks",
+                  "topicName",
+                  "categoryName",
+                  "minimumLevel",
+                  "requiredCount",
+                  "achievedCount",
+                  "satisfied")),
+          // Phase 4, the forced-update gate. This one is in the set for an inverted reason: every
+          // other entry is frozen so a shipped app keeps working, and this is frozen so a shipped
+          // app can be told to STOP working. If the server ever renamed `minimumVersionCode`, the
+          // build that most needs the answer -- the one already too old -- would read no floor and
+          // carry on against a contract that no longer exists. It is also the operation an app
+          // calls before it has a token, so it must keep answering when everything else refuses.
+          new ContractOperation(
+              "/api/v1/app/version-policy",
+              "get",
+              Set.of("minimumVersionCode", "latestVersionCode", "releasesUrl")),
+          // Phase 4, Raffinerie. `status` is frozen as a FIELD and its constants are frozen by the
+          // required-enum guard, because the app sends them back as query values -- a renamed
+          // constant turns the whole list request into a 400 while the screen keeps loading.
+          //
+          // `endsAt` is frozen on the LIST only, and that asymmetry is deliberate: the detail DTO
+          // does not carry it, and the app computes it from `startedAt` + `durationMinutes` so the
+          // two screens agree. Freezing it on the detail would record a field that has never been
+          // sent.
+          new ContractOperation(
+              "/api/v1/refinery-orders/my-orders",
+              "get",
+              Set.of(
+                  "content",
+                  "totalElements",
+                  "totalPages",
+                  "id",
+                  "status",
+                  "location",
+                  "refiningMethod",
+                  "startedAt",
+                  "durationMinutes",
+                  "endsAt",
+                  "goods",
+                  "oreSales",
+                  "profit",
+                  "version")),
+          new ContractOperation(
+              "/api/v1/refinery-orders/{id}",
+              "get",
+              Set.of(
+                  "id",
+                  "status",
+                  "location",
+                  "refiningMethod",
+                  "startedAt",
+                  "durationMinutes",
+                  "goods",
+                  "oreSales",
+                  "profit",
+                  "version")),
+          // The booking. Its item list is what the whole slice turns on: the endpoint marks an
+          // order COMPLETED whatever that list contains, so a renamed field would mark orders
+          // stored while creating nothing -- silently, and unrecoverably for the member.
+          new ContractOperation(
+              "/api/v1/refinery-orders/{id}/store", "post", Set.of(), Set.of("items")),
+          // Phase 4, Materialbörse. `kind` is frozen with its constants because the app reads a
+          // DIFFERENT PAIR OF FIELDS depending on it: an item names itself in `itemName` /
+          // `itemQuantity`, a material in `material` / `amount`. A renamed constant renders every
+          // item row blank rather than failing.
+          //
+          // `quantityType` is frozen for the reason the unit exists: an item counted in pieces and
+          // labelled „SCU" is a quantity a member acts on in a handover the tool never sees.
+          new ContractOperation(
+              "/api/v1/material-exchange/offers",
+              "get",
+              Set.of(
+                  "content",
+                  "totalElements",
+                  "totalPages",
+                  "id",
+                  "kind",
+                  "material",
+                  "quantityType",
+                  "itemName",
+                  "itemQuantity",
+                  "owner",
+                  "effectiveName",
+                  "ownerOrgUnits",
+                  "shorthand",
+                  "mine",
+                  "quality",
+                  "amount",
+                  "releasedAt",
+                  "remark",
+                  "interestCount",
+                  "interestedHandles",
+                  "viewerInterested",
+                  "version")),
+          new ContractOperation(
+              "/api/v1/material-requests",
+              "get",
+              Set.of(
+                  "content",
+                  "totalElements",
+                  "totalPages",
+                  "id",
+                  "kind",
+                  "material",
+                  "quantityType",
+                  "itemName",
+                  "itemQuantity",
+                  "requestedAmount",
+                  "minQuality",
+                  "owner",
+                  "effectiveName",
+                  "ownerOrgUnits",
+                  "shorthand",
+                  "mine",
+                  "postedAt",
+                  "remark",
+                  "interestCount",
+                  "interestedHandles",
+                  "viewerInterested",
+                  "version")),
+          // The pledge and its withdrawal answer with the updated row, which is what lets the app
+          // replace one entry instead of re-reading the page. Freezing the response is therefore
+          // not optional here: a body that stopped carrying `interestCount` would leave the count
+          // frozen on screen with no error anywhere.
+          new ContractOperation(
+              "/api/v1/material-exchange/offers/{id}/interest",
+              "post",
+              Set.of("id", "interestCount", "viewerInterested", "version")),
+          new ContractOperation(
+              "/api/v1/material-exchange/offers/{id}/interest",
+              "delete",
+              Set.of("id", "interestCount", "viewerInterested", "version")),
+          new ContractOperation(
+              "/api/v1/material-requests/{id}/interest",
+              "post",
+              Set.of("id", "interestCount", "viewerInterested", "version")),
+          new ContractOperation(
+              "/api/v1/material-requests/{id}/interest",
+              "delete",
+              Set.of("id", "interestCount", "viewerInterested", "version")),
+          new ContractOperation(
+              "/api/v1/material-exchange/offers/{id}/deactivate", "post", Set.of("id", "status")),
+          new ContractOperation(
+              "/api/v1/material-requests/{id}/deactivate", "post", Set.of("id", "status")),
+          // The two creates. `inventoryItemId` is what makes an offer an offer of something the
+          // member actually holds; `materialId` the same for a request.
+          new ContractOperation(
+              "/api/v1/material-exchange/offers",
+              "post",
+              Set.of(),
+              Set.of("inventoryItemId", "offeredAmount")),
+          new ContractOperation(
+              "/api/v1/material-requests",
+              "post",
+              Set.of(),
+              Set.of("materialId", "requestedAmount")),
+          // The offer sheet's stock suggestion. `alreadyReleased` is frozen because it is the only
+          // thing stopping a member from offering the same stack twice, and `quantityType` for the
+          // unit reason above.
+          new ContractOperation(
+              "/api/v1/material-exchange/releasable-items",
+              "get",
+              Set.of(
+                  "inventoryItemId",
+                  "materialName",
+                  "quantityType",
+                  "quality",
+                  "amount",
+                  "locationName",
+                  "alreadyReleased")));
 
   /**
    * Query parameters a shipped client addresses these operations by, keyed {@code method path}.
@@ -910,7 +1145,14 @@ class ExternalContractTest {
               "get /api/v1/users/search", Set.of("query:string", "page:integer", "size:integer")),
           // The live-sync stream's whole subscription protocol is this one parameter (ADR-0143).
           // Losing it would not degrade the stream, it would silently open every client on nothing.
-          Map.entry("get /api/v1/live-sync/stream", Set.of("topics:string")));
+          Map.entry("get /api/v1/live-sync/stream", Set.of("topics:string")),
+          // The Raffinerie list. `status` repeats, which the array type records: the two live
+          // filters are one request for OPEN + IN_PROGRESS, split on the device.
+          Map.entry(
+              "get /api/v1/refinery-orders/my-orders",
+              Set.of("status:array", "page:integer", "size:integer")),
+          Map.entry("get /api/v1/material-exchange/offers", Set.of("page:integer", "size:integer")),
+          Map.entry("get /api/v1/material-requests", Set.of("page:integer", "size:integer")));
 
   @Test
   @DisplayName("the query parameters a shipped client asks with still exist, with their types")

@@ -2,7 +2,15 @@
 
 ## [Unreleased]
 
+## [v1.6.0](https://github.com/krt-profit/basetool/releases/tag/v1.6.0) - 2026-08-25
+
 ### Added
+
+- **Die App darf Benachrichtigungen jetzt auch als gelesen markieren und löschen.** Die vier dafür nötigen Endpunkte sind im eingefrorenen App-Vertrag und auf der API-vhost-Allow-List ergänzt; der Posteingang der App war bis jetzt nur lesend (REQ-API-009).
+
+- **Raffinerie und Materialbörse sind für die App freigegeben und eingefroren.** Die eigenen Raffinerie-Orders samt Einlagern, dazu Angebote, Gesuche, „Ich kann liefern", Zurückziehen und die beiden Erstellen-Wege. Die Logistik-Sichten der Raffinerie und die Item-Anlage der Börse bleiben ausgeschlossen (REQ-API-009, REQ-SEC-037).
+
+- **Der Server kann jetzt sagen, welche App-Versionen er noch bedient.** Ein neuer Endpunkt nennt die älteste noch unterstützte App-Version; eine ältere App zeigt daraufhin selbst „Update erforderlich" statt an einer Schnittstelle zu scheitern, die es nicht mehr gibt. Voreingestellt ist keine Untergrenze — ein nicht konfigurierter Server sperrt niemanden aus. Der Endpunkt antwortet bewusst ohne Anmeldung, weil eine App, die sich nicht mehr anmelden kann, sonst nie erfährt, warum (REQ-API-010, REQ-SEC-037).
 
 - **Änderungen aus der App und aus dem Browser sehen sich jetzt gegenseitig.** Das Backend hat einen Live-Sync-Strom für die App bekommen und hängt am selben Redis-Kanal wie die Weboberfläche: eine Bearbeitung im Browser erscheint in der App ohne manuelles Neuladen, und eine Buchung in der App aktualisiert jede offene Browser-Ansicht. Vorher war beides blind füreinander. Bearbeiter-Punkte bleiben absichtlich der Weboberfläche vorbehalten (ADR-0143, REQ-FE-019).
 
@@ -32,33 +40,27 @@
 
 - **Die SpotBugs-Gradle-Plugin-Version wurde auf 6.5.11 angehoben.** Reiner Bugfix-Bump ohne bekannte Sicherheitslücke, im Rahmen des routinemäßigen Abhängigkeits-Audits.
 
-### Changed
-
 - **Der nächtliche Edge-Probe deckt jetzt die vollständige Phase-2-Allowlist ab**, inklusive der einen Stelle, an der nur das Verb zwei Oberflächen trennt: `POST /api/v1/orders` ist der öffentliche Antragsweg und muss auf dem API-vhost mit 405 abgewiesen werden. Dazu steht im Runbook jetzt eine Schritt-für-Schritt-Anleitung für den einen verbleibenden manuellen Schritt (Phase H).
 
-### Changed
-
 - **Die letzten Phase-2-Lesepfade sind eingefroren und für den API-vhost vorbereitet:** Lager-Baum, Auftragswarteschlange samt Detail und die Org-Bank (Salden, Kontodetail, Buchungen). Alles als exakte Pfade, und die schreibende Hälfte bleibt draußen — bei `/api/v1/orders` trennt nur das Verb den öffentlichen Antragsweg von der Warteschlangenansicht, weshalb der Read-Only-Schutz des vhosts diese Familie jetzt mit abdeckt.
-- **Die Hangar-Lesepfade sind eingefroren und für den API-vhost vorbereitet.** Die eigene Schiffsliste und die Aggregation über die aktive Org-Einheit stehen im REQ-API-009-Vertragssatz — als exakte Pfade, denn dieselbe Familie trägt die Schiffe *aller* Mitglieder, die Admin-Ansicht und die Schreibverben. Der Vertrags-Guard prüft jetzt auch verschachtelte Objekte, nicht nur Listen: bisher war bei einem Schiff nur `shipType` eingefroren, nicht dessen `name` — also genau das, was auf der Karte steht.
-- **Die Ankündigung ist für ausgelieferte Clients eingefroren und für den API-vhost vorbereitet.** `GET /api/v1/announcement` steht im REQ-API-009-Vertragssatz — einschließlich der 204-Antwort, wenn es nichts anzukündigen gibt: ein Client, der die leere Antwort als Fehler liest, zeigt eine Störung, wo „kein Banner" richtig wäre. Der Pfad ist exakt freigeschaltet, nicht als Präfix, weil darunter die Admin-Ansicht und der Schreibpfad derselben Zeile liegen.
-- **Die Benachrichtigungs-Lesepfade sind für ausgelieferte Clients eingefroren und für den API-vhost vorbereitet.** Posteingang, Ungelesen-Zähler und der SSE-Push stehen im REQ-API-009-Vertragssatz; die schreibende Hälfte der Familie bleibt draußen und wird zusätzlich per 405 abgewiesen. Der Stream setzt jetzt `X-Accel-Buffering: no`, damit ein nginx davor die Ereignisse nicht puffert — sonst kommen sie verspätet, gebündelt oder gar nicht an, und das sieht wie ein kaputter Push aus statt wie eine Proxy-Einstellung.
-- **Die Operationen-Lesepfade sind für ausgelieferte Clients eingefroren und für den API-vhost vorbereitet.** `GET /api/v1/operations/search`, `/{id}`, `/{id}/finance-summary` und `/{id}/payouts` stehen im REQ-API-009-Vertragssatz; der Vertrags-Guard prüft jetzt auch die Zeilen **eingebetteter** Listen, vorher war nur der Listenname eingefroren und ein umbenanntes `shareAmount` wäre unbemerkt durchgegangen. Die Operationen-Familie ist auf dem vhost ebenfalls schreibgeschützt (405). Braucht wieder einen manuellen Konfigurationsschritt (Runbook § D.3a).
-- **`GET /api/v1/users/me` ist für die App freigeschaltet — für genau ein Feld.** Die Auszahlungszeilen einer Operation sind auf die Backend-Benutzer-ID verschlüsselt, nicht auf den Keycloak-`sub` der App und nicht auf einen Anzeigenamen; ohne `id` kann die App einem Mitglied nicht sagen, welche der Zeilen seine ist. Nur `id` ist eingefroren, der Rest der Antwort bleibt frei.
-- **Der nächtliche Edge-Probe prüft jetzt die komplette Statustabelle des API-vhosts von außen.** Bisher konnte niemand feststellen, ob ein Pfad überhaupt freigeschaltet wurde — die Allowlist liegt in der NPM-Datenbank, und ein nie eingefügter Pfad antwortet mit 404 wie ein absichtlich gesperrter. Genau das hatte zuletzt einen leeren Einsatz-Detailbildschirm verursacht. Der Lauf schlägt in beide Richtungen an: 2xx, wo eine Abweisung stehen muss, und 404, wo ein Status stehen muss.
 
-### Changed
+- **Die Hangar-Lesepfade sind eingefroren und für den API-vhost vorbereitet.** Die eigene Schiffsliste und die Aggregation über die aktive Org-Einheit stehen im REQ-API-009-Vertragssatz — als exakte Pfade, denn dieselbe Familie trägt die Schiffe *aller* Mitglieder, die Admin-Ansicht und die Schreibverben. Der Vertrags-Guard prüft jetzt auch verschachtelte Objekte, nicht nur Listen: bisher war bei einem Schiff nur `shipType` eingefroren, nicht dessen `name` — also genau das, was auf der Karte steht.
+
+- **Die Ankündigung ist für ausgelieferte Clients eingefroren und für den API-vhost vorbereitet.** `GET /api/v1/announcement` steht im REQ-API-009-Vertragssatz — einschließlich der 204-Antwort, wenn es nichts anzukündigen gibt: ein Client, der die leere Antwort als Fehler liest, zeigt eine Störung, wo „kein Banner" richtig wäre. Der Pfad ist exakt freigeschaltet, nicht als Präfix, weil darunter die Admin-Ansicht und der Schreibpfad derselben Zeile liegen.
+
+- **Die Benachrichtigungs-Lesepfade sind für ausgelieferte Clients eingefroren und für den API-vhost vorbereitet.** Posteingang, Ungelesen-Zähler und der SSE-Push stehen im REQ-API-009-Vertragssatz; die schreibende Hälfte der Familie bleibt draußen und wird zusätzlich per 405 abgewiesen. Der Stream setzt jetzt `X-Accel-Buffering: no`, damit ein nginx davor die Ereignisse nicht puffert — sonst kommen sie verspätet, gebündelt oder gar nicht an, und das sieht wie ein kaputter Push aus statt wie eine Proxy-Einstellung.
+
+- **Die Operationen-Lesepfade sind für ausgelieferte Clients eingefroren und für den API-vhost vorbereitet.** `GET /api/v1/operations/search`, `/{id}`, `/{id}/finance-summary` und `/{id}/payouts` stehen im REQ-API-009-Vertragssatz; der Vertrags-Guard prüft jetzt auch die Zeilen **eingebetteter** Listen, vorher war nur der Listenname eingefroren und ein umbenanntes `shareAmount` wäre unbemerkt durchgegangen. Die Operationen-Familie ist auf dem vhost ebenfalls schreibgeschützt (405). Braucht wieder einen manuellen Konfigurationsschritt (Runbook § D.3a).
+
+- **`GET /api/v1/users/me` ist für die App freigeschaltet — für genau ein Feld.** Die Auszahlungszeilen einer Operation sind auf die Backend-Benutzer-ID verschlüsselt, nicht auf den Keycloak-`sub` der App und nicht auf einen Anzeigenamen; ohne `id` kann die App einem Mitglied nicht sagen, welche der Zeilen seine ist. Nur `id` ist eingefroren, der Rest der Antwort bleibt frei.
+
+- **Der nächtliche Edge-Probe prüft jetzt die komplette Statustabelle des API-vhosts von außen.** Bisher konnte niemand feststellen, ob ein Pfad überhaupt freigeschaltet wurde — die Allowlist liegt in der NPM-Datenbank, und ein nie eingefügter Pfad antwortet mit 404 wie ein absichtlich gesperrter. Genau das hatte zuletzt einen leeren Einsatz-Detailbildschirm verursacht. Der Lauf schlägt in beide Richtungen an: 2xx, wo eine Abweisung stehen muss, und 404, wo ein Status stehen muss.
 
 - **Die Rollout-Prüfung des API-vhosts nannte für die beiden Finanz-Lesepfade den falschen Status.** Ohne Token antworten sie mit **403**, nicht mit 401: unterhalb von `/api/v1/missions/**` ist die Filterkette `permitAll`, die Abweisung entsteht erst an der Methode und wird dort als 403 gerendert. Beide Pfade sind unverändert dicht — nur die Zahl in der Prüftabelle war falsch, und ein neuer Test hält sie jetzt fest (REQ-SEC-037, Runbook § D.3a).
 
-### Changed
-
 - **Eine neue Enum-Konstante kann eine ausgelieferte App nicht mehr unbemerkt lahmlegen.** Jede *pflichtige* Enum-Eigenschaft, die von einer Vertragsoperation aus erreichbar ist, ist konstantenweise eingefroren; eine Erweiterung lässt jetzt den Backend-Build scheitern. Grund: ein streng parsender Client verliert bei einer unbekannten Konstante nicht das Feld, sondern die **ganze Antwort** — gemessen an der Android-App machte ein einzelner unbekannter `JobTypeDto.archetype` die komplette Einsatz-Detailantwort unlesbar, während die Liste weiterlief. Die Reihenfolge „App-Build zuerst, dann Konstante“ wird damit erzwungen statt gehofft (REQ-API-009).
 
-### Changed
-
 - **Einsatzdetail und Finanzen sind für ausgelieferte Clients eingefroren und auf dem API-vhost freigeschaltet.** `GET /api/v1/missions/{id}` sowie die beiden Finanz-Lesepfade stehen im REQ-API-009-Vertragssatz. Die vhost-Einträge sind UUID-förmig und **verankert**, weil unterhalb von `{id}` fast nur Schreibpfade liegen; zusätzlich weist der vhost jede Nicht-`GET`-Anfrage unterhalb von `/api/v1/missions` mit 405 ab, da eine pfadbasierte Allowlist die Methode nicht sieht und `/missions/{id}` auch `PUT` und `DELETE` beantwortet. Braucht wieder einen manuellen Konfigurationsschritt (Runbook § D.3a).
-
-### Changed
 
 - **Die anonyme Oberfläche des API-vhosts ist jetzt vollständig aufgezählt statt beiläufig.** Zwei Endpunkte antworten dort bewusst ohne Token — der Nutzungsbedingungstext und die Einsatzsuche, deren gastredigierte Zeilen die öffentliche Startseite ohnehin anzeigt. Beide stehen mit Begründung in REQ-SEC-037. Die Prüfanweisung im Rollout-Runbook nannte pauschal „401 ist bestanden“ und schlug deshalb bei genau diesen Pfaden falschen Alarm; sie liest den erwarteten Status jetzt aus einer Tabelle pro Pfad.
 
@@ -77,6 +79,8 @@
 - **Spring Boot auf 4.1.1 angehoben (Wartungs-Release).** Es bringt unter anderem Spring Framework 7.0.9, Spring Security 7.1.1, Hibernate 7.4.5, Tomcat 11.0.24, Netty 4.2.17.Final und den PostgreSQL-Treiber 42.7.13 mit; die drei temporären CVE-Overrides für Tomcat, Netty und den PostgreSQL-Treiber entfallen damit, weil Spring Boot genau diese Versionen jetzt selbst ausliefert. Rein intern, keine Auswirkung auf die Oberfläche.
 
 ### Fixed
+
+- **Der Push-Kanal funktioniert wieder — er war unbemerkt tot.** Ein ETag-Filter puffert jede Antwort, um eine Prüfsumme zu bilden, und schrieb sie bei laufender Nebenläufigkeit nie zurück: Benachrichtigungs-Ströme nahmen Verbindungen an und lieferten dauerhaft kein einziges Byte. Sichtbar war das nirgends, weil die Metrik erzeugte Verbindungen zählt und nicht angekommene Daten (#1653).
 
 - **Eine Anmeldung über die Android-App entzog Administratoren ihre Admin-Rolle in der Datenbank.** Der Rollensatz wurde bei jeder Anmeldung aus dem Token überschrieben, und das App-Token führt `Admin` bewusst nicht mit — bis zur nächsten Web-Anfrage sahen Hintergrundjobs, Benachrichtigungsregeln und Mitgliederlisten den verkürzten Satz. Tokens von Clients mit absichtlich unvollständigem Rollen-Scope schreiben jetzt gar keine Rollen mehr; die Anfrage selbst wird weiterhin nur mit den Rollen aus dem Token autorisiert, die App bekommt also nach wie vor keine Administrationsrechte. Neue optionale Umgebungsvariable `APP_SECURITY_PARTIAL_ROLE_SCOPE_CLIENT_IDS` (REQ-SEC-036).
 

@@ -580,6 +580,15 @@ class RateLimitingFilterTest {
       assertEquals("1", resp2.getHeader("X-Rate-Limit-Limit"));
       assertEquals("0", resp2.getHeader("X-Rate-Limit-Remaining"));
       assertNotNull(resp2.getHeader("X-Rate-Limit-Retry-After-Seconds"));
+      // The STANDARD header, which is the one a client's HTTP library reads. The Android app's
+      // retry ladder is documented to honour the server's wait and could not, because only the
+      // vendor header above was ever sent; a rate-limited device is what showed it. Both carry the
+      // same number, and both are delta-seconds -- an HTTP-date would make the client trust its own
+      // clock against ours.
+      assertEquals(
+          resp2.getHeader("X-Rate-Limit-Retry-After-Seconds"),
+          resp2.getHeader("Retry-After"),
+          "Retry-After must carry the same delta-seconds as the vendor header");
       // Body must look like a problem document.
       String body = resp2.getContentAsString();
       assertTrue(body.contains("\"status\":429"), body);

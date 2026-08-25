@@ -277,6 +277,21 @@ app:
       # here; pointing this at a channel of its own would sever web-to-app propagation while every
       # health signal stayed green.
       channel: ${APP_LIVE_SYNC_REDIS_FANOUT_CHANNEL:basetool:livesync:changed}
+  android:
+    # What the server tells the app about which builds it still serves (REQ-API-010). Config, not a
+    # table: raising the floor is what an operator does the moment a contract breaks, and it has to
+    # work without a migration or a deploy.
+    #
+    # The floor defaults to 0 = "no floor" ON PURPOSE. Any non-zero default would lock every member
+    # out of the app the first time this reaches an environment nobody has configured yet, and that
+    # is the expensive direction of a wrong guess -- serving an old build for one more day is the
+    # cheap one.
+    minimum-version-code: ${APP_ANDROID_MINIMUM_VERSION_CODE:0}
+    # Carried separately so a routine release does not read as a forced one: the app needs to tell
+    # "your build is no longer served" from "a newer build exists", and it only has a wall for the
+    # first.
+    latest-version-code: ${APP_ANDROID_LATEST_VERSION_CODE:0}
+    releases-url: ${APP_ANDROID_RELEASES_URL:https://github.com/krt-profit/basetool-android/releases/latest}
   default-blueprints:
     provisioning:
       # One-time seed of the starter default blueprints + idempotent backfill/sweep that keeps the
