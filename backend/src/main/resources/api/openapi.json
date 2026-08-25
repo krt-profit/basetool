@@ -63701,6 +63701,10 @@
           "meetingPoint" : {
             "type" : "string"
           },
+          "registeredCount" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"

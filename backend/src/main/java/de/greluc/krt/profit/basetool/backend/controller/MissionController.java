@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
+import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddCrewRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddParticipantPublicRequest;
@@ -57,6 +58,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -152,30 +154,27 @@ public class MissionController {
             sort,
             Set.of("plannedStartTime", "name", "status", "id"),
             "plannedStartTime");
-    Page<MissionListDto> pageResult;
+    Page<Mission> pageResult;
     if (!authHelperService.isMemberOrAbove()) {
       pageResult =
-          missionService
-              .searchMissions(null, null, null, List.of("PLANNED", "ACTIVE"), false, null, pageable)
-              .map(missionMapper::toListDto);
+          missionService.searchMissions(
+              null, null, null, List.of("PLANNED", "ACTIVE"), false, null, pageable);
     } else {
       // Authenticated callers MUST go through searchMissions so the squadron scope (own
       // squadron OR is_internal=false cross-staffel public) is applied — getAllMissions
       // would call missionRepository.findAll() unfiltered and leak internal missions of
       // other squadrons to every authenticated user (MULTI_SQUADRON_PLAN.md section 1).
       pageResult =
-          missionService
-              .searchMissions(
-                  null,
-                  null,
-                  null,
-                  List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED"),
-                  null,
-                  null,
-                  pageable)
-              .map(missionMapper::toListDto);
+          missionService.searchMissions(
+              null,
+              null,
+              null,
+              List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED"),
+              null,
+              null,
+              pageable);
     }
-    return PageResponse.of(pageResult);
+    return PageResponse.of(withRegisteredCounts(pageResult));
   }
 
   /**
@@ -245,17 +244,13 @@ public class MissionController {
               Collections.emptyList(), 0, pageable.getPageSize(), 0, 0, List.of());
         }
       }
-      Page<MissionListDto> pageResult =
-          missionService
-              .searchMissions(query, start, end, status, false, operationId, pageable)
-              .map(missionMapper::toListDto);
-      return PageResponse.of(pageResult);
+      Page<Mission> pageResult =
+          missionService.searchMissions(query, start, end, status, false, operationId, pageable);
+      return PageResponse.of(withRegisteredCounts(pageResult));
     }
-    Page<MissionListDto> pageResult =
-        missionService
-            .searchMissions(query, start, end, status, null, operationId, pageable)
-            .map(missionMapper::toListDto);
-    return PageResponse.of(pageResult);
+    Page<Mission> pageResult =
+        missionService.searchMissions(query, start, end, status, null, operationId, pageable);
+    return PageResponse.of(withRegisteredCounts(pageResult));
   }
 
   /**
@@ -2287,5 +2282,25 @@ public class MissionController {
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
     missionService.removeManager(id, userId);
     return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * Projects a page of missions into list rows, resolving the whole page's registration counts in
+   * ONE grouped statement.
+   *
+   * <p>Every list row shows "{n} angemeldet". The figure lives in the mission's lazy {@code
+   * participants} collection, so letting the mapper read it would be a SELECT per row — the N+1
+   * REQ-DATA-003 forbids. Asking once per page keeps a 100-row page at two statements instead of
+   * 101. A mission with no participants has no count row, which is the zero.
+   *
+   * @param missions the page as the service returned it.
+   * @return the same page as list DTOs, each carrying its registration count.
+   */
+  private Page<MissionListDto> withRegisteredCounts(@NotNull Page<Mission> missions) {
+    Map<UUID, Long> counts =
+        missionService.registeredCounts(
+            missions.getContent().stream().map(Mission::getId).toList());
+    return missions.map(
+        mission -> missionMapper.toListDto(mission, counts.getOrDefault(mission.getId(), 0L)));
   }
 }

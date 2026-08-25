@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.model.projection.MissionParticipantCount;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
@@ -50,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -659,5 +661,24 @@ class MissionServiceTest {
 
     assertEquals(parentSquadron, saved.getOwningOrgUnit());
     assertEquals(parent, saved.getParent());
+  }
+
+  /**
+   * The grouped count read is turned into a lookup, and an empty page never reaches the database.
+   *
+   * <p>REQ-MISSION-018. `IN ()` with no ids is a statement worth nothing, and Hibernate renders it
+   * differently per dialect, so the empty case short-circuits rather than being sent.
+   */
+  @Test
+  void registeredCounts_groupsPerMissionAndSkipsTheQueryForAnEmptyPage() {
+    UUID crowded = UUID.randomUUID();
+    UUID quiet = UUID.randomUUID();
+    when(missionParticipantRepository.countByMissions(List.of(crowded, quiet)))
+        .thenReturn(List.of(new MissionParticipantCount(crowded, 4L)));
+
+    assertEquals(Map.of(crowded, 4L), missionService.registeredCounts(List.of(crowded, quiet)));
+
+    assertEquals(Map.of(), missionService.registeredCounts(List.of()));
+    verify(missionParticipantRepository, never()).countByMissions(List.of());
   }
 }

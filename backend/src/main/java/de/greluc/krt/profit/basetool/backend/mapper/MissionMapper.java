@@ -145,12 +145,19 @@ public abstract class MissionMapper {
    * {@code owningSquadron} DTO slot so the column on the missions list renders without an extra
    * round-trip, projecting either a Staffel or a Spezialkommando owner into the slim reference.
    *
+   * <p>The registration count is passed in rather than read off {@code mission.getParticipants()}:
+   * that collection is lazy, so touching it once per row would be a SELECT per mission
+   * (REQ-DATA-003). The caller resolves the whole page's counts in one grouped statement ({@code
+   * MissionService.registeredCounts}) and hands each row its own figure.
+   *
    * @param mission the mission entity to project; {@code null} returns {@code null}.
+   * @param registeredCount how many participants the mission has, zero when it has none.
    * @return the slim list-row DTO.
    */
   @Mapping(target = "description", expression = "java(resolveDescription(mission))")
-  @Mapping(target = "owningSquadron", source = "owningOrgUnit")
-  public abstract MissionListDto toListDto(Mission mission);
+  @Mapping(target = "owningSquadron", source = "mission.owningOrgUnit")
+  @Mapping(target = "registeredCount", expression = "java(registeredCount)")
+  public abstract MissionListDto toListDto(Mission mission, long registeredCount);
 
   // toEntity(MissionDto) has been removed (audit finding C-3, 2026-05-20): the previous mapper
   // copied id / version / owningSquadron / parent / isInternal straight from the response DTO

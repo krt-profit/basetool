@@ -21,8 +21,10 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -49,11 +51,13 @@ import de.greluc.krt.profit.basetool.backend.service.MissionService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -206,6 +210,37 @@ class MissionControllerLifecycleTest {
         null); // meetingPoint
   }
 
+  /**
+   * A list page resolves its registration counts in ONE grouped read, and each row gets its own.
+   *
+   * <p>REQ-MISSION-018 / REQ-DATA-003. The figure lives in the mission's lazy {@code participants}
+   * collection, so the tempting implementation — letting the mapper read it — is a SELECT per row.
+   * This pins the shape that avoids it: one call for the whole page, and a mission the grouped
+   * statement returned no row for is a zero rather than a null.
+   */
+  @Test
+  void listRows_getTheirOwnCountFromOneGroupedRead() {
+    Mission crowded = new Mission();
+    crowded.setId(UUID.randomUUID());
+    Mission empty = new Mission();
+    empty.setId(UUID.randomUUID());
+    Page<Mission> page = new PageImpl<>(List.of(crowded, empty), PageRequest.of(0, 20), 2);
+    when(missionService.searchMissions(
+            any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+        .thenReturn(page);
+    // Only the crowded mission has participants; the empty one produced no row at all.
+    when(missionService.registeredCounts(any())).thenReturn(Map.of(crowded.getId(), 7L));
+    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+
+    controller.getAllMissions(null, null, null);
+
+    ArgumentCaptor<Long> counts = ArgumentCaptor.forClass(Long.class);
+    verify(missionMapper, times(2)).toListDto(any(Mission.class), counts.capture());
+    assertThat(counts.getAllValues()).containsExactly(7L, 0L);
+    // One grouped read for the page, not one per row.
+    verify(missionService, times(1)).registeredCounts(List.of(crowded.getId(), empty.getId()));
+  }
+
   // ── GET /api/v1/missions (anonymous filtering) ───────────────────────
 
   // Asserts the deprecated-for-removal MissionService.getAllMissions(Pageable) is never hit;
@@ -230,6 +265,7 @@ class MissionControllerLifecycleTest {
             null,
             null,
             null,
+            0L,
             1L);
     Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
     // Post-fix #1: authenticated callers now go through searchMissions so the service-layer
@@ -244,7 +280,7 @@ class MissionControllerLifecycleTest {
             org.mockito.ArgumentMatchers.isNull(),
             any(Pageable.class)))
         .thenReturn(page);
-    when(missionMapper.toListDto(m)).thenReturn(listDto);
+    when(missionMapper.toListDto(eq(m), anyLong())).thenReturn(listDto);
     // Registered member (or above) → full scoped search, no anonymous status restriction.
     when(authHelperService.isMemberOrAbove()).thenReturn(true);
 
@@ -283,6 +319,7 @@ class MissionControllerLifecycleTest {
             null,
             null,
             null,
+            0L,
             1L);
     Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
     when(missionService.searchMissions(
@@ -294,7 +331,7 @@ class MissionControllerLifecycleTest {
             eq(null),
             any(Pageable.class)))
         .thenReturn(page);
-    when(missionMapper.toListDto(m)).thenReturn(listDto);
+    when(missionMapper.toListDto(eq(m), anyLong())).thenReturn(listDto);
     // Outsider = anonymous OR authenticated role-less GUEST (isMemberOrAbove == false).
     when(authHelperService.isMemberOrAbove()).thenReturn(false);
 
@@ -355,6 +392,7 @@ class MissionControllerLifecycleTest {
             null,
             null,
             null,
+            0L,
             1L);
     Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
     when(missionService.searchMissions(
@@ -366,7 +404,7 @@ class MissionControllerLifecycleTest {
             eq(null),
             any(Pageable.class)))
         .thenReturn(page);
-    when(missionMapper.toListDto(m)).thenReturn(listDto);
+    when(missionMapper.toListDto(eq(m), anyLong())).thenReturn(listDto);
     // Outsider = anonymous OR authenticated role-less GUEST (isMemberOrAbove == false).
     when(authHelperService.isMemberOrAbove()).thenReturn(false);
 
@@ -408,6 +446,7 @@ class MissionControllerLifecycleTest {
             null,
             null,
             null,
+            0L,
             1L);
     Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
     Instant start = Instant.parse("2026-04-01T00:00:00Z");
@@ -422,7 +461,7 @@ class MissionControllerLifecycleTest {
             eq(operationId),
             any(Pageable.class)))
         .thenReturn(page);
-    when(missionMapper.toListDto(m)).thenReturn(listDto);
+    when(missionMapper.toListDto(eq(m), anyLong())).thenReturn(listDto);
     // Registered member (or above) → status filter passes through verbatim, internals included.
     when(authHelperService.isMemberOrAbove()).thenReturn(true);
 

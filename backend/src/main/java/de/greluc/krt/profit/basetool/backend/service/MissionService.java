@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.model.projection.MissionParticipantCount;
 import de.greluc.krt.profit.basetool.backend.repository.FrequencyTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFrequencyRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionOwnershipRepository;
@@ -51,10 +52,13 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -161,6 +165,29 @@ public class MissionService {
    *
    * @return paged matching missions
    */
+  /**
+   * Registration counts for the missions of one list page, in a single grouped statement.
+   *
+   * <p>The list shows "{n} angemeldet" per mission, and a {@code MissionParticipant} row
+   * <em>is</em> the registration — there is no accept/decline state to weigh. Reading the figure
+   * from each mission's lazy {@code participants} collection would be a SELECT per row, which is
+   * exactly the N+1 REQ-DATA-003 forbids, so it is asked for once for the whole page.
+   *
+   * @param missionIds the missions on the page; an empty collection short-circuits without a query.
+   * @return count per mission id; missions with no participants are <em>absent</em> rather than
+   *     zero, so callers must read through a default.
+   */
+  @Transactional(readOnly = true)
+  public Map<UUID, Long> registeredCounts(@NotNull Collection<UUID> missionIds) {
+    if (missionIds.isEmpty()) {
+      return Map.of();
+    }
+    return missionParticipantRepository.countByMissions(missionIds).stream()
+        .collect(
+            Collectors.toMap(
+                MissionParticipantCount::missionId, MissionParticipantCount::registered));
+  }
+
   public Page<Mission> searchMissions(
       String query,
       Instant start,

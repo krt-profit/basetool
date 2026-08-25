@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Die Einsatzliste der API nennt jetzt die Teilnehmerzahl.** Jede Listenzeile trägt
+  `registeredCount`, damit die Android-App auf der Übersicht „{n} angemeldet" zeigen kann — bisher
+  stand die Zahl nur im Einsatz-Detail. Die Zahl für eine ganze Seite wird in **einer** Abfrage
+  geholt, nicht je Zeile. Für die Weboberfläche ändert sich nichts.
+
 ## [v1.6.2](https://github.com/krt-profit/basetool/releases/tag/v1.6.2) - 2026-08-25
 
 ### Fixed
