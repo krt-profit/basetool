@@ -678,7 +678,7 @@ docker run --rm -v /var/iri/monitoring/secrets/alertmanager.yml:/cfg.yml:ro \
 
 # promtool against the committed prometheus config + alert rules:
 docker run --rm -v /var/iri/code/monitoring/prometheus:/p:ro \
-  --entrypoint promtool prom/prometheus:v3.13.2 check config /p/prometheus.yml
+  --entrypoint promtool prom/prometheus:v3.14.0 check config /p/prometheus.yml
 
 # alloy config check:
 docker run --rm -v /var/iri/code/monitoring/alloy:/a:ro \
@@ -974,8 +974,8 @@ there.
 5. **Lint before deploying.** From the repo root:
 
 ```bash
-docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.13.2 check config /cfg/prometheus.yml
-docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.13.2 -c 'promtool check rules /cfg/alerts/*.yml'
+docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.14.0 check config /cfg/prometheus.yml
+docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.14.0 -c 'promtool check rules /cfg/alerts/*.yml'
 docker run --rm -v "$PWD/monitoring/blackbox:/cfg" prom/blackbox-exporter:v0.28.0 --config.file=/cfg/blackbox.yml --config.check
 ```
 
