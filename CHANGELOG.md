@@ -4,6 +4,15 @@
 
 ### Fixed
 
+- **Schreibende Aktionen in der Android-App funktionieren wieder.** Lagerbuchungen (Ausbuchen),
+  einen Auftrag übernehmen und seinen Status ändern sowie das Sollguthaben eines Bankkontos wurden
+  vom Server mit „Zugriff verweigert" abgelehnt. Ursache war eine CSRF-Prüfung, die für
+  Token-basierte Clients nichts schützen kann, aber alle Pfade außerhalb einer kurzen Ausnahmeliste
+  blockiert hat.
+- **Die Preisliste eines Materials über alle Terminals braucht jetzt eine Anmeldung.** Sie war über
+  die öffentliche API ohne Login abrufbar, obwohl sie nur die angemeldete Lager-Ansicht nutzt.
+- **Ein abgelehnter Aufruf ist im Log jetzt auffindbar.** Die Zeile nennt zusätzlich die Codestelle,
+  die abgelehnt hat — bisher stand dort nur, *dass* abgelehnt wurde.
 - **Live-Sync in der Android-App bleibt nicht mehr stumm, wenn viele Bildschirme offen sind.** Die
   App hält eine Verbindung für alle Bildschirme zusammen; der Server hat ab 8 Räumen die ganze
   Anfrage abgelehnt, womit Live-Sync in der gesamten App ausfiel, solange sie offen war. Das Limit

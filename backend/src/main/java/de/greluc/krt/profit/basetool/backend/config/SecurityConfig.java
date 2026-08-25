@@ -110,6 +110,37 @@ public class SecurityConfig {
   static final String TERMS_GATE_ARMED_IN_TEST = "app.security.terms.armed-in-test";
 
   /**
+   * Paths exempt from cookie-based CSRF, because on them there is no ambient credential for a
+   * cross-site request to ride.
+   *
+   * <p>This chain is {@link
+   * org.springframework.security.config.http.SessionCreationPolicy#STATELESS} and authenticates
+   * with nothing but a bearer JWT — no form login, no basic auth, no session cookie. CSRF defends
+   * against a browser attaching a credential by itself; a bearer token is never attached by itself,
+   * so on {@code /api/v1/**} the check can only ever refuse a legitimate client.
+   *
+   * <p><strong>It did.</strong> The list used to name five paths, and every path outside it
+   * answered {@code 403 MissingCsrfToken} to any caller without a CSRF cookie — which is every
+   * bearer client, i.e. the whole native app. In production that broke booking stock out of the
+   * Lager ({@code POST /api/v1/inventory/{id}/book-out}), taking and progressing an Auftrag ({@code
+   * /api/v1/orders/{id}/assignees/{userId}}, {@code /status}) and a bank account's balance target —
+   * while {@code /api/v1/missions/**} and {@code /api/v1/operations/**}, which were on the list,
+   * worked. The nightly {@code edge-deny-probe} named all four: it asserts {@code 401} for an
+   * anonymous write and got {@code 403}, because the CSRF filter runs ahead of authorization and
+   * answered first.
+   *
+   * <p>Growing the list per broken endpoint is what produced that shape. The pattern now matches
+   * the reason: the whole bearer-only API. {@code /internal/**} keeps its entry —
+   * machine-to-machine with its own shared-secret header, also cookie-less (REQ-SEC-022).
+   *
+   * <p>Package-private so {@code SecurityConfigCsrfExemptionTest} can pin it. The {@code test}
+   * profile disables CSRF outright so MockMvc can post, which means no {@code @SpringBootTest} in
+   * this repo exercises the production branch at all — that blind spot is why the gap shipped, and
+   * a test over this constant is the part of it that can be closed cheaply.
+   */
+  static final String[] CSRF_EXEMPT_PATHS = {"/api/v1/**", "/internal/**"};
+
+  /**
    * Cross-origin allowlist for the backend API. Empty by default: the backend is only addressed
    * server-side from the Spring-Boot frontend (Thymeleaf SSR), so no direct browser-to-backend
    * cross-origin traffic is expected, and any such call is rejected with HTTP 403. Override in
@@ -381,23 +412,9 @@ public class SecurityConfig {
           csrf ->
               csrf.csrfTokenRepository(csrfRepo)
                   .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                  // L-10: keep the ignore list co-located with one comment so a future
-                  // reviewer sees the contract. Every entry here MUST be JSON-only +
-                  // bearer-token-authenticated (no session cookie). Adding {@code
-                  // /api/v1/announcement} would technically be consistent because the
-                  // controller is also JSON+bearer — left out for now because no client
-                  // hits it from a session-cookie context, so the missing entry costs
-                  // nothing in practice.
-                  .ignoringRequestMatchers(
-                      "/api/v1/missions/**",
-                      "/api/v1/operations/**",
-                      "/api/v1/orders",
-                      "/api/v1/orders/items",
-                      "/api/v1/finance-entries",
-                      // Internal machine-to-machine endpoint called by the Keycloak Discord SPI
-                      // (REQ-SEC-022). It carries no browser session/cookie and is guarded by its
-                      // own shared-secret header, so cookie-based CSRF does not apply.
-                      "/internal/**"));
+                  // The reason each pattern is here, and what a per-endpoint list cost,
+                  // are on CSRF_EXEMPT_PATHS. Do not narrow it back to individual paths.
+                  .ignoringRequestMatchers(CSRF_EXEMPT_PATHS));
     }
 
     http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -528,7 +545,19 @@ public class SecurityConfig {
                     // stay ahead of any broader /api/v1/app rule and the authenticated catch-all.
                     .requestMatchers(HttpMethod.GET, "/api/v1/app/version-policy")
                     .permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/v1/materials/matrix")
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/v1/materials/matrix",
+                        // Same carve-out, same reason, and it was meant to land with the line
+                        // above: the per-material slice of that price matrix. Its only consumer is
+                        // the inventory page's "where can I sell this" suggestion, which is
+                        // authenticated, so a token costs nothing here either — while leaving it
+                        // anonymous publishes UEX trade prices per material to the whole internet
+                        // from the API vhost. The nightly edge-deny probe has asserted 401 for it
+                        // since the phase-3 paste and got 200: the expectation was right and the
+                        // carve-out was simply missing. Ordering matters — Spring Security takes
+                        // the FIRST matching rule, so both must stay above /api/v1/materials/**.
+                        "/api/v1/materials/*/terminals")
                     .authenticated()
                     .requestMatchers(
                         "/api/v1/frequency-types", "/api/v1/frequency-types/**",
