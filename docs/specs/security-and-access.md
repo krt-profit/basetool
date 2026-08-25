@@ -1760,6 +1760,47 @@ DEBUG with the account's UUID and the two set sizes — never the username (REQ-
 `CustomJwtGrantedAuthoritiesConverter#assembleFor(User, Collection)` · **Configuration:**
 `app.security.partial-role-scope.client-ids`
 
+### REQ-SEC-038 — The Android App Link is verifiable, or the login is broken
+
+The Android app's production redirect URI is an **App Link** —
+`https://profit-base.online/app/callback` — rather than a custom scheme, so that no other installed
+app can claim the end of a login. Android honours that claim only after fetching
+`https://profit-base.online/.well-known/assetlinks.json` and finding the app's package name and
+signing-certificate digest in it.
+
+**The frontend MUST serve that file** at exactly that path, and the response MUST satisfy all three
+of Android's conditions:
+
+|              |                                                                  |
+|--------------|------------------------------------------------------------------|
+| status       | `200` — **no redirect**, not even one that ends at `200`         |
+| content type | `application/json`                                               |
+| access       | anonymous; it is fetched by the platform, which holds no session |
+
+`AssetLinksController` serves it and `SecurityConfig` lists the path in the anonymous matcher set.
+A static file under `static/` would not do: behind this application's chain the path fell through
+to `anyRequest().authenticated()` and answered `302` into the OAuth entry point — the same trap the
+`/sm/**` and `/**/*.map` entries beside it were added for.
+
+**Failure is silent and looks like a server fault.** Verification fails, Android declines to open
+the link in the app, the browser follows it instead, the frontend has no such route, and the member
+lands on the 404 page in the middle of signing in. Nothing in either build can see it: the app is
+correct, the server is correct, and only their agreement is missing. This shipped in the app's
+v0.1.0 and was found by a member on a phone.
+
+**The digest list is a list, and that is load-bearing.** A signing-key rotation must publish the
+new digest **before** the rotated APK ships, while the old key is still installed on every device;
+both must therefore be servable at once. Configuration:
+`app.android-app-link.sha256-cert-fingerprints`, overridable per environment. A rotation that
+replaces rather than appends breaks every installed copy for the length of the rollout.
+
+**Code:** `frontend/…/controller/AssetLinksController.java`,
+`frontend/…/config/AndroidAppLinkProperties.java`, `SecurityConfig` (anonymous matchers).
+**Test:** `AssetLinksControllerTest` — asserts the three response conditions through the real
+security chain, and that the digests are an array.
+
+---
+
 ### REQ-SEC-037 — The public API vhost's anonymous surface is enumerated, not incidental
 
 The vhost is a default-deny allow-list (ADR-0135), and every path on it **inherits whatever

@@ -154,6 +154,13 @@ spring:
             user-name-attribute: preferred_username
 
 app:
+  # Published at /.well-known/assetlinks.json so Android hands the login callback to the app
+  # instead of to a browser. The fingerprint list is a LIST on purpose: a signing-key rotation has
+  # to publish the new digest while the old key is still installed on every device, so both must be
+  # servable at once. Overridable per environment; the default is the production release key.
+  android-app-link:
+    package-name: ${APP_ANDROID_PACKAGE_NAME:de.greluc.krt.profit.basetool.android}
+    sha256-cert-fingerprints: "${APP_ANDROID_CERT_FINGERPRINTS:E8:40:20:5E:EC:16:F5:FD:CD:BA:8B:44:81:18:06:3C:4A:37:E6:16:20:99:CC:49:00:DF:23:80:C1:AF:50:64}"
   http:
     connect-timeout: 2s
     response-timeout: 5s

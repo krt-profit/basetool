@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Die Anmeldung in der Android-App funktioniert wieder.** Der Server veröffentlicht jetzt unter `/.well-known/assetlinks.json`, dass die App zu dieser Domain gehört. Ohne diese Datei hat Android den Rücksprung nach dem Login nicht der App zugeordnet, sondern im Browser geöffnet — und dort landete man auf der 404-Seite (REQ-SEC-038).
+
 ## [v1.6.0](https://github.com/krt-profit/basetool/releases/tag/v1.6.0) - 2026-08-25
 
 ### Added
