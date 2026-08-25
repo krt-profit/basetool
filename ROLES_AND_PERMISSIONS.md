@@ -96,14 +96,20 @@ order lands in a defined SK queue instead of nowhere.
   (`GET`/`POST /api/v1/.../finance-entries`) is the payout view of the mission and
   requires member-or-above (`isMemberOrAbove`). Anonymous → `401`, a logged-in
   **Guest** → `403` (see "Anonymous ≈ Guest role" below). Creating finance entries
-  is thus **no longer anonymous**.
+  is thus **no longer anonymous** — and, since REQ-SEC-042, no longer merely a matter of
+  being allowed to *see* the mission: a member books only against their own participant
+  row, the mission's management books for anyone on it (§3.7).
 - **View the description of a mission** — the free-text description is stripped
-  server-side from the public mission response (§1.3). Organization, participant list
-  (without PII), units and frequencies remain visible, by contrast; the payout
-  preference and the free-text comment of individual participants, however, are also
-  stripped for outsiders (ADR-0034).
+  server-side from the public mission response (§1.3), and from the mission **list and
+  search** rows too: the gate is membership rather than bare authentication, so a
+  role-less guest no longer reads via the list what the detail withholds (REQ-SEC-041).
+  Organization, participant list (without PII), units and frequencies remain visible, by
+  contrast; the payout preference and the free-text comment of individual participants,
+  however, are also stripped for outsiders (ADR-0034).
 - **View participant PII** (email, real name) — stripped from every outsider response;
-  only the public callsign (username/displayName/rank) remains visible.
+  only the public callsign (username/displayName/rank) remains visible. This holds for
+  **every** nested user, not only the participants: an assigned unit's ship owner is
+  redacted through the same pass (REQ-SEC-040).
 - **Material claims, refinery, hangar, inventory, personal inventory/blueprints,
   user directory, promotion system, admin area** — all authenticated
   or role-gated.
@@ -413,9 +419,14 @@ Notes are visible to everyone who sees the job order.
 |:----------------------------------------------------------------------------------------------------------------------------------|:---------:|:------:|:----:|:--:|:-------:|:-----:|
 | Read/create own refinery orders, incl. screenshot import (`POST /import-extract`) (`isAuthenticated()` [+ `canSeeRefineryOrder`]) |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Edit/delete/store refinery order (`isAuthenticated()` + `canEditRefineryOrder`: Owner **or** Logistician)                         |     ❌     |   ✅¹   |  ✅   | ✅¹ |    ✅    |   ✅   |
+| Store refinery output onto **another member** (per-item `userId`, Logistician only)                                               |     ❌     |   ❌²   |  ✅   | ❌² |    ✅    |   ✅   |
 | Create/manage refinery orders **for others** (`/users/{id}`, `hasRole('LOGISTICIAN')`)                                            |     ❌     |   ❌    |  ✅   | ❌  |    ✅    |   ✅   |
 
 ¹ Only as owner of the respective order.
+² The per-item `userId` names the receiving stock owner, so it is gated separately from the
+order-ownership check: a non-Logistician may only book onto themselves and any other value is
+refused with `403` (REQ-SEC-039) — the same privilege the Einbuchen path requires for a foreign
+target user. The store dialog therefore shows the receiver picker only to a Logistician.
 
 ### 3.5 Missions
 
@@ -482,7 +493,7 @@ or to ownerless; a non-admin may only pick a direct membership or a unit within 
 | Function (gate)                                                               | Anonymous | Member | Log. | MM | Officer | Admin |
 |:------------------------------------------------------------------------------|:---------:|:------:|:----:|:--:|:-------:|:-----:|
 | Read a mission's finance entries (`isMemberOrAbove` + `canSeeMission`)        |    ❌²     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| **Create** finance entry (`isMemberOrAbove` + `canSeeMission`)                |    ❌²     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| **Create** finance entry (`isMemberOrAbove` + `canCreateFinanceEntry`)        |    ❌²     |   ✅¹   |  ✅¹  | ✅³ |   ✅³    |   ✅   |
 | Edit/delete finance entry (`canEditFinanceEntry`: owner **or** Officer/Admin) |     ❌     |   ✅¹   |  ✅¹  | ✅¹ |    ✅    |   ✅   |
 | Read profit calculation (`hasAnyRole('KRT_MEMBER','OFFICER','ADMIN')`)        |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Material overview / material collection of a job order (`isAuthenticated()`)  |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
@@ -491,6 +502,11 @@ or to ownerless; a non-admin may only pick a direct membership or a unit within 
 ² The finance ledger is the payout view and requires member-or-above: anonymous → `401`,
 roleless guest → `403` (a guest is treated like anonymous for missions, §1.3). Creating job orders
 is unaffected by this (possible for everyone).
+³ For any participant of the mission, but only within their own owning-OrgUnit scope
+(`canManageMission`); the mission owner and its co-managers pass the same way. **Creating** is a
+write and therefore no longer rides the read-level `canSeeMission`, whose cross-squadron public
+escape let any member book into a foreign squadron's ledger and attribute the row to one of its
+participants (REQ-SEC-042).
 
 ### 3.8 Promotion system
 

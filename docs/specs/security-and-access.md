@@ -1458,9 +1458,31 @@ nor the provisioning service account.
 
 ### REQ-SEC-031 — Sensitive GET families MUST be uncacheable, not merely revalidatable
 
-API GET responses under `/api/v1/bank/**`, `/api/v1/users/**`, `/api/v1/me/**` and
-`/api/v1/notifications/**` MUST carry `Cache-Control: private, no-store`. Every other `/api/**` GET
-keeps `no-cache, must-revalidate`.
+API GET responses of every sensitive family MUST carry `Cache-Control: private, no-store`. Every
+other `/api/**` GET keeps `no-cache, must-revalidate`. The families are the bank surfaces
+(`/api/v1/bank/**` **and** `/api/v1/org-units/bank/**`), `/api/v1/users/**`, `/api/v1/me/**`,
+`/api/v1/notifications/**`, the ledgers (`/api/v1/finance-entries/**`,
+`/api/v1/missions/*/finance-entries/**`, `/api/v1/operations/**`), the holdings
+(`/api/v1/personal-inventory/**`, `/api/v1/personal-blueprints/**`, `/api/v1/inventory/**`,
+`/api/v1/hangar/**`, `/api/v1/refinery-orders/**`) and `/api/v1/promotion/**`.
+
+**Both bank spellings, because they are different surfaces.** `/api/v1/bank/**` is the
+bank-employee one; the member-facing account a shipped client actually reads lives under
+`/api/v1/org-units/bank/**`, and its transaction rows carry a `holderHandle`. Listing only the
+former — as this requirement originally did — left the member bank ledger, along with the mission
+finance reads, the personal holdings and the refinery profit figures, on the storable directive:
+exactly the families the public API vhost added, and exactly the data the rule exists for.
+
+**A missing family is actively downgraded, not merely un-opted-in.** `ApiCacheControlFilter` runs at
+`HIGHEST_PRECEDENCE + 20`, ahead of the Spring Security chain, and sets `Cache-Control` before
+`CacheControlHeadersWriter` would — and that writer only acts when the header is unset. So a
+sensitive family absent from the list loses the framework's own default `no-store`. Adding a
+sensitive GET family means adding it to `NO_STORE_SCOPES` in the same change.
+
+The Materialbörse (`/api/v1/material-exchange/**`, `/api/v1/material-requests/**`) is deliberately
+excluded: it is an org-wide shared board whose handles are the same public callsign tuple the public
+mission roster already serves, so it belongs in the revalidate bucket with the other shared
+listings.
 
 The distinction is not cosmetic. `no-cache, must-revalidate` permits an intermediary to **store** the
 body and reuse it after a successful revalidation; only `no-store` forbids the copy existing at all.
@@ -1479,9 +1501,13 @@ rather than configuration: which data is sensitive is a property of the domain, 
 
 **Acceptance**
 
-- [x] The four families answer with `private, no-store`, including the notification SSE stream.
+- [x] Every listed family answers with `private, no-store`, including the notification SSE stream.
+- [x] The member bank, mission-finance, personal-inventory, personal-blueprint, inventory, hangar,
+  refinery-order and promotion reads in the frozen external contract are covered — asserted at the
+  bare collection path as well as a child, since the bare path is itself an endpoint a client calls.
 - [x] An encoded spelling of a sensitive path still gets `no-store`.
-- [x] Other `/api/**` GETs are unchanged, and non-API paths and writes are untouched.
+- [x] Other `/api/**` GETs are unchanged (the shared listings keep `must-revalidate`), and non-API
+  paths and writes are untouched.
 - [x] `Vary: Accept-Encoding` is still set on the sensitive families.
 
 **Enforced by:** `ApiCacheControlFilterTest` · **Code:** `ApiCacheControlFilter`
@@ -2032,6 +2058,133 @@ than a test, for the reason in the open item above · **Code:** `SecurityConfig`
 `MissionController#searchMissions` (outsider redaction), `HomeController#home` (the anonymous
 consumer) · **Decision:** [ADR-0135](../adr/0135-public-api-vhost-not-a-gateway.md),
 [ADR-0138](../adr/0138-terms-wording-is-a-backend-resource.md)
+
+### REQ-SEC-039 — A per-item receiver id is an authorization input, not a routing hint
+
+`POST /api/v1/refinery-orders/{id}/store` takes a `userId` per stored item that names the
+**receiving stock owner**. Because it decides whose ledger the output lands in, it MUST be
+authorized against the caller: a caller who is not a `LOGISTICIAN` may only name **themselves**,
+and any other value is refused with `403`. The check runs on the **requested** id and **before**
+the user is loaded, so an unauthorised caller cannot distinguish an existing member id from an
+unknown one.
+
+The order-ownership check that already guarded this endpoint does **not** cover it: it constrains
+*which order* may be stored, not *who the stock is booked for*. Until this requirement, a member
+storing their own refinery order could name any other member and fabricate arbitrary inventory rows
+(any material, quality up to 1000, unbounded amount) as that member's shared squadron stock — or,
+with `personal`, their private stock — leaving `INVENTORY_RECEIVED_FROM_REFINERY` audit rows
+attributed to the victim. The identical operation on the Einbuchen path
+(`InventoryItemService#createInventoryItem`) has always required this privilege; the two entry
+points into "create an `InventoryItem` for another user" MUST NOT diverge.
+
+The frontend follows the gate rather than relying on it: the store dialog's receiver picker is
+rendered only for a logistician, and a plain member sees their own name in a disabled field
+(REQ-FE — a control whose every foreign choice answers `403` must not be offered). The disabled
+field submits nothing, so the server falls back to the order's owner, which for a non-logistician is
+the caller.
+
+**Acceptance**
+
+- [x] A non-logistician storing their own order with a foreign `items[].userId` → `403`, and no
+  inventory row and no order completion are written.
+- [x] The refusal happens before the user lookup (no user-existence oracle).
+- [x] A non-logistician naming their own id explicitly is accepted, exactly like omitting it.
+- [x] A logistician may still book onto another member.
+- [x] The receiver picker is absent for a non-logistician, including on a split row and on the
+  flash-attribute re-render after a validation error.
+
+**Enforced by:** `RefineryOrderServiceTest` · **Code:** `RefineryOrderService#storeRefineryOrder`,
+`RefineryOrderPageController#viewOrderDetail`, `refinery-orders-details.html` · **Mirrors:**
+`InventoryItemService#createInventoryItem`
+
+### REQ-SEC-040 — Guest redaction MUST reach every nested user, not only the participants
+
+The mission guest redactor's compiler-enforced exhaustiveness (the explicit full-field record
+reconstruction) only holds for records it actually **descends into**. A nested collection forwarded
+by reference is a hole in it, and MUST NOT contain a record that reaches a user, a squadron or free
+text without its own `cleanup…ForGuest` pass.
+
+Concretely: `assignedUnits` is forwarded to outsiders as mission planning data, and each unit's
+`ship` carries a full `UserDto` owner. `UserMapper` nulls only `email`, so an un-redacted
+pass-through handed an **unauthenticated** caller of the public mission detail the ship owner's
+`roles` and `permissions` — i.e. who holds `ADMIN`/`OFFICER` — plus their free-text `description`,
+org-unit memberships, `joinDate` and `discordLinked`. `Ship.owner` is `nullable = false`, so any
+unit with an assigned ship always carried one. The owner is now reduced to the public callsign
+tuple by the same `cleanupUserForGuest` pass every other nested user goes through.
+
+Note what did **not** catch this, because the same blind spots apply to the next nested record:
+`anonymousReadableMissionEndpointsMustRedactGuestPii` asserts that a `cleanup…ForGuest` method is
+*called*, never that the redaction is *complete*; and `ExternalContractTest` freezes
+`assignedUnits` only as a top-level field name and never inspects the nested shape.
+
+**Acceptance**
+
+- [x] An outsider's `GET /api/v1/missions/{id}` returns `assignedUnits[].ship.owner` with `roles`,
+  `permissions`, `description`, `email`, `squadron`, `squadrons`, `joinDate` and `discordLinked`
+  all null, and the callsign tuple (`username`, `displayName`, `effectiveName`, `rank`) intact.
+- [x] The strict outsider level inherits the pass from the member-peer level.
+- [x] A unit with no assigned ship redacts without error.
+
+**Enforced by:** `MissionGuestRedactorTest` · **Code:** `MissionGuestRedactor#cleanupUnitForGuest`,
+`#cleanupShipForGuest` · **Related:** REQ-SEC-007, REQ-SEC-009, ADR-0034
+
+### REQ-SEC-041 — The mission description is gated on membership, not on authentication
+
+`MissionMapper#resolveDescription` MUST return the free-text mission description only to a caller
+who is a member or above (`AuthHelperService#isMemberOrAbove`), never merely to an authenticated
+one. A role-less `GUEST` is authenticated yet is a **mission outsider** by REQ-SEC-009, and ADR-0034
+withholds the description from that tier.
+
+The gate had been bare `isAuthenticated()`, which the *detail* endpoint compensated for by nulling
+the description in `cleanupOutsiderMissionForGuest`. The list and search projections run through no
+redactor, so a `GUEST` token read on `GET /api/v1/missions/search` — an operation in the frozen
+external contract, reachable over the public API vhost — returned the planning notes the detail
+endpoint deliberately withheld from the very same caller. Gating at the single source fixes both
+projections instead of bolting a second redactor onto the list path. Anonymous callers were
+protected only incidentally (`isAuthenticated()` was false for them), which is why the gap was
+invisible from the anonymous surface.
+
+**Acceptance**
+
+- [x] A role-less `GUEST` token gets `description == null` from `/api/v1/missions/search` and from
+  the mission detail alike.
+- [x] A member still receives the description on both.
+
+**Enforced by:** `MissionViewerAccessServiceTest` · **Code:** `MissionMapper#resolveDescription`,
+`MissionViewerAccess#isMemberOrAbove` · **Related:** REQ-SEC-009, ADR-0034
+
+### REQ-SEC-042 — Booking into a mission ledger is a write, and is gated like one
+
+`POST /api/v1/finance-entries` MUST be authorized by `MissionSecurityService#canCreateFinanceEntry`:
+a caller who may manage the mission (ADMIN; an OFFICER / MISSION_MANAGER whose owning-OrgUnit scope
+covers it; the owner or a co-manager) may book for any of its participants, and every other member
+may book **only against their own participant row** on that mission.
+
+It MUST NOT be gated on `OwnerScopeService#canSeeMission`, which deliberately grants the
+cross-squadron **public escape** on a non-internal mission. That is the correct rule for a read and
+the wrong one for a write: combined with a service that checked only that the participant belonged
+to the mission, any member could post income/expense rows into another squadron's payout ledger and
+attribute them to a member of that squadron — while editing or deleting that same row required being
+its owner or an officer in scope (`canEditFinanceEntry`). A create strictly weaker than the edit of
+what it creates is a broken-object-level-authorization asymmetry, and booking money is a management
+act on the mission (MULTI_SQUADRON_PLAN.md § 1: editing is the owning OrgUnit's prerogative).
+
+The self-booking branch resolves the caller's participant row by `(missionId, userId)` and compares
+it to the requested id, so it enforces three conditions at once — the row exists, it belongs to this
+mission, and it is the caller's — mirroring `canEditFinanceEntry`'s "owner **and** still a
+participant" rule.
+
+**Acceptance**
+
+- [x] A member who may only *see* the mission gets `403`, and the service is never invoked.
+- [x] A member naming another participant's row gets `403`.
+- [x] A member booking against their own row succeeds.
+- [x] A mission manager in scope may book for any participant.
+- [x] An anonymous caller still gets `401` and a role-less `GUEST` still `403`, unchanged.
+
+**Enforced by:** `MissionSecurityServiceTest`, `MissionFinanceEntryControllerSecurityTest` ·
+**Code:** `MissionSecurityService#canCreateFinanceEntry`,
+`MissionFinanceEntryController#createFinanceEntry` · **Related:** REQ-SEC-006, REQ-SEC-009
 
 ## Out of scope
 

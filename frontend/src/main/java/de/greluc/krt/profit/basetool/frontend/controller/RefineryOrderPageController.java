@@ -552,6 +552,12 @@ public class RefineryOrderPageController {
       return "refinery-orders-details :: fragmentError";
     }
     boolean isLogistician = isLogistician(principal);
+    // Set unconditionally, not only on the fresh-load branch below: the store dialog's receiver
+    // picker is gated on this flag (REQ-SEC-039), and on the flash-attribute re-render after a
+    // validation error the branch is skipped — which would silently demote a logistician to the
+    // read-only receiver field. A missing flag renders as "not a logistician", so the failure mode
+    // is safe but wrong, and only visible after a failed submit.
+    model.addAttribute("isLogistician", isLogistician);
 
     if (!model.containsAttribute("refineryOrderForm") || !model.containsAttribute("storeForm")) {
       try {
@@ -567,7 +573,6 @@ public class RefineryOrderPageController {
 
         boolean canEdit = isLogistician || isOwner;
         model.addAttribute("canEdit", canEdit);
-        model.addAttribute("isLogistician", isLogistician);
         model.addAttribute("order", orderDto);
 
         // Store-dialog owning-org-unit picker (#596): options for the default receiver (the caller)

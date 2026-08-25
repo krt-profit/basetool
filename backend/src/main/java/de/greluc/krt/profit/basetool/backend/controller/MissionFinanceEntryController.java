@@ -157,10 +157,17 @@ public class MissionFinanceEntryController {
    * Creates a finance entry. Restricted to registered members and above ({@code
    * isMemberOrAbove()}): anonymous callers AND authenticated role-less {@code GUEST} accounts are
    * rejected with 401/403, because the finance ledger is the mission's payout view and a guest is
-   * treated like an anonymous visitor there. {@code @ownerScopeService.canSeeMission} additionally
-   * keeps a member from writing to a mission outside their scope. The response strips the nested
-   * participant PII via {@link #redactParticipantPii} so the create cannot echo a peer's email back
-   * to the creator (email is a profile-only field, H-1).
+   * treated like an anonymous visitor there. The response strips the nested participant PII via
+   * {@link #redactParticipantPii} so the create cannot echo a peer's email back to the creator
+   * (email is a profile-only field, H-1).
+   *
+   * <p>REQ-SEC-042: the write gate is {@code @missionSecurityService.canCreateFinanceEntry}, not
+   * the read-level {@code canSeeMission} it used to be. The latter grants the cross-squadron public
+   * escape on a non-internal mission, which let any member book into another squadron's ledger and
+   * attribute the row to one of that squadron's participants — while editing the same row required
+   * being its owner or an officer in scope. The create is now gated like the management act it is:
+   * a mission manager (in scope) books for anyone on the mission, a plain member only for their own
+   * participant row.
    *
    * @param dto create payload
    * @return the persisted entry, with nested participant PII stripped
@@ -169,7 +176,8 @@ public class MissionFinanceEntryController {
   @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @ownerScopeService.canSeeMission(#dto.missionId())")
+          + " and @missionSecurityService.canCreateFinanceEntry(#dto.missionId(),"
+          + " #dto.participantId(), authentication)")
   public MissionFinanceEntryDto createFinanceEntry(
       @RequestBody @Valid MissionFinanceEntryCreateDto dto) {
     // Strip the nested participant PII so the create response cannot echo a peer's email back to

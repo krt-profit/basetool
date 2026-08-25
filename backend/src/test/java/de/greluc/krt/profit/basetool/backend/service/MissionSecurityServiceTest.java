@@ -556,6 +556,93 @@ class MissionSecurityServiceTest {
   }
 
   // ---------------------------------------------------------------------
+  // canCreateFinanceEntry — REQ-SEC-042: booking money is a WRITE, so it is
+  // gated like one. The create used to ride ownerScopeService.canSeeMission,
+  // whose cross-squadron public escape let any member post into a foreign
+  // squadron's payout ledger AND attribute the row to one of its participants,
+  // while editing that same row required owning it. These pin both halves.
+  // ---------------------------------------------------------------------
+
+  @Test
+  void canCreateFinanceEntry_MissionManagerInScope_ShouldReturnTrue() {
+    // A manager runs the mission's ledger and may book for any of its participants.
+    when(authentication.isAuthenticated()).thenReturn(true);
+    when(authentication.getAuthorities())
+        .thenAnswer(
+            i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
+    when(ownerScopeService.canEditMission(missionId)).thenReturn(true);
+
+    assertTrue(
+        missionSecurityService.canCreateFinanceEntry(missionId, UUID.randomUUID(), authentication));
+  }
+
+  @Test
+  void canCreateFinanceEntry_MemberBookingOwnParticipantRow_ShouldReturnTrue() {
+    UUID participantId = UUID.randomUUID();
+    MissionParticipant own = new MissionParticipant();
+    own.setId(participantId);
+    own.setUser(user);
+
+    when(authentication.isAuthenticated()).thenReturn(true);
+    when(authentication.getAuthorities())
+        .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.empty());
+    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(missionParticipantRepository.findByMissionIdAndUserId(missionId, userId))
+        .thenReturn(Optional.of(own));
+
+    assertTrue(
+        missionSecurityService.canCreateFinanceEntry(missionId, participantId, authentication));
+  }
+
+  @Test
+  void canCreateFinanceEntry_MemberAttributingToAnotherParticipant_ShouldReturnFalse() {
+    // The regression: a member may book only for THEIR OWN participant row. Naming a peer's row
+    // would falsify who a payout line belongs to — and the sibling edit/delete gate has always
+    // refused exactly that.
+    MissionParticipant own = new MissionParticipant();
+    own.setId(UUID.randomUUID());
+    own.setUser(user);
+
+    when(authentication.isAuthenticated()).thenReturn(true);
+    when(authentication.getAuthorities())
+        .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.empty());
+    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(missionParticipantRepository.findByMissionIdAndUserId(missionId, userId))
+        .thenReturn(Optional.of(own));
+
+    assertFalse(
+        missionSecurityService.canCreateFinanceEntry(missionId, UUID.randomUUID(), authentication));
+  }
+
+  @Test
+  void canCreateFinanceEntry_MemberOfAnotherSquadronNotOnTheMission_ShouldReturnFalse() {
+    // The cross-squadron case the public escape used to admit: the caller can SEE the non-internal
+    // mission, but is not on it and cannot manage it, so there is nothing for them to book.
+    when(authentication.isAuthenticated()).thenReturn(true);
+    when(authentication.getAuthorities())
+        .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+    when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.empty());
+    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(missionParticipantRepository.findByMissionIdAndUserId(missionId, userId))
+        .thenReturn(Optional.empty());
+
+    assertFalse(
+        missionSecurityService.canCreateFinanceEntry(missionId, UUID.randomUUID(), authentication));
+  }
+
+  @Test
+  void canCreateFinanceEntry_NullArguments_ShouldReturnFalse() {
+    assertFalse(
+        missionSecurityService.canCreateFinanceEntry(missionId, UUID.randomUUID(), null),
+        "an unauthenticated caller must never pass the create gate");
+    assertFalse(
+        missionSecurityService.canCreateFinanceEntry(null, UUID.randomUUID(), authentication));
+    assertFalse(missionSecurityService.canCreateFinanceEntry(missionId, null, authentication));
+  }
+
+  // ---------------------------------------------------------------------
   // canEditFinanceEntry — security audit H1: ADMIN edits any finance entry,
   // but an OFFICER may edit/delete only within their owning-OrgUnit scope
   // (canEditMission). A cross-OrgUnit officer must be denied — this was the

@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Security
+
+- **Die öffentliche Einsatzansicht gibt keine Mitgliederdaten mehr preis.** Bei einem Einsatz mit
+  zugewiesenem Schiff lieferte sie ohne Anmeldung den vollständigen Datensatz der Schiffsbesitzerin
+  mit — Rollen und Berechtigungen, Profiltext, Staffelzugehörigkeit, Beitrittsdatum. Sichtbar bleibt
+  nur noch der öffentliche Rufzeichen-Eintrag (REQ-SEC-040).
+- **Raffinerie-Erträge lassen sich nicht mehr in fremde Bestände einlagern.** Beim Einlagern einer
+  eigenen Raffinerie-Order konnte pro Position ein beliebiges anderes Mitglied als Empfänger
+  eingetragen und diesem so jede Materialmenge ins Lager geschrieben werden. Das dürfen jetzt nur
+  Logistiker; alle anderen sehen im Dialog ihren eigenen Namen ohne Auswahl (REQ-SEC-039).
+- **Einsatz-Finanzen kann nur noch buchen, wer am Einsatz beteiligt ist.** Bisher genügte es, einen
+  öffentlichen Einsatz sehen zu dürfen, um Einnahmen und Ausgaben in dessen Kasse zu buchen — auch in
+  die einer fremden Staffel und auf den Namen eines fremden Teilnehmers. Es buchen jetzt die
+  Einsatzleitung für alle Beteiligten und jedes Mitglied für den eigenen Eintrag (REQ-SEC-042).
+- **Bank-, Finanz- und Bestandsantworten dürfen von Zwischenspeichern nicht mehr abgelegt werden.**
+  Sie trugen „revalidieren" statt „nicht speichern", womit ein Proxy zwischen App und Server
+  Kontoauszüge samt Handles hätte vorhalten dürfen. Betrifft die Mitglieder-Kontoansicht,
+  Einsatzfinanzen, Mein Inventar, Lager, Hangar, Raffinerie und Beförderung (REQ-SEC-031).
+- **Einsatzbeschreibungen sind für Gastkonten auch in der Suche ausgeblendet.** Die Detailansicht
+  hatte den Beschreibungstext vor ihnen verborgen, die Einsatzsuche gab ihn trotzdem heraus
+  (REQ-SEC-041).
+
 ### Fixed
 
 - **Schreibende Aktionen in der Android-App funktionieren wieder.** Lagerbuchungen (Ausbuchen),

@@ -21,7 +21,10 @@ package de.greluc.krt.profit.basetool.backend.support;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionUnitDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.ShipDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
@@ -38,21 +41,30 @@ import org.springframework.stereotype.Component;
  *
  * <ul>
  *   <li>{@link #cleanupMissionForGuest(MissionDto)} — the <b>member-peer</b> level: owner/managers
- *       cleared, edit/manage flags forced off, and each participant's nested user stripped to the
- *       public callsign tuple. Payout preference and the free-text comment are kept.
+ *       cleared, edit/manage flags forced off, and every nested user — each participant's, and each
+ *       assigned unit's <b>ship owner</b> (REQ-SEC-040) — stripped to the public callsign tuple.
+ *       Payout preference and the free-text comment are kept.
  *   <li>{@link #cleanupOutsiderMissionForGuest(MissionDto)} — the strict <b>outsider</b> level: the
  *       member-peer pass plus the free-text description hidden and each participant's {@code
  *       payoutPreference} + {@code comment} nulled.
  * </ul>
  *
  * <p><b>Why the explicit full-field {@code new MissionDto(...)} reconstruction is deliberate — do
- * not "simplify" it into pass-through withers.</b> Every field the mission/participant/user records
- * carry is listed out here, so adding a field to any of those records is a compile error until a
- * human decides, field by field, whether a guest may see it. That compiler-enforced exhaustiveness
- * is the load-bearing safety net that prevents a newly added sensitive field from silently leaking
- * to guests; a wither-based redactor ({@code dto.withOwner(null)}) would default a new field to
- * <em>pass through</em>, which is the dangerous default for a redactor. Keep the reconstruction
- * explicit.
+ * not "simplify" it into pass-through withers.</b> Every field the
+ * mission/participant/unit/ship/user records carry is listed out here, so adding a field to any of
+ * those records is a compile error until a human decides, field by field, whether a guest may see
+ * it. That compiler-enforced exhaustiveness is the load-bearing safety net that prevents a newly
+ * added sensitive field from silently leaking to guests; a wither-based redactor ({@code
+ * dto.withOwner(null)}) would default a new field to <em>pass through</em>, which is the dangerous
+ * default for a redactor. Keep the reconstruction explicit.
+ *
+ * <p><b>The exhaustiveness only holds for records this class actually descends into.</b> A nested
+ * collection forwarded by reference is a hole in it, because the compiler has nothing to check:
+ * that is precisely how {@code assignedUnits[].ship.owner} shipped a full {@link UserDto} — roles,
+ * permissions, memberships — to anonymous callers of the public mission detail while every
+ * surrounding control stayed green (REQ-SEC-040). When a new nested record reaches a user, a
+ * squadron or any free text, give it its own {@code cleanup…ForGuest} pass here rather than
+ * forwarding the collection.
  *
  * <p>The {@code cleanup&hellip;ForGuest} method names are load-bearing too: the {@code
  * anonymousReadableMissionEndpointsMustRedactGuestPii} ArchUnit rule recognises a redaction call by
@@ -81,6 +93,11 @@ public class MissionGuestRedactor {
                 .map(this::cleanupParticipantForGuest)
                 .collect(Collectors.toSet());
 
+    List<MissionUnitDto> cleanedUnits =
+        dto.assignedUnits() == null
+            ? null
+            : dto.assignedUnits().stream().map(this::cleanupUnitForGuest).toList();
+
     return new MissionDto(
         dto.id(),
         dto.name(),
@@ -94,7 +111,7 @@ public class MissionGuestRedactor {
         dto.actualEndTime(),
         dto.isInternal(),
         cleanedParticipants,
-        dto.assignedUnits(),
+        cleanedUnits,
         dto.frequencies(),
         dto.operation(),
         null, // owner
@@ -177,7 +194,8 @@ public class MissionGuestRedactor {
         peer.actualEndTime(),
         peer.isInternal(),
         outsiderParticipants, // roster kept, but payout + comment stripped (ADR-0034)
-        peer.assignedUnits(), // units kept
+        peer.assignedUnits(), // units kept — each unit's ship owner already redacted by the peer
+        // pass
         peer.frequencies(), // frequencies kept
         peer.operation(),
         peer.owner(), // already null
@@ -200,6 +218,63 @@ public class MissionGuestRedactor {
         peer.objectives(), // goals kept; long description is the hidden free-text field
         peer.objectivesVersion(),
         peer.meetingPoint());
+  }
+
+  /**
+   * Redacts one assigned unit for guests by cleaning the nested {@link ShipDto}.
+   *
+   * <p>The unit itself is mission planning data an outsider may see (REQ-SEC-021) — name, ship
+   * type, frequency, note, crew and the {@code responsibleUser}, which is a PII-free {@link
+   * de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto} callsign tuple. Its {@code
+   * ship}, however, carries a full {@link UserDto} owner, which is why this pass exists at all
+   * (REQ-SEC-040).
+   *
+   * @param dto the unit DTO straight from the mapper; never {@code null}.
+   * @return a copy whose ship owner is reduced to the public callsign tuple.
+   */
+  public MissionUnitDto cleanupUnitForGuest(MissionUnitDto dto) {
+    return new MissionUnitDto(
+        dto.id(),
+        dto.name(),
+        dto.shipType(),
+        dto.ship() == null ? null : cleanupShipForGuest(dto.ship()),
+        dto.frequency(),
+        dto.highValueUnit(),
+        // UserReferenceDto — the public callsign tuple only, same rationale as partyLeadUser.
+        dto.responsibleUser(),
+        dto.note(),
+        dto.version(),
+        dto.crew());
+  }
+
+  /**
+   * Redacts a ship DTO for guests: routes the nested {@code owner} through {@link
+   * #cleanupUserForGuest} so it leaves the API as the public callsign tuple instead of a full
+   * member record.
+   *
+   * <p><b>REQ-SEC-040 — why this exists.</b> {@code Ship.owner} is {@code nullable = false}, so an
+   * assigned ship <em>always</em> carries an owner, and {@code UserMapper.toDto} nulls only {@code
+   * email}. Before this pass, {@code assignedUnits[].ship.owner} therefore handed an
+   * <em>unauthenticated</em> caller of the public mission detail the owner's roles and permissions
+   * (i.e. who holds ADMIN/OFFICER), free-text description, org-unit memberships, join date and
+   * Discord-link status — the exact field set {@link #cleanupUserForGuest} exists to strip, reached
+   * through a path no redactor descended into.
+   *
+   * @param dto the ship DTO nested in an assigned unit; never {@code null}.
+   * @return a copy whose owner is redacted for guests.
+   */
+  public ShipDto cleanupShipForGuest(ShipDto dto) {
+    return new ShipDto(
+        dto.id(),
+        dto.name(),
+        dto.shipType(),
+        dto.insurance(),
+        dto.location(),
+        dto.fitted(),
+        dto.owner() == null ? null : cleanupUserForGuest(dto.owner()),
+        // Squadron shorthand is not sensitive — same call as the mission's own owningSquadron.
+        dto.owningSquadron(),
+        dto.version());
   }
 
   /**

@@ -156,6 +156,57 @@ public class MissionSecurityService {
   }
 
   /**
+   * Authorizes <b>creating</b> a mission finance entry, as the write-level twin of {@link
+   * #canEditFinanceEntry}.
+   *
+   * <p>True for a caller who may manage the mission ({@link #canManageMission} — ADMIN
+   * unconditionally, an OFFICER / MISSION_MANAGER whose owning-OrgUnit scope covers it, the owner
+   * or a co-manager), and otherwise only for a member booking against <b>their own</b> participant
+   * row on that mission. The self-booking branch resolves the caller's participant row by {@code
+   * (missionId, userId)} and compares it to the requested id, so it enforces all three conditions
+   * at once: the row exists, it belongs to this mission, and it is the caller's.
+   *
+   * <p><b>REQ-SEC-042 — why this replaced the read-level gate.</b> The create used to be gated by
+   * {@code ownerScopeService.canSeeMission(...)}, which deliberately grants the cross-squadron
+   * <em>public escape</em> on a non-internal mission — appropriate for a read, wrong for a write.
+   * Combined with a service that only checked that the participant belonged to the mission, any
+   * member could book income/expense rows into another squadron's payout ledger and attribute them
+   * to a member of that squadron, while the edit/delete of the very same row stayed restricted to
+   * its owner / an officer in scope. A create strictly weaker than the edit of what it creates is
+   * the broken-object-level-authorization asymmetry this closes; booking money is a management act
+   * on the mission, so it is gated like one (MULTI_SQUADRON_PLAN.md section 1: editing is the
+   * owning OrgUnit's prerogative).
+   *
+   * @param missionId the mission the entry is booked against
+   * @param participantId the participant the entry is attributed to
+   * @param authentication current Spring Security authentication
+   * @return true if the caller may create the entry
+   */
+  public boolean canCreateFinanceEntry(
+      UUID missionId, UUID participantId, Authentication authentication) {
+    if (authentication == null
+        || !authentication.isAuthenticated()
+        || missionId == null
+        || participantId == null) {
+      return false;
+    }
+
+    if (canManageMission(missionId, authentication)) {
+      return true;
+    }
+
+    UUID currentUserId = userService.getCurrentUser().map(User::getId).orElse(null);
+    if (currentUserId == null) {
+      return false;
+    }
+
+    return missionParticipantRepository
+        .findByMissionIdAndUserId(missionId, currentUserId)
+        .map(own -> participantId.equals(own.getId()))
+        .orElse(false);
+  }
+
+  /**
    * Authorizes editing or deleting a mission finance entry.
    *
    * <p>Grants access to ADMIN unconditionally and to an OFFICER only when the entry's mission is

@@ -41,12 +41,26 @@ import java.util.UUID;
 public interface MissionViewerAccess {
 
   /**
-   * Reports whether the current request is made by an authenticated (non-guest) caller. Backs the
-   * mission {@code description} redaction — guests never see the free-text description.
+   * Reports whether the current request is made by an authenticated caller.
    *
    * @return {@code true} iff the caller is authenticated.
    */
   boolean isAuthenticated();
+
+  /**
+   * Reports whether the current caller is a squadron member or above — the "mission outsider"
+   * discriminator of REQ-SEC-009, false for both anonymous callers and authenticated but role-less
+   * {@code GUEST} accounts.
+   *
+   * <p>Backs the mission {@code description} redaction (REQ-SEC-041). {@link #isAuthenticated()} is
+   * deliberately <em>not</em> the gate for it: a role-less GUEST is authenticated yet is an
+   * outsider, and the detail endpoint has always hidden the description from that tier via {@code
+   * MissionGuestRedactor#cleanupOutsiderMissionForGuest}. Gating on membership here makes the
+   * list/search rows agree with the detail instead of leaking what the redactor removes.
+   *
+   * @return {@code true} iff the caller holds a member or elevated role.
+   */
+  boolean isMemberOrAbove();
 
   /**
    * Reports whether the current caller may edit (manage) the given mission.
