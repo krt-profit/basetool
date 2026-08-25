@@ -533,17 +533,17 @@ can run these from the repo root:
 # Prometheus scrape config + alert rules.
 # NOTE the --entrypoint: the image's entrypoint is /bin/prometheus, so passing `promtool` as the
 # first argument fails with "unexpected promtool".
-docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.13.2 \
+docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.14.0 \
   check config /cfg/prometheus.yml
 # The two glob'd commands below go through `sh -c` so the pattern is expanded INSIDE the container:
 # the host shell cannot expand a /cfg or /work path, passes it through literally, and promtool then
 # exits with "path '/cfg/alerts/*.yml' does not exist".
-docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.13.2 \
+docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.14.0 \
   -c 'promtool check rules /cfg/alerts/*.yml'
 
 # Alert-rule unit tests (run from the repo root; -w /work makes the tests' ../alerts paths resolve)
 docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/work" -w /work \
-  prom/prometheus:v3.13.2 -c 'promtool test rules tests/*_test.yml'
+  prom/prometheus:v3.14.0 -c 'promtool test rules tests/*_test.yml'
 
 # Alertmanager — check the RENDERED alertmanager.yml (after envsubst), not the .tmpl. Run it from
 # the directory holding the rendered file. The --entrypoint is required for the same reason as

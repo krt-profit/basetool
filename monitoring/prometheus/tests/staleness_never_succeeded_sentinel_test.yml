@@ -27,7 +27,7 @@
 # prom/prometheus image's entrypoint is /bin/prometheus, so passing `promtool` as the first argument
 # fails with "unexpected promtool".
 #   docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.13.2 test rules tests/staleness_never_succeeded_sentinel_test.yml
+#     prom/prometheus:v3.14.0 test rules tests/staleness_never_succeeded_sentinel_test.yml
 
 rule_files:
   - ../alerts/business.yml

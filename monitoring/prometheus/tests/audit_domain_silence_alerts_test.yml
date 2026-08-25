@@ -27,7 +27,7 @@
 # makes the `../alerts` path above resolve). The tag is pinned and kept honest by
 # scripts/check-monitoring-image-pins.sh:
 #   docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.13.2 -c 'promtool test rules tests/audit_domain_silence_alerts_test.yml'
+#     prom/prometheus:v3.14.0 -c 'promtool test rules tests/audit_domain_silence_alerts_test.yml'
 
 rule_files:
   - ../alerts/business.yml
