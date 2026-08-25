@@ -1567,11 +1567,30 @@ The bridge (ADR-0143) closes both directions over the channel REQ-FE-015 already
 the frontend is modified: it keeps publishing and consuming exactly as it did, and simply now has a
 peer that is not a frontend instance.
 
-**Receiving — `GET /api/v1/live-sync/stream?topics=…`.** One SSE stream per screen, its topic set
-named in the URL and fixed for the stream's life; a navigation closes it and opens another. The URL
-*is* the subscription, so there is no subscribe protocol to fall out of sync after a reconnect.
-Three events: `subscribed` once, naming the topics that were **accepted**; `changed` per frame; and
-the same keep-alive heartbeat the notification stream sends, for the same proxy and NAT reasons.
+**Receiving — `GET /api/v1/live-sync/stream?topics=…`.** **One stream per client, not per screen** —
+it carries the *union* of every screen currently observing, reference-counted so a room leaves when
+its last observer does, and reopened whenever that union changes. The topic set is named in the URL
+and fixed for one stream's life, so the URL *is* the subscription and there is no subscribe protocol
+to fall out of sync after a reconnect. Three events: `subscribed` once, naming the topics that were
+**accepted**; `changed` per frame; and the same keep-alive heartbeat the notification stream sends,
+for the same proxy and NAT reasons.
+
+**The per-stream topic cap is therefore a per-client budget, and it is 16** —
+`LiveSyncController.MAX_TOPICS_PER_STREAM`, matching `LiveSyncWebSocketHandler.MAX_TOPICS_PER_SESSION`
+for the web relay's identical union shape. It was 8, sized against "what the busiest screen needs",
+and the number was wrong because the shape was: screens left on the back stack keep their rooms, so a
+member moving through the app accumulates them. In production one member crossed 8, and because the
+endpoint refuses the **whole** request rather than the surplus, live sync went dead on *every* screen
+at once and stayed dead — the client re-asked on its reconnect backoff and was refused each time.
+Refusing rather than truncating is still right (a silently half-live screen has nothing to notice it
+by), which is exactly why the budget has to fit the union and the two caps must not drift apart.
+
+**A refusal of the request is a verdict the client must stop re-sending.** `400` and `403` both say
+something about *this* request that an identical retry cannot change, so the client gives up after
+two and tells its screens with an empty `subscribed` list, which is their cue to poll. The scope of
+"gives up" is the union, not the app: a changed union opens a fresh stream with a fresh counter. A
+`401` is deliberately not in that set — a stale token is precisely the refusal a retry fixes once the
+token has been renewed.
 
 **A topic the caller may not join is dropped from the set, not made fatal** — and the accepted list
 is the first thing the client is told. A client must be able to distinguish "this room is live and

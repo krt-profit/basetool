@@ -61,6 +61,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -1048,6 +1049,49 @@ public class GlobalExceptionHandler {
     return handleAppException(
         new ExternalServiceException("Outbound call failed: " + ex.getClass().getSimpleName(), ex),
         request);
+  }
+
+  // --- disconnected SSE clients ----------------------------------------------------------
+
+  /**
+   * A client that went away while the server was still writing its stream. Not an error, and
+   * deliberately answered with <em>nothing at all</em>.
+   *
+   * <p>Written after it filled the production log. Both SSE endpoints — {@code
+   * /api/v1/live-sync/stream} and {@code /api/v1/notifications/stream} — hand the servlet container
+   * a response that stays open for minutes, and every ordinary way a client leaves closes it
+   * mid-write: a navigation, a closed tab, a phone whose screen went off, a proxy reaping an idle
+   * connection. Tomcat reports the broken pipe, Spring wraps it as {@link
+   * AsyncRequestNotUsableException}, and before this handler existed it fell through to {@link
+   * #handleAllExceptions} and cost <em>two</em> log lines per disconnect:
+   *
+   * <ul>
+   *   <li>an {@code ERROR "Unexpected error at /api/v1/live-sync/stream"} with a full stack trace —
+   *       the wrong severity for the most routine thing an SSE endpoint experiences, and it feeds
+   *       {@code logback_events_total{level="error"}} and every error-rate alert built on it;
+   *   <li>a {@code WARN} from Spring itself, because the {@link ProblemDetail} that handler returns
+   *       cannot be written to a response whose content type is already {@code text/event-stream}
+   *       ({@code HttpMessageNotWritableException: No converter for [class ProblemDetail] with
+   *       preset Content-Type}). Even on a live connection that body would be unparseable to an
+   *       {@code EventSource}.
+   * </ul>
+   *
+   * <p>In one 16-hour production window those two lines were 30 of the 50 WARN/ERROR entries the
+   * backend produced.
+   *
+   * <p><strong>The {@code void} return type is the fix, not an oversight.</strong> It tells Spring
+   * the exception is handled and leaves the response untouched — there is no socket left to write
+   * to, and any attempt to write one is what produced the second line. {@code DEBUG} rather than
+   * {@code INFO}: a disconnect carries no information a reader would act on, and an SSE deployment
+   * produces one per client per navigation.
+   *
+   * @param ex the disconnect, kept only for the debug line's cause
+   * @param request servlet request, for the URI in the debug line
+   */
+  @ExceptionHandler(AsyncRequestNotUsableException.class)
+  public void handleDisconnectedClient(
+      AsyncRequestNotUsableException ex, HttpServletRequest request) {
+    log.debug("Client disconnected from {}: {}", request.getRequestURI(), ex.getMessage());
   }
 
   // --- 500 fallback ---------------------------------------------------------------------

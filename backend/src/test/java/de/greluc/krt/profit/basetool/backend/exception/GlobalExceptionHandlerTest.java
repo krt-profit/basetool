@@ -911,6 +911,56 @@ class GlobalExceptionHandlerTest {
   }
 
   // ---------------------------------------------------------------------
+  // Disconnected SSE clients — handled, silent, and no response body
+  // ---------------------------------------------------------------------
+
+  /**
+   * The routing half. Without a dedicated handler this lands on {@code handleAllExceptions}, which
+   * is how a client closing an SSE tab became an {@code ERROR} with a stack trace in production —
+   * 30 of 50 WARN/ERROR lines in one 16-hour window came from this single cause.
+   */
+  @Test
+  void springResolvesADisconnectedClientToItsOwnHandlerNotTheFallback() {
+    ExceptionHandlerMethodResolver resolver =
+        new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class);
+
+    assertEquals(
+        "handleDisconnectedClient",
+        resolver
+            .resolveMethod(
+                new org.springframework.web.context.request.async.AsyncRequestNotUsableException(
+                    "Servlet container error notification for disconnected client",
+                    new java.io.IOException("Broken pipe")))
+            .getName());
+  }
+
+  /**
+   * The response half. The handler must be {@code void}: the second production log line was Spring
+   * failing to write a {@link ProblemDetail} into a response whose content type is already {@code
+   * text/event-stream}, and there is no socket left to write to in any case.
+   */
+  @Test
+  void aDisconnectedClientHandlerReturnsNothingAtAll() throws Exception {
+    assertEquals(
+        void.class,
+        GlobalExceptionHandler.class
+            .getMethod(
+                "handleDisconnectedClient",
+                org.springframework.web.context.request.async.AsyncRequestNotUsableException.class,
+                HttpServletRequest.class)
+            .getReturnType(),
+        "a body cannot be written to a closed connection, and writing one is what produced the"
+            + " HttpMessageNotWritableException warning this handler exists to stop");
+
+    // Must not throw, and must not touch the response.
+    handler.handleDisconnectedClient(
+        new org.springframework.web.context.request.async.AsyncRequestNotUsableException(
+            "Servlet container error notification for disconnected client",
+            new java.io.IOException("Broken pipe")),
+        request);
+  }
+
+  // ---------------------------------------------------------------------
   // ReportGenerationException — 500 with generic localized detail
   // ---------------------------------------------------------------------
 

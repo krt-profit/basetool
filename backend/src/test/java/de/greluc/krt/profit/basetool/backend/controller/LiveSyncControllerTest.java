@@ -126,6 +126,25 @@ class LiveSyncControllerTest {
   }
 
   @Test
+  @DisplayName("a member moving through the app accumulates rooms and still gets a stream")
+  void aMultiScreenUnionIsAccepted() {
+    // The client holds ONE stream and asks for the union of every screen currently observing, so
+    // rooms accumulate from screens still on the back stack. Twelve is what that looks like in
+    // practice; the first revision's cap of 8 refused it — and refuses the whole request, so live
+    // sync went dead on every screen at once and stayed dead behind the reconnect backoff.
+    when(authorizer.maySubscribe(any())).thenReturn(true);
+    when(streamService.subscribe(eq(ALICE), anyList())).thenReturn(new SseEmitter());
+    List<String> union = new ArrayList<>();
+    for (int i = 0; i < 12; i++) {
+      union.add("mission:" + new UUID(0L, i));
+    }
+
+    controller.stream(ALICE, String.join(",", union), response());
+
+    verify(streamService).subscribe(eq(ALICE), anyList());
+  }
+
+  @Test
   @DisplayName("duplicates and blanks in the parameter do not count against the cap")
   void duplicatesAreCollapsed() {
     when(authorizer.maySubscribe(any())).thenReturn(true);

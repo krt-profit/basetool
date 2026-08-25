@@ -63,6 +63,20 @@ probe noise, with bots, scanners and pre-login navigation adding more. The
 log level, so the signal survives for the dashboard/alerts; every other 4xx — including `403
 ACCESS_DENIED`, the security-relevant "authenticated but not allowed" case — stays at `WARN`.
 
+**A client that closes an SSE stream is not an error, and gets no response at all.** Both long-lived
+endpoints — `/api/v1/live-sync/stream` and `/api/v1/notifications/stream` — hand the container a
+response that stays open for minutes, and every ordinary way a client leaves closes it mid-write: a
+navigation, a closed tab, a phone whose screen went off, a proxy reaping an idle connection. Tomcat
+reports the broken pipe and Spring wraps it as `AsyncRequestNotUsableException`. Without a handler of
+its own it lands on the `Exception` fallback and costs **two** lines per disconnect: an `ERROR` with
+a stack trace — feeding `logback_events_total{level="error"}` and `LogbackErrorSpike` on the most
+routine thing an SSE endpoint experiences — and a `WARN` from Spring itself, because the
+`ProblemDetail` that fallback returns cannot be written into a response whose content type is already
+`text/event-stream`. In one 16-hour production window those two were **30 of the 50** WARN/ERROR lines
+the backend produced. `GlobalExceptionHandler.handleDisconnectedClient` takes it at `DEBUG`, and its
+`void` return type is the second half of the fix rather than an oversight: there is no socket left to
+write to, and attempting to write one is what produced the second line.
+
 The frontend's `GlobalExceptionHandler` applies the same expected-noise demotion to **asset-shaped
 path-variable type mismatches**: when a request path whose final segment carries a filename
 extension (e.g. `GET /missions/common-handlers.js`, a crawler resolving the shared script names of

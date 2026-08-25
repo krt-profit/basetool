@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Live-Sync in der Android-App bleibt nicht mehr stumm, wenn viele Bildschirme offen sind.** Die
+  App hält eine Verbindung für alle Bildschirme zusammen; der Server hat ab 8 Räumen die ganze
+  Anfrage abgelehnt, womit Live-Sync in der gesamten App ausfiel, solange sie offen war. Das Limit
+  liegt jetzt bei 16 — dem Wert, den die Weboberfläche schon verwendet.
+- **Abgebrochene Live-Verbindungen landen nicht mehr als Fehler im Log.** Schließt jemand die App
+  oder wechselt die Seite, ist das der Normalfall und keine Störung. Bisher erzeugte jeder solche
+  Abbruch zwei Log-Zeilen inklusive Fehlerzähler — zuletzt 30 von 50 Meldungen in 16 Stunden.
+
 ## [v1.6.1](https://github.com/krt-profit/basetool/releases/tag/v1.6.1) - 2026-08-25
 
 ### Fixed
