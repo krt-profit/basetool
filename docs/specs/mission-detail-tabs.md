@@ -527,3 +527,27 @@ bump, no re-fetch, id-only / kind-only audit) + `MissionServiceTest` /
 frontend `MissionForm` (`objectivesJson` / `stepsJson`), `CreateMissionRequest`,
 `MissionWriteController.createMission`, `mission-detail.html` (create editors + floating-save rule),
 `mission-detail.js` (create-form editor module).
+
+### REQ-MISSION-018 — Registration count on the mission list row
+
+Every mission **list** row carries `registeredCount` — how many members and guests are registered for
+that mission. A `MissionParticipant` row **is** the registration (there is no accept/decline state to
+weigh), so the figure is that row count. It is the number the Android app's mission tile shows as
+"{n} angemeldet" (design chapter 05); until now the count existed only on the **detail** DTO, so a
+list consumer could not show it without one detail read per row.
+
+**No N+1.** The count is deliberately *not* read from the mission's lazy `participants` collection —
+that would be one SELECT per row, which REQ-DATA-003 forbids. `MissionController.withRegisteredCounts`
+resolves the whole page in **one** grouped statement via `MissionService.registeredCounts` →
+`MissionParticipantRepository.countByMissions` (`MissionParticipantCount` projection, mirroring the
+`BankAccountBalance` precedent of REQ-BANK-016), so a 100-row page costs two statements, not 101. A
+mission with no participants produces no count row; the caller reads through a `0L` default, so the
+field is never null.
+
+The field is additive on the wire: it appears on every `MissionListDto` response, and consumers that
+do not know it ignore it.
+
+**Enforced by:** `MissionControllerLifecycleTest` (list endpoints route through the counted mapper) ·
+**Code:** backend `MissionListDto.registeredCount`, `MissionMapper.toListDto(Mission, long)`,
+`MissionController.withRegisteredCounts`, `MissionService.registeredCounts`,
+`MissionParticipantRepository.countByMissions`, `MissionParticipantCount`.

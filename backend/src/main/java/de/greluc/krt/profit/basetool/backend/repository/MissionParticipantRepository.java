@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.model.projection.MissionParticipantCount;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -115,4 +117,24 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
   int clampCheckedInEndTimes(
       @org.springframework.data.repository.query.Param("missionId") UUID missionId,
       @org.springframework.data.repository.query.Param("end") java.time.Instant end);
+
+  /**
+   * Registration counts for a whole page of missions in ONE grouped statement.
+   *
+   * <p>The mission list shows "{n} angemeldet" per row. Reading it from each mission's lazy {@code
+   * participants} collection would be one SELECT per row (REQ-DATA-003), and the detail endpoint —
+   * the only other place the figure exists — is a different read entirely. Missions with no
+   * participants produce no row; the caller treats a missing id as zero.
+   *
+   * @param missionIds the missions on the page; an empty collection yields an empty list.
+   * @return one count row per mission that has at least one participant.
+   */
+  @org.springframework.data.jpa.repository.Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.projection.MissionParticipantCount(
+        p.mission.id, COUNT(p))
+      FROM MissionParticipant p WHERE p.mission.id IN :missionIds GROUP BY p.mission.id
+      """)
+  List<MissionParticipantCount> countByMissions(
+      @org.springframework.data.repository.query.Param("missionIds") Collection<UUID> missionIds);
 }
