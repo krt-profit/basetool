@@ -160,12 +160,6 @@ public class MissionService {
   }
 
   /**
-   * Free-text search over mission name, description, location and operation name. Optional filters
-   * narrow by status, time window and operation. Used by the mission list page.
-   *
-   * @return paged matching missions
-   */
-  /**
    * Registration counts for the missions of one list page, in a single grouped statement.
    *
    * <p>The list shows "{n} angemeldet" per mission, and a {@code MissionParticipant} row
@@ -188,6 +182,12 @@ public class MissionService {
                 MissionParticipantCount::missionId, MissionParticipantCount::registered));
   }
 
+  /**
+   * Free-text search over mission name, description, location and operation name. Optional filters
+   * narrow by status, time window and operation. Used by the mission list page.
+   *
+   * @return paged matching missions
+   */
   public Page<Mission> searchMissions(
       String query,
       Instant start,

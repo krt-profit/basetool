@@ -290,6 +290,7 @@ class OperationPageControllerMvcTest {
             null,
             null,
             null,
+            0L,
             0L);
     PageResponse<MissionListDto> missionsPage =
         new PageResponse<>(List.of(mission), 0, 10, 1L, 1, List.of("plannedStartTime,asc"));
@@ -355,6 +356,7 @@ class OperationPageControllerMvcTest {
             null,
             null,
             null,
+            0L,
             0L);
     // Two pages so the embedded pager renders.
     when(backendApiClient.get(
