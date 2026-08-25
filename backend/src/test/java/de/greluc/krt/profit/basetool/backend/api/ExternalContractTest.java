@@ -549,6 +549,26 @@ class ExternalContractTest {
           // `replaced`) are the real contract and are pinned in the app's spec, since nothing in
           // this document describes them.
           new ContractOperation("/api/v1/notifications/stream", "get", Set.of()),
+          // Phase 5, the inbox's mutating half. The app shipped a read-only inbox because these
+          // four were "Phase 3" work that phase 3 never picked up; design chapter 07 specifies a
+          // fully interactive one, so the deferral was a defect rather than a decision.
+          //
+          // Only the DELETE of a single row is a 204. The other three answer with a body, and
+          // `unreadCount` on the two bulk results is the field worth freezing hardest: it is what
+          // lets the badge settle from the same response that changed it. Without it the app would
+          // have to follow every bulk action with a second call to `/unread-count`, and the badge
+          // would disagree with the list for as long as that took.
+          //
+          // `/read` and `/read-all` are literal segments sitting beside `{id}`, which is a UUID --
+          // they cannot collide, and the vhost allow-list relies on exactly that to admit the
+          // three by name without admitting the family or the `/notification-rules` admin surface
+          // next to it.
+          new ContractOperation("/api/v1/notifications/{id}/read", "post", Set.of("id", "read")),
+          new ContractOperation(
+              "/api/v1/notifications/read-all", "post", Set.of("affected", "unreadCount")),
+          new ContractOperation("/api/v1/notifications/{id}", "delete", Set.of()),
+          new ContractOperation(
+              "/api/v1/notifications/read", "delete", Set.of("affected", "unreadCount")),
           // Phase 2, the caller's own record. The app needs two fields of it. Its own backend user
           // id: an Operation's payout rows are keyed by that id -- not by the Keycloak `sub` the
           // app holds, and not by a name -- so "Dein Anteil" cannot be found without it, and
@@ -690,6 +710,29 @@ class ExternalContractTest {
               Set.of("id", "productKey", "productName", "note", "acquiredAt", "version"),
               Set.of("version")),
           new ContractOperation("/api/v1/personal-blueprints/{id}", "delete", Set.of()),
+          // Phase 5, the recipe behind one owned blueprint. Design ch. 09 lays the tablet's
+          // Blueprints out as master-detail "with live ingredient quality", and the quality it
+          // means is `minQuality` on each ingredient -- the lowest grade that still satisfies the
+          // requirement. Without this operation the detail pane of that layout has nothing to show.
+          //
+          // Both quantity fields are frozen, and deliberately both: `quantityScu` and
+          // `quantityUnits` are the same amount in two scales, and the app has already been bitten
+          // once by reading a unit figure as SCU (the refinery's 100x stock bug). Freezing the pair
+          // means a client can render the one its column is labelled for instead of converting.
+          new ContractOperation(
+              "/api/v1/personal-blueprints/{id}/recipe",
+              "get",
+              Set.of(
+                  "productName",
+                  "variantCount",
+                  "requirementGroups",
+                  "ingredients",
+                  "kind",
+                  "name",
+                  "quantityScu",
+                  "quantityUnits",
+                  "minQuality",
+                  "quantityType")),
           // The craftability chip. `limitingMaterialName` is what turns "N Materialien fehlen"
           // into a sentence a member can act on, and `craftableWithRefinery` is the second answer
           // the same question has once refining is allowed for — dropping either would leave the
