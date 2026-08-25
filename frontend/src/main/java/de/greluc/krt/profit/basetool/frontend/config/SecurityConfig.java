@@ -199,6 +199,13 @@ public class SecurityConfig {
                         // (Google, Bing, archive.org) get an explicit no-index preference
                         // instead of a custom-app-signal 404.
                         "/robots.txt",
+                        // Android fetches this to verify the app's claim on
+                        // https://profit-base.online/app/callback. It must answer 200 with
+                        // application/json and MUST NOT redirect: behind the catch-all it
+                        // answered 302 into the OAuth entry point, verification failed, and the
+                        // login callback opened in the browser instead of the app — the member
+                        // landed on the 404 page mid-login. Same class as the /sm/** entry below.
+                        "/.well-known/assetlinks.json",
                         // Browser-side asset paths that must never trigger an OAuth2 entry-point
                         // (and therefore must never land in HttpSessionRequestCache as a saved
                         // request). Background sourcemap lookups fired by DevTools and browser
