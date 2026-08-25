@@ -45,6 +45,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.PathContainer;
@@ -513,6 +514,15 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     response.setHeader("X-Rate-Limit-Limit", String.valueOf(rejectedLimit));
     response.setHeader("X-Rate-Limit-Remaining", "0");
     response.setHeader("X-Rate-Limit-Retry-After-Seconds", String.valueOf(retryAfterSeconds));
+    // The STANDARD header too, in the delta-seconds form (RFC 9110 §10.2.3, and RFC 6585 says a 429
+    // SHOULD carry it). The vendor header above stays for the clients that already read it, but it
+    // is not the one anybody's HTTP library looks at: the Android app's retry ladder is documented
+    // to honour the server's wait and could never do so, because it reads `Retry-After` and this
+    // response never had one. Found by walking a rate-limited device (app REQ-APP-UI-003).
+    //
+    // Delta-seconds rather than an HTTP-date on purpose: a date makes the client trust its own
+    // clock against ours, and a skew turns thirty seconds into hours or into none.
+    response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfterSeconds));
     // Echo the minted correlationId as the app-wide response header. This filter rejects before
     // CorrelationIdFilter runs, so that filter never gets to echo it — mirror its contract here so
     // a 429 response still carries X-Correlation-Id (RFC-7807 hardening, REQ-OBS).

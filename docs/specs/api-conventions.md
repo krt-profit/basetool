@@ -260,6 +260,10 @@ constraint for nothing and record a guess about which fields matter.
 | `GET /api/v1/notifications`                                 | envelope `content`, `page`, `totalElements`, `totalPages`; row `id`, `type`, `params`, `entityType`, `entityId`, `read`, `createdAt`                                                                                                                                                                                                        |
 | `GET /api/v1/notifications/unread-count`                    | `count`                                                                                                                                                                                                                                                                                                                                     |
 | `GET /api/v1/notifications/stream`                          | *(a stream, not a schema — the frozen part is the path, the verb and the event names)*                                                                                                                                                                                                                                                      |
+| `POST /api/v1/notifications/{id}/read`                      | `id`, `read`                                                                                                                                                                                                                                                                                                                                |
+| `POST /api/v1/notifications/read-all`                       | `affected`, `unreadCount` — the count settles the badge from the same response that changed it                                                                                                                                                                                                                                              |
+| `DELETE /api/v1/notifications/{id}`                         | *(204, no body — the frozen part is the path and the verb)*                                                                                                                                                                                                                                                                                 |
+| `DELETE /api/v1/notifications/read`                         | `affected`, `unreadCount`                                                                                                                                                                                                                                                                                                                   |
 | `GET /api/v1/operations/{id}/payouts`                       | `totalDonations`; row `participantId`, `participantName`, `payoutPreference`, `shareAmount`, `donatedAmount`, `payoutAmount`, `paidOut`                                                                                                                                                                                                     |
 | `GET /api/v1/personal-inventory`                            | envelope; row `id`, `name`, `note`, `locationUexId`, `locationType`, `locationName`, `quantity`, `version`                                                                                                                                                                                                                                  |
 | `POST /api/v1/personal-inventory`                           | `id`, `name`, `quantity`, `locationUexId`, `locationType`, `version` — **request** requires `name`, `quantity`, `locationUexId`, `locationType`                                                                                                                                                                                             |
@@ -271,6 +275,7 @@ constraint for nothing and record a guess about which fields matter.
 | `POST /api/v1/personal-blueprints`                          | `id`, `productKey`, `productName`, `version` — **request** requires `productKey`                                                                                                                                                                                                                                                            |
 | `PUT /api/v1/personal-blueprints/{id}`                      | as the row — **request** requires `version` only; note and date are optional                                                                                                                                                                                                                                                                |
 | `DELETE /api/v1/personal-blueprints/{id}`                   | *(204, no body)*                                                                                                                                                                                                                                                                                                                            |
+| `GET /api/v1/personal-blueprints/{id}/recipe`               | `productName`, `variantCount`, `requirementGroups`, `ingredients`; ingredient `kind`, `name`, `quantityScu`, `quantityUnits`, `minQuality`, `quantityType` — **both** quantity scales, so a client renders the one its column is labelled for instead of converting                                                                         |
 | `GET /api/v1/personal-blueprints/craftability`              | `blueprintId`, `recipeResolved`, `craftable`, `craftableWithRefinery`, `limitingMaterialName`, `limitingMaterialNameWithRefinery`; row `materialName`, `requiredScu`, `availableScu`, `missingScu`, `quantityType`                                                                                                                          |
 | `GET /api/v1/blueprints/products/search`                    | `productKey`, `name`, `manufacturerName`, `ownedByCurrentUser`                                                                                                                                                                                                                                                                              |
 | `POST /api/v1/hangar/ships`                                 | `id`, `name`, `shipType`, `insurance`, `location`, `fitted`, `version` — **request** requires `insurance`, `shipTypeId`                                                                                                                                                                                                                     |
@@ -305,6 +310,21 @@ constraint for nothing and record a guess about which fields matter.
 | `PUT …/bank/accounts/{id}/balance-target`                   | as the settings — **request** requires `version` only; sending no target clears it                                                                                                                                                                                                                                                          |
 | `POST`/`DELETE …/bank/accounts/{id}/visibility/role/{code}` | as the settings; addressed entirely by path, no body                                                                                                                                                                                                                                                                                        |
 | `PUT …/bank/accounts/{id}/visibility/all-members/{enabled}` | as the settings; the switch is a path segment                                                                                                                                                                                                                                                                                               |
+| `GET /api/v1/promotion/evaluations/my`                      | `categoryName`, `topicName`, `assignedLevel` — me-scoped; the level is a **field**, not a frozen enum, since the levels are the organisation's to name                                                                                                                                                                                      |
+| `GET /api/v1/promotion/eligibility/my`                      | `fromRank`, `toRank`, `eligible`, `hasConfiguredRules`, `checks`, `topicName`, `categoryName`, `minimumLevel`, `requiredCount`, `achievedCount`, `satisfied` — `hasConfiguredRules` separates "no rules exist" from "you do not meet them"                                                                                                  |
+| `GET /api/v1/app/version-policy`                            | `minimumVersionCode`, `latestVersionCode`, `releasesUrl` — **anonymous** (REQ-SEC-037); frozen so a shipped app can be told to STOP (REQ-API-010)                                                                                                                                                                                           |
+| `GET /api/v1/refinery-orders/my-orders`                     | envelope; row `id`, `status`, `location`, `refiningMethod`, `startedAt`, `durationMinutes`, `endsAt`, `goods`, `oreSales`, `profit`, `version` — `endsAt` is frozen on the LIST only; the detail has none and the app computes it                                                                                                           |
+| `GET /api/v1/refinery-orders/{id}`                          | as the list, without `endsAt`                                                                                                                                                                                                                                                                                                               |
+| `POST /api/v1/refinery-orders/{id}/store`                   | *(no body)* — **request** requires `items`; the endpoint marks the order stored whatever that list holds, which is why the field is frozen                                                                                                                                                                                                  |
+| `GET /api/v1/material-exchange/offers`                      | envelope; row `id`, `kind`, `material.quantityType`, `itemName`, `itemQuantity`, `owner.effectiveName`, `ownerOrgUnits.shorthand`, `mine`, `quality`, `amount`, `releasedAt`, `remark`, `interestCount`, `interestedHandles`, `viewerInterested`, `version`                                                                                 |
+| `GET /api/v1/material-requests`                             | as the offers, with `requestedAmount`, `minQuality` and `postedAt` in place of `amount`, `quality` and `releasedAt`                                                                                                                                                                                                                         |
+| `POST`/`DELETE …/offers/{id}/interest`                      | `id`, `interestCount`, `viewerInterested`, `version` — the updated row, which is what lets the app replace one entry instead of re-reading the page                                                                                                                                                                                         |
+| `POST`/`DELETE …/material-requests/{id}/interest`           | as the offer's                                                                                                                                                                                                                                                                                                                              |
+| `POST …/offers/{id}/deactivate`                             | `id`, `status`                                                                                                                                                                                                                                                                                                                              |
+| `POST …/material-requests/{id}/deactivate`                  | `id`, `status`                                                                                                                                                                                                                                                                                                                              |
+| `POST /api/v1/material-exchange/offers`                     | *(no body)* — **request** requires `inventoryItemId`, `offeredAmount`                                                                                                                                                                                                                                                                       |
+| `POST /api/v1/material-requests`                            | *(no body)* — **request** requires `materialId`, `requestedAmount`                                                                                                                                                                                                                                                                          |
+| `GET /api/v1/material-exchange/releasable-items`            | `inventoryItemId`, `materialName`, `quantityType`, `quality`, `amount`, `locationName`, `alreadyReleased` — the caller's OWN stacks, which is why it is not anonymous                                                                                                                                                                       |
 
 **Frozen has three more sides than the response body, and phase 3 is where each starts to bite.**
 
@@ -447,8 +467,57 @@ a subset of this set, and the two move together.
   an objective loses its kind badge rather than its screen, and freezing them would make the guard
   fire on harmless additions until it means nothing. Verified by adding a constant: three failures.
 - [ ] Type and nullability changes are caught. **Open** — needs a schema diff of the contract
-- [ ] A sunset can actually retire old builds. **Open** — depends on the minimum-app-version gate
-  (exposure plan item A5), which is therefore a prerequisite for the first `/api/v2`.
+- [x] A sunset can actually retire old builds — **closed by REQ-API-010** (2026-08-24). The gate
+  the first `/api/v2` was waiting on now exists: the server names a floor and the app refuses to run
+  below it. What that unblocks is narrower than "old builds are gone", and the difference matters
+  when planning a sunset — the floor stops a build from *running*, it does not remove it from
+  anyone's phone, and a member who never opens the app never learns of it.
 
 **Enforced by:** `ExternalContractTest` (backend) ·
 **Related:** ADR-0136, ADR-0135, ADR-0003, REQ-API-001, REQ-API-007, REQ-SEC-027
+
+---
+
+### REQ-API-010 — The server states which app builds it still serves
+
+A frozen contract (REQ-API-009) keeps a shipped build working. It cannot make one **stop**: when an
+operation is genuinely retired, or a defect makes a build unsafe to keep using, something has to
+tell the device. Nothing did — the sunset checkbox of REQ-API-009 sat open for exactly this reason,
+and it is why the first `/api/v2` was blocked on a gate that did not exist.
+
+`GET /api/v1/app/version-policy` answers three values: `minimumVersionCode` (the oldest build still
+served; `0` means no floor), `latestVersionCode` (the newest published, or `0` when unknown) and
+`releasesUrl`. The app compares its own `versionCode` against the floor and, below it, shows the
+non-dismissible „Update erforderlich" screen of design chapter 14.
+
+**Three properties, each of which is the requirement rather than an implementation note.**
+
+- **Anonymous** (owner decision, 2026-08-24). The API vhost opens no anonymous paths as a matter of
+  stance (plan Q8) and this is its single exception. A version gate that answers only after a
+  successful login is silent in the one case it exists for: when the break is in the auth flow, the
+  old build cannot log in, and it would show an authentication error where the design calls for an
+  update wall — telling the member their credentials are wrong, which they are not. It publishes
+  three integers and a public release URL; no caller identity goes in and none comes out. It is
+  enumerated in REQ-SEC-037 like every other anonymous path, and its status is pinned by a test.
+- **The floor and the newest build are two numbers.** Collapsing them makes every release a forced
+  one, because the app could no longer tell "your build is no longer served" from "a newer build
+  exists" — and it only has a wall for the first.
+- **The default floor is `0`.** A server nobody has configured must not refuse every installed
+  build. Locking members out is the expensive direction of a wrong default; serving an old build
+  for one more day is the cheap one.
+
+Configuration (`app.android.*`), not a table: raising the floor is what an operator does at the
+moment a contract breaks, and it has to work without a migration, an admin screen or a deploy.
+
+The operation is itself in the frozen set, for an inverted reason worth stating — every other entry
+is frozen so a shipped app keeps working, this one so a shipped app can be told to stop. A renamed
+`minimumVersionCode` would leave the build that most needs the answer, the one already too old,
+reading "no floor" and carrying on against a contract that no longer exists.
+
+**The CTA is a deviation from the design.** Chapter 14 points its button at a store listing;
+distribution is GitHub Releases plus Obtainium (plan Q1), so `releasesUrl` names the release page
+instead. Recorded here rather than left as a silent difference between design and build.
+
+**Enforced by:** `AppVersionPolicyControllerTest`, `ExternalContractTest`,
+`ApiVhostAnonymousSurfaceTest` (backend) ·
+**Related:** REQ-API-009, REQ-SEC-037, ADR-0136, app issue krt-profit/basetool-android#67

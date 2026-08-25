@@ -16,7 +16,7 @@
 #
 # Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
 #   docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.13.2 test rules tests/livesync_relay_drop_alerts_test.yml
+#     prom/prometheus:v3.14.0 test rules tests/livesync_relay_drop_alerts_test.yml
 
 rule_files:
   - ../alerts/business.yml
