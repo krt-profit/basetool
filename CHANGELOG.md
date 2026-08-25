@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.6.3](https://github.com/krt-profit/basetool/releases/tag/v1.6.3) - 2026-08-25
+
 ### Added
 
 - **Die Einsatzliste der API nennt jetzt die Teilnehmerzahl.** Jede Listenzeile trägt
