@@ -445,12 +445,26 @@
                                 </select>
                             </div>
                             <div class="form-group flex-1 mb-0">
-                                <label th:for="'storeUser_' + ${stat.index}" th:text="#{refineryorder.store.user}">Mitglied</label>
+                                <label th:for="${isLogistician ? 'storeUser_' + stat.index : 'storeUserFixed_' + stat.index}" th:text="#{refineryorder.store.user}">Mitglied</label>
                                 <!-- Server-side searchable combobox (remote-users, #1193): seed only
                                      the current receiver (defaults to the caller); the roster is
-                                     searched on demand. -->
-                                <select th:id="'storeUser_' + ${stat.index}" th:field="*{items[__${stat.index}__].userId}" required data-krt-combobox="remote-users">
+                                     searched on demand.
+
+                                     REQ-SEC-039: booking the output onto ANOTHER member is a
+                                     logistician act, so only a logistician gets the picker. A plain
+                                     member sees their own name in a disabled field — offering a
+                                     roster picker whose every foreign choice answers 403 is worse
+                                     than not offering one. The disabled field submits nothing, so
+                                     the server falls back to the order's owner, which for a
+                                     non-logistician is the caller by the ownership check. The id
+                                     deliberately does NOT start with `storeUser_`: that prefix is
+                                     what duplicateStoreItem() looks for to graft a fresh combobox
+                                     onto a split row, which would put the picker straight back. -->
+                                <select th:if="${isLogistician}" th:id="'storeUser_' + ${stat.index}" th:field="*{items[__${stat.index}__].userId}" required data-krt-combobox="remote-users">
                                     <option th:if="${item.userId != null}" th:value="${item.userId}" th:text="${seedUserNames.get(item.userId)}"></option>
+                                </select>
+                                <select th:unless="${isLogistician}" th:id="'storeUserFixed_' + ${stat.index}" disabled>
+                                    <option th:text="${item.userId != null ? seedUserNames.get(item.userId) : ''}"></option>
                                 </select>
                             </div>
                         </div>

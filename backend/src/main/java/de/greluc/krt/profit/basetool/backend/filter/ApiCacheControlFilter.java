@@ -72,13 +72,48 @@ public class ApiCacheControlFilter extends OncePerRequestFilter {
    * switchable by an env var nobody reviews. Extending it is a one-line change.
    *
    * <ul>
-   *   <li>{@code bank} — account balances, bookings and the ledger;
+   *   <li>{@code bank} and {@code org-units/bank} — account balances, bookings and the ledger. Both
+   *       spellings, because they are <em>different</em> surfaces: {@code /api/v1/bank/**} is the
+   *       bank-employee one, while the member-facing account a client actually reads lives under
+   *       {@code /api/v1/org-units/bank/**} and its transaction rows carry a {@code holderHandle};
    *   <li>{@code users} and {@code me} — member records, the only PII the API serves;
-   *   <li>{@code notifications} — one member's personal feed, including the SSE stream.
+   *   <li>{@code notifications} — one member's personal feed, including the SSE stream;
+   *   <li>{@code finance-entries} (both the standalone write family and the per-mission read) and
+   *       {@code operations} — the mission/operation payout ledgers and their rollups;
+   *   <li>{@code personal-inventory}, {@code personal-blueprints}, {@code inventory}, {@code
+   *       hangar} and {@code refinery-orders} — a member's own holdings and the org stock/fleet
+   *       they name members in;
+   *   <li>{@code promotion} — a member's own evaluation and eligibility record.
    * </ul>
+   *
+   * <p>The Materialbörse ({@code material-exchange} / {@code material-requests}) is deliberately
+   * <em>not</em> here: it is an org-wide shared board, and the handles it carries are the same
+   * public callsign tuple the public mission roster already serves, so it belongs in the revalidate
+   * bucket with the other shared listings.
+   *
+   * <p><b>This list is load-bearing, not advisory</b> (REQ-SEC-031). Because this filter runs at
+   * {@code HIGHEST_PRECEDENCE + 20} — ahead of the Spring Security chain — it sets {@code
+   * Cache-Control} before {@code CacheControlHeadersWriter} would, and that writer only acts when
+   * the header is unset. So a sensitive family missing from this list does not merely fail to opt
+   * in: it is actively <em>downgraded</em> from the framework's default {@code no-store} to the
+   * storable {@code must-revalidate}. Adding a sensitive GET family means adding it here.
    */
   private static final List<PathPattern> NO_STORE_SCOPES =
-      Stream.of("/api/v1/bank/**", "/api/v1/users/**", "/api/v1/me/**", "/api/v1/notifications/**")
+      Stream.of(
+              "/api/v1/bank/**",
+              "/api/v1/org-units/bank/**",
+              "/api/v1/users/**",
+              "/api/v1/me/**",
+              "/api/v1/notifications/**",
+              "/api/v1/finance-entries/**",
+              "/api/v1/missions/*/finance-entries/**",
+              "/api/v1/operations/**",
+              "/api/v1/personal-inventory/**",
+              "/api/v1/personal-blueprints/**",
+              "/api/v1/inventory/**",
+              "/api/v1/hangar/**",
+              "/api/v1/refinery-orders/**",
+              "/api/v1/promotion/**")
           .map(PathPatternParser.defaultInstance::parse)
           .toList();
 

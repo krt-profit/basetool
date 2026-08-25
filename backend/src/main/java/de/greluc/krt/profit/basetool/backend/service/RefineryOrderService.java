@@ -619,7 +619,13 @@ public class RefineryOrderService {
    * while the refinery order's automatic mission earmark is simply not applied (marking the batch
    * personal is exactly the act of taking it out of the mission pool).
    *
-   * @throws AccessDeniedException when the caller is neither owner nor logistician
+   * <p>A non-logistician may only book the output onto <strong>themselves</strong>: the per-item
+   * {@code userId} chooses the receiving stock owner, so it is gated separately from the
+   * order-ownership check (REQ-SEC-039), mirroring {@code
+   * InventoryItemService#createInventoryItem}.
+   *
+   * @throws AccessDeniedException when the caller is neither owner nor logistician, or when a
+   *     non-logistician names another user as an item's receiving stock owner
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the order or any
    *     referenced id is unknown
    * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the order is
@@ -663,6 +669,28 @@ public class RefineryOrderService {
                   () ->
                       new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
                           "Location not found: " + itemDto.locationId()));
+
+      // REQ-SEC-039: the per-item userId names the RECEIVING inventory owner, so it decides whose
+      // ledger the output lands in. The order-ownership check above does not cover that — it
+      // constrains which order may be stored, not who the stock is booked for — so without this
+      // guard a member storing their OWN order could redirect arbitrary amounts of any material
+      // into any other member's stock (shared, or with `personal` into their private stock) and
+      // leave INVENTORY_RECEIVED_FROM_REFINERY audit rows attributed to that member. Only a
+      // logistician books on behalf of someone else, mirroring the Einbuchen path's guard verbatim
+      // (InventoryItemService#createInventoryItem): the same "create an InventoryItem for another
+      // user" operation must not be privileged in one entry point and open in the other.
+      //
+      // Checked on the REQUESTED id and BEFORE the lookup, for the same reason createInventoryItem
+      // does it in that order: resolving first would answer "user not found" vs "access denied" to
+      // an unauthorised caller, turning the endpoint into a user-existence oracle.
+      final UUID targetUserId =
+          itemDto.userId() != null
+              ? itemDto.userId()
+              : (order.getOwner() != null ? order.getOwner().getId() : null);
+      if (!isLogistician && !userId.equals(targetUserId)) {
+        throw new AccessDeniedException(
+            "Access denied: You are not allowed to store refinery output for other users");
+      }
 
       User assignee;
       if (itemDto.userId() != null) {

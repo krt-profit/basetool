@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.service.MissionFinanceEntryService;
+import de.greluc.krt.profit.basetool.backend.service.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import java.math.BigDecimal;
 import java.util.List;
@@ -64,6 +65,9 @@ import org.springframework.web.context.WebApplicationContext;
  *   <li>role-less GUEST create → 403 (method gate requires a member), no service call,
  *   <li>member / officer create on an in-scope mission → 201 with the nested participant's email
  *       stripped (H-1),
+ *   <li>member create on a mission they may only <em>read</em> → 403, because the write gate is
+ *       {@code canCreateFinanceEntry} and not the public-escape-granting {@code canSeeMission}
+ *       (REQ-SEC-042),
  *   <li>GUEST read → 403; member / officer read → 200 with participant email stripped,
  *   <li>oversized {@code note} or out-of-range {@code amount} (member caller) → 400 before the
  *       service is hit.
@@ -78,6 +82,7 @@ class MissionFinanceEntryControllerSecurityTest {
 
   @MockitoBean private MissionFinanceEntryService financeEntryService;
   @MockitoBean private OwnerScopeService ownerScopeService;
+  @MockitoBean private MissionSecurityService missionSecurityService;
   @MockitoBean private JwtDecoder jwtDecoder;
 
   @BeforeEach
@@ -189,7 +194,7 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void createFinanceEntry_member_returnsEntryWithParticipantEmailStripped() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
+    when(missionSecurityService.canCreateFinanceEntry(any(), any(), any())).thenReturn(true);
     when(financeEntryService.createEntry(any())).thenReturn(persistedEntryWithUserPii(missionId));
 
     String body =
@@ -220,7 +225,7 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void createFinanceEntry_authenticatedOfficer_stripsParticipantEmail() throws Exception {
     UUID missionId = UUID.randomUUID();
-    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
+    when(missionSecurityService.canCreateFinanceEntry(any(), any(), any())).thenReturn(true);
     when(financeEntryService.createEntry(any())).thenReturn(persistedEntryWithUserPii(missionId));
 
     String body =
@@ -246,6 +251,39 @@ class MissionFinanceEntryControllerSecurityTest {
     org.junit.jupiter.api.Assertions.assertFalse(
         body.contains("bob@example.invalid"),
         "authenticated create response must not echo the participant's email");
+  }
+
+  /**
+   * REQ-SEC-042: a member who may merely <em>see</em> the mission may not book into its ledger.
+   *
+   * <p>This is the regression the create gate shipped with: it was gated on {@code
+   * ownerScopeService.canSeeMission}, which deliberately grants the cross-squadron public escape on
+   * a non-internal mission. A member of another squadron could therefore post income/expense rows
+   * into that mission's payout ledger and attribute them to one of its participants — while editing
+   * or deleting the very same row required being its owner or an officer in scope. The stub below
+   * reproduces exactly that state: the read gate says yes, the write gate says no, and the write
+   * gate is the one that decides.
+   */
+  @Test
+  void createFinanceEntry_memberWhoMayOnlySeeTheMission_isForbidden() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
+    when(missionSecurityService.canCreateFinanceEntry(any(), any(), any())).thenReturn(false);
+
+    mockMvc
+        .perform(
+            post("/api/v1/finance-entries")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"missionId\":\""
+                        + missionId
+                        + "\",\"participantId\":\""
+                        + UUID.randomUUID()
+                        + "\",\"type\":\"EXPENSE\",\"amount\":99999999.00}")
+                .with(jwt().authorities(member())))
+        .andExpect(status().isForbidden());
+
+    verify(financeEntryService, never()).createEntry(any());
   }
 
   @Test

@@ -188,14 +188,24 @@ public abstract class MissionMapper {
   }
 
   /**
-   * Returns the mission description only to authenticated callers; guests get {@code null} so the
-   * description is never exposed via the public detail endpoint.
+   * Returns the mission description only to squadron members and above; every mission outsider —
+   * anonymous <em>and</em> authenticated role-less {@code GUEST} (REQ-SEC-009) — gets {@code null}.
+   *
+   * <p>REQ-SEC-041: the gate is membership, not bare authentication. It used to be {@code
+   * isAuthenticated()}, which the detail endpoint compensated for by nulling the description in
+   * {@code MissionGuestRedactor#cleanupOutsiderMissionForGuest} — but the list/search rows run
+   * through no redactor, so a GUEST token read on {@code /api/v1/missions/search} the free-text
+   * planning notes the detail deliberately withheld from the same caller. Gating here fixes both
+   * projections at their single source instead of bolting a second redactor onto the list path.
+   *
+   * @param mission the mission being projected; {@code null} yields {@code null}.
+   * @return the description for a member-or-above caller, otherwise {@code null}.
    */
   public String resolveDescription(Mission mission) {
     if (mission == null || mission.getDescription() == null) {
       return null;
     }
-    if (missionViewerAccess.isAuthenticated()) {
+    if (missionViewerAccess.isMemberOrAbove()) {
       return mission.getDescription();
     }
     return null;

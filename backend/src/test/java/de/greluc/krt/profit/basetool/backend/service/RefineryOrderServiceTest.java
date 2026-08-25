@@ -276,6 +276,9 @@ class RefineryOrderServiceTest {
       when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(location));
       when(userRepository.findById(OTHER_USER_ID)).thenReturn(Optional.empty());
 
+      // Driven as a LOGISTICIAN: since REQ-SEC-039 a plain member naming a foreign assignee is
+      // refused before the lookup, so the unknown-user path is only reachable for a caller who is
+      // actually allowed to book on someone else's behalf.
       assertThrows(
           NotFoundException.class,
           () ->
@@ -283,7 +286,7 @@ class RefineryOrderServiceTest {
                   OWNER_ID,
                   ORDER_ID,
                   new RefineryOrderStoreDto(List.of(item(OTHER_USER_ID, null))),
-                  false));
+                  true));
     }
 
     @Test
@@ -324,7 +327,7 @@ class RefineryOrderServiceTest {
     }
 
     @Test
-    void usesExplicitlyProvidedUserAsAssignee_whenItemUserIdIsSet() {
+    void usesExplicitlyProvidedUserAsAssignee_whenLogisticianBooksOnBehalfOfSomeoneElse() {
       User other = new User();
       other.setId(OTHER_USER_ID);
       other.setUsername("bob");
@@ -332,12 +335,76 @@ class RefineryOrderServiceTest {
       stubLookupsForSingleItem();
       when(userRepository.findById(OTHER_USER_ID)).thenReturn(Optional.of(other));
 
+      // Booking someone else's stock is a LOGISTICIAN act (REQ-SEC-039) — the same privilege the
+      // Einbuchen path requires for a foreign target user.
       refineryOrderService.storeRefineryOrder(
-          OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(OTHER_USER_ID, null))), false);
+          OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(OTHER_USER_ID, null))), true);
 
       ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
       verify(inventoryItemRepository, times(1)).save(captor.capture());
       assertSame(other, captor.getValue().getUser());
+    }
+
+    /**
+     * REQ-SEC-039: the per-item {@code userId} must not let a plain member write into someone
+     * else's ledger.
+     *
+     * <p>The caller here passes every other gate — they own the order, so the ownership check above
+     * is satisfied — and the only thing standing between them and an arbitrary cross-user inventory
+     * write is this guard. Without it a member could fabricate any material, at any quality and any
+     * amount, as another member's stock (or, with {@code personal}, their private stock) and leave
+     * the audit row attributed to the victim.
+     */
+    @Test
+    void throwsAccessDenied_whenNonLogisticianNamesAnotherUserAsAssignee() {
+      stubLookupsForSingleItem();
+
+      assertThrows(
+          AccessDeniedException.class,
+          () ->
+              refineryOrderService.storeRefineryOrder(
+                  OWNER_ID,
+                  ORDER_ID,
+                  new RefineryOrderStoreDto(List.of(item(OTHER_USER_ID, null))),
+                  false));
+
+      // Nothing was written: neither the victim's inventory row nor the order's completion.
+      verify(inventoryItemRepository, never()).save(any());
+      verify(refineryOrderRepository, never()).save(any());
+    }
+
+    /**
+     * The guard runs on the requested id before the user lookup, so an unauthorised caller cannot
+     * tell an existing member id from a non-existent one (no user-existence oracle).
+     */
+    @Test
+    void refusesForeignAssigneeBeforeLookingItUp() {
+      stubLookupsForSingleItem();
+
+      assertThrows(
+          AccessDeniedException.class,
+          () ->
+              refineryOrderService.storeRefineryOrder(
+                  OWNER_ID,
+                  ORDER_ID,
+                  new RefineryOrderStoreDto(List.of(item(OTHER_USER_ID, null))),
+                  false));
+
+      verify(userRepository, never()).findById(OTHER_USER_ID);
+    }
+
+    /** Naming your own id explicitly is the same act as omitting it, and stays allowed. */
+    @Test
+    void allowsNonLogisticianToNameTheirOwnIdExplicitly() {
+      stubLookupsForSingleItem();
+      when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+
+      refineryOrderService.storeRefineryOrder(
+          OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(OWNER_ID, null))), false);
+
+      ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
+      verify(inventoryItemRepository, times(1)).save(captor.capture());
+      assertSame(owner, captor.getValue().getUser());
     }
   }
 

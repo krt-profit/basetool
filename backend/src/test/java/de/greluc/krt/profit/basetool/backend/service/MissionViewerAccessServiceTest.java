@@ -69,6 +69,22 @@ class MissionViewerAccessServiceTest {
     verify(authHelperService).isAuthenticated();
   }
 
+  /**
+   * REQ-SEC-041: the mission {@code description} redaction hangs off this delegation, and it must
+   * be membership rather than bare authentication — a role-less GUEST is authenticated yet is a
+   * mission outsider, and the detail endpoint has always hidden the description from that tier.
+   */
+  @Test
+  void isMemberOrAbove_delegatesToAuthHelper() {
+    when(authHelperService.isMemberOrAbove()).thenReturn(false);
+
+    boolean result = missionViewerAccessService.isMemberOrAbove();
+
+    assertFalse(result, "isMemberOrAbove must return the AuthHelperService result verbatim");
+    verify(authHelperService).isMemberOrAbove();
+    verify(authHelperService, never()).isAuthenticated();
+  }
+
   @Test
   void canManageMission_delegatesWithRawAuthentication() {
     // Given

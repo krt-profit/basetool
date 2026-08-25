@@ -54,6 +54,17 @@ public class MissionViewerAccessService implements MissionViewerAccess {
   }
 
   /**
+   * Delegates to {@link AuthHelperService#isMemberOrAbove()} — the REQ-SEC-009 outsider
+   * discriminator, false for anonymous and role-less {@code GUEST} callers alike.
+   *
+   * @return {@code true} iff the caller holds a member or elevated role.
+   */
+  @Override
+  public boolean isMemberOrAbove() {
+    return authHelperService.isMemberOrAbove();
+  }
+
+  /**
    * Resolves the caller's {@code Authentication} via {@link AuthHelperService} and delegates to
    * {@link MissionSecurityService#canManageMission(UUID,
    * org.springframework.security.core.Authentication)}.
