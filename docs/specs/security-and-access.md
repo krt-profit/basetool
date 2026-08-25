@@ -1521,12 +1521,22 @@ amplification the surface offers.
 
 Two rules follow.
 
-**The material x terminal price matrix MUST require authentication.** `GET /api/v1/materials/matrix`
-is the largest single response the API can produce and used to fall into the catalog `permitAll`
-through `/api/v1/materials/**`. It is operating data rather than guest content, and its only consumer
-is a page controller annotated `@PreAuthorize("isAuthenticated()")`, so the carve-out costs nothing.
-Because Spring Security takes the **first** matching rule, the authenticated matcher MUST stay above
-the catalog block; moving it below re-opens the surface with no other symptom.
+**The material x terminal price matrix MUST require authentication — both of its shapes.** `GET
+/api/v1/materials/matrix` is the largest single response the API can produce and used to fall into
+the catalog `permitAll` through `/api/v1/materials/**`. It is operating data rather than guest
+content, and its only consumer is a page controller annotated `@PreAuthorize("isAuthenticated()")`,
+so the carve-out costs nothing. Because Spring Security takes the **first** matching rule, the
+authenticated matcher MUST stay above the catalog block; moving it below re-opens the surface with
+no other symptom.
+
+`GET /api/v1/materials/{id}/terminals` — the per-material slice of that same matrix, which the
+inventory page uses to suggest where to sell — is covered by the identical reasoning and was
+**missing from the rule until it was caught in production**. Its only consumer is authenticated, so
+a token costs nothing there either, while leaving it out published UEX trade prices per material to
+anyone who could reach the API vhost. The nightly `edge-deny-probe` asserted `401` for it from the
+day the phase-3 paste landed and got `200` every night: the expectation was right and the matcher
+was simply absent. Size is not the argument for this one — one material's terminal list is small —
+which is why it has to be stated rather than inferred from the amplification rule above.
 
 **An unauthenticated caller MUST NOT request more than 1000 entries per page**, and the refusal MUST
 be an explicit `400` naming the limit rather than a silent reduction. Silently clamping is the defect
@@ -1543,6 +1553,7 @@ Authenticated callers keep the 100 000 clamp. The scope is matched on the **deco
 
 - [x] `GET /api/v1/materials/matrix` answers 401 without a token; the rest of the material catalogue
   stays anonymously readable.
+- [x] `GET /api/v1/materials/{id}/terminals` answers 401 without a token (`SecurityTest`).
 - [x] An anonymous request with `size=50000` is refused with `400` and the stable code
   `PAGE_SIZE_TOO_LARGE`.
 - [x] An anonymous request with `size=1000` still succeeds.
@@ -1824,6 +1835,46 @@ replaces rather than appends breaks every installed copy for the length of the r
 `frontend/…/config/AndroidAppLinkProperties.java`, `SecurityConfig` (anonymous matchers).
 **Test:** `AssetLinksControllerTest` — asserts the three response conditions through the real
 security chain, and that the digests are an array.
+
+---
+
+### REQ-SEC-039 — Cookie CSRF MUST NOT gate the bearer-only API
+
+The backend's filter chain is `SessionCreationPolicy.STATELESS` and authenticates with exactly one
+mechanism: a bearer JWT. No form login, no HTTP basic, no session cookie — **no ambient credential
+of any kind**. CSRF exists to stop a cross-site request riding a credential the browser attaches by
+itself, so on this surface the check cannot prevent an attack. It can only refuse a legitimate
+client, and it did.
+
+**The exemption MUST name the surface, not individual endpoints.** `SecurityConfig.CSRF_EXEMPT_PATHS`
+is `/api/v1/**` plus `/internal/**` (machine-to-machine, its own shared-secret header, REQ-SEC-022).
+It used to name five paths, and every write outside them answered `403 MissingCsrfToken` to any
+caller without a CSRF cookie — which is every bearer client, i.e. the whole native app. Booking stock
+out of the Lager, taking an Auftrag and moving its status, and a bank account's balance target were
+refused in production, while `/api/v1/missions/**` and `/api/v1/operations/**` worked because they
+happened to be on the list. A per-endpoint list fails this way once per endpoint nobody remembers to
+add, in production, with a status that names CSRF and misdirects the reader (ADR-0144).
+
+**The exemption MUST stay scoped.** Anything outside those two patterns keeps CSRF. Nothing
+browser-facing lives on this backend today — it serves no HTML, ArchUnit-enforced — and the point of
+scoping is that adding something browser-facing later does not arrive pre-exempted. **The precondition
+travels with the rule:** if this chain ever gains a session cookie, a form login or a browser-facing
+endpoint, the exemption has to be revisited rather than inherited.
+
+**Nothing in the test suite observes the production branch.** The `test` profile disables CSRF
+outright so MockMvc can post without first fetching a token, so every `@SpringBootTest` here runs the
+branch that has no CSRF. That blind spot is why the gap shipped and it is **not** closed:
+`SecurityConfigCsrfExemptionTest` pins the pattern list without a Spring context, and the nightly
+`edge-deny-probe` remains the only end-to-end check — which is how this was found, by asserting `401`
+for an anonymous write and getting `403`, because the CSRF filter runs ahead of authorization.
+
+**Acceptance**
+
+- [x] Every write path the native app uses is CSRF-exempt (`SecurityConfigCsrfExemptionTest`).
+- [x] The exemption is expressed as `/api/v1/**`, not as a list of endpoints (same test).
+- [x] A path outside the bearer API is not exempt (same test).
+- [ ] `edge-deny-probe` answers `401` for the four anonymous writes. **Open** — verified only by the
+  nightly run after the next deploy.
 
 ---
 

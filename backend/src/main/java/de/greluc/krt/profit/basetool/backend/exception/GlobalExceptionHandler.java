@@ -222,6 +222,9 @@ public class GlobalExceptionHandler {
     return ProblemResponseFactory.correlationId();
   }
 
+  /** Package prefix that tells this application's stack frames from the framework's. */
+  private static final String APP_PACKAGE = "de.greluc.krt.profit.basetool";
+
   /**
    * Postgres / H2 / generic JDBC constraint name pattern (e.g. "violates foreign key constraint
    * \"fk_xyz\"").
@@ -642,9 +645,50 @@ public class GlobalExceptionHandler {
       pd.setProperty("correlationId", cid);
     } else {
       ex.extraProperties().forEach(pd::setProperty);
-      logProblem(request, pd, ex.logLabel(), ex.logExtra());
+      // logExtra() is null for most kinds, so this cannot be a copy-constructor.
+      java.util.Map<String, Object> extra = new java.util.LinkedHashMap<>();
+      if (ex.logExtra() != null) {
+        extra.putAll(ex.logExtra());
+      }
+      String origin = originOf(ex);
+      if (origin != null) {
+        extra.put("thrownAt", origin);
+      }
+      logProblem(request, pd, ex.logLabel(), extra);
     }
     return toEntity(pd);
+  }
+
+  /**
+   * The source line that refused the request, for the log line that otherwise says only that
+   * something was refused.
+   *
+   * <p>Written after a production {@code 400} could not be diagnosed. {@code Bad request for POST
+   * /api/v1/missions/{id}/participants/slim [status=400, code=BAD_REQUEST, correlationId=…]} is the
+   * whole line: the caller received the reason in the problem detail, and the operator received
+   * none of it. There are 242 {@code BadRequestException} call sites, so "which rule was it" is not
+   * a question the URI answers.
+   *
+   * <p><strong>The line number and not the message, deliberately.</strong> The messages are
+   * developer-authored, but a minority interpolate the value that was rejected ({@code "Unknown
+   * material type: " + dto.type()}), and logging a rejected user value is exactly what the PII rule
+   * forbids (REQ-OBS-004) — it would persist for the retention window and there is no per-call-site
+   * audit that could make a blanket copy safe. A file and line carry no runtime data at all, cannot
+   * be made to, and answer the same question: the reader opens that line and reads the message in
+   * the source.
+   *
+   * @param ex the refusal.
+   * @return {@code File.java:123} for the innermost frame belonging to this application, or {@code
+   *     null} when the stack has none (a proxy-only stack, or one stripped by the JVM).
+   */
+  @org.jetbrains.annotations.Nullable
+  private static String originOf(@org.jetbrains.annotations.NotNull Throwable ex) {
+    for (StackTraceElement frame : ex.getStackTrace()) {
+      if (frame.getClassName().startsWith(APP_PACKAGE) && frame.getFileName() != null) {
+        return frame.getFileName() + ":" + frame.getLineNumber();
+      }
+    }
+    return null;
   }
 
   // --- 400 Illegal arguments / malformed bodies -----------------------------------------
