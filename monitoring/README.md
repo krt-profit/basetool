@@ -548,7 +548,7 @@ docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/work" -w /work \
 # Alertmanager — check the RENDERED alertmanager.yml (after envsubst), not the .tmpl. Run it from
 # the directory holding the rendered file. The --entrypoint is required for the same reason as
 # promtool above: the image starts /bin/alertmanager, which rejects `amtool` as "unexpected amtool".
-docker run --rm --entrypoint amtool -v "$PWD:/cfg" quay.io/prometheus/alertmanager:v0.33.1 \
+docker run --rm --entrypoint amtool -v "$PWD:/cfg" quay.io/prometheus/alertmanager:v0.34.0 \
   check-config /cfg/alertmanager.yml
 
 # Blackbox — the exporter has no `check-config` subcommand, so validate by starting it on the
