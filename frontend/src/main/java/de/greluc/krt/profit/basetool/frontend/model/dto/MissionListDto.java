@@ -38,4 +38,5 @@ public record MissionListDto(
     OperationDto operation,
     SquadronReferenceDto owningSquadron,
     String meetingPoint,
+    long registeredCount,
     Long version) {}

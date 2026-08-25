@@ -545,7 +545,10 @@ mission with no participants produces no count row; the caller reads through a `
 field is never null.
 
 The field is additive on the wire: it appears on every `MissionListDto` response, and consumers that
-do not know it ignore it.
+do not know it ignore it. The **frontend mirror record carries it too** — `DtoMirrorConsistencyTest`
+requires every backend record component to exist on its frontend twin, because a template
+referencing a missing one renders a 500. No web template reads it today; the mirror exists so one
+safely can.
 
 **Enforced by:** `MissionControllerLifecycleTest` (list endpoints route through the counted mapper) ·
 **Code:** backend `MissionListDto.registeredCount`, `MissionMapper.toListDto(Mission, long)`,

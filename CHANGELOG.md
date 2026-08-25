@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Die Build-Prüfungen sind wieder grün.** Die Teilnehmerzahl aus v1.6.3 hat zwei Gates gerissen:
+  ein Javadoc rutschte an die falsche Stelle, und das Spiegel-DTO der Weboberfläche kannte das neue
+  Feld nicht. Beides betrifft nur Prüfungen — die Anwendung selbst war nie betroffen.
+
 ## [v1.6.3](https://github.com/krt-profit/basetool/releases/tag/v1.6.3) - 2026-08-25
 
 ### Added
