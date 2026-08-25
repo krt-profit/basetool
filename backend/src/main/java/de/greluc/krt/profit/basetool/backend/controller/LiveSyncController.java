@@ -77,11 +77,21 @@ public class LiveSyncController {
   /**
    * Topics one stream may name.
    *
-   * <p>Above what any screen needs — the busiest asks for a detail room, its list room and the
-   * global inventory room — and low enough that a crafted request cannot make the server run
-   * hundreds of authorization reads for one connection.
+   * <p><strong>This is a per-client budget, not a per-screen one.</strong> The first revision sized
+   * it at 8 against "what the busiest screen needs — a detail room, its list room and the global
+   * inventory room", and that reasoning was wrong about the client it serves: the app holds
+   * <em>one</em> stream and asks for the union of every screen currently observing, so a member
+   * moving through the app accumulates rooms from screens still on the back stack. In production
+   * one member's app crossed 8, and because the endpoint refuses the whole request rather than the
+   * surplus, live sync was dead on <em>every</em> screen for as long as the app stayed open — it
+   * re-asked on the reconnect backoff and was refused each time.
+   *
+   * <p>16 matches {@code LiveSyncWebSocketHandler.MAX_TOPICS_PER_SESSION}, the web relay's cap for
+   * the same multiplexed-union shape. Both exist for the same reason — a crafted request must not
+   * make the server run unbounded authorization reads for one connection — and they should not
+   * disagree about the number, because the two clients subscribe alike.
    */
-  static final int MAX_TOPICS_PER_STREAM = 8;
+  static final int MAX_TOPICS_PER_STREAM = 16;
 
   private final LiveSyncStreamService streamService;
   private final LiveSyncSubscriptionAuthorizer authorizer;
