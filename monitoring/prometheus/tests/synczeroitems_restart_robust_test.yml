@@ -12,7 +12,7 @@
 #
 # Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
 #   docker run --rm -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.13.2 promtool test rules tests/synczeroitems_restart_robust_test.yml
+#     prom/prometheus:v3.14.0 promtool test rules tests/synczeroitems_restart_robust_test.yml
 
 rule_files:
   - ../alerts/business.yml

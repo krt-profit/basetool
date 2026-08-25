@@ -341,12 +341,19 @@ if ($uri = "/api/v1/operations/search") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/finance-summary$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/payouts$") { set $krt_api_allowed 1; }
-# Phase 2 - the notification inbox, its badge count and its push stream. EXACT paths: the
-# family's mutating half (`/read-all`, `/read`, `/{id}`, `/{id}/read`) is a POST and two
-# DELETEs, and the read-only guard below refuses them by verb as well.
+# Phase 2 - the notification inbox, its badge count and its push stream. EXACT paths.
 if ($uri = "/api/v1/notifications") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/notifications/unread-count") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/notifications/stream") { set $krt_api_allowed 1; }
+# Phase 5 - the inbox's mutating half, which phase 2 deliberately left off this list. All four
+# are me-scoped: the backend resolves the caller's own notifications and a member cannot name
+# somebody else's row. `/read-all` and `/read` are literal segments beside `{id}`, which is a
+# [0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12} - they cannot collide, so naming the three by name does not admit the family.
+# Each one ALSO needs the carve-out below: this list matches on the path and cannot see the verb.
+if ($uri = "/api/v1/notifications/read-all") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/notifications/read") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/notifications/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/notifications/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/read$") { set $krt_api_allowed 1; }
 # Phase 2 - the dashboard's announcement band. EXACT path: /api/v1/announcement/admin is
 # the admin read of the same row and /api/v1/announcement itself also answers PUT, so a
 # prefix would carry both onto a vhost that exists to keep them off it.
@@ -385,6 +392,32 @@ if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a
 # Phase 4: the app's live-sync bridge (ADR-0143, REQ-FE-019). Two paths and no prefix wildcard --
 # `live-sync` is NOT in the read-only family list below, so the POST is admitted by being named
 # here and nothing else under the stem is reachable at all.
+# Phase 4: Beforderung. Two me-scoped reads and no id in either path, so no uuid group is needed
+# -- and `promotion` is NOT in the read-only family list, which is safe here because these two are
+# the only paths of that stem this vhost admits at all.
+if ($uri = "/api/v1/promotion/evaluations/my") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/promotion/eligibility/my") { set $krt_api_allowed 1; }
+# Phase 4: the served-version floor the forced-update gate reads (REQ-API-010). The ONLY anonymous
+# path on this vhost, decided by the owner on 2026-08-24 -- an app too old to authenticate must
+# still be able to learn that it is too old. It answers 200 without a token BY DESIGN; a 401 here
+# is the broken state, not the hardened one.
+if ($uri = "/api/v1/app/version-policy") { set $krt_api_allowed 1; }
+# Phase 4: Raffinerie. `refinery-orders` is NOT in the read-only family list, so the booking POST
+# is admitted by being named and nothing else under the stem -- not /all, not /users/<id>, not the
+# create -- is reachable at all. That is the same choice `live-sync` made, and it is available here
+# for the same reason: the app touches three of that controller's eleven paths.
+if ($uri = "/api/v1/refinery-orders/my-orders") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/refinery-orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/refinery-orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/store$") { set $krt_api_allowed 1; }
+# Phase 4: Materialboerse. Same stance -- neither `material-exchange` nor `material-requests` is a
+# read-only family, so every write below is admitted by name. The item creates (/item-offers,
+# /material-requests/item) are deliberately NOT here: the app cannot send a P4K productKey and has
+# no picker for one.
+if ($uri = "/api/v1/material-exchange/offers") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/material-exchange/releasable-items") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/material-exchange/offers/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(interest|deactivate)$") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/material-requests") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/material-requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(interest|deactivate)$") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/live-sync/stream") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/live-sync/changed") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/personal-inventory") { set $krt_api_allowed 1; }
@@ -398,10 +431,14 @@ if ($uri = "/api/v1/uex/locations/search") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/personal-blueprints") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/personal-blueprints/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
 # Phase 3 - the craftability read behind the chip, and the product picker behind "hinzufuegen".
-# EXACT paths: /personal-blueprints/{id}/recipe and /blueprints/** carry the whole catalogue and
-# stay off this vhost until something actually reads them.
+# EXACT paths: /blueprints/** carries the whole catalogue and stays off this vhost.
 if ($uri = "/api/v1/personal-blueprints/craftability") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/blueprints/products/search") { set $krt_api_allowed 1; }
+# Phase 5 - the recipe of ONE owned blueprint, which design ch. 09's tablet master-detail reads.
+# The comment above used to say this path stays off "until something actually reads them"; the
+# Blueprints detail pane now does. Still me-scoped and still a single row: the backend resolves
+# {id} against the caller's own owned blueprints, so it cannot name somebody else's.
+if ($uri ~ "^/api/v1/personal-blueprints/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/recipe$") { set $krt_api_allowed 1; }
 # Phase 3 - the member's own ships. EXACT paths, and deliberately NOT /hangar/users/<uuid>/ships:
 # that one names a member and is the admin surface. /hangar/ships answers a bulk DELETE with no
 # id as well, which the carve-out below does not open - only the per-ship verbs are named.
@@ -460,6 +497,14 @@ if ($uri ~ "^/api/v1/inventory/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9
 # Logistician edit surface. Only the assignee edge and the status change are named.
 if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/assignees/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(/note)?$") { set $krt_readonly_family ""; }
 if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/status$") { set $krt_readonly_family ""; }
+# /notifications stays in the family because the prefix also carries /notification-rules, the
+# admin surface that creates and deletes the rules every member's inbox is generated from. Only
+# the four me-scoped inbox mutations are named. Naming a path opens every verb the backend serves
+# on it, which for `/{id}` is GET and DELETE and for the other three is exactly one POST or DELETE.
+if ($uri = "/api/v1/notifications/read-all") { set $krt_readonly_family ""; }
+if ($uri = "/api/v1/notifications/read") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/notifications/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/notifications/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/read$") { set $krt_readonly_family ""; }
 # /missions stays in the family because the prefix carries the whole planning surface - units,
 # crews, steps, objectives, the mission itself. Only the caller's own participation is named.
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/join$") { set $krt_readonly_family ""; }
@@ -575,6 +620,7 @@ The safe order, and the reason for it:
    | `/api/v1/personal-blueprints`                         | **401**                                                             | me-scoped; POST likewise                                                                                 |
    | `/api/v1/personal-blueprints/<uuid>`                  | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
    | `/api/v1/personal-blueprints/craftability`            | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/personal-blueprints/<uuid>/recipe`           | **401**                                                             | me-scoped; GET only, phase 5                                                                             |
    | `/api/v1/blueprints/products/search`                  | **401**                                                             | `isAuthenticated()`                                                                                      |
    | `/api/v1/hangar/ships`                                | **401**                                                             | me-scoped; POST likewise                                                                                 |
    | `/api/v1/hangar/ships/<uuid>`                         | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
@@ -596,6 +642,11 @@ The safe order, and the reason for it:
    | `/api/v1/notifications`                               | **401**                                                             | me-scoped inbox                                                                                          |
    | `/api/v1/notifications/unread-count`                  | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/notifications/stream`                        | **401**                                                             | me-scoped SSE                                                                                            |
+   | `/api/v1/notifications/read-all`                      | **401**                                                             | me-scoped write; POST only, phase 5                                                                      |
+   | `/api/v1/notifications/read`                          | **401**                                                             | me-scoped write; DELETE only, phase 5                                                                    |
+   | `/api/v1/notifications/<uuid>`                        | **401**                                                             | me-scoped; GET + DELETE, phase 5                                                                         |
+   | `/api/v1/notifications/<uuid>/read`                   | **401**                                                             | me-scoped write; POST only, phase 5                                                                      |
+   | `/api/v1/notification-rules`                          | **404**                                                             | admin surface, NOT admitted — the four rows above must not have widened the prefix                       |
    | `/api/v1/users/me`                                    | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/users/me/registration-status`                | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/users/me/memberships`                        | **401**                                                             | me-scoped                                                                                                |
@@ -952,6 +1003,14 @@ statuses in the table below; nothing is pasted until the last one is merged, and
 gains its rows in the same PR as the paste instruction so it never reports a state nobody intends to
 fix yet.
 
+**The owner confirmed this on 2026-08-24, with the probe already red.** It was asked directly --
+paste phase I now and get a green run tonight, or hold for one paste -- and the answer was to hold.
+So the nightly `edge-deny-probe` reports 23 phase-3 paths answering `404` where it lists `401`, and
+**that is the correct reading of production, not a defect**: those paths have never been admitted to
+the vhost. Do not investigate that run again, do not "fix" it in the repo, and do not silence the
+block -- the fix is the paste below, and it happens when phase 4 closes. Anything failing that is
+*not* in the phase-3 list is a different matter and does deserve stopping for.
+
 **If Phase I has not been applied yet, apply it after this phase closes and it covers both.** The
 § D.3 block is pasted *whole*, so the copy in this repo is always the complete current intent —
 phase 2's reads, phase 3's writes and phase 4's paths together. If Phase I has already been applied,
@@ -960,10 +1019,18 @@ it.
 
 ### What the paste must contain
 
-|   Slice   |            Paths            |   Verbs   |
-|-----------|-----------------------------|-----------|
-| Live-Sync | `/api/v1/live-sync/stream`  | GET (SSE) |
-| Live-Sync | `/api/v1/live-sync/changed` | POST      |
+|    Slice    |                                 Paths                                  |    Verbs     |
+|-------------|------------------------------------------------------------------------|--------------|
+| Beförderung | `/api/v1/promotion/evaluations/my`, `/api/v1/promotion/eligibility/my` | GET          |
+| Live-Sync   | `/api/v1/live-sync/stream`                                             | GET (SSE)    |
+| Live-Sync   | `/api/v1/live-sync/changed`                                            | POST         |
+| App-Gate    | `/api/v1/app/version-policy`                                           | GET          |
+| Raffinerie  | `/api/v1/refinery-orders/my-orders`, `/<uuid>`                         | GET          |
+| Raffinerie  | `/api/v1/refinery-orders/<uuid>/store`                                 | POST         |
+| Börse       | `/api/v1/material-exchange/offers`, `/material-requests`               | GET, POST    |
+| Börse       | `/api/v1/material-exchange/releasable-items`                           | GET          |
+| Börse       | `…/offers/<uuid>/interest`, `…/material-requests/<uuid>/interest`      | POST, DELETE |
+| Börse       | `…/offers/<uuid>/deactivate`, `…/material-requests/<uuid>/deactivate`  | POST         |
 
 `live-sync` is deliberately **not** in the read-only family list, so it needs no carve-out: the two
 paths are admitted by being named, and nothing else under the stem is reachable at all. That is the
@@ -972,10 +1039,22 @@ two endpoints rather than a surface with an admin half hiding in it.
 
 ### What to expect afterwards
 
-|               Path               | Anonymous status |
-|----------------------------------|------------------|
-| `GET /api/v1/live-sync/stream`   | **401**          |
-| `POST /api/v1/live-sync/changed` | **401**          |
+|                       Path                       | Anonymous status |
+|--------------------------------------------------|------------------|
+| `GET /api/v1/promotion/evaluations/my`           | **401**          |
+| `GET /api/v1/promotion/eligibility/my`           | **401**          |
+| `GET /api/v1/live-sync/stream`                   | **401**          |
+| `POST /api/v1/live-sync/changed`                 | **401**          |
+| `GET /api/v1/app/version-policy`                 | **200**          |
+| `GET /api/v1/refinery-orders/my-orders`          | **401**          |
+| `GET /api/v1/material-exchange/offers`           | **401**          |
+| `GET /api/v1/material-requests`                  | **401**          |
+| `GET /api/v1/material-exchange/releasable-items` | **401**          |
+
+**The `200` in that table is not a typo and not a finding.** `version-policy` is the single
+anonymous path this vhost admits (REQ-SEC-037), and a `401` there would mean the gate is broken:
+the build that most needs to be told it is too old is the one that cannot log in. Check it
+deliberately, and do not "fix" it upward.
 
 Two things worth knowing before reading a result. The stream answers `403`, not `401`, for an
 *authenticated* caller none of whose topics were accepted — the caller authenticated fine, they
@@ -985,6 +1064,52 @@ path tells you the allow-list matched and nothing else.
 
 A **404** on either path means the block was never pasted, which is the failure with no other
 signal — the app keeps working and simply never goes live.
+
+### Doing it — step by step
+
+Everything below runs on the production host and is yours to execute; nothing in this repo reaches
+that host. The steps are Phase I's, because the block is the same block — if you have not applied
+Phase I yet, doing this once covers both.
+
+1. **Open the vhost's Advanced tab.** Nginx Proxy Manager → *Hosts → Proxy Hosts* →
+   `api.profit-base.online` → *Advanced*.
+
+2. **Replace the whole custom-configuration block** with § D.3 of this document as it stands after
+   the last phase-4 PR. Not a merge of the old and the new: the block is written to be pasted
+   whole, and hand-merging is how the read-only guard ends up with two `set $krt_readonly_family ""`
+   lines that disagree.
+
+3. **Save.** NPM tests the configuration before writing it, so a syntax error is refused here rather
+   than taking the vhost down. If it refuses, nothing changed and the old block is still live.
+
+4. **Check the two new paths from your own shell.** The stream needs its `topics` parameter — a
+   bare probe of the path answers `400` even with a valid token and tells you only that the
+   allow-list matched:
+
+   ```powershell
+   foreach ($p in '/api/v1/live-sync/stream?topics=inventory','/api/v1/live-sync/changed','/api/v1/promotion/evaluations/my','/api/v1/promotion/eligibility/my','/api/v1/app/version-policy','/api/v1/refinery-orders/my-orders','/api/v1/material-exchange/offers','/api/v1/material-requests','/api/v1/material-exchange/releasable-items') { '{0,-52} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' "https://api.profit-base.online$p") }
+   ```
+
+   Expected: `401` for everything except **`version-policy`, which must answer `200`** — it is
+   the one anonymous path on this vhost (REQ-SEC-037) and is meant to answer without a token. A
+   `404` anywhere means the block was never pasted — the failure with no other signal, because the
+   app keeps working and simply never goes live.
+
+5. **Check that phase 2's and phase 3's paths still answer as they did**, since you replaced the
+   whole block:
+
+   ```powershell
+   foreach ($p in '/api/v1/personal-inventory','/api/v1/hangar/ships','/api/v1/inventory','/api/v1/finance-entries','/api/v1/ship-types','/api/v1/materials/search') { '{0,-40} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' "https://api.profit-base.online$p") }
+   ```
+
+   Expected: `401` for the first four, `200` for the last two.
+
+6. **Run the probe once by hand** rather than waiting for the night:
+   *Actions → Edge deny probe → Run workflow*. It must come back green.
+
+If step 4 or 5 disagrees, put the previous block back — it is in this file's git history — and say
+what you saw. Nothing breaks while the old block is live: the phase-4 paths simply stay unreachable
+from outside, which is where they have been all along.
 
 ## Phase G — flip the audience enforcement (D5, release gate)
 

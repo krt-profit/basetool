@@ -1086,6 +1086,19 @@ transaction per pass) rather than per-scrape.
   0.0 overnight, well separated by the 0.01 req/s floor. If the frontend job vanishes the guard goes
   absent and the alert stays silent by design — a full outage belongs to `TargetDown` / blackbox.
   Locked by `monitoring/prometheus/tests/ssepushchanneldead_traffic_guard_test.yml`.
+
+  **None of these metrics can see a stream that delivers nothing** — the blind spot #1653 was found
+  in. Every one of them is counted before the bytes leave the process: the gauge counts emitters
+  that were *created*, the failure counter counts writes that *threw*, and a write into a filter's
+  buffer neither fails nor closes. For eight months a `ShallowEtagHeaderFilter` registered on `/*`
+  buffered both stream endpoints and never wrote the buffer back (it skips the write-back once
+  async processing has started), so the notification push was dead while every panel above read
+  healthy and `SsePushChannelDead` stayed quiet on a plentiful supply of connections. No
+  server-side metric closes this: the only difference between the two states is whether a socket
+  received a byte, and nothing inside the process observes that. The guard is therefore a test, not
+  a rule -- `SseDeliveryThroughFilterChainTest` opens both streams over a real port through the
+  real filter chain and waits for the first frame, so any future component that buffers, wraps or
+  delays a streaming response fails the build regardless of which one it is.
   The cross-replica SSE fan-out (#1102, REQ-FE-015 / ADR-0094) adds
   `basetool_sse_redis_published_total` / `basetool_sse_redis_consumed_total` (real-time notification
   signals this replica published to / consumed from the `basetool:notify:published` Redis channel;
