@@ -2,27 +2,7 @@
 
 ## [Unreleased]
 
-### Security
-
-- **Die öffentliche Einsatzansicht gibt keine Mitgliederdaten mehr preis.** Bei einem Einsatz mit
-  zugewiesenem Schiff lieferte sie ohne Anmeldung den vollständigen Datensatz der Schiffsbesitzerin
-  mit — Rollen und Berechtigungen, Profiltext, Staffelzugehörigkeit, Beitrittsdatum. Sichtbar bleibt
-  nur noch der öffentliche Rufzeichen-Eintrag (REQ-SEC-040).
-- **Raffinerie-Erträge lassen sich nicht mehr in fremde Bestände einlagern.** Beim Einlagern einer
-  eigenen Raffinerie-Order konnte pro Position ein beliebiges anderes Mitglied als Empfänger
-  eingetragen und diesem so jede Materialmenge ins Lager geschrieben werden. Das dürfen jetzt nur
-  Logistiker; alle anderen sehen im Dialog ihren eigenen Namen ohne Auswahl (REQ-SEC-039).
-- **Einsatz-Finanzen kann nur noch buchen, wer am Einsatz beteiligt ist.** Bisher genügte es, einen
-  öffentlichen Einsatz sehen zu dürfen, um Einnahmen und Ausgaben in dessen Kasse zu buchen — auch in
-  die einer fremden Staffel und auf den Namen eines fremden Teilnehmers. Es buchen jetzt die
-  Einsatzleitung für alle Beteiligten und jedes Mitglied für den eigenen Eintrag (REQ-SEC-042).
-- **Bank-, Finanz- und Bestandsantworten dürfen von Zwischenspeichern nicht mehr abgelegt werden.**
-  Sie trugen „revalidieren" statt „nicht speichern", womit ein Proxy zwischen App und Server
-  Kontoauszüge samt Handles hätte vorhalten dürfen. Betrifft die Mitglieder-Kontoansicht,
-  Einsatzfinanzen, Mein Inventar, Lager, Hangar, Raffinerie und Beförderung (REQ-SEC-031).
-- **Einsatzbeschreibungen sind für Gastkonten auch in der Suche ausgeblendet.** Die Detailansicht
-  hatte den Beschreibungstext vor ihnen verborgen, die Einsatzsuche gab ihn trotzdem heraus
-  (REQ-SEC-041).
+## [v1.6.2](https://github.com/krt-profit/basetool/releases/tag/v1.6.2) - 2026-08-25
 
 ### Fixed
 
@@ -31,17 +11,47 @@
   vom Server mit „Zugriff verweigert" abgelehnt. Ursache war eine CSRF-Prüfung, die für
   Token-basierte Clients nichts schützen kann, aber alle Pfade außerhalb einer kurzen Ausnahmeliste
   blockiert hat.
+
 - **Die Preisliste eines Materials über alle Terminals braucht jetzt eine Anmeldung.** Sie war über
   die öffentliche API ohne Login abrufbar, obwohl sie nur die angemeldete Lager-Ansicht nutzt.
+
 - **Ein abgelehnter Aufruf ist im Log jetzt auffindbar.** Die Zeile nennt zusätzlich die Codestelle,
   die abgelehnt hat — bisher stand dort nur, *dass* abgelehnt wurde.
+
 - **Live-Sync in der Android-App bleibt nicht mehr stumm, wenn viele Bildschirme offen sind.** Die
   App hält eine Verbindung für alle Bildschirme zusammen; der Server hat ab 8 Räumen die ganze
   Anfrage abgelehnt, womit Live-Sync in der gesamten App ausfiel, solange sie offen war. Das Limit
   liegt jetzt bei 16 — dem Wert, den die Weboberfläche schon verwendet.
+
 - **Abgebrochene Live-Verbindungen landen nicht mehr als Fehler im Log.** Schließt jemand die App
   oder wechselt die Seite, ist das der Normalfall und keine Störung. Bisher erzeugte jeder solche
   Abbruch zwei Log-Zeilen inklusive Fehlerzähler — zuletzt 30 von 50 Meldungen in 16 Stunden.
+
+### Security
+
+- **Die öffentliche Einsatzansicht gibt keine Mitgliederdaten mehr preis.** Bei einem Einsatz mit
+  zugewiesenem Schiff lieferte sie ohne Anmeldung den vollständigen Datensatz der Schiffsbesitzerin
+  mit — Rollen und Berechtigungen, Profiltext, Staffelzugehörigkeit, Beitrittsdatum. Sichtbar bleibt
+  nur noch der öffentliche Rufzeichen-Eintrag (REQ-SEC-040).
+
+- **Raffinerie-Erträge lassen sich nicht mehr in fremde Bestände einlagern.** Beim Einlagern einer
+  eigenen Raffinerie-Order konnte pro Position ein beliebiges anderes Mitglied als Empfänger
+  eingetragen und diesem so jede Materialmenge ins Lager geschrieben werden. Das dürfen jetzt nur
+  Logistiker; alle anderen sehen im Dialog ihren eigenen Namen ohne Auswahl (REQ-SEC-039).
+
+- **Einsatz-Finanzen kann nur noch buchen, wer am Einsatz beteiligt ist.** Bisher genügte es, einen
+  öffentlichen Einsatz sehen zu dürfen, um Einnahmen und Ausgaben in dessen Kasse zu buchen — auch in
+  die einer fremden Staffel und auf den Namen eines fremden Teilnehmers. Es buchen jetzt die
+  Einsatzleitung für alle Beteiligten und jedes Mitglied für den eigenen Eintrag (REQ-SEC-042).
+
+- **Bank-, Finanz- und Bestandsantworten dürfen von Zwischenspeichern nicht mehr abgelegt werden.**
+  Sie trugen „revalidieren" statt „nicht speichern", womit ein Proxy zwischen App und Server
+  Kontoauszüge samt Handles hätte vorhalten dürfen. Betrifft die Mitglieder-Kontoansicht,
+  Einsatzfinanzen, Mein Inventar, Lager, Hangar, Raffinerie und Beförderung (REQ-SEC-031).
+
+- **Einsatzbeschreibungen sind für Gastkonten auch in der Suche ausgeblendet.** Die Detailansicht
+  hatte den Beschreibungstext vor ihnen verborgen, die Einsatzsuche gab ihn trotzdem heraus
+  (REQ-SEC-041).
 
 ## [v1.6.1](https://github.com/krt-profit/basetool/releases/tag/v1.6.1) - 2026-08-25
 
