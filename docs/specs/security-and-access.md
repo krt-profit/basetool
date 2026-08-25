@@ -1775,15 +1775,31 @@ endpoint answers exactly as cheerfully as an authenticated one.
 
 The anonymous surface, complete:
 
-|               Operation                |                                                              Why it is anonymous                                                              |                                                                             What an anonymous caller gets                                                                              |
-|----------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `GET /api/v1/terms/document`           | ADR-0138 — wording everyone must read *before* agreeing cannot require having agreed                                                          | the same text already world-readable at `/terms`                                                                                                                                       |
-| `GET /api/v1/missions/search`          | the public home page (`/`, `permitAll`) renders its upcoming-Einsatz tiles from this very endpoint                                            | `PLANNED` + `ACTIVE`, **non-internal** rows only, through the outsider redaction in `MissionController#searchMissions`                                                                 |
-| `GET /api/v1/missions/{id}`            | the same public surface, one Einsatz deep                                                                                                     | the redacted DTO of ADR-0034 — no description, no owner, no managers, participants without payout preference or comment; an **internal** or **terminal** Einsatz is refused with `403` |
-| `GET /api/v1/ship-types`               | phase 3's Hangar editor needs the hull catalogue before a member has picked anything, and `/api/v1/ship-types/**` is `permitAll` in the chain | game data — hull names, manufacturers, SCU — already rendered without a session by the public web frontend; no member, org unit or ship of anyone's is reachable through it            |
-| `GET /api/v1/materials/search`         | phase 3's Lager form needs the material catalogue, and `/api/v1/materials/**` is `permitAll` in the chain                                     | material names, their unit and their category — the same catalogue the public web frontend renders; no stock figure and no member is reachable through it                              |
-| `GET /api/v1/locations/search`         | the same form needs the place catalogue, under the same `permitAll` prefix                                                                    | place names and ids; what is *stored* at a place needs a token                                                                                                                         |
-| `GET /api/v1/materials/{id}/terminals` | the sell half of the book-out needs the terminals that buy a material, same prefix                                                            | terminal names and their sell price — public market data                                                                                                                               |
+|               Operation                |                                                                   Why it is anonymous                                                                   |                                                                             What an anonymous caller gets                                                                              |
+|----------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `GET /api/v1/terms/document`           | ADR-0138 — wording everyone must read *before* agreeing cannot require having agreed                                                                    | the same text already world-readable at `/terms`                                                                                                                                       |
+| `GET /api/v1/missions/search`          | the public home page (`/`, `permitAll`) renders its upcoming-Einsatz tiles from this very endpoint                                                      | `PLANNED` + `ACTIVE`, **non-internal** rows only, through the outsider redaction in `MissionController#searchMissions`                                                                 |
+| `GET /api/v1/missions/{id}`            | the same public surface, one Einsatz deep                                                                                                               | the redacted DTO of ADR-0034 — no description, no owner, no managers, participants without payout preference or comment; an **internal** or **terminal** Einsatz is refused with `403` |
+| `GET /api/v1/ship-types`               | phase 3's Hangar editor needs the hull catalogue before a member has picked anything, and `/api/v1/ship-types/**` is `permitAll` in the chain           | game data — hull names, manufacturers, SCU — already rendered without a session by the public web frontend; no member, org unit or ship of anyone's is reachable through it            |
+| `GET /api/v1/materials/search`         | phase 3's Lager form needs the material catalogue, and `/api/v1/materials/**` is `permitAll` in the chain                                               | material names, their unit and their category — the same catalogue the public web frontend renders; no stock figure and no member is reachable through it                              |
+| `GET /api/v1/locations/search`         | the same form needs the place catalogue, under the same `permitAll` prefix                                                                              | place names and ids; what is *stored* at a place needs a token                                                                                                                         |
+| `GET /api/v1/materials/{id}/terminals` | the sell half of the book-out needs the terminals that buy a material, same prefix                                                                      | terminal names and their sell price — public market data                                                                                                                               |
+| `GET /api/v1/app/version-policy`       | REQ-API-010 — an app too old to authenticate must still be able to learn that it is too old; a token-gated gate is silent in the one case it exists for | three integers and the public GitHub release URL. No caller identity goes in and none comes out — the rare `/api` path with nothing to redact                                          |
+
+**This one was decided, not inherited.** Every other row above is anonymous because something
+already public depends on it; `version-policy` is anonymous because the owner chose it on
+2026-08-24 against the standing stance that the vhost opens no anonymous paths (plan Q8). The
+alternative was considered and rejected on the merits: a token-gated policy endpoint cannot answer
+an app whose *login* is what the new contract broke, and that app would then show an authentication
+error — telling a member their credentials are wrong when they are not. The exception is one path,
+one verb, and a body with nothing in it worth protecting.
+
+**Phase 4's two feature slices add nine paths and not one anonymous one.** The Raffinerie's three
+(`my-orders`, one order, its booking) and the Materialbörse's six all sit behind
+`hasRole(KRT_MEMBER)` and answer `401` without a token; their statuses are pinned in
+`ApiVhostAnonymousSurfaceTest` like every other allow-listed path. Two families are admitted **by
+name rather than by stem**, which is why the wider surfaces behind them stay unreachable: the app
+touches three of the refinery controller's eleven paths, and neither item-create of the board.
 
 Everything else on the list is refused without a token — the Finanzen endpoints among them
 (`isAuthenticated() and isMemberOrAbove() and canSeeMission`), which is why a mission's money is
@@ -1826,6 +1842,15 @@ that does. Under operations the write that matters is `PUT
 /api/v1/operations/<uuid>/payouts/paid-out`, which marks a member as paid — phase 3 opens it, and
 opening it means naming that one path rather than widening the family, because the guard is
 verb-blind by design.
+
+**Phase 4's Beförderung reads are the least remarkable entries on the list, and that is the point
+of naming them.** `GET /api/v1/promotion/evaluations/my` and `…/eligibility/my` are
+`isAuthenticated()` and me-scoped by construction: both end in `/my`, the member is resolved from
+the token, and there is no id an anonymous caller could substitute. They answer `401`. The rule
+here is that every admitted path has its status recorded when it is added — not that the obvious
+ones may be assumed, because "obvious" is exactly what the one wrong entry always looked like
+beforehand. The officers' matrix (`/promotion/manage`, `/evaluations/all`, `/evaluations/members`)
+is **not** on the list at all: the admin area is web-only permanently.
 
 **The live-sync bridge adds a second stream and the vhost's first client-driven publish**
 (ADR-0143, REQ-FE-019). Both are `isAuthenticated()` on the controller, so both answer `401`, and

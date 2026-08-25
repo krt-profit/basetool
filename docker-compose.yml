@@ -558,6 +558,14 @@ x-backend: &backend-template
     # starts. Note the channel is the FRONTEND's -- the bridge works by both modules speaking
     # on one wire, so overriding it severs web-to-app propagation while every signal stays green.
     APP_LIVE_SYNC_REDIS_FANOUT_ENABLED: ${APP_LIVE_SYNC_REDIS_FANOUT_ENABLED:-true}
+    # Which Android builds the server still serves (REQ-API-010). Passed through here because
+    # raising the floor is meant to be an env var and a restart -- an operator acting the moment a
+    # contract breaks cannot wait for a deploy, and a property the compose file does not forward is
+    # a property they cannot set at all. Default 0 = no floor, which is also the property's own
+    # default: a stack nobody has configured must not refuse every installed build.
+    APP_ANDROID_MINIMUM_VERSION_CODE: ${APP_ANDROID_MINIMUM_VERSION_CODE:-0}
+    APP_ANDROID_LATEST_VERSION_CODE: ${APP_ANDROID_LATEST_VERSION_CODE:-0}
+    APP_ANDROID_RELEASES_URL: ${APP_ANDROID_RELEASES_URL:-https://github.com/krt-profit/basetool-android/releases/latest}
     # Monitoring plane (epic #936, REQ-OBS-005/-009). Every value defaults OFF/empty so dev, test,
     # e2e and a prod host without the monitoring stack stay inert: /actuator/prometheus denies every
     # request until MONITORING_SCRAPE_* is set, and tracing exports nothing until

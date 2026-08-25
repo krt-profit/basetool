@@ -281,7 +281,7 @@ sudo chmod 600 /var/iri/monitoring/secrets/alertmanager.yml
 # Validate the RENDERED file with amtool from the pinned Alertmanager image.
 docker run --rm \
   -v /var/iri/monitoring/secrets/alertmanager.yml:/cfg.yml:ro \
-  --entrypoint amtool quay.io/prometheus/alertmanager:v0.33.1 check-config /cfg.yml
+  --entrypoint amtool quay.io/prometheus/alertmanager:v0.34.0 check-config /cfg.yml
 # expect: "Checking '/cfg.yml'  SUCCESS" and no unresolved ${...} placeholders.
 
 # Immediately unset the SMTP secrets from your shell environment.
@@ -674,11 +674,11 @@ docker run --rm --network net-monitoring-core curlimages/curl:8.11.1 \
 ```bash
 # amtool against the RENDERED alertmanager config (Phase 3.5 already did this):
 docker run --rm -v /var/iri/monitoring/secrets/alertmanager.yml:/cfg.yml:ro \
-  --entrypoint amtool quay.io/prometheus/alertmanager:v0.33.1 check-config /cfg.yml
+  --entrypoint amtool quay.io/prometheus/alertmanager:v0.34.0 check-config /cfg.yml
 
 # promtool against the committed prometheus config + alert rules:
 docker run --rm -v /var/iri/code/monitoring/prometheus:/p:ro \
-  --entrypoint promtool prom/prometheus:v3.13.2 check config /p/prometheus.yml
+  --entrypoint promtool prom/prometheus:v3.14.0 check config /p/prometheus.yml
 
 # alloy config check:
 docker run --rm -v /var/iri/code/monitoring/alloy:/a:ro \
@@ -690,7 +690,7 @@ docker run --rm -v /var/iri/code/monitoring/alloy:/a:ro \
 ```bash
 # Add a transient alert straight into Alertmanager from a core-net container.
 docker run --rm --network net-monitoring-core --entrypoint amtool \
-  quay.io/prometheus/alertmanager:v0.33.1 \
+  quay.io/prometheus/alertmanager:v0.34.0 \
   --alertmanager.url=http://alertmanager:9093 \
   alert add alertname="RolloutCanary" severity="critical" \
   --annotation=summary="monitoring rollout canary — please ignore"
@@ -974,8 +974,8 @@ there.
 5. **Lint before deploying.** From the repo root:
 
 ```bash
-docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.13.2 check config /cfg/prometheus.yml
-docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.13.2 -c 'promtool check rules /cfg/alerts/*.yml'
+docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.14.0 check config /cfg/prometheus.yml
+docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.14.0 -c 'promtool check rules /cfg/alerts/*.yml'
 docker run --rm -v "$PWD/monitoring/blackbox:/cfg" prom/blackbox-exporter:v0.28.0 --config.file=/cfg/blackbox.yml --config.check
 ```
 
