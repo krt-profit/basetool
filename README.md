@@ -76,7 +76,8 @@ The README is the overview; everything else lives in dedicated, versioned docs:
 |:-------------------------------------------------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | [CHANGELOG.md](CHANGELOG.md)                                                                     | Release notes and every user-visible change.                                                                                                                                  |
 | [CONTRIBUTING.md](CONTRIBUTING.md) / [CLA.md](CLA.md) / [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Contribution workflow and style guide, Contributor License Agreement, community standards.                                                                                    |
-| [.github/SECURITY.md](.github/SECURITY.md)                                                       | Security policy, supported versions, release verification (Cosign, SLSA, SBOM).                                                                                               |
+| [.github/SECURITY.md](.github/SECURITY.md)                                                       | Security policy, supported versions, release verification (Cosign, SLSA provenance, GitHub attestations, SBOM).                                                               |
+| [.github/CODEOWNERS](.github/CODEOWNERS)                                                         | Review routing — who is auto-requested on a PR, and which surfaces count as high-risk. Grants no permissions.                                                                 |
 | [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md)                                             | The full role and permission matrix plus the public request surface.                                                                                                          |
 | [docs/specs/INDEX.md](docs/specs/INDEX.md)                                                       | Registry of the binding requirement specs (`REQ-<AREA>-NNN`) — security, tenancy, persistence, API, observability, UI and the per-feature specs.                              |
 | [docs/adr/README.md](docs/adr/README.md)                                                         | Architecture Decision Records.                                                                                                                                                |
@@ -266,7 +267,7 @@ If you only need the stack to *start* (health checks, a UI smoke test that does 
 - **Frontend** — Thymeleaf + Spring Security OAuth2 Client, WebClient wrapped with Resilience4j (Timeout, Retry, CircuitBreaker, Bulkhead)
 - **API docs** — SpringDoc / OpenAPI; each REST-serving module ships one committed document — `backend/src/main/resources/api/openapi.json` and `ingest/src/main/resources/api/openapi.json` — as its single documentation artifact
 - **DTO mapping** — MapStruct
-- **Containerization** — Docker / Docker Compose; images published to GHCR, Cosign-signed with SLSA provenance + SBOM attestations
+- **Containerization** — Docker / Docker Compose; images published to GHCR, Cosign-signed with SLSA provenance + SBOM attestations, and additionally attested to GitHub's attestation store so provenance survives a registry-side rewrite (`gh attestation verify`, REQ-OPS-023)
 
 ### Project structure
 

@@ -83,7 +83,19 @@ name: Release Images
 #   3. Carries SLSA build provenance + an SPDX SBOM as OCI attestations
 #      (`provenance: mode=max`, `sbom: true`) so a downstream auditor can
 #      prove which commit + builder produced the image and which packages
-#      it bundles.
+#      it bundles. Provenance is recorded TWICE, in two places with two
+#      different trust roots: the buildx attestation manifest above, which
+#      lives in the GHCR repository next to the image, and a signed SLSA v1
+#      statement in GitHub's own attestation store, written by
+#      `actions/attest-build-provenance` under the `attestations: write`
+#      permission. The second one exists because the first is only as
+#      trustworthy as the registry holding it -- a `packages: write`
+#      credential can rewrite a package version together with its provenance
+#      manifest and its cosign signature, since all three are siblings in the
+#      repository that credential controls. The attestation store is not
+#      reachable with `packages: write`, so it survives that. Verify it with
+#      `gh attestation verify oci://ghcr.io/<owner>/basetool-<module>:<tag>
+#      --repo <owner>/basetool` (REQ-OPS-023, ADR-0145).
 #   4. Scanned with Trivy. Findings are uploaded as SARIF to the repository's
 #      Security tab for visibility; the scan does NOT block the push itself
 #      (a CVE-bearing image is preferable to no image when a hotfix is
@@ -855,6 +867,51 @@ jobs:
           echo "::error::cosign sign failed after ${attempts} attempts for ${IMAGE}" >&2
           exit 1
 
+      # A SECOND provenance record, in a store the registry cannot rewrite.
+      #
+      # The image already carries SLSA provenance: buildx attached a `mode=max`
+      # in-toto attestation manifest to it, and the step above cosign-signed the
+      # index digest. Both of those live **inside the GHCR repository** as
+      # ordinary manifests. That is their weakness, not their strength: anything
+      # holding `packages: write` on this org can delete a package version and
+      # push a new one, and the provenance manifest and the signature layer go
+      # with it, because they are siblings of the image in the very repository
+      # the credential controls. The host gate (REQ-OPS-015) closes the case
+      # where `:stable` is moved to point at a *different* digest; it does not
+      # close the case where the whole package is rewritten as a coherent set.
+      #
+      # `actions/attest-build-provenance` writes a signed SLSA v1 provenance
+      # statement, keyed by this digest, to GitHub's own attestation store. That
+      # store is reached through the `attestations: write` permission and the
+      # `/repos/{owner}/{repo}/attestations` API — NOT through `packages: write`
+      # — so a registry-side compromise cannot reach it, and a verifier can ask
+      # GitHub "what do you know about this digest?" without trusting the
+      # registry that serves it. It is a second, independently rooted answer to
+      # the same question, which is the entire point of adding it next to a
+      # provenance record that already exists.
+      #
+      # `push-to-registry: false` is deliberate and is the whole design. Pushing
+      # the attestation back to GHCR would place the independent copy in exactly
+      # the mutable location whose mutability motivated it, and it would add a
+      # referrer manifest to an index whose composition `plan` and `merge`
+      # reason about explicitly. Keeping it out of the registry is the feature.
+      #
+      # Verify with a single command, no cosign and no identity regexp to keep
+      # in sync across deploy.sh / promote.yml / this file:
+      #   gh attestation verify       #     oci://ghcr.io/krt-profit/basetool-<module>:<tag>       #     --repo krt-profit/basetool
+      #
+      # Runs unconditionally, reuse run included, for the same reason the sign
+      # step does: every digest a release tag points at carries an attestation
+      # from the run that applied the tag, rather than one this run only
+      # inherited and never witnessed. Attesting a digest twice is additive --
+      # verification passes on any matching statement.
+      - name: Attest build provenance (GitHub attestation store)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}
+          subject-digest: ${{ steps.inspect.outputs.digest }}
+          push-to-registry: false
+
       # Makes the build-vs-reuse decision legible on the run page next to the
       # digest it produced, so "why was this release so fast?" is answerable
       # without reading the plan job's log.
@@ -1032,6 +1089,18 @@ jobs:
           echo "::error::cosign sign failed after ${attempts} attempts for ${IMAGE}" >&2
           exit 1
 
+      # Parity with the app images: a GitHub-attestation-store provenance record
+      # alongside the in-registry buildx provenance + cosign signature, so this
+      # bundle can be verified without trusting the registry that serves it. The
+      # full rationale (and why `push-to-registry` stays false) is on the merge
+      # job's equivalent step above.
+      - name: Attest build provenance (GitHub attestation store)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-config
+          subject-digest: ${{ steps.inspect.outputs.digest }}
+          push-to-registry: false
+
   # The Keycloak provider-JAR bundle: a `FROM scratch` image (docker/keycloak-spi/
   # Dockerfile) carrying ONLY the keycloak-spi provider JAR. It is a SEPARATE
   # artifact from basetool-config because REQ-OPS-005 bars keycloak/providers JARs
@@ -1200,3 +1269,15 @@ jobs:
           done
           echo "::error::cosign sign failed after ${attempts} attempts for ${IMAGE}" >&2
           exit 1
+
+      # Parity with the app images: a GitHub-attestation-store provenance record
+      # alongside the in-registry buildx provenance + cosign signature, so this
+      # bundle can be verified without trusting the registry that serves it. The
+      # full rationale (and why `push-to-registry` stays false) is on the merge
+      # job's equivalent step above.
+      - name: Attest build provenance (GitHub attestation store)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-keycloak-spi
+          subject-digest: ${{ steps.inspect.outputs.digest }}
+          push-to-registry: false

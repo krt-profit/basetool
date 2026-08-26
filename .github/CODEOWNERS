@@ -1,0 +1,92 @@
+# Code owners for krt-profit/basetool.
+#
+# GitHub reads this file to decide who is automatically requested for review on
+# a pull request. It is REVIEW ROUTING, not an access-control mechanism: an
+# entry here grants nobody any permission, and it only becomes a merge gate if
+# branch protection on `main` has "Require review from Code Owners" enabled.
+# Owning a path therefore costs nothing except a review request.
+#
+# Syntax notes that bite:
+#   - Patterns are gitignore-style. `docs/` matches the whole tree; `/docs/`
+#     anchors at the repository root; `*.md` matches at every depth.
+#   - THE LAST MATCHING RULE WINS — unlike .gitignore, rules do not accumulate.
+#     A file matched by both `*` and `/scripts/deploy.sh` is owned by whoever
+#     the LATER line names, and by them alone. Order the stanzas from broad to
+#     narrow, and never re-broaden further down the file.
+#   - An owner must have write access to the repository, or GitHub silently
+#     drops the rule rather than reporting an error.
+#   - GitHub never requests a review from the pull request's own author, so a
+#     maintainer opening a PR against a path they own is not blocked by it.
+#
+# The repository currently has a single maintainer, so every stanza names the
+# same owner. The paths are still spelled out rather than collapsed into one
+# `*` line: they document which surfaces are considered high-risk, and they
+# keep working unchanged when a second maintainer is added — that change then
+# becomes a one-line edit per area instead of a rewrite.
+
+# ---------------------------------------------------------------------------
+# Default owner for everything not matched by a more specific rule below.
+# ---------------------------------------------------------------------------
+*                                   @greluc
+
+# ---------------------------------------------------------------------------
+# Supply chain and CI/CD.
+#
+# These files decide what gets built, what gets signed, what is attested and
+# what reaches the production host. A change here can compromise every artifact
+# the project publishes without touching a single line of application code, so
+# they are called out explicitly rather than left to the `*` default.
+# ---------------------------------------------------------------------------
+/.github/                           @greluc
+/.github/workflows/                 @greluc
+/.github/CODEOWNERS                 @greluc
+/.github/dependabot.yml             @greluc
+
+# The deploy path: the host pulls and applies whatever these produce
+# (REQ-OPS-001, REQ-OPS-015). deploy.sh runs as a docker-group user, i.e.
+# root-equivalent on the production box.
+/scripts/                           @greluc
+/docker/                            @greluc
+/docker-compose*.yml                @greluc
+/monitoring/                        @greluc
+
+# Build definition and dependency pins. `gradle/libs.versions.toml` is the
+# single place dependency versions are declared, so it is the single place a
+# malicious or careless version change would land.
+/build.gradle.kts                   @greluc
+/settings.gradle.kts                @greluc
+/gradle/                            @greluc
+/gradlew                            @greluc
+/gradlew.bat                        @greluc
+/config/                            @greluc
+
+# ---------------------------------------------------------------------------
+# Binding governance documents.
+#
+# Specs and ADRs are binding per CLAUDE.md — code may not silently contradict
+# them, and amending one is how a requirement legitimately changes. The role
+# matrix is the authoritative statement of who may do what. Licensing, the CLA
+# and the security policy carry legal weight.
+# ---------------------------------------------------------------------------
+/docs/specs/                        @greluc
+/docs/adr/                          @greluc
+/ROLES_AND_PERMISSIONS.md           @greluc
+/.github/SECURITY.md                @greluc
+/LICENSE.md                         @greluc
+/CLA.md                             @greluc
+/CONTRIBUTING.md                    @greluc
+/CODE_OF_CONDUCT.md                 @greluc
+/CLAUDE.md                          @greluc
+
+# ---------------------------------------------------------------------------
+# Security-critical application code.
+#
+# Authorization is centralised in @PreAuthorize plus OwnerScopeService, and the
+# multi-org-unit scoping is what keeps one squadron's data out of another's
+# (REQ-SEC-*, REQ-ORG-*). Flyway migrations are irreversible in production.
+# ---------------------------------------------------------------------------
+/backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/       @greluc
+/backend/src/main/resources/db/migration/                                  @greluc
+/frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/     @greluc
+/keycloak-spi/                                                             @greluc
+/keycloak-theme/                                                           @greluc
