@@ -250,6 +250,7 @@ address it before merge.
 ### Review and merge
 
 - PRs are reviewed by maintainers; non-trivial changes typically need at least one approving review.
+- Reviewers are requested automatically from [`.github/CODEOWNERS`](.github/CODEOWNERS). That file is **review routing, not access control** — an entry there grants nobody any permission. It also documents which surfaces the project treats as high-risk: the release and deploy path, the Gradle build and dependency pins, the binding specs and ADRs, the role matrix, the licensing and security documents, and the security-critical application code (authorization config, Flyway migrations, the Keycloak SPI and theme). If you touch one of those, expect the review to be closer. Note that in CODEOWNERS **the last matching rule wins** — rules do not accumulate the way `.gitignore` patterns do — so add new stanzas from broad to narrow and never re-broaden further down the file.
 - Reviewer comments are not blockers by default — please respond to them, even if your response is "I disagree, here is why".
 - Maintainers normally merge via **squash merge** so the final commit on `main` matches the PR title. Write the PR title accordingly: it is what ends up in `git log`.
 - Do not force-push to a PR branch once review has started unless a reviewer asks you to; prefer additional commits and let the squash collapse them at merge time.

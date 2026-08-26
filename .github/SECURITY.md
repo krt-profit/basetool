@@ -177,11 +177,32 @@ before reporting a finding against it:
   signing identity is the `release-images.yml` workflow on a ref under
   `refs/heads/main` or `refs/tags/v*.*.*`, issued by
   `https://token.actions.githubusercontent.com`.
-- **Provenance** — SLSA build provenance (`provenance: mode=max`) is
-  attached as an OCI attestation to every published manifest.
+- **Provenance (in the registry)** — SLSA build provenance
+  (`provenance: mode=max`) is attached as an OCI attestation to every
+  published manifest.
+- **Provenance (independent of the registry)** — the same build is also
+  attested to GitHub's own attestation store, which is written under a
+  different permission than the registry (`attestations: write`, not
+  `packages: write`). This is the copy that survives a registry-side
+  rewrite of a package, so prefer it when the question is *"did this
+  organisation's CI really build this digest?"*:
+
+  ```bash
+  gh attestation verify oci://ghcr.io/krt-profit/basetool-backend:1.6.3 --repo krt-profit/basetool
+  ```
+
+  The same works for `basetool-frontend`, `basetool-ingest`,
+  `basetool-config` and `basetool-keycloak-spi`.
+
 - **SBOM** — an SPDX SBOM is attached as an OCI attestation; CycloneDX
   SBOMs are also generated locally via `./gradlew cyclonedxBom` and
-  shipped under `<module>/docs/`.
+  shipped under `<module>/docs/`. The four CycloneDX files attached to a
+  GitHub Release carry their own build provenance — verify a downloaded
+  one before you trust what it lists:
+
+  ```bash
+  gh attestation verify backend-bom.json --repo krt-profit/basetool
+  ```
 
 A finding that requires bypassing these verification steps is itself in
 scope.

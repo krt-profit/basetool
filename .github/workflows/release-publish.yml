@@ -8,7 +8,11 @@ name: Release · Publish
 #   2. Creates the `vX.Y.Z` tag at the merge commit -- ONCE, on a commit that
 #      already carries the tidied changelog + fresh SBOM, so the tag never has to
 #      be moved.
-#   3. Publishes the GitHub Release: body = the freshly cut CHANGELOG section in
+#   3. Attests SLSA build provenance for the four SBOM files, binding their
+#      hashes to this run and the release commit in GitHub's attestation store
+#      (REQ-OPS-023, ADR-0145) -- before they are uploaded, so there is no
+#      window in which a published asset has no provenance.
+#   4. Publishes the GitHub Release: body = the freshly cut CHANGELOG section in
 #      the release-notes skill's German rubric style, plus links to the signed
 #      multi-arch GHCR images and the four SBOM files attached as assets.
 #
@@ -33,7 +37,9 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write   # create the GitHub Release (tag is created via the API below)
+  contents: write      # create the GitHub Release (tag is created via the API below)
+  id-token: write      # OIDC token for the Sigstore-backed provenance attestation
+  attestations: write  # SLSA build provenance for the published release assets
 
 env:
   REGISTRY: ghcr.io
@@ -102,6 +108,40 @@ jobs:
           python3 .github/scripts/extract_release_notes.py "${TAG}" CHANGELOG.md \
             --version "${VERSION}" --registry "${REGISTRY}" --owner "${IMAGE_OWNER}" > "$body"
           echo "path=${body}" >> "$GITHUB_OUTPUT"
+
+      # Build provenance for the files this job is about to publish.
+      #
+      # The container images have carried provenance for a while; the four
+      # CycloneDX SBOMs attached to the GitHub Release carried none. That is the
+      # asymmetry this closes. A release asset is a bare file on a URL: someone
+      # downloading `backend-bom.json` to audit what the release ships has no
+      # way to tell it apart from a file uploaded by anyone who ever held
+      # `contents: write` on the repository, and an SBOM is precisely the
+      # artifact an attacker would want to doctor -- it is what a consumer reads
+      # INSTEAD of unpacking the image.
+      #
+      # The attestation binds each file's sha256 to this workflow, this run and
+      # the release commit, in GitHub's attestation store. Note what it does and
+      # does not claim: the SBOMs are generated and committed by
+      # release-prepare.yml, not here, so the statement says "these bytes were
+      # published as assets of this release, from this commit, by this workflow"
+      # -- which is the question a downloader actually has -- and not "this
+      # workflow ran cyclonedxBom".
+      #
+      # Attested BEFORE the upload so the assets are never downloadable in an
+      # unattested window, and so a failure here fails the release rather than
+      # leaving published assets that quietly have no provenance.
+      #
+      # Verify a downloaded asset with:
+      #   gh attestation verify backend-bom.json --repo krt-profit/basetool
+      - name: Attest the release assets
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            backend/docs/backend-bom.json
+            backend/docs/backend-bom.xml
+            frontend/docs/frontend-bom.json
+            frontend/docs/frontend-bom.xml
 
       - name: Create or update the GitHub Release
         env:

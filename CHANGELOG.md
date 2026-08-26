@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Veröffentlichte Artefakte tragen jetzt eine zweite, registry-unabhängige Herkunftsbestätigung.**
+  Die Images hatten ihre SLSA-Provenance und die Cosign-Signatur bisher nur in der Registry liegen,
+  wo ein Token mit Schreibrecht auf die Pakete beides mit austauschen könnte; die vier SBOM-Dateien
+  einer Veröffentlichung hatten überhaupt keinen Nachweis. Beides wird jetzt zusätzlich bei GitHub
+  hinterlegt und lässt sich mit einem Befehl prüfen (`gh attestation verify`, REQ-OPS-023) — am
+  Server ändert sich nichts.
+
+- **`.github/CODEOWNERS` bestimmt, wer bei einem Pull Request automatisch als Reviewer angefragt
+  wird.** Die Datei vergibt keine Rechte, sondern hält fest, welche Bereiche als besonders heikel
+  gelten — Release- und Deploy-Pfad, Build- und Abhängigkeitsdefinition, bindende Spezifikationen
+  und ADRs, Rollenmatrix sowie sicherheitskritischer Code.
+
 ### Fixed
 
 - **Der eingefrorene API-Vertrag prüft die Query-Parameter jetzt bei jedem Endpunkt.** Die Parameter waren zwar eingefroren, aber in einer getrennten Liste — fünf Endpunkte der App standen deshalb ohne einen einzigen darin, unter anderem zwei geblätterte Listen und die Sperre gegen gleichzeitiges Bearbeiten beim Löschen einer Auftragsnotiz. Sie sind jetzt abgedeckt, und ein neuer Endpunkt ohne Angabe bricht den Build (REQ-API-009).

@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-08-03.
-> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-08-26.
+> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md)
 
 # Deployment delivery & promotion
 
@@ -755,6 +755,65 @@ configured one.
 **Enforced by:** `.github/workflows/promote-testing.yml` · `docker-compose.yml`
 (`KC_HOSTNAME`, `KEYCLOAK_ISSUER_URI`) · `.env.example` · **Runbook:** `docs/deployment.md` →
 *Promoting to testing*
+
+### REQ-OPS-023 — Build provenance is anchored outside the registry
+
+Every artifact this project publishes carries a **SLSA build provenance attestation in GitHub's
+attestation store**, binding the artifact's digest to the workflow, the run and the source commit:
+the three app images, the `basetool-config` and `basetool-keycloak-spi` bundles, and the CycloneDX
+SBOM files attached to the GitHub Release. This is **in addition to**, never instead of, the
+in-registry provenance — the buildx `mode=max` attestation manifest and the cosign keyless
+signature — which REQ-OPS-015 continues to gate on.
+
+The reason for a second record of the same fact is *where it is kept*, not *what it says*. The
+buildx provenance manifest and the cosign signature layer are ordinary manifests in the GHCR
+repository, siblings of the image itself. A credential holding `packages: write` on the
+organisation can delete a package version and push a replacement, and the provenance and signature
+go with it, because they live in the repository that credential controls. REQ-OPS-015 closes the
+case where `:stable` is **moved** to point at a different digest — the host re-resolves and
+re-verifies on every tick — but it does not close the case where a package is **rewritten as a
+coherent set**, provenance included. The attestation store is reached through `attestations: write`
+and the `/repos/{owner}/{repo}/attestations` API, neither of which `packages: write` grants, so it
+is a second answer to "who built this digest?" with an independent trust root.
+
+For the release assets the gap was absolute rather than partial: the four SBOMs carried **no**
+provenance of any kind. A release asset is a bare file behind a URL, indistinguishable from one
+uploaded by anyone who ever held `contents: write` — and an SBOM is exactly the artifact worth
+doctoring, because it is what a consumer reads *instead of* unpacking the image.
+
+**The attestation is deliberately not pushed back into the registry** (`push-to-registry: false`).
+Doing so would place the independent copy in the mutable location whose mutability motivated it,
+and would add a referrer manifest to an index whose composition `plan` and `merge` reason about
+explicitly (REQ-OPS-021).
+
+**This does not change the host gate, and is not intended to.** `deploy.sh` still verifies with
+cosign and nothing else. Verifying a GitHub attestation requires a GitHub API credential, and the
+production host deliberately holds only a **read-only GHCR pull token** (REQ-OPS-001); giving it a
+GitHub credential to strengthen a verification would weaken the property that credential-minimalism
+buys. The attestation store therefore serves the **auditor and the CI half** of the supply-chain
+seam — anyone verifying a published artifact after the fact — while the host half stays cosign,
+fail-closed, exactly as REQ-OPS-015 specifies.
+
+**Acceptance**
+
+- [ ] `merge` (per module), `build-config` and `build-keycloak-spi` each attest the **manifest
+  digest** they just signed — the subject is a digest, never a tag, so every tag pointing at that
+  digest (including a later `:stable` promotion) is covered by one attestation.
+- [ ] `release-publish.yml` attests all four SBOM assets **before** `gh release create/upload`, so
+  no published asset is ever downloadable in an unattested window.
+- [ ] `push-to-registry` is `false` at every call site.
+- [ ] The attestation runs on a reuse run too (REQ-OPS-021), so every digest a release tag points
+  at was attested by the run that applied the tag, not only by the run that built it.
+- [ ] Both workflows declare `id-token: write` **and** `attestations: write`; `release-publish.yml`
+  additionally keeps `contents: write` for the release itself.
+- [ ] A published artifact verifies with `gh attestation verify` alone — no cosign, and no copy of
+  the signer-identity regexp that `deploy.sh` and `promote.yml` must keep in sync.
+- [ ] `deploy.sh` is **unchanged**: the host-side gate remains the cosign verification of
+  REQ-OPS-015, and the host acquires no GitHub credential.
+
+**Enforced by:** `.github/workflows/release-images.yml` (`merge`, `build-config`,
+`build-keycloak-spi`) · `.github/workflows/release-publish.yml` · **Runbook:**
+`.github/SECURITY.md` → *Verifying Releases* · **Decision:** ADR-0145
 
 ## Out of scope
 
