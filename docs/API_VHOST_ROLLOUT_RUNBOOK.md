@@ -483,9 +483,12 @@ if ($request_method !~ "^(GET|HEAD)$") { set $krt_readonly_family "${krt_readonl
 # has to erase the flag rather than qualify it.
 #
 # /hangar stays in the family above because /hangar/users/<uuid>/ships (the admin surface, which
-# names a member) and the two /import paths (phase 4) live under the same prefix and must keep
-# answering 405. Only the two own-ship paths are named here, and naming a path opens EVERY verb the
-# backend serves on it - which for these is POST, PUT and DELETE, each gated by @PreAuthorize.
+# names a member) and the two /import paths (phase 4) live under the same prefix. None of the three
+# is admitted today, so the deny above answers them 404 before this guard runs at all - what the
+# family membership buys is the day one of them IS admitted: it is then 405 rather than open, and
+# opening it has to be a named carve-out. Only the two own-ship paths are named here, and naming a
+# path opens EVERY verb the backend serves on it - which for these is POST, PUT and DELETE, each
+# gated by @PreAuthorize.
 if ($uri = "/api/v1/hangar/ships") { set $krt_readonly_family ""; }
 if ($uri ~ "^/api/v1/hangar/ships/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_readonly_family ""; }
 # /inventory stays in the family because the prefix also carries /inventory/all, the two bulk
@@ -938,17 +941,20 @@ Anonymously, from outside the host — the same shape as Phase H's check:
 | `…/bank/accounts/<uuid>/balance-target`      | **401**                                                                           |
 | `POST /api/v1/bank/deposits`                 | **404** — the bank-employee surface is not on the allow-list at all               |
 | `POST /api/v1/orders`                        | **405** — the public request form stays refused on this vhost                     |
-| `POST /api/v1/hangar/import/fleetview`       | **405** — still refused, and that is the point                                    |
+| `POST /api/v1/hangar/import/fleetview`       | **404** — phase 4, on no allow-list line; refused before the verb is judged       |
 
-A **405** on any of these would be the read-only guard swallowing a write the phase is supposed to
-open: `/personal-inventory` and `/personal-blueprints` must NOT be in the guard's family list, while
-`uex` and `blueprints` must — the picker and the location search are reads, and the catalogue behind
-them has writes this vhost never admits.
+A **405** on any row listed **401** would be the read-only guard swallowing a write the phase is
+supposed to open: `/personal-inventory` and `/personal-blueprints` must NOT be in the guard's family
+list, while `uex` and `blueprints` must — the picker and the location search are reads, and the
+catalogue behind them has writes this vhost never admits. `POST /api/v1/orders` is the one row where
+**405** is the right answer, and it reads that way because the path *is* admitted — as the phase-2
+queue — and only the verb is refused.
 
 A **404** where a **401** is listed means the path did not match the allow-list — a typo in the
-regex, most likely a `<uuid>` group that lost a brace. A **401** where a **404** is listed on
-`/inventory/all` or `/bank/deposits` means the opposite: something was admitted that should not have
-been, and that one is worth stopping for.
+regex, most likely a `<uuid>` group that lost a brace. Anything other than **404** on
+`/inventory/all`, `/bank/deposits` or `/hangar/import/fleetview` means the opposite: something was
+admitted that should not have been — a **405** included, because reaching the read-only guard at all
+means the path got past the deny. That one is worth stopping for.
 
 ### Doing it — step by step
 
@@ -981,8 +987,9 @@ nothing in this repo reaches that host.
    foreach ($p in '/api/v1/bank/deposits','/api/v1/inventory/all','/api/v1/hangar/import/fleetview') { '{0,-46} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' -X POST "https://api.profit-base.online$p") }
    ```
 
-   Expected: `404`, `404`, `405`. A `401` here would mean a path was admitted that should not have
-   been.
+   Expected: `404` for all three — none of them is on the allow-list, and the deny answers before
+   the read-only guard can. A `401` or a `405` here would mean a path was admitted that should not
+   have been.
 
 6. **Run the probe once by hand** rather than waiting for the night:
    *Actions → Edge deny probe → Run workflow*. It must come back green; it now carries every path of
