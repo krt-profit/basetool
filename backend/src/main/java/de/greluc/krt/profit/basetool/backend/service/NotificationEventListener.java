@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.AsyncConfig;
 import de.greluc.krt.profit.basetool.backend.event.NotificationEvent;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -68,9 +69,9 @@ public class NotificationEventListener {
   @Async(AsyncConfig.NOTIFICATION_EXECUTOR)
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onNotificationEvent(NotificationEvent event) {
-    Set<UUID> recipients;
+    Map<NotificationSignal, Set<UUID>> recipientsBySignal;
     try {
-      recipients = notificationCreationService.createFromEvent(event);
+      recipientsBySignal = notificationCreationService.createFromEvent(event);
     } catch (RuntimeException e) {
       log.error(
           "Failed to create notifications for event {} entity {}",
@@ -79,13 +80,18 @@ public class NotificationEventListener {
           e);
       return;
     }
-    if (recipients.isEmpty()) {
+    if (recipientsBySignal.isEmpty()) {
       return;
     }
     try {
       // Push through the fan-out seam: local-only by default, cross-replica via Redis when enabled
       // (ADR-0094). Best-effort — the polling fallback keeps the badge correct (REQ-NOTIF-010).
-      notificationFanout.publish(recipients);
+      //
+      // One call per signal, not one per event: recipients of the same event can have been told
+      // different things, and a client is entitled to know which of them it was told.
+      for (Map.Entry<NotificationSignal, Set<UUID>> entry : recipientsBySignal.entrySet()) {
+        notificationFanout.publish(entry.getValue(), entry.getKey());
+      }
     } catch (RuntimeException e) {
       log.debug("Real-time notification push failed; polling fallback remains", e);
     }

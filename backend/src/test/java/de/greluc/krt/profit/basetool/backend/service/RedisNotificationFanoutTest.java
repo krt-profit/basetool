@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
@@ -64,10 +65,10 @@ class RedisNotificationFanoutTest {
 
   @Test
   void publish_deliversLocallyFirst_thenPublishesToRedis_andCounts() {
-    fanout.publish(List.of(USER));
+    fanout.publish(List.of(USER), NotificationSignal.refreshOnly());
 
     // Local delivery happens before (and independent of) the cross-replica publish.
-    verify(streamService).publish(List.of(USER));
+    verify(streamService).publish(List.of(USER), NotificationSignal.refreshOnly());
     verify(redisTemplate).convertAndSend(anyString(), anyString());
     assertThat(publishedCount()).isEqualTo(1.0);
   }
@@ -78,10 +79,10 @@ class RedisNotificationFanoutTest {
         .when(redisTemplate)
         .convertAndSend(anyString(), anyString());
 
-    fanout.publish(List.of(USER));
+    fanout.publish(List.of(USER), NotificationSignal.refreshOnly());
 
     // The local delivery already happened; the failed cross-replica publish is swallowed + counted.
-    verify(streamService).publish(List.of(USER));
+    verify(streamService).publish(List.of(USER), NotificationSignal.refreshOnly());
     assertThat(errorCount(MetricNames.OP_PUBLISH)).isEqualTo(1.0);
     assertThat(publishedCount()).isZero();
   }
@@ -92,7 +93,7 @@ class RedisNotificationFanoutTest {
 
     fanout.onMessage(message(body), null);
 
-    verify(streamService, never()).publish(anyCollection());
+    verify(streamService, never()).publish(anyCollection(), any());
     assertThat(consumedCount()).isZero();
   }
 
@@ -102,7 +103,7 @@ class RedisNotificationFanoutTest {
 
     fanout.onMessage(message(body), null);
 
-    verify(streamService).publish(List.of(USER));
+    verify(streamService).publish(List.of(USER), NotificationSignal.refreshOnly());
     assertThat(consumedCount()).isEqualTo(1.0);
   }
 
@@ -110,7 +111,7 @@ class RedisNotificationFanoutTest {
   void onMessage_ignoresMalformedPayload_andCountsAConsumeError() {
     fanout.onMessage(message("{not json"), null);
 
-    verify(streamService, never()).publish(anyCollection());
+    verify(streamService, never()).publish(anyCollection(), any());
     assertThat(errorCount(MetricNames.OP_CONSUME)).isEqualTo(1.0);
   }
 
@@ -129,7 +130,7 @@ class RedisNotificationFanoutTest {
 
     fanout.onMessage(message(body), null);
 
-    verify(streamService).publish(List.of(USER, other));
+    verify(streamService).publish(List.of(USER, other), NotificationSignal.refreshOnly());
     assertThat(consumedCount()).isEqualTo(1.0);
     assertThat(errorCount(MetricNames.OP_CONSUME)).isZero();
   }

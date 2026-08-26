@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.support.NotificationParamsCodec;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -72,20 +73,31 @@ public class NotificationCreationService {
    * items were removed, so a staff member's badge/inbox refreshes live the moment a request is
    * decided.
    *
+   * <p>The result is keyed by <strong>signal</strong> rather than flattened to a recipient set,
+   * because one event can raise different notification types for different audiences and the push
+   * now tells each recipient what they were told (REQ-NOTIF-010). Recipients whose stale items were
+   * merely cleared appear under {@link NotificationSignal#refreshOnly()} — their inbox changed and
+   * their badge must move, but there is no message to file or open.
+   *
    * @param event the fired event
-   * @return the deduplicated recipient {@code sub}s whose inbox changed (created or cleared); empty
-   *     when nothing changed
+   * @return the recipients whose inbox changed, grouped by what they were told; empty when nothing
+   *     changed
    */
   @Transactional
-  public Set<UUID> createFromEvent(@NotNull NotificationEvent event) {
-    Set<UUID> affected = new HashSet<>(removeSupersededNotifications(event));
+  @NotNull
+  public Map<NotificationSignal, Set<UUID>> createFromEvent(@NotNull NotificationEvent event) {
+    Map<NotificationSignal, Set<UUID>> bySignal = new LinkedHashMap<>();
+    Set<UUID> cleared = removeSupersededNotifications(event);
+    if (!cleared.isEmpty()) {
+      bySignal.put(NotificationSignal.refreshOnly(), new HashSet<>(cleared));
+    }
 
     Map<NotificationType, Set<UUID>> recipientsByType =
         ruleEvaluationService.resolveRecipients(event);
     if (recipientsByType.isEmpty()) {
       log.debug(
           "Event {} for entity {} resolved no recipients", event.eventType(), event.entityId());
-      return affected;
+      return bySignal;
     }
     String paramsJson = notificationParamsCodec.serialize(event.renderParams());
     List<Notification> toCreate = new ArrayList<>();
@@ -109,8 +121,13 @@ public class NotificationCreationService {
         toCreate.size(),
         event.eventType(),
         event.entityId());
-    recipientsByType.values().forEach(affected::addAll);
-    return affected;
+    for (Map.Entry<NotificationType, Set<UUID>> entry : recipientsByType.entrySet()) {
+      NotificationSignal signal =
+          new NotificationSignal(
+              entry.getKey(), event.entityType(), event.entityId(), event.renderParams());
+      bySignal.computeIfAbsent(signal, key -> new HashSet<>()).addAll(entry.getValue());
+    }
+    return bySignal;
   }
 
   /**

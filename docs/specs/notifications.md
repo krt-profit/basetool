@@ -198,6 +198,54 @@ independent of the user-initiated delete (REQ-NOTIF-005).
 (`deleteReadOlderThan`) · **Code:** `task/NotificationRetentionTask`,
 `service/NotificationService#purgeReadOlderThan`
 
+### REQ-NOTIF-021 — The `notification` event says what arrived
+
+The push carried the literal string `new`. That is enough for the web app, whose handler takes no
+argument and refetches the unread count, and not enough for the Android app: without a kind it
+cannot file the shade entry under the right notification channel, and without an entity it cannot
+open the screen the message is about. Both are requirements of its own design specification
+(`REQ-APP-UI-007` there), and neither is answerable from a bare ping.
+
+**The event name does not change.** `notification` is what the frozen contract pins
+([api-conventions.md](api-conventions.md)); only its `data` grows. The web client is unaffected by
+construction — it never read the payload.
+
+**The payload is a signal, and a signal is per notification type — not per event.** One event
+resolves to a `Map<NotificationType, Set<UUID>>`: the same trigger raises different kinds for
+different audiences. Two recipients of one event can therefore be told two different things, and a
+payload describing the *event* would be wrong for at least one of them. `createFromEvent` returns
+its result keyed by signal, and the listener publishes once per signal.
+
+```json
+{ "type": "…", "entityType": "JOB_ORDER", "entityId": "…", "params": { "…": "…" } }
+```
+
+**A recipient whose inbox was only *cleared* still gets `new`.** When an event supersedes stale
+items (REQ-NOTIF-018) the affected recipients receive nothing new — their badge must move, but there
+is no message to file or open. That case keeps the historic payload exactly, so the wire is
+unchanged for the situation it already covered.
+
+**The render parameters travel.** They are already returned to the same recipient by their own
+inbox over the same authenticated connection, so nothing is exposed to anyone the notification was
+not addressed to. What a client *does* with them on a lock screen is the client's rule, not this
+one — the Android app's chapter 14 obligations are unaffected by the payload existing.
+
+**Degrading is always toward the old behaviour.** A signal that cannot be serialised, a Redis peer
+running an older build, a notification type this instance does not know: each falls back to the bare
+`new`. A client that cannot be told *what* arrived is still told *that* something did, which is what
+it had before.
+
+**Acceptance**
+
+- [x] A refresh-only signal renders the historic `new`; a typed one carries kind, entity and params
+  (`NotificationStreamServiceTest`).
+- [x] One event with two audiences publishes once per signal, each to its own recipients
+  (`NotificationEventListenerTest`).
+- [x] The Redis message carries the signal as an **optional** field at the unchanged payload
+  version, so neither direction of a rolling deploy depends on the other having landed.
+
+---
+
 ### REQ-NOTIF-010 — Real-time push (SSE)
 
 Beyond the in-app polling baseline (REQ-NOTIF-006), real-time server push uses Server-Sent

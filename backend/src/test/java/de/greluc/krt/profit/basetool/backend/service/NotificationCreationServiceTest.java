@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.support.NotificationParamsCodec;
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -77,7 +78,7 @@ class NotificationCreationServiceTest {
         .thenReturn(Map.of(NotificationType.JOB_ORDER_CREATED, Set.of(A, B)));
     when(notificationParamsCodec.serialize(any())).thenReturn("{\"displayId\":\"9\"}");
 
-    Set<UUID> recipients = service.createFromEvent(event);
+    Set<UUID> recipients = flatten(service.createFromEvent(event));
 
     // #1152: createFromEvent now returns the deduped recipients (the listener publishes to them
     // after commit) rather than a row count; the row count stays covered by the saveAll capture.
@@ -103,7 +104,7 @@ class NotificationCreationServiceTest {
     JobOrderCreatedEvent event = event();
     when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
 
-    Set<UUID> recipients = service.createFromEvent(event);
+    Set<UUID> recipients = flatten(service.createFromEvent(event));
 
     assertThat(recipients).isEmpty();
     verify(notificationRepository, never()).saveAll(any());
@@ -145,7 +146,7 @@ class NotificationCreationServiceTest {
         .thenReturn(Map.of(NotificationType.BANK_BOOKING_REQUEST_CONFIRMED, Set.of(requester)));
     when(notificationParamsCodec.serialize(any())).thenReturn("{}");
 
-    Set<UUID> affected = service.createFromEvent(event);
+    Set<UUID> affected = flatten(service.createFromEvent(event));
 
     // The removed-notification holders (staff) plus the new-notification recipient (requester).
     assertThat(affected).containsExactlyInAnyOrder(staffA, staffB, requester);
@@ -179,7 +180,7 @@ class NotificationCreationServiceTest {
         .thenReturn(1);
     when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
 
-    Set<UUID> affected = service.createFromEvent(event);
+    Set<UUID> affected = flatten(service.createFromEvent(event));
 
     assertThat(affected).containsExactly(staff);
     verify(notificationRepository, never()).saveAll(any());
@@ -198,10 +199,27 @@ class NotificationCreationServiceTest {
         .thenReturn(List.of());
     when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
 
-    Set<UUID> affected = service.createFromEvent(event);
+    Set<UUID> affected = flatten(service.createFromEvent(event));
 
     assertThat(affected).isEmpty();
     verify(notificationRepository, never()).deleteByTypeInAndEntity(any(), any(), any());
     verify(notificationRepository, never()).saveAll(any());
+  }
+
+  /**
+   * Every recipient the call reached, whatever they were told.
+   *
+   * <p>The result is keyed by signal now, because one event can raise different notification types
+   * for different audiences. These assertions are about *who* was reached, which is the question
+   * they were always asking; the signal itself is asserted where it matters, in {@code
+   * NotificationEventListenerTest}.
+   *
+   * @param bySignal the call's result
+   * @return the union of its recipient sets
+   */
+  private static Set<UUID> flatten(Map<NotificationSignal, Set<UUID>> bySignal) {
+    Set<UUID> all = new HashSet<>();
+    bySignal.values().forEach(all::addAll);
+    return all;
   }
 }

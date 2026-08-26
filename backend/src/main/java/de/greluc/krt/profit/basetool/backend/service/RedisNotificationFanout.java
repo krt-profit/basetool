@@ -20,11 +20,14 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -96,9 +99,9 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
 
   /** {@inheritDoc} */
   @Override
-  public void publish(@NotNull Collection<UUID> recipientSubs) {
+  public void publish(@NotNull Collection<UUID> recipientSubs, @NotNull NotificationSignal signal) {
     // Deliver to this instance's emitters first — a Redis failure then only degrades peer delivery.
-    notificationStreamService.publish(recipientSubs);
+    notificationStreamService.publish(recipientSubs, signal);
     try {
       ObjectNode root = jsonMapper.createObjectNode();
       root.put("v", PAYLOAD_VERSION);
@@ -106,6 +109,17 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
       ArrayNode recipients = root.putArray("recipients");
       for (UUID sub : recipientSubs) {
         recipients.add(sub.toString());
+      }
+      // Optional by design, and the version stays at 1. A peer on an older build ignores the field
+      // and pushes the bare refresh it always did; this build receiving a message without one does
+      // the same. Neither direction of a rolling deploy needs the other to have landed first.
+      if (signal.describesNotification()) {
+        ObjectNode signalNode = root.putObject("signal");
+        signalNode.put("type", String.valueOf(signal.type()));
+        signalNode.put("entityType", signal.entityType());
+        signalNode.put("entityId", signal.entityId() == null ? null : signal.entityId().toString());
+        ObjectNode params = signalNode.putObject("params");
+        signal.params().forEach(params::put);
       }
       redisTemplate.convertAndSend(channel, jsonMapper.writeValueAsString(root));
       meterRegistry.counter(MetricNames.SSE_REDIS_PUBLISHED).increment();
@@ -115,6 +129,50 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
           .increment();
       log.debug("Notification Redis publish failed", e);
     }
+  }
+
+  /**
+   * Reads the signal a peer attached, if any.
+   *
+   * <p>Defensive in the same way the recipient list is: a malformed or absent signal degrades to
+   * the bare refresh rather than dropping the push, because a client that cannot be told what
+   * arrived can still be told that something did.
+   *
+   * @param root the parsed message
+   * @return the signal, or {@link NotificationSignal#refreshOnly()}
+   */
+  @NotNull
+  private NotificationSignal readSignal(@NotNull JsonNode root) {
+    JsonNode node = root.get("signal");
+    if (node == null || !node.isObject()) {
+      return NotificationSignal.refreshOnly();
+    }
+    NotificationType type;
+    try {
+      type = NotificationType.valueOf(node.path("type").asString(""));
+    } catch (IllegalArgumentException e) {
+      // A type this build does not know: a peer running a newer version. The push still lands.
+      log.debug("Skipping unknown notification type in fan-out message", e);
+      return NotificationSignal.refreshOnly();
+    }
+    UUID entityId = null;
+    String rawId = node.path("entityId").asString("");
+    if (!rawId.isEmpty()) {
+      try {
+        entityId = UUID.fromString(rawId);
+      } catch (IllegalArgumentException e) {
+        log.debug("Skipping malformed entity id in fan-out message", e);
+      }
+    }
+    Map<String, String> params = new LinkedHashMap<>();
+    JsonNode paramsNode = node.get("params");
+    if (paramsNode != null && paramsNode.isObject()) {
+      paramsNode
+          .propertyStream()
+          .forEach(entry -> params.put(entry.getKey(), entry.getValue().asString("")));
+    }
+    String entityType = node.path("entityType").asString("");
+    return new NotificationSignal(type, entityType.isEmpty() ? null : entityType, entityId, params);
   }
 
   /**
@@ -152,7 +210,7 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
       if (recipients.isEmpty()) {
         return;
       }
-      notificationStreamService.publish(recipients);
+      notificationStreamService.publish(recipients, readSignal(root));
       meterRegistry.counter(MetricNames.SSE_REDIS_CONSUMED).increment();
     } catch (RuntimeException e) {
       meterRegistry

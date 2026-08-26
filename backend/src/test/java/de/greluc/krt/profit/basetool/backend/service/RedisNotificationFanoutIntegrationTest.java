@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -96,7 +97,7 @@ class RedisNotificationFanoutIntegrationTest {
               return null;
             })
         .when(streamB)
-        .publish(anyCollection());
+        .publish(anyCollection(), any());
     RedisNotificationFanout instanceB =
         new RedisNotificationFanout(
             streamB, template, new SimpleMeterRegistry(), CHANNEL, "backend-B");
@@ -111,7 +112,7 @@ class RedisNotificationFanoutIntegrationTest {
     listenerContainer.addMessageListener(instanceA, new ChannelTopic(CHANNEL));
     Thread.sleep(300); // let the subscriptions register before publishing
 
-    instanceA.publish(List.of(user));
+    instanceA.publish(List.of(user), NotificationSignal.refreshOnly());
 
     assertThat(peerDelivered.await(5, TimeUnit.SECONDS))
         .as("peer instance B delivered the signal to its emitters")
@@ -121,6 +122,6 @@ class RedisNotificationFanoutIntegrationTest {
     // consume-and-skip it, then assert A delivered locally EXACTLY once (the own-origin skip means
     // the looped-back consume never triggers a second local publish).
     Thread.sleep(300);
-    verify(streamA, times(1)).publish(List.of(user));
+    verify(streamA, times(1)).publish(List.of(user), NotificationSignal.refreshOnly());
   }
 }

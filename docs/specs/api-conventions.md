@@ -464,7 +464,10 @@ an empty object instead would break every client that already special-cases the 
 verb must keep existing. Its body is a Server-Sent-Event stream, so the response-field assertion is
 vacuous by nature, and the real contract is the **event names** — `connected`, `notification`,
 `heartbeat`, `replaced`. Nothing in `openapi.json` describes them, so they are pinned in the app's
-own spec instead of being left to a schema check that cannot see them. Its response carries
+own spec instead of being left to a schema check that cannot see them. The `notification` event's
+**data** carries a signal since REQ-NOTIF-021 — kind, entity and render params — and the event name
+is still the frozen part: a client that ignores the payload behaves exactly as before, and a
+recipient whose inbox was only cleared still receives the historic `new`. Its response carries
 `X-Accel-Buffering: no`, which is what keeps an nginx from holding a trickling stream in a buffer;
 the guarantee travels with the endpoint rather than depending on a vhost's defaults.
 

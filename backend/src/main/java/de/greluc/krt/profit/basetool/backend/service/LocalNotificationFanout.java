@@ -48,7 +48,7 @@ public class LocalNotificationFanout implements NotificationFanout {
 
   /** {@inheritDoc} */
   @Override
-  public void publish(@NotNull Collection<UUID> recipientSubs) {
-    notificationStreamService.publish(recipientSubs);
+  public void publish(@NotNull Collection<UUID> recipientSubs, @NotNull NotificationSignal signal) {
+    notificationStreamService.publish(recipientSubs, signal);
   }
 }
