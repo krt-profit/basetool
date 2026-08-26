@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.6.4](https://github.com/krt-profit/basetool/releases/tag/v1.6.4) - 2026-08-26
+
 ### Added
 
 - **Veröffentlichte Artefakte tragen jetzt eine zweite, registry-unabhängige Herkunftsbestätigung.**
