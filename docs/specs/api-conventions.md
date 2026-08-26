@@ -328,11 +328,62 @@ constraint for nothing and record a guess about which fields matter.
 
 **Frozen has three more sides than the response body, and phase 3 is where each starts to bite.**
 
-*The query parameters* the app addresses an operation by are frozen as `name:type`
-(`FROZEN_QUERY_PARAMS`). A renamed parameter is silently ignored and the member gets the wrong
-rows; a retyped one comes back `400` and the screen says it could not load. Both were seen inside
-one afternoon on the Lager slice, and neither had failed a build. The assertion is a subset one, so
-adding an optional parameter stays free.
+*The query parameters* the app addresses an operation by are frozen as `name:type`, as a **fifth
+component of the `ContractOperation` record** (`addressedBy(...)`). A renamed parameter is silently
+ignored and the member gets the wrong rows; a retyped one comes back `400` and the screen says it
+could not load. Both were seen inside one afternoon on the Lager slice, and neither had failed a
+build. The assertion is a subset one, so adding an optional parameter stays free.
+
+**The parameters live on the entry, and an operation may not stay silent about them.** They were
+first held in a side map keyed by `"method path"`, and the shape of that map was the defect: adding
+an operation to the set did not oblige anyone to say how the app addresses it. Five operations that
+take query parameters therefore reached the set with none recorded — the Einsatz Finanzen tab and
+the Hangar org overview (both paged, both frozen down to their `content` envelope, neither able to
+prove it could still ask for page two), the Materialbörse offer sheet's picker, and
+`DELETE /api/v1/orders/{id}/assignees/{userId}/note`, whose `version` **is** the optimistic lock and
+whose rename would not have failed anything: a `null` version skips the check server-side, so every
+note deletion in the field would quietly stop being locked and take the last write over a
+colleague's edit. A second guard now fails the build when an operation declares query parameters and
+freezes none, so the omission has to become a decision — either `addressedBy(...)` or a named entry
+in `ADDRESSED_BY_NO_QUERY_PARAMETER` saying why the app sends nothing.
+
+Only the parameters the app **sends** are frozen, for the same reason only the response fields it
+reads are. `sort` is generally absent: the app takes the server's default order as it comes. So is
+`allKinds` on `GET /api/v1/users/me/memberships`, whose default (`false` — the Staffel/SK-only
+shape) is exactly what the org-unit switcher renders; it is the one entry in the exemption ledger.
+A **query parameter's enum constants** are not reached by the required-enum guard, which walks
+request and response schemas only — `kind` on the offer-sheet picker is frozen by name and type
+here, and its `MATERIAL` / `ITEM` vocabulary stays pinned by the offers response that carries the
+same field.
+
+|                        Operation                        |                                                        Frozen query parameters                                                         |
+|---------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| `GET /api/v1/missions/search`                           | `query:string`, `status:array`, `start:string`, `end:string`, `page:integer`, `size:integer`, `sort:string`                            |
+| `GET /api/v1/missions/{missionId}/finance-entries`      | `page:integer`, `size:integer`                                                                                                         |
+| `GET /api/v1/inventory/aggregated`                      | `page:integer`, `size:integer`                                                                                                         |
+| `GET /api/v1/inventory/all/grouped`                     | `materialIds:array`                                                                                                                    |
+| `GET /api/v1/orders`                                    | `status:array`, `page:integer`, `size:integer`                                                                                         |
+| `DELETE /api/v1/orders/{id}/assignees/{userId}/note`    | `version:integer`                                                                                                                      |
+| `GET /api/v1/org-units/bank/accounts/{id}/transactions` | `page:integer`, `size:integer`                                                                                                         |
+| `GET /api/v1/hangar/my-ships`                           | `search:string`, `page:integer`, `size:integer`                                                                                        |
+| `GET /api/v1/hangar/squadron-overview`                  | `search:string`, `page:integer`, `size:integer`                                                                                        |
+| `GET /api/v1/notifications`                             | `page:integer`, `size:integer`                                                                                                         |
+| `GET /api/v1/operations/search`                         | `query:string`, `status:array`, `start:string`, `end:string`, `page:integer`, `size:integer`, `sort:string`                            |
+| `GET /api/v1/personal-inventory`                        | `q:string`, `page:integer`, `size:integer`                                                                                             |
+| `GET /api/v1/uex/locations/search`                      | `q:string`, `limit:integer`                                                                                                            |
+| `GET /api/v1/personal-blueprints`                       | `q:string`, `page:integer`, `size:integer`                                                                                             |
+| `GET /api/v1/personal-blueprints/craftability`          | `includeRefinery:boolean`                                                                                                              |
+| `GET /api/v1/blueprints/products/search`                | `q:string`, `limit:integer`                                                                                                            |
+| `GET /api/v1/ship-types`                                | `page:integer`, `size:integer`, `sort:string`                                                                                          |
+| `GET /api/v1/inventory/all/stack/entries`               | `materialId:string`, `locationId:string`, `userId:string`, `quality:integer`, `owningOrgUnitId:string`, `page:integer`, `size:integer` |
+| `GET /api/v1/materials/search`                          | `search:string`, `page:integer`, `size:integer`                                                                                        |
+| `GET /api/v1/locations/search`                          | `search:string`, `page:integer`, `size:integer`                                                                                        |
+| `GET /api/v1/users/search`                              | `query:string`, `page:integer`, `size:integer`                                                                                         |
+| `GET /api/v1/live-sync/stream`                          | `topics:string`                                                                                                                        |
+| `GET /api/v1/refinery-orders/my-orders`                 | `status:array`, `page:integer`, `size:integer`                                                                                         |
+| `GET /api/v1/material-exchange/offers`                  | `page:integer`, `size:integer`                                                                                                         |
+| `GET /api/v1/material-requests`                         | `page:integer`, `size:integer`                                                                                                         |
+| `GET /api/v1/material-exchange/releasable-items`        | `q:string`, `kind:string`                                                                                                              |
 
 *Required enums on the request* are frozen alongside the response ones. A shipped build sends
 `status=IN_PROGRESS` and `locationType=CITY` as literal strings, so renaming a constant turns every
