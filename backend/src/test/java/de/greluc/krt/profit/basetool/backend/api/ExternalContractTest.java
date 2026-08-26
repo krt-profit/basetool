@@ -45,10 +45,14 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p><b>What this test can and cannot prove.</b> It reads the committed {@code openapi.json} — the
  * artifact REQ-API-007 already keeps in sync with the controllers — and fails when a contract
- * operation disappears, changes its verb, or loses a recorded response field. Those are the breaks
- * that silently reach a device. It does <em>not</em> compare types, nullability or enum values;
- * that needs a real schema diff against the previous release, which ADR-0136 records as the next
- * step rather than pretending this covers it.
+ * operation disappears, changes its verb, loses a recorded response field, gains a required request
+ * field, changes a required enum's constants, or renames or retypes a query parameter the app
+ * addresses it by. Those are the breaks that silently reach a device.
+ *
+ * <p>It still does <em>not</em> compare response field types, nullability, or a parameter's default
+ * value — the last of which is a real gap, since a list whose {@code sort} default flips reorders a
+ * shipped screen with every name and type intact. Catching that needs a schema diff against the
+ * previous release, which ADR-0136 records as the next step rather than pretending this covers it.
  *
  * <p><b>Adding to the set is a deliberate act.</b> The list grows one app phase at a time, together
  * with the vhost allow-list that exposes those paths. Removing an entry is not a way to make this
@@ -69,17 +73,34 @@ class ExternalContractTest {
   private static final int MAX_NESTING = 2;
 
   /**
-   * One frozen operation: path, verb, the response fields a shipped client may rely on, and — for a
-   * write — the request fields the server may demand of it.
+   * One frozen operation: path, verb, the response fields a shipped client may rely on, the query
+   * parameters it addresses the operation by, and — for a write — the request fields the server may
+   * demand of it.
+   *
+   * <p><b>Why the query parameters sit here and not in a list of their own.</b> They were held in a
+   * side map keyed by {@code "method path"}, and the shape of that map was the defect: adding an
+   * operation to {@code CONTRACT} did not oblige anyone to say how the app addresses it. Five
+   * operations that take query parameters therefore reached the set with none recorded — a paged
+   * Finanzen tab, the paged Hangar org overview, the offer sheet's picker, an optimistic lock
+   * riding a {@code DELETE} as a query parameter, and one whose honest answer turned out to be
+   * "none at all". As a component the slot travels with the entry, and the coverage guard fails the
+   * build when it is left unanswered.
    *
    * @param path the {@code /api/v1} path exactly as it appears in the document
    * @param method the HTTP verb, lower case, as OpenAPI spells it
    * @param responseFields response properties that must keep existing; additive change is fine
    * @param requiredRequestFields the request body's {@code required} list, frozen exactly. Empty
    *     for an operation with no request body, and for one whose body is entirely optional
+   * @param queryParams query parameters the app sends, as {@code name:type}, frozen as a subset so
+   *     the server may still add optional ones. Empty for an operation the app addresses by path
+   *     alone
    */
   private record ContractOperation(
-      String path, String method, Set<String> responseFields, Set<String> requiredRequestFields) {
+      String path,
+      String method,
+      Set<String> responseFields,
+      Set<String> requiredRequestFields,
+      Set<String> queryParams) {
 
     /**
      * A read, or a write whose request body carries no required field.
@@ -89,7 +110,36 @@ class ExternalContractTest {
      * @param responseFields the frozen response properties
      */
     ContractOperation(String path, String method, Set<String> responseFields) {
-      this(path, method, responseFields, Set.of());
+      this(path, method, responseFields, Set.of(), Set.of());
+    }
+
+    /**
+     * A write whose request body has a {@code required} list to freeze.
+     *
+     * @param path the {@code /api/v1} path
+     * @param method the HTTP verb, lower case
+     * @param responseFields the frozen response properties
+     * @param requiredRequestFields the request body's frozen {@code required} list
+     */
+    ContractOperation(
+        String path, String method, Set<String> responseFields, Set<String> requiredRequestFields) {
+      this(path, method, responseFields, requiredRequestFields, Set.of());
+    }
+
+    /**
+     * Records the query parameters a shipped client addresses this operation by.
+     *
+     * <p>Written as a builder step rather than a fifth argument so the seventy-odd entries the app
+     * reaches by path alone stay as they are, and the ones that take parameters name them where a
+     * reviewer reads the entry.
+     *
+     * @param frozen the parameters as {@code name:type}, using the schema type the document
+     *     declares; an array's element type is left out, since a client sends the same repeated
+     *     parameter either way
+     * @return a copy of this operation carrying the frozen parameters
+     */
+    ContractOperation addressedBy(Set<String> frozen) {
+      return new ContractOperation(path, method, responseFields, requiredRequestFields, frozen);
     }
   }
 
@@ -144,24 +194,33 @@ class ExternalContractTest {
           // `calendarLink` and `version` are left out because the app does not consume them, and
           // freezing a field nobody reads buys the backend a constraint for nothing.
           new ContractOperation(
-              "/api/v1/missions/search",
-              "get",
-              Set.of(
-                  "content",
-                  "page",
-                  "totalElements",
-                  "totalPages",
-                  "id",
-                  "name",
-                  "status",
-                  "meetingTime",
-                  "plannedStartTime",
-                  "actualStartTime",
-                  "plannedEndTime",
-                  "isInternal",
-                  "operation",
-                  "owningSquadron",
-                  "meetingPoint")),
+                  "/api/v1/missions/search",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "id",
+                      "name",
+                      "status",
+                      "meetingTime",
+                      "plannedStartTime",
+                      "actualStartTime",
+                      "plannedEndTime",
+                      "isInternal",
+                      "operation",
+                      "owningSquadron",
+                      "meetingPoint"))
+              .addressedBy(
+                  Set.of(
+                      "query:string",
+                      "status:array",
+                      "start:string",
+                      "end:string",
+                      "page:integer",
+                      "size:integer",
+                      "sort:string")),
           // Phase 2, the Einsatz detail. Anonymous by design like the search above it, and
           // redacted for an outsider by MissionGuestRedactor (ADR-0034): no description, no owner,
           // no managers, and each participant loses their payout preference and comment. An
@@ -236,17 +295,24 @@ class ExternalContractTest {
           // permitAll here and the refusal happens at the method seam (REQ-SEC-037, pinned by
           // ApiVhostAnonymousSurfaceTest).
           new ContractOperation(
-              "/api/v1/missions/{missionId}/finance-entries",
-              "get",
-              Set.of(
-                  "content",
-                  "page",
-                  "totalElements",
-                  "totalPages",
-                  "id",
-                  "type",
-                  "amount",
-                  "note")),
+                  "/api/v1/missions/{missionId}/finance-entries",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "id",
+                      "type",
+                      "amount",
+                      "note"))
+              // Paged like every other list the app scrolls: the envelope above is frozen, so the
+              // two
+              // parameters that reach page two belong to the same contract. `sort` is left alone --
+              // the
+              // app takes the server's `createdAt,desc` default, as it does on the inbox and the
+              // ledger.
+              .addressedBy(Set.of("page:integer", "size:integer")),
           new ContractOperation(
               "/api/v1/missions/{missionId}/finance-entries/summary",
               "get",
@@ -287,52 +353,55 @@ class ExternalContractTest {
           // `/inventory/all`, which is the flat entry list -- a tree that fetched every leaf to
           // draw its roots would pull the whole warehouse to show a dozen headings.
           new ContractOperation(
-              "/api/v1/inventory/aggregated",
-              "get",
-              Set.of(
-                  "content",
-                  "page",
-                  "totalElements",
-                  "totalPages",
-                  "material",
-                  "amount",
-                  "quality",
-                  "maxQuality",
-                  "name",
-                  "quantityType")),
+                  "/api/v1/inventory/aggregated",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "material",
+                      "amount",
+                      "quality",
+                      "maxQuality",
+                      "name",
+                      "quantityType"))
+              .addressedBy(Set.of("page:integer", "size:integer")),
           new ContractOperation(
-              "/api/v1/inventory/all/grouped",
-              "get",
-              Set.of(
-                  "material",
-                  "totalAmount",
-                  "averageQuality",
-                  "maxQuality",
-                  "stacks",
-                  "user",
-                  "location",
-                  "personal",
-                  "entryCount")),
+                  "/api/v1/inventory/all/grouped",
+                  "get",
+                  Set.of(
+                      "material",
+                      "totalAmount",
+                      "averageQuality",
+                      "maxQuality",
+                      "stacks",
+                      "user",
+                      "location",
+                      "personal",
+                      "entryCount"))
+              .addressedBy(Set.of("materialIds:array")),
           // Phase 2, the Aufträge queue and one order in full. `redacted` is frozen because it is
           // the field that tells the screen it is looking at a reduced order (REQ-ORDERS-023): a
           // requester sees their own order without the parts that are not theirs, and a client
           // that stopped seeing the flag would present the gaps as the whole truth.
           new ContractOperation(
-              "/api/v1/orders",
-              "get",
-              Set.of(
-                  "content",
-                  "page",
-                  "totalElements",
-                  "totalPages",
-                  "id",
-                  "displayId",
-                  "status",
-                  "priority",
-                  "type",
-                  "createdAt",
-                  "materials",
-                  "redacted")),
+                  "/api/v1/orders",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "id",
+                      "displayId",
+                      "status",
+                      "priority",
+                      "type",
+                      "createdAt",
+                      "materials",
+                      "redacted"))
+              .addressedBy(Set.of("status:array", "page:integer", "size:integer")),
           // Phase 3 widened this one rather than adding a second entry: the assignee edge is what
           // the app now writes to, and it is reached through this response. `note` and `version`
           // are the edge's own -- the version is NOT the order's, and sending the order's would
@@ -386,9 +455,17 @@ class ExternalContractTest {
               Set.of("id", "assignees", "user", "effectiveName", "note", "version"),
               Set.of()),
           new ContractOperation(
-              "/api/v1/orders/{id}/assignees/{userId}/note",
-              "delete",
-              Set.of("id", "assignees", "user", "effectiveName", "note", "version")),
+                  "/api/v1/orders/{id}/assignees/{userId}/note",
+                  "delete",
+                  Set.of("id", "assignees", "user", "effectiveName", "note", "version"))
+              // The optimistic lock, and it travels as a QUERY parameter here where the PUT twin
+              // carries
+              // it in the body. A null version skips the check server-side, so a renamed parameter
+              // does
+              // not fail: every note deletion in the field silently stops being locked and takes
+              // the last
+              // write over a colleague's edit. Nothing about the screen would look wrong.
+              .addressedBy(Set.of("version:integer")),
           // The status change. LOGISTICIAN + per-order scope, so the app offers it only to a
           // Logistician and names the refusal when the order is outside their slice.
           //
@@ -464,19 +541,20 @@ class ExternalContractTest {
               "put",
               Set.of("accountId", "allMembersGranted", "version")),
           new ContractOperation(
-              "/api/v1/org-units/bank/accounts/{id}/transactions",
-              "get",
-              Set.of(
-                  "content",
-                  "page",
-                  "totalElements",
-                  "totalPages",
-                  "postingId",
-                  "type",
-                  "amount",
-                  "note",
-                  "createdAt",
-                  "holderHandle")),
+                  "/api/v1/org-units/bank/accounts/{id}/transactions",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "postingId",
+                      "type",
+                      "amount",
+                      "note",
+                      "createdAt",
+                      "holderHandle"))
+              .addressedBy(Set.of("page:integer", "size:integer")),
           // Phase 2, the member's own hangar. The row's `shipType` and `location` are nested
           // objects whose `name` is what the card actually shows, which is why the guard now
           // descends into a referenced schema and not only into an array's items.
@@ -485,36 +563,39 @@ class ExternalContractTest {
           // and on this endpoint it is always the caller's own, so the app has no reason to read
           // it. Freezing it would oblige the backend to keep sending a payload nobody wants.
           new ContractOperation(
-              "/api/v1/hangar/my-ships",
-              "get",
-              Set.of(
-                  "content",
-                  "page",
-                  "totalElements",
-                  "totalPages",
-                  "id",
-                  "name",
-                  "shipType",
-                  "insurance",
-                  "location",
-                  "fitted",
-                  "manufacturer",
-                  // Added in phase 3: the app now edits these rows, and the edit echoes the
-                  // version it read. A read-only client had no use for it; a writing one cannot
-                  // save without it.
-                  "version")),
+                  "/api/v1/hangar/my-ships",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "id",
+                      "name",
+                      "shipType",
+                      "insurance",
+                      "location",
+                      "fitted",
+                      "manufacturer",
+                      // Added in phase 3: the app now edits these rows, and the edit echoes the
+                      // version it read. A read-only client had no use for it; a writing one cannot
+                      // save without it.
+                      "version"))
+              .addressedBy(Set.of("search:string", "page:integer", "size:integer")),
           // The org-unit half of the same screen: one row per ship type with its counts.
           new ContractOperation(
-              "/api/v1/hangar/squadron-overview",
-              "get",
-              Set.of(
-                  "content",
-                  "page",
-                  "totalElements",
-                  "totalPages",
-                  "shipType",
-                  "count",
-                  "fittedCount")),
+                  "/api/v1/hangar/squadron-overview",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "shipType",
+                      "count",
+                      "fittedCount"))
+              // The org half of the Hangar screen, addressed exactly like `my-ships` beside it.
+              .addressedBy(Set.of("search:string", "page:integer", "size:integer")),
           // Phase 2, the dashboard's announcement band. `content` is the whole point of the
           // operation, and the endpoint answers 204 when there is nothing to announce -- a
           // no-content answer the client must read as "no banner", never as a failure. That
@@ -528,20 +609,21 @@ class ExternalContractTest {
           // back to the generic wording when a placeholder cannot be filled -- a defence that
           // belongs there, because no schema check can express it.
           new ContractOperation(
-              "/api/v1/notifications",
-              "get",
-              Set.of(
-                  "content",
-                  "page",
-                  "totalElements",
-                  "totalPages",
-                  "id",
-                  "type",
-                  "params",
-                  "entityType",
-                  "entityId",
-                  "read",
-                  "createdAt")),
+                  "/api/v1/notifications",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "id",
+                      "type",
+                      "params",
+                      "entityType",
+                      "entityId",
+                      "read",
+                      "createdAt"))
+              .addressedBy(Set.of("page:integer", "size:integer")),
           new ContractOperation("/api/v1/notifications/unread-count", "get", Set.of("count")),
           // The push channel. Its response is a stream, not a schema, so the field assertion here
           // is vacuous by nature -- what this entry is worth is the OTHER guard: the path and verb
@@ -586,9 +668,18 @@ class ExternalContractTest {
           // adding them rather than spend aggregate queries on a list that has documented itself
           // as cheap ("the bulk endpoints have no reason to spend the extra count query").
           new ContractOperation(
-              "/api/v1/operations/search",
-              "get",
-              Set.of("content", "page", "totalElements", "totalPages", "id", "name", "status")),
+                  "/api/v1/operations/search",
+                  "get",
+                  Set.of("content", "page", "totalElements", "totalPages", "id", "name", "status"))
+              .addressedBy(
+                  Set.of(
+                      "query:string",
+                      "status:array",
+                      "start:string",
+                      "end:string",
+                      "page:integer",
+                      "size:integer",
+                      "sort:string")),
           // The Operation detail. `payoutPreliminary` is frozen because it is authoritative HERE
           // and nowhere else -- the app reads it to say that the payout figures may still
           // rebalance, and a screen that silently stopped saying so would present a provisional
@@ -624,21 +715,22 @@ class ExternalContractTest {
           // request-side guard above exists. A member's personal stock is theirs alone: the list
           // is me-scoped by the service, so no id of anyone else appears in these paths.
           new ContractOperation(
-              "/api/v1/personal-inventory",
-              "get",
-              Set.of(
-                  "content",
-                  "page",
-                  "totalElements",
-                  "totalPages",
-                  "id",
-                  "name",
-                  "note",
-                  "locationUexId",
-                  "locationType",
-                  "locationName",
-                  "quantity",
-                  "version")),
+                  "/api/v1/personal-inventory",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "id",
+                      "name",
+                      "note",
+                      "locationUexId",
+                      "locationType",
+                      "locationName",
+                      "quantity",
+                      "version"))
+              .addressedBy(Set.of("q:string", "page:integer", "size:integer")),
           // `locationName` is frozen although the create/update pair does not send it: it is
           // resolved server-side from the UEX id, and it is the only human-readable form of the
           // place the member picked. Without it a row can only show a number.
@@ -675,28 +767,30 @@ class ExternalContractTest {
           // by the UEX id the two write bodies send. `type` is frozen because it IS the
           // `locationType` half of that pair — the row carries both halves of what gets saved.
           new ContractOperation(
-              "/api/v1/uex/locations/search",
-              "get",
-              Set.of("uexId", "type", "name", "starSystemName", "parentName")),
+                  "/api/v1/uex/locations/search",
+                  "get",
+                  Set.of("uexId", "type", "name", "starSystemName", "parentName"))
+              .addressedBy(Set.of("q:string", "limit:integer")),
           // Phase 3, the Blueprints half of the same screen. `removable` is frozen because it
           // qualifies the row rather than describing it: an entry the server will not let go of
           // must not be offered a delete action that answers 409 (same class as `redacted` and
           // `truncated`).
           new ContractOperation(
-              "/api/v1/personal-blueprints",
-              "get",
-              Set.of(
-                  "content",
-                  "page",
-                  "totalElements",
-                  "totalPages",
-                  "id",
-                  "productKey",
-                  "productName",
-                  "acquiredAt",
-                  "note",
-                  "removable",
-                  "version")),
+                  "/api/v1/personal-blueprints",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "id",
+                      "productKey",
+                      "productName",
+                      "acquiredAt",
+                      "note",
+                      "removable",
+                      "version"))
+              .addressedBy(Set.of("q:string", "page:integer", "size:integer")),
           new ContractOperation(
               "/api/v1/personal-blueprints",
               "post",
@@ -738,28 +832,30 @@ class ExternalContractTest {
           // the same question has once refining is allowed for — dropping either would leave the
           // chip stating a bare boolean.
           new ContractOperation(
-              "/api/v1/personal-blueprints/craftability",
-              "get",
-              Set.of(
-                  "blueprintId",
-                  "recipeResolved",
-                  "craftable",
-                  "craftableWithRefinery",
-                  "limitingMaterialName",
-                  "limitingMaterialNameWithRefinery",
-                  "materials",
-                  "materialName",
-                  "requiredScu",
-                  "availableScu",
-                  "missingScu",
-                  "quantityType")),
+                  "/api/v1/personal-blueprints/craftability",
+                  "get",
+                  Set.of(
+                      "blueprintId",
+                      "recipeResolved",
+                      "craftable",
+                      "craftableWithRefinery",
+                      "limitingMaterialName",
+                      "limitingMaterialNameWithRefinery",
+                      "materials",
+                      "materialName",
+                      "requiredScu",
+                      "availableScu",
+                      "missingScu",
+                      "quantityType"))
+              .addressedBy(Set.of("includeRefinery:boolean")),
           // The product picker behind "Blueprint hinzufügen". `ownedByCurrentUser` is frozen
           // because it is what keeps the picker from offering a duplicate the server would then
           // refuse.
           new ContractOperation(
-              "/api/v1/blueprints/products/search",
-              "get",
-              Set.of("productKey", "name", "manufacturerName", "ownedByCurrentUser")),
+                  "/api/v1/blueprints/products/search",
+                  "get",
+                  Set.of("productKey", "name", "manufacturerName", "ownedByCurrentUser"))
+              .addressedBy(Set.of("q:string", "limit:integer")),
           // Phase 3, the Hangar's own ships. The write path is /hangar/ships, NOT
           // /hangar/users/{id}/ships: the second one names a member and is the admin surface,
           // which this contract set has no reason to carry.
@@ -782,10 +878,17 @@ class ExternalContractTest {
           // The two pickers the editor needs. `manufacturer` is frozen on the ship type because it
           // is what tells two similarly named hulls apart in a list of hundreds.
           new ContractOperation(
-              "/api/v1/ship-types",
-              "get",
-              Set.of(
-                  "content", "page", "totalElements", "totalPages", "id", "name", "manufacturer")),
+                  "/api/v1/ship-types",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "id",
+                      "name",
+                      "manufacturer"))
+              .addressedBy(Set.of("page:integer", "size:integer", "sort:string")),
           new ContractOperation("/api/v1/locations/home-locations", "get", Set.of("id", "name")),
           // Phase 3, the Lager's three bookings. Every one of them carries `version`, and the two
           // that move stock carry `amount` — the pair that decides what actually happens to a
@@ -794,21 +897,33 @@ class ExternalContractTest {
           // cannot select, and the two levels phase 2 read stop at the stack. `version` is frozen
           // here for the same reason as on my-ships — every booking echoes it.
           new ContractOperation(
-              "/api/v1/inventory/all/stack/entries",
-              "get",
-              Set.of(
-                  "content",
-                  "page",
-                  "totalElements",
-                  "totalPages",
-                  "id",
-                  "material",
-                  "location",
-                  "amount",
-                  "quality",
-                  "personal",
-                  "note",
-                  "user")),
+                  "/api/v1/inventory/all/stack/entries",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "id",
+                      "material",
+                      "location",
+                      "amount",
+                      "quality",
+                      "personal",
+                      "note",
+                      "user"))
+              // The stack drill-down: five of these together name ONE stack. Dropping any of them
+              // does
+              // not widen the answer, it asks a different question.
+              .addressedBy(
+                  Set.of(
+                      "materialId:string",
+                      "locationId:string",
+                      "userId:string",
+                      "quality:integer",
+                      "owningOrgUnitId:string",
+                      "page:integer",
+                      "size:integer")),
           new ContractOperation(
               "/api/v1/inventory",
               "post",
@@ -833,21 +948,30 @@ class ExternalContractTest {
           // because it is the unit every amount on the screen is expressed in — SCU or units — and
           // a number without its unit is not a quantity.
           new ContractOperation(
-              "/api/v1/materials/search",
-              "get",
-              Set.of(
-                  "content", "page", "totalElements", "totalPages", "id", "name", "quantityType")),
+                  "/api/v1/materials/search",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "id",
+                      "name",
+                      "quantityType"))
+              .addressedBy(Set.of("search:string", "page:integer", "size:integer")),
           new ContractOperation(
-              "/api/v1/locations/search",
-              "get",
-              Set.of("content", "page", "totalElements", "totalPages", "id", "name")),
+                  "/api/v1/locations/search",
+                  "get",
+                  Set.of("content", "page", "totalElements", "totalPages", "id", "name"))
+              .addressedBy(Set.of("search:string", "page:integer", "size:integer")),
           // `effectiveName` and not `username`: it is what the web app renders and what the member
           // recognises. The rest of the record — email, roles, permissions — is deliberately not
           // frozen, because the picker must not read it.
           new ContractOperation(
-              "/api/v1/users/search",
-              "get",
-              Set.of("content", "page", "totalElements", "totalPages", "id", "effectiveName")),
+                  "/api/v1/users/search",
+                  "get",
+                  Set.of("content", "page", "totalElements", "totalPages", "id", "effectiveName"))
+              .addressedBy(Set.of("query:string", "page:integer", "size:integer")),
           new ContractOperation(
               "/api/v1/materials/{id}/terminals",
               "get",
@@ -863,7 +987,12 @@ class ExternalContractTest {
           // key breaks a shipped client silently -- it keeps streaming and simply never hears about
           // that screen again. That half cannot live here, because the topics appear in no OpenAPI
           // schema; it is held by LiveSyncTopicRegistryParityTest against the frontend's registry.
-          new ContractOperation("/api/v1/live-sync/stream", "get", Set.of()),
+          new ContractOperation("/api/v1/live-sync/stream", "get", Set.of())
+              // The live-sync stream's whole subscription protocol is this one parameter
+              // (ADR-0143).
+              // Losing it would not degrade the stream, it would silently open every client on
+              // nothing.
+              .addressedBy(Set.of("topics:string")),
           // The publish half. Frozen for its request fields rather than its response: it answers
           // 202 with no body, and what a shipped client must keep being able to SEND is the frame.
           new ContractOperation(
@@ -915,23 +1044,27 @@ class ExternalContractTest {
           // two screens agree. Freezing it on the detail would record a field that has never been
           // sent.
           new ContractOperation(
-              "/api/v1/refinery-orders/my-orders",
-              "get",
-              Set.of(
-                  "content",
-                  "totalElements",
-                  "totalPages",
-                  "id",
-                  "status",
-                  "location",
-                  "refiningMethod",
-                  "startedAt",
-                  "durationMinutes",
-                  "endsAt",
-                  "goods",
-                  "oreSales",
-                  "profit",
-                  "version")),
+                  "/api/v1/refinery-orders/my-orders",
+                  "get",
+                  Set.of(
+                      "content",
+                      "totalElements",
+                      "totalPages",
+                      "id",
+                      "status",
+                      "location",
+                      "refiningMethod",
+                      "startedAt",
+                      "durationMinutes",
+                      "endsAt",
+                      "goods",
+                      "oreSales",
+                      "profit",
+                      "version"))
+              // `status` repeats, which the array type records: the two live filters are one
+              // request for
+              // OPEN + IN_PROGRESS, split on the device.
+              .addressedBy(Set.of("status:array", "page:integer", "size:integer")),
           new ContractOperation(
               "/api/v1/refinery-orders/{id}",
               "get",
@@ -959,57 +1092,59 @@ class ExternalContractTest {
           // `quantityType` is frozen for the reason the unit exists: an item counted in pieces and
           // labelled „SCU" is a quantity a member acts on in a handover the tool never sees.
           new ContractOperation(
-              "/api/v1/material-exchange/offers",
-              "get",
-              Set.of(
-                  "content",
-                  "totalElements",
-                  "totalPages",
-                  "id",
-                  "kind",
-                  "material",
-                  "quantityType",
-                  "itemName",
-                  "itemQuantity",
-                  "owner",
-                  "effectiveName",
-                  "ownerOrgUnits",
-                  "shorthand",
-                  "mine",
-                  "quality",
-                  "amount",
-                  "releasedAt",
-                  "remark",
-                  "interestCount",
-                  "interestedHandles",
-                  "viewerInterested",
-                  "version")),
+                  "/api/v1/material-exchange/offers",
+                  "get",
+                  Set.of(
+                      "content",
+                      "totalElements",
+                      "totalPages",
+                      "id",
+                      "kind",
+                      "material",
+                      "quantityType",
+                      "itemName",
+                      "itemQuantity",
+                      "owner",
+                      "effectiveName",
+                      "ownerOrgUnits",
+                      "shorthand",
+                      "mine",
+                      "quality",
+                      "amount",
+                      "releasedAt",
+                      "remark",
+                      "interestCount",
+                      "interestedHandles",
+                      "viewerInterested",
+                      "version"))
+              .addressedBy(Set.of("page:integer", "size:integer")),
           new ContractOperation(
-              "/api/v1/material-requests",
-              "get",
-              Set.of(
-                  "content",
-                  "totalElements",
-                  "totalPages",
-                  "id",
-                  "kind",
-                  "material",
-                  "quantityType",
-                  "itemName",
-                  "itemQuantity",
-                  "requestedAmount",
-                  "minQuality",
-                  "owner",
-                  "effectiveName",
-                  "ownerOrgUnits",
-                  "shorthand",
-                  "mine",
-                  "postedAt",
-                  "remark",
-                  "interestCount",
-                  "interestedHandles",
-                  "viewerInterested",
-                  "version")),
+                  "/api/v1/material-requests",
+                  "get",
+                  Set.of(
+                      "content",
+                      "totalElements",
+                      "totalPages",
+                      "id",
+                      "kind",
+                      "material",
+                      "quantityType",
+                      "itemName",
+                      "itemQuantity",
+                      "requestedAmount",
+                      "minQuality",
+                      "owner",
+                      "effectiveName",
+                      "ownerOrgUnits",
+                      "shorthand",
+                      "mine",
+                      "postedAt",
+                      "remark",
+                      "interestCount",
+                      "interestedHandles",
+                      "viewerInterested",
+                      "version"))
+              .addressedBy(Set.of("page:integer", "size:integer")),
           // The pledge and its withdrawal answer with the updated row, which is what lets the app
           // replace one entry instead of re-reading the page. Freezing the response is therefore
           // not optional here: a body that stopped carrying `interestCount` would leave the count
@@ -1050,126 +1185,98 @@ class ExternalContractTest {
           // thing stopping a member from offering the same stack twice, and `quantityType` for the
           // unit reason above.
           new ContractOperation(
-              "/api/v1/material-exchange/releasable-items",
-              "get",
-              Set.of(
-                  "inventoryItemId",
-                  "materialName",
-                  "quantityType",
-                  "quality",
-                  "amount",
-                  "locationName",
-                  "alreadyReleased")));
+                  "/api/v1/material-exchange/releasable-items",
+                  "get",
+                  Set.of(
+                      "inventoryItemId",
+                      "materialName",
+                      "quantityType",
+                      "quality",
+                      "amount",
+                      "locationName",
+                      "alreadyReleased"))
+              // The offer sheet's picker: `q` is its search box and `kind` its Material/Item radio
+              // (REQ-MARKET-002). `kind` carries the MATERIAL / ITEM vocabulary already frozen on
+              // the
+              // offers response -- but as a PARAMETER enum, which the required-enum guard does not
+              // walk,
+              // so the type is all this half can hold and the constants stay pinned by that
+              // response.
+              .addressedBy(Set.of("q:string", "kind:string")));
 
   /**
-   * Query parameters a shipped client addresses these operations by, keyed {@code method path}.
+   * Contract operations the app addresses by <strong>no</strong> query parameter, although the
+   * document declares one.
    *
-   * <p>A response field that disappears is caught by the field guard and a request field that
-   * becomes mandatory by the required-field one. A **query parameter** was caught by neither, and
-   * it is how the app says <em>which</em> rows it wants: rename {@code materialId}, retype {@code
-   * quality} from integer to string, and the installed build asks a question the server no longer
-   * understands. Two of those happened inside one afternoon on the Lager slice — a {@code 400
-   * TYPE_MISMATCH} on a decimal quality, and an omitted {@code owningOrgUnitId} that the server
-   * reads as "the unpooled stack" rather than "any pool" — and neither would have failed a build.
+   * <p>An exemption ledger, not a second freeze list. The coverage guard below refuses an operation
+   * that takes query parameters and records none, because that silence is indistinguishable from
+   * forgetting — which is exactly how five of them slipped in. Naming one here is the way to say
+   * "considered, and the app sends nothing", and it costs a line in a diff a reviewer sees.
    *
-   * <p>Frozen as {@code name:type} so a retype is caught as loudly as a rename. Only the parameters
-   * the app actually sends are here, for the same reason only the response fields it reads are:
-   * freezing the rest would buy the backend a constraint nobody is relying on. The assertion is a
-   * subset one — the server may add optional parameters freely.
-   *
-   * <p>Paging and sorting count. A shipped list that cannot ask for page two is as broken as one
-   * that cannot parse a row.
+   * <p>{@code GET /api/v1/users/me/memberships} declares {@code allKinds}, and the app relies on
+   * its <em>default</em> rather than sending it: {@code false} is the Staffel/SK-only shape the
+   * org-unit switcher renders, and the {@code kind} field frozen on its response is that pair. The
+   * house rule — freeze only what the app sends — keeps it out, for the same reason {@code sort} is
+   * absent from the paged lists whose server-side default order the app takes as it comes.
    */
-  private static final Map<String, Set<String>> FROZEN_QUERY_PARAMS =
-      Map.ofEntries(
-          Map.entry(
-              "get /api/v1/missions/search",
-              Set.of(
-                  "query:string",
-                  "status:array",
-                  "start:string",
-                  "end:string",
-                  "page:integer",
-                  "size:integer",
-                  "sort:string")),
-          Map.entry(
-              "get /api/v1/operations/search",
-              Set.of(
-                  "query:string",
-                  "status:array",
-                  "start:string",
-                  "end:string",
-                  "page:integer",
-                  "size:integer",
-                  "sort:string")),
-          Map.entry("get /api/v1/orders", Set.of("status:array", "page:integer", "size:integer")),
-          Map.entry("get /api/v1/notifications", Set.of("page:integer", "size:integer")),
-          Map.entry(
-              "get /api/v1/org-units/bank/accounts/{id}/transactions",
-              Set.of("page:integer", "size:integer")),
-          Map.entry(
-              "get /api/v1/personal-inventory", Set.of("q:string", "page:integer", "size:integer")),
-          Map.entry("get /api/v1/uex/locations/search", Set.of("q:string", "limit:integer")),
-          Map.entry(
-              "get /api/v1/personal-blueprints",
-              Set.of("q:string", "page:integer", "size:integer")),
-          Map.entry(
-              "get /api/v1/personal-blueprints/craftability", Set.of("includeRefinery:boolean")),
-          Map.entry("get /api/v1/blueprints/products/search", Set.of("q:string", "limit:integer")),
-          Map.entry(
-              "get /api/v1/hangar/my-ships",
-              Set.of("search:string", "page:integer", "size:integer")),
-          Map.entry(
-              "get /api/v1/ship-types", Set.of("page:integer", "size:integer", "sort:string")),
-          Map.entry("get /api/v1/inventory/aggregated", Set.of("page:integer", "size:integer")),
-          Map.entry("get /api/v1/inventory/all/grouped", Set.of("materialIds:array")),
-          // The stack drill-down: five of these together name ONE stack. Dropping any of them does
-          // not widen the answer, it asks a different question.
-          Map.entry(
-              "get /api/v1/inventory/all/stack/entries",
-              Set.of(
-                  "materialId:string",
-                  "locationId:string",
-                  "userId:string",
-                  "quality:integer",
-                  "owningOrgUnitId:string",
-                  "page:integer",
-                  "size:integer")),
-          Map.entry(
-              "get /api/v1/materials/search",
-              Set.of("search:string", "page:integer", "size:integer")),
-          Map.entry(
-              "get /api/v1/locations/search",
-              Set.of("search:string", "page:integer", "size:integer")),
-          Map.entry(
-              "get /api/v1/users/search", Set.of("query:string", "page:integer", "size:integer")),
-          // The live-sync stream's whole subscription protocol is this one parameter (ADR-0143).
-          // Losing it would not degrade the stream, it would silently open every client on nothing.
-          Map.entry("get /api/v1/live-sync/stream", Set.of("topics:string")),
-          // The Raffinerie list. `status` repeats, which the array type records: the two live
-          // filters are one request for OPEN + IN_PROGRESS, split on the device.
-          Map.entry(
-              "get /api/v1/refinery-orders/my-orders",
-              Set.of("status:array", "page:integer", "size:integer")),
-          Map.entry("get /api/v1/material-exchange/offers", Set.of("page:integer", "size:integer")),
-          Map.entry("get /api/v1/material-requests", Set.of("page:integer", "size:integer")));
+  private static final Set<String> ADDRESSED_BY_NO_QUERY_PARAMETER =
+      Set.of("get /api/v1/users/me/memberships");
 
   @Test
   @DisplayName("the query parameters a shipped client asks with still exist, with their types")
   void theContractQueryParametersAreFrozen() throws IOException {
+    // A response field that disappears is caught by the field guard and a request field that
+    // becomes mandatory by the required-field one. A query parameter was caught by neither, and it
+    // is how the app says WHICH rows it wants: rename `materialId`, retype `quality` from integer
+    // to string, and the installed build asks a question the server no longer understands. Two of
+    // those happened inside one afternoon on the Lager slice -- a 400 TYPE_MISMATCH on a decimal
+    // quality, and an omitted `owningOrgUnitId` that the server reads as "the unpooled stack"
+    // rather than "any pool" -- and neither would have failed a build.
+    //
+    // Frozen as `name:type` so a retype is caught as loudly as a rename, and asserted as a subset
+    // so adding an optional parameter stays free. Paging counts: a shipped list that cannot ask
+    // for page two is as broken as one that cannot parse a row.
     JsonNode document = openapi();
 
-    for (Map.Entry<String, Set<String>> frozen : FROZEN_QUERY_PARAMS.entrySet()) {
-      String[] key = frozen.getKey().split(" ", 2);
-      Set<String> declared = queryParameters(document, key[1], key[0]);
-      assertThat(declared)
+    for (ContractOperation operation : CONTRACT) {
+      if (operation.queryParams().isEmpty()) {
+        continue;
+      }
+      assertThat(queryParameters(document, operation))
           .as(
-              "%s lost a query parameter the app addresses it by, or changed its type. The"
+              "%s %s lost a query parameter the app addresses it by, or changed its type. The"
                   + " installed build keeps sending it: a renamed one is silently ignored and the"
                   + " member gets the wrong rows, a retyped one comes back 400 and the screen says"
                   + " it could not load. Neither is fixable without a new APK",
-              frozen.getKey())
-          .containsAll(frozen.getValue());
+              operation.method().toUpperCase(java.util.Locale.ROOT), operation.path())
+          .containsAll(operation.queryParams());
+    }
+  }
+
+  @Test
+  @DisplayName("no operation joins the set with its query parameters left unrecorded")
+  void everyOperationWithQueryParametersStatesThem() throws IOException {
+    // The guard that keeps the guard above honest, and the one this file was missing: freezing the
+    // parameters once closed nothing durably, because the next operation added could simply not
+    // mention them. Five already had: a paged Finanzen tab, the paged Hangar overview, the offer
+    // sheet's picker, the assignee note's DELETE -- whose `version` IS the optimistic lock -- and
+    // the org-unit switcher, whose answer turned out to be "none", which is why it is the one
+    // entry in the ledger above rather than a fifth freeze.
+    JsonNode document = openapi();
+
+    for (ContractOperation operation : CONTRACT) {
+      String key = operation.method() + " " + operation.path();
+      if (!operation.queryParams().isEmpty() || ADDRESSED_BY_NO_QUERY_PARAMETER.contains(key)) {
+        continue;
+      }
+      assertThat(queryParameters(document, operation))
+          .as(
+              "%s %s takes query parameters and freezes none. Record the ones the app sends with"
+                  + " addressedBy(...), or name it in ADDRESSED_BY_NO_QUERY_PARAMETER and say why"
+                  + " the app sends nothing — an unanswered slot reads as a decision and is not"
+                  + " one (REQ-API-009)",
+              operation.method().toUpperCase(java.util.Locale.ROOT), operation.path())
+          .isEmpty();
     }
   }
 
@@ -1177,23 +1284,26 @@ class ExternalContractTest {
    * The query parameters an operation declares, as {@code name:type}.
    *
    * @param document the parsed API document
-   * @param path the {@code /api/v1} path
-   * @param method the HTTP verb, lower case
+   * @param operation the contract operation to resolve
    * @return the declared query parameters; an array's element type is not part of the key, since a
    *     client sends the same repeated parameter either way
    */
-  private static Set<String> queryParameters(JsonNode document, String path, String method) {
-    JsonNode operation = document.get("paths").path(path).path(method);
-    assertThat(operation.isMissingNode())
-        .as("%s %s is in the query-parameter freeze but not in the document", method, path)
+  private static Set<String> queryParameters(JsonNode document, ContractOperation operation) {
+    JsonNode node = document.get("paths").path(operation.path()).path(operation.method());
+    assertThat(node.isMissingNode())
+        .as(
+            "%s %s is in the contract set but not in the document",
+            operation.method(), operation.path())
         .isFalse();
     Set<String> declared = new TreeSet<>();
-    for (JsonNode parameter : operation.path("parameters")) {
-      if (!"query".equals(parameter.path("in").asText())) {
+    for (JsonNode parameter : node.path("parameters")) {
+      if (!"query".equals(parameter.path("in").asString(""))) {
         continue;
       }
       declared.add(
-          parameter.path("name").asText() + ":" + parameter.path("schema").path("type").asText());
+          parameter.path("name").asString("")
+              + ":"
+              + parameter.path("schema").path("type").asString(""));
     }
     return declared;
   }

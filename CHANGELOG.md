@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Der eingefrorene API-Vertrag prüft die Query-Parameter jetzt bei jedem Endpunkt.** Die Parameter waren zwar eingefroren, aber in einer getrennten Liste — fünf Endpunkte der App standen deshalb ohne einen einzigen darin, unter anderem zwei geblätterte Listen und die Sperre gegen gleichzeitiges Bearbeiten beim Löschen einer Auftragsnotiz. Sie sind jetzt abgedeckt, und ein neuer Endpunkt ohne Angabe bricht den Build (REQ-API-009).
+
 - **Die Build-Prüfungen sind wieder grün.** Die Teilnehmerzahl aus v1.6.3 hat zwei Gates gerissen:
   ein Javadoc rutschte an die falsche Stelle, und das Spiegel-DTO der Weboberfläche kannte das neue
   Feld nicht. Beides betrifft nur Prüfungen — die Anwendung selbst war nie betroffen.
