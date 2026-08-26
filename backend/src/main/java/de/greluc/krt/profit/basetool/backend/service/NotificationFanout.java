@@ -42,7 +42,12 @@ public interface NotificationFanout {
    * Best-effort: an implementation must not throw to the caller (the originating transaction has
    * already committed).
    *
+   * <p>Called once per {@link NotificationSignal}: one event can raise different notification types
+   * for different audiences, so the recipients of one call are the ones being told the same thing.
+   *
    * @param recipientSubs the Keycloak subjects of the users to notify
+   * @param signal what those recipients are being told, or {@link NotificationSignal#refreshOnly()}
+   *     when their inbox changed without a new message
    */
-  void publish(@NotNull Collection<UUID> recipientSubs);
+  void publish(@NotNull Collection<UUID> recipientSubs, @NotNull NotificationSignal signal);
 }

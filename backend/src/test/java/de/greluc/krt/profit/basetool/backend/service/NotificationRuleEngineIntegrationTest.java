@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleReposito
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -137,7 +138,7 @@ class NotificationRuleEngineIntegrationTest {
 
     try {
       JobOrderCreatedEvent event = eventForRandomUnits();
-      Set<UUID> recipients = notificationCreationService.createFromEvent(event);
+      Set<UUID> recipients = flatten(notificationCreationService.createFromEvent(event));
 
       assertThat(recipients).isNotEmpty();
       assertThat(notificationRepository.findAllByRecipientSub(recipient, Pageable.unpaged()))
@@ -192,8 +193,9 @@ class NotificationRuleEngineIntegrationTest {
               });
 
       Set<UUID> recipients =
-          notificationCreationService.createFromEvent(
-              new DiscordRegistrationPendingEvent(newUserId, "newbie"));
+          flatten(
+              notificationCreationService.createFromEvent(
+                  new DiscordRegistrationPendingEvent(newUserId, "newbie")));
 
       assertThat(recipients).isNotEmpty();
       assertThat(notificationRepository.findAllByRecipientSub(adminSub, Pageable.unpaged()))
@@ -244,5 +246,17 @@ class NotificationRuleEngineIntegrationTest {
     transactionTemplate.executeWithoutResult(status -> notificationRuleRepository.deleteById(id));
 
     assertThat(notificationRuleRepository.findById(id)).isEmpty();
+  }
+
+  /**
+   * Every recipient the call reached, whatever they were told.
+   *
+   * @param bySignal the call's result, keyed by what each group was told
+   * @return the union of its recipient sets
+   */
+  private static Set<UUID> flatten(Map<NotificationSignal, Set<UUID>> bySignal) {
+    Set<UUID> all = new HashSet<>();
+    bySignal.values().forEach(all::addAll);
+    return all;
   }
 }

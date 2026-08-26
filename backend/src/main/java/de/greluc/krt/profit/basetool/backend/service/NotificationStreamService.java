@@ -37,6 +37,8 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * In-memory registry of live Server-Sent-Event subscribers, keyed by recipient {@code sub}
@@ -56,6 +58,12 @@ public class NotificationStreamService {
 
   /** How long a single SSE connection is held open before the client must reconnect. */
   private static final long EMITTER_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
+
+  /** What the event carried before it carried anything, and what a refresh-only push still is. */
+  private static final String REFRESH_ONLY_PAYLOAD = "new";
+
+  /** Renders the signal; stateless and thread-safe, so one instance serves every push. */
+  private static final JsonMapper JSON_MAPPER = JsonMapper.builder().build();
 
   /**
    * Max concurrent SSE streams retained per recipient {@code sub} (#1156). Every browser tab /
@@ -171,12 +179,20 @@ public class NotificationStreamService {
   }
 
   /**
-   * Pushes a lightweight "notification" event to every live subscriber of the given recipients so
-   * their client refreshes its unread state. Dead emitters are dropped.
+   * Pushes a "notification" event to every live subscriber of the given recipients so their client
+   * refreshes its unread state. Dead emitters are dropped.
+   *
+   * <p>The event's <strong>name</strong> is the frozen part of this contract, and it does not
+   * change. Its data used to be the literal string {@code "new"}; it now carries the signal, so a
+   * client that needs to know <em>what</em> arrived does not have to fetch to find out. The web
+   * app's handler takes no argument and is unaffected; the Android app files the shade entry by
+   * kind and deep-links the tap by entity (REQ-APP-UI-007).
    *
    * @param recipientSubs the recipients whose connections to notify
+   * @param signal what those recipients are being told
    */
-  public void publish(@NotNull Collection<UUID> recipientSubs) {
+  public void publish(@NotNull Collection<UUID> recipientSubs, @NotNull NotificationSignal signal) {
+    String payload = serialize(signal);
     for (UUID recipientSub : recipientSubs) {
       Queue<SseEmitter> emitters = emittersBySub.get(recipientSub);
       if (emitters == null) {
@@ -184,12 +200,45 @@ public class NotificationStreamService {
       }
       for (SseEmitter emitter : emitters) {
         try {
-          emitter.send(SseEmitter.event().name("notification").data("new"));
+          emitter.send(SseEmitter.event().name("notification").data(payload));
         } catch (IOException | RuntimeException e) {
           recordSendFailure(MetricNames.SSE_EVENT_NOTIFICATION, recipientSub, e);
           remove(recipientSub, emitter);
         }
       }
+    }
+  }
+
+  /**
+   * Renders a signal as the event's data.
+   *
+   * <p>A refresh-only signal keeps the historic {@code "new"} so nothing about the old payload has
+   * to be re-learned for the case it already covered, and so a client that only ever looked for a
+   * non-empty body keeps working.
+   *
+   * <p>A failure to serialise falls back to {@code "new"} rather than dropping the push: a client
+   * that cannot read what arrived still refetches, which is the behaviour before this method
+   * existed.
+   *
+   * @param signal what to render
+   * @return the event data
+   */
+  @NotNull
+  private String serialize(@NotNull NotificationSignal signal) {
+    if (!signal.describesNotification()) {
+      return REFRESH_ONLY_PAYLOAD;
+    }
+    try {
+      ObjectNode root = JSON_MAPPER.createObjectNode();
+      root.put("type", String.valueOf(signal.type()));
+      root.put("entityType", signal.entityType());
+      root.put("entityId", signal.entityId() == null ? null : signal.entityId().toString());
+      ObjectNode params = root.putObject("params");
+      signal.params().forEach(params::put);
+      return JSON_MAPPER.writeValueAsString(root);
+    } catch (RuntimeException e) {
+      log.debug("Notification signal could not be serialised; falling back to the bare push", e);
+      return REFRESH_ONLY_PAYLOAD;
     }
   }
 

@@ -37,10 +37,12 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -162,13 +164,62 @@ class NotificationStreamServiceTest {
     clearInvocations(service.emitter); // drop the `connected` send from subscribe()
 
     // When a notification is published to that recipient
-    service.publish(List.of(recipientSub));
+    service.publish(List.of(recipientSub), NotificationSignal.refreshOnly());
 
     // Then a named `notification` event is pushed so the client refreshes its unread state
     ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
         ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
     verify(service.emitter).send(captor.capture());
     assertTrue(render(captor.getValue()).contains("event:notification"));
+  }
+
+  @Test
+  void publish_refreshOnlySignal_keepsTheHistoricPayload() throws Exception {
+    // Given a subscriber
+    CapturingStreamService service = new CapturingStreamService();
+    UUID recipientSub = UUID.randomUUID();
+    service.subscribe(recipientSub);
+    clearInvocations(service.emitter);
+
+    // When an event that only CLEARED stale items is published
+    service.publish(List.of(recipientSub), NotificationSignal.refreshOnly());
+
+    // Then the payload is still the literal the event carried before it carried anything, so a
+    // client written against the old contract sees no change at all.
+    ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
+        ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+    verify(service.emitter).send(captor.capture());
+    assertTrue(render(captor.getValue()).contains("data:new"));
+  }
+
+  @Test
+  void publish_signalWithAType_carriesKindEntityAndParams() throws Exception {
+    // Given a subscriber
+    CapturingStreamService service = new CapturingStreamService();
+    UUID recipientSub = UUID.randomUUID();
+    UUID entityId = UUID.randomUUID();
+    service.subscribe(recipientSub);
+    clearInvocations(service.emitter);
+
+    // When a real notification is pushed
+    service.publish(
+        List.of(recipientSub),
+        new NotificationSignal(
+            NotificationType.DISCORD_REGISTRATION_PENDING,
+            "USER",
+            entityId,
+            Map.of("username", "newbie")));
+
+    // Then the event carries what the client needs to file it under a channel and open the right
+    // screen without a second request. The event NAME is unchanged -- that is the frozen part.
+    ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
+        ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+    verify(service.emitter).send(captor.capture());
+    String rendered = render(captor.getValue());
+    assertTrue(rendered.contains("event:notification"));
+    assertTrue(rendered.contains("DISCORD_REGISTRATION_PENDING"));
+    assertTrue(rendered.contains(entityId.toString()));
+    assertTrue(rendered.contains("newbie"));
   }
 
   @Test
@@ -214,7 +265,7 @@ class NotificationStreamServiceTest {
         .send(any(SseEmitter.SseEventBuilder.class));
 
     // When the notification push fails on a dead emitter
-    service.publish(List.of(recipientSub));
+    service.publish(List.of(recipientSub), NotificationSignal.refreshOnly());
 
     // Then the failure is counted under the `notification` event and the emitter is dropped
     assertEquals(
@@ -323,7 +374,8 @@ class NotificationStreamServiceTest {
     doThrow(brokenPipe).when(service.emitter).send(any(SseEmitter.SseEventBuilder.class));
 
     List<ILoggingEvent> events =
-        withStreamLogAppender(() -> service.publish(List.of(recipientSub)));
+        withStreamLogAppender(
+            () -> service.publish(List.of(recipientSub), NotificationSignal.refreshOnly()));
 
     assertEquals(
         1.0,
