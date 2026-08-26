@@ -756,6 +756,79 @@ configured one.
 (`KC_HOSTNAME`, `KEYCLOAK_ISSUER_URI`) · `.env.example` · **Runbook:** `docs/deployment.md` →
 *Promoting to testing*
 
+### REQ-OPS-023 — Every published artifact carries a GitHub build-provenance attestation
+
+Every artifact a release publishes — the three app images, the `basetool-config` and
+`basetool-keycloak-spi` bundles, and the four SBOM files attached to the GitHub Release — carries an
+[`actions/attest-build-provenance`](https://github.com/actions/attest-build-provenance) attestation
+binding it to the workflow, the commit and the runner that produced it. It is stored in this
+repository's attestation store and verified with one command that needs no prior knowledge:
+
+```bash
+gh attestation verify oci://ghcr.io/krt-profit/basetool-backend@sha256:… --repo krt-profit/basetool
+gh attestation verify backend-bom.json --repo krt-profit/basetool
+```
+
+**This does not replace the cosign gate of [REQ-OPS-015](#req-ops-015--host-side-signature-verification-before-apply), and is not a second copy of it.**
+The two answer different questions for different readers:
+
+|              | cosign keyless (REQ-OPS-015)                              | GitHub attestation (this)              |
+|:-------------|:----------------------------------------------------------|:---------------------------------------|
+| Read by      | `deploy.sh`, `promote.yml`                                | a person, `gh`                         |
+| Needs        | the pinned identity regexp, a cosign ≥ the signer's major | the repository name                    |
+| Covers       | the five OCI artifacts                                    | those **and** the release's SBOM files |
+| Fails closed | yes — the host aborts the tick                            | no — it is evidence, not a gate        |
+
+The machine gate stays the cosign one, because it is the one the host can enforce without a GitHub
+token. What this adds is a check a **member or an auditor** can run: until now, verifying that an
+image came from this repository meant knowing that the identity to expect is
+`…/release-images.yml@refs/(heads/main|tags/v.+)` and that the issuer is
+`token.actions.githubusercontent.com`. Anyone who does not already know that cannot verify anything,
+and the four SBOM files — the only artifacts a release hands out as plain downloads — had no
+provenance record at all.
+
+The attestation is minted by the **run that publishes the artifact**, on a reuse run too
+(REQ-OPS-021). That is the same invariant the cosign signature already keeps: every digest a release
+tag points at was attested by the run that applied the tag, not by a run this one merely trusted.
+It is stored in GitHub rather than pushed to the registry — the registry copy would need
+`packages: write` on jobs that otherwise only read, and buildx already attaches SLSA provenance and
+an SPDX SBOM to each index as OCI attestations for the registry-side view.
+
+**Acceptance**
+
+- [ ] `release-images.yml` attests each merged app-image index, the config bundle and the
+  keycloak-spi bundle by digest, after signing and regardless of whether the run built or reused.
+- [ ] `release-publish.yml` attests the four SBOM assets **before** uploading them, so an asset
+  never reaches the release page ahead of its provenance record.
+- [ ] `gh attestation verify` succeeds for every published artifact of a release against
+  `--repo krt-profit/basetool`, and fails for an artifact built anywhere else.
+- [ ] The attestation is evidence, never a deploy gate: `deploy.sh` continues to gate on cosign
+  alone and needs no GitHub token.
+
+**Enforced by:** `.github/workflows/release-images.yml` (`merge`, `build-config`,
+`build-keycloak-spi`) · `.github/workflows/release-publish.yml` · **Runbook:** `docs/deployment.md`
+→ *Signature verification (cosign)*
+
+### REQ-OPS-024 — Every path has a code owner
+
+[`.github/CODEOWNERS`](../../.github/CODEOWNERS) assigns every path to @greluc, which is what gives
+branch protection's required review its meaning. "A review" on a public repository can be satisfied
+by any account; a review **by a code owner** is one by somebody who can judge the change — and the
+paths where that matters most are the ones a diff summary does not announce: the release and deploy
+workflows, the Keycloak and edge configuration, the Flyway migrations, the monitoring rules, and the
+specs and ADRs the rest of the repository is held against.
+
+It is deliberately one rule. Per-path entries that all resolve to the same owner document nothing
+and go stale the moment a directory is renamed; the narrower rules are what a second maintainer
+joining would bring, and the paths listed above are the list to start from.
+
+**Acceptance**
+
+- [ ] `.github/CODEOWNERS` matches every path in the repository.
+- [ ] The `main` branch protection requires a code-owner review (a repository setting, not a file).
+
+**Enforced by:** `.github/CODEOWNERS` · branch protection on `main`
+
 ## Out of scope
 
 - The deploy script (`deploy.sh`) and the systemd units themselves are **not** delivered via

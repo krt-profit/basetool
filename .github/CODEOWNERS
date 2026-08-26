@@ -1,0 +1,19 @@
+# Every path in this repository is owned by the maintainer.
+#
+# This is what makes "required review" on `main` mean something. Branch
+# protection can require *a* review; on a public repository that can be satisfied
+# by anyone with a GitHub account and a fork. Requiring a review from a code
+# owner is what turns it into a review by somebody who can judge the change --
+# and it applies to the paths where that matters most, none of which announce
+# themselves in a diff summary: the release and deploy workflows, the Keycloak
+# and edge configuration, the Flyway migrations, the monitoring rules, and the
+# specs and ADRs that the rest of the repository is held against.
+#
+# One line, deliberately. Per-path rules that all resolve to the same owner
+# document nothing and drift the moment a directory is renamed; when a second
+# maintainer joins, this is the file that gets the narrower rules, and the
+# reasoning above is the list to start from.
+#
+# Full policy: CONTRIBUTING.md.
+
+* @greluc

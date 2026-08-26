@@ -1394,6 +1394,29 @@ and tagged builds, so an image built by a `workflow_dispatch` run of
   sudo -u deploy IRI_COSIGN_VERIFY=false /var/iri/code/scripts/deploy.sh --force
   ```
 
+### Verifying a published artifact yourself (`gh attestation verify`)
+
+The cosign gate above is what the **host** enforces, and running it by hand means
+knowing the identity regexp and the issuer to expect. For a person — a member
+checking a release, an auditor reading the repository — every published artifact
+also carries a GitHub build-provenance attestation (REQ-OPS-023) that needs
+nothing but the repository name:
+
+```bash
+# an image, by digest
+gh attestation verify oci://ghcr.io/krt-profit/basetool-backend@sha256:… \
+  --repo krt-profit/basetool
+
+# a release asset
+gh release download v1.6.3 --pattern 'backend-bom.json'
+gh attestation verify backend-bom.json --repo krt-profit/basetool
+```
+
+It reports which workflow, which commit and which run produced the artifact. It
+is **evidence, not a gate**: `deploy.sh` still verifies with cosign and needs no
+GitHub token, and a failing `gh attestation verify` on the host would not stop a
+deploy. The two are complementary — see the table in REQ-OPS-023.
+
 The trusted identity is overridable for a fork via `IRI_COSIGN_REPO` /
 `IRI_COSIGN_IDENTITY_REGEXP` / `IRI_COSIGN_OIDC_ISSUER` (see `deploy.sh --help`);
 the defaults match this repository's `release-images.yml`.

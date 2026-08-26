@@ -855,6 +855,28 @@ jobs:
           echo "::error::cosign sign failed after ${attempts} attempts for ${IMAGE}" >&2
           exit 1
 
+      # The second, independent provenance record: buildx already attaches SLSA
+      # provenance to the image as an OCI attestation, and cosign already signs the
+      # index -- but reading either takes knowing which tool to reach for and which
+      # workflow identity to expect. This one is stored in GitHub's own attestation
+      # store and answers to a single command with no prior knowledge:
+      #
+      #   gh attestation verify oci://${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@<digest> --repo ${{ github.repository }}
+      #
+      # Same reasoning as the signature above for running it on a reuse run too:
+      # the operation is idempotent, it costs seconds, and it keeps the invariant
+      # that every digest a release tag points at was attested by the run that
+      # applied the tag -- not by a run this one merely trusted.
+      - name: Attest build provenance (${{ matrix.module }})
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}
+          subject-digest: ${{ steps.inspect.outputs.digest }}
+          # Stored in GitHub rather than pushed to GHCR: the registry copy would
+          # need `packages: write` on a job that otherwise only reads, and the
+          # OCI-attached SLSA provenance already covers the registry-side view.
+          push-to-registry: false
+
       # Makes the build-vs-reuse decision legible on the run page next to the
       # digest it produced, so "why was this release so fast?" is answerable
       # without reading the plan job's log.
@@ -1032,6 +1054,28 @@ jobs:
           echo "::error::cosign sign failed after ${attempts} attempts for ${IMAGE}" >&2
           exit 1
 
+      # The second, independent provenance record: buildx already attaches SLSA
+      # provenance to the image as an OCI attestation, and cosign already signs the
+      # index -- but reading either takes knowing which tool to reach for and which
+      # workflow identity to expect. This one is stored in GitHub's own attestation
+      # store and answers to a single command with no prior knowledge:
+      #
+      #   gh attestation verify oci://${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-config@<digest> --repo ${{ github.repository }}
+      #
+      # Same reasoning as the signature above for running it on a reuse run too:
+      # the operation is idempotent, it costs seconds, and it keeps the invariant
+      # that every digest a release tag points at was attested by the run that
+      # applied the tag -- not by a run this one merely trusted.
+      - name: Attest build provenance (config bundle)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-config
+          subject-digest: ${{ steps.inspect.outputs.digest }}
+          # Stored in GitHub rather than pushed to GHCR: the registry copy would
+          # need `packages: write` on a job that otherwise only reads, and the
+          # OCI-attached SLSA provenance already covers the registry-side view.
+          push-to-registry: false
+
   # The Keycloak provider-JAR bundle: a `FROM scratch` image (docker/keycloak-spi/
   # Dockerfile) carrying ONLY the keycloak-spi provider JAR. It is a SEPARATE
   # artifact from basetool-config because REQ-OPS-005 bars keycloak/providers JARs
@@ -1200,3 +1244,25 @@ jobs:
           done
           echo "::error::cosign sign failed after ${attempts} attempts for ${IMAGE}" >&2
           exit 1
+
+      # The second, independent provenance record: buildx already attaches SLSA
+      # provenance to the image as an OCI attestation, and cosign already signs the
+      # index -- but reading either takes knowing which tool to reach for and which
+      # workflow identity to expect. This one is stored in GitHub's own attestation
+      # store and answers to a single command with no prior knowledge:
+      #
+      #   gh attestation verify oci://${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-keycloak-spi@<digest> --repo ${{ github.repository }}
+      #
+      # Same reasoning as the signature above for running it on a reuse run too:
+      # the operation is idempotent, it costs seconds, and it keeps the invariant
+      # that every digest a release tag points at was attested by the run that
+      # applied the tag -- not by a run this one merely trusted.
+      - name: Attest build provenance (keycloak-spi bundle)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-keycloak-spi
+          subject-digest: ${{ steps.inspect.outputs.digest }}
+          # Stored in GitHub rather than pushed to GHCR: the registry copy would
+          # need `packages: write` on a job that otherwise only reads, and the
+          # OCI-attached SLSA provenance already covers the registry-side view.
+          push-to-registry: false

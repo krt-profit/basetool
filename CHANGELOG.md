@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Jede veröffentlichte Datei lässt sich jetzt mit einem Befehl auf ihre Herkunft prüfen.** Die
+  drei Anwendungs-Images, die beiden Konfigurations-Bündel und die vier SBOM-Dateien eines Releases
+  tragen eine GitHub-Build-Attestierung: `gh attestation verify <datei> --repo krt-profit/basetool`
+  belegt, welcher Workflow sie auf welchem Commit erzeugt hat. Die cosign-Prüfung auf dem
+  Produktionshost bleibt unverändert die Instanz, die einen Deploy stoppt — neu ist, dass auch ohne
+  Kenntnis der cosign-Identität geprüft werden kann, und dass die SBOM-Dateien überhaupt einen
+  Herkunftsnachweis haben.
+
 ### Fixed
 
 - **Die Build-Prüfungen sind wieder grün.** Die Teilnehmerzahl aus v1.6.3 hat zwei Gates gerissen:
