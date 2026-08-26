@@ -1961,6 +1961,19 @@ that does. Under operations the write that matters is `PUT
 opening it means naming that one path rather than widening the family, because the guard is
 verb-blind by design.
 
+**A refusal by this vhost is `404` or `405`, and which one is decided by order, not by family.** The
+allow-list's default deny runs first; the read-only guard runs after it. A path that is on no
+allow-list line is therefore `404` for **every** verb — its family membership in the read-only guard
+is never consulted, because the request is already refused. Only an *admitted* path can answer
+`405`, and that is what `POST /api/v1/orders` does: the queue is on the list as a phase-2 read, so
+the verb is the only thing left to refuse. The Hangar imports read the other way round — `POST
+/api/v1/hangar/import/fleetview` is `404` today, not `405`, because phase 4 has not admitted it, and
+the `/hangar` prefix sitting in the read-only family only decides what happens on the day it is.
+Stating this is worth the paragraph because the two are trivially confused when reading the block
+top-down, and the confusion is silent in the direction that matters least and loud in a nightly
+probe: REQ-OBS-012's run asserted `405` on that path for three nights against a vhost that had
+always answered `404`.
+
 **Phase 4's Beförderung reads are the least remarkable entries on the list, and that is the point
 of naming them.** `GET /api/v1/promotion/evaluations/my` and `…/eligibility/my` are
 `isAuthenticated()` and me-scoped by construction: both end in `/my`, the member is resolved from

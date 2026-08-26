@@ -154,11 +154,18 @@ jobs:
           # therefore 404 to everybody, and a 401 here would mean that rule changed.
           probe POST "/api/v1/missions/$nil/participants/$nil/check-in/slim" 404
 
-          # Still refused, and that is the point: the bank-employee surface and the every-member
-          # inventory list are not on the allow-list at all, and the imports are phase 4.
+          # Still refused, and that is the point: the bank-employee surface, the every-member
+          # inventory list and the two Hangar imports (phase 4) are on no allow-list line at all.
+          #
+          # All three answer 404 rather than 405, and the ORDER of the two guards is why: the
+          # allow-list's `if ($krt_api_allowed = 0) { return 404; }` fires before the read-only
+          # family guard, so a path that was never admitted is refused without its verb ever being
+          # judged. /hangar being a read-only family therefore says nothing about the imports yet --
+          # that only becomes visible on the day phase 4 admits them, at which point 405 is what
+          # this line must expect and the guard is what keeps the writes shut.
           probe POST /api/v1/bank/deposits 404
           probe POST /api/v1/inventory/all 404
-          probe POST /api/v1/hangar/import/fleetview 405
+          probe POST /api/v1/hangar/import/fleetview 404
 
           # Default deny.
           probe GET /api/v1/definitely-not-allow-listed 404
