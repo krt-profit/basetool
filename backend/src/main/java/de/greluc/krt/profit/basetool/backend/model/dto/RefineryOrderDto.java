@@ -32,10 +32,17 @@ import java.util.UUID;
  * Data transfer record carrying Refinery Order payload.
  *
  * <p>The trailing {@code owningOrgUnitId} field is the R5.d picker output: when present on create
- * (POST), the service stamps the new refinery order onto the picked org unit instead of the order
- * owner's home Staffel. {@code null} preserves the legacy stamping path. Validation against the
- * order owner's memberships happens at the service layer via {@code
- * OwnerScopeService.resolveSquadronForPickerOutput}.
+ * (POST), the service stamps the new refinery order onto the picked org unit instead of the pool
+ * the owner would otherwise be auto-stamped into. Resolution happens at the service layer via
+ * {@code OwnerScopeService.resolveOrgUnitForPickerOutputNullable}, which accepts <b>all four</b>
+ * org-unit kinds (Staffel, Spezialkommando, Bereich, Organisationsleitung) — the strict,
+ * Staffel-only {@code resolveSquadronForPickerOutput} is not on this path. A non-null pick is
+ * honoured when it is one of the order owner's DIRECT memberships or an org unit the current caller
+ * may edit ({@code AccessGateService.canEditOrgUnit}, cascade-aware — epic #692 Phase 4 /
+ * REQ-ORG-016), and rejected with 400 otherwise. {@code null} auto-stamps a single-membership
+ * owner, honours an active-context pin (REQ-ORG-017), 400s a multi-membership owner with neither,
+ * and leaves the order ownerless ({@code owningOrgUnit == null}, legal since V132) for a
+ * membershipless owner.
  */
 public record RefineryOrderDto(
     UUID id,

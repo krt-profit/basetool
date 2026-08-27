@@ -36,9 +36,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * Servlet filter that intercepts known bot, scanner, and exploit requests before they reach the
  * Spring Security filter chain.
  *
- * <p>Three independent detection strategies are applied in order:
+ * <p>Four independent detection strategies are applied in order:
  *
  * <ol>
+ *   <li><b>Query-string syntax:</b> a query string carrying a chunk with an empty parameter name
+ *       (e.g. {@code /?=phpinfo()}) is answered with a bare HTTP 400 — see {@link
+ *       #isMalformedQueryString(String)}. This runs <em>first</em>, because the three rules below
+ *       answer with {@code sendError()}, and the container's error dispatch would re-read the same
+ *       unparseable query string.
  *   <li><b>Path-prefix matching:</b> URIs starting with known bot/scanner path prefixes (e.g.
  *       {@code /wp-admin/}, {@code /actuator}, {@code /.env}) are answered with HTTP 404
  *       immediately.
@@ -166,6 +171,20 @@ public class BotProtectionFilter extends OncePerRequestFilter {
     String uri = request.getRequestURI();
     String method = request.getMethod();
 
+    // 0. Query-string syntax check — FIRST, because every later branch answers with sendError(),
+    // and a container error dispatch re-parses the very query string that cannot be parsed.
+    if (isMalformedQueryString(request.getQueryString())) {
+      log.debug("Blocked malformed query string: {} {}", method, uri);
+      recordBlocked(MetricNames.BOT_RULE_QUERY_STRING);
+      // Deliberately setStatus() and not sendError(): sendError() hands the request to the
+      // container's error dispatch, whose first act is to read a request parameter again — the
+      // exact loop this branch exists to break. A bare 400 with no body is also the cheapest
+      // possible answer to a scanner.
+      response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+      response.setContentLength(0);
+      return;
+    }
+
     // 1. HTTP method check
     if (!ALLOWED_HTTP_METHODS.contains(method.toUpperCase())) {
       log.debug("Blocked disallowed HTTP method: {} {}", method, uri);
@@ -191,6 +210,50 @@ public class BotProtectionFilter extends OncePerRequestFilter {
     }
 
     filterChain.doFilter(request, response);
+  }
+
+  /**
+   * Mirrors the one query-string syntax rule Tomcat's parameter parser rejects outright: a chunk
+   * whose parameter <em>name</em> is empty but which still carries a value, i.e. a chunk starting
+   * with {@code =} ({@code /?=phpinfo()}, {@code /?a=1&amp;=2}). Tomcat splits on {@code &} before
+   * any percent-decoding, so this check runs on the raw query string and a {@code %3D} is correctly
+   * not treated as a separator. A wholly empty chunk ({@code a=1&amp;&amp;b=2}) is legal and
+   * skipped, matching {@code Parameters.processParameters}.
+   *
+   * <p>Scanners produce these constantly ({@code GET /?=phpinfo()} is a stock PHP-CGI probe); no
+   * browser or {@code URLSearchParams} caller ever does. Left unhandled, the failure surfaces on
+   * the first {@code getParameter*()} call of the request — for the frontend that is {@code
+   * LocaleChangeInterceptor} reading {@code ?lang}, i.e. <em>every</em> request — and lands on the
+   * {@code Exception} catch-all as a 500 with a full stack trace.
+   *
+   * <p>Deliberately narrow: Tomcat's other two parameter-parse rejects (a percent-escape that fails
+   * to decode, and the {@code maxParameterCount} cap) are not re-implemented here — reproducing its
+   * decoder would be the kind of divergence that turns into a wrong 400 on legitimate traffic.
+   * Those stay with {@code GlobalExceptionHandler}, which demotes them to a clean 400 + {@code
+   * DEBUG}.
+   *
+   * @param queryString the raw query string as returned by {@code getQueryString()}; may be {@code
+   *     null} (no query string at all, which is trivially well-formed)
+   * @return {@code true} when at least one chunk starts with {@code =} and must be rejected
+   */
+  static boolean isMalformedQueryString(String queryString) {
+    if (queryString == null || queryString.isEmpty()) {
+      return false;
+    }
+    int chunkStart = 0;
+    int length = queryString.length();
+    while (chunkStart < length) {
+      int ampersand = queryString.indexOf('&', chunkStart);
+      int chunkEnd = ampersand < 0 ? length : ampersand;
+      if (chunkEnd > chunkStart && queryString.charAt(chunkStart) == '=') {
+        return true;
+      }
+      if (ampersand < 0) {
+        break;
+      }
+      chunkStart = ampersand + 1;
+    }
+    return false;
   }
 
   /**

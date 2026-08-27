@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.ingest.filter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -413,5 +414,97 @@ class BotProtectionFilterTest {
     assertFalse(filter.isBotFileExtension("/v1/refinery-extract"));
     assertFalse(filter.isBotFileExtension("/actuator/prometheus"));
     assertFalse(filter.isBotFileExtension("/v3/api-docs"));
+  }
+
+  // -------------------------------------------------------------------------
+  // Malformed query string (rule 0)
+  // -------------------------------------------------------------------------
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        // The stock PHP-CGI probe, verbatim from the production log that motivated this rule.
+        "=phpinfo",
+        "=phpinfo()",
+        "=-phpinfo()",
+        // The empty name can also sit in a later chunk.
+        "a=1&=2",
+        "a=1&=",
+        // A bare "=" is invalid too: empty name, empty value.
+        "="
+      })
+  void doFilterInternal_shouldReturn400_whenQueryStringIsMalformed(String queryString)
+      throws Exception {
+    // Given
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
+    request.setRequestURI("/");
+    request.setQueryString(queryString);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    // When
+    filter.doFilterInternal(request, response, filterChain);
+
+    // Then
+    assertEquals(
+        400, response.getStatus(), "malformed query string must be rejected: " + queryString);
+    // sendError() would hand the request to the container's error dispatch, which re-reads the very
+    // parameters that cannot be parsed. The reject therefore carries no error page at all.
+    assertNull(response.getErrorMessage());
+    assertEquals("", response.getContentAsString());
+    verify(filterChain, never()).doFilter(request, response);
+    assertEquals(1.0, botCount(MetricNames.BOT_RULE_QUERY_STRING));
+  }
+
+  @Test
+  void doFilterInternal_shouldRejectMalformedQueryString_beforeTheOtherRules() throws Exception {
+    // A scanner combines both: a bot path AND a broken query string. The path rule answers with
+    // sendError(404), whose error dispatch would re-parse the query string and blow up — so the
+    // query-string rule has to win.
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/wp-login.php");
+    request.setRequestURI("/wp-login.php");
+    request.setQueryString("=phpinfo()");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    filter.doFilterInternal(request, response, filterChain);
+
+    assertEquals(400, response.getStatus());
+    assertEquals(1.0, botCount(MetricNames.BOT_RULE_QUERY_STRING));
+    assertEquals(0.0, botCount(MetricNames.BOT_RULE_PATH_PREFIX));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "lang=en",
+        "page=2&size=25",
+        // An empty chunk is legal for Tomcat and must not be rejected.
+        "a=1&&b=2",
+        "&",
+        // A name with no value is legal.
+        "flag",
+        "a=1&flag&b=2",
+        // "=" inside a VALUE is legal; only a chunk STARTING with "=" is not.
+        "filter=a=b",
+        // %3D is a separator only after decoding, which happens per chunk — not a chunk boundary.
+        "%3Dphpinfo=1"
+      })
+  void doFilterInternal_shouldPassThrough_whenQueryStringIsWellFormed(String queryString)
+      throws Exception {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
+    request.setRequestURI("/");
+    request.setQueryString(queryString);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    filter.doFilterInternal(request, response, filterChain);
+
+    assertEquals(200, response.getStatus(), "well-formed query string must pass: " + queryString);
+    verify(filterChain, times(1)).doFilter(request, response);
+    assertEquals(0.0, botCount(MetricNames.BOT_RULE_QUERY_STRING));
+  }
+
+  @Test
+  void isMalformedQueryString_shouldTolerateNullAndEmpty() {
+    assertFalse(BotProtectionFilter.isMalformedQueryString(null));
+    assertFalse(BotProtectionFilter.isMalformedQueryString(""));
   }
 }

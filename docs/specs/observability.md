@@ -87,6 +87,35 @@ a genuinely malformed id on a real navigation (e.g. a truncated pasted link, no 
 `400` + `WARN` signal, as does every non-UUID type mismatch. The rejected parameter value itself is
 never logged at any level (REQ-OBS-004: it may carry PII).
 
+**An unparseable request is the client's fault and is logged as such.** A query-string chunk with
+an empty parameter name (`GET /?=phpinfo()`, a stock PHP-CGI scanner probe) makes Tomcat's parameter
+parser throw, and it throws on the *first* `getParameter*()` call of the request — which in the
+frontend is `LocaleChangeInterceptor` reading `?lang`, i.e. on **every** request regardless of what
+it was addressed to. Left on the `Exception` catch-all it produced a `500` and an `ERROR` line with a
+~200-frame stack trace; worse, the resulting `/error` dispatch re-read the same query string and threw
+again, so one probe cost two ERROR lines. Three of them arrived inside eight seconds on 2026-08-27 —
+`logback_events_total{level="error"}` and `LogbackErrorSpike` cannot tell that from a real fault.
+Two changes, in that order: `BotProtectionFilter` rejects the malformed query string at the edge
+with a **bare 400** (`setStatus`, never `sendError` — the error dispatch is the loop) before anything
+parses parameters, counted as `basetool_bot_blocked_total{rule="query_string"}` and logged at `DEBUG`
+like its sibling rules; and `GlobalExceptionHandler.handleInvalidParameter` maps whatever still gets
+through — a percent-escape that fails to decode (`?q=100%`, reachable by a real user pasting a
+truncated link), a `maxParameterCount` breach, a malformed `POST` body — onto a clean `400` at
+`DEBUG`. The exception message is never logged at any level: it quotes the offending chunk verbatim,
+i.e. raw attacker-controlled bytes that may contain line breaks (CWE-117, REQ-OBS-004).
+
+**A masking keyword only counts when a separator follows it.** `PiiMasker`'s keyword rule
+(`bearer` / `token` / `session-id` / `authorization`) previously treated the `:`/`=`/whitespace
+separator as optional, so the keyword matched **inside** any identifier containing it and the value
+class then ate the rest. In the centralized log a stack frame
+`GuestEditTokenContextFilter.doFilterInternal(GuestEditTokenContextFilter.java:70)` arrived as
+`GuestEditToken***(GuestEditToken***:70)` and `…intercept.AuthorizationFilter.doFilter` as
+`Authorization***` — the frames an incident is triaged from, destroyed by the masker rather than by
+the failure. The separator is now required. Nothing is unmasked by this: a secret is logged as
+`token=x`, `token: x`, `token x` or `Bearer x`, never as `tokenx`; a keyword-suffixed field name
+(`guestEditToken=…`) still masks, because the narrowing is about the separator, not about where the
+keyword sits. All three module copies of the masker carry the change.
+
 **A scheduled job run is one correlated unit.** A scheduler thread carries no request, so
 `CorrelationIdFilter` never runs for it and every line the eight `@Scheduled` jobs emitted had an
 empty `correlationId` — with overlapping schedules, a nightly window interleaved several jobs with
@@ -1365,9 +1394,10 @@ refusal, not routine "no session yet" noise. A state/session-loss break also sur
 `CsrfRejectionSpike` (a systematic CSRF-wiring regression that `krtFetch`'s silent single-retry
 otherwise masks as intermittent failed writes). The pre-auth `BotProtectionFilter` adds
 `basetool_bot_blocked_total{rule}` (#1041 item 19; `rule` = `method` / `path_prefix` /
-`file_extension`) at its three reject branches, which were otherwise `log.debug`-only and
-prod-invisible — the counter also surfaces a self-inflicted false positive when a new legit route
-matches a blocked prefix. The **ingest gateway** carries the same filter (`REQ-INGEST-009`) and emits
+`file_extension` / `query_string`) at its four reject branches, which were otherwise `log.debug`-only
+and prod-invisible — the counter also surfaces a self-inflicted false positive when a new legit route
+matches a blocked prefix, and it is the only prod-visible signal that the `query_string` rule is
+firing at all. The **ingest gateway** carries the same filter (`REQ-INGEST-009`) and emits
 the same `basetool_bot_blocked_total{rule}` series, distinguished by the `application` common tag
 (`basetool-ingest` vs `basetool-frontend`); the "Bot-blocked/hour by rule" panel groups by
 `application` + `rule` so both modules are visible. Panels only, all labels fixed literals.

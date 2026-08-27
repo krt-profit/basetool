@@ -299,17 +299,55 @@ class PiiMaskerTest {
     }
 
     @Test
-    void tokenWithoutSeparator_stillMatches() {
-      // The keyword pattern is `token\s*[:=]?\s*` — all separators are
-      // optional. So "tokenabc" matches with group(3)="token" and
-      // group(4)="abc". This is an aggressive but documented behaviour;
-      // any word starting with "token" followed by alphanumerics will be
-      // masked. Locking this in.
+    void tokenWithoutSeparator_isNotMasked() {
+      // The keyword now requires a real separator (":", "=" or whitespace). Without one it is not
+      // a keyword introducing a value, it is part of an identifier — and treating it as a keyword
+      // ate the identifier and everything after it. See the stack-frame regression below.
       assertEquals(
-          "token***",
+          "tokenabc",
           PiiMasker.mask("tokenabc"),
-          "the [:=] and surrounding whitespace are all optional — "
-              + "the masker masks even with zero separator characters");
+          "a keyword with no separator introduces no value and must be left alone");
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Identifiers that merely CONTAIN a keyword — must survive intact
+  // ---------------------------------------------------------------
+
+  @Nested
+  class KeywordInsideIdentifierTests {
+
+    @Test
+    void stackFrameCarryingTokenInAClassName_survivesIntact() {
+      // Observed in production: this frame reached the centralized log as
+      // "GuestEditToken***(GuestEditToken***:70)" because the separator between keyword and value
+      // was optional, so "Token" matched and swallowed the rest of the identifier. A stack trace
+      // whose frames are truncated at every "Token"/"Authorization" is unusable during triage.
+      String frame =
+          "at de.greluc.krt.profit.basetool.frontend.logging."
+              + "GuestEditTokenContextFilter.doFilterInternal(GuestEditTokenContextFilter.java:70)";
+      assertEquals(frame, PiiMasker.mask(frame));
+    }
+
+    @Test
+    void stackFrameCarryingAuthorizationInAClassName_survivesIntact() {
+      String frame =
+          "at org.springframework.security.web.access.intercept.AuthorizationFilter.doFilter"
+              + "(AuthorizationFilter.java:101)";
+      assertEquals(frame, PiiMasker.mask(frame));
+    }
+
+    @Test
+    void exceptionTypeNameCarryingAuthorization_survivesIntact() {
+      String message = "AuthorizationDeniedException while evaluating the @PreAuthorize gate";
+      assertEquals(message, PiiMasker.mask(message));
+    }
+
+    @Test
+    void keywordSuffixedIdentifierStillMasksItsValue() {
+      // The narrowing is about the separator, not about where the keyword sits: a camelCase field
+      // name ending in "Token" followed by "=" is still a secret assignment and stays masked.
+      assertEquals("guestEditToken=***", PiiMasker.mask("guestEditToken=abcDEF123"));
     }
   }
 }

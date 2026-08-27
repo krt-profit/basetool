@@ -25,6 +25,10 @@ import static org.mockito.Mockito.*;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
+import java.nio.charset.StandardCharsets;
+import org.apache.tomcat.util.buf.MessageBytes;
+import org.apache.tomcat.util.http.InvalidParameterException;
+import org.apache.tomcat.util.http.Parameters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -422,5 +426,158 @@ class BotProtectionFilterTest {
     assertFalse(filter.isBotFileExtension("/images/logo.png"));
     assertFalse(filter.isBotFileExtension("/fonts/lato.woff2"));
     assertFalse(filter.isBotFileExtension("/page.html"));
+  }
+
+  // -------------------------------------------------------------------------
+  // Malformed query string (rule 0)
+  // -------------------------------------------------------------------------
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        // The stock PHP-CGI probe, verbatim from the production log that motivated this rule.
+        "=phpinfo",
+        "=phpinfo()",
+        "=-phpinfo()",
+        // The empty name can also sit in a later chunk.
+        "a=1&=2",
+        "a=1&=",
+        // A bare "=" is invalid too: empty name, empty value.
+        "="
+      })
+  void doFilterInternal_shouldReturn400_whenQueryStringIsMalformed(String queryString)
+      throws Exception {
+    // Given
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
+    request.setRequestURI("/");
+    request.setQueryString(queryString);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    // When
+    filter.doFilterInternal(request, response, filterChain);
+
+    // Then
+    assertEquals(
+        400, response.getStatus(), "malformed query string must be rejected: " + queryString);
+    // sendError() would hand the request to the container's error dispatch, which re-reads the very
+    // parameters that cannot be parsed. The reject therefore carries no error page at all.
+    assertNull(response.getErrorMessage());
+    assertEquals("", response.getContentAsString());
+    verify(filterChain, never()).doFilter(request, response);
+    assertEquals(1.0, botCount(MetricNames.BOT_RULE_QUERY_STRING));
+  }
+
+  @Test
+  void doFilterInternal_shouldRejectMalformedQueryString_beforeTheOtherRules() throws Exception {
+    // A scanner combines both: a bot path AND a broken query string. The path rule answers with
+    // sendError(404), whose error dispatch would re-parse the query string and blow up — so the
+    // query-string rule has to win.
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/wp-login.php");
+    request.setRequestURI("/wp-login.php");
+    request.setQueryString("=phpinfo()");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    filter.doFilterInternal(request, response, filterChain);
+
+    assertEquals(400, response.getStatus());
+    assertEquals(1.0, botCount(MetricNames.BOT_RULE_QUERY_STRING));
+    assertEquals(0.0, botCount(MetricNames.BOT_RULE_PATH_PREFIX));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "lang=en",
+        "page=2&size=25",
+        // An empty chunk is legal for Tomcat and must not be rejected.
+        "a=1&&b=2",
+        "&",
+        // A name with no value is legal.
+        "flag",
+        "a=1&flag&b=2",
+        // "=" inside a VALUE is legal; only a chunk STARTING with "=" is not.
+        "filter=a=b",
+        // %3D is a separator only after decoding, which happens per chunk — not a chunk boundary.
+        "%3Dphpinfo=1"
+      })
+  void doFilterInternal_shouldPassThrough_whenQueryStringIsWellFormed(String queryString)
+      throws Exception {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
+    request.setRequestURI("/");
+    request.setQueryString(queryString);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    filter.doFilterInternal(request, response, filterChain);
+
+    assertEquals(200, response.getStatus(), "well-formed query string must pass: " + queryString);
+    verify(filterChain, times(1)).doFilter(request, response);
+    assertEquals(0.0, botCount(MetricNames.BOT_RULE_QUERY_STRING));
+  }
+
+  @Test
+  void isMalformedQueryString_shouldTolerateNullAndEmpty() {
+    assertFalse(BotProtectionFilter.isMalformedQueryString(null));
+    assertFalse(BotProtectionFilter.isMalformedQueryString(""));
+  }
+
+  /**
+   * Differential check against the container's own parser: whatever this filter rejects, Tomcat
+   * would have rejected too. This is the one-directional property that matters, because a false
+   * positive here turns a legitimate request into a 400 while the reverse only means a rare probe
+   * takes the {@code GlobalExceptionHandler} path instead of the edge one. The corpus therefore
+   * deliberately includes inputs Tomcat rejects and this filter does not (a broken percent-escape),
+   * which the assertion permits. For a query string carrying no percent-escape the decoder cannot
+   * be the reason for a reject, so there the two verdicts are asserted to match exactly — that is
+   * what pins this filter's rule to {@code Parameters.processParameters} across a Tomcat upgrade.
+   *
+   * @param queryString the raw query string under test
+   */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "=phpinfo()",
+        "a=1&=2",
+        "=",
+        "a=1&=&b=2",
+        "lang=en",
+        "a=1&&b=2",
+        "flag",
+        "filter=a=b",
+        "%3Dphpinfo=1",
+        "q=hello+world",
+        "q=%C3%A4",
+        "",
+        "&",
+        "&&",
+        // Rejected by Tomcat's DECODER, not by the empty-name rule — the assertion below is
+        // one-directional precisely so this stays legal input for the filter.
+        "q=100%",
+        "q=%zz"
+      })
+  void isMalformedQueryString_neverRejectsWhatTomcatAccepts(String queryString) {
+    boolean tomcatRejects;
+    try {
+      byte[] raw = queryString.getBytes(StandardCharsets.ISO_8859_1);
+      MessageBytes query = MessageBytes.newInstance();
+      query.setBytes(raw, 0, raw.length);
+      Parameters parameters = new Parameters();
+      parameters.setQueryStringCharset(StandardCharsets.UTF_8);
+      parameters.setQuery(query);
+      parameters.handleQueryParameters();
+      tomcatRejects = false;
+    } catch (InvalidParameterException expected) {
+      tomcatRejects = true;
+    }
+
+    boolean filterRejects = BotProtectionFilter.isMalformedQueryString(queryString);
+    if (queryString.indexOf('%') < 0) {
+      // No percent-escape means the decoder cannot be the reason, so the empty-name rule is the
+      // only one in play and the two verdicts must match exactly.
+      assertEquals(
+          tomcatRejects, filterRejects, "filter and container disagree on: " + queryString);
+    } else if (filterRejects) {
+      assertTrue(
+          tomcatRejects, "the filter rejected a query string Tomcat parses fine: " + queryString);
+    }
   }
 }
