@@ -28,6 +28,7 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.tomcat.util.http.InvalidParameterException;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.MDC;
 import org.springframework.context.MessageSource;
@@ -396,6 +397,56 @@ public class GlobalExceptionHandler {
     model.addAttribute("error", title);
     model.addAttribute("message", message);
     model.addAttribute("status", String.valueOf(HttpStatus.CONTENT_TOO_LARGE.value()));
+    return "error/error";
+  }
+
+  /**
+   * Answers a request whose parameters the servlet container refused to parse with a clean {@code
+   * 400} instead of letting it reach the {@link Exception} catch-all as a {@code 500} + {@code
+   * ERROR} + full stack trace.
+   *
+   * <p>Tomcat rejects three things at parameter-parse time: a chunk with an empty parameter name
+   * ({@code /?=phpinfo()} — a stock PHP-CGI scanner probe), a percent-escape that fails to decode
+   * ({@code ?q=100%}, which a real user can produce by pasting a truncated link), and a breach of
+   * {@code maxParameterCount}. All three surface on the <em>first</em> {@code getParameter*()} call
+   * of the request, which in this module is {@code LocaleChangeInterceptor} reading {@code ?lang} —
+   * i.e. on every request, whatever it was addressed to, and again on the {@code /error} dispatch
+   * that the resulting failure triggers. {@link
+   * de.greluc.krt.profit.basetool.frontend.config.BotProtectionFilter} rejects the first and by far
+   * most common case at the edge before anything parses; this handler is the backstop for the other
+   * two and for a malformed {@code POST} body.
+   *
+   * <p>{@code DEBUG}, not {@code ERROR}: the input is entirely client-controlled, so any higher
+   * level is a log-flood vector (REQ-OBS-001) — one scanner produced three 200-line ERROR stack
+   * traces in eight seconds, which is exactly what {@code LogbackErrorSpike} watches for. The
+   * exception message is never logged either: it quotes the offending chunk verbatim, i.e. raw
+   * attacker-controlled bytes including possible line breaks (CWE-117, REQ-OBS-004).
+   *
+   * @param request the current request, used to decide JSON-vs-HTML and for the diagnostic line
+   * @param model the model populated for the HTML error page
+   * @return a {@code 400} JSON body for XHR callers, or the {@code error/error} view name otherwise
+   */
+  @ExceptionHandler(InvalidParameterException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public Object handleInvalidParameter(@NotNull HttpServletRequest request, @NotNull Model model) {
+    Locale locale = LocaleContextHolder.getLocale();
+    String title = resolve("error.400.title", locale, "Bad Request");
+    String message = resolve("error.malformedRequest", locale, "The request could not be parsed.");
+    log.debug(
+        "Rejected unparseable request parameters for {} {}",
+        request.getMethod(),
+        request.getRequestURI());
+    if (wantsJson(request)) {
+      Map<String, Object> body = new LinkedHashMap<>();
+      body.put("code", "MALFORMED_REQUEST");
+      body.put("status", HttpStatus.BAD_REQUEST.value());
+      body.put("title", title);
+      body.put("message", message);
+      return ResponseEntity.badRequest().contentType(MediaType.APPLICATION_JSON).body(body);
+    }
+    model.addAttribute("error", title);
+    model.addAttribute("message", message);
+    model.addAttribute("status", String.valueOf(HttpStatus.BAD_REQUEST.value()));
     return "error/error";
   }
 

@@ -123,8 +123,9 @@ public final class MetricNames {
 
   /**
    * Counter {@code basetool_bot_blocked_total} — tag {@code rule} ({@link #BOT_RULE_METHOD} /
-   * {@link #BOT_RULE_PATH_PREFIX} / {@link #BOT_RULE_FILE_EXTENSION}). Bumped by {@link
-   * de.greluc.krt.profit.basetool.ingest.filter.BotProtectionFilter} at its three reject branches
+   * {@link #BOT_RULE_PATH_PREFIX} / {@link #BOT_RULE_FILE_EXTENSION} / {@link
+   * #BOT_RULE_QUERY_STRING}). Bumped by {@link
+   * de.greluc.krt.profit.basetool.ingest.filter.BotProtectionFilter} at its four reject branches
    * (REQ-INGEST-009), which are otherwise {@code log.debug}-only (prod-invisible). Shares its name
    * with the frontend bot counter; the {@code application} common tag distinguishes the module. The
    * counter also surfaces a self-inflicted false positive when a new legit route matches a blocked
@@ -143,6 +144,14 @@ public final class MetricNames {
 
   /** Bot-block rule: a never-served file extension (answered 404). */
   public static final String BOT_RULE_FILE_EXTENSION = "file_extension";
+
+  /**
+   * Bot-block rule: a syntactically invalid query string (answered with a bare 400). A chunk whose
+   * parameter name is empty but which carries a value (e.g. {@code /?=phpinfo()}) makes Tomcat's
+   * parameter parser throw on the first {@code getParameter*()} call, which happens on every
+   * request; rejecting it at the edge is what keeps that failure out of the error dispatch.
+   */
+  public static final String BOT_RULE_QUERY_STRING = "query_string";
 
   /**
    * Counter {@code basetool_ingest_client_total} — tag {@code client_id}. Bumped once per accepted
