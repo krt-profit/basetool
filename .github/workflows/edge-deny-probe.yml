@@ -173,6 +173,7 @@ jobs:
           # Every one of these must reach the backend and be refused there.
           for p in /api/v1/bank/dashboard /api/v1/bank/accounts /api/v1/bank/requests \
                    /api/v1/bank/grants /api/v1/bank/holders \
+                   /api/v1/users/search-bank \
                    "/api/v1/bank/accounts/$nil" "/api/v1/bank/accounts/$nil/transactions" \
                    "/api/v1/bank/accounts/$nil/balance-series" \
                    "/api/v1/bank/accounts/$nil/statement" \

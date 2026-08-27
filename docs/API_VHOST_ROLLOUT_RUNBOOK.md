@@ -508,6 +508,12 @@ if ($uri ~ "^/api/v1/bank/holders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[
 if ($uri ~ "^/api/v1/bank/holders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/transactions$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/bank/transactions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/reversal$") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/bank/export/three-month-report") { set $krt_api_allowed 1; }
+# Phase L - the grantee picker of artboard 7's create modal. The bank twin of /users/search two
+# groups up, and the app must use THIS one: the two run the same query over the same scope with the
+# same peer-redacted projection, and differ only in the role gate, which here is widened to
+# BANK_EMPLOYEE (so BANK_MANAGEMENT via the hierarchy). A bank manager who holds no org role gets
+# 403 on /users/search and would have no picker at all. Read-only.
+if ($uri = "/api/v1/users/search-bank") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- The missions and operations families are READ-ONLY on this vhost ---------
@@ -1248,6 +1254,7 @@ being true when `REQ-APP-BANK-007` was amended.
 | Konto-Detail      | `/api/v1/bank/transactions/<uuid>/reversal`                       | POST             |
 | Konto-Detail      | `/api/v1/bank/export/three-month-report`                          | GET              |
 | Grants (ab. 7)    | `/api/v1/bank/grants`                                             | GET, POST        |
+| Grants            | `/api/v1/users/search-bank`                                       | GET              |
 | Grants            | `…/grants/<uuid>/<uuid>`                                          | PATCH, DELETE    |
 | Halter (ab. 6/8)  | `/api/v1/bank/holders`, `…/<uuid>`, `…/<uuid>/transactions`       | GET, POST, PATCH |
 | Halter-Umbuchung  | `/api/v1/bank/holders/transfer`                                   | POST             |
@@ -1258,6 +1265,13 @@ exactly that — GET+PATCH on an account, PATCH+DELETE on a grant — and the sa
 allow-list's `404` default rather than from a verb guard. That is the same stance
 `/personal-inventory` takes, and it is available here **only** because every path is named
 individually and anchored: the admin half of the stem is never named, so it is never reachable.
+
+**Why the grantee picker needs its own path.** `/api/v1/users/search` is already admitted, but the
+app cannot use it here: it is gated on ADMIN/OFFICER/KRT_MEMBER, and a bank manager who holds no org
+role — the exact caller this tab exists for — gets 403. `/users/search-bank` is the same search with
+`BANK_EMPLOYEE` added to the gate and nothing else changed (same query, same scope, same
+peer-redacted projection), which is why the backend keeps it as a separate path rather than widening
+the first one. Admitting it widens the mobile surface by no rows: both answer the same set.
 
 **What stays 404, and is probed for it:** `/api/v1/bank/admin/wipe-reset`,
 `/api/v1/bank/admin/audit`, `/api/v1/bank/deposits`, `/api/v1/bank/withdrawals`,
