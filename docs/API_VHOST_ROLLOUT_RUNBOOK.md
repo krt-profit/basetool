@@ -325,9 +325,9 @@ if ($uri ~ "^/api/v1/finance-entries/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4
 # The payout confirmation. /operations stays a read-only family: the prefix carries the whole
 # Operation edit surface, and only this one path is named.
 if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/payouts/paid-out$") { set $krt_api_allowed 1; }
-# Phase 3 - the only bank writes a member has: the settings of an account they are responsible for.
-# /api/v1/bank/** stays off the list entirely - deposits, withdrawals and transfers are the
-# bank-employee surface and the app does not carry it.
+# Phase 3 - the only bank writes a MEMBER has: the settings of an account they are responsible
+# for. The staff surface is admitted separately in phase L, and the direct booking forms
+# (deposits, withdrawals, transfers) are not admitted there either - no artboard draws them.
 if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/settings$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/balance-target$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/visibility/role/[A-Za-z0-9_-]{1,64}$") { set $krt_api_allowed 1; }
@@ -380,8 +380,9 @@ if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-f
 if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/assignees/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/assignees/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/note$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/status$") { set $krt_api_allowed 1; }
-# Phase 2 - the org bank a member may see. /org-units/bank/**, never /bank/accounts/**:
-# the latter is the bank-employee surface and lists every account in the organisation.
+# Phase 2 - the org bank a member may see. /org-units/bank/** answers with the accounts THIS
+# caller may see; /bank/accounts/** is the staff surface and lists every account in the
+# organisation. The latter is admitted separately in phase L, path by path.
 if ($uri = "/api/v1/org-units/bank/balances") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/transactions$") { set $krt_api_allowed 1; }
@@ -479,6 +480,34 @@ if ($uri ~ "^/api/v1/org-units/bank/requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a
 # name, no email, no rank - which is the same stance as /users/search two lines up. NOT cleared out
 # of the read-only family: the PATCH the backend serves on this very path stays 405 here.
 if ($uri ~ "^/api/v1/users/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/memberships$") { set $krt_api_allowed 1; }
+# Phase L - the bank-STAFF surface (app REQ-APP-BANK-007, amended 2026-08-27). This is the first
+# time /api/v1/bank/** is admitted at all, and the scope is what design chapter 12 draws in
+# artboards 4-8. `bank` is NOT in the read-only family below, so naming a path opens every verb the
+# backend serves on it - GET+PATCH on an account, GET+PATCH on a holder, PATCH+DELETE on a grant.
+# That is deliberate and it is safe only because this list defaults to 404: nothing under /bank is
+# reachable that is not named here.
+#
+# THREE THINGS STAY OUT, and each for its own reason:
+#   * /api/v1/bank/admin/** - wipe-reset and the bank audit log. The admin area is web-only by
+#     owner decision and is never named below, so it keeps answering 404.
+#   * /bank/deposits, /bank/withdrawals, /bank/transfers, /bank/transfer-fee-rate - the direct
+#     booking forms. No artboard draws them; a booking that had no request stays a browser act.
+#   * /bank/accounts/<uuid>/approval-tiers and /balance-target - the KRT ladder editor is not one
+#     of the app's four tabs, and the balance target is already reachable on the member surface.
+if ($uri = "/api/v1/bank/dashboard") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/bank/accounts") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(close|reopen|transactions|balance-series|statement)$") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/bank/requests") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/bank/requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(confirm|reject)$") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/bank/grants") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/bank/grants/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/bank/holders") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/bank/holders/transfer") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/bank/holders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/bank/holders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/transactions$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/bank/transactions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/reversal$") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/bank/export/three-month-report") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- The missions and operations families are READ-ONLY on this vhost ---------
@@ -963,7 +992,7 @@ Anonymously, from outside the host — the same shape as Phase H's check:
 | `/api/v1/operations/<uuid>/payouts/paid-out` | **401**                                                                           |
 | `…/bank/accounts/<uuid>/settings`            | **401**                                                                           |
 | `…/bank/accounts/<uuid>/balance-target`      | **401**                                                                           |
-| `POST /api/v1/bank/deposits`                 | **404** — the bank-employee surface is not on the allow-list at all               |
+| `POST /api/v1/bank/deposits`                 | **404** — a direct booking form; not drawn, so not admitted even in phase L       |
 | `POST /api/v1/orders`                        | **405** — the public request form stays refused on this vhost                     |
 | `POST /api/v1/hangar/import/fleetview`       | **404** — phase 4, on no allow-list line; refused before the verb is judged       |
 
@@ -1160,9 +1189,10 @@ That is how both gaps survived a full device verification.
 | Bank-Anträge   | `…/requests/<uuid>/owner-approval`                                            | POST, DELETE |
 | Lager-Umbuchen | `/api/v1/users/<uuid>/memberships`                                            | **GET only** |
 
-**The bank-employee surface is untouched.** Confirming and rejecting a request are
-`/api/v1/bank/requests/<uuid>/(confirm|reject)`, `hasRole(BANK_EMPLOYEE)`, and stay on no
-allow-list line at all — the app has no such screen (app `REQ-APP-BANK-007`).
+**The bank-employee surface is untouched by *this* phase.** Confirming and rejecting a request
+are `/api/v1/bank/requests/<uuid>/(confirm|reject)`, `hasRole(BANK_EMPLOYEE)`; they are
+admitted in phase L below, together with the rest of the staff surface the app gained when
+`REQ-APP-BANK-007` was amended. Nothing in phase K opens them.
 
 **Why `/users/<uuid>/memberships` and not `me`.** The Umbuchen picker offers the org units of the
 **destination** member, because the server validates the target unit against *their* memberships,
@@ -1191,6 +1221,55 @@ the entry, and re-pasting the § D.3 block whole is what preserves it.
 A `405` on any of the six writes means the read-only carve-out was lost; a `404` means the
 allow-list line never matched. The single deliberate `405` is the last row, and a `401` there would
 mean the org-unit admin write had been opened by accident.
+
+---
+
+## Phase L — the bank-staff surface
+
+**Owner decision, 2026-08-27.** Asked which endpoints the app's Verwaltung scope should put on the
+public mobile vhost — everything the design draws, everything but the destructive and exporting
+ones, or reads only — the answer was **everything design chapter 12 draws in artboards 4 to 8**.
+`/api/v1/bank/admin` stays out permanently, and so do the direct booking forms and the KRT ladder
+editor, because no artboard draws them (app `REQ-APP-BANK-007`).
+
+This is the first time `/api/v1/bank/**` is admitted at all. Until now the runbook's own comments
+said "never `/bank/accounts/**`"; that was true while the app had no staff surface and stopped
+being true when `REQ-APP-BANK-007` was amended.
+
+|   Tab / screen    |                               Paths                               |      Verbs       |
+|-------------------|-------------------------------------------------------------------|------------------|
+| Übersicht (ab. 4) | `/api/v1/bank/dashboard`                                          | GET              |
+| Anträge (ab. 5)   | `/api/v1/bank/requests`                                           | GET              |
+| Anträge           | `…/requests/<uuid>/confirm`, `…/reject`                           | POST             |
+| Konten (ab. 6)    | `/api/v1/bank/accounts`                                           | GET, POST        |
+| Konten            | `…/accounts/<uuid>`                                               | GET, PATCH       |
+| Konten            | `…/accounts/<uuid>/close`, `/reopen`                              | POST             |
+| Konto-Detail      | `…/accounts/<uuid>/transactions`, `/balance-series`, `/statement` | GET              |
+| Konto-Detail      | `/api/v1/bank/transactions/<uuid>/reversal`                       | POST             |
+| Konto-Detail      | `/api/v1/bank/export/three-month-report`                          | GET              |
+| Grants (ab. 7)    | `/api/v1/bank/grants`                                             | GET, POST        |
+| Grants            | `…/grants/<uuid>/<uuid>`                                          | PATCH, DELETE    |
+| Halter (ab. 6/8)  | `/api/v1/bank/holders`, `…/<uuid>`, `…/<uuid>/transactions`       | GET, POST, PATCH |
+| Halter-Umbuchung  | `/api/v1/bank/holders/transfer`                                   | POST             |
+
+**The write family, and why that is the right shape here.** `bank` is not in the read-only family
+list, so a named path answers every verb the backend serves on it. Each of the pairs above wants
+exactly that — GET+PATCH on an account, PATCH+DELETE on a grant — and the safety comes from the
+allow-list's `404` default rather than from a verb guard. That is the same stance
+`/personal-inventory` takes, and it is available here **only** because every path is named
+individually and anchored: the admin half of the stem is never named, so it is never reachable.
+
+**What stays 404, and is probed for it:** `/api/v1/bank/admin/wipe-reset`,
+`/api/v1/bank/admin/audit`, `/api/v1/bank/deposits`, `/api/v1/bank/withdrawals`,
+`/api/v1/bank/transfers`, `/api/v1/bank/transfer-fee-rate`, and
+`/api/v1/bank/accounts/<uuid>/approval-tiers`.
+
+### What to expect afterwards
+
+Every admitted path answers **401** anonymously — the entry point refuses before any row is read —
+and every excluded one answers **404**. A `405` anywhere in the first group would mean the
+read-only guard swallowed a write this phase opens; a `404` there would mean the line never
+matched. A `401` in the second group would mean something was opened by accident.
 
 ---
 

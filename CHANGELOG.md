@@ -21,6 +21,13 @@
 
 ### Added
 
+- **Die Android-App kann jetzt die Bankverwaltung öffnen.** Die Endpunkte der
+  Bankmitarbeiter-Ansicht — Dashboard, Antrags-Queue mit Bestätigen und Ablehnen, Konten-Lifecycle,
+  Grants, Halter samt Umbuchung, Storno und die beiden Berichte — stehen jetzt auf der Allowlist des
+  API-vhosts. Der Admin-Bereich der Bank, die direkten Buchungsformulare und der KRT-Stufeneditor
+  bleiben ausdrücklich draußen. `GET /api/v1/me/capabilities` nennt dazu zwei neue Flags, damit die
+  App nicht aus Rollennamen raten muss, wer die Verwaltung sehen darf.
+
 - **Die Android-App darf jetzt Buchungsanträge stellen und freigeben.** Die dafür nötigen
   Mitglieds-Endpunkte der Org-Einheits-Bank stehen jetzt auf der Allowlist des API-vhosts, ebenso
   der Lesezugriff auf die Org-Einheiten eines Mitglieds, den der Umbuchen-Dialog der App braucht.
