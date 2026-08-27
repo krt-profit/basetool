@@ -489,7 +489,15 @@ class ExternalContractTest {
                   "balance",
                   "delta30d",
                   "sparkline",
-                  "orgUnitName")),
+                  "orgUnitName",
+                  // The request sheet is built out of these three. `canRequest` decides which
+                  // accounts a withdrawal or transfer may name at all; `approvalLimit` is the
+                  // threshold the sheet states live under the amount, per caller and per account;
+                  // `approvalExempt` is why it sometimes states nothing. Losing any of them turns
+                  // a form that explains itself into one that guesses.
+                  "canRequest",
+                  "approvalLimit",
+                  "approvalExempt")),
           new ContractOperation(
               "/api/v1/org-units/bank/accounts/{id}",
               "get",
@@ -555,6 +563,90 @@ class ExternalContractTest {
                       "createdAt",
                       "holderHandle"))
               .addressedBy(Set.of("page:integer", "size:integer")),
+          // Phase 5, the member's booking requests (app REQ-APP-BANK-008). Still
+          // `/org-units/bank/**`: confirming and rejecting live on `/api/v1/bank/requests/**`,
+          // which is `BANK_EMPLOYEE` and stays off this list.
+          //
+          // `requiredApprover` is the field that keeps the app honest about the approval model.
+          // There is no count of approvals anywhere — one owner approval, granted by the class
+          // this field names (REQ-BANK-041/-047) — and the app's row chip renders that class.
+          // Dropping it would leave the client unable to say who a request is waiting on.
+          new ContractOperation(
+              "/api/v1/org-units/bank/requests",
+              "get",
+              Set.of(
+                  "id",
+                  "accountId",
+                  "accountName",
+                  "targetAccountId",
+                  "type",
+                  "amount",
+                  "note",
+                  "status",
+                  "requesterHandle",
+                  "rejectReason",
+                  "applicableLimit",
+                  "requiresOwnerApproval",
+                  "requiredApprover",
+                  "ownerApprovalGranted",
+                  "ownerApprovalGrantedByHandle",
+                  "createdAt",
+                  "version")),
+          new ContractOperation(
+              "/api/v1/org-units/bank/requests/foreign",
+              "get",
+              Set.of(
+                  "id",
+                  "accountId",
+                  "accountName",
+                  "type",
+                  "amount",
+                  "note",
+                  "status",
+                  "requesterHandle",
+                  "requiresOwnerApproval",
+                  "requiredApprover",
+                  "ownerApprovalGranted",
+                  "ownerApprovalGrantedByHandle",
+                  "createdAt",
+                  "version")),
+          // A transfer's destinations. The app shows the name and falls back to the number, so
+          // both are relied on.
+          new ContractOperation(
+              "/api/v1/org-units/bank/transfer-targets", "get", Set.of("id", "name", "accountNo")),
+          // Raising one. `targetAccountId` travels only for a TRANSFER; the server ignores it
+          // otherwise, and the app omits it rather than putting a value on the wire that
+          // describes nothing.
+          new ContractOperation(
+              "/api/v1/org-units/bank/requests",
+              "post",
+              Set.of("id", "status", "requiresOwnerApproval", "requiredApprover", "version"),
+              Set.of("sourceAccountId", "type", "amount")),
+          // Correcting one's own. The account and the kind are absent on purpose: the server
+          // refuses a change to either, so a client that sent them would be asking for a 400.
+          // Only `amount` is required. The version travels too and the app sends it, but the
+          // server accepts the edit without one — recorded as it is rather than as it ought to be,
+          // because this set is what a shipped build is held to.
+          new ContractOperation(
+              "/api/v1/org-units/bank/requests/{id}",
+              "put",
+              Set.of("id", "amount", "note", "targetAccountId", "version"),
+              Set.of("amount")),
+          new ContractOperation(
+              "/api/v1/org-units/bank/requests/{id}/cancel",
+              "post",
+              Set.of("id", "status", "version"),
+              Set.of("version")),
+          // The two approval verbs take NO body — no version to echo, and the app sends none.
+          // Frozen so that gaining one would be a contract change rather than a silent 400.
+          new ContractOperation(
+              "/api/v1/org-units/bank/requests/{id}/owner-approval",
+              "post",
+              Set.of("id", "ownerApprovalGranted", "ownerApprovalGrantedByHandle", "version")),
+          new ContractOperation(
+              "/api/v1/org-units/bank/requests/{id}/owner-approval",
+              "delete",
+              Set.of("id", "ownerApprovalGranted", "version")),
           // Phase 2, the member's own hangar. The row's `shipType` and `location` are nested
           // objects whose `name` is what the card actually shows, which is why the guard now
           // descends into a referenced schema and not only into an array's items.
@@ -1356,7 +1448,12 @@ class ExternalContractTest {
           "MissionFinanceEntryCreateDto.type",
           Set.of("INCOME", "EXPENSE"),
           "MissionFinanceEntryUpdateDto.type",
-          Set.of("INCOME", "EXPENSE"));
+          Set.of("INCOME", "EXPENSE"),
+          // The three movements the app's request sheet sends as literals. Renaming one would
+          // turn every booking request an installed build raises into a 400 while the sheet still
+          // opens and still looks fine.
+          "CreateBankBookingRequest.type",
+          Set.of("DEPOSIT", "WITHDRAWAL", "TRANSFER"));
 
   @Test
   @DisplayName("no enum a shipped client must parse has gained or lost a constant")

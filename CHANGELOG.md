@@ -19,6 +19,11 @@
 
 ### Added
 
+- **Die Android-App darf jetzt Buchungsanträge stellen und freigeben.** Die dafür nötigen
+  Mitglieds-Endpunkte der Org-Einheits-Bank stehen jetzt auf der Allowlist des API-vhosts, ebenso
+  der Lesezugriff auf die Org-Einheiten eines Mitglieds, den der Umbuchen-Dialog der App braucht.
+  Bankmitarbeiter-Endpunkte bleiben unverändert draußen.
+
 - **Der vom Fankit-Agreement geforderte Hinweis steht jetzt auf der Seite** — der Satz zur
   Nicht-Verbundenheit mit Cloud Imperium, der Copyright-Hinweis und „All rights reserved". Er
   ergänzt die bisherige kurze Markenzeile, ersetzt sie nicht: die beiden Hinweise stammen aus
