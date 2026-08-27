@@ -32,6 +32,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.apache.tomcat.util.http.InvalidParameterException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.servlet.ModelAndView;
 
 /**
@@ -717,6 +720,58 @@ class GlobalExceptionHandlerTest {
     assertEquals("error.413.title", model.getAttribute("error"));
     assertEquals("error.uploadTooLarge", model.getAttribute("message"));
     assertEquals("413", model.getAttribute("status"));
+  }
+
+  // ─── handleInvalidParameter (unparseable request parameters) ────────────
+
+  @Test
+  void invalidParameter_htmlRequest_returnsErrorViewWith400() {
+    Model model = new ConcurrentModel();
+
+    Object result = handler.handleInvalidParameter(htmlRequest(), model);
+
+    // Not the 500 the Exception catch-all would have produced: unparseable client input is a bad
+    // request, and the ERROR + stack trace it used to emit is pure scanner noise (REQ-OBS-001).
+    assertEquals("error/error", result);
+    assertEquals("error.400.title", model.getAttribute("error"));
+    assertEquals("error.malformedRequest", model.getAttribute("message"));
+    assertEquals("400", model.getAttribute("status"));
+  }
+
+  @Test
+  void invalidParameter_jsonRequest_returns400ProblemBody() {
+    Model model = new ConcurrentModel();
+
+    Object result = handler.handleInvalidParameter(jsonRequest(), model);
+
+    assertInstanceOf(ResponseEntity.class, result);
+    ResponseEntity<?> response = (ResponseEntity<?>) result;
+    assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    @SuppressWarnings("unchecked")
+    Map<String, Object> body = (Map<String, Object>) response.getBody();
+    assertNotNull(body);
+    assertEquals("MALFORMED_REQUEST", body.get("code"));
+    assertEquals(400, body.get("status"));
+    assertEquals("error.400.title", body.get("title"));
+    assertEquals("error.malformedRequest", body.get("message"));
+  }
+
+  @Test
+  void invalidParameter_isMappedAheadOfTheGenericCatchAll() throws Exception {
+    // The two handlers overlap: InvalidParameterException extends IllegalStateException, so
+    // without a dedicated @ExceptionHandler it lands on the Exception catch-all — which is exactly
+    // how the production 500s were produced. Assert the specific mapping exists and is annotated
+    // with 400, since Spring picks the most specific declared exception type.
+    var method =
+        GlobalExceptionHandler.class.getMethod(
+            "handleInvalidParameter", HttpServletRequest.class, Model.class);
+    var handlerAnnotation = method.getAnnotation(ExceptionHandler.class);
+    assertNotNull(handlerAnnotation);
+    assertEquals(
+        InvalidParameterException.class,
+        handlerAnnotation.value()[0],
+        "the container's parameter-parse failure must map here, not to the catch-all");
+    assertEquals(HttpStatus.BAD_REQUEST, method.getAnnotation(ResponseStatus.class).value());
   }
 
   // ─── handleException (generic catch-all) ────────────────────────────────

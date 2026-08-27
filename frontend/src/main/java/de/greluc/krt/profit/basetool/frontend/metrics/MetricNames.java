@@ -235,10 +235,11 @@ public final class MetricNames {
 
   /**
    * Counter {@code basetool_bot_blocked_total} — tag {@code rule} ({@link #BOT_RULE_METHOD} /
-   * {@link #BOT_RULE_PATH_PREFIX} / {@link #BOT_RULE_FILE_EXTENSION}). {@code
-   * BotProtectionFilter}'s three reject branches are otherwise {@code log.debug}-only
-   * (prod-invisible); the counter also surfaces a self-inflicted false positive when a new legit
-   * route matches a blocked prefix (#1041 item 19).
+   * {@link #BOT_RULE_PATH_PREFIX} / {@link #BOT_RULE_FILE_EXTENSION} / {@link
+   * #BOT_RULE_QUERY_STRING}). {@code BotProtectionFilter}'s four reject branches are otherwise
+   * {@code log.debug}-only (prod-invisible); the counter also surfaces a self-inflicted false
+   * positive when a new legit route matches a blocked prefix, or when the query-string rule starts
+   * rejecting traffic the app itself produces (#1041 item 19).
    */
   public static final String BOT_BLOCKED = "basetool.bot.blocked";
 
@@ -305,6 +306,14 @@ public final class MetricNames {
 
   /** Bot-block rule: a never-served file extension (answered 404). */
   public static final String BOT_RULE_FILE_EXTENSION = "file_extension";
+
+  /**
+   * Bot-block rule: a syntactically invalid query string (answered with a bare 400). A chunk whose
+   * parameter name is empty but which carries a value (e.g. {@code /?=phpinfo()}) makes Tomcat's
+   * parameter parser throw on the first {@code getParameter*()} call, which happens on every
+   * request; rejecting it at the edge is what keeps that failure out of the error dispatch.
+   */
+  public static final String BOT_RULE_QUERY_STRING = "query_string";
 
   /** Login outcome: authentication succeeded. */
   public static final String OUTCOME_SUCCESS = "success";

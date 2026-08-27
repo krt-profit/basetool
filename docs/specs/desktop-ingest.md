@@ -393,8 +393,16 @@ The gateway is the only new internet-reachable surface (`REQ-INGEST-001`), so it
 target of automated scanners probing for WordPress, PHP, Actuator, WebDAV and hidden-config paths.
 A pre-security `BotProtectionFilter` (the gateway mirror of the frontend filter) rejects these
 before they reach Spring Security — so a scan never spins up the resource-server bearer-token filter
-or an identity-provider round-trip — using three fixed, case-insensitive strategies:
+or an identity-provider round-trip — using four fixed, case-insensitive strategies:
 
+- **Malformed query string → bare 400.** A query-string chunk with an empty parameter name but a
+  value (`/?=phpinfo()`, `/?a=1&=2`) is what Tomcat's parameter parser rejects outright, and it
+  throws on the *first* `getParameter*()` of the request. This rule runs **first** and answers with
+  `setStatus`, not `sendError`: the three rules below use `sendError`, whose container error
+  dispatch re-reads the very query string that cannot be parsed, turning one scanner probe into a
+  500 with a stack trace. No browser or `URLSearchParams` caller emits such a chunk. Deliberately
+  narrow — Tomcat's other two parameter-parse rejects (a percent-escape that fails to decode, the
+  `maxParameterCount` cap) are left to the exception handler rather than re-implemented here.
 - **Disallowed HTTP method → 405.** The gateway only ever uses `GET` (actuator / api-docs), `POST`
   (the two `/v1` ingest endpoints), `HEAD` (health probes) and `OPTIONS` (CORS preflight). Every
   other method — `PUT`/`DELETE`/`PATCH` verb-tampering, `TRACE`/`CONNECT`, WebDAV `PROPFIND`/`MKCOL`/…
@@ -406,9 +414,9 @@ The filter runs after `CorrelationIdFilter` (a blocked request is still correlat
 before the size-cap, rate-limit and Spring Security filters. The gateway's real surface — `/v1/**`,
 `/actuator/health` (+ liveness/readiness), `/actuator/prometheus` (exact match → the fail-closed
 scrape chain still runs) and `/v3/api-docs` (non-prod) — is never blocked. Each reject bumps
-`basetool_bot_blocked_total{rule}` (bounded `rule` ∈ {`method`, `path_prefix`, `file_extension`};
-never the URI or method — `REQ-OBS-006/-011`), shared with the frontend counter and distinguished by
-the `application` common tag; it makes the otherwise `log.debug`-only rejects visible and surfaces a
+`basetool_bot_blocked_total{rule}` (bounded `rule` ∈ {`method`, `path_prefix`, `file_extension`,
+`query_string`}; never the URI or method — `REQ-OBS-006/-011`), shared with the frontend counter
+and distinguished by the `application` common tag; it makes the otherwise `log.debug`-only rejects visible and surfaces a
 self-inflicted false positive if a future legit route matches a blocked prefix.
 
 **Acceptance**
@@ -416,6 +424,8 @@ self-inflicted false positive if a future legit route matches a blocked prefix.
 - [x] A request for a known bot path (`/wp-admin/…`, `/.env`, `/actuator/env`, …) or a never-served
   file extension is answered 404 without reaching the security chain; a disallowed method is
   answered 405.
+- [x] A query string with an empty-named chunk (`/?=phpinfo()`) is answered with a bare 400 — no
+  body, no error dispatch — and wins over the path/extension/method rules when several apply.
 - [x] The gateway's real surface (`/v1/**`, `/actuator/health*`, `/actuator/prometheus`,
   `/v3/api-docs*`) passes the filter unchanged.
 - [x] Every reject increments `basetool_bot_blocked_total` under its bounded `rule` tag and nothing

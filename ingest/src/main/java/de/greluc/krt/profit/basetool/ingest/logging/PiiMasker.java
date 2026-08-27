@@ -37,7 +37,11 @@ import java.util.regex.Pattern;
  *       JWT_***}.
  *   <li>RFC 5322-ish e-mail addresses -&gt; {@code ***@***.***}.
  *   <li>Values introduced by the keywords {@code bearer}, {@code token}, {@code session-id} or
- *       {@code authorization} keep the keyword and replace the trailing value with {@code ***}.
+ *       {@code authorization} keep the keyword and replace the trailing value with {@code ***}. The
+ *       keyword only counts when a separator follows it ({@code :}, {@code =} or whitespace), so an
+ *       identifier that merely contains one of them -&gt; a {@code GuestEditTokenContextFilter}
+ *       stack frame, an {@code AuthorizationFilter} class name -&gt; survives intact instead of
+ *       being truncated at the keyword.
  * </ul>
  *
  * <p>All replacements are alphanumeric only, never quotes or backslashes, so applying the masker on
@@ -54,9 +58,16 @@ public final class PiiMasker {
       "([a-zA-Z0-9_!#$%&'*+/=?`{|}~^.-]+@(?:[a-zA-Z0-9-]++\\.)++[a-zA-Z]{2,})";
   // Value class includes the standard-base64 alphabet (+, /, =) so a base64 secret logged next to
   // one of these keywords is masked in full, not truncated at the first +/=/ (security audit L6).
+  // The keyword must be followed by a real separator - ":", "=" or whitespace. With the
+  // separator optional, every identifier that merely CONTAINS one of the keywords was eaten
+  // together with everything after it: a stack frame
+  // "GuestEditTokenContextFilter.doFilterInternal" reached the log as "GuestEditToken***" and
+  // "...intercept.AuthorizationFilter.doFilter" as "Authorization***", which is exactly the
+  // information an incident needs. Requiring the separator loses no secret: a token is logged as
+  // "token=x", "token: x" or "Bearer x", never as "tokenx".
   private static final String KEYWORD_TOKEN_PATTERN =
-      "(?i)(bearer\\s+|token\\s*[:=]?\\s*|session[-_]?id\\s*[:=]?\\s*"
-          + "|authorization\\s*[:=]?\\s*(?:bearer\\s+)?)([a-zA-Z0-9\\-_\\.+/=]+)";
+      "(?i)(bearer\\s+|(?:token|session[-_]?id|authorization)"
+          + "(?:\\s*[:=]\\s*|\\s+)(?:bearer\\s+)?)([a-zA-Z0-9\\-_\\.+/=]+)";
 
   private static final Pattern PII_PATTERN =
       Pattern.compile(JWT_PATTERN + "|" + EMAIL_PATTERN + "|" + KEYWORD_TOKEN_PATTERN);

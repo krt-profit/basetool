@@ -280,7 +280,9 @@ saturation) — an unverified presence subscribe is refused, not admitted.
 
 ### REQ-SEC-008 — Frontend bot protection & silent re-auth
 
-The frontend's `BotProtectionFilter` returns 404 directly for known scanner paths;
+The frontend's `BotProtectionFilter` returns 404 directly for known scanner paths and a bare 400
+for a syntactically invalid query string (an empty-named chunk such as `/?=phpinfo()`, which Tomcat's
+parameter parser refuses — see REQ-OBS-001 for why that reject must not use `sendError`);
 `SsoReAuthenticationEntryPoint` gives legitimate paths with expired sessions a silent
 `prompt=none` Keycloak redirect.
 

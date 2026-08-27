@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Scanner-Anfragen mit kaputter Adresse fluten das Protokoll nicht mehr.** Eine Anfrage wie
+  `/?=phpinfo()` konnte Tomcat nicht auswerten und landete als Serverfehler mit vollem Stacktrace im
+  Protokoll — pro Sonde gleich zweimal, weil die Fehlerseite dieselbe Adresse erneut las. Solche
+  Anfragen werden jetzt direkt mit „400 Ungültige Anfrage" beantwortet; unbeteiligte Nutzer merken
+  nichts.
+
+- **Stacktraces im Protokoll werden nicht mehr verstümmelt.** Die Maskierung von Zugangsdaten griff
+  auch mitten in Klassennamen, die „Token" oder „Authorization" enthalten, und schnitt den Rest der
+  Zeile ab. Sie verlangt jetzt ein Trennzeichen hinter dem Schlüsselwort — echte Zugangsdaten werden
+  unverändert entfernt.
+
 ## [v1.6.4](https://github.com/krt-profit/basetool/releases/tag/v1.6.4) - 2026-08-26
 
 ### Added
