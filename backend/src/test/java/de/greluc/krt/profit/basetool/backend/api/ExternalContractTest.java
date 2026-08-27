@@ -158,10 +158,21 @@ class ExternalContractTest {
           new ContractOperation(
               "/api/v1/terms/acceptance", "post", Set.of("accepted", "currentVersion")),
           new ContractOperation("/api/v1/me/active-org-unit", "get", Set.of("orgUnitId")),
+          // The two bank flags are what the app's scope segment is drawn from, and they are here
+          // rather than derived client-side on purpose: the me-response reports role DISPLAY names
+          // ("Bank Employee"), the bank roles carry no permissions at all, and the hierarchy
+          // ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE lives in SecurityConfig. Losing either flag
+          // would lock the staff bank away from the people who run it, on a build nobody can
+          // redeploy.
           new ContractOperation(
               "/api/v1/me/capabilities",
               "get",
-              Set.of("canSeeBlueprintOverview", "canViewJobOrders", "canViewOwnJobOrders")),
+              Set.of(
+                  "canSeeBlueprintOverview",
+                  "canViewJobOrders",
+                  "canViewOwnJobOrders",
+                  "canViewBankStaff",
+                  "canManageBank")),
           new ContractOperation(
               "/api/v1/users/me/registration-status", "get", Set.of("approvalStatus")),
           // ADR-0138: the app renders the wording from here instead of shipping a copy in the APK,

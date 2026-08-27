@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +51,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class MeController {
 
   private final OwnerScopeService ownerScopeService;
+
+  /** Answers role questions through the configured hierarchy rather than by literal match. */
+  private final AuthHelperService authHelperService;
 
   /**
    * Returns the org-unit context that the backend currently applies to staffel-scoped queries for
@@ -88,12 +93,17 @@ public class MeController {
    * @return the caller's UI capability flags; never {@code null}.
    */
   @GetMapping("/capabilities")
-  @Operation(summary = "Per-principal UI capability flags (blueprint-overview + job-order access).")
+  @Operation(
+      summary = "Per-principal UI capability flags (blueprint overview, job orders, bank staff).")
   public CapabilitiesResponse getCapabilities() {
     return new CapabilitiesResponse(
         ownerScopeService.canAccessBlueprintOverview(),
         ownerScopeService.canViewJobOrders(),
-        ownerScopeService.canViewOwnJobOrders());
+        ownerScopeService.canViewOwnJobOrders(),
+        // Through the hierarchy on purpose: a Bankleitung holds BANK_MANAGEMENT and NOT
+        // BANK_EMPLOYEE, so a direct check would hide the staff bank from the people who run it.
+        authHelperService.hasReachableRole(Roles.authority(Roles.BANK_EMPLOYEE)),
+        authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)));
   }
 
   /**
@@ -115,7 +125,15 @@ public class MeController {
    * @param canViewOwnJobOrders {@code true} iff the caller may view the orders their own org unit
    *     requested (admin, or member of at least one org unit), independent of profit eligibility
    *     (REQ-ORDERS-023).
+   * @param canViewBankStaff {@code true} iff the caller may reach the bank's staff surface at all
+   *     &mdash; {@code BANK_EMPLOYEE} or anything above it in the role hierarchy.
+   * @param canManageBank {@code true} iff the caller additionally holds {@code BANK_MANAGEMENT},
+   *     which is what gates the account lifecycle and the grants matrix.
    */
   public record CapabilitiesResponse(
-      boolean canSeeBlueprintOverview, boolean canViewJobOrders, boolean canViewOwnJobOrders) {}
+      boolean canSeeBlueprintOverview,
+      boolean canViewJobOrders,
+      boolean canViewOwnJobOrders,
+      boolean canViewBankStaff,
+      boolean canManageBank) {}
 }

@@ -169,6 +169,42 @@ jobs:
           # admin write. It is inside the read-only family and nothing clears it, so 405.
           probe PATCH "/api/v1/users/$nil/memberships" 405
 
+          # Phase L - the bank-STAFF surface, admitted for the first time (runbook § Phase L).
+          # Every one of these must reach the backend and be refused there.
+          for p in /api/v1/bank/dashboard /api/v1/bank/accounts /api/v1/bank/requests \
+                   /api/v1/bank/grants /api/v1/bank/holders \
+                   "/api/v1/bank/accounts/$nil" "/api/v1/bank/accounts/$nil/transactions" \
+                   "/api/v1/bank/accounts/$nil/balance-series" \
+                   "/api/v1/bank/accounts/$nil/statement" \
+                   "/api/v1/bank/holders/$nil" "/api/v1/bank/holders/$nil/transactions" \
+                   /api/v1/bank/export/three-month-report; do
+            probe GET "$p" 401
+          done
+          probe POST /api/v1/bank/accounts 401
+          probe PATCH "/api/v1/bank/accounts/$nil" 401
+          probe POST "/api/v1/bank/accounts/$nil/close" 401
+          probe POST "/api/v1/bank/accounts/$nil/reopen" 401
+          probe POST "/api/v1/bank/requests/$nil/confirm" 401
+          probe POST "/api/v1/bank/requests/$nil/reject" 401
+          probe POST /api/v1/bank/grants 401
+          probe PATCH "/api/v1/bank/grants/$nil/$nil" 401
+          probe DELETE "/api/v1/bank/grants/$nil/$nil" 401
+          probe POST /api/v1/bank/holders 401
+          probe PATCH "/api/v1/bank/holders/$nil" 401
+          probe POST /api/v1/bank/holders/transfer 401
+          probe POST "/api/v1/bank/transactions/$nil/reversal" 401
+
+          # And the parts of the same stem that must STAY shut. The admin half is web-only by owner
+          # decision; the direct booking forms and the KRT ladder editor are drawn by no artboard.
+          # A 401 on any of these would mean the allow-list opened something by accident.
+          for p in /api/v1/bank/admin/audit /api/v1/bank/transfer-fee-rate; do
+            probe GET "$p" 404
+          done
+          probe POST /api/v1/bank/admin/wipe-reset 404
+          probe POST /api/v1/bank/withdrawals 404
+          probe POST /api/v1/bank/transfers 404
+          probe PATCH "/api/v1/bank/accounts/$nil/approval-tiers" 404
+
           # The four participant writes are the exception on this whole list: canAccessParticipant
           # resolves the row BEFORE it judges the caller, because a guest sign-up is editable by
           # the anonymous creator holding its capability token (REQ-SEC-018). An unknown row is

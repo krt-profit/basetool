@@ -26,7 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -44,6 +46,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class MeControllerTest {
 
   @Mock private OwnerScopeService ownerScopeService;
+
+  @Mock private AuthHelperService authHelperService;
 
   @InjectMocks private MeController controller;
 
@@ -93,5 +97,51 @@ class MeControllerTest {
     when(ownerScopeService.canViewJobOrders()).thenReturn(false);
 
     assertFalse(controller.getCapabilities().canViewJobOrders());
+  }
+
+  @Test
+  void getCapabilities_bankEmployee_seesTheStaffSurfaceButNotTheLifecycle() {
+    when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_EMPLOYEE))).thenReturn(true);
+    when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
+        .thenReturn(false);
+
+    MeController.CapabilitiesResponse response = controller.getCapabilities();
+
+    assertTrue(response.canViewBankStaff());
+    assertFalse(response.canManageBank());
+  }
+
+  /**
+   * The whole reason these two flags exist rather than the client reading role names.
+   *
+   * <p>A Bankleitung holds {@code BANK_MANAGEMENT} and <strong>not</strong> {@code BANK_EMPLOYEE};
+   * the hierarchy is what connects them, and it lives here rather than on the wire. A client
+   * matching role names would hide the staff bank from the people who run the bank &mdash; and the
+   * names it would be matching are display names ({@code "Bank Employee"}), not the codes the gates
+   * use.
+   */
+  @Test
+  void getCapabilities_bankManagement_reachesTheEmployeeRoleThroughTheHierarchy() {
+    when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_EMPLOYEE))).thenReturn(true);
+    when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
+        .thenReturn(true);
+
+    MeController.CapabilitiesResponse response = controller.getCapabilities();
+
+    assertTrue(response.canViewBankStaff());
+    assertTrue(response.canManageBank());
+  }
+
+  @Test
+  void getCapabilities_ordinaryMember_reachesNeither() {
+    when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_EMPLOYEE)))
+        .thenReturn(false);
+    when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
+        .thenReturn(false);
+
+    MeController.CapabilitiesResponse response = controller.getCapabilities();
+
+    assertFalse(response.canViewBankStaff());
+    assertFalse(response.canManageBank());
   }
 }
