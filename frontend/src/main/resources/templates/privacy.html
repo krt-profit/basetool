@@ -133,6 +133,19 @@
 
         <p><em th:text="#{privacy.last_updated}">Stand dieser Datenschutzerklärung: 20.07.2026</em></p>
     </div>
+    <!--
+      Fankit Agreement clause 2 g asks for its notice "wherever materials, trademarks, or
+      properties owned by CIG are located". These are the legal pages the Android app's
+      Datenschutz / Impressum rows open — the app has no in-app legal screen of its own, so this
+      is where a member reaching them from the app lands.
+
+      The band is included whole rather than the notice alone: its three elements are coupled by
+      REQ-UI-018 and section 2 requires the trademark notice wherever the logo appears.
+
+      This is an ADDITION. The sanctioned §2b placement stays the home page; a legal subpage is
+      not one of the two surfaces section 2b accepts and never substitutes for it.
+    -->
+    <th:block th:replace="~{fragments/fankit :: band}" />
 </main>
 </body>
 </html>

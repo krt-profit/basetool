@@ -2,13 +2,22 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <!--
-  Star Citizen Fan Kit compliance band (Fan Kit Guidelines, sections 2 and 2b).
-  Two required elements are deliberately kept in ONE fragment so neither can be
-  moved or removed without the other:
+  Star Citizen Fan Kit compliance band. TWO CIG documents bind this band and
+  they apply CUMULATIVELY — the Guidelines (sections 2 and 2b) and the Fankit
+  Agreement (clause 2 g). Three required elements are deliberately kept in ONE
+  fragment so none can be moved or removed without the others:
     * the "Made By The Community" logo, which identifies the app as a Star
-      Citizen fan project, and
+      Citizen fan project,
     * the mandatory CIG trademark notice attributing the marks — section 2
-      requires the notice whenever that logo is used.
+      requires the notice whenever that logo is used, and
+    * the Agreement's clause 2 g notice, which the Guidelines do NOT contain:
+      the non-affiliation sentence, the copyright line, "Squadron 42®" in the
+      mark list and the closing "All rights reserved."
+
+  The two notices differ in details that look like mistakes and are not. The
+  §2b line has a space before its third ®; the 2 g notice has none before any
+  of its four. The 2 g notice writes "Ltd.." with two full stops and carries an
+  Oxford comma before "and Cloud Imperium®". Both are quoted, not written.
 
   Placement: section 2b accepts the notice "on the home page, on a navigation
   area that is always visible regardless of scrolling, or both". The band used
@@ -29,6 +38,7 @@
              width="36" height="36"
              loading="lazy" decoding="async">
         <span class="krt-fankit-trademark" th:text="#{fankit.trademark}">Star Citizen®, Roberts Space Industries® and Cloud Imperium ® are registered trademarks of Cloud Imperium Rights LLC</span>
+        <p class="krt-fankit-disclaimer" th:text="#{fankit.disclaimer}">This site is not endorsed by or affiliated with the Cloud Imperium or Roberts Space Industries group of companies. All game content and materials are copyright Cloud Imperium Rights LLC and Cloud Imperium Rights Ltd.. Star Citizen®, Squadron 42®, Roberts Space Industries®, and Cloud Imperium® are registered trademarks of Cloud Imperium Rights LLC. All rights reserved.</p>
     </aside>
 </th:block>
 </body>

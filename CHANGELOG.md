@@ -19,6 +19,12 @@
 
 ### Added
 
+- **Der vom Fankit-Agreement geforderte Hinweis steht jetzt auf der Seite** — der Satz zur
+  Nicht-Verbundenheit mit Cloud Imperium, der Copyright-Hinweis und „All rights reserved". Er
+  ergänzt die bisherige kurze Markenzeile, ersetzt sie nicht: die beiden Hinweise stammen aus
+  zwei verschiedenen CIG-Dokumenten, die beide gelten. Zu sehen auf der Startseite sowie auf
+  Datenschutz und Impressum.
+
 - **Veröffentlichte Artefakte tragen jetzt eine zweite, registry-unabhängige Herkunftsbestätigung.**
   Die Images hatten ihre SLSA-Provenance und die Cosign-Signatur bisher nur in der Registry liegen,
   wo ein Token mit Schreibrecht auf die Pakete beides mit austauschen könnte; die vier SBOM-Dateien

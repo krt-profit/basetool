@@ -1179,6 +1179,12 @@ tbody tr:nth-child(even):hover {
 .krt-fankit-band {
     display: flex;
     align-items: center;
+    /*
+     * Wraps so the Fankit Agreement clause 2(g) notice can take a row of its own
+     * (see .krt-fankit-disclaimer). Without the wrap that 370-character paragraph
+     * becomes a third column and squashes the other two into slivers.
+     */
+    flex-wrap: wrap;
     gap: var(--space-3);
     margin-top: var(--space-8);
     padding-top: var(--space-4);
@@ -1201,6 +1207,31 @@ tbody tr:nth-child(even):hover {
  * (section 2b) — the --fs-xs used elsewhere for fine print is only ~9.6pt.
  */
 .krt-fankit-trademark {
+    /*
+     * Shares the first row with the logo and wraps inside its own box. Without the
+     * flex growth the wrapped band drops the logo onto a row of its own at narrow
+     * widths, which visually separates it from the notice section 2 couples it to.
+     * `min-width: 0` is what lets a flex item wrap instead of forcing the row wider.
+     */
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: var(--fs-sm);
+    color: var(--color-gray-1);
+    line-height: 1.4;
+}
+/*
+ * The Fankit Agreement clause 2(g) notice. A SECOND, longer notice, required by a
+ * different CIG document than the trademark line above it — the Guidelines and the
+ * Agreement bind this project cumulatively, so neither notice substitutes for the
+ * other. Same size and ink as the line above, because 2(g) states no size of its own
+ * and section 2b's ">=10pt, legible colour" floor is the one to clear either way.
+ *
+ * `flex-basis: 100%` puts it on its own row under the logo and the trademark line
+ * rather than beside them.
+ */
+.krt-fankit-disclaimer {
+    flex-basis: 100%;
+    margin: 0;
     font-size: var(--fs-sm);
     color: var(--color-gray-1);
     line-height: 1.4;
