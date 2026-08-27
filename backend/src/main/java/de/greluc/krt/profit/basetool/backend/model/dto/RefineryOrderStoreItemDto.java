@@ -40,13 +40,18 @@ import java.util.UUID;
  * lets the user attach remarks already at the time of storage.
  *
  * <p>The optional {@code owningOrgUnitId} is the picker output that stamps the resulting {@code
- * InventoryItem}'s owning OrgUnit, validated against the receiving user's ({@code userId}, else the
- * order owner's) memberships by {@code OwnerScopeService.resolveOrgUnitForPickerOutputNullable}. It
- * is required only when that receiving user belongs to more than one OrgUnit (the §5.5.1 matrix's
- * "&gt;1 + no output → 400" branch); for a single-membership or membershipless receiver it may stay
- * {@code null} and the resolver auto-stamps (or leaves the row ownerless). The store dialog
- * pre-fills it with the order's own owning OrgUnit, so a same-OrgUnit self-store needs no manual
- * choice.
+ * InventoryItem}'s owning OrgUnit, resolved by {@code
+ * OwnerScopeService.resolveOrgUnitForPickerOutputNullable}. All four org-unit kinds (Staffel,
+ * Spezialkommando, Bereich, Organisationsleitung) are accepted. A non-null pick is honoured when it
+ * is one of the receiving user's ({@code userId}, else the order owner's) DIRECT memberships
+ * <em>or</em> — this being one of the two create-on-behalf paths where caller and receiver differ —
+ * an org unit the current caller may edit ({@code AccessGateService.canEditOrgUnit}, cascade-aware
+ * — epic #692 Phase 4 / REQ-ORG-016); a pick that is neither is rejected with 400. It is required
+ * only when that receiving user belongs to more than one OrgUnit and no active-context pin applies
+ * (the §5.5.1 matrix's "&gt;1 + no output → 400" branch); for a single-membership or membershipless
+ * receiver it may stay {@code null} and the resolver auto-stamps (or leaves the row ownerless). The
+ * store dialog pre-fills it with the order's own owning OrgUnit, so a same-OrgUnit self-store needs
+ * no manual choice.
  *
  * <p>The optional {@code personal} flag marks the resulting {@code InventoryItem} as the receiver's
  * private stock ({@code inventory_item.personal = true}) instead of shared squadron stock — the

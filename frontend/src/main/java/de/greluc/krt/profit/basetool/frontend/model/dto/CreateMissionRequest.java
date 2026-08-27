@@ -29,10 +29,14 @@ import java.util.UUID;
  * dozens of read-only fields (sub-missions, participants, inventory, version counters) through a
  * null-filled constructor every time.
  *
- * <p>R5.d.d added the trailing {@link #owningOrgUnitId} picker output — the backend's {@code
- * OwnerScopeService.resolveSquadronForPickerOutput} validates it against the caller's memberships
- * and rejects Spezialkommando selections with 400 until the destructive cleanup release loosens NOT
- * NULL on the legacy {@code owning_squadron_id} column.
+ * <p>R5.d.d added the trailing {@link #owningOrgUnitId} picker output — the backend resolves it
+ * through {@code OwnerScopeService.resolveOrgUnitForPickerOutputNullable}, which accepts all four
+ * org-unit kinds (Staffel, Spezialkommando, Bereich, Organisationsleitung). A non-null value is
+ * honoured when it is one of the mission owner's DIRECT memberships or an org unit the caller may
+ * edit ({@code AccessGateService.canEditOrgUnit}, cascade-aware — epic #692 Phase 4 / REQ-ORG-016),
+ * and rejected with 400 otherwise. {@code null} auto-stamps a single-membership owner, honours an
+ * active-context pin (REQ-ORG-017), 400s a multi-membership owner with neither, and leaves the
+ * mission ownerless for a membershipless leadership owner (V144 / ADR-0004).
  *
  * <p>{@link #objectives} / {@link #steps} carry the optional Ziele / Ablauf rows the create form
  * seeds together with the mission (both {@code null} when none). The write controller builds them

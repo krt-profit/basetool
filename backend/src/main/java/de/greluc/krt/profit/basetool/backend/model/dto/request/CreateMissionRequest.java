@@ -45,11 +45,16 @@ import org.jetbrains.annotations.Nullable;
  *       de.greluc.krt.profit.basetool.backend.service.MissionService#createMission}.
  *   <li>{@code owningSquadron}: stamped via the picker resolver on {@link
  *       de.greluc.krt.profit.basetool.backend.service.OwnerScopeService} in {@code createMission}.
- *       When the caller supplies {@link #owningOrgUnitId}, the resolver validates it against the
- *       owner's memberships and honours it (rejecting Spezialkommando selections with 400 until the
- *       destructive cleanup release loosens NOT NULL on the legacy column). When {@code null}, the
- *       resolver falls back to the owner's home Staffel. Sub-missions inherit from their parent in
- *       {@code addSubMission} and ignore this field.
+ *       Concretely {@code OwnerScopeService.resolveOrgUnitForPickerOutputNullable}, which accepts
+ *       all four org-unit kinds (Staffel, Spezialkommando, Bereich, Organisationsleitung) — the
+ *       strict, Staffel-only {@code resolveSquadronForPickerOutput} is not on this path. A non-null
+ *       {@link #owningOrgUnitId} is honoured when it is one of the owner's DIRECT memberships or an
+ *       org unit the caller may edit ({@code AccessGateService.canEditOrgUnit}, cascade-aware —
+ *       epic #692 Phase 4 / REQ-ORG-016), and rejected with 400 otherwise. When {@code null}, the
+ *       resolver auto-stamps a single-membership owner, honours an active-context pin
+ *       (REQ-ORG-017), 400s a multi-membership owner with neither, and leaves the mission ownerless
+ *       ({@code owningOrgUnit == null}, V144 / ADR-0004) for a membershipless leadership owner.
+ *       Sub-missions inherit from their parent in {@code addSubMission} and ignore this field.
  *   <li>{@code parent}: stamped from the path variable in {@code addSubMission} — never the body.
  *   <li>{@code managers} / participants / units / frequencies / inventory / refinery: have their
  *       own dedicated endpoints; not part of the create payload.
@@ -67,7 +72,8 @@ import org.jetbrains.annotations.Nullable;
  * here is an explicit decision to expose it to the API, while the absence of a field is a
  * structural guarantee that it cannot be smuggled in via JSON. The R5.d.d addition of {@link
  * #owningOrgUnitId} follows that rule — the field is an optional picker output that the service
- * layer validates against the caller's memberships before stamping.
+ * layer resolves through the central stamping resolver before stamping, never a raw client-supplied
+ * owner id.
  */
 public record CreateMissionRequest(
     @NotBlank @Size(max = 255) String name,

@@ -34,13 +34,27 @@ import org.jetbrains.annotations.Nullable;
  * <p>R5.d.g added the trailing {@link #targetOwningOrgUnitId} picker output. Applies only to the
  * {@link CheckoutType#TRANSFER} branch — the cross-user transfer flow lands the new {@link
  * de.greluc.krt.profit.basetool.backend.model.InventoryItem} row on the picked org unit instead of
- * the destination user's home Staffel. The service routes the stamp through {@code
- * OwnerScopeService.resolveSquadronForPickerOutput(targetUser, targetOwningOrgUnitId)} — the
- * resolver validates the picked OrgUnit against the *destination* user's memberships (intentional
- * cross-org-unit semantics per plan §D4: User A from Staffel-X may book out into User B's
- * Spezialkommando-Y stock as long as User B is a member of Y). Spezialkommando selections are still
- * refused with 400 until the destructive cleanup release loosens NOT NULL on the legacy {@code
- * owning_squadron_id} column.
+ * the pool the destination user would otherwise be auto-stamped into. The service routes the stamp
+ * through {@code OwnerScopeService.resolveOrgUnitForPickerOutputNullable(targetUser,
+ * targetOwningOrgUnitId)} — which delegates to {@code OrgUnitStampingService.resolveStampedOrgUnit}
+ * and therefore accepts <b>all four</b> org-unit kinds: Staffel, Spezialkommando, Bereich and
+ * Organisationsleitung. (The strict, Staffel-only {@code resolveSquadronForPickerOutput} is
+ * <em>not</em> on this path, so its "Spezialkommando ownership of this aggregate is not yet
+ * supported" rejection never fires here.) The Umbuchen picker matches that acceptance rule by
+ * fetching {@code /users/&#123;id&#125;/memberships?allKinds=true}.
+ *
+ * <p>A non-null pick is honoured when it is one of the <em>destination</em> user's DIRECT
+ * memberships — intentional cross-org-unit semantics per plan §D4: User A from Staffel-X may book
+ * out into User B's Spezialkommando-Y stock as long as User B is a member of Y — <em>or</em> when
+ * it is an org unit the current <b>caller</b> may edit ({@code AccessGateService.canEditOrgUnit},
+ * cascade-aware), the create-on-behalf widening of epic #692 Phase 4 / REQ-ORG-016 that lets a
+ * Bereichsleitung/OL place the recipient's row in a subordinate unit they oversee. A pick that is
+ * neither is rejected with 400.
+ *
+ * <p>When {@code null}, the resolver auto-stamps a single-membership target, honours an
+ * active-context pin onto one of the target's own units (REQ-ORG-017 "pin, else choose"), rejects a
+ * multi-membership target that has neither with 400, and yields an ownerless row ({@code
+ * owningOrgUnit == null}, legal since V132) for a membershipless target.
  *
  * <p>Ignored for {@link CheckoutType#DISCARD} and {@link CheckoutType#SELL} — both terminate the
  * inventory row and never create a new ownership stamp.
