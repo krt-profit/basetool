@@ -148,6 +148,27 @@ jobs:
           probe PUT "/api/v1/operations/$nil/payouts/paid-out" 401
           probe PUT "/api/v1/org-units/bank/accounts/$nil/balance-target" 401
 
+          # Phase 5 - the member's bank booking requests and the one membership read the Lager's
+          # Umbuchen picker needs. Same rule again: these join with the paste that opens them
+          # (runbook § Phase K), so the run is red between merging this and pasting the block.
+          #
+          # The two GETs are 401 because the entry point refuses before any row is read. The four
+          # writes must be 401 too: a 405 would mean the read-only guard swallowed a write this
+          # phase opens, and a 404 that the allow-list line never matched. The owner-approval pair
+          # is the only place a DELETE is opened on the /org-units stem, so it is probed on its own.
+          for p in /api/v1/org-units/bank/requests /api/v1/org-units/bank/requests/foreign                    /api/v1/org-units/bank/transfer-targets "/api/v1/users/$nil/memberships"; do
+            probe GET "$p" 401
+          done
+          probe POST /api/v1/org-units/bank/requests 401
+          probe PUT "/api/v1/org-units/bank/requests/$nil" 401
+          probe POST "/api/v1/org-units/bank/requests/$nil/cancel" 401
+          probe POST "/api/v1/org-units/bank/requests/$nil/owner-approval" 401
+          probe DELETE "/api/v1/org-units/bank/requests/$nil/owner-approval" 401
+
+          # And the one that must stay shut: PATCH on the same membership path is the org-unit
+          # admin write. It is inside the read-only family and nothing clears it, so 405.
+          probe PATCH "/api/v1/users/$nil/memberships" 405
+
           # The four participant writes are the exception on this whole list: canAccessParticipant
           # resolves the row BEFORE it judges the caller, because a guest sign-up is editable by
           # the anonymous creator holding its capability token (REQ-SEC-018). An unknown row is

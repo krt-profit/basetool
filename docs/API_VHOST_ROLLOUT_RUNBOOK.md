@@ -462,6 +462,23 @@ if ($uri = "/api/v1/materials/search") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/locations/search") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/users/search") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/materials/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/terminals$") { set $krt_api_allowed 1; }
+# Phase 5 - the member's bank booking requests (app REQ-APP-BANK-008). Still /org-units/bank/**
+# and never /bank/**: confirming and rejecting are BANK_EMPLOYEE acts on the surface the app does
+# not carry. `requests` and `requests/foreign` are literal; the four id-bearing paths carry the
+# request's uuid. The three writes are cleared out of the read-only family further down, one path
+# at a time, because `/org-units` also carries the org-unit admin surface.
+if ($uri = "/api/v1/org-units/bank/requests") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/org-units/bank/requests/foreign") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/org-units/bank/transfer-targets") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/org-units/bank/requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/org-units/bank/requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/cancel$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/org-units/bank/requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/owner-approval$") { set $krt_api_allowed 1; }
+# Phase 5 - one member's org-unit memberships, which the Lager's Umbuchen picker needs for the
+# DESTINATION member rather than the caller, so /users/me/memberships cannot serve it. A GET the
+# backend gates on any member and documents as carrying no personally identifying data - no display
+# name, no email, no rank - which is the same stance as /users/search two lines up. NOT cleared out
+# of the read-only family: the PATCH the backend serves on this very path stays 405 here.
+if ($uri ~ "^/api/v1/users/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/memberships$") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- The missions and operations families are READ-ONLY on this vhost ---------
@@ -519,6 +536,13 @@ if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-
 # three account-settings writes are named.
 if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/balance-target$") { set $krt_readonly_family ""; }
 if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/visibility/(role/[A-Za-z0-9_-]{1,64}|all-members/(true|false))$") { set $krt_readonly_family ""; }
+# The three booking-request writes. POST /requests raises one and POST /requests/{id}/cancel
+# withdraws it; PUT /requests/{id} corrects it, which is why the bare id path is named; the
+# owner-approval path answers POST and DELETE and needs both. Naming a path opens every verb the
+# backend serves on it, and on each of these that is exactly the set above.
+if ($uri = "/api/v1/org-units/bank/requests") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/org-units/bank/requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/org-units/bank/requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(cancel|owner-approval)$") { set $krt_readonly_family ""; }
 if ($krt_readonly_family = "RW") { return 405; }
 
 # --- Which family gets which shape ---------------------------------------------------------------
@@ -1117,6 +1141,58 @@ Phase I yet, doing this once covers both.
 If step 4 or 5 disagrees, put the previous block back — it is in this file's git history — and say
 what you saw. Nothing breaks while the old block is live: the phase-4 paths simply stay unreachable
 from outside, which is where they have been all along.
+
+## Phase K — the member's bank booking requests, and one membership read
+
+**Not yet, and for the same reason as Phase J:** these lines join the one pending paste rather than
+prompting a separate visit to the host. Nothing below is applied until it goes with them.
+
+Two app slices need this, and both were verified against the local test stack — which is reached
+**directly, with no vhost in front of it**, and therefore cannot show a missing allow-list line.
+That is how both gaps survived a full device verification.
+
+|     Slice      |                                     Paths                                     |    Verbs     |
+|----------------|-------------------------------------------------------------------------------|--------------|
+| Bank-Anträge   | `/api/v1/org-units/bank/requests`, `…/requests/foreign`, `…/transfer-targets` | GET          |
+| Bank-Anträge   | `/api/v1/org-units/bank/requests`                                             | POST         |
+| Bank-Anträge   | `/api/v1/org-units/bank/requests/<uuid>`                                      | PUT          |
+| Bank-Anträge   | `…/requests/<uuid>/cancel`                                                    | POST         |
+| Bank-Anträge   | `…/requests/<uuid>/owner-approval`                                            | POST, DELETE |
+| Lager-Umbuchen | `/api/v1/users/<uuid>/memberships`                                            | **GET only** |
+
+**The bank-employee surface is untouched.** Confirming and rejecting a request are
+`/api/v1/bank/requests/<uuid>/(confirm|reject)`, `hasRole(BANK_EMPLOYEE)`, and stay on no
+allow-list line at all — the app has no such screen (app `REQ-APP-BANK-007`).
+
+**Why `/users/<uuid>/memberships` and not `me`.** The Umbuchen picker offers the org units of the
+**destination** member, because the server validates the target unit against *their* memberships,
+not the caller's. The me-scoped path cannot answer that. The backend gates the endpoint on any
+member and documents that a non-admin derives no personally identifying data from it — no display
+name, no email, no rank — which is the same stance as `/api/v1/users/search`, already admitted.
+
+It is **not** cleared out of the read-only family, so the `PATCH` the backend serves on the very
+same path — the org-unit admin write — keeps answering `405` here. That asymmetry is the point of
+the entry, and re-pasting the § D.3 block whole is what preserves it.
+
+### What to expect afterwards
+
+|                        Path                        | Anonymous status |
+|----------------------------------------------------|------------------|
+| `GET /api/v1/org-units/bank/requests`              | **401**          |
+| `GET /api/v1/org-units/bank/requests/foreign`      | **401**          |
+| `GET /api/v1/org-units/bank/transfer-targets`      | **401**          |
+| `POST /api/v1/org-units/bank/requests`             | **401**          |
+| `PUT /api/v1/org-units/bank/requests/<uuid>`       | **401**          |
+| `POST …/requests/<uuid>/cancel`                    | **401**          |
+| `POST` / `DELETE …/requests/<uuid>/owner-approval` | **401**          |
+| `GET /api/v1/users/<uuid>/memberships`             | **401**          |
+| `PATCH /api/v1/users/<uuid>/memberships`           | **405**          |
+
+A `405` on any of the six writes means the read-only carve-out was lost; a `404` means the
+allow-list line never matched. The single deliberate `405` is the last row, and a `401` there would
+mean the org-unit admin write had been opened by accident.
+
+---
 
 ## Phase G — flip the audience enforcement (D5, release gate)
 
