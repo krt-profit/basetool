@@ -489,11 +489,21 @@ ADR-0120.
 
 ### REQ-UI-018 — Star Citizen Fan Kit compliance band lives on the home page
 
-The app is a Star Citizen fan project and uses Fan Kit assets, so the **Fan Kit Guidelines**
-(section 2/2b) oblige it to show two coupled elements: the **"Made By The Community" logo** and the
-**required CIG trademark notice**. Section 2b accepts three placements on a website — the home page,
-an always-visible navigation area, or both. The Basetool uses the **home page**: the band renders at
-the end of `index.html`'s `<main>`.
+The app is a Star Citizen fan project and uses Fan Kit assets, so **two CIG documents bind it, and
+they apply cumulatively**:
+
+|             Document             |                                         Requires                                         |
+|----------------------------------|------------------------------------------------------------------------------------------|
+| Fan Kit **Guidelines** §2/§2b    | the "Made By The Community" logo and the short **trademark notice** (`fankit.trademark`) |
+| Fankit **Agreement** clause 2(g) | a separate, longer **non-affiliation notice** (`fankit.disclaimer`)                      |
+
+Clause 2(g) asks for its notice "in a reasonably prominent location, on your fan site or other fan
+work wherever materials, trademarks, or properties owned by CIG are located" — which is where the
+band already is. The band therefore shows **three** coupled elements, not two.
+
+Section 2b accepts three placements on a website — the home page, an always-visible navigation
+area, or both. The Basetool uses the **home page**: the band renders at the end of `index.html`'s
+`<main>`.
 
 It deliberately no longer sits in the global footer. As a full-width first row it cost every page a
 3.25 rem band of a `position: fixed` footer that overlays content, which is worst on the phone/small
@@ -501,12 +511,23 @@ device classes of REQ-UI-009. Scrolling with the home page costs no viewport hei
 
 Binding details:
 
-- **The logo and the notice ship as one fragment** (`fragments/fankit.html`) and are included
-  together. Section 2 requires the notice wherever that logo appears, so neither element may be
-  rendered, moved or removed on its own.
-- **The notice is prescribed legal wording, not UI copy.** It stays verbatim English in *every*
-  locale bundle (`fankit.trademark`) — translating it breaks compliance while passing key-parity
-  checks.
+- **All three elements ship as one fragment** (`fragments/fankit.html`) and are included together.
+  Section 2 requires the trademark notice wherever the logo appears and clause 2(g) requires its
+  notice wherever CIG material sits, so none of the three may be rendered, moved or removed on its
+  own.
+- **Both notices are prescribed legal wording, not UI copy.** Each stays verbatim English in *every*
+  locale bundle (`fankit.trademark`, `fankit.disclaimer`) — translating one breaks compliance while
+  passing every key-parity check.
+- **The two notices differ in details that look like mistakes, and both are correct.** ^fankit-traps
+  The §2b line carries a space before its third ®, because CIG's §2b prose writes it that way;
+  clause 2(g) carries **no** space before any of its four. Clause 2(g) additionally writes
+  `Ltd..` with **two** full stops and an Oxford comma before "and Cloud Imperium®". Harmonising them
+  produces a band that satisfies neither document while looking tidier, so
+  `FanKitComplianceMvcTest` asserts the difference itself, not just each value.
+- **The checked kit version is recorded**, because Agreement clause 11 lets CIG change the documents
+  at any time. Verified against `Fankit_2025_11_19` (`06_Fankit_Agreement_2025_11_19.pdf`,
+  `08_Fankit_Guidelines.pdf`); the Agreement's 2(g) sentence is byte-identical across the
+  2024-04-25, 2025-06-03 and 2025-11-19 kits.
 - **Legibility (section 2b):** at least 10 pt and high-contrast. `--fs-sm` (0.9 rem ≈ 10.8 pt) on
   `--color-gray-1` is the floor; the finer `--fs-xs` (≈ 9.6 pt) is not permitted for this text.
 - **The artwork is used unmodified** (section 3): no recolour, flip, distortion, outline, drop
@@ -515,22 +536,25 @@ Binding details:
   is visible without a login. Gating `/` behind authentication would forfeit this placement and
   require moving the band back to an always-visible navigation area.
 - A mention in the Nutzungsbedingungen or Impressum is a welcome *addition* but never a
-  **substitute** — a legal subpage is neither of the two sanctioned surfaces. Terms section 9
-  carries that addition: `terms.p_9_4` (unofficial, non-commercial, unendorsed fan project) and
-  `terms.p_9_5` (Fan Kit material used under the Fankit Agreement, Fan Style Guide and the RSI
-  Terms of Service, UGC section). The trademark line rendered there reuses the **same**
-  `fankit.trademark` message rather than a `terms.*` copy, so the prescribed wording exists once
-  and cannot drift between the two surfaces — and, by design, stays out of the `terms.*` content
-  digest, so fixing an attribution never re-prompts every user for consent (REQ-SEC-028).
+  **substitute** — a legal subpage is neither of the two sanctioned surfaces.
+
+  > Correction, 27.08.2026: this bullet used to name `terms.p_9_4` and `terms.p_9_5` as carrying
+  > that addition. **Neither key exists** in any bundle, and no migration seeds equivalent text, so
+  > the addition was documented but never shipped. The compliance-critical placement is the band,
+  > which is where both notices now are.
 
 **Acceptance**
 
-- [ ] An anonymous `GET /` renders both the Made-By-The-Community artwork and the trademark notice.
-- [ ] `fankit.trademark` is byte-identical in the DE, EN and default bundles.
-- [ ] The notice renders at ≥ 10 pt with an AA-clearing contrast on its surface.
-- [ ] No page carries the logo without the notice.
+- [x] An anonymous `GET /` renders the Made-By-The-Community artwork, the §2b trademark notice and
+  the clause-2(g) notice.
+- [x] `fankit.trademark` and `fankit.disclaimer` are byte-identical in the DE, EN and default
+  bundles.
+- [x] The two notices keep their **differing** ® spacing, and 2(g) keeps `Ltd..`.
+- [ ] Both notices render at ≥ 10 pt with an AA-clearing contrast on their surface.
+- [ ] No page carries the logo without both notices.
 
-**Enforced by:** `FanKitComplianceMvcTest` · design review against the Fan Kit Guidelines ·
+**Enforced by:** `FanKitComplianceMvcTest` · design review against the Fan Kit Guidelines and the
+Fankit Agreement ·
 **Code:** `fragments/fankit.html`, `index.html`, `.krt-fankit-*` in `styles.css`,
 `fankit.*` in the three message bundles · **Related:** REQ-UI-009.
 
