@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.6.5](https://github.com/krt-profit/basetool/releases/tag/v1.6.5) - 2026-08-27
+
 ### Fixed
 
 - **Scanner-Anfragen mit kaputter Adresse fluten das Protokoll nicht mehr.** Eine Anfrage wie
