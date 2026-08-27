@@ -41,9 +41,12 @@ import java.util.UUID;
  *
  * <p>{@code owningOrgUnitId} (R5.d.d) is the owner-picker output: when the caller belongs to more
  * than one OrgUnit, the picker offers each membership and the chosen id lands here. The backend
- * service validates it via {@code OwnerScopeService.resolveSquadronForPickerOutput} and rejects
- * Spezialkommando selections with 400 until the destructive cleanup release loosens NOT NULL on the
- * legacy {@code owning_squadron_id} column. {@code null} preserves the legacy stamping path.
+ * service resolves it via {@code OwnerScopeService.resolveOrgUnitForPickerOutputNullable}, which
+ * accepts all four org-unit kinds (Staffel, Spezialkommando, Bereich, Organisationsleitung) and
+ * rejects with 400 only a pick that is neither one of the mission owner's DIRECT memberships nor an
+ * org unit the caller may edit ({@code AccessGateService.canEditOrgUnit}, cascade-aware — epic #692
+ * Phase 4 / REQ-ORG-016). {@code null} leaves the stamp to the resolver's auto-stamp / pin /
+ * ownerless branches.
  *
  * <p>{@code objectivesJson} / {@code stepsJson} carry the create form's optional Ziele / Ablauf
  * rows as a compact JSON array, client-serialized into a hidden input on submit (blank when none).
