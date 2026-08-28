@@ -371,6 +371,11 @@ if ($uri = "/api/v1/inventory/all/grouped") { set $krt_api_allowed 1; }
 # answers POST, and that POST is permitAll in the chain (the public request form). The
 # read-only guard below refuses it here, and the allow-list never names it.
 if ($uri = "/api/v1/orders") { set $krt_api_allowed 1; }
+# Phase 5 - the two unit pickers on the app's „Neuer Auftrag" form. GET only, and it is already
+# permitAll in the backend chain for exactly this reason: the public request form's pickers have
+# to be fillable anonymously. The payload carries no PII - name, shorthand, kind and the profit
+# flag.
+if ($uri = "/api/v1/org-units/active-all-kinds") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
 # Phase 3 - the two things a member does to an order they can see: put their own name on it and
 # write the note that says which part they take. Plus the status change, which is LOGISTICIAN-only
@@ -554,11 +559,17 @@ if ($uri ~ "^/api/v1/hangar/ships/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[
 # endpoints and the allocation family. Only the three per-entry bookings and the create are named.
 if ($uri = "/api/v1/inventory") { set $krt_readonly_family ""; }
 if ($uri ~ "^/api/v1/inventory/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(book-out|personal-rebook|note)$") { set $krt_readonly_family ""; }
-# /orders stays in the family because the prefix also carries the public request form (POST
-# /api/v1/orders, permitAll in the chain), the handovers, the production reports and the whole
-# Logistician edit surface. Only the assignee edge and the status change are named.
+# /orders stays in the family because the prefix also carries the handovers, the production
+# reports and the whole Logistician edit surface. Only the assignee edge, the status change and
+# the create are named.
+#
+# The create used to be the one path where only the VERB separated two surfaces: POST
+# /api/v1/orders was permitAll, the public request form, and this guard was what kept it off this
+# host. It requires a login since ADR-0149, so the two surfaces no longer differ in kind and the
+# exact-match line below opens the collection POST and nothing beneath it.
 if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/assignees/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(/note)?$") { set $krt_readonly_family ""; }
 if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/status$") { set $krt_readonly_family ""; }
+if ($uri = "/api/v1/orders") { set $krt_readonly_family ""; }
 # /notifications stays in the family because the prefix also carries /notification-rules, the
 # admin surface that creates and deletes the rules every member's inbox is generated from. Only
 # the four me-scoped inbox mutations are named. Naming a path opens every verb the backend serves

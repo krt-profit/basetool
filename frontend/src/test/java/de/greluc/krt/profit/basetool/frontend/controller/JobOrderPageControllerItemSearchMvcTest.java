@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -75,7 +76,7 @@ class JobOrderPageControllerItemSearchMvcTest {
     PageResponse<GameItemReferenceDto> page =
         new PageResponse<>(
             List.of(new GameItemReferenceDto(id, "P8-SC SMG", "WEAPON")), 0, 25, 1L, 1, List.of());
-    doReturn(page).when(backendApiClient).getPublic(any(), any(), any());
+    doReturn(page).when(backendApiClient).get(any(), anyTypeRef(), any());
 
     mockMvc
         .perform(get("/orders/item-search").param("q", "p8"))
@@ -90,7 +91,7 @@ class JobOrderPageControllerItemSearchMvcTest {
   void itemSearch_backendFailure_returnsEmptyList() throws Exception {
     doThrow(new RuntimeException("backend down"))
         .when(backendApiClient)
-        .getPublic(any(), any(), any());
+        .get(any(), anyTypeRef(), any());
 
     mockMvc
         .perform(get("/orders/item-search").param("q", "x"))

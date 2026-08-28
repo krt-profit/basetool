@@ -37,14 +37,13 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * {@code /orders} queue must gain a newly-created order IN PLACE, no manual reload — the {@code
  * queue} section key crossing the global {@code orders} room.
  *
- * <p>This drives the <b>server-side</b> publish path: an <em>anonymous guest</em> order create fans
- * {@code orders/[queue]} to every subscribed viewer straight from the frontend {@code
- * JobOrderWriteController} (a guest has no socket to publish from, so the create is what triggers
- * the fan-out). The publish only fires for a create that goes through the <b>frontend</b> form — a
- * backend-direct seed would never reach the controller — so context A submits the real public
- * {@code /orders/create} form (the flow {@code AnonymousJobOrderE2eTest} exercises), while context
- * B is a passive logged-in queue viewer that must gain the new row without a reload. The global
- * {@code orders} room coalesces at ~1.5&nbsp;s, so the assertion carries a generous timeout.
+ * <p>This drives the <b>server-side</b> publish path: an order create fans {@code orders/[queue]}
+ * to every subscribed viewer straight from the frontend {@code JobOrderWriteController} rather than
+ * from the creating client, which holds no queue subscription while it is on the create page. The
+ * publish only fires for a create that goes through the <b>frontend</b> form — a backend-direct
+ * seed would never reach the controller — so context A submits the real {@code /orders/create}
+ * form, while context B is a passive queue viewer that must gain the new row without a reload. The
+ * global {@code orders} room coalesces at ~1.5&nbsp;s, so the assertion carries a generous timeout.
  */
 @Tag("e2e")
 class JobOrderQueueLiveSyncE2eTest {
@@ -57,7 +56,7 @@ class JobOrderQueueLiveSyncE2eTest {
 
   /**
    * The canonical IRIDIUM Squadron seeded at stack bootstrap (a profit-eligible unit, so it is both
-   * a valid requester and a valid responsible for the guest create, and the queue viewer sees it).
+   * a valid requester and a valid responsible for the create, and the queue viewer sees it).
    */
   private static final String IRIDIUM_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -93,9 +92,15 @@ class JobOrderQueueLiveSyncE2eTest {
   }
 
   /**
-   * A passive viewer on {@code /orders} that never reloads must gain a row when a guest creates a
-   * new order through the public form, driven purely by the {@code orders/[queue]} change signal
-   * the frontend controller publishes server-side.
+   * A passive viewer on {@code /orders} that never reloads must gain a row when somebody else
+   * creates one, driven purely by the {@code orders/[queue]} change signal the frontend controller
+   * publishes server-side.
+   *
+   * <p>The creator used to be an anonymous guest, which made the server-side publish obviously
+   * necessary — a guest has no socket at all. Creating an order requires a login since ADR-0149, so
+   * the creator is now a second browser context of the same member; the point survives unchanged,
+   * because that context is sitting on {@code /orders/create} and is subscribed to no queue room. A
+   * session is not a socket.
    */
   @Test
   void orderCreatePropagatesToTheQueueViewerLive() {
@@ -107,10 +112,15 @@ class JobOrderQueueLiveSyncE2eTest {
                     .setStorageStatePath(
                         E2eSupport.authenticatedStorageState(
                             browser, baseUrl, USERNAME, PASSWORD)));
-        BrowserContext guest =
-            browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+        BrowserContext creator =
+            browser.newContext(
+                new Browser.NewContextOptions()
+                    .setIgnoreHTTPSErrors(true)
+                    .setStorageStatePath(
+                        E2eSupport.authenticatedStorageState(
+                            browser, baseUrl, USERNAME, PASSWORD)))) {
       Page pageB = viewer.newPage();
-      Page pageA = guest.newPage();
+      Page pageA = creator.newPage();
       try {
         E2eSupport.navigate(pageB, baseUrl + "/orders");
         pageB.waitForLoadState();
@@ -128,9 +138,10 @@ class JobOrderQueueLiveSyncE2eTest {
                         "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
                             + " && window.krtLiveSync.subscribedTopics().length > 0)")));
 
-        // Context A (an anonymous guest) creates an order through the public frontend form — the
-        // frontend JobOrderWriteController fans orders/[queue] to the room server-side (the guest
-        // has no socket). Responsible = IRIDIUM (profit-eligible) so the row lands in B's queue.
+        // Context A creates an order through the frontend form. The frontend
+        // JobOrderWriteController fans orders/[queue] to the room server-side, which is what B is
+        // waiting on: A is on the create page and holds no queue subscription of its own.
+        // Responsible = IRIDIUM (profit-eligible) so the row lands in B's queue.
         E2eSupport.navigate(pageA, baseUrl + "/orders/create");
         pageA.locator("#requestingOrgUnitId").selectOption(IRIDIUM_ID);
         pageA.locator("#responsibleOrgUnitId").selectOption(IRIDIUM_ID);

@@ -450,10 +450,11 @@ response — email, roles, rank, memberships — stays unfrozen because the app 
 sees their own order with the parts that are not theirs removed (REQ-ORDERS-023), and a client that
 stopped seeing the flag would present the gaps as the whole order.
 
-`GET /api/v1/orders` is on the list as an **exact** path, and it is the one entry where the verb is
-the only thing separating two different surfaces: the same path answers a `POST` that is `permitAll`
-by design (the public request form). The vhost's read-only guard refuses that verb before it
-arrives; the allow-list never names it.
+`GET /api/v1/orders` is on the list as an **exact** path. It used to be the one entry where the verb
+was the only thing separating two different surfaces — the same path answered a `POST` that was
+`permitAll` by design (the public request form) — and the vhost's read-only guard refused that verb
+before it arrived. Since ADR-0149 the create requires a login, so the two surfaces no longer differ
+in kind and the guard's job there is ordinary.
 
 `GET /api/v1/hangar/my-ships` freezes the row and the **names inside its nested objects**, because
 `shipType.name` and `location.name` are what the card shows. `owner` is deliberately left out: it is

@@ -124,7 +124,7 @@
 <main>
     <div class="greeting hud-box flex-between">
         <h1 th:text="${editOrderId != null} ? #{orders.create.editTitle} : #{orders.create.title}">Neuer Auftrag</h1>
-        <div class="flex-gap-sm" sec:authorize="isAuthenticated()">
+        <div class="flex-gap-sm">
             <a th:href="@{/orders}" class="btn btn-ghost" th:text="#{orders.detail.back}">Zurück zur Übersicht</a>
         </div>
     </div>
@@ -226,7 +226,7 @@
 
                 <div class="mt-2-flex-gap">
                     <button type="submit" class="btn btn--cta" data-testid="order-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.create.save}">Speichern</span></button>
-                    <a sec:authorize="isAuthenticated()" th:href="@{/orders}" class="btn btn-ghost krtm-text-align-center-display-flex-align-items-c-a651" th:text="#{orders.create.cancel}">Abbrechen</a>
+                    <a th:href="@{/orders}" class="btn btn-ghost krtm-text-align-center-display-flex-align-items-c-a651" th:text="#{orders.create.cancel}">Abbrechen</a>
                 </div>
             </form>
             </div>
@@ -263,7 +263,7 @@
 
                 <div class="mt-2-flex-gap">
                     <button type="submit" class="btn btn--cta" data-testid="order-item-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.create.save}">Speichern</span></button>
-                    <a sec:authorize="isAuthenticated()" th:href="@{/orders}" class="btn btn-ghost krtm-text-align-center-display-flex-align-items-c-a651" th:text="#{orders.create.cancel}">Abbrechen</a>
+                    <a th:href="@{/orders}" class="btn btn-ghost krtm-text-align-center-display-flex-align-items-c-a651" th:text="#{orders.create.cancel}">Abbrechen</a>
                 </div>
             </form>
             </div>

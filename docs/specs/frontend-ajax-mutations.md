@@ -1178,8 +1178,9 @@ open (safe: no data rides the socket, every fragment re-fetch re-authorizes per 
 class's section whitelist and the per-session token bucket — **no subscription**: a requester
 creating an order must be able to signal the staff queue it may not read, and an org-unit owner
 approval must reach the bank-staff rooms. Mutations that can happen with no authenticated socket at
-all (the anonymous job-order create form) publish **server-side** through the same local bus the
-relay uses. The worst a malicious authenticated client can achieve is bounded re-fetch
+all publish **server-side** through the same local bus the relay uses — the job-order create was the
+example, and since ADR-0149 it needs a login; the server-side publish stays because a socket is not
+implied by a session (a form submit from a page whose socket dropped is the ordinary case). The worst a malicious authenticated client can achieve is bounded re-fetch
 amplification: whitelisted keys only, bucket-capped frames, and every receiver clamps via its
 coalesce window regardless of publish rate. The `K sockets × rate × viewers` amplification lever is
 bounded on all three multipliers (F2 / #1243): a **per-user socket cap** (20 concurrent `/ws/sync`
@@ -1244,7 +1245,7 @@ the same `presence` frame — so no client change was needed.
   across pages (an order status change updates both a peer's order detail and a peer's queue; a
   bank confirm updates the staff queue, the account views and the org-unit tabs).
 - [ ] A requester/guest cannot subscribe to the `orders` queue or the bank rooms, yet their
-  (server-published, for anonymous) order create still refreshes staff viewers' queues.
+  (server-published) order create still refreshes staff viewers' queues.
 - [ ] No entity data crosses the socket on any topic; every peer re-render is the peer's own
   authorized, redaction-applied fragment GET with fresh `data-version` attributes.
 - [ ] With Redis stopped, same-instance peers keep syncing; with two instances and Redis up, a

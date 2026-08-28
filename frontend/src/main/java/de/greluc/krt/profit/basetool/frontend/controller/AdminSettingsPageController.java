@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
-import de.greluc.krt.profit.basetool.frontend.model.dto.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingUpdateDto;
@@ -82,22 +81,11 @@ public class AdminSettingsPageController {
   private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
 
   /**
-   * System-setting key holding the UUID of the designated intake Spezialkommando that anonymous /
-   * guest Job-Order creations are routed to. Seeded empty by Flyway V128; an admin picks the SK
-   * here.
-   */
-  private static final String INTAKE_SK_SETTING_KEY = "job_order.intake_special_command_id";
-
-  /**
    * Display default for the transfer-fee rate (percent) used when the backend lookup fails. Kept in
    * sync with {@code OperationService.DEFAULT_TRANSFER_FEE_RATE} (0.005 = 0.5%) so the form never
    * renders blank.
    */
   private static final BigDecimal DEFAULT_TRANSFER_FEE_PERCENT = new BigDecimal("0.5");
-
-  /** Response type for the Spezialkommando list backing the intake-SK dropdown. */
-  private static final ParameterizedTypeReference<PageResponse<SpecialCommandDto>>
-      SPECIAL_COMMAND_PAGE_TYPE = new ParameterizedTypeReference<>() {};
 
   /** Response type for the active-squadron list backing the promotion-toggle section. */
   private static final ParameterizedTypeReference<PageResponse<SquadronDto>> SQUADRON_PAGE_TYPE =
@@ -190,56 +178,9 @@ public class AdminSettingsPageController {
     CompleteCatalog<SquadronDto> squadronCatalog = fetchSquadronsForPromotionToggle();
     model.addAttribute("squadrons", squadronCatalog.items());
 
-    String intakeSpecialCommandId = "";
-    Long intakeSpecialCommandVersion = 0L;
-    try {
-      SystemSettingDto intakeSetting =
-          backendApiClient.get("/api/v1/settings/" + INTAKE_SK_SETTING_KEY, SystemSettingDto.class);
-      intakeSpecialCommandId = intakeSetting.value() == null ? "" : intakeSetting.value();
-      intakeSpecialCommandVersion = intakeSetting.version();
-    } catch (BackendServiceException e) {
-      log.debug("Could not fetch job-order intake special-command setting", e);
-    } catch (Exception e) {
-      log.warn("Could not fetch job-order intake special-command setting", e);
-    }
-    model.addAttribute("intakeSpecialCommandId", intakeSpecialCommandId);
-    model.addAttribute("intakeSpecialCommandVersion", intakeSpecialCommandVersion);
-    CompleteCatalog<SpecialCommandDto> specialCommandCatalog = fetchSpecialCommands();
-    model.addAttribute("specialCommands", specialCommandCatalog.items());
-    model.addAttribute(
-        "catalogTruncated", squadronCatalog.truncated() || specialCommandCatalog.truncated());
+    model.addAttribute("catalogTruncated", squadronCatalog.truncated());
 
     return "admin-settings";
-  }
-
-  /**
-   * Loads <em>every</em> Spezialkommando (alphabetical, all pages — REQ-ADMIN-001, ADR-0102) for
-   * the job-order intake-SK dropdown on the admin-settings page. A backend failure degrades to an
-   * empty catalogue with a logged warning so the rest of the page still renders; a page walk that
-   * hits its safety cap is flagged for the page-level warning banner (REQ-ADMIN-002).
-   *
-   * @return Spezialkommandos sorted by name plus the truncation flag, never {@code null}.
-   */
-  private CompleteCatalog<SpecialCommandDto> fetchSpecialCommands() {
-    try {
-      CompleteCatalog<SpecialCommandDto> catalog =
-          CatalogPages.fetchAll(
-              page ->
-                  backendApiClient.get(
-                      "/api/v1/special-commands?size=1000&sort=name,asc&page=" + page,
-                      SPECIAL_COMMAND_PAGE_TYPE));
-      List<SpecialCommandDto> sorted =
-          catalog.items().stream()
-              .sorted(
-                  Comparator.comparing(
-                      s -> s.name() == null ? "" : s.name(), String.CASE_INSENSITIVE_ORDER))
-              .toList();
-      return new CompleteCatalog<>(sorted, catalog.totalElements(), catalog.truncated());
-    } catch (Exception e) {
-      log.warn(
-          "Could not fetch special commands for admin-settings intake picker: {}", e.getMessage());
-      return CompleteCatalog.empty();
-    }
   }
 
   /**
@@ -291,10 +232,8 @@ public class AdminSettingsPageController {
    * @param refineryRoundingMode rounding mode (one of {@code UP}/{@code DOWN}/{@code HALF_UP}/…)
    * @param refineryRoundingVersion optimistic-lock version for the rounding setting
    * @param transferFeePercentStr in-game banking transfer fee as a percentage (e.g. {@code 0.5})
-   * @param transferFeeVersion optimistic-lock version for the transfer-fee setting
-   * @param intakeSpecialCommandId UUID of the job-order intake Spezialkommando; blank leaves the
-   *     current value untouched (the value cannot be cleared back to blank via this form)
-   * @param intakeSpecialCommandVersion optimistic-lock version for the intake-SK setting
+   * @param transferFeeVersion optimistic-lock version for the transfer-fee setting current value
+   *     untouched (the value cannot be cleared back to blank via this form)
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/settings}
    */
@@ -308,10 +247,6 @@ public class AdminSettingsPageController {
       @RequestParam("refineryRoundingVersion") Long refineryRoundingVersion,
       @RequestParam("transferFeePercent") String transferFeePercentStr,
       @RequestParam("transferFeeVersion") Long transferFeeVersion,
-      @RequestParam(name = "intakeSpecialCommandId", required = false, defaultValue = "")
-          String intakeSpecialCommandId,
-      @RequestParam(name = "intakeSpecialCommandVersion", required = false, defaultValue = "0")
-          Long intakeSpecialCommandVersion,
       RedirectAttributes redirectAttributes) {
     try {
       int yellowDays = Integer.parseInt(ageYellowDaysStr);
@@ -348,17 +283,6 @@ public class AdminSettingsPageController {
             new SystemSettingUpdateDto(
                 transferFeeRate.stripTrailingZeros().toPlainString(), transferFeeVersion),
             SystemSettingDto.class);
-
-        // Only persist the intake SK when an SK is actually selected. The backend setting is
-        // @NotBlank, so a blank submit (no SK chosen yet) is treated as "leave unchanged" rather
-        // than an attempt to clear it.
-        if (intakeSpecialCommandId != null && !intakeSpecialCommandId.isBlank()) {
-          backendApiClient.put(
-              "/api/v1/settings/" + INTAKE_SK_SETTING_KEY,
-              new SystemSettingUpdateDto(
-                  intakeSpecialCommandId.trim(), intakeSpecialCommandVersion),
-              SystemSettingDto.class);
-        }
       } finally {
         // The job-order age thresholds are read via getCached on the orders pages, so evict in a
         // finally: even a partial save (an early PUT lands, a later one throws) still drops the
@@ -435,26 +359,11 @@ public class AdminSettingsPageController {
                     request.transferFeeVersion()),
                 SystemSettingDto.class);
 
-        Long intakeVersion =
-            request.intakeSpecialCommandVersion() != null
-                ? request.intakeSpecialCommandVersion()
-                : 0L;
-        String intakeId = request.intakeSpecialCommandId();
-        if (intakeId != null && !intakeId.isBlank()) {
-          SystemSettingDto intake =
-              backendApiClient.put(
-                  "/api/v1/settings/" + INTAKE_SK_SETTING_KEY,
-                  new SystemSettingUpdateDto(intakeId.trim(), intakeVersion),
-                  SystemSettingDto.class);
-          intakeVersion = intake.version();
-        }
-
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("ageYellowVersion", yellow.version());
         result.put("ageRedVersion", red.version());
         result.put("refineryRoundingVersion", rounding.version());
         result.put("transferFeeVersion", fee.version());
-        result.put("intakeSpecialCommandVersion", intakeVersion);
         result.put("transferFeePercent", transferFeePercent.stripTrailingZeros().toPlainString());
         return ResponseEntity.ok(result);
       } finally {
@@ -505,9 +414,6 @@ public class AdminSettingsPageController {
    * @param refineryRoundingVersion optimistic-lock version for the rounding setting
    * @param transferFeePercent in-game transfer fee as a percent string (e.g. {@code 0.5})
    * @param transferFeeVersion optimistic-lock version for the transfer-fee setting
-   * @param intakeSpecialCommandId UUID string of the intake Spezialkommando, or blank to leave it
-   *     unchanged
-   * @param intakeSpecialCommandVersion optimistic-lock version for the intake-SK setting
    */
   public record SettingsAjaxRequest(
       String ageYellowDays,
@@ -517,7 +423,5 @@ public class AdminSettingsPageController {
       String refineryRoundingMode,
       Long refineryRoundingVersion,
       String transferFeePercent,
-      Long transferFeeVersion,
-      String intakeSpecialCommandId,
-      Long intakeSpecialCommandVersion) {}
+      Long transferFeeVersion) {}
 }

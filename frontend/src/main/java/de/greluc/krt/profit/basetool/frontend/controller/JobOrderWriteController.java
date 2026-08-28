@@ -174,9 +174,10 @@ public class JobOrderWriteController {
               form.getComment(),
               lines,
               form.getVersion());
-      backendApiClient.post("/api/v1/orders/items", dto, JobOrderDto.class, true);
-      // Server-side queue poke (REQ-FE-015): a guest create has no socket, so the queue room is
-      // notified here rather than from the (possibly anonymous) client.
+      backendApiClient.post("/api/v1/orders/items", dto, JobOrderDto.class);
+      // Server-side queue poke (REQ-FE-015). The original reason was a guest create with no
+      // socket; there are no guest creates any more (ADR-0149), but a session is not a socket —
+      // a submit from a page whose socket dropped is the ordinary case — so the poke stays here.
       liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
@@ -269,7 +270,7 @@ public class JobOrderWriteController {
                   form.getComment(),
                   lines,
                   form.getVersion());
-          backendApiClient.post("/api/v1/orders/items", dto, JobOrderDto.class, true);
+          backendApiClient.post("/api/v1/orders/items", dto, JobOrderDto.class);
           liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
           return org.springframework.http.ResponseEntity.ok(
               java.util.Map.of(
@@ -392,9 +393,10 @@ public class JobOrderWriteController {
               form.getComment(),
               materials,
               form.getVersion());
-      backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class, true);
-      // Server-side queue poke (REQ-FE-015): a guest create has no socket, so the queue room is
-      // notified here rather than from the (possibly anonymous) client.
+      backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class);
+      // Server-side queue poke (REQ-FE-015). The original reason was a guest create with no
+      // socket; there are no guest creates any more (ADR-0149), but a session is not a socket —
+      // a submit from a page whose socket dropped is the ordinary case — so the poke stays here.
       liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
@@ -486,7 +488,7 @@ public class JobOrderWriteController {
                   form.getComment(),
                   materials,
                   form.getVersion());
-          backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class, true);
+          backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class);
           liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
           return org.springframework.http.ResponseEntity.ok(
               java.util.Map.of(

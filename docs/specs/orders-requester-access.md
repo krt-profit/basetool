@@ -81,7 +81,8 @@ side's owners. See [`orders-item-production.md`](orders-item-production.md) `REQ
 ## Out of scope
 
 - Per-user ("only the person who created it") ownership — ownership is org-unit-level by design
-  (ADR-0091); a job order has no `created_by` column and may be created anonymously.
+  (ADR-0091); a job order has no `created_by` column. Creating one requires a login since ADR-0149,
+  but that did not add authorship — access still follows the requesting org unit, not an author.
 - Changing the responsible org unit, status, priority or handle from the requester side — those stay
   processing-side concerns (the reassignment endpoint owns the responsible unit).
 - The item-order requester **edit UI** ships in a later increment; the backend endpoint

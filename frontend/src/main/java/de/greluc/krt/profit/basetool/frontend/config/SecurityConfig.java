@@ -237,13 +237,28 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/operations/**")
                     .permitAll()
+                    // The order queue stays readable without a login, as it always was. Creating
+                    // one does not: the public request form is gone (ADR-0149), so /orders/create
+                    // — and the POST behind it — need a principal. Listed before the wildcard so
+                    // the wildcard cannot re-open it.
+                    .requestMatchers(
+                        "/orders/create",
+                        "/orders/create/**",
+                        "/orders/items",
+                        "/orders/item-search",
+                        "/orders/item-blueprints/**",
+                        "/orders/item-derivation/**")
+                    .authenticated()
                     .requestMatchers("/orders", "/orders/")
                     .permitAll()
                     .requestMatchers("/orders/**")
                     .permitAll()
-                    // Catalog picker live-search relays (REQ-FE-016): public because the anonymous
-                    // order form carries a material picker; they proxy permitAll backend catalog
-                    // endpoints and expose only public catalog names (materials / locations).
+                    // Catalog picker live-search relays (REQ-FE-016). They proxy permitAll backend
+                    // catalog endpoints and expose only public catalog names (materials /
+                    // locations). Their original reason was the anonymous order form's material
+                    // picker (gone, ADR-0149), but they now serve authenticated pickers across
+                    // several forms and the payload was never caller-specific, so they stay public
+                    // rather than being closed as a side effect of an unrelated change.
                     .requestMatchers("/catalog/**")
                     .permitAll()
                     .anyRequest()

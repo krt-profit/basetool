@@ -625,12 +625,14 @@ public class JobOrderPageController {
   /**
    * Renders the create-order form ({@code /orders/create}). Seeds the materials + orderable-item
    * catalogs and the two owner-pickers; the {@code source} parameter threads through so the
-   * post-save redirect can return to the originating page. For an anonymous guest, the responsible
-   * (processing) picker is pre-selected to the configured intake Spezialkommando (see {@link
-   * #preselectIntakeForGuest}).
+   * post-save redirect can return to the originating page.
+   *
+   * <p>The route requires a login (ADR-0149). There is no guest rendering any more, and with it
+   * went the pre-selection of the configured intake Spezialkommando that used to stand in for an
+   * anonymous caller's missing org context.
    *
    * @param source optional origin marker
-   * @param principal the caller, or {@code null} for an anonymous guest
+   * @param principal the caller
    * @param model Thymeleaf model populated with form and reference catalogs
    * @return the {@code order-create} view name
    */
@@ -658,12 +660,6 @@ public class JobOrderPageController {
     model.addAttribute("hasOrderableItems", hasOrderableItems());
     model.addAttribute("squadrons", fetchSquadrons());
     addOwnerPickerOptions(model);
-    // Anonymous guests have no org-unit context; default the responsible (processing) picker to the
-    // configured intake Spezialkommando — the unit the backend routes a guest order to absent a
-    // profit-eligible pick — so the form shows it up front. Authenticated callers pick their own.
-    if (authHelper.isAnonymous()) {
-      preselectIntakeForGuest(model);
-    }
     return "orders-create";
   }
 
@@ -786,8 +782,7 @@ public class JobOrderPageController {
       List<BlueprintReferenceDto> result =
           backendApiClient.get(
               "/api/v1/orders/item-catalog/" + gameItemId + "/blueprints",
-              LIST_OF_BLUEPRINT_REFERENCE,
-              true);
+              LIST_OF_BLUEPRINT_REFERENCE);
       return result != null ? result : List.of();
     } catch (Exception e) {
       log.error("Failed to fetch blueprints for item {}", gameItemId, e);
@@ -811,8 +806,7 @@ public class JobOrderPageController {
     try {
       return backendApiClient.get(
           "/api/v1/orders/item-catalog/blueprints/" + blueprintId + "/derivation?amount=" + amount,
-          ItemDerivationDto.class,
-          true);
+          ItemDerivationDto.class);
     } catch (Exception e) {
       log.error("Failed to derive materials for blueprint {}", blueprintId, e);
       return null;
@@ -837,7 +831,7 @@ public class JobOrderPageController {
   public List<GameItemReferenceDto> itemSearch(@RequestParam(required = false) String q) {
     try {
       PageResponse<GameItemReferenceDto> page =
-          backendApiClient.getPublic(
+          backendApiClient.get(
               "/api/v1/orders/item-catalog?search={q}&size="
                   + PickerSearch.PAGE_SIZE
                   + "&sort=name,asc",
@@ -937,7 +931,7 @@ public class JobOrderPageController {
   private boolean hasOrderableItems() {
     try {
       PageResponse<GameItemReferenceDto> page =
-          backendApiClient.getCached(CachedCatalog.ITEM_CATALOG, PAGE_OF_GAME_ITEM_REFERENCE, true);
+          backendApiClient.getCached(CachedCatalog.ITEM_CATALOG, PAGE_OF_GAME_ITEM_REFERENCE);
       return page == null || page.content() == null || !page.content().isEmpty();
     } catch (Exception e) {
       log.error("Failed to probe orderable items", e);
@@ -1182,9 +1176,10 @@ public class JobOrderPageController {
    * carries its {@code isProfitEligible} flag so {@link #addOwnerPickerOptions} can derive the
    * responsible picker from the requesting one without a second, authenticated SK-catalog call.
    * Read through the public client ({@code isPublic = true}) because the endpoint is {@code
-   * permitAll}: the create form is reachable anonymously, and the authenticated client has no
-   * bearer token for a guest — it would 401 and leave both pickers empty. Falls back to an empty
-   * list on backend hiccup so the rest of the form stays renderable.
+   * permitAll} and the catalogue carries no PII. Since ADR-0149 this is the degradation path rather
+   * than the guest path: {@link #fetchRequestingOrgUnitOptions} prefers the all-kinds catalogue and
+   * falls back here when that read fails, which costs the Bereich/OL tiers but keeps the form
+   * renderable.
    *
    * @return picker options or empty list; never {@code null}.
    */
@@ -1214,9 +1209,6 @@ public class JobOrderPageController {
    * @return requesting-picker options; never {@code null}.
    */
   private List<OrgUnitMembershipOptionDto> fetchRequestingOrgUnitOptions() {
-    if (!isAuthenticatedCaller()) {
-      return fetchActiveOrgUnitOptions();
-    }
     try {
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.getCached(
@@ -1232,30 +1224,13 @@ public class JobOrderPageController {
   }
 
   /**
-   * Whether the current request carries an authenticated (non-anonymous) principal. Mirrors the
-   * {@code SecurityContextHolder} read used by {@link #isLogistician}; used to decide whether the
-   * requesting picker may offer the Bereich/OL tiers.
-   *
-   * @return {@code true} for an authenticated caller, {@code false} for an anonymous guest.
-   */
-  private boolean isAuthenticatedCaller() {
-    org.springframework.security.core.Authentication auth =
-        org.springframework.security.core.context.SecurityContextHolder.getContext()
-            .getAuthentication();
-    return auth != null
-        && auth.isAuthenticated()
-        && !(auth
-            instanceof org.springframework.security.authentication.AnonymousAuthenticationToken);
-  }
-
-  /**
    * Populates the create/edit form model with the two owner-picker option lists, both derived from
    * a single {@link #fetchRequestingOrgUnitOptions} fetch: {@code requestingOptions} (the customer)
-   * is the full list — every active Staffel/SK for a guest, plus the Bereich/OL tiers for an
-   * authenticated caller (epic #692) — and {@code responsibleOptions} (only profit-eligible
-   * squadrons + SKs may process orders) is the {@code isProfitEligible} subset, which excludes
-   * Bereiche/OL because they are never profit-eligible. Each carries a boolean flag telling the
-   * template whether to render the SK optgroup.
+   * is the full list — every active Staffel/SK plus the Bereich/OL tiers (epic #692), or only the
+   * Staffel/SK catalogue when the all-kinds read failed — and {@code responsibleOptions} (only
+   * profit-eligible squadrons + SKs may process orders) is the {@code isProfitEligible} subset,
+   * which excludes Bereiche/OL because they are never profit-eligible. Each carries a boolean flag
+   * telling the template whether to render the SK optgroup.
    *
    * @param model the Thymeleaf model to populate.
    */
@@ -1283,54 +1258,6 @@ public class JobOrderPageController {
     model.addAttribute("responsibleHasSpecialCommand", containsSpecialCommand(responsibleOptions));
     model.addAttribute("requestingOptions", requestingOptions);
     model.addAttribute("requestingHasSpecialCommand", containsSpecialCommand(requestingOptions));
-  }
-
-  /**
-   * Pre-selects the configured intake Spezialkommando as the responsible (processing) unit on the
-   * anonymous create form's two form beans, but only when the caller has not already chosen one (a
-   * re-render after a failed submit keeps their pick). Mirrors the backend's guest fallback — a
-   * guest order with no profit-eligible pick routes to the intake SK — so the form shows up front
-   * the unit the order will actually land on. Never invoked for authenticated callers (they pick
-   * their own unit). No-op when no intake SK is configured.
-   *
-   * @param model the Thymeleaf model carrying the two form beans.
-   */
-  private void preselectIntakeForGuest(Model model) {
-    UUID intakeId = fetchIntakeSpecialCommandId();
-    if (intakeId == null) {
-      return;
-    }
-    if (model.getAttribute("jobOrderForm") instanceof JobOrderForm form
-        && form.getResponsibleOrgUnitId() == null) {
-      form.setResponsibleOrgUnitId(intakeId);
-    }
-    if (model.getAttribute("jobOrderItemForm") instanceof JobOrderItemForm itemForm
-        && itemForm.getResponsibleOrgUnitId() == null) {
-      itemForm.setResponsibleOrgUnitId(intakeId);
-    }
-  }
-
-  /**
-   * Resolves the configured intake Spezialkommando id (system setting {@code
-   * job_order.intake_special_command_id}) for the anonymous responsible-picker preselection. Read
-   * through the public client because the settings endpoint is {@code permitAll} and the create
-   * form is reachable by guests. Returns {@code null} when the setting is unset / blank / malformed
-   * or the backend call fails, so the picker simply renders with nothing preselected.
-   *
-   * @return the intake SK id, or {@code null} when none is configured / resolvable.
-   */
-  private UUID fetchIntakeSpecialCommandId() {
-    try {
-      SystemSettingDto setting =
-          backendApiClient.get(
-              "/api/v1/settings/job_order.intake_special_command_id", SystemSettingDto.class, true);
-      if (setting != null && setting.value() != null && !setting.value().isBlank()) {
-        return UUID.fromString(setting.value().trim());
-      }
-    } catch (Exception e) {
-      log.warn("Failed to resolve intake Spezialkommando id for responsible-picker preselection");
-    }
-    return null;
   }
 
   private UUID getCurrentUserId(OidcUser principal) {
