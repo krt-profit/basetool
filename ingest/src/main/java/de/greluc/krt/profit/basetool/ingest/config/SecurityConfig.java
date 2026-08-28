@@ -78,7 +78,10 @@ public class SecurityConfig {
    * enforcement (signature/issuer/expiry still apply). Set {@code
    * app.security.jwt.expected-audiences=basetool-backend} to require it — but only once the realm's
    * clients actually emit that audience (see {@code docs/INGEST_KEYCLOAK_SETUP.md}); the same value
-   * the backend uses, because the gateway forwards the same bearer to the backend.
+   * the backend uses, because the {@code extractor-ingest} client scope stamps it on the tokens
+   * this gateway is presented with. That the two modules check the same value is a fact about what
+   * the realm mints, not a consequence of forwarding: since ADR-0129 the caller's token stops here
+   * and the backend is called with the gateway's own.
    */
   @Value("${app.security.jwt.expected-audiences:}")
   private List<String> expectedAudiences;

@@ -39,8 +39,9 @@ import org.slf4j.MDC;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Verifies the backend relay forwards the caller's bearer and the locale / correlation headers to
- * the correct backend paths and returns the backend body verbatim (REQ-INGEST-001, REQ-OBS-*).
+ * Verifies the backend relay calls the correct backend paths as the gateway itself — its own bearer
+ * plus the on-behalf-of header naming the caller (ADR-0129) — forwards the locale / correlation
+ * headers, and returns the backend body verbatim (REQ-INGEST-001, REQ-OBS-*).
  */
 class BackendImportClientTest {
 
