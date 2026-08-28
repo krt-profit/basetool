@@ -493,7 +493,7 @@ class KeycloakServiceTest {
   }
 
   /**
-   * Production regression guard (REQ-SEC-018): a {@code 403} on the realm-role listing ({@code GET
+   * Production regression guard (REQ-SEC-043): a {@code 403} on the realm-role listing ({@code GET
    * /admin/realms/{realm}/roles}) — the exact failure seen when the {@code backend-service} service
    * account holds {@code view-users} but not {@code view-realm} — must skip the whole run (empty
    * roster, never a degraded persist) and increment the fetch-failure counter, exactly like any

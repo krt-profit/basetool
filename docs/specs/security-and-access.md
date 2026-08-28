@@ -701,7 +701,7 @@ ADR-0072.
 (`spring.ssl.bundle.jks.keycloak-trust`), `docker-compose.yml` (`keycloak` command, backend
 `KEYCLOAK_ADMIN_URL`) · **Runbook:** [`deployment.md` &rarr; Keycloak behind NPM over HTTPS](../deployment.md#keycloak-behind-npm-over-https)
 
-### REQ-SEC-018 — The Keycloak user sync MUST page the full user list before reconciling deletions
+### REQ-SEC-043 — The Keycloak user sync MUST page the full user list before reconciling deletions
 
 `UserSyncTask` reconciles local users against Keycloak: after syncing every fetched user it calls
 `UserService.markMissingUsers(currentIds)`, which flags every local user whose Keycloak id did **not**
@@ -1842,7 +1842,7 @@ security chain, and that the digests are an array.
 
 ---
 
-### REQ-SEC-039 — Cookie CSRF MUST NOT gate the bearer-only API
+### REQ-SEC-044 — Cookie CSRF MUST NOT gate the bearer-only API
 
 The backend's filter chain is `SessionCreationPolicy.STATELESS` and authenticates with exactly one
 mechanism: a bearer JWT. No form login, no HTTP basic, no session cookie — **no ambient credential

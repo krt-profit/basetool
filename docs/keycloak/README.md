@@ -87,7 +87,7 @@ here instead. The service account MUST hold **both** `realm-management` client r
 |     Role     |                                                                                                 Why                                                                                                 |
 |--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `view-users` | list users (`GET /users`) and read a user's federated identity (Discord back-fill).                                                                                                                 |
-| `view-realm` | list realm roles (`GET /admin/realms/{realm}/roles`) and read their members (`GET /roles/{name}/users`) — the role-indexed resolution added by the 5000-account hardening (ADR-0085 / REQ-SEC-018). |
+| `view-realm` | list realm roles (`GET /admin/realms/{realm}/roles`) and read their members (`GET /roles/{name}/users`) — the role-indexed resolution added by the 5000-account hardening (ADR-0085 / REQ-SEC-043). |
 
 **`view-realm` is easy to miss:** before role-indexing the sync read roles per user and needed only
 `view-users`, so an older deployment's service account may carry `view-users` alone. With only

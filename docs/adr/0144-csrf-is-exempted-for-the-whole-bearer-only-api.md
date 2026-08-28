@@ -1,7 +1,7 @@
 # ADR-0144 — CSRF is exempted for the whole bearer-only API, not per endpoint
 
 > **Status:** Accepted · **Date:** 2026-08-25 · **Deciders:** @greluc
-> **Related:** `REQ-SEC-039`, `REQ-SEC-037`, `REQ-SEC-022`, ADR-0012 (the frontend's CSRF model),
+> **Related:** `REQ-SEC-044`, `REQ-SEC-037`, `REQ-SEC-022`, ADR-0012 (the frontend's CSRF model),
 > `krt-profit/basetool-android` (the client this broke)
 
 ## Context
@@ -69,7 +69,7 @@ Rejected:
 - The native app's writes work against production. That is the fix; there is no client change.
 - The security model is now stated in one place with its precondition attached: *stateless,
   bearer-only*. If either ever stops being true — a session cookie, a form login, a browser-facing
-  endpoint on this backend — this exemption has to be revisited, and `REQ-SEC-039` says so.
+  endpoint on this backend — this exemption has to be revisited, and `REQ-SEC-044` says so.
 - `SecurityConfigCsrfExemptionTest` pins the exemption list without a Spring context, which is the
   part of the blind spot that can be closed cheaply. The rest of it stands: the `test` profile still
   disables CSRF, so no integration test observes the production branch, and the nightly probe
