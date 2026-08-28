@@ -373,6 +373,53 @@ class UexItemSyncServiceTest {
   }
 
   @Test
+  void syncItems_skipsOrphanSweep_whenACategoryFetchFailed_evenWithFreshItems() {
+    // The data-loss case this gate exists for: category 3 answers with a fresh item, category 75's
+    // call fails (5xx / timeout / decode error / non-ok envelope) and is swallowed into an EMPTY
+    // list — the same shape a legitimately empty category returns, and UEX really has two of those.
+    // seenUexItemIds therefore holds nothing from category 75, and sweeping would soft-delete every
+    // one of its items — up to ~500 rows for the largest category — until the next healthy run
+    // re-upserted them. Only FetchResult.complete() can tell the two apart (REQ-DATA-014).
+    UexItemDto helmet =
+        helmetDto(11, "Venture Helmet", UUID.randomUUID().toString(), helmetsCategory);
+    when(categoryRefService.syncCategories())
+        .thenReturn(List.of(helmetsCategory, liveriesCategory));
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
+    when(uexClient.getItemsForCategory(75)).thenReturn(failed());
+    when(gameItemRepository.findByUexItemId(anyInt())).thenReturn(Optional.empty());
+    when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
+    when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    int upserted = service.syncItems();
+
+    verify(gameItemRepository, never()).markUexDeletedExcept(any(), any());
+    assertEquals(
+        1, upserted, "the fresh item is still ingested; only the orphan sweep stands down");
+  }
+
+  @Test
+  void syncItems_runsOrphanSweep_whenAnEmptyCategoryAnsweredCompletely() {
+    // The other half of the same distinction: an empty category that ANSWERED (complete, zero rows)
+    // must not stand the sweep down — two UEX item categories are permanently empty, so treating
+    // "no rows" as a failure would suppress orphan detection forever, which is the shape of the
+    // SC-Wiki census bug (ADR-0147).
+    UexItemDto helmet =
+        helmetDto(11, "Venture Helmet", UUID.randomUUID().toString(), helmetsCategory);
+    when(categoryRefService.syncCategories())
+        .thenReturn(List.of(helmetsCategory, liveriesCategory));
+    when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
+    when(uexClient.getItemsForCategory(75)).thenReturn(fetched());
+    when(gameItemRepository.findByUexItemId(anyInt())).thenReturn(Optional.empty());
+    when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
+    when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(gameItemRepository.markUexDeletedExcept(any(), any())).thenReturn(0);
+
+    service.syncItems();
+
+    verify(gameItemRepository).markUexDeletedExcept(any(), any());
+  }
+
+  @Test
   void syncItems_runsOrphanSweep_whenAtLeastOneItemProcessed() {
     UexItemDto helmet =
         helmetDto(11, "Venture Helmet", UUID.randomUUID().toString(), helmetsCategory);
@@ -596,7 +643,7 @@ class UexItemSyncServiceTest {
    * @return a {@link UexClient.FetchResult} carrying the items with {@code notModified = false}
    */
   private static UexClient.FetchResult<UexItemDto> fetched(UexItemDto... items) {
-    return new UexClient.FetchResult<>(List.of(items), false);
+    return UexClient.FetchResult.of(List.of(items));
   }
 
   /**
@@ -607,7 +654,19 @@ class UexItemSyncServiceTest {
    * @return an empty {@link UexClient.FetchResult} flagged {@code notModified = true}
    */
   private static UexClient.FetchResult<UexItemDto> unchanged() {
-    return new UexClient.FetchResult<>(List.of(), true);
+    return UexClient.FetchResult.unchanged();
+  }
+
+  /**
+   * A swallowed-failure fetch result — empty data, {@code notModified = false}, {@code complete =
+   * false}: the shape {@link UexClient#getItemsForCategory(int)} returns when the call timed out,
+   * answered non-2xx, failed to decode, or carried a non-ok envelope status. Indistinguishable from
+   * an empty category by its rows alone, which is exactly why the flag exists.
+   *
+   * @return an empty {@link UexClient.FetchResult} flagged incomplete
+   */
+  private static UexClient.FetchResult<UexItemDto> failed() {
+    return UexClient.FetchResult.partial(List.of());
   }
 
   private UexItemDto helmetDto(int id, String name, String uuid, UexCategory cat) {

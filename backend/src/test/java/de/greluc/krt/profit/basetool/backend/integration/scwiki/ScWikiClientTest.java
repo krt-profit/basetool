@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiCommodityDto;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiResponseDto;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -157,6 +158,50 @@ class ScWikiClientTest {
     assertTrue(
         path.contains("include=blueprints,items") || path.contains("include=blueprints%2Citems"),
         "include= must be appended to the page-1 query string: " + path);
+  }
+
+  // ─── Per-endpoint page size ─────────────────────────────────────────────
+
+  @Test
+  void pageSizeOverride_isSentOnEveryPage_andDrivesTheFullPageCheck() throws Exception {
+    // /api/vehicles answers 10.4 MB on page 1 at the shared page size of 200, against a 16 MB codec
+    // ceiling whose overrun is swallowed into an empty list — a silent stop. The vehicle walk
+    // therefore asks for a smaller page, and the override has to reach BOTH the wire and the
+    // "was page 1 full?" contract check, which is what decides whether a missing meta.last_page is
+    // a healthy single page or an un-walked remainder.
+    properties.setPageSize(200);
+    server.enqueue(jsonOk(pageBodyWithoutMeta(rows(2))));
+
+    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
+        client.fetchAllPagesResult(
+            "/api/commodities", commodityTypeRef(), "commodities", null, null, 2);
+
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(req);
+    assertTrue(
+        req.getPath().contains("page%5Bsize%5D=2"),
+        "the override, not the configured 200, must go on the wire: " + req.getPath());
+    assertFalse(
+        result.complete(),
+        "two rows fill a page of two, so a missing last_page is an un-walked remainder — judging"
+            + " fullness against the configured 200 would have called this a complete census");
+  }
+
+  @Test
+  void nonPositivePageSizeOverride_fallsBackToTheConfiguredDefault() throws Exception {
+    // A misconfigured override must degrade to the default rather than ask the upstream for zero
+    // rows and let the empty answer read as an outage.
+    properties.setPageSize(200);
+    server.enqueue(jsonOk(pageBody(1, 1, rows(1))));
+
+    client.fetchAllPagesResult(
+        "/api/commodities", commodityTypeRef(), "commodities", null, null, 0);
+
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(req);
+    assertTrue(
+        req.getPath().contains("page%5Bsize%5D=200"),
+        "a non-positive override must fall back to the configured page size: " + req.getPath());
   }
 
   // ─── ETag 304 short-circuit ─────────────────────────────────────────────
@@ -353,30 +398,135 @@ class ScWikiClientTest {
   }
 
   @Test
-  void metaTotalDisagreeingWithMergedRows_isIncomplete_andWarns() {
-    // The upstream states 205 rows for this filter; the walk merged 1. Whatever the cause (a
-    // dropped page, a feed that changed mid-walk), the merged list is not a census of the feed.
+  void distinctRowsFallingShortOfMetaTotal_isIncomplete_andWarns() {
+    // The upstream states 205 rows for this filter; the walk saw 1. Whatever the cause (a dropped
+    // page, a feed that changed mid-walk), 204 rows the Wiki still lists are absent from the merged
+    // list — the direction that gets live rows tombstoned, so it must not be sweepable.
     server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 205, rows(1))));
 
     ScWikiClient.FetchResult<ScWikiCommodityDto> result =
         client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
 
-    assertFalse(result.complete(), "a merged count below meta.total is not a complete census");
+    assertFalse(
+        result.complete(), "a distinct-row count below meta.total is not a complete census");
     assertEquals(1, result.data().size(), "the fetched rows are still returned");
     assertEquals(1.0, fetchErrorCount(), "a total mismatch must count as a fetch error");
   }
 
   @Test
-  void metaTotalMatchingMergedRows_staysComplete() {
+  void metaTotalMatchingTheDistinctRowCount_staysComplete() {
     server.enqueue(jsonOk(pageBodyWithTotal(1, 2, 3, rows(2))));
-    server.enqueue(jsonOk(pageBodyWithTotal(2, 2, 3, rows(1))));
+    server.enqueue(jsonOk(pageBodyWithTotal(2, 2, 3, rows(1, 3))));
 
     ScWikiClient.FetchResult<ScWikiCommodityDto> result =
         client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
 
-    assertTrue(result.complete(), "a walk that merged exactly meta.total rows is a full census");
+    assertTrue(
+        result.complete(), "a walk that saw exactly meta.total distinct rows is a full census");
     assertEquals(3, result.data().size());
     assertEquals(0.0, fetchErrorCount(), "a healthy full walk is not a fetch error");
+  }
+
+  @Test
+  void distinctRowsExceedingMetaTotal_staysComplete_andDoesNotCount() {
+    // The live /api/items shape (verified 2026-08-28): the paginator serves 12 331 distinct rows
+    // across the 62 pages it announces while its own meta.total says 12 283 — a stable upstream
+    // count that under-reports its own feed, on the one endpoint the residual GENERIC pass walks.
+    // Every row was seen and none twice, so there is no gap for a tombstone sweep to fall into.
+    // Reading the surplus as INCOMPLETE suppressed the cross-kind orphan sweep on every nightly run
+    // and burned a daily external-fetch-error into ScWikiCensusIncompleteStreak.
+    server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 2, rows(3))));
+
+    List<ScWikiClient.FetchResult<ScWikiCommodityDto>> captured = new ArrayList<>();
+    List<ILoggingEvent> events =
+        captureClientLog(
+            () ->
+                captured.add(
+                    client.fetchAllPagesResult(
+                        "/api/commodities", commodityTypeRef(), "commodities")));
+
+    assertTrue(
+        captured.get(0).complete(),
+        "more distinct rows than meta.total claims cannot hide a row from the sweep — the census"
+            + " stands");
+    assertEquals(3, captured.get(0).data().size(), "every fetched row is still returned");
+    assertEquals(
+        0.0,
+        fetchErrorCount(),
+        "an upstream count that under-reports its own feed is not a fetch" + " error");
+    assertTrue(
+        events.stream().noneMatch(e -> e.getLevel() == Level.WARN),
+        "a surplus must not WARN on every run: " + messages(events));
+  }
+
+  @Test
+  void rowServedOnTwoPages_isIncomplete_evenWhenTheRowCountMatchesMetaTotal() {
+    // Page 2 re-serves row 3 instead of row 4 — the shape a row inserted upstream mid-walk
+    // produces, which shifts every later row across the page boundaries. The merged SIZE still
+    // matches meta.total exactly, because the duplicate and the omission cancel out: a size-only
+    // cross-check calls this a full census and row 4, which was never fetched, becomes a tombstone
+    // candidate. Only the distinct count can see it.
+    server.enqueue(jsonOk(pageBodyWithTotal(1, 2, 4, rows(3))));
+    server.enqueue(jsonOk(pageBodyWithTotal(2, 2, 4, rows(1, 3))));
+
+    List<ScWikiClient.FetchResult<ScWikiCommodityDto>> captured = new ArrayList<>();
+    List<ILoggingEvent> events =
+        captureClientLog(
+            () ->
+                captured.add(
+                    client.fetchAllPagesResult(
+                        "/api/commodities", commodityTypeRef(), "commodities")));
+
+    assertFalse(
+        captured.get(0).complete(),
+        "a walk that was served the same row twice never enumerated the feed, however well the"
+            + " totals line up");
+    assertEquals(4, captured.get(0).data().size(), "the rows that did arrive are still returned");
+    assertTrue(
+        events.stream()
+            .anyMatch(
+                e ->
+                    e.getLevel() == Level.WARN
+                        && e.getFormattedMessage().contains("only 3 distinct")),
+        "the repeated row must WARN with both counts: " + messages(events));
+    assertEquals(
+        1.0,
+        fetchErrorCount(),
+        "the repetition and the shortfall it causes are one failed fetch, not two");
+  }
+
+  @Test
+  void feedAnnouncingMorePagesByTheEndOfTheWalk_isIncomplete() {
+    // The loop bound is fixed when page 1 answers. Page 2 comes back announcing a page 3 that was
+    // therefore never requested — the same "we never asked" case as a dropped page, and the guard
+    // that lets a surplus stand above without letting a growing feed slip through with it.
+    server.enqueue(jsonOk(pageBodyWithTotal(1, 2, 4, rows(2))));
+    server.enqueue(jsonOk(pageBodyWithTotal(2, 3, 6, rows(2, 3))));
+
+    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+
+    assertFalse(
+        result.complete(),
+        "the pages past the original bound were never fetched, so nothing may"
+            + " be tombstoned for missing from the merged list");
+    assertEquals(4, result.data().size(), "the two walked pages are still returned");
+    assertEquals(1.0, fetchErrorCount(), "an un-walked tail must leave a metric trail");
+  }
+
+  @Test
+  void rowsWithoutUuidsAreNotMistakenForOneRowRepeated() {
+    // An endpoint that serves rows without a uuid has no identity to deduplicate on. Collapsing
+    // them would report 1 distinct row for 3, i.e. a permanent "the feed repeated itself" verdict
+    // on an entirely healthy walk.
+    server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 3, idlessRows(3))));
+
+    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+
+    assertTrue(result.complete(), "id-less rows each count as their own row, not as duplicates");
+    assertEquals(3, result.data().size());
+    assertEquals(0.0, fetchErrorCount(), "a healthy id-less feed is not a fetch error");
   }
 
   @Test
@@ -624,7 +774,7 @@ class ScWikiClientTest {
 
   // A 2xx page whose meta states a total but has LOST last_page — the shape a partially renamed
   // meta block produces, and the one that makes a single fetch trip two census problems at once
-  // (full page 1 without a page count, and a merged row count below the stated total).
+  // (full page 1 without a page count, and a distinct row count below the stated total).
   private String pageBodyWithTotalWithoutLastPage(int total, String dataCommaSeparated) {
     String data = dataCommaSeparated == null ? "" : dataCommaSeparated.trim();
     return """
@@ -652,14 +802,35 @@ class ScWikiClientTest {
         .formatted(data);
   }
 
-  // `count` comma-separated commodity rows with distinct synthetic uuids.
+  // `count` comma-separated commodity rows with distinct synthetic uuids, numbered from 1.
   private static String rows(int count) {
+    return rows(count, 1);
+  }
+
+  // `count` comma-separated commodity rows numbered from `firstIndex`. Multi-page fixtures MUST
+  // number their pages consecutively: the client counts DISTINCT uuids to decide whether a walk
+  // enumerated the feed, so a second page that restarts at 1 is a feed that served the same rows
+  // twice — which is exactly what the census check exists to reject.
+  private static String rows(int count, int firstIndex) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = firstIndex; i < firstIndex + count; i++) {
+      if (i > firstIndex) {
+        sb.append(",\n");
+      }
+      sb.append("{\"uuid\":\"00000000-0000-0000-0000-%012d\",\"name\":\"Row%d\"}".formatted(i, i));
+    }
+    return sb.toString();
+  }
+
+  // `count` comma-separated commodity rows the upstream served WITHOUT a uuid — the shape that
+  // must NOT read as one row repeated `count` times to the distinct-row census.
+  private static String idlessRows(int count) {
     StringBuilder sb = new StringBuilder();
     for (int i = 1; i <= count; i++) {
       if (i > 1) {
         sb.append(",\n");
       }
-      sb.append("{\"uuid\":\"00000000-0000-0000-0000-%012d\",\"name\":\"Row%d\"}".formatted(i, i));
+      sb.append("{\"name\":\"Row%d\"}".formatted(i));
     }
     return sb.toString();
   }

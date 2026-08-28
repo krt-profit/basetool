@@ -102,7 +102,8 @@ class UexItemPriceSyncServiceTest {
     service.syncItemPrices();
 
     verify(gameItemPriceRepository, never()).save(any());
-    verify(gameItemPriceRepository, never()).clearStalePrices(any());
+    verify(gameItemPriceRepository, never()).findIdsWithLivePrices();
+    verify(gameItemPriceRepository, never()).clearPricesByIds(any());
   }
 
   @Test
@@ -132,7 +133,7 @@ class UexItemPriceSyncServiceTest {
     assertNull(price.getPriceRent());
     assertNull(price.getStatusBuy());
     // A processed row → non-empty seen set → the stale-row sweep runs.
-    verify(gameItemPriceRepository).clearStalePrices(any());
+    verify(gameItemPriceRepository).findIdsWithLivePrices();
   }
 
   @Test
@@ -168,7 +169,8 @@ class UexItemPriceSyncServiceTest {
     service.syncItemPrices();
 
     verify(gameItemPriceRepository, never()).save(any());
-    verify(gameItemPriceRepository, never()).clearStalePrices(any());
+    verify(gameItemPriceRepository, never()).findIdsWithLivePrices();
+    verify(gameItemPriceRepository, never()).clearPricesByIds(any());
   }
 
   @Test
@@ -181,7 +183,8 @@ class UexItemPriceSyncServiceTest {
     service.syncItemPrices();
 
     verify(gameItemPriceRepository, never()).save(any());
-    verify(gameItemPriceRepository, never()).clearStalePrices(any());
+    verify(gameItemPriceRepository, never()).findIdsWithLivePrices();
+    verify(gameItemPriceRepository, never()).clearPricesByIds(any());
   }
 
   @Test
@@ -211,6 +214,8 @@ class UexItemPriceSyncServiceTest {
     Terminal terminal3 = terminal();
     UUID id1 = UUID.randomUUID();
     UUID id3 = UUID.randomUUID();
+    // A priced row left over from an earlier run that this run's feed does not mention.
+    UUID staleId = UUID.randomUUID();
     when(uexClient.getItemPrices())
         .thenReturn(
             fetched(
@@ -241,15 +246,19 @@ class UexItemPriceSyncServiceTest {
               p.setId(p.getGameItem() == item1 ? id1 : id3);
               return p;
             });
+    when(gameItemPriceRepository.findIdsWithLivePrices()).thenReturn(List.of(id1, id3, staleId));
 
     service.syncItemPrices();
 
     // All three rows were attempted — the per-row catch did not abort the loop on the middle row.
     verify(gameItemPriceRepository, times(3)).save(any(GameItemPrice.class));
-    // Only the two successfully-saved ids reach the sweep; the failed row's id is never added.
+    // Only the two successfully-saved ids count as seen, so they are spared and the leftover row
+    // is cleared. The sweep subtracts the seen ids from the priced rows and clears the remainder in
+    // bounded chunks (REQ-DATA-014), so what reaches the repository is the STALE set - the exact
+    // inverse of what the old `id NOT IN :seenIds` statement received.
     ArgumentCaptor<Collection<UUID>> sweep = ArgumentCaptor.captor();
-    verify(gameItemPriceRepository).clearStalePrices(sweep.capture());
-    assertEquals(Set.of(id1, id3), Set.copyOf(sweep.getValue()));
+    verify(gameItemPriceRepository).clearPricesByIds(sweep.capture());
+    assertEquals(Set.of(staleId), Set.copyOf(sweep.getValue()));
   }
 
   // ---- helpers ---------------------------------------------------------------------------------

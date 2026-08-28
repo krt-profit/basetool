@@ -188,8 +188,6 @@ class UexUniverseSyncServiceTest {
         UexFactionDto.builder()
             .id(1)
             .name("UEE")
-            .code("UEE")
-            .isAvailableLive(1)
             .wiki("https://wiki/UEE")
             .isPiracy(0)
             .isBountyHunting(1)
@@ -206,8 +204,10 @@ class UexUniverseSyncServiceTest {
     Faction saved = cap.getValue();
     assertEquals(1, saved.getIdFaction());
     assertEquals("UEE", saved.getName());
-    assertEquals("UEE", saved.getCode());
-    assertTrue(saved.getIsAvailableLive());
+    // UEX's /factions payload carries neither `code` nor `is_available_live` (REQ-DATA-015), so
+    // the sync must leave both columns alone rather than writing a null / a fabricated `false`.
+    assertNull(saved.getCode());
+    assertNull(saved.getIsAvailableLive());
     assertFalse(saved.getIsPiracy());
     assertTrue(saved.getIsBountyHunting());
   }
@@ -237,7 +237,6 @@ class UexUniverseSyncServiceTest {
         UexJurisdictionDto.builder()
             .id(10)
             .name("Hurston Sec")
-            .code("HS")
             .isAvailableLive(1)
             .nickname("HUR")
             .wiki("https://wiki")
@@ -343,7 +342,6 @@ class UexUniverseSyncServiceTest {
         UexOutpostDto.builder()
             .id(40)
             .name("HDMS-Anderson")
-            .code("HDMS")
             .isAvailableLive(1)
             .isAvailable(1)
             .padTypes("M,L")
@@ -439,7 +437,6 @@ class UexUniverseSyncServiceTest {
         UexSpaceStationDto.builder()
             .id(70)
             .name("Port Olisar")
-            .code("POL")
             .isAvailableLive(1)
             .isAvailable(1)
             .isLagrange(1)

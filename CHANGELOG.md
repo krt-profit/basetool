@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Ein einzelner Aussetzer beim UEX-Abgleich löscht keine Items mehr.** Schlug einer der rund 50
+  Kategorie-Aufrufe fehl, war das nicht von einer wirklich leeren Kategorie zu unterscheiden, und die
+  Aufräumrunde markierte deren sämtliche Items (bis zu ~500) bis zum nächsten Lauf als gelöscht. Kommt
+  jetzt auch nur eine Kategorie unvollständig zurück, bleibt die Aufräumrunde für den ganzen Lauf
+  stehen.
+
+- **Item-Maße, Crew-Stärke und Schiffsbeschreibungen kommen wieder an.** Mehrere Felder waren auf
+  Namen abgebildet, die es in den Schnittstellen gar nicht gibt — die Maße eines Items und acht
+  Schiffsangaben blieben deshalb dauerhaft leer, und zwei davon (Fahrzeug-Frachtraum, englische
+  Schiffsbeschreibung) leerte der UEX-Abgleich sogar jedes Mal wieder, nachdem der SC-Wiki-Abgleich
+  sie gefüllt hatte. Die Crew-Stärke wird jetzt aus dem Feld gelesen, das UEX wirklich liefert.
+
+- **Der Fahrzeug-Abgleich mit dem SC-Wiki läuft nicht mehr am Speicherlimit entlang.** Eine Seite mit
+  200 Fahrzeugen ist 10,4 MB groß, bei einer Obergrenze von 16 MB — ein Überschreiten hätte den
+  Abgleich stillschweigend abgebrochen. Fahrzeuge werden jetzt in kleineren Seiten geholt.
+
+- **Die Preis-Aufräumrunde läuft nicht mehr in eine Datenbankgrenze.** Sie übergab je einen Parameter
+  pro gemeldeter Preiszeile (23.770) und wäre bei etwa 38 % Wachstum an der Grenze von PostgreSQL
+  gescheitert. Sie arbeitet jetzt in festen Blöcken.
+
+- **Aus dem SC-Wiki entfernte Items werden wieder als gelöscht markiert.** Die
+  Vollständigkeitsprüfung des Item-Abgleichs verglich die geholten Zeilen mit der Gesamtzahl, die das
+  Wiki selbst meldet — und die liegt auf `/api/items` dauerhaft 48 Zeilen zu niedrig. Jeder
+  nächtliche Lauf galt deshalb als unvollständig, die Aufräumrunde wurde jedes Mal übersprungen und
+  die tägliche Warnung dazu war ein Fehlalarm. Gezählt werden jetzt eindeutige Item-Kennungen: eine
+  Überzahl ist kein Fehler mehr, eine doppelt gelieferte Zeile dagegen schon.
+
 ## [v1.6.6](https://github.com/krt-profit/basetool/releases/tag/v1.6.6) - 2026-08-27
 
 ## [v1.6.5](https://github.com/krt-profit/basetool/releases/tag/v1.6.5) - 2026-08-27

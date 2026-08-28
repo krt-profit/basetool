@@ -250,9 +250,9 @@ public class UexUniverseSyncService {
                                 return factionRepository.save(n);
                               }));
       entity.setName(dto.name());
-      entity.setCode(dto.code());
-      entity.setIsAvailableLive(dto.checkIsAvailableLive());
-
+      // No code / is_available_live: UEX's /factions payload carries neither (REQ-DATA-015). The
+      // absent flag decoded to null, which checkIsAvailableLive() turned into a hard `false` — a
+      // value UEX never stated — so the column is now left to whatever a source that knows writes.
       entity.setWiki(dto.wiki());
       entity.setIsPiracy(dto.checkIsPiracy());
       entity.setIsBountyHunting(dto.checkIsBountyHunting());
@@ -303,7 +303,8 @@ public class UexUniverseSyncService {
                                 return jurisdictionRepository.save(n);
                               }));
       entity.setName(dto.name());
-      entity.setCode(dto.code());
+      // No code: UEX's /jurisdictions payload has no `code` field (it carries `nickname`,
+      // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
       entity.setIsAvailableLive(dto.checkIsAvailableLive());
 
       entity.setNickname(dto.nickname());
@@ -457,7 +458,8 @@ public class UexUniverseSyncService {
                                 return outpostRepository.save(n);
                               }));
       entity.setName(dto.name());
-      entity.setCode(dto.code());
+      // No code: UEX's /outposts payload has no `code` field (it carries `nickname`,
+      // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
       entity.setIsAvailableLive(dto.checkIsAvailableLive());
       entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
       entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
@@ -592,7 +594,8 @@ public class UexUniverseSyncService {
                                 return poiRepository.save(n);
                               }));
       entity.setName(dto.name());
-      entity.setCode(dto.code());
+      // No code: UEX's /poi payload has no `code` field (it carries `nickname`,
+      // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
       entity.setIsAvailableLive(dto.checkIsAvailableLive());
       entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
       entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
@@ -675,7 +678,8 @@ public class UexUniverseSyncService {
                                 return spacestationRepository.save(n);
                               }));
       entity.setName(dto.name());
-      entity.setCode(dto.code());
+      // No code: UEX's /space_stations payload has no `code` field (it carries `nickname`,
+      // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
       entity.setIsAvailableLive(dto.checkIsAvailableLive());
       entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
       entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));

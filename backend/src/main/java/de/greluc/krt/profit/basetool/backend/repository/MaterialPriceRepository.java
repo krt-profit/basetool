@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialSellingTerminalDto;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -58,8 +59,9 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
    * per-row upserts are flushed before the bulk UPDATE runs so the {@code id NOT IN} predicate sees
    * the freshly-inserted rows.
    *
-   * @param seenIds ids of the rows that WERE returned by UEX in the current sync; must be non-empty
-   *     (caller short-circuits an empty set to avoid wiping every row on a total-failure burst)
+   * @param ids the stale row ids to clear, in chunks bounded by the caller; the complement is
+   *     computed in Java from {@link #findIdsWithLivePrices()} so the statement never binds one
+   *     parameter per row the feed returned
    * @return number of rows whose prices were cleared
    */
   @Modifying(flushAutomatically = true)
@@ -73,7 +75,7 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
           p.scuSellStock = NULL,
           p.statusBuy = false,
           p.statusSell = false
-      WHERE p.id NOT IN :seenIds
+      WHERE p.id IN :ids
       AND (p.priceBuy IS NOT NULL
            OR p.priceSell IS NOT NULL
            OR p.scuBuy IS NOT NULL
@@ -82,7 +84,32 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
            OR p.statusBuy = true
            OR p.statusSell = true)
       """)
-  int clearStalePrices(@Param("seenIds") Collection<UUID> seenIds);
+  int clearPricesByIds(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Returns the id of every {@link MaterialPrice} row that still carries a price, SCU or status
+   * value — the candidate set the stale-row sweep subtracts this run's seen ids from.
+   *
+   * <p>Same reasoning as {@code GameItemPriceRepository.findIdsWithLivePrices()}: the previous
+   * {@code id NOT IN :seenIds} form bound one parameter per row UEX returned, which scales with the
+   * feed and ends at PostgreSQL's 65 535 bind-parameter limit. The commodity matrix is far smaller
+   * than the item matrix (2 593 rows against 23 770 today), so it was not the one about to break —
+   * but two sweeps of the same shape with only one of them bounded is how the next one gets missed.
+   *
+   * @return ids of every row that currently holds a price / SCU / status value
+   */
+  @Query(
+      """
+      SELECT p.id FROM MaterialPrice p
+      WHERE p.priceBuy IS NOT NULL
+         OR p.priceSell IS NOT NULL
+         OR p.scuBuy IS NOT NULL
+         OR p.scuSell IS NOT NULL
+         OR p.scuSellStock IS NOT NULL
+         OR p.statusBuy = true
+         OR p.statusSell = true
+      """)
+  List<UUID> findIdsWithLivePrices();
 
   /**
    * Returns paginated buy/sell prices for one material across every non-hidden terminal, projected

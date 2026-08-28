@@ -166,7 +166,10 @@ class ScWikiItemSyncServiceClosureTest {
     assertEquals("venture-helmet-white-2", result.getScwikiSlug());
     assertEquals("FPS.Armor.Helmet", result.getClassification());
     assertEquals(2.5, result.getMass());
+    // width -> x, height -> y, length -> z; the Wiki serves the box under those names, never x/y/z.
     assertEquals(0.3, result.getDimensionX());
+    assertEquals(0.4, result.getDimensionY());
+    assertEquals(0.35, result.getDimensionZ());
     assertEquals("An explorer helmet.", result.getDescriptionEn());
     assertEquals("Ein Forscherhelm.", result.getDescriptionDe());
     assertEquals(1, result.getSizeClass());

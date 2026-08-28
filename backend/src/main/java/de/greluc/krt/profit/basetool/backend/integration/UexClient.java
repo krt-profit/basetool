@@ -509,7 +509,7 @@ public class UexClient {
                     "Fetched 0 {} from UEX API: unchanged since the last sync (304 Not Modified) —"
                         + " nothing to re-import.",
                     resourceLabel);
-                return Mono.just(new FetchResult<>(Collections.<T>emptyList(), true));
+                return Mono.just(FetchResult.<T>unchanged());
               }
               if (!response.statusCode().is2xxSuccessful()) {
                 return response.createError();
@@ -525,10 +525,10 @@ public class UexClient {
             e -> {
               log.warn("Failed to fetch {} from UEX API", resourceLabel, e);
               recordFetchError();
-              return Mono.just(new FetchResult<>(Collections.<T>emptyList(), false));
+              return Mono.just(FetchResult.<T>partial(Collections.emptyList()));
             })
         .blockOptional()
-        .orElse(new FetchResult<>(Collections.<T>emptyList(), false));
+        .orElse(FetchResult.partial(Collections.emptyList()));
   }
 
   /**
@@ -582,7 +582,9 @@ public class UexClient {
           ENVELOPE_STATUS_OK,
           rows.size());
       recordFetchError();
-      return new FetchResult<>(rows, false);
+      // Self-reported trouble: the rows are handed on so upserts still run, but the result cannot
+      // vouch for the endpoint's full contents, so no caller may sweep on it (REQ-DATA-014).
+      return FetchResult.partial(rows);
     }
     if (body.data() == null) {
       log.info(
@@ -591,11 +593,14 @@ public class UexClient {
               + " left untouched.",
           resourceLabel,
           status);
-      return new FetchResult<>(rows, false);
+      // A `data: null` under an ok status is UEX saying "nothing matches" — an answer, so this is
+      // a COMPLETE result whose row list happens to be empty (two item categories are really
+      // empty). Only a failure to get an answer at all is incomplete.
+      return FetchResult.of(rows);
     }
     log.info(
         "Fetched {} {} from UEX API (envelope status '{}').", rows.size(), resourceLabel, status);
-    return new FetchResult<>(rows, false);
+    return FetchResult.of(rows);
   }
 
   /**
@@ -611,17 +616,68 @@ public class UexClient {
   }
 
   /**
-   * Outcome of a single UEX list fetch: the parsed rows plus whether the upstream answered {@code
-   * 304 Not Modified} (the feed is unchanged since the last sync, served from the {@link
-   * #etagByEndpoint} conditional-GET cache). The {@code notModified} flag lets a caller tell a
-   * healthy unchanged catalogue ({@code data} empty, {@code notModified = true}) apart from a
-   * genuine empty-200 outage or a swallowed fetch error ({@code data} empty, {@code notModified =
-   * false}) — the distinction that keeps the {@code SyncZeroItems} alert from firing on a
-   * fully-cached UEX item sync.
+   * Outcome of a single UEX list fetch: the parsed rows, whether the upstream answered {@code 304
+   * Not Modified} (the feed is unchanged since the last sync, served from the {@link
+   * #etagByEndpoint} conditional-GET cache), and whether this call can vouch for what it returned.
+   *
+   * <p>The {@code notModified} flag lets a caller tell a healthy unchanged catalogue ({@code data}
+   * empty, {@code notModified = true}) apart from a genuine empty-200 outage or a swallowed fetch
+   * error ({@code data} empty, {@code notModified = false}) — the distinction that keeps the {@code
+   * SyncZeroItems} alert from firing on a fully-cached UEX item sync.
+   *
+   * <p>{@link #complete()} answers the separate, stricter question: <em>did this call actually get
+   * an answer?</em> It is {@code false} on a transport / non-2xx / decode failure, on an envelope
+   * whose {@code status} is not {@code ok}, and on a {@code 304} (which enumerates nothing). It
+   * matters because every one of those degrades to an <b>empty list</b>, which is exactly what a
+   * legitimately empty endpoint returns — and two of the UEX item categories really are empty. A
+   * caller that sweeps rows "the feed no longer returns" therefore cannot use the row list alone:
+   * before this flag existed, a single 5xx on one of the ~50 per-category item calls made the whole
+   * category look deleted and soft-deleted every one of its rows until the next healthy run
+   * (REQ-DATA-014). Mirrors {@code ScWikiClient.FetchResult.complete()}.
    *
    * @param <T> the per-row payload type
    * @param data the parsed rows, or an empty list on {@code 304} / empty-200 / error
    * @param notModified {@code true} only when the upstream returned {@code 304 Not Modified}
+   * @param complete {@code true} iff this call got a usable answer from the upstream and its rows
+   *     may therefore drive a tombstone sweep
    */
-  public record FetchResult<T>(List<T> data, boolean notModified) {}
+  public record FetchResult<T>(List<T> data, boolean notModified, boolean complete) {
+
+    /**
+     * The healthy outcome: a {@code 2xx} whose envelope did not report a problem. A genuinely empty
+     * {@code data} belongs here too — "the endpoint has no rows" is an answer.
+     *
+     * @param <T> the per-row payload type
+     * @param data the parsed rows (possibly empty)
+     * @return a result carrying {@code data} with {@code notModified == false, complete == true}
+     */
+    public static <T> FetchResult<T> of(List<T> data) {
+      return new FetchResult<>(data, false, true);
+    }
+
+    /**
+     * The outcome of a call that could not vouch for its result — a transport / non-2xx / decode
+     * failure (empty rows) or an envelope that self-reported a non-{@code ok} status (whatever rows
+     * came with it). The rows are still returned so upserts can proceed; only sweeps stand down.
+     *
+     * @param <T> the per-row payload type
+     * @param data whatever rows arrived (possibly empty)
+     * @return a result carrying {@code data} with {@code notModified == false, complete == false}
+     */
+    public static <T> FetchResult<T> partial(List<T> data) {
+      return new FetchResult<>(data, false, false);
+    }
+
+    /**
+     * The {@code 304 Not Modified} outcome: empty rows, {@code notModified == true}. Not complete —
+     * a conditional-GET hit enumerates nothing, so a caller that ignored {@link #notModified()}
+     * still cannot sweep on it.
+     *
+     * @param <T> the per-row payload type
+     * @return an unchanged, incomplete result with an empty row list
+     */
+    public static <T> FetchResult<T> unchanged() {
+      return new FetchResult<>(List.of(), true, false);
+    }
+  }
 }

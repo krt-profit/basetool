@@ -188,14 +188,21 @@ groups:
 
       # (PR #1472, review finding 6a) The SC-Wiki tombstone sweep has stood down on every run for
       # three days. ScWikiClient marks a page walk INCOMPLETE whenever it cannot vouch for the census
-      # — a page failed mid-walk, meta.last_page went absent while page 1 came back full, or
-      # meta.total disagrees with the merged row count — and ScWikiOrphanSweep then refuses to
-      # tombstone. That refusal is correct: sweeping a half-walked feed soft-deletes every row that
-      # was merely never fetched. But it degrades SILENTLY. If upstream's meta.total turns out to be
-      # unfiltered, or off by the include= expansion, `complete` is false on EVERY run and orphan
-      # detection is off indefinitely while scwiki_sync keeps recording success with a healthy item
-      # tally — ExternalSyncStale, SyncZeroItems and ScWikiStepFailing all stay quiet, and the only
-      # trace is a WARN line per run.
+      # — a page failed mid-walk, meta.last_page went absent while page 1 came back full, the same
+      # row arrived on two pages, the DISTINCT row count fell short of meta.total, or the feed
+      # announced more pages by the end of the walk than page 1 did — and ScWikiOrphanSweep then
+      # refuses to tombstone. That refusal is correct: sweeping a half-walked feed soft-deletes every
+      # row that was merely never fetched. But it degrades SILENTLY: `complete` false on EVERY run
+      # means orphan detection is off indefinitely while scwiki_sync keeps recording success with a
+      # healthy item tally — ExternalSyncStale, SyncZeroItems and ScWikiStepFailing all stay quiet,
+      # and the only trace is a WARN line per run.
+      #
+      # This is not hypothetical: it is what the alert caught in 2026-08. The census criterion was
+      # "merged row count == meta.total", and /api/items serves 12331 duplicate-free rows across the
+      # 62 pages it announces while its own meta.total says 12283 — so every nightly run was
+      # INCOMPLETE, the sweep never ran, and this rule fired daily on a defect in the CHECK rather
+      # than in the feed (REQ-DATA-014, ADR-0147). A surplus over meta.total is no longer a census
+      # failure; a repeated row now is.
       #
       # There is NO metric for "the sweep stood down" — the skip is a log line and nothing else. The
       # closest faithful proxy is basetool_external_fetch_errors_total{source="scwiki"}: every branch
@@ -225,7 +232,7 @@ groups:
           severity: warning
         annotations:
           summary: "SC-Wiki page walk incomplete on three consecutive days (orphan sweep standing down)"
-          description: "Every one of the last three daily SC-Wiki syncs recorded a fetch/census error, so the page walk was flagged INCOMPLETE and the scwiki_deleted orphan sweep refused to run on all of them — rows the Wiki has actually dropped are no longer being tombstoned, while the sync keeps reporting success. Grep the backend log for 'INCOMPLETE' / 'Skipping the … scwiki_deleted sweep' to see which check fails: a genuinely broken upstream also trips ExternalFetchErrors, whereas this alert alone points at a pagination-contract drift (meta.total counting differently than the merged rows, or meta.last_page renamed)."
+          description: "Every one of the last three daily SC-Wiki syncs recorded a fetch/census error, so the page walk was flagged INCOMPLETE and the scwiki_deleted orphan sweep refused to run on all of them — rows the Wiki has actually dropped are no longer being tombstoned, while the sync keeps reporting success. Grep the backend log for 'INCOMPLETE' / 'Skipping the … scwiki_deleted sweep' to see which check fails: a genuinely broken upstream also trips ExternalFetchErrors, whereas this alert alone points at a pagination-contract drift (rows repeating across pages, the distinct rows falling short of meta.total, meta.last_page renamed, or the announced page count growing mid-walk). Note which side the numbers fall on: a SURPLUS over meta.total is deliberately not a census failure (ADR-0147), so it is not what is firing this."
 
       # (#1041 item 3) All-jobs staleness. UserSyncStale/ExternalSyncStale covered only user_sync and
       # the two catalogue syncs; the daily notification-retention purge and the hourly default-

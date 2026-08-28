@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.GameItemPrice;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -60,8 +61,9 @@ public interface GameItemPriceRepository extends JpaRepository<GameItemPrice, UU
    * guarantees the preceding per-row upserts are flushed before the bulk UPDATE evaluates {@code id
    * NOT IN}.
    *
-   * @param seenIds ids of the rows UEX returned this run; must be non-empty (the caller
-   *     short-circuits an empty set so a total-failure burst never wipes the whole matrix)
+   * @param ids the stale row ids to clear, in chunks bounded by the caller; the complement is
+   *     computed in Java from {@link #findIdsWithLivePrices()} so the statement never binds one
+   *     parameter per row the feed returned
    * @return number of rows whose prices were cleared
    */
   @Modifying(flushAutomatically = true)
@@ -73,12 +75,40 @@ public interface GameItemPriceRepository extends JpaRepository<GameItemPrice, UU
           p.priceRent = NULL,
           p.statusBuy = NULL,
           p.statusSell = NULL
-      WHERE p.id NOT IN :seenIds
+      WHERE p.id IN :ids
       AND (p.priceBuy IS NOT NULL
            OR p.priceSell IS NOT NULL
            OR p.priceRent IS NOT NULL
            OR p.statusBuy IS NOT NULL
            OR p.statusSell IS NOT NULL)
       """)
-  int clearStalePrices(@Param("seenIds") Collection<UUID> seenIds);
+  int clearPricesByIds(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Returns the id of every {@link GameItemPrice} row that still carries a price, status or rent
+   * value — the candidate set the stale-row sweep subtracts this run's seen ids from.
+   *
+   * <p>Exists so the sweep never binds one parameter per row UEX returned. The previous {@code id
+   * NOT IN :seenIds} form did exactly that: {@code /items_prices_all} answers with 23 770 rows
+   * today, which Spring Boot's IN-clause parameter padding rounds up to 32 768 bind parameters
+   * against PostgreSQL's hard limit of 65 535. The next padding step is 65 536 — so at roughly 38%
+   * growth the whole item-price sweep would start failing with a protocol error rather than
+   * degrading. Selecting the candidates and clearing them in bounded chunks keeps the parameter
+   * count flat no matter how large the matrix grows (REQ-DATA-014).
+   *
+   * <p>The predicate mirrors {@link #clearPricesByIds}: rows that are already cleared are not
+   * candidates, so a steady state selects nothing and writes nothing.
+   *
+   * @return ids of every row that currently holds a price / status / rent value
+   */
+  @Query(
+      """
+      SELECT p.id FROM GameItemPrice p
+      WHERE p.priceBuy IS NOT NULL
+         OR p.priceSell IS NOT NULL
+         OR p.priceRent IS NOT NULL
+         OR p.statusBuy IS NOT NULL
+         OR p.statusSell IS NOT NULL
+      """)
+  List<UUID> findIdsWithLivePrices();
 }

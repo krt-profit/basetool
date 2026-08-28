@@ -702,9 +702,11 @@ public class ScWikiItemSyncService {
     item.setRarity(dto.rarity());
     item.setMass(dto.mass());
     if (dto.dimension() != null) {
-      item.setDimensionX(dto.dimension().x());
-      item.setDimensionY(dto.dimension().y());
-      item.setDimensionZ(dto.dimension().z());
+      // width/height/length are the Wiki's own axis names; the local columns are x/y/z in that
+      // order (GameItem.dimensionX = width). Binding x/y/z here wrote null for every item.
+      item.setDimensionX(dto.dimension().width());
+      item.setDimensionY(dto.dimension().height());
+      item.setDimensionZ(dto.dimension().length());
     }
     if (dto.description() != null) {
       item.setDescriptionEn(dto.description().get("en_EN"));

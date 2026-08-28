@@ -40,4 +40,4 @@ import java.util.UUID;
  *     .scwiki_code}; also the abbreviation-fallback match key)
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record ScWikiManufacturerDto(UUID uuid, String name, String code) {}
+public record ScWikiManufacturerDto(UUID uuid, String name, String code) implements ScWikiRow {}

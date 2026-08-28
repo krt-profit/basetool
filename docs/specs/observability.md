@@ -242,13 +242,26 @@ is `DEBUG`, because at any higher level it is a log-flood vector; an operator-ac
 *Backend.*
 
 - **SC-Wiki census completeness** (`ScWikiClient`) — `WARN` when a **full** page 1 carries no
-  `meta.last_page`, when a page fails mid-walk, or when `meta.total` disagrees with the accumulated
-  row count; each also bumps the fetch-error counter and marks the walk **incomplete**. A genuinely
-  short single page stays `complete` and silent, which is what keeps the WARN off healthy runs. The
-  closing census line is one `INFO` per walk reporting pages fetched vs. announced plus the
-  `complete` flag. The flag is not cosmetic: `ScWikiOrphanSweep` (and the inline sweeps in the
-  commodity/blueprint/item sync services) now **refuse to tombstone** on an incomplete walk and WARN
-  why — a truncated census previously read as "the rest of the catalogue was deleted".
+  `meta.last_page`, when a page fails mid-walk, when the walk was served the same row twice, when
+  the **distinct** row count falls short of `meta.total`, or when the feed announces more pages by
+  the end of the walk than page 1 did; each also bumps the fetch-error counter and marks the walk
+  **incomplete**. A genuinely short single page stays `complete` and silent, which is what keeps the
+  WARN off healthy runs. A **surplus** — more distinct rows than `meta.total` claims — is `INFO`,
+  not `WARN`, and stays `complete`: it cannot hide a row from a sweep, and `/api/items` produces one
+  on every run (12 331 distinct rows against a stated 12 283). Reading it as a census failure kept
+  the item backfill's orphan sweep suppressed on every nightly run and fired
+  `ScWikiCensusIncompleteStreak` daily on a defect in the check — REQ-DATA-014 / ADR-0147. The
+  closing census line is one `INFO` per walk reporting merged vs. distinct rows and pages fetched
+  vs. announced plus the `complete` flag. The flag is not cosmetic: `ScWikiOrphanSweep` (and the
+  inline sweeps in the commodity/blueprint/item sync services) **refuse to tombstone** on an
+  incomplete walk and WARN why — a truncated census previously read as "the rest of the catalogue
+  was deleted".
+- **UEX fetch completeness** (`UexClient` / `UexItemSyncService`) — the client's `FetchResult` now
+  also carries `complete`, and the item sync `WARN`s once per run when any per-category fetch came
+  back incomplete (failed, non-`ok` envelope, or `304`) and the `uex_deleted` sweep therefore stood
+  down. No new meter: the failure branch already increments
+  `basetool_external_fetch_errors_total{source="uex"}`, so a category that keeps failing shows up in
+  `ExternalFetchErrors` while the WARN names which run lost its orphan detection (REQ-DATA-014).
 - **UEX envelope outcome** (`UexClient`) — exactly **one** line per 2xx: `INFO` with the row count
   and the envelope status on a healthy response; `WARN` plus a fetch-error counter when `data` is
   `null` or when `status` is present and not `ok` (the rows are still returned). A blank/absent
@@ -929,7 +942,10 @@ transaction per pass) rather than per-scrape.
   `fetchOne`), not one HTTP request.
   Because the count is now exactly one per incomplete walk, it is also the only usable **proxy for
   "the SC-Wiki orphan sweep stood down"**: `ScWikiOrphanSweep` refuses to tombstone on an incomplete
-  census and says so in a WARN and nowhere else — the skip touches no meter. `ScWikiCensusIncompleteStreak`
+  census and says so in a WARN and nowhere else — the skip touches no meter. The proxy held: the
+  alert fired daily from 2026-08 because the census criterion itself was wrong (a row-count
+  comparison against an upstream total that under-reports its own feed — REQ-DATA-014, ADR-0147),
+  which is exactly the silent degradation it was built to surface. `ScWikiCensusIncompleteStreak`
   (warning) therefore keys on **persistence, not volume**: an error in each of three *consecutive*
   24 h windows means three daily runs in a row came back incomplete and orphan detection has been off
   for three days, while `scwiki_sync` kept recording success with a healthy item tally and

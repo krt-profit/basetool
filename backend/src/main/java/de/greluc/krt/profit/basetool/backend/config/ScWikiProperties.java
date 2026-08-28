@@ -156,6 +156,26 @@ public class ScWikiProperties {
   private Integer pageSize = 200;
 
   /**
+   * Page size for the {@code /api/vehicles} walk specifically, overriding {@link #pageSize}.
+   *
+   * <p>Vehicle rows are two orders of magnitude larger than any other list row — each carries its
+   * full port / hardpoint / shield / power tree — so at the shared page size of 200 the first page
+   * alone is <b>10.4 MB</b> against the client's 16 MB in-memory codec ceiling (measured against
+   * the live API on 2026-08-28). Crossing that ceiling is not a partial read: the decode throws,
+   * the error is swallowed into an empty list, and the whole vehicle sync aborts with "No vehicles
+   * received from SC Wiki API" — a silent stop, not a visible failure. At 50 the page is ~3.2 MB (a
+   * fifth of the ceiling) and the walk costs four extra paced requests, which is the trade.
+   *
+   * <p>Kept as its own property rather than lowering {@link #pageSize} for everything: the other
+   * endpoints pay a real request-count cost for a page size they do not need (the item walk is 62
+   * pages at 200 and would become 247), and the census cross-check would then have four times as
+   * many page boundaries to stay consistent across.
+   */
+  @Min(50)
+  @Max(200)
+  private Integer vehiclesPageSize = 50;
+
+  /**
    * Inter-page sleep target in requests-per-second. Used by {@code ScWikiClient.paceForRateLimit}
    * between page fetches inside a single sync run; the sleep is {@code 1000 / requestsPerSecond}
    * milliseconds.

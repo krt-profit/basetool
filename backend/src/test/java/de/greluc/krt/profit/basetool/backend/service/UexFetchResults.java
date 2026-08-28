@@ -53,7 +53,7 @@ final class UexFetchResults {
    * @return a fetch result carrying {@code rows} with {@code notModified == false}
    */
   static <T> UexClient.FetchResult<T> fetched(List<T> rows) {
-    return new UexClient.FetchResult<>(rows, false);
+    return UexClient.FetchResult.of(rows);
   }
 
   /**
@@ -65,6 +65,18 @@ final class UexFetchResults {
    * @return a fetch result with an empty row list and {@code notModified == true}
    */
   static <T> UexClient.FetchResult<T> unchanged() {
-    return new UexClient.FetchResult<>(List.of(), true);
+    return UexClient.FetchResult.unchanged();
+  }
+
+  /**
+   * The swallowed-failure outcome: no rows, {@code notModified == false} and — the part that
+   * matters — {@code complete == false}. Use it to assert that a sync service treats a failed fetch
+   * as "we never asked" rather than as "the feed dropped these rows" (REQ-DATA-014).
+   *
+   * @param <T> the per-row payload type
+   * @return an empty, incomplete fetch result
+   */
+  static <T> UexClient.FetchResult<T> failed() {
+    return UexClient.FetchResult.partial(List.of());
   }
 }

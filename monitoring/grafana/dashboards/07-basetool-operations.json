@@ -2376,7 +2376,7 @@
       },
       "type": "timeseries",
       "title": "External catalogue fetch errors/hour by source",
-      "description": "Swallowed UEX / SC-Wiki fetch, parse and pagination-contract failures (basetool_external_fetch_errors_total). Each is mapped to an empty or incomplete result, so the sync job still records success and the staleness alerts stay quiet. For scwiki this doubles as the only proxy for 'the scwiki_deleted orphan sweep stood down this run': an incomplete page walk always contributes one increment here. A burst trips ExternalFetchErrors; a line that is non-zero on every daily run trips ScWikiCensusIncompleteStreak, which means orphan detection has been off for days.",
+      "description": "Swallowed UEX / SC-Wiki fetch, parse and pagination-contract failures (basetool_external_fetch_errors_total). Each is mapped to an empty or incomplete result, so the sync job still records success and the staleness alerts stay quiet. For scwiki this doubles as the only proxy for 'the scwiki_deleted orphan sweep stood down this run': an incomplete page walk always contributes one increment here. A burst trips ExternalFetchErrors; a line that is non-zero on every daily run trips ScWikiCensusIncompleteStreak, which means orphan detection has been off for days (in 2026-08 that was a defect in the census check itself, not the feed — ADR-0147).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

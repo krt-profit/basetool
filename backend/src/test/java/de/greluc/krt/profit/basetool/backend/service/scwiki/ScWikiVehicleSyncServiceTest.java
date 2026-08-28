@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service.scwiki;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
@@ -73,6 +74,22 @@ class ScWikiVehicleSyncServiceTest {
   }
 
   @Test
+  void syncVehicles_requestsTheVehicleSpecificPageSize() {
+    // A vehicle row carries its whole port / shield / power tree, so at the shared page size of 200
+    // page 1 alone is 10.4 MB against the client's 16 MB codec ceiling - and an overrun is not a
+    // truncation but a decode failure that this client swallows into an empty list, stopping the
+    // sync silently. The walk must therefore ask for the vehicle-specific page size.
+    properties.setVehiclesPageSize(50);
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of()));
+
+    service.syncVehicles();
+
+    verify(scWikiClient)
+        .fetchAllPagesResult(any(), any(), eq("vehicles"), isNull(), isNull(), eq(50));
+  }
+
+  @Test
   void syncVehicles_fillsWikiColumns_flipsUexOnlyToBoth_andLeavesUexFieldsUntouched() {
     UUID uuid = UUID.randomUUID();
     ShipType uexShip = new ShipType();
@@ -93,7 +110,7 @@ class ScWikiVehicleSyncServiceTest {
             2.0,
             Map.of("en_EN", "Wiki English desc", "de_DE", "Wiki Deutsch"));
 
-    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles")))
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(shipTypeRepository.findByExternalUuid(uuid)).thenReturn(Optional.of(uexShip));
     when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -121,7 +138,7 @@ class ScWikiVehicleSyncServiceTest {
     ScWikiVehicleDto dto =
         new ScWikiVehicleDto(
             uuid, "wiki-only-ship", "Wiki Only Ship", null, null, null, Map.of("en_EN", "x"));
-    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles")))
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(shipTypeRepository.findByExternalUuid(uuid)).thenReturn(Optional.empty());
     when(shipTypeRepository.findByNameIgnoreCase("Wiki Only Ship")).thenReturn(Optional.empty());
@@ -146,7 +163,7 @@ class ScWikiVehicleSyncServiceTest {
     // legacy: externalUuid null (pre-R2 row never UUID-stamped)
     ScWikiVehicleDto dto =
         new ScWikiVehicleDto(uuid, "drake-cutlass", "Cutlass Black", null, null, null, null);
-    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles")))
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
     when(shipTypeRepository.findByExternalUuid(uuid)).thenReturn(Optional.empty());
     when(shipTypeRepository.findByNameIgnoreCase("Cutlass Black")).thenReturn(Optional.of(legacy));
@@ -164,7 +181,7 @@ class ScWikiVehicleSyncServiceTest {
 
   @Test
   void syncVehicles_emptyResponse_skipsOrphanSweep() {
-    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles")))
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.of(List.of()));
 
     int written = service.syncVehicles();
@@ -179,7 +196,7 @@ class ScWikiVehicleSyncServiceTest {
   void syncVehicles_notModified_reportsLiveCount_andSkipsSyncAndSweep() {
     // A 304 (unchanged) catalogue must report the live Wiki-linked ship_type count, NOT 0 — an
     // all-304 run is healthy, not a zero-item outage (#1182).
-    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles")))
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.unchanged());
     when(shipTypeRepository.countLiveScwikiShipTypes()).thenReturn(42L);
 
@@ -199,7 +216,7 @@ class ScWikiVehicleSyncServiceTest {
     UUID uuid = UUID.randomUUID();
     ScWikiVehicleDto dto =
         new ScWikiVehicleDto(uuid, "drake-caterpillar", "Caterpillar", null, null, null, null);
-    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles")))
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.partial(List.of(dto)));
     when(shipTypeRepository.findByExternalUuid(uuid)).thenReturn(Optional.empty());
     when(shipTypeRepository.findByNameIgnoreCase("Caterpillar")).thenReturn(Optional.empty());
