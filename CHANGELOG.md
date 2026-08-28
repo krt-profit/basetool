@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Eine Anmeldung übernimmt kein fremdes Konto mehr, nur weil der Callsign passt.** Fand die
+  Anmeldung kein Konto zur Kennung des Tokens, band sie die Sitzung bisher an das Konto mit dem
+  gleichen Benutzernamen — und da Keycloak-Benutzernamen nach einer Löschung wiederverwendbar
+  sind, erbte ein neu angelegtes Konto so Lager, Bankrechte und Benachrichtigungen des früheren
+  Mitglieds. Es entsteht jetzt eine normale neue Registrierung; die Freigabeliste markiert sie mit
+  „Callsign doppelt“, damit die Admins entscheiden statt zu erben.
+
+
 ## [v1.6.8](https://github.com/krt-profit/basetool/releases/tag/v1.6.8) - 2026-08-28
 
 ## [v1.6.7](https://github.com/krt-profit/basetool/releases/tag/v1.6.7) - 2026-08-28

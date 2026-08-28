@@ -84,6 +84,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
             "VanguardPilot",
             Instant.parse("2026-06-22T00:00:00Z"),
             null,
+            false,
             1L);
     PendingRegistrationDto withoutNick =
         new PendingRegistrationDto(
@@ -92,6 +93,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
             null,
             Instant.parse("2026-06-22T00:00:00Z"),
             null,
+            false,
             1L);
 
     when(backendApiClient.get(eq("/api/v1/admin/registrations"), anyTypeRef()))
@@ -116,6 +118,53 @@ class AdminDiscordRegistrationsNicknameRenderTest {
         .isEqualTo(1);
   }
 
+  /**
+   * The queue marks a registration whose callsign a second account already holds (#1639).
+   *
+   * <p>This is the surface the removed name-matching fallback is replaced by: the login no longer
+   * adopts the other account silently, so the admin has to be told that approving this row creates
+   * a <b>second</b> account for one callsign. Rendered on the row rather than as a page-level
+   * banner, because the decision is per row.
+   */
+  @Test
+  void queue_marksARegistrationWhoseCallsignAnotherAccountHolds() throws Exception {
+    PendingRegistrationDto colliding =
+        new PendingRegistrationDto(
+            UUID.randomUUID(),
+            "AliceCallsign",
+            null,
+            Instant.parse("2026-06-22T00:00:00Z"),
+            null,
+            true,
+            1L);
+    PendingRegistrationDto ordinary =
+        new PendingRegistrationDto(
+            UUID.randomUUID(),
+            "BobCallsign",
+            null,
+            Instant.parse("2026-06-22T00:00:00Z"),
+            null,
+            false,
+            1L);
+
+    when(backendApiClient.get(eq("/api/v1/admin/registrations"), anyTypeRef()))
+        .thenReturn(List.of(colliding, ordinary));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/admin/discord-registrations")
+                    .with(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(countOccurrences(html, "Callsign doppelt"))
+        .as("exactly the colliding row carries the marker, not every row")
+        .isEqualTo(1);
+  }
+
   @Test
   void queue_rendersLinkActionAndAccountPicker() throws Exception {
     when(backendApiClient.get(eq("/api/v1/admin/registrations"), anyTypeRef()))
@@ -127,6 +176,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
                     null,
                     Instant.parse("2026-07-20T00:00:00Z"),
                     null,
+                    false,
                     1L)));
 
     String html =
@@ -157,7 +207,13 @@ class AdminDiscordRegistrationsNicknameRenderTest {
             eq(PendingRegistrationDto.class)))
         .thenReturn(
             new PendingRegistrationDto(
-                target, "MadrukSedras", null, Instant.parse("2026-07-20T00:00:00Z"), null, 2L));
+                target,
+                "MadrukSedras",
+                null,
+                Instant.parse("2026-07-20T00:00:00Z"),
+                null,
+                false,
+                2L));
 
     mockMvc
         .perform(
@@ -183,6 +239,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
                     null,
                     Instant.parse("2026-06-22T00:00:00Z"),
                     Instant.parse("2026-06-29T09:41:00Z"),
+                    false,
                     3L)));
 
     String html =
@@ -217,6 +274,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
                     null,
                     Instant.parse("2026-06-22T00:00:00Z"),
                     null,
+                    false,
                     1L)));
     when(backendApiClient.get(eq("/api/v1/admin/registrations?status=REJECTED"), anyTypeRef()))
         .thenThrow(new IllegalStateException("backend does not know ?status="));
@@ -246,7 +304,13 @@ class AdminDiscordRegistrationsNicknameRenderTest {
             eq(PendingRegistrationDto.class)))
         .thenReturn(
             new PendingRegistrationDto(
-                id, "StolpiCallsign", null, Instant.parse("2026-06-22T00:00:00Z"), null, 4L));
+                id,
+                "StolpiCallsign",
+                null,
+                Instant.parse("2026-06-22T00:00:00Z"),
+                null,
+                false,
+                4L));
 
     mockMvc
         .perform(

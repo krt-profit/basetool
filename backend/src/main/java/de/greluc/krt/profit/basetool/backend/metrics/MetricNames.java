@@ -87,6 +87,22 @@ public final class MetricNames {
    */
   public static final String KEYCLOAK_SYNC_FETCH_FAILURES = "basetool.keycloak.sync.fetch.failures";
 
+  // --- Identity (UserReconciliationService) ----------------------------------------------
+
+  /**
+   * Counter {@code basetool_user_callsign_collisions_total} (untagged). Bumped when a login
+   * presents a subject that matches no {@code app_user} row while another row holds the same {@code
+   * preferred_username} (ADR-0142 point 5, #1639).
+   *
+   * <p>Access-control-relevant, and low-volume by nature: it is normally zero. Until this release
+   * the login silently adopted that row, so the case had no signal at all. A sustained non-zero
+   * rate means either a member is being re-provisioned repeatedly, or a Keycloak username is being
+   * reused after a deletion -- both want a human, and the admin queue shows the same collision.
+   * Untagged on purpose: a username is a member's callsign and would be both unbounded and PII
+   * (REQ-OBS-011, REQ-OBS-004).
+   */
+  public static final String USER_CALLSIGN_COLLISIONS = "basetool.user.callsign.collisions";
+
   // --- HTTP error rate (GlobalExceptionHandler) ------------------------------------------
 
   /** Counter {@code basetool_http_error_total} — tag {@code code} (stable RFC-7807 code). */

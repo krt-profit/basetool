@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -302,6 +303,48 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    */
   @EntityGraph(attributePaths = {"roles", "roles.permissions"})
   Optional<User> findByUsername(String username);
+
+  /**
+   * Ids of every account holding {@code username}, without hydrating the entity or its role graph.
+   *
+   * <p>Used at login to detect a callsign collision: a subject that matches no row while another
+   * account holds the same {@code preferred_username} (ADR-0142 point 5, #1639). Only the id is
+   * ever needed -- it is what gets logged, and a username must never reach a log line (REQ-OBS-004)
+   * -- so this deliberately does not go through {@link #findByUsername(String)}, whose
+   * {@code @EntityGraph} would fetch roles and permissions for a check that reads one column.
+   *
+   * <p>Returns a list rather than an {@code Optional} because {@code app_user.username} carries no
+   * unique constraint: after this release two accounts may legitimately share a callsign until an
+   * admin merges them.
+   *
+   * @param username the {@code preferred_username} to look for; exact match
+   * @return the ids of the accounts holding it, empty when none does
+   */
+  @Query("SELECT u.id FROM User u WHERE u.username = :username")
+  List<UUID> findIdsByUsername(@Param("username") String username);
+
+  /**
+   * Of the given usernames, the ones held by <b>more than one</b> account.
+   *
+   * <p>Backs the "same callsign, different account" marker on the admin registration queue: one
+   * query for the whole page rather than a lookup per row (REQ-DATA-003). Matching is
+   * case-insensitive, because Keycloak treats usernames that way and an admin comparing two rows by
+   * eye does too; the returned values are lower-cased, so callers must fold their own side of the
+   * comparison as well.
+   *
+   * @param usernames the lower-cased usernames to check; must not be empty (JPQL rejects an empty
+   *     {@code IN} list)
+   * @return the subset held by two or more accounts, lower-cased; empty when none collides
+   */
+  @Query(
+      """
+      SELECT LOWER(u.username) FROM User u
+      WHERE LOWER(u.username) IN :usernames
+      GROUP BY LOWER(u.username)
+      HAVING COUNT(u.id) > 1
+      """)
+  Set<String> findUsernamesHeldByMoreThanOneAccount(
+      @Param("usernames") Collection<String> usernames);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code
