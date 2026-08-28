@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Admins können zwei Konten eines Mitglieds zusammenführen.** Wer mit einer neuen Kennung
+  ankommt, bekommt ein neues Konto — das alte behält bis dahin Lager, Hangar, Inventar,
+  Mitgliedschaften, Bankrechte und Benachrichtigungen. Die neue Aktion in der Freigabeliste
+  schiebt genau das herüber; was festhält, *wer etwas getan hat*, bleibt stehen — das ist
+  Historie und keine Habe. Halten beide Konten ein Bank-Konto, bricht die Aktion ab, statt zwei
+  Kassenbücher zu raten.
+
 ### Fixed
 
 - **Die Daten eines gelöschten Kontos überleben es nicht mehr.** Fünf Spalten hielten eine
