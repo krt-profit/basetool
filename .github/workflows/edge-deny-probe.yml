@@ -133,6 +133,13 @@ jobs:
           probe GET /api/v1/ship-types 200
           probe GET /api/v1/materials/search 200
           probe GET /api/v1/locations/search 200
+          # Phase M - the create form's write and its two mandatory pickers. All three must reach
+          # the backend and be refused there; the org-wide list and the extractor import must not.
+          probe POST /api/v1/refinery-orders 401
+          probe GET /api/v1/locations/refineries 401
+          probe GET /api/v1/refining-methods 401
+          probe GET /api/v1/refinery-orders/all 404
+          probe POST /api/v1/refinery-orders/import-extract 404
           probe GET "/api/v1/materials/$nil/terminals" 401
 
           # Refused at the method seam, which renders 403 rather than 401.
