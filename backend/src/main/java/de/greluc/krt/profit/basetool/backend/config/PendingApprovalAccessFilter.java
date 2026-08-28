@@ -58,8 +58,15 @@ import tools.jackson.databind.ObjectMapper;
  * refused with {@code 403} on every {@code /api/**} endpoint, with one deliberate exception — the
  * registration-status endpoint the frontend reads to route them to the waiting page.
  *
- * <p>Runs after the bearer-token authentication filter (so the authorities are already assembled)
- * and is a no-op for every approved/role-bearing user, so it adds no risk to the normal path.
+ * <p>Runs after {@link ActingMemberFilter}, which itself sits after the bearer-token authentication
+ * filter — so the authorities are already assembled, and an ingest-gateway request has already had
+ * the member it acts for substituted as its security identity (ADR-0129). That substitution is why
+ * this gate also covers the desktop extractor: the gateway authenticates with its own service
+ * account and only names the member in an on-behalf-of header, so without it the filter would judge
+ * a service account instead of the person sending. The acting member's authorities are assembled by
+ * the same converter the login path uses, so a member who is still PENDING carries the marker here
+ * too and is refused. The filter is a no-op for every approved/role-bearing user, so it adds no
+ * risk to the normal path.
  *
  * <p>The 403 body is a full RFC&nbsp;7807 problem document mirroring {@code GlobalExceptionHandler}
  * (RFC-7807 hardening, REQ-API-004): {@code type} built off {@link AppProblemProperties}, localized
