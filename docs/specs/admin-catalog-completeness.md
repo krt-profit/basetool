@@ -34,8 +34,8 @@ one bounded page. The frontend assembles the complete set by walking the backend
 the last page is reached (shared helper: `CatalogPages.fetchAll`), bounded only by a safety cap
 against inconsistent backend page math. Covered surfaces: `/admin/materials` (materials),
 `/admin/locations` (locations), `/admin/mission-data` (job types, squadrons, frequency types),
-`/admin/special-commands` (Spezialkommandos), `/admin/settings` (intake-SK picker, promotion
-squadron toggles), `/admin/uex-data` (cities, space stations, outposts, POIs, terminals),
+`/admin/special-commands` (Spezialkommandos), `/admin/settings` (promotion squadron toggles; the
+intake-SK picker was removed with the anonymous order form, ADR-0149), `/admin/uex-data` (cities, space stations, outposts, POIs, terminals),
 `/ship-data` (manufacturers, ship types). Any *new* admin surface of this shape falls under this
 requirement as well, and an existing surface later found to match the shape is converted when it
 is next touched.

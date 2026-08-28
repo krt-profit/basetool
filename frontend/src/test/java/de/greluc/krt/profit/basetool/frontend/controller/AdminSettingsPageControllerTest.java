@@ -29,7 +29,6 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.UUID;
@@ -50,36 +49,28 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 @ExtendWith(MockitoExtension.class)
 class AdminSettingsPageControllerTest {
 
-  private static final String INTAKE_URI = "/api/v1/settings/job_order.intake_special_command_id";
-
   @Mock private BackendApiClient backendApiClient;
 
   @InjectMocks private AdminSettingsPageController controller;
 
   @Test
-  void updateSettings_persistsIntakeSk_whenAnSkIsSelected() {
-    RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
-    UUID sk = UUID.randomUUID();
-
-    controller.updateSettings("30", 0L, "90", 0L, "UP", 0L, "0.5", 0L, sk.toString(), 0L, ra);
-
-    verify(backendApiClient).put(eq(INTAKE_URI), any(), eq(SystemSettingDto.class));
-  }
-
-  @Test
-  void updateSettings_skipsIntakeSk_whenSelectionIsBlank() {
+  void updateSettings_neverTouchesTheDroppedIntakeSetting() {
+    // The intake Spezialkommando went with the anonymous order form (ADR-0149, V234). Pinned as a
+    // negative rather than deleted outright, because a settings page that silently starts writing
+    // a key nothing reads is exactly the rot the removal was for.
     RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
-    controller.updateSettings("30", 0L, "90", 0L, "UP", 0L, "0.5", 0L, "  ", 0L, ra);
+    controller.updateSettings("30", 0L, "90", 0L, "UP", 0L, "0.5", 0L, ra);
 
-    verify(backendApiClient, never()).put(eq(INTAKE_URI), any(), any());
+    verify(backendApiClient, never())
+        .put(eq("/api/v1/settings/job_order.intake_special_command_id"), any(), any());
   }
 
   // covers REQ-ADMIN-001 — a squadron beyond the first backend page still gets its promotion
   // toggle rendered on the settings page
   @Test
   void viewSettings_walksAllSquadronPickerPages() {
-    // Given — the squadron catalog spans two backend pages; the SK picker is empty
+    // Given — the squadron catalog spans two backend pages
     SquadronDto first = new SquadronDto(UUID.randomUUID(), "Alpha", "AL", "", true, true, true, 0L);
     SquadronDto second = new SquadronDto(UUID.randomUUID(), "Zulu", "ZU", "", true, true, true, 0L);
     String squadronsBase = "/api/v1/squadrons?size=1000&sort=name,asc";
@@ -87,9 +78,6 @@ class AdminSettingsPageControllerTest {
         .thenReturn(new PageResponse<>(List.of(second), 0, 1000, 2, 2, List.of()));
     when(backendApiClient.get(eq(squadronsBase + "&page=1"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(first), 1, 1000, 2, 2, List.of()));
-    when(backendApiClient.get(
-            eq("/api/v1/special-commands?size=1000&sort=name,asc&page=0"), anyTypeRef()))
-        .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of()));
     ConcurrentModel model = new ConcurrentModel();
 
     // When

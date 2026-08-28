@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Removed
+
+- **Aufträge lassen sich nicht mehr ohne Login anlegen.** Das öffentliche Anfrageformular ist
+  entfallen: `/orders/create` verlangt jetzt eine Anmeldung, und damit auch die Einstellung
+  „Eingangs-Spezialkommando", die es nur gab, weil eine anonyme Anfrage keine Einheit mitbrachte.
+  Wer der Organisation einen Auftrag geben will, braucht ein Konto. Hintergrund: ADR-0149.
+
 ### Fixed
 
 - **Ein einzelner Aussetzer beim UEX-Abgleich löscht keine Items mehr.** Schlug einer der rund 50

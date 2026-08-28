@@ -67,7 +67,6 @@
                 <input type="hidden" name="ageRedVersion" th:value="${ageRedVersion}">
                 <input type="hidden" name="refineryRoundingVersion" th:value="${refineryRoundingVersion}">
                 <input type="hidden" name="transferFeeVersion" th:value="${transferFeeVersion}">
-                <input type="hidden" name="intakeSpecialCommandVersion" th:value="${intakeSpecialCommandVersion}">
 
                 <div class="form-group krtm-max-width-300px-c261">
                     <label for="ageYellowDays" th:text="#{admin.settings.orders.yellowDays}">Tage bis gelbe Markierung</label>
@@ -99,22 +98,6 @@
                     <div class="form-group krtm-max-width-300px-c261">
                         <label for="transferFeePercent" th:text="#{admin.settings.operations.transferFeeRate}">Überweisungsgebühr (%)</label>
                         <input type="number" id="transferFeePercent" name="transferFeePercent" th:value="${transferFeePercent}" min="0" max="99.99" step="0.01" required>
-                    </div>
-                </div>
-
-                <div class="data-section mt-2">
-                    <h2 th:text="#{admin.settings.joborder}">Auftragsannahme</h2>
-                    <p class="mb-1 text-muted" th:text="#{admin.settings.joborder.intakeSpecialCommand.description}">Spezialkommando, dem anonym erstellte Aufträge zugewiesen werden.</p>
-
-                    <div class="form-group krtm-max-width-300px-c261">
-                        <label for="intakeSpecialCommandId" th:text="#{admin.settings.joborder.intakeSpecialCommand}">Eingangs-Spezialkommando</label>
-                        <select id="intakeSpecialCommandId" name="intakeSpecialCommandId">
-                            <option value="" th:text="#{admin.settings.joborder.intakeSpecialCommand.none}">— Keines —</option>
-                            <option th:each="sk : ${specialCommands}"
-                                    th:value="${sk.id}"
-                                    th:text="${sk.name}"
-                                    th:selected="${sk.id != null and sk.id.toString() == intakeSpecialCommandId}">SK</option>
-                        </select>
                     </div>
                 </div>
 

@@ -223,8 +223,6 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         const el = settingsForm.elements;
-        const intakeIdEl = el['intakeSpecialCommandId'];
-        const intakeVerEl = el['intakeSpecialCommandVersion'];
         const payload = {
             ageYellowDays: el['ageYellowDays'].value,
             ageYellowVersion: Number(el['ageYellowVersion'].value),
@@ -234,8 +232,6 @@ document.addEventListener('DOMContentLoaded', function () {
             refineryRoundingVersion: Number(el['refineryRoundingVersion'].value),
             transferFeePercent: el['transferFeePercent'].value,
             transferFeeVersion: Number(el['transferFeeVersion'].value),
-            intakeSpecialCommandId: intakeIdEl ? intakeIdEl.value : '',
-            intakeSpecialCommandVersion: intakeVerEl ? Number(intakeVerEl.value) : 0,
         };
         const submitBtn = settingsForm.querySelector('button[type="submit"]');
         if (submitBtn) {
@@ -262,7 +258,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     setVer('ageRedVersion', body.ageRedVersion);
                     setVer('refineryRoundingVersion', body.refineryRoundingVersion);
                     setVer('transferFeeVersion', body.transferFeeVersion);
-                    setVer('intakeSpecialCommandVersion', body.intakeSpecialCommandVersion);
                     if (body.transferFeePercent != null && el['transferFeePercent']) {
                         el['transferFeePercent'].value = body.transferFeePercent;
                     }

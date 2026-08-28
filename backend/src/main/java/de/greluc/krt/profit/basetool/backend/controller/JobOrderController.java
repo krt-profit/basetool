@@ -96,8 +96,9 @@ import org.springframework.web.bind.annotation.RestController;
  * mutations are constrained to the caller's visibility scope (Phase 3, #343) via {@code
  * @ownerScopeService.canSee/canEditJobOrder}: SK-responsible orders are public, squadron-
  * responsible orders private to that squadron + admins. Mutations additionally require LOGISTICIAN
- * or above; delete is ADMIN-only. Job-order creation is {@code permitAll()} so unauthenticated
- * squadron members can file requests via a public form (routed onto the configured intake SK).
+ * or above; delete is ADMIN-only. Job-order creation requires a login but no role beyond it
+ * (ADR-0149) — it used to be {@code permitAll()}, a public request form whose orders were stamped
+ * onto a configured intake Spezialkommando because they had no author.
  *
  * <p>Heavy concurrency lives in the service layer: {@code updateJobOrderPriority} acquires a
  * pessimistic write lock for the reorder shift; {@code updateJobOrderStatus} atomically unlinks

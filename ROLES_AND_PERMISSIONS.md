@@ -78,10 +78,12 @@ deliberate construction seam that makes the sign-up flow usable without a login.
 As soon as a participant is linked to a real user, only that user themselves or an
 elevated role (Mission-Manager/Officer/Admin) may edit them.
 
-**Where anonymous orders go:** When created without a login, the order is
-mandatorily stamped onto the configured **intake Spezialkommando** (system setting
-`job_order.intake_special_command_id`, introduced with V128). This way every guest
-order lands in a defined SK queue instead of nowhere.
+**Creating a job order requires a login** ([ADR-0149](docs/adr/0149-the-job-order-request-form-requires-a-login.md)).
+Until 2026-08-28 it did not: `POST /api/v1/orders` and `/orders/items` were `permitAll`, the web's
+`/orders/create` was reachable by anyone, and an order raised that way was stamped onto a configured
+**intake Spezialkommando** (`job_order.intake_special_command_id`, V128) because it had no author.
+That form is gone, the setting is dropped (V234), and every order now names the unit its creator
+picked.
 
 ### 1.2 What anonymous users may **not** do
 
@@ -501,7 +503,7 @@ or to ownerless; a non-admin may only pick a direct membership or a unit within 
 ¹ Only one's own entry and only while still a participant of the mission.
 ² The finance ledger is the payout view and requires member-or-above: anonymous → `401`,
 roleless guest → `403` (a guest is treated like anonymous for missions, §1.3). Creating job orders
-is unaffected by this (possible for everyone).
+requires a login since ADR-0149, but no role beyond it — a roleless guest may raise one.
 ³ For any participant of the mission, but only within their own owning-OrgUnit scope
 (`canManageMission`); the mission owner and its co-managers pass the same way. **Creating** is a
 write and therefore no longer rides the read-level `canSeeMission`, whose cross-squadron public

@@ -117,8 +117,8 @@ the gap where a multi-membership receiver was hard-rejected with the `>1 + no ou
 because the form offered no choice — the picker is always shown so the receiver's OrgUnit pool is
 explicit, while the inherited default keeps a same-OrgUnit self-store one-click.
 
-Job Order uses its own resolvers: `responsible_org_unit_id` must be profit-eligible (or the configured intake SK
-from system setting `job_order.intake_special_command_id` for guest creations);
+Job Order uses its own resolvers: `responsible_org_unit_id` is required and must be profit-eligible
+— the guest fallback onto a configured intake SK went with the anonymous create (ADR-0149);
 `requesting_org_unit_id` accepts any OrgUnit and is freely editable.
 
 > **Amended by epic #692 (REQ-ORG-016):** stamping **validation** widens to `(direct memberships ∪
@@ -459,8 +459,9 @@ extended:
 - [x] The create-form pickers surface the Bereich/OL tiers in the UI: the Mission/Operation/Refinery/
   Inventory **owning** picker (cascade-scoped via `/api/v1/users/me/pickable-org-units`, Phase 5) and
   the Job Order **requesting** (Auftraggeber) picker (every active unit via
-  `/api/v1/org-units/active-all-kinds` for an authenticated caller; the anonymous public order form
-  keeps the Staffel/SK-only `/api/v1/org-units/active` catalog). The Job Order **responsible** picker
+  `/api/v1/org-units/active-all-kinds`; since ADR-0149 the order form has no anonymous caller, so
+  the Staffel/SK-only `/api/v1/org-units/active` catalogue is its degradation path rather than its
+  guest path). The Job Order **responsible** picker
   stays profit-eligible Staffel/SK only — Bereiche/OL are never profit-eligible, so they can be the
   customer but never the processor.
 

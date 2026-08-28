@@ -109,10 +109,12 @@ jobs:
             probe GET "$p" 401
           done
 
-          # The one where only the VERB separates two surfaces: this path also answers a POST that
-          # is permitAll by design (the public request form), and the vhost's read-only guard is
-          # what keeps it off this host.
-          probe POST /api/v1/orders 405
+          # This used to be the one where only the VERB separated two surfaces: the path also
+          # answered a POST that was permitAll by design (the public request form), and the
+          # read-only guard was what kept it off this host. The create requires a login since
+          # ADR-0149, so the vhost admits it and the chain refuses an anonymous caller -- which is
+          # the stronger assertion, because it does not depend on an nginx rule to hold.
+          probe POST /api/v1/orders 401
 
 
           # Phase 3's writes. Same rule as phase 2's reads above: these join with the ONE paste

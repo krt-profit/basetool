@@ -602,24 +602,27 @@ public class SecurityConfig {
                         "/api/v1/missions/*/participants/*/check-in/slim",
                         "/api/v1/missions/*/participants/*/check-out/slim")
                     .permitAll()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/orders")
-                    .permitAll()
-                    // Item-order create + its catalog reads mirror the material create's anonymous
-                    // access (the public request form). The item-handover / report endpoints are
-                    // NOT listed here — they stay behind the authenticated catch-all +
-                    // @PreAuthorize.
-                    .requestMatchers(HttpMethod.POST, "/api/v1/orders/items")
-                    .permitAll()
+                    // Both order creates require a login (ADR-0149). They were permitAll — the
+                    // public request form, which let an outsider ask the organisation for material
+                    // without an account and stamped the order onto the intake Spezialkommando
+                    // because it had no author. That form is gone: every write in this system is
+                    // attributable to a person, and this was the one that was not. Listed
+                    // explicitly rather than left to the authenticated catch-all so the change is
+                    // visible at the place that used to say the opposite.
+                    .requestMatchers(HttpMethod.POST, "/api/v1/orders", "/api/v1/orders/items")
+                    .authenticated()
+                    // The item catalogue followed the anonymous item create and has no other
+                    // anonymous consumer, so it follows it out again.
                     .requestMatchers(
                         HttpMethod.GET,
                         "/api/v1/orders/item-catalog",
                         "/api/v1/orders/item-catalog/**")
-                    .permitAll()
-                    // The Job Order create form is reachable anonymously (the public request form),
-                    // so the org-unit catalog that fills its requesting/responsible pickers must be
-                    // too. The payload carries no PII — only name + shorthand + kind + profit flag
-                    // —
-                    // mirroring the already-permitAll /api/v1/squadrons catalog.
+                    .authenticated()
+                    // The active Staffel/SK catalogue stays anonymous. Its stated reason was the
+                    // public order form (now gone, ADR-0149), but it is not the only one: it
+                    // mirrors the already-permitAll /api/v1/squadrons catalogue, carries no PII —
+                    // name + shorthand + kind + profit flag — and the anonymous mission sign-up
+                    // still renders org names. Closing it would be a second, unrelated change.
                     .requestMatchers(HttpMethod.GET, "/api/v1/org-units/active")
                     .permitAll()
                     // Finance-entry creation is no longer anonymous: the method-level

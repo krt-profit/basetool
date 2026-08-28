@@ -32,14 +32,13 @@ import org.jetbrains.annotations.Nullable;
  * <p>Two org-unit references:
  *
  * <ul>
- *   <li>{@code responsibleOrgUnitId} — the org unit that <em>processes</em> the order. Must be a
- *       profit-eligible squadron or Spezialkommando (the service returns 400 for an authenticated
- *       caller otherwise). Required for authenticated callers. For anonymous/guest creations it is
- *       <b>honoured when it names a profit-eligible org unit</b>; otherwise (absent, unresolvable,
- *       or not profit-eligible) the order is routed onto the configured intake Spezialkommando
- *       ({@code job_order.intake_special_command_id}), so a guest can never direct work to a
- *       non-profit unit. Ignored on update — the responsible org unit is only changed through the
- *       dedicated reassignment endpoint ({@code PATCH /api/v1/orders/{id}/responsible-org-unit}).
+ *   <li>{@code responsibleOrgUnitId} — the org unit that <em>processes</em> the order. Required,
+ *       and must be a profit-eligible squadron or Spezialkommando; the service returns 400
+ *       otherwise. Creating an order requires a login (ADR-0149), so there is one rule rather than
+ *       the two this field used to carry — the forgiving guest path that routed an anonymous
+ *       request onto a configured intake Spezialkommando went with the public request form. Ignored
+ *       on update — the responsible org unit is only changed through the dedicated reassignment
+ *       endpoint ({@code PATCH /api/v1/orders/{id}/responsible-org-unit}).
  *   <li>{@code requestingOrgUnitId} — the org unit the order is placed on behalf of (the customer).
  *       Any squadron or Spezialkommando, no profit-eligibility restriction. Mandatory; the service
  *       returns 400 when it does not resolve.

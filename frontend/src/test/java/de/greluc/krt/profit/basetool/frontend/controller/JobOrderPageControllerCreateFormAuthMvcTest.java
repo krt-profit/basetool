@@ -33,46 +33,43 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Anonymous-guest behaviour of the Job-Order create form ({@code GET /orders/create}).
+ * Who may open the Job-Order create form ({@code GET /orders/create}), and what it loads.
  *
- * <p>Covers two things an unauthenticated caller must get right:
+ * <p>The form used to be anonymous — the public request form — and this class pinned the guest
+ * behaviour: the Staffel/SK-only picker catalogue and the pre-selected intake Spezialkommando. That
+ * feature is gone (ADR-0149), so the first thing to pin is the refusal.
+ *
+ * <p>Two things survive the change and are still worth guarding:
  *
  * <ul>
  *   <li>The job-order materials catalog loads through the <em>public</em> WebClient ({@code
  *       isPublic=true}), not the OAuth2-bearer-relaying authenticated one — otherwise the scmdb
  *       shopping-list import finds zero matches (the regression that first motivated this test).
- *   <li>Both owner-pickers populate from the {@code permitAll} {@code /api/v1/org-units/active}
- *       catalog (requesting = all, responsible = the profit-eligible subset incl. SKs), and the
- *       responsible picker is pre-selected to the configured intake Spezialkommando — mirroring the
- *       backend's guest fallback so the form shows the unit the order will land on.
+ *       The endpoint is still {@code permitAll}, so this stays true for a logged-in caller too.
+ *   <li>The blanket {@code .form-group input} rule keeps its zero-specificity {@code :where()}
+ *       exclusion, which is a CSS invariant and has nothing to do with who is looking.
  * </ul>
  */
 @SpringBootTest
-class JobOrderPageControllerCreateFormAnonymousMvcTest {
-
-  private static final String ACTIVE_URI = "/api/v1/org-units/active";
-  private static final String ALL_KINDS_URI = "/api/v1/org-units/active-all-kinds";
-  private static final String INTAKE_SETTING_URI =
-      "/api/v1/settings/job_order.intake_special_command_id";
+class JobOrderPageControllerCreateFormAuthMvcTest {
 
   @Autowired private WebApplicationContext context;
 
@@ -91,8 +88,17 @@ class JobOrderPageControllerCreateFormAnonymousMvcTest {
 
   @Test
   @WithAnonymousUser
-  void viewCreateForm_AsAnonymousGuest_ShouldFetchMaterialsThroughPublicWebClient()
-      throws Exception {
+  void viewCreateForm_AsAnonymousGuest_IsRefused() throws Exception {
+    // The whole point of ADR-0149: an order is raised by somebody, and the form says so before it
+    // renders. A redirect, not a 403 — the frontend sends a browser to the OAuth2 login.
+    mockMvc.perform(get("/orders/create")).andExpect(status().is3xxRedirection());
+
+    verify(backendApiClient, never()).getCached(any(CachedCatalog.class), anyTypeRef(), eq(true));
+  }
+
+  @Test
+  @WithMockUser
+  void viewCreateForm_ShouldFetchMaterialsThroughPublicWebClient() throws Exception {
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), eq(true)))
         .thenReturn(Collections.emptyList());
 
@@ -113,7 +119,7 @@ class JobOrderPageControllerCreateFormAnonymousMvcTest {
   // rule that reserves right padding for the dropdown chevron. Guards the selector text so a
   // revert to the unfiltered blanket rule fails the build.
   @Test
-  @WithAnonymousUser
+  @WithMockUser
   void viewCreateForm_blanketInputRuleExcludesRadioAndCheckboxControls() throws Exception {
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), eq(true)))
         .thenReturn(Collections.emptyList());
@@ -129,53 +135,32 @@ class JobOrderPageControllerCreateFormAnonymousMvcTest {
   }
 
   @Test
-  @WithAnonymousUser
-  void viewCreateForm_AsAnonymousGuest_PopulatesPickersAndPreselectsIntakeSk() throws Exception {
-    UUID intakeId = UUID.randomUUID();
+  @WithMockUser
+  void viewCreateForm_PopulatesBothPickersFromTheAllKindsCatalogue() throws Exception {
     OrgUnitMembershipOptionDto profitStaffel =
         new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Profit Staffel", "PS", "SQUADRON", true);
-    OrgUnitMembershipOptionDto intakeSk =
-        new OrgUnitMembershipOptionDto(intakeId, "Intake SK", "INTK", "SPECIAL_COMMAND", true);
     OrgUnitMembershipOptionDto nonProfitSk =
         new OrgUnitMembershipOptionDto(
             UUID.randomUUID(), "Combat SK", "CSK", "SPECIAL_COMMAND", false);
 
-    // Reference catalogs (materials / orderable items / squadrons) go through the cached public
-    // client; an empty list keeps them from blocking the render.
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), eq(true)))
         .thenReturn(Collections.emptyList());
-    // The org-unit catalog and the intake-SK setting are reachable anonymously (permitAll) via the
-    // public client. The org-unit catalog is now cached (REQ-DATA-007).
-    when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef(), eq(true)))
-        .thenReturn(List.of(profitStaffel, intakeSk, nonProfitSk));
-    when(backendApiClient.get(eq(INTAKE_SETTING_URI), eq(SystemSettingDto.class), eq(true)))
-        .thenReturn(new SystemSettingDto(INTAKE_SETTING_URI, intakeId.toString(), 0L));
+    when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
+        .thenReturn(List.of(profitStaffel, nonProfitSk));
 
     mockMvc
         .perform(get("/orders/create"))
         .andExpect(status().isOk())
         .andExpect(view().name("orders-create"))
-        // Requesting picker offers every active org unit, including the non-profit SK ...
+        // The customer picker offers every active unit, the non-profit SK included ...
         .andExpect(content().string(Matchers.containsString("Combat SK")))
-        .andExpect(content().string(Matchers.containsString("Profit Staffel")))
-        // ... and the responsible picker pre-selects the configured intake SK. Thymeleaf preserves
-        // the template's inter-attribute newline, so value and selected are whitespace- (not
-        // space-) separated — match with a DOTALL regex.
-        .andExpect(
-            content()
-                .string(
-                    Matchers.matchesPattern(
-                        Pattern.compile(
-                            ".*value=\""
-                                + Pattern.quote(intakeId.toString())
-                                + "\"\\s+selected=\"selected\".*",
-                            Pattern.DOTALL))));
+        .andExpect(content().string(Matchers.containsString("Profit Staffel")));
 
-    verify(backendApiClient).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef(), eq(true));
-    verify(backendApiClient).get(eq(INTAKE_SETTING_URI), eq(SystemSettingDto.class), eq(true));
-    // A guest keeps the Staffel/SK-only catalog — the Bereich/OL tiers (authenticated, epic #692)
-    // are never offered to an anonymous caller.
+    // ... and it comes from the all-kinds catalogue, which carries the Bereich/OL tiers (epic
+    // #692). Before ADR-0149 an anonymous caller got the narrower Staffel/SK-only list instead;
+    // there is no anonymous caller left, so there is no second list to fall to except on failure.
+    verify(backendApiClient).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef());
     verify(backendApiClient, never())
-        .getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef());
+        .getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef(), eq(true));
   }
 }
