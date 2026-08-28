@@ -146,10 +146,7 @@ public class NotificationRuleService {
       rule.addSelector(
           NotificationRuleSelector.builder()
               .kind(selectorRequest.kind())
-              // The write DTO still spells the property userSub: renaming it is a breaking
-              // change to the frozen contract and ships with its own deprecation window
-              // (#1640, REQ-API-009). Same value, two names, for exactly as long as that takes.
-              .userId(selectorRequest.userSub())
+              .userId(selectorRequest.userId())
               .roleCode(trimToNull(selectorRequest.roleCode()))
               .orgRelativeRole(selectorRequest.orgRelativeRole())
               .contextRole(selectorRequest.contextRole())
@@ -160,7 +157,7 @@ public class NotificationRuleService {
   private void validateSelector(@NotNull NotificationRuleSelectorWriteRequest selector) {
     switch (selector.kind()) {
       case SPECIFIC_USER -> {
-        if (selector.userSub() == null) {
+        if (selector.userId() == null) {
           throw new IllegalArgumentException("SPECIFIC_USER selector requires a user id");
         }
       }

@@ -56600,7 +56600,7 @@
             "type" : "string",
             "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE" ]
           },
-          "userSub" : {
+          "userId" : {
             "type" : "string",
             "format" : "uuid"
           },
@@ -56708,7 +56708,7 @@
             "type" : "string",
             "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE" ]
           },
-          "userSub" : {
+          "userId" : {
             "type" : "string",
             "format" : "uuid"
           },

@@ -85,7 +85,12 @@ One direct `jwt.getSubject()` read stays on purpose: `UserService#getUserIdFromJ
 during authentication, before a `SecurityContext` exists, so it cannot go through
 `AuthenticatedSubject` — it *is* the seam point 2 asks for, on the authentication-time side.
 
-Point 5 is still open (issue #1639).
+Points 1 and 2 are now complete **including the wire format**: the two selector schemas were renamed
+outright rather than dual-served, for the reason recorded in the correction below.
+
+Point 5 is implemented as far as the login path goes (#1639): the `preferred_username` fallback is
+gone, the collision is logged, counted and marked on the admin queue. The explicit admin merge that
+moves a member's data onto the surviving account is the remaining half.
 
 ## Consequences
 
@@ -94,10 +99,25 @@ FK-less columns stop outliving accounts. The frontend's `getName()`-versus-`getS
 its second half, because there is nothing left called `sub` to confuse with a name. And the identity
 provider stops being welded to the schema: if Keycloak is ever replaced, one column changes.
 
-**What it costs.** Renaming `userSub` → `userId` on two API schemas is a **breaking change to the
+**What it costs.** ~~Renaming `userSub` → `userId` on two API schemas is a **breaking change to the
 frozen external contract** (`REQ-API-009`, `ExternalContractTest`) and to the Android app's generated
 DTOs. It has to ship as a deprecation window — both properties served, the old one marked
-`@ApiDeprecation` — not as a rename, because a shipped app cannot be asked to update in step.
+`@ApiDeprecation` — not as a rename, because a shipped app cannot be asked to update in step.~~
+
+> [!warning] Corrected 2026-08-29 — the deprecation window was never needed
+> The two schemas are `NotificationRuleSelectorDto` and `NotificationRuleSelectorWriteRequest`, and
+> they belong to the **`/api/v1/notification-rules` admin surface**. That surface is not in
+> `ExternalContractTest`'s frozen set, and the public API vhost's allow-list **deliberately does not
+> admit it** — `docs/API_VHOST_ROLLOUT_RUNBOOK.md` verifies it answers `404` there, and
+> `ExternalContractTest` says in as many words that the three notification paths are admitted "by
+>
+>> name without admitting the family or the `/notification-rules` admin surface next to it".
+>
+> A shipped Android build therefore cannot reach these properties at all, and REQ-API-001's
+> carve-out applies: frontend and backend deploy atomically. This shipped as a **plain rename**
+> (#1640), not a dual-served window. The original paragraph counted "two API schemas" without
+> checking which surface they sit on — the cost it priced in was real for the schema count and
+> wrong for these two.
 
 **What is deliberately not decided here.** Whether `app_user` eventually gets a generated primary
 key with `keycloak_sub` beside it. Point 4 keeps that door open at the price of one migration; it is

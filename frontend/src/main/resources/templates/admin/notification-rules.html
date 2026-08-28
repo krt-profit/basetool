@@ -198,13 +198,13 @@
                     <option value="GUEST">GUEST</option>
                 </select>
             </div>
-            <div class="form-group" data-field="userSub">
-                <label th:text="#{admin.notificationRules.selector.userSub}">Benutzer</label>
+            <div class="form-group" data-field="userId">
+                <label th:text="#{admin.notificationRules.selector.userId}">Benutzer</label>
                 <!-- Server-side searchable combobox (remote-users, #1193): the roster is searched on
                      demand via /users/search. An existing rule's chosen user is seeded in edit mode
                      by notification-rules.js (resolves the name via /users/{id}). -->
-                <select data-selector-userSub data-krt-combobox="remote-users">
-                    <option value="" th:text="#{admin.notificationRules.selector.userSub.placeholder}">-- Nutzer wählen --</option>
+                <select data-selector-userId data-krt-combobox="remote-users">
+                    <option value="" th:text="#{admin.notificationRules.selector.userId.placeholder}">-- Nutzer wählen --</option>
                 </select>
             </div>
             <div class="form-group">

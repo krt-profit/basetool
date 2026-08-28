@@ -56,7 +56,7 @@
         setFieldVisible(row, 'orgRelativeRole', kind === 'ORG_RELATIVE_ROLE');
         setFieldVisible(row, 'contextRole', kind === 'ORG_RELATIVE_ROLE');
         setFieldVisible(row, 'roleCode', kind === 'ROLE');
-        setFieldVisible(row, 'userSub', kind === 'SPECIFIC_USER');
+        setFieldVisible(row, 'userId', kind === 'SPECIFIC_USER');
     }
 
     function setFieldVisible(row, field, visible) {
@@ -98,12 +98,12 @@
                 window.krtEnhanceComboboxes(row);
             }
         };
-        if (!selector || selector.kind !== 'SPECIFIC_USER' || !selector.userSub) {
+        if (!selector || selector.kind !== 'SPECIFIC_USER' || !selector.userId) {
             enhance();
             return;
         }
-        const select = row.querySelector('[data-selector-userSub]');
-        fetch('/users/' + encodeURIComponent(selector.userSub), {
+        const select = row.querySelector('[data-selector-userId]');
+        fetch('/users/' + encodeURIComponent(selector.userId), {
             headers: { Accept: 'application/json' },
         })
             .then(function (response) {
@@ -115,10 +115,10 @@
             .then(function (user) {
                 if (select) {
                     const option = document.createElement('option');
-                    option.value = selector.userSub;
+                    option.value = selector.userId;
                     option.textContent =
                         (user && (user.effectiveName || user.displayName || user.username)) ||
-                        selector.userSub;
+                        selector.userId;
                     option.selected = true;
                     select.appendChild(option);
                 }
@@ -150,7 +150,7 @@
             } else if (kind === 'ROLE') {
                 selector.roleCode = readValue(row, '[data-selector-roleCode]');
             } else if (kind === 'SPECIFIC_USER') {
-                selector.userSub = readValue(row, '[data-selector-userSub]');
+                selector.userId = readValue(row, '[data-selector-userId]');
             }
             return selector;
         });
