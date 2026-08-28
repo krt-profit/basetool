@@ -118,7 +118,7 @@ class NotificationRuleServiceTest {
     persisted.addSelector(
         NotificationRuleSelector.builder()
             .kind(SelectorKind.SPECIFIC_USER)
-            .userSub(UUID.randomUUID())
+            .userId(UUID.randomUUID())
             .build());
     when(notificationRuleRepository.findByIdWithSelectors(id)).thenReturn(Optional.of(persisted));
     when(notificationRuleRepository.saveAndFlush(persisted)).thenReturn(persisted);
@@ -160,10 +160,10 @@ class NotificationRuleServiceTest {
   private static Stream<Arguments> invalidSelectors() {
     return Stream.of(
         Arguments.of(
-            "SPECIFIC_USER without userSub",
+            "SPECIFIC_USER without userId",
             new NotificationRuleSelectorWriteRequest(
                 SelectorKind.SPECIFIC_USER, null, null, null, null),
-            "SPECIFIC_USER selector requires userSub"),
+            "SPECIFIC_USER selector requires a user id"),
         Arguments.of(
             "ROLE with blank roleCode",
             new NotificationRuleSelectorWriteRequest(SelectorKind.ROLE, null, "   ", null, null),

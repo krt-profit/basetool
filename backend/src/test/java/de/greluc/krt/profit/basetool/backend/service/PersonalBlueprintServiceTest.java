@@ -103,31 +103,33 @@ class PersonalBlueprintServiceTest {
   @Test
   void listOwn_blankQuery_usesUnfilteredOwnerLookup() {
     PersonalBlueprint entity = PersonalBlueprint.builder().productKey("k").build();
-    when(repository.findAllByOwnerSub(eq(SUB), any())).thenReturn(new PageImpl<>(List.of(entity)));
+    when(repository.findAllByOwnerUserId(eq(SUB), any()))
+        .thenReturn(new PageImpl<>(List.of(entity)));
     when(mapper.toResponse(eq(entity), anyBoolean())).thenReturn(sampleResponse());
 
     var page = service.listOwn(SUB, "  ", PageRequest.of(0, 10));
 
     assertEquals(1, page.getTotalElements());
-    verify(repository).findAllByOwnerSub(eq(SUB), any());
+    verify(repository).findAllByOwnerUserId(eq(SUB), any());
   }
 
   @Test
   void listOwn_withQuery_usesNameContainsFilter() {
-    when(repository.findAllByOwnerSubAndProductNameContainingIgnoreCase(eq(SUB), eq("arc"), any()))
+    when(repository.findAllByOwnerUserIdAndProductNameContainingIgnoreCase(
+            eq(SUB), eq("arc"), any()))
         .thenReturn(new PageImpl<>(List.of()));
 
     service.listOwn(SUB, " arc ", PageRequest.of(0, 10));
 
     verify(repository)
-        .findAllByOwnerSubAndProductNameContainingIgnoreCase(eq(SUB), eq("arc"), any());
+        .findAllByOwnerUserIdAndProductNameContainingIgnoreCase(eq(SUB), eq("arc"), any());
   }
 
   @Test
   void add_stampsResolvedProductAndSaves_whenNotOwned() {
     when(blueprintProductService.resolveByProductKey("k"))
         .thenReturn(Optional.of(new ResolvedProduct("k", "Arclight Pistol", null)));
-    when(repository.existsByOwnerSubAndProductKey(SUB, "k")).thenReturn(false);
+    when(repository.existsByOwnerUserIdAndProductKey(SUB, "k")).thenReturn(false);
     when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     when(mapper.toResponse(any(), anyBoolean())).thenReturn(sampleResponse());
 
@@ -137,7 +139,7 @@ class PersonalBlueprintServiceTest {
     ArgumentCaptor<PersonalBlueprint> captor = ArgumentCaptor.forClass(PersonalBlueprint.class);
     verify(repository).save(captor.capture());
     PersonalBlueprint saved = captor.getValue();
-    assertEquals(SUB, saved.getOwnerSub());
+    assertEquals(SUB, saved.getOwnerUserId());
     assertEquals("k", saved.getProductKey());
     assertEquals("Arclight Pistol", saved.getProductName());
     assertEquals(acquired, saved.getAcquiredAt());
@@ -150,7 +152,7 @@ class PersonalBlueprintServiceTest {
     GameItem ref = new GameItem();
     when(blueprintProductService.resolveByProductKey("k"))
         .thenReturn(Optional.of(new ResolvedProduct("k", "Name", itemId)));
-    when(repository.existsByOwnerSubAndProductKey(SUB, "k")).thenReturn(false);
+    when(repository.existsByOwnerUserIdAndProductKey(SUB, "k")).thenReturn(false);
     when(gameItemRepository.getReferenceById(itemId)).thenReturn(ref);
     when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     when(mapper.toResponse(any(), anyBoolean())).thenReturn(sampleResponse());
@@ -172,7 +174,7 @@ class PersonalBlueprintServiceTest {
     String forged = "k\nERROR --- forged line";
     when(blueprintProductService.resolveByProductKey(forged))
         .thenReturn(Optional.of(new ResolvedProduct("k", "Arclight Pistol", null)));
-    when(repository.existsByOwnerSubAndProductKey(SUB, "k")).thenReturn(false);
+    when(repository.existsByOwnerUserIdAndProductKey(SUB, "k")).thenReturn(false);
     when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     when(mapper.toResponse(any(), anyBoolean())).thenReturn(sampleResponse());
 
@@ -200,7 +202,7 @@ class PersonalBlueprintServiceTest {
   void add_throwsDuplicate_whenAlreadyOwned() {
     when(blueprintProductService.resolveByProductKey("k"))
         .thenReturn(Optional.of(new ResolvedProduct("k", "Name", null)));
-    when(repository.existsByOwnerSubAndProductKey(SUB, "k")).thenReturn(true);
+    when(repository.existsByOwnerUserIdAndProductKey(SUB, "k")).thenReturn(true);
 
     assertThrows(
         DuplicateEntityException.class,
@@ -226,8 +228,8 @@ class PersonalBlueprintServiceTest {
     when(blueprintProductService.resolveByProductKey("b"))
         .thenReturn(Optional.of(new ResolvedProduct("b", "B", null)));
     when(blueprintProductService.resolveByProductKey("z")).thenReturn(Optional.empty());
-    when(repository.existsByOwnerSubAndProductKey(SUB, "a")).thenReturn(false);
-    when(repository.existsByOwnerSubAndProductKey(SUB, "b")).thenReturn(true);
+    when(repository.existsByOwnerUserIdAndProductKey(SUB, "a")).thenReturn(false);
+    when(repository.existsByOwnerUserIdAndProductKey(SUB, "b")).thenReturn(true);
     when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     PersonalBlueprintBatchResult result =
@@ -243,9 +245,14 @@ class PersonalBlueprintServiceTest {
   void update_appliesChanges_whenVersionMatches() {
     UUID id = UUID.randomUUID();
     PersonalBlueprint entity =
-        PersonalBlueprint.builder().id(id).ownerSub(SUB).productKey("k").productName("N").build();
+        PersonalBlueprint.builder()
+            .id(id)
+            .ownerUserId(SUB)
+            .productKey("k")
+            .productName("N")
+            .build();
     entity.setVersion(3L);
-    when(repository.findByIdAndOwnerSub(id, SUB)).thenReturn(Optional.of(entity));
+    when(repository.findByIdAndOwnerUserId(id, SUB)).thenReturn(Optional.of(entity));
     when(repository.save(entity)).thenReturn(entity);
     when(mapper.toResponse(eq(entity), anyBoolean())).thenReturn(sampleResponse());
 
@@ -260,9 +267,9 @@ class PersonalBlueprintServiceTest {
   @Test
   void update_throwsOptimisticLock_whenVersionStale() {
     UUID id = UUID.randomUUID();
-    PersonalBlueprint entity = PersonalBlueprint.builder().id(id).ownerSub(SUB).build();
+    PersonalBlueprint entity = PersonalBlueprint.builder().id(id).ownerUserId(SUB).build();
     entity.setVersion(3L);
-    when(repository.findByIdAndOwnerSub(id, SUB)).thenReturn(Optional.of(entity));
+    when(repository.findByIdAndOwnerUserId(id, SUB)).thenReturn(Optional.of(entity));
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
@@ -273,7 +280,7 @@ class PersonalBlueprintServiceTest {
   @Test
   void update_throwsNotFound_whenMissingOrForeign() {
     UUID id = UUID.randomUUID();
-    when(repository.findByIdAndOwnerSub(id, SUB)).thenReturn(Optional.empty());
+    when(repository.findByIdAndOwnerUserId(id, SUB)).thenReturn(Optional.empty());
 
     assertThrows(
         EntityNotFoundException.class,
@@ -283,8 +290,8 @@ class PersonalBlueprintServiceTest {
   @Test
   void delete_removesOwnedEntity() {
     UUID id = UUID.randomUUID();
-    PersonalBlueprint entity = PersonalBlueprint.builder().id(id).ownerSub(SUB).build();
-    when(repository.findByIdAndOwnerSub(id, SUB)).thenReturn(Optional.of(entity));
+    PersonalBlueprint entity = PersonalBlueprint.builder().id(id).ownerUserId(SUB).build();
+    when(repository.findByIdAndOwnerUserId(id, SUB)).thenReturn(Optional.of(entity));
 
     service.delete(SUB, id);
 
@@ -294,7 +301,7 @@ class PersonalBlueprintServiceTest {
   @Test
   void delete_throwsNotFound_whenMissingOrForeign() {
     UUID id = UUID.randomUUID();
-    when(repository.findByIdAndOwnerSub(id, SUB)).thenReturn(Optional.empty());
+    when(repository.findByIdAndOwnerUserId(id, SUB)).thenReturn(Optional.empty());
 
     assertThrows(EntityNotFoundException.class, () -> service.delete(SUB, id));
   }
@@ -303,8 +310,8 @@ class PersonalBlueprintServiceTest {
   void delete_throwsConflict_andDoesNotDelete_whenEntryIsDefault() {
     UUID id = UUID.randomUUID();
     PersonalBlueprint entity =
-        PersonalBlueprint.builder().id(id).ownerSub(SUB).productKey("s-38 pistol").build();
-    when(repository.findByIdAndOwnerSub(id, SUB)).thenReturn(Optional.of(entity));
+        PersonalBlueprint.builder().id(id).ownerUserId(SUB).productKey("s-38 pistol").build();
+    when(repository.findByIdAndOwnerUserId(id, SUB)).thenReturn(Optional.of(entity));
     when(defaultBlueprintKeyService.isDefault("s-38 pistol")).thenReturn(true);
 
     assertThrows(BusinessConflictException.class, () -> service.delete(SUB, id));
@@ -313,12 +320,12 @@ class PersonalBlueprintServiceTest {
 
   @Test
   void deleteAllOwn_delegatesToOwnerScopedBulkDeleteAndReturnsCount() {
-    when(repository.deleteRemovableByOwnerSub(SUB)).thenReturn(4);
+    when(repository.deleteRemovableByOwnerUserId(SUB)).thenReturn(4);
 
     int removed = service.deleteAllOwn(SUB);
 
     assertEquals(4, removed);
-    verify(repository).deleteRemovableByOwnerSub(SUB);
+    verify(repository).deleteRemovableByOwnerUserId(SUB);
   }
 
   @Test
@@ -327,11 +334,11 @@ class PersonalBlueprintServiceTest {
     PersonalBlueprint entity =
         PersonalBlueprint.builder()
             .id(id)
-            .ownerSub(SUB)
+            .ownerUserId(SUB)
             .productKey("k")
             .productName("Name")
             .build();
-    when(repository.findByIdAndOwnerSub(id, SUB)).thenReturn(Optional.of(entity));
+    when(repository.findByIdAndOwnerUserId(id, SUB)).thenReturn(Optional.of(entity));
     PersonalBlueprintRecipeResponse recipe =
         new PersonalBlueprintRecipeResponse("Name", 2, List.of(), List.of());
     when(blueprintProductService.resolveRecipe("k")).thenReturn(Optional.of(recipe));
@@ -345,11 +352,11 @@ class PersonalBlueprintServiceTest {
     PersonalBlueprint entity =
         PersonalBlueprint.builder()
             .id(id)
-            .ownerSub(SUB)
+            .ownerUserId(SUB)
             .productKey("k")
             .productName("Name")
             .build();
-    when(repository.findByIdAndOwnerSub(id, SUB)).thenReturn(Optional.of(entity));
+    when(repository.findByIdAndOwnerUserId(id, SUB)).thenReturn(Optional.of(entity));
     when(blueprintProductService.resolveRecipe("k")).thenReturn(Optional.empty());
 
     PersonalBlueprintRecipeResponse result = service.recipeForOwn(SUB, id);
@@ -363,7 +370,7 @@ class PersonalBlueprintServiceTest {
   @Test
   void recipeForOwn_throwsNotFound_whenMissingOrForeign() {
     UUID id = UUID.randomUUID();
-    when(repository.findByIdAndOwnerSub(id, SUB)).thenReturn(Optional.empty());
+    when(repository.findByIdAndOwnerUserId(id, SUB)).thenReturn(Optional.empty());
 
     assertThrows(EntityNotFoundException.class, () -> service.recipeForOwn(SUB, id));
   }
@@ -372,18 +379,18 @@ class PersonalBlueprintServiceTest {
 
   @Test
   void listForUser_delegatesToOwnerLookupWithTargetSub() {
-    when(repository.findAllByOwnerSub(eq(TARGET), any())).thenReturn(new PageImpl<>(List.of()));
+    when(repository.findAllByOwnerUserId(eq(TARGET), any())).thenReturn(new PageImpl<>(List.of()));
 
     service.listForUser(TARGET, null, PageRequest.of(0, 10));
 
-    verify(repository).findAllByOwnerSub(eq(TARGET), any());
+    verify(repository).findAllByOwnerUserId(eq(TARGET), any());
   }
 
   @Test
   void updateForUser_appliesByIdAlone_whenVersionMatches() {
     UUID id = UUID.randomUUID();
     PersonalBlueprint entity =
-        PersonalBlueprint.builder().id(id).ownerSub(OTHER_USER).productKey("k").build();
+        PersonalBlueprint.builder().id(id).ownerUserId(OTHER_USER).productKey("k").build();
     entity.setVersion(5L);
     when(repository.findById(id)).thenReturn(Optional.of(entity));
     when(repository.save(entity)).thenReturn(entity);
@@ -408,7 +415,7 @@ class PersonalBlueprintServiceTest {
   @Test
   void deleteForUser_removesById() {
     UUID id = UUID.randomUUID();
-    PersonalBlueprint entity = PersonalBlueprint.builder().id(id).ownerSub(OTHER_USER).build();
+    PersonalBlueprint entity = PersonalBlueprint.builder().id(id).ownerUserId(OTHER_USER).build();
     when(repository.findById(id)).thenReturn(Optional.of(entity));
 
     service.deleteForUser(id);
@@ -428,7 +435,11 @@ class PersonalBlueprintServiceTest {
   void deleteForUser_throwsConflict_andDoesNotDelete_whenEntryIsDefault() {
     UUID id = UUID.randomUUID();
     PersonalBlueprint entity =
-        PersonalBlueprint.builder().id(id).ownerSub(OTHER_USER).productKey("p4-ar rifle").build();
+        PersonalBlueprint.builder()
+            .id(id)
+            .ownerUserId(OTHER_USER)
+            .productKey("p4-ar rifle")
+            .build();
     when(repository.findById(id)).thenReturn(Optional.of(entity));
     when(defaultBlueprintKeyService.isDefault("p4-ar rifle")).thenReturn(true);
 

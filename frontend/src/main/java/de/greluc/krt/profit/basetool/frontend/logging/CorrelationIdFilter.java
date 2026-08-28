@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.logging;
 
 import de.greluc.krt.profit.basetool.frontend.config.LoggingProperties;
+import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -118,9 +119,9 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
   private static String resolveUserId() {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     if (auth != null && auth.getPrincipal() instanceof OidcUser oidc) {
-      String sub = oidc.getSubject();
-      if (sub != null && !sub.isBlank()) {
-        return sub;
+      String userId = CurrentUser.userIdText(oidc);
+      if (userId != null && !userId.isBlank()) {
+        return userId;
       }
     }
     return ANONYMOUS;

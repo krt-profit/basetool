@@ -85,7 +85,7 @@ class BlueprintProductServiceTest {
   }
 
   private void noneOwned() {
-    when(personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(
+    when(personalBlueprintRepository.findAllByOwnerUserIdAndProductKeyIn(
             eq(SUB), org.mockito.ArgumentMatchers.any()))
         .thenReturn(List.of());
   }
@@ -153,7 +153,7 @@ class BlueprintProductServiceTest {
   void searchProducts_marksProductsOwnedByCaller() {
     when(blueprintRepository.findActiveProductRows(""))
         .thenReturn(List.of(row("Alpha", "A", null, null), row("Bravo", "B", null, null)));
-    when(personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(
+    when(personalBlueprintRepository.findAllByOwnerUserIdAndProductKeyIn(
             eq(SUB), org.mockito.ArgumentMatchers.any()))
         .thenReturn(List.of(PersonalBlueprint.builder().productKey("alpha").build()));
 

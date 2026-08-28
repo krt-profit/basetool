@@ -30,10 +30,10 @@ import org.jetbrains.annotations.Nullable;
  * Domain event published right after a member signals they can supply a Materialbörse request /
  * Gesuch ("Ich kann liefern", REQ-MARKET-020). It is directed at the request's owner (the Suchende)
  * so they learn about the would-be supplier without having to poll the board: the {@code
- * EVENT_RECIPIENT} selector resolves to {@link #contextRecipientSub()} (the requester), while the
- * signalling member is the {@link #actorSub()} (excluded when the rule sets {@code excludeActor} —
- * harmless here since a member can never signal fulfilment on their own request, so actor and
- * recipient are always distinct).
+ * EVENT_RECIPIENT} selector resolves to {@link #contextRecipientUserId()} (the requester), while
+ * the signalling member is the {@link #actorSub()} (excluded when the rule sets {@code
+ * excludeActor} — harmless here since a member can never signal fulfilment on their own request, so
+ * actor and recipient are always distinct).
  *
  * <p>Carries only immutable scalars (ids and pre-resolved display strings) so the after-commit
  * listener never touches the managed request/interest entities. The supplier's name is carried as a
@@ -70,7 +70,7 @@ public record MaterialRequestFulfillmentSignalledEvent(
   }
 
   @Override
-  public UUID contextRecipientSub() {
+  public UUID contextRecipientUserId() {
     return requesterSub;
   }
 

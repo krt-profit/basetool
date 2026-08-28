@@ -120,7 +120,7 @@ class NotificationRuleEngineIntegrationTest {
     NotificationRule extraRule =
         transactionTemplate.execute(
             status -> {
-              // notification_rule_selector.user_sub is a foreign key to app_user(id) since V235
+              // notification_rule_selector.user_id is a foreign key to app_user(id) since V235
               // (REQ-DATA-008): a selector pointing at an invented member no longer inserts.
               User target = new User();
               target.setId(recipient);
@@ -137,7 +137,7 @@ class NotificationRuleEngineIntegrationTest {
               rule.addSelector(
                   NotificationRuleSelector.builder()
                       .kind(SelectorKind.SPECIFIC_USER)
-                      .userSub(recipient)
+                      .userId(recipient)
                       .build());
               return notificationRuleRepository.saveAndFlush(rule);
             });
@@ -147,7 +147,7 @@ class NotificationRuleEngineIntegrationTest {
       Set<UUID> recipients = flatten(notificationCreationService.createFromEvent(event));
 
       assertThat(recipients).isNotEmpty();
-      assertThat(notificationRepository.findAllByRecipientSub(recipient, Pageable.unpaged()))
+      assertThat(notificationRepository.findAllByRecipientUserId(recipient, Pageable.unpaged()))
           .singleElement()
           .satisfies(
               n -> {
@@ -210,7 +210,7 @@ class NotificationRuleEngineIntegrationTest {
                   new DiscordRegistrationPendingEvent(newUserId, "newbie")));
 
       assertThat(recipients).isNotEmpty();
-      assertThat(notificationRepository.findAllByRecipientSub(adminSub, Pageable.unpaged()))
+      assertThat(notificationRepository.findAllByRecipientUserId(adminSub, Pageable.unpaged()))
           .singleElement()
           .satisfies(
               n -> {
@@ -224,7 +224,7 @@ class NotificationRuleEngineIntegrationTest {
       transactionTemplate.executeWithoutResult(
           status -> {
             notificationRepository
-                .findAllByRecipientSub(adminSub, Pageable.unpaged())
+                .findAllByRecipientUserId(adminSub, Pageable.unpaged())
                 .forEach(n -> notificationRepository.deleteById(n.getId()));
             userRepository.deleteById(adminSub);
           });

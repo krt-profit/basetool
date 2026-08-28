@@ -135,10 +135,10 @@ class UserDeletionServiceTest {
 
     verify(inventoryItemRepository).deleteByUserId(userId);
     verify(shipRepository).deleteByOwnerId(userId);
-    verify(personalInventoryItemRepository).deleteByOwnerSub(userId);
-    verify(personalBlueprintRepository).deleteAllByOwnerSub(userId);
+    verify(personalInventoryItemRepository).deleteByOwnerUserId(userId);
+    verify(personalBlueprintRepository).deleteAllByOwnerUserId(userId);
     verify(notificationRepository).deleteAllForRecipient(userId);
-    verify(notificationRuleRepository).deleteSelectorsByUserSub(userId);
+    verify(notificationRuleRepository).deleteSelectorsByUserId(userId);
     verify(memberEvaluationRepository).deleteAllByUserId(userId);
     // ...while the shared/historical aggregates only change owner.
     verify(refineryOrderRepository).updateOwner(user, admin);
@@ -161,7 +161,7 @@ class UserDeletionServiceTest {
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
     when(inventoryItemRepository.deleteByUserId(userId)).thenReturn(3);
     when(shipRepository.deleteByOwnerId(userId)).thenReturn(7);
-    when(personalBlueprintRepository.deleteAllByOwnerSub(userId)).thenReturn(8);
+    when(personalBlueprintRepository.deleteAllByOwnerUserId(userId)).thenReturn(8);
     when(refineryOrderRepository.updateOwner(user, admin)).thenReturn(2);
 
     // When
@@ -208,7 +208,7 @@ class UserDeletionServiceTest {
     verify(userRepository, never()).delete(any());
     verify(inventoryItemRepository, never()).deleteByUserId(any());
     verify(shipRepository, never()).deleteByOwnerId(any());
-    verify(personalBlueprintRepository, never()).deleteAllByOwnerSub(any());
+    verify(personalBlueprintRepository, never()).deleteAllByOwnerUserId(any());
   }
 
   @Test
@@ -279,7 +279,7 @@ class UserDeletionServiceTest {
 
     verify(userRepository, never()).delete(any());
     verify(inventoryItemRepository, never()).deleteByUserId(any());
-    verify(personalInventoryItemRepository, never()).deleteByOwnerSub(any());
+    verify(personalInventoryItemRepository, never()).deleteByOwnerUserId(any());
   }
 
   @Test

@@ -33,7 +33,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Domain event published right after a bank employee confirms a booking request (epic #666 F2,
  * REQ-BANK-026). It is directed at the requesting officer/lead so they learn the outcome: the
- * {@code EVENT_RECIPIENT} selector resolves to {@link #contextRecipientSub()} (the requester),
+ * {@code EVENT_RECIPIENT} selector resolves to {@link #contextRecipientUserId()} (the requester),
  * while the confirming employee is the {@link #actorSub()} (excluded when the rule sets {@code
  * excludeActor}). It additionally carries the account id ({@link #contextAccountId()}) so the
  * {@code ACCOUNT_RESPONSIBLE} selector can notify the account's responsible holder (REQ-BANK-034).
@@ -66,7 +66,7 @@ public record BankBookingRequestConfirmedEvent(
   }
 
   @Override
-  public UUID contextRecipientSub() {
+  public UUID contextRecipientUserId() {
     return requesterSub;
   }
 

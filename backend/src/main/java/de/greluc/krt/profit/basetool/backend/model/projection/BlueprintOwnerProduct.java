@@ -29,7 +29,7 @@ import java.util.UUID;
  * just to read these two fields is wasted I/O and heap (REQ-DATA-003) — the projection scales with
  * the two needed columns instead.
  *
- * @param ownerSub the {@code app_user.id} of the blueprint's owner.
+ * @param ownerUserId the {@code app_user.id} of the blueprint's owner.
  * @param productName the product name as stored on the blueprint (case-preserving).
  */
-public record BlueprintOwnerProduct(UUID ownerSub, String productName) {}
+public record BlueprintOwnerProduct(UUID ownerUserId, String productName) {}

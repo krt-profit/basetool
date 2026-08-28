@@ -38,8 +38,8 @@ import org.springframework.web.context.request.NativeWebRequest;
 
 /**
  * Unit tests for {@link CurrentUserArgumentResolver}, asserting it reproduces the exact {@code
- * requireSub(JwtAuthenticationToken)} guards it replaced: which parameters it claims, the
- * String-vs-UUID return shaping, and the {@link AccessDeniedException} failure modes.
+ * requireSub(JwtAuthenticationToken)} guards it replaced: which parameters it claims, the parsed
+ * UUID it returns, and the {@link AccessDeniedException} failure modes.
  */
 class CurrentUserArgumentResolverTest {
 
@@ -47,18 +47,14 @@ class CurrentUserArgumentResolverTest {
 
   /** Reflection target providing annotated parameters for {@link MethodParameter} construction. */
   @SuppressWarnings("unused")
-  private void handlers(
-      @CurrentUserSub String sub,
-      @CurrentUserId UUID id,
-      @CurrentUserSub UUID subOnWrongType,
-      String plain) {
+  private void handlers(@CurrentUserId UUID id, @CurrentUserId String idOnWrongType, String plain) {
     // Parameter carrier only; never invoked.
   }
 
   private static MethodParameter param(int index) throws NoSuchMethodException {
     Method method =
         CurrentUserArgumentResolverTest.class.getDeclaredMethod(
-            "handlers", String.class, UUID.class, UUID.class, String.class);
+            "handlers", UUID.class, String.class, String.class);
     return new MethodParameter(method, index);
   }
 
@@ -114,62 +110,41 @@ class CurrentUserArgumentResolverTest {
   }
 
   @Test
-  void supportsCurrentUserSubOnString() throws Exception {
+  void supportsCurrentUserIdOnUuid() throws Exception {
     assertThat(resolver.supportsParameter(param(0))).isTrue();
   }
 
   @Test
-  void supportsCurrentUserIdOnUuid() throws Exception {
-    assertThat(resolver.supportsParameter(param(1))).isTrue();
-  }
-
-  @Test
-  void rejectsCurrentUserSubOnNonStringParameter() throws Exception {
-    assertThat(resolver.supportsParameter(param(2))).isFalse();
+  void rejectsCurrentUserIdOnNonUuidParameter() throws Exception {
+    assertThat(resolver.supportsParameter(param(1))).isFalse();
   }
 
   @Test
   void rejectsUnannotatedParameter() throws Exception {
-    assertThat(resolver.supportsParameter(param(3))).isFalse();
-  }
-
-  @Test
-  void resolvesSubjectAsRawStringForCurrentUserSub() throws Exception {
-    NativeWebRequest request = requestWithPrincipal(tokenWithSubject("subject-123"));
-    Object resolved = resolver.resolveArgument(param(0), null, request, null);
-    assertThat(resolved).isEqualTo("subject-123");
+    assertThat(resolver.supportsParameter(param(2))).isFalse();
   }
 
   @Test
   void resolvesSubjectAsUuidForCurrentUserId() throws Exception {
     UUID expected = UUID.randomUUID();
     NativeWebRequest request = requestWithPrincipal(tokenWithSubject(expected.toString()));
-    Object resolved = resolver.resolveArgument(param(1), null, request, null);
+    Object resolved = resolver.resolveArgument(param(0), null, request, null);
     assertThat(resolved).isEqualTo(expected);
   }
 
   /**
-   * The acting member resolves for {@code @CurrentUserSub} — a subject, no token.
+   * The acting member resolves — a subject, no token.
    *
    * <p>The regression test for the finding that every ingest-gateway call was 403'd during argument
    * resolution. Reintroducing the type demand turns this red, which none of the other cases in this
    * class would do.
    */
   @Test
-  void resolvesATokenlessSubjectForCurrentUserSub() throws Exception {
-    String sub = UUID.randomUUID().toString();
-    NativeWebRequest request = requestWithPrincipal(new TokenlessSubject(sub));
-
-    assertThat(resolver.resolveArgument(param(0), null, request, null)).isEqualTo(sub);
-  }
-
-  /** The same for {@code @CurrentUserId}, which is what both acting endpoints' twin uses. */
-  @Test
   void resolvesATokenlessSubjectForCurrentUserId() throws Exception {
     UUID id = UUID.randomUUID();
     NativeWebRequest request = requestWithPrincipal(new TokenlessSubject(id.toString()));
 
-    assertThat(resolver.resolveArgument(param(1), null, request, null)).isEqualTo(id);
+    assertThat(resolver.resolveArgument(param(0), null, request, null)).isEqualTo(id);
   }
 
   @Test
@@ -215,7 +190,7 @@ class CurrentUserArgumentResolverTest {
   @Test
   void throwsWhenSubjectNotAUuidForCurrentUserId() throws Exception {
     NativeWebRequest request = requestWithPrincipal(tokenWithSubject("not-a-uuid"));
-    assertThatThrownBy(() -> resolver.resolveArgument(param(1), null, request, null))
+    assertThatThrownBy(() -> resolver.resolveArgument(param(0), null, request, null))
         .isInstanceOf(AccessDeniedException.class)
         .hasMessage("JWT subject claim is not a valid identifier.");
   }

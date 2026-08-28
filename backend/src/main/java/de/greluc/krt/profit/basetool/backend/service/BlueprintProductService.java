@@ -77,16 +77,16 @@ public class BlueprintProductService {
   /**
    * Searches the blueprint products by a case-insensitive substring of the product name, returning
    * up to {@code limit} (capped at {@link #MAX_LIMIT}) alphabetically sorted products, each flagged
-   * with whether {@code ownerSub} already owns it.
+   * with whether {@code ownerUserId} already owns it.
    *
    * @param query case-insensitive product-name substring; {@code null} / blank returns all products
    * @param limit requested maximum number of products; clamped to {@code [1, MAX_LIMIT]}
-   * @param ownerSub {@code app_user.id} of the caller, used to compute the owned flag
+   * @param ownerUserId {@code app_user.id} of the caller, used to compute the owned flag
    * @return the matching products, alphabetically by name, capped to the effective limit
    */
   @NotNull
   public List<BlueprintProductDto> searchProducts(
-      @Nullable String query, int limit, @NotNull UUID ownerSub) {
+      @Nullable String query, int limit, @NotNull UUID ownerUserId) {
     int cap = Math.max(1, Math.min(limit, MAX_LIMIT));
     String q = query == null ? "" : query.trim();
 
@@ -96,7 +96,7 @@ public class BlueprintProductService {
             p -> p.displayName, Comparator.nullsLast(String::compareToIgnoreCase)));
     List<ProductAccumulator> capped = products.size() > cap ? products.subList(0, cap) : products;
 
-    Set<String> owned = ownedKeys(ownerSub, capped.stream().map(p -> p.productKey).toList());
+    Set<String> owned = ownedKeys(ownerUserId, capped.stream().map(p -> p.productKey).toList());
     List<BlueprintProductDto> out = new ArrayList<>(capped.size());
     for (ProductAccumulator p : capped) {
       out.add(
@@ -363,17 +363,17 @@ public class BlueprintProductService {
   /**
    * Returns the subset of {@code keys} the owner already owns, via a single bulk lookup.
    *
-   * @param ownerSub {@code app_user.id} of the owner
+   * @param ownerUserId {@code app_user.id} of the owner
    * @param keys the product keys to test
    * @return the owned product keys
    */
-  private Set<String> ownedKeys(UUID ownerSub, List<String> keys) {
+  private Set<String> ownedKeys(UUID ownerUserId, List<String> keys) {
     if (keys.isEmpty()) {
       return Set.of();
     }
     Set<String> out = new HashSet<>();
     for (PersonalBlueprint pb :
-        personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(ownerSub, keys)) {
+        personalBlueprintRepository.findAllByOwnerUserIdAndProductKeyIn(ownerUserId, keys)) {
       out.add(pb.getProductKey());
     }
     return out;

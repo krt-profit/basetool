@@ -78,7 +78,7 @@ public interface NotificationEvent {
    *
    * @return the directed recipient's sub, or {@code null}
    */
-  default UUID contextRecipientSub() {
+  default UUID contextRecipientUserId() {
     return null;
   }
 

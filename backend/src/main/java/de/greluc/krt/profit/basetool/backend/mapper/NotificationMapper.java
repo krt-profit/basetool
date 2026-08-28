@@ -27,8 +27,8 @@ import org.mapstruct.Mapper;
 /**
  * MapStruct mapper from {@link Notification} entities to their outbound {@link NotificationDto}.
  * The {@code type} enum is rendered to its name and the opaque JSON {@code params} column is
- * expanded to a map via {@link NotificationParamsCodec}; {@code recipientSub} is deliberately not
- * exposed.
+ * expanded to a map via {@link NotificationParamsCodec}; {@code recipientUserId} is deliberately
+ * not exposed.
  */
 @Mapper(config = CentralMapperConfig.class, uses = NotificationParamsCodec.class)
 public interface NotificationMapper {

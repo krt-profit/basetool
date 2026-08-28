@@ -36,8 +36,8 @@ import lombok.Setter;
 
 /**
  * Personal inventory entry owned by exactly one user (identified by their {@code app_user.id},
- * stored in {@link #ownerSub}). Belongs to the user's personal inventory; not to be confused with
- * {@link InventoryItem}, which represents material/location-bound squadron stock.
+ * stored in {@link #ownerUserId}). Belongs to the user's personal inventory; not to be confused
+ * with {@link InventoryItem}, which represents material/location-bound squadron stock.
  *
  * <p>The location is referenced by its UEX numeric id (see {@link City#getIdCity()} resp. {@link
  * SpaceStation#getIdSpaceStation()}) plus a {@link PersonalInventoryLocationType} discriminator.
@@ -68,8 +68,8 @@ public class PersonalInventoryItem extends AbstractEntity<UUID> {
    * cascade removes a managed entity holding a reference to the user being deleted -- the {@code
    * TransientPropertyValueException} landmine REQ-DATA-008 documents.
    */
-  @Column(name = "owner_sub", nullable = false)
-  private UUID ownerSub;
+  @Column(name = "owner_user_id", nullable = false)
+  private UUID ownerUserId;
 
   @Column(nullable = false, length = 120)
   private String name;

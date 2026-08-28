@@ -23,7 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.DefaultBlueprintCreateReq
 import de.greluc.krt.profit.basetool.backend.model.dto.DefaultBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.service.DefaultBlueprintService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
-import de.greluc.krt.profit.basetool.backend.web.CurrentUserSub;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -82,7 +82,7 @@ public class AdminDefaultBlueprintController {
    * Adds a product to the default set and grants it to every existing user.
    *
    * @param request the product key to mark as default
-   * @param adminSub the calling admin's subject, stamped as the creator
+   * @param adminUserId the calling admin's {@code app_user.id}, stamped as the creator
    * @return the persisted DTO
    */
   @PostMapping
@@ -96,8 +96,10 @@ public class AdminDefaultBlueprintController {
     @ApiResponse(responseCode = "409", description = "Product is already a default.")
   })
   public DefaultBlueprintResponse add(
-      @Valid @RequestBody DefaultBlueprintCreateRequest request, @CurrentUserSub String adminSub) {
-    return service.add(request.productKey(), adminSub);
+      @Valid @RequestBody DefaultBlueprintCreateRequest request, @CurrentUserId UUID adminUserId) {
+    // created_by is a provenance column that also holds the literal "system" for seeded
+    // rows, so it stays text and takes the rendered id rather than a foreign key.
+    return service.add(request.productKey(), adminUserId.toString());
   }
 
   /**

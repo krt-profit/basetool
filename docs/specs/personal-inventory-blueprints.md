@@ -94,7 +94,7 @@ existing and future users:
   (the grant runs in the same `UserService.syncUser` transaction, so the rows are committed before
   the first request returns);
 - a deploy / drift is reconciled by a startup backfill and a periodic sweep
-  (`DefaultBlueprintProvisioningTask`), both bulk `INSERT … SELECT … ON CONFLICT (owner_sub,
+  (`DefaultBlueprintProvisioningTask`), both bulk `INSERT … SELECT … ON CONFLICT (owner_user_id,
   product_key) DO NOTHING` so a re-run never duplicates;
 - adding a new default grants it to all existing users at once (REQ-INV-017).
 
@@ -184,7 +184,7 @@ it preserves the surrounding guarantees:
 The flag is self-service: the user reads / sets it through `GET` / `PUT
 /api/v1/users/me/blueprint-sharing` (JWT-scoped, optimistic-locked), saved in place on the
 profile page (REQ-FE-001) next to the payout preference. The two aggregations union the opted-in
-users' `owner_sub`s into their org-unit member set before counting; an owner who is both a member
+users' `owner_user_id`s into their org-unit member set before counting; an owner who is both a member
 and a global sharer is counted once.
 
 **Acceptance criteria:**

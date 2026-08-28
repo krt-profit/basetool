@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -233,7 +234,7 @@ public class OrgUnitBankPageController {
     // the option value with it submitted a username where the backend deserializes a UUID, which
     // 400'd every withdrawal request (caught by BankOrgUnitRequestsE2eTest, invisible to the MVC
     // render tests). `sub` is the same value as app_user.id, which is what the backend expects.
-    model.addAttribute("requesterId", principal == null ? null : principal.getSubject());
+    model.addAttribute("requesterId", CurrentUser.userIdText(principal));
     model.addAttribute("requesterHandle", requesterHandle(principal));
     if ("orgUnitBank".equals(fragment)) {
       return "org-unit-bank :: orgUnitBank";
@@ -266,8 +267,9 @@ public class OrgUnitBankPageController {
     if (preferred != null && !preferred.isBlank()) {
       return preferred;
     }
-    String subject = principal.getSubject();
-    return subject == null || subject.isBlank() ? null : subject;
+    // Last resort: show the id itself rather than an empty cell.
+    String userId = CurrentUser.userIdText(principal);
+    return userId == null || userId.isBlank() ? null : userId;
   }
 
   /**

@@ -24,7 +24,7 @@ that responsible unit** and the **global admins**; the creating actor is exclude
 
 ### REQ-NOTIF-001 — Generic per-user notification inbox
 
-A `notification` row is a single message addressed to exactly one recipient (`recipient_sub`,
+A `notification` row is a single message addressed to exactly one recipient (`recipient_user_id`,
 the Keycloak `sub` = `app_user.id`). It carries a machine `type` (`@Enumerated(STRING)`, no
 CHECK — the set grows), a JSON `params` map (plain `TEXT`, never queried) for i18n rendering, a
 loose `entity_type` + `entity_id` back-reference (no FK, survives source deletion), and
