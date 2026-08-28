@@ -860,14 +860,17 @@ public class RefineryOrderService {
         || itemDto.amount() == null) {
       return;
     }
-    for (de.greluc.krt.profit.basetool.backend.model.RefineryGood good : order.getGoods()) {
-      if (good.getOutputMaterial() == null || good.getOutputMaterial().getId() == null) {
-        continue;
-      }
-      if (!good.getOutputMaterial().getId().equals(itemDto.materialId())) {
-        continue;
-      }
-
+    // Material AND grade. One run can yield the same material at two qualities, and matching on the
+    // material alone put every item of that material on the first of them: the later item overwrote
+    // the earlier one and the second good was never updated. The grade-less fallback keeps callers
+    // that send no quality working exactly as before.
+    de.greluc.krt.profit.basetool.backend.model.RefineryGood target =
+        findGood(order, itemDto.materialId(), itemDto.quality());
+    if (target == null) {
+      target = findGood(order, itemDto.materialId(), null);
+    }
+    if (target != null) {
+      de.greluc.krt.profit.basetool.backend.model.RefineryGood good = target;
       double amount = itemDto.amount();
       String quantityTypeName =
           good.getOutputMaterial().getQuantityType() != null
@@ -882,8 +885,32 @@ public class RefineryOrderService {
       // Respect @Min(1) on outputQuantity: 0 would be an invalid value.
       int clamped = (int) Math.max(1L, Math.min(rawNew, Integer.MAX_VALUE));
       good.setOutputQuantity(clamped);
-      return;
     }
+  }
+
+  /**
+   * Finds the good a store item belongs to.
+   *
+   * @param order the order whose goods to search
+   * @param materialId the output material the item books
+   * @param quality the grade the item carries, or {@code null} to match on the material alone
+   * @return the good, or {@code null} when none matches
+   */
+  private de.greluc.krt.profit.basetool.backend.model.RefineryGood findGood(
+      RefineryOrder order, java.util.UUID materialId, Integer quality) {
+    for (de.greluc.krt.profit.basetool.backend.model.RefineryGood good : order.getGoods()) {
+      if (good.getOutputMaterial() == null || good.getOutputMaterial().getId() == null) {
+        continue;
+      }
+      if (!good.getOutputMaterial().getId().equals(materialId)) {
+        continue;
+      }
+      if (quality != null && !quality.equals(good.getQuality())) {
+        continue;
+      }
+      return good;
+    }
+    return null;
   }
 
   /**
