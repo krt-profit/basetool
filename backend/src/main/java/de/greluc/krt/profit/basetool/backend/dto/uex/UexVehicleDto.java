@@ -28,11 +28,22 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  *
  * <p>R2 expansion (SC_WIKI_SYNC_PLAN.md §6.5): the original three-field projection has been
  * replaced by the full UEX vehicle payload — integer id + in-game UUID + 36 {@code is_*} capability
- * flags + dimensions + fuel + urls + descriptions. The hardened {@code UexVehicleService} uses
- * {@code uuid} as the primary join key (falling back to {@code id} then case-insensitive {@code
- * name}) and writes every column it carries onto {@code ship_type}. {@code uuid} is captured as a
- * {@link String} for the same reason as {@code UexItemDto} — UEX returns an empty string for ~31%
- * of vehicles.
+ * flags + dimensions + fuel + urls. The hardened {@code UexVehicleService} uses {@code uuid} as the
+ * primary join key (falling back to {@code id} then case-insensitive {@code name}) and writes every
+ * column it carries onto {@code ship_type}. {@code uuid} is captured as a {@link String} for the
+ * same reason as {@code UexItemDto} — UEX returns an empty string for ~31% of vehicles.
+ *
+ * <p><b>Bound to what UEX actually serves (REQ-DATA-015 / ADR-0148).</b> Eleven components were
+ * removed on 2026-08-28 after a field-by-field comparison against the live endpoint: {@code
+ * crew_min}, {@code crew_max}, {@code mass_total}, {@code vehicle_inventory}, {@code ore_capacity},
+ * {@code max_medical_tier}, {@code health}, {@code shield_hp}, {@code url_wiki}, {@code
+ * description} and {@code description_de} are not in the payload and never were during this
+ * record's lifetime. Because the record is {@link JsonIgnoreProperties}{@code (ignoreUnknown =
+ * true)} they decoded to {@code null}, and {@code UexVehicleService} wrote every one of them onto
+ * {@code ship_type} — which not only left eight columns permanently empty but also cleared {@code
+ * vehicle_inventory_scu} and {@code description_en} after each Wiki vehicle sync had filled them.
+ * The crew range survives the removal: UEX serves it as the compact {@code crew} string ({@code
+ * "1"}, {@code "1,2"}), which {@code UexValues.parseCrew} splits back into min / max.
  *
  * @param id UEX integer vehicle id (stable across runs)
  * @param uuid in-game RSI asset UUID — empty string for vehicles UEX has not catalogued yet
@@ -43,10 +54,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @param scu cargo SCU (legacy field kept for back-compat with the synthesized description)
  * @param crew legacy crew text field — kept for back-compat; new code reads {@code crewMin}/{@code
  *     crewMax}
- * @param crewMin minimum crew complement
- * @param crewMax maximum crew complement
  * @param mass hull mass (kg)
- * @param massTotal hull + loadout mass (kg)
  * @param width metres
  * @param height metres
  * @param length metres ({@code length} reserved in SQL — entity column is {@code length_m})
@@ -54,20 +62,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  *     {@code "XL"})
  * @param fuelQuantum quantum fuel capacity
  * @param fuelHydrogen hydrogen fuel capacity
- * @param vehicleInventory vehicle internal inventory SCU
- * @param oreCapacity mining vehicle ore capacity
  * @param containerSizes comma-separated SCU container sizes (e.g. {@code "1,2"})
- * @param maxMedicalTier highest medical service tier provided
- * @param health hull health points
- * @param shieldHp shield health points
  * @param urlStore RSI pledge store URL
  * @param urlBrochure marketing brochure URL
  * @param urlHotsite ship-specific hotsite URL
  * @param urlPhoto promotional photo URL
  * @param urlVideo promotional video URL
- * @param urlWiki RSI / community wiki URL
- * @param descriptionEn English description
- * @param descriptionDe German description
  * @param isAddon UEX flag (0/1)
  * @param isBoarding UEX flag
  * @param isBomber UEX flag
@@ -118,30 +118,19 @@ public record UexVehicleDto(
     @JsonProperty("company_name") String companyName,
     @JsonProperty("scu") Integer scu,
     @JsonProperty("crew") String crew,
-    @JsonProperty("crew_min") Integer crewMin,
-    @JsonProperty("crew_max") Integer crewMax,
     @JsonProperty("mass") Double mass,
-    @JsonProperty("mass_total") Double massTotal,
     @JsonProperty("width") Double width,
     @JsonProperty("height") Double height,
     @JsonProperty("length") Double length,
     @JsonProperty("pad_type") String padType,
     @JsonProperty("fuel_quantum") Double fuelQuantum,
     @JsonProperty("fuel_hydrogen") Double fuelHydrogen,
-    @JsonProperty("vehicle_inventory") Double vehicleInventory,
-    @JsonProperty("ore_capacity") Double oreCapacity,
     @JsonProperty("container_sizes") String containerSizes,
-    @JsonProperty("max_medical_tier") Integer maxMedicalTier,
-    @JsonProperty("health") Integer health,
-    @JsonProperty("shield_hp") Integer shieldHp,
     @JsonProperty("url_store") String urlStore,
     @JsonProperty("url_brochure") String urlBrochure,
     @JsonProperty("url_hotsite") String urlHotsite,
     @JsonProperty("url_photo") String urlPhoto,
     @JsonProperty("url_video") String urlVideo,
-    @JsonProperty("url_wiki") String urlWiki,
-    @JsonProperty("description") String descriptionEn,
-    @JsonProperty("description_de") String descriptionDe,
     @JsonProperty("is_addon") Integer isAddon,
     @JsonProperty("is_boarding") Integer isBoarding,
     @JsonProperty("is_bomber") Integer isBomber,

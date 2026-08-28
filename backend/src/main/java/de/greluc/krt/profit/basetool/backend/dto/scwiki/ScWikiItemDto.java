@@ -76,4 +76,5 @@ public record ScWikiItemDto(
     @JsonProperty("description") Map<String, String> description,
     @JsonProperty("is_base_variant") Boolean isBaseVariant,
     @JsonProperty("is_craftable") Boolean isCraftable,
-    @JsonProperty("version") String version) {}
+    @JsonProperty("version") String version)
+    implements ScWikiRow {}

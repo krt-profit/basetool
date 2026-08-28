@@ -37,6 +37,52 @@ public final class UexValues {
   private UexValues() {}
 
   /**
+   * The crew complement UEX serves for a vehicle, split into its two bounds.
+   *
+   * @param min the smallest crew the vehicle can be operated with, or {@code null} when UEX carried
+   *     nothing parseable
+   * @param max the largest crew it supports; equal to {@code min} when UEX states a single number
+   */
+  public record CrewRange(@Nullable Integer min, @Nullable Integer max) {
+
+    /** The answer for a vehicle whose {@code crew} field is absent, blank or unparseable. */
+    static final CrewRange UNKNOWN = new CrewRange(null, null);
+  }
+
+  /**
+   * Splits UEX's compact {@code crew} string into its min / max bounds.
+   *
+   * <p>UEX serves the crew complement as either a single number ({@code "1"}) or a comma-separated
+   * pair ({@code "1,2"} = one to two). It does <b>not</b> serve the {@code crew_min} / {@code
+   * crew_max} fields this project used to bind — they decoded to {@code null} and cleared both
+   * columns on every run (REQ-DATA-015 / ADR-0148), which is why the range is derived here instead.
+   *
+   * <p>Anything that does not parse — a blank string, a range with a non-numeric bound, an empty
+   * second bound — yields {@link CrewRange#UNKNOWN} rather than a half-filled range: a crew of "1
+   * to ?" is not a fact UEX stated. Extra bounds past the second are ignored.
+   *
+   * @param crew the raw {@code crew} value, or {@code null}
+   * @return the parsed bounds, or {@link CrewRange#UNKNOWN} when nothing parseable was carried
+   */
+  public static CrewRange parseCrew(@Nullable String crew) {
+    if (!StringUtils.hasText(crew)) {
+      return CrewRange.UNKNOWN;
+    }
+    // split(-1) keeps trailing empties, so "1," stays a two-bound value with an unparseable second
+    // bound (-> UNKNOWN) instead of silently collapsing to the single-value form, and "," does not
+    // yield an empty array whose parts[0] would throw past the NumberFormatException catch.
+    String[] parts = crew.split(",", -1);
+    try {
+      int min = Integer.parseInt(parts[0].trim());
+      int max = parts.length > 1 ? Integer.parseInt(parts[1].trim()) : min;
+      return new CrewRange(min, Math.max(min, max));
+    } catch (NumberFormatException e) {
+      log.debug("Non-numeric UEX crew value '{}' — leaving crew_min / crew_max null", crew);
+      return CrewRange.UNKNOWN;
+    }
+  }
+
+  /**
    * Normalises a UEX 0/1 integer flag into a {@link Boolean}, treating an absent flag as {@code
    * false} ("not set" ≡ off). Use this on surfaces that do not distinguish "UEX omitted the flag"
    * from "UEX carried 0".

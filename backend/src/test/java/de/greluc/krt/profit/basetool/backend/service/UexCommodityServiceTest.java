@@ -554,6 +554,7 @@ class UexCommodityServiceTest {
     UUID materialId = UUID.randomUUID();
     UUID terminalId = UUID.randomUUID();
     UUID assignedPriceId = UUID.randomUUID();
+    UUID stalePriceId = UUID.randomUUID();
     Material material = new Material();
     material.setId(materialId);
     material.setIdCommodity(1);
@@ -578,17 +579,22 @@ class UexCommodityServiceTest {
               mp.setId(assignedPriceId);
               return mp;
             });
+    // One priced row survives from an earlier run and is NOT in this run's feed - the sweep's
+    // whole purpose.
+    when(materialPriceRepository.findIdsWithLivePrices())
+        .thenReturn(List.of(assignedPriceId, stalePriceId));
 
     // When
     uexCommodityService.fetchAndProcessCommoditiesPrices();
 
-    // Then — the cleanup must run with exactly the set of ids we just upserted, so any
-    // pre-existing (material, terminal) row that UEX dropped from this run gets its prices
-    // nulled. This is the Quantanium regression: terminals that stop listing a commodity used to
-    // keep stale priceBuy values forever.
+    // Then - every pre-existing (material, terminal) row that UEX dropped from this run gets its
+    // prices nulled, and the row we just upserted does not. This is the Quantanium regression:
+    // terminals that stop listing a commodity used to keep stale priceBuy values forever. The
+    // sweep now works by subtracting the seen ids from the priced rows and clearing the remainder
+    // in bounded chunks, so what reaches the repository is the STALE set (REQ-DATA-014).
     ArgumentCaptor<Collection<UUID>> idsCap = ArgumentCaptor.captor();
-    verify(materialPriceRepository).clearStalePrices(idsCap.capture());
-    assertEquals(Set.of(assignedPriceId), Set.copyOf(idsCap.getValue()));
+    verify(materialPriceRepository).clearPricesByIds(idsCap.capture());
+    assertEquals(Set.of(stalePriceId), Set.copyOf(idsCap.getValue()));
   }
 
   @Test
@@ -614,7 +620,8 @@ class UexCommodityServiceTest {
 
     // Then — refusing to clear-everything when the sync produced nothing is the whole point:
     // a transient burst of failures must not wipe the entire price matrix.
-    verify(materialPriceRepository, never()).clearStalePrices(any());
+    verify(materialPriceRepository, never()).findIdsWithLivePrices();
+    verify(materialPriceRepository, never()).clearPricesByIds(any());
   }
 
   // ─── helpers ────────────────────────────────────────────────────────────
@@ -641,10 +648,8 @@ class UexCommodityServiceTest {
     return new UexCommodityDto(
         id,
         name,
-        /*code*/ "C", /*slug*/
-        "s", /*kind*/
-        "k", /*type*/
-        "t",
+        /*code*/ "C", /*kind*/
+        "k",
         /*weightScu*/ 1.0, /*priceBuy*/
         1.0, /*priceSell*/
         1.0,

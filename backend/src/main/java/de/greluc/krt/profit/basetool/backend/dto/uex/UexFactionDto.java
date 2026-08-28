@@ -31,16 +31,9 @@ import lombok.Builder;
 public record UexFactionDto(
     @JsonProperty("id") Integer id,
     @JsonProperty("name") String name,
-    @JsonProperty("code") String code,
-    @JsonProperty("is_available_live") Integer isAvailableLive,
     @JsonProperty("wiki") String wiki,
     @JsonProperty("is_piracy") Integer isPiracy,
     @JsonProperty("is_bounty_hunting") Integer isBountyHunting) {
-  /** Returns {@code true} iff UEX reports the faction as currently active in-game. */
-  public Boolean checkIsAvailableLive() {
-    return isAvailableLive != null && isAvailableLive == 1;
-  }
-
   /** Returns {@code true} iff the faction is flagged as piracy-aligned by UEX. */
   public Boolean checkIsPiracy() {
     return isPiracy != null && isPiracy == 1;

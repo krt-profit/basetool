@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.Terminal;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
+import de.greluc.krt.profit.basetool.backend.support.StalePriceSweep;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.HashSet;
@@ -135,7 +136,14 @@ public class UexItemPriceSyncService {
               + "({} dto(s) received). Refusing to wipe the entire item-price matrix.",
           dtos.size());
     } else {
-      int cleared = gameItemPriceRepository.clearStalePrices(seenPriceIds);
+      // Cleared in bounded chunks rather than with one `id NOT IN :seenIds` statement: that form
+      // bound a parameter per row UEX returned (23 770 today) and would hit PostgreSQL's 65 535
+      // bind-parameter ceiling as the matrix grows (REQ-DATA-014).
+      int cleared =
+          StalePriceSweep.clearStale(
+              gameItemPriceRepository.findIdsWithLivePrices(),
+              seenPriceIds,
+              gameItemPriceRepository::clearPricesByIds);
       if (cleared > 0) {
         log.info("Cleared prices on {} game_item_price row(s) no longer returned by UEX.", cleared);
       }

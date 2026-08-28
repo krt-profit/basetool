@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.support.LogSafe;
+import de.greluc.krt.profit.basetool.backend.support.StalePriceSweep;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -137,7 +138,9 @@ public class UexCommodityService {
 
             material.setType(determineMaterialType(dto));
             material.setCode(dto.code());
-            material.setSlug(dto.slug());
+            // No slug: UEX's /commodities payload has no `slug` field, so the previous mapping only
+            // wrote null into material.slug on every run (REQ-DATA-015). The commodity's Wiki slug
+            // lives in its own column (scwiki_slug) and is written by the Wiki commodity sync.
             material.setKind(dto.kind());
             material.setWeightScu(dto.weightScu());
             material.setPriceBuy(dto.priceBuy());
@@ -219,7 +222,13 @@ public class UexCommodityService {
               + "({} dto(s) received, all failed). Refusing to wipe the entire price matrix.",
           dtos.size());
     } else {
-      int cleared = materialPriceRepository.clearStalePrices(seenPriceIds);
+      // Same bounded-chunk sweep as the item-price matrix (REQ-DATA-014): the parameter count no
+      // longer scales with the number of rows the feed returned.
+      int cleared =
+          StalePriceSweep.clearStale(
+              materialPriceRepository.findIdsWithLivePrices(),
+              seenPriceIds,
+              materialPriceRepository::clearPricesByIds);
       if (cleared > 0) {
         log.info("Cleared prices on {} material_price row(s) no longer returned by UEX.", cleared);
       }

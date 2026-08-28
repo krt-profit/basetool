@@ -67,4 +67,5 @@ public record ScWikiBlueprintDto(
     @JsonProperty("dismantle_returns") List<ScWikiBlueprintIngredientDto> dismantleReturns,
     @JsonProperty("requirement_groups") List<ScWikiBlueprintRequirementGroupDto> requirementGroups,
     @JsonProperty("summary_properties") List<ScWikiBlueprintSummaryPropertyDto> summaryProperties,
-    @JsonProperty("dismantle") ScWikiBlueprintDismantleDto dismantle) {}
+    @JsonProperty("dismantle") ScWikiBlueprintDismantleDto dismantle)
+    implements ScWikiRow {}

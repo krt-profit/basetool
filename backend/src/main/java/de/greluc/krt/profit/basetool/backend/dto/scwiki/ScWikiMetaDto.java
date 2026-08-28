@@ -48,8 +48,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * <p>Because the record is {@link JsonIgnoreProperties}{@code (ignoreUnknown = true)}, an upstream
  * rename of any of these fields decodes as {@code null} instead of failing — which is why the
  * client treats an absent {@link #lastPage()} on a full first page as a contract break, and
- * cross-checks {@link #total()} against the merged row count before letting the result drive a
- * tombstone sweep.
+ * cross-checks {@link #total()} against the number of DISTINCT rows the walk enumerated (never the
+ * merged row count, which a re-paginated feed inflates by exactly as much as it hides) before
+ * letting the result drive a tombstone sweep. A shortfall voids the census; a surplus does not —
+ * {@code /api/items} reports 12 283 for a feed whose own paginator serves 12 331 (ADR-0147).
  *
  * @param currentPage 1-based page number this response represents
  * @param lastPage highest page number for the current filter / sort

@@ -82,10 +82,13 @@ import org.springframework.web.util.UriUtils;
  * their {@code uex_deleted_at} stamped via {@link
  * GameItemRepository#markUexDeletedExcept(java.util.Collection, Instant)}. The sweep is gated twice
  * so it never wipes a still-present item: it is skipped when the seen-id set is empty (a sync that
- * fetched nothing) AND when any category came back {@code 304 Not Modified} (the seen-id set is
- * then an incomplete view of the catalogue — a cached category's items are missing from it only
- * because they were not re-fetched, so sweeping would soft-delete every unchanged item). Orphans
- * are reconciled on the next run that fetches every category fresh.
+ * fetched nothing) AND when <b>any category fetch came back incomplete</b> — a transport / non-2xx
+ * / decode failure, an envelope that self-reported a non-{@code ok} status, or a {@code 304 Not
+ * Modified}. All three degrade to an empty row list, which is indistinguishable from a legitimately
+ * empty category (UEX has two), so without the {@link UexClient.FetchResult#complete()} flag one
+ * 5xx on one of the ~50 per-category calls soft-deleted that whole category — up to ~500 rows —
+ * until the next healthy run re-upserted them (REQ-DATA-014). Orphans are reconciled on the next
+ * run that fetches every category fresh.
  *
  * <p><strong>Per-item isolation (REQ-DATA-004).</strong> Each item is upserted in its own {@code
  * REQUIRES_NEW} transaction via {@link #upsertItemWithinTransaction(UexItemDto, UexCategory,
@@ -165,6 +168,7 @@ public class UexItemSyncService {
     int itemsCreated = 0;
     int sharedUuidDeclined = 0;
     boolean anyCategoryUnchanged = false;
+    int incompleteCategories = 0;
     Instant now = Instant.now();
 
     for (UexCategory category : categories) {
@@ -175,6 +179,15 @@ public class UexItemSyncService {
         continue;
       }
       UexClient.FetchResult<UexItemDto> fetched = uexClient.getItemsForCategory(category.getId());
+      if (!fetched.complete()) {
+        // This category did not answer (transport / non-2xx / decode failure, a non-ok envelope
+        // status, or a 304). Every one of those degrades to an EMPTY list — the same shape a
+        // legitimately empty category returns — so the seen-id set below is missing this
+        // category's items for a reason that is NOT "UEX dropped them", and the sweep must stand
+        // down for the whole run (REQ-DATA-014). Counted before the 304 branch so both reasons
+        // land here.
+        incompleteCategories++;
+      }
       if (fetched.notModified()) {
         // UEX served this category from the conditional-GET cache (304 Not Modified): its items are
         // unchanged since the last sync — a HEALTHY no-op, not an empty catalogue. Remember it so a
@@ -234,20 +247,20 @@ public class UexItemSyncService {
       log.warn(
           "Skipping orphan sweep — no UEX item was processed across {} category response(s).",
           categoriesProcessed);
-    } else if (anyCategoryUnchanged) {
-      // At least one category was served from the 304 cache, so seenUexItemIds is an INCOMPLETE
-      // view
-      // of the catalogue: a cached category's items are absent from it only because they were not
-      // re-fetched, NOT because UEX dropped them. Running markUexDeletedExcept now would
-      // soft-delete
-      // every still-present item in every unchanged category. Defer the sweep to a run that fetched
-      // all categories fresh (e.g. after a restart repopulates the ETag cache), where the seen-set
-      // is complete — orphan detection is delayed but never wrongly deletes a cached item.
-      log.debug(
-          "Skipping orphan sweep — {} item(s) seen but at least one category was unchanged (304),"
-              + " so the seen-set is incomplete and a sweep could wrongly soft-delete cached"
-              + " items.",
-          seenUexItemIds.size());
+    } else if (incompleteCategories > 0) {
+      // At least one category could not vouch for its rows — it failed, self-reported a non-ok
+      // envelope, or was served from the 304 cache. Either way seenUexItemIds is an INCOMPLETE view
+      // of the catalogue: that category's items are absent from it because they were never
+      // enumerated, NOT because UEX dropped them. Running markUexDeletedExcept now would
+      // soft-delete every one of them (up to ~500 rows for the largest category) until the next
+      // healthy run re-upserts them and clears uex_deleted_at. Orphan detection is delayed by a
+      // cycle; nothing is wrongly deleted (REQ-DATA-014).
+      log.warn(
+          "Skipping orphan sweep — {} item(s) seen but {} category fetch(es) came back incomplete"
+              + " (failed, non-ok envelope or 304), so the seen-set is not a census of the"
+              + " catalogue and a sweep would soft-delete rows that were merely never fetched.",
+          seenUexItemIds.size(),
+          incompleteCategories);
     } else {
       marked = gameItemRepository.markUexDeletedExcept(seenUexItemIds, now);
       if (marked > 0) {

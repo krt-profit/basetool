@@ -629,6 +629,113 @@ de-N+1-ing the sort comparator), `JobOrderHandoverService` / `JobOrderItemHandov
 Covered by `StaffelMembershipResolverTest`, `OwnerScopeServiceTest`,
 `OrgUnitMembershipQueryServiceTest`, `PromotionFeatureFlagServiceGateTest`.
 
+### REQ-DATA-014 — an external-catalogue tombstone sweep runs only on an identity-verified census (ADR-0147)
+
+A sweep that soft-deletes every local row **missing from** a fetched upstream list (the SC-Wiki
+`scwiki_deleted` sweeps, and any future sweep of that shape) may run only when the page walk that
+produced the list can be shown to have enumerated the whole feed. "Shown" means counted, and the
+thing counted is **distinct row identities** — never the merged row count:
+
+- **A repeated row voids the census.** A walk over a feed that is being written to is served some
+  rows twice and never sees others: an upstream insert or delete shifts every later row across the
+  page boundaries. A row-count comparison cannot see this — one duplicate cancels one omission in
+  the total — so the rows that were never fetched would be tombstoned for it.
+- **A shortfall against the upstream's stated total voids the census**, measured against the
+  distinct count. This is the direction that gets live rows tombstoned.
+- **A surplus does not.** More distinct rows than the upstream's own total claims cannot hide a row
+  from the sweep: those rows were seen. An upstream count query may under-report its own paginator
+  (`GET /api/items` answers 12 331 distinct rows for a stated 12 283) and rows appended mid-walk
+  look the same, so a surplus is reported at `INFO` and the census stands.
+- **A feed that announces more pages by the end of the walk than it did on page 1 voids the
+  census** — the loop bound was fixed when page 1 answered, so the tail was never requested. This is
+  what allows the surplus rule above without letting a growing feed through with it.
+- Row-count baselines come from **page 1**; the page count is re-read from every page. On a
+  shrinking feed a fresher, lower total would hide exactly the rows a mid-walk deletion pushed out
+  of the pagination window before the walk reached them.
+
+**The same refusal applies to a fetch that is not a page walk.** `UexClient.FetchResult` carries a
+`complete()` flag for the same reason: its item sync makes one call per category, every failure mode
+(transport, non-2xx, decode, a non-`ok` envelope `status`) degrades to an **empty list**, and two UEX
+item categories are legitimately empty — so the rows alone cannot tell "UEX dropped these" from "we
+never asked". One 5xx on one of ~50 per-category calls therefore soft-deleted that entire category
+(up to ~500 rows) until the next healthy run re-upserted them. A run in which **any** category fetch
+came back incomplete skips the sweep entirely. A `data: null` under an `ok` status is *not*
+incomplete — that is the upstream answering "nothing matches", and treating it as a failure would
+suppress orphan detection forever, which is exactly how the SC-Wiki census bug behaved.
+
+**A sweep's bind-parameter count must not scale with the feed.** The stale-price sweeps expressed
+themselves as one `WHERE id NOT IN :seenIds` statement, binding a parameter per row the feed had just
+returned: 23 770 for `items_prices_all` today, which Spring Boot's IN-clause parameter padding rounds
+up to 32 768 against PostgreSQL's hard limit of 65 535. The next padding step crosses that line, so
+at ~38% growth the sweep would have begun failing with a protocol error — invisibly, because stale
+prices simply keep being served. The sweep is therefore inverted: ask which rows still hold a price,
+subtract the seen ids in Java, and clear the remainder in fixed-size chunks
+(`StalePriceSweep.CHUNK_SIZE`), which keeps the per-statement parameter count flat however large the
+matrix grows.
+
+Every voided census also keeps its own `WARN` and contributes to
+`basetool_external_fetch_errors_total{source}` at most once per client call (REQ-OBS-011): the
+skipped sweep touches no meter of its own, so that counter is the only signal that orphan detection
+stood down.
+
+The identity is a compile-time requirement, not a convention: `ScWikiClient`'s page walk bounds its
+payload type on `ScWikiRow` (`UUID uuid()`), so a paginated DTO without an identity is a build
+failure rather than a census check that silently degrades to comparing sizes. Rows the upstream
+serves without a UUID each count as their own row, so an id-less feed does not read as one row
+repeated N times.
+
+**Acceptance** (`UexItemSyncServiceTest`): a run in which one category fetch comes back incomplete
+ingests the other categories but runs no sweep; a run in which a category answers *completely* with
+zero rows still sweeps. (`StalePriceSweepTest`): the same rows are cleared as the `NOT IN` form
+cleared, no statement is issued when nothing is stale, and the ids arrive in bounded batches.
+
+**Acceptance** (`ScWikiClientTest`): a walk whose distinct rows exceed `meta.total` stays
+`complete`, does not `WARN` and does not count; a walk in which one row arrives on two pages is
+`INCOMPLETE` **even when the merged size matches `meta.total` exactly**; a distinct-row shortfall is
+`INCOMPLETE`; a second page announcing a third page is `INCOMPLETE`; id-less rows do not read as
+duplicates; and a walk exhibiting two symptoms of one break still increments the fetch-error counter
+once.
+
+**Enforced by:** `ScWikiClient.fetchAllPagesResult` (`countDistinctRows`, `FetchResult.complete()`)
+· **Callers:** `ScWikiItemSyncService` (Mode-B cross-kind orphan sweep),
+`ScWikiCommoditySyncService` / `ScWikiBlueprintSyncService` / `ScWikiVehicleSyncService` /
+`ScWikiManufacturerSyncService` (inline sweeps) · **Repository:**
+`GameItemRepository.markScwikiDeletedExcept` (gated on `scwiki_synced_at IS NOT NULL`, so UEX-only
+rows are never stamped) · See ADR-0147.
+
+### REQ-DATA-015 — an inbound catalogue mapping binds only fields the upstream serves (ADR-0148)
+
+A DTO that binds an external feed must map a field **only if the live payload carries it**, and a
+sync must never write a column it has no value for.
+
+Every inbound catalogue record is `@JsonIgnoreProperties(ignoreUnknown = true)`, which is correct for
+a third-party feed and silent about the inverse mistake: a component bound to an absent name decodes
+to `null` on every row of every run, and the sync writes that `null` onto its entity. The failure is
+invisible — no exception, no warning, just a column that never holds a value, and, where a second
+source writes the same column, a value that is erased once per cycle.
+
+- **A phantom component is deleted, together with its write** — not kept "in case it comes back". A
+  component that decodes to `null` on every row is not a placeholder; it is an instruction to erase.
+- **Not writing is how another source's value survives.** `ship_type.vehicle_inventory_scu` and
+  `description_en` are filled by the SC-Wiki vehicle sync and were blanked by the UEX one on its next
+  run, every cycle, because UEX serves neither field.
+- **Where the data exists in another shape, re-derive it.** UEX serves the crew complement as the
+  compact `crew` string (`"1"`, `"1,2"`), not as `crew_min` / `crew_max`; `UexValues.parseCrew`
+  splits it back into the two bounds.
+- **The columns stay.** Dropping the now-unwritten ones is a migration that buys nothing and
+  forecloses a future source; the ADR records why they are empty.
+
+**Acceptance** (`ExternalCatalogueMappingTest`): every inbound catalogue record's bound JSON names
+are a subset of the key set its endpoint last returned. One direction only — upstream fields that are
+deliberately not bound are an ever-growing choice, not a defect. A failure means "re-capture the key
+set against the live payload and fix the mapping"; it never means "add the field".
+
+**Enforced by:** `ExternalCatalogueMappingTest` · **Fixed instances (2026-08-28):**
+`ScWikiDimensionDto` (`x/y/z` → `width/height/length`, so `game_item.dimension_x/y/z` holds values
+for the first time), `UexVehicleDto` (eleven phantom components; the crew range re-derived from
+`crew`), `UexFactionDto` / `UexJurisdictionDto` / `UexOutpostDto` / `UexPoiDto` /
+`UexSpaceStationDto` (`code`), `UexCommodityDto` (`slug`, `type`) · See ADR-0148.
+
 ## Out of scope
 
 **Material-amount SCU-scale storage and rounding** (the `@PrePersist`/`@PreUpdate` HALF_UP-to-three-

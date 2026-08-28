@@ -22,14 +22,18 @@ package de.greluc.krt.profit.basetool.backend.integration.scwiki;
 import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiMetaDto;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiResponseDto;
+import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiRow;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -122,8 +126,16 @@ public class ScWikiClient {
    * Builds the {@link WebClient} after dependency injection. Done once in {@code @PostConstruct}
    * instead of lazily per call so the Reactor-Netty connection pool from {@link
    * de.greluc.krt.profit.basetool.backend.config.WebClientConfig} is reused for every Wiki request
-   * over the application's lifetime. The 16 MB in-memory codec ceiling matches {@code UexClient}:
-   * the largest probed Wiki list page sits around 1.3 MB, the OpenAPI document around 700 KB.
+   * over the application's lifetime.
+   *
+   * <p>The 16 MB in-memory codec ceiling matches {@code UexClient}. It is <b>not</b> the
+   * comfortable margin an earlier version of this comment claimed ("the largest probed Wiki list
+   * page sits around 1.3 MB"): measured against the live API on 2026-08-28, {@code /api/vehicles}
+   * at the default page size of 200 answers with <b>10.4 MB</b> on page 1, because a vehicle row
+   * carries its entire port / shield / power tree. Exceeding the ceiling throws inside the decode,
+   * which this client swallows into an empty list — so the sync would stop silently rather than
+   * fail loudly. The vehicle walk therefore requests a smaller page (see {@code
+   * ScWikiProperties.vehiclesPageSize}), which is the real fix; the ceiling is the backstop.
    */
   @PostConstruct
   void initClient() {
@@ -175,7 +187,7 @@ public class ScWikiClient {
    * @param resourceLabel human-readable label for log lines (singular / plural to taste)
    * @return merged list of rows across all pages, or an empty list on 304 / error
    */
-  public <T> List<T> fetchAllPages(
+  public <T extends ScWikiRow> List<T> fetchAllPages(
       String endpoint,
       ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
       String resourceLabel) {
@@ -195,7 +207,7 @@ public class ScWikiClient {
    *     "blueprints,items"}); {@code null} or blank means no include
    * @return merged list of rows across all pages, or an empty list on 304 / error
    */
-  public <T> List<T> fetchAllPages(
+  public <T extends ScWikiRow> List<T> fetchAllPages(
       String endpoint,
       ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
       String resourceLabel,
@@ -218,7 +230,7 @@ public class ScWikiClient {
    * @param filters optional {@code filter[<key>]=<value>} pairs; {@code null} / empty means none
    * @return merged list of rows across all pages, or an empty list on 304 / error
    */
-  public <T> List<T> fetchAllPages(
+  public <T extends ScWikiRow> List<T> fetchAllPages(
       String endpoint,
       ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
       String resourceLabel,
@@ -249,12 +261,19 @@ public class ScWikiClient {
    *       result {@link FetchResult#complete() incomplete} when it cannot vouch for the census:
    *       {@code meta.last_page} absent while page 1 came back full (the signature of an upstream
    *       field rename, which {@code @JsonIgnoreProperties(ignoreUnknown = true)} turns into a
-   *       silent {@code null} instead of a parse error), a page failing mid-walk, or {@code
-   *       meta.total} disagreeing with the merged row count. Each of those warns on its own so an
-   *       operator sees every symptom, and together they increment {@link
+   *       silent {@code null} instead of a parse error), a page failing mid-walk, the same row
+   *       coming back on two pages, the distinct rows falling <em>short</em> of {@code meta.total},
+   *       or the feed announcing more pages by the end of the walk than page 1 did. Each of those
+   *       warns on its own so an operator sees every symptom, and together they increment {@link
    *       MetricNames#EXTERNAL_FETCH_ERRORS} <b>at most once per call</b> (see {@link
    *       #recordFetchErrorOnce}) so a contract break is visible in metrics without one failed
    *       fetch inflating the error rate by its number of symptoms.
+   *   <li>A <em>surplus</em> — more distinct rows than {@code meta.total} claims — is explicitly
+   *       <b>not</b> a census failure. An upstream count query may under-report what its own
+   *       paginator serves ({@code /api/items}: 12 331 distinct rows across 62 announced pages
+   *       against a stated total of 12 283), and rows appended mid-walk look the same. Neither can
+   *       hide a row from a tombstone sweep, whereas the duplicate and shortfall checks above catch
+   *       every shape that can — so the surplus is reported at {@code INFO} and the census stands.
    * </ol>
    *
    * <p><b>Why {@code complete} exists (H5):</b> the merged list feeds tombstone sweeps that mark
@@ -290,15 +309,48 @@ public class ScWikiClient {
    *     {@code complete} census flag; the data is empty both on a 304 (flag {@code true}) and on a
    *     genuine empty-200 / error (flag {@code false})
    */
-  public <T> FetchResult<T> fetchAllPagesResult(
+  public <T extends ScWikiRow> FetchResult<T> fetchAllPagesResult(
       String endpoint,
       ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
       String resourceLabel,
       String include,
       Map<String, String> filters) {
+    return fetchAllPagesResult(endpoint, typeRef, resourceLabel, include, filters, null);
+  }
+
+  /**
+   * {@link #fetchAllPagesResult(String, ParameterizedTypeReference, String, String, Map)} with a
+   * per-endpoint {@code page[size]} override.
+   *
+   * <p>Exists because one endpoint's rows can be far heavier than the shared page size assumes:
+   * {@code /api/vehicles} serves each vehicle's whole port / shield / power tree, so page 1 at the
+   * default 200 is <b>10.4 MB</b> against the 16 MB codec ceiling described in the class doc — and
+   * crossing that ceiling does not truncate, it throws, is swallowed into an empty list, and stops
+   * the sync silently. The override is a page size, not a byte budget, because that is the only
+   * knob the upstream offers.
+   *
+   * @param <T> per-row payload type inside {@link ScWikiResponseDto#data()}
+   * @param endpoint Wiki endpoint path
+   * @param typeRef typed wrapper carrying the parametric envelope type
+   * @param resourceLabel human-readable label for log lines
+   * @param include optional value for the {@code ?include=…} parameter; {@code null} / blank means
+   *     none
+   * @param filters optional {@code filter[<key>]=<value>} pairs; {@code null} / empty means none
+   * @param pageSizeOverride rows per page for this walk, or {@code null} to use the configured
+   *     default; a non-positive value is ignored the same way
+   * @return the merged rows plus the {@code notModified} and {@code complete} flags
+   */
+  public <T extends ScWikiRow> FetchResult<T> fetchAllPagesResult(
+      String endpoint,
+      ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
+      String resourceLabel,
+      String include,
+      Map<String, String> filters,
+      Integer pageSizeOverride) {
     log.info("Fetching all {} from SC Wiki API (paginated)", resourceLabel);
 
-    String firstPageUri = buildPagedUri(endpoint, 1, include, filters);
+    int pageSize = effectivePageSize(pageSizeOverride);
+    String firstPageUri = buildPagedUri(endpoint, 1, include, filters, pageSize);
     String previousEtag = etagByFirstPageUri.get(firstPageUri);
     // One latch for the whole walk: however many distinct problems this fetch turns out to have,
     // they collectively contribute exactly one external-fetch-error increment.
@@ -325,8 +377,15 @@ public class ScWikiClient {
       accumulated.addAll(first.data());
     }
 
+    // Page 1's meta is the census BASELINE: what the feed claimed about itself before the walk
+    // started. Later pages' meta is tracked separately (freshestMeta) so a feed that grows past its
+    // own announced page count mid-walk is still caught — but the row-count baseline stays page
+    // 1's on purpose. On a SHRINKING feed the fresher, lower total would hide exactly the rows a
+    // mid-walk deletion pushed out of the pagination window before the walk reached them.
     ScWikiMetaDto meta = first.meta();
+    ScWikiMetaDto freshestMeta = meta;
     boolean complete = true;
+    boolean walkAbandoned = false;
     int lastPage = 1;
     if (meta == null || meta.lastPage() == null) {
       // The envelope carries no page count. Two very different situations share this shape, and
@@ -335,7 +394,7 @@ public class ScWikiClient {
       // into a silent null rather than an exception. The tell is a FULL page 1: the Wiki filled the
       // page size exactly, so there is almost certainly a page 2 we would never ask for, and every
       // row on it would then read as "no longer in the Wiki feed" to an orphan sweep.
-      if (isFullPage(accumulated.size())) {
+      if (isFullPage(accumulated.size(), pageSize)) {
         log.warn(
             "SC Wiki {} returned no pagination metadata (meta.last_page absent) while page 1 came"
                 + " back full at {} row(s) — treating the page walk as INCOMPLETE; later pages were"
@@ -352,7 +411,7 @@ public class ScWikiClient {
     int pagesFetched = 1;
     for (int page = 2; page <= lastPage; page++) {
       paceForRateLimit();
-      String pageUri = buildPagedUri(endpoint, page, include, filters);
+      String pageUri = buildPagedUri(endpoint, page, include, filters, pageSize);
       ScWikiResponseDto<T> next =
           fetchSinglePage(pageUri, typeRef, resourceLabel, null, errorLatch).body();
       if (next == null) {
@@ -365,33 +424,99 @@ public class ScWikiClient {
             accumulated.size());
         recordFetchErrorOnce(errorLatch);
         complete = false;
+        walkAbandoned = true;
         break;
       }
       pagesFetched++;
+      if (next.meta() != null) {
+        freshestMeta = next.meta();
+      }
       if (next.data() != null) {
         accumulated.addAll(next.data());
       }
     }
 
-    if (meta != null && meta.total() != null && meta.total() != accumulated.size()) {
-      // meta.total is the upstream's own row count for this filter. A mismatch means the walk
-      // merged fewer (or more) rows than the feed claims to hold — a dropped page, a page-size
-      // disagreement, or a catalogue that changed mid-walk. Whatever the cause, the accumulated
-      // list is not a faithful census, so it must not drive a tombstone sweep.
+    int distinctRows = countDistinctRows(accumulated);
+    int repeatedRows = accumulated.size() - distinctRows;
+    if (repeatedRows > 0) {
+      // The walk was served the same row twice. A consistent snapshot never repeats a row, so this
+      // is a pagination window that moved underneath the walk: an upstream insert or delete shifts
+      // every later row across the page boundaries, re-serving some and pushing others out of view
+      // entirely. The rows that were pushed out are precisely the ones a tombstone sweep would read
+      // as deleted — and no row-COUNT comparison can see them, because a duplicate and an omission
+      // cancel each other out in the total.
       log.warn(
-          "SC Wiki {} page walk merged {} row(s) but meta.total reports {} — treating the result as"
-              + " INCOMPLETE; the accumulated rows are not a full census of the feed.",
+          "SC Wiki {} page walk merged {} row(s) but only {} distinct one(s) — the feed was"
+              + " re-paginated mid-walk, so {} row(s) came back twice and an unknown number never"
+              + " came back at all; treating the result as INCOMPLETE.",
           resourceLabel,
           accumulated.size(),
-          meta.total());
+          distinctRows,
+          repeatedRows);
+      recordFetchErrorOnce(errorLatch);
+      complete = false;
+    }
+
+    Integer announcedTotal = meta == null ? null : meta.total();
+    if (announcedTotal != null && distinctRows < announcedTotal) {
+      // A SHORTFALL: the feed states more rows than the walk can account for — a dropped page, a
+      // page-size disagreement, or rows deleted mid-walk shifting later ones out of the window.
+      // Whichever it is, rows the Wiki still lists are missing from the merged list, so the list
+      // must not drive a tombstone sweep.
+      log.warn(
+          "SC Wiki {} page walk enumerated {} distinct row(s) but meta.total reports {} — {} row(s)"
+              + " are unaccounted for; treating the result as INCOMPLETE, the accumulated rows are"
+              + " not a full census of the feed.",
+          resourceLabel,
+          distinctRows,
+          announcedTotal,
+          announcedTotal - distinctRows);
+      recordFetchErrorOnce(errorLatch);
+      complete = false;
+    } else if (announcedTotal != null && distinctRows > announcedTotal) {
+      // A SURPLUS is not a gap, and is deliberately NOT a census failure. The upstream's own count
+      // query can disagree with what its own paginator serves — /api/items answers 12 331 distinct
+      // rows across its 62 announced pages for a stated total of 12 283 (reproduced against the
+      // live API on 2026-08-28, stable across the whole walk, while every kind endpoint agrees
+      // exactly) — and rows appended while the walk ran land here too. Neither can hide a row from
+      // the sweep: the surplus rows were SEEN, and an omission would have surfaced above as a
+      // duplicate or a shortfall. Reading a surplus as "incomplete" is what suppressed the
+      // cross-kind orphan sweep on every single run.
+      log.info(
+          "SC Wiki {} page walk enumerated {} distinct row(s) while meta.total reports {} — every"
+              + " announced page was fetched and no row came back twice, so the surplus is an"
+              + " upstream count under-reporting its own feed (or rows added mid-walk), not a gap;"
+              + " the census stands.",
+          resourceLabel,
+          distinctRows,
+          announcedTotal);
+    }
+
+    if (!walkAbandoned
+        && freshestMeta != null
+        && freshestMeta.lastPage() != null
+        && freshestMeta.lastPage() > lastPage) {
+      // The loop bound was fixed when page 1 answered, and by the end of the walk the feed
+      // announced more pages than that. The tail was never requested — the same "we never asked"
+      // case as a dropped page, and the reason a surplus above is allowed to stand: growth that
+      // outruns the announced page count is caught here instead.
+      log.warn(
+          "SC Wiki {} announced {} page(s) on page 1 but {} by the end of the walk — the {} page(s)"
+              + " past the original bound were never requested; treating the result as INCOMPLETE.",
+          resourceLabel,
+          lastPage,
+          freshestMeta.lastPage(),
+          freshestMeta.lastPage() - lastPage);
       recordFetchErrorOnce(errorLatch);
       complete = false;
     }
 
     log.info(
-        "Fetched {} {} from SC Wiki API across {} of {} announced page(s) (complete={}).",
+        "Fetched {} {} ({} distinct) from SC Wiki API across {} of {} announced page(s)"
+            + " (complete={}).",
         accumulated.size(),
         resourceLabel,
+        distinctRows,
         pagesFetched,
         lastPage,
         complete);
@@ -411,7 +536,7 @@ public class ScWikiClient {
    * @param resourceLabel human-readable label for log lines
    * @return the merged rows plus whether page 1 answered 304 Not Modified
    */
-  public <T> FetchResult<T> fetchAllPagesResult(
+  public <T extends ScWikiRow> FetchResult<T> fetchAllPagesResult(
       String endpoint,
       ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
       String resourceLabel) {
@@ -425,11 +550,63 @@ public class ScWikiClient {
    * {@code false} — an unknown page size must not manufacture a warning.
    *
    * @param rowCount the number of rows page 1 carried
-   * @return {@code true} when the configured page size is known, positive and fully used up
+   * @param pageSize the page size this walk actually requested
+   * @return {@code true} when the page size is positive and fully used up
    */
-  private boolean isFullPage(int rowCount) {
-    Integer pageSize = properties.getPageSize();
-    return pageSize != null && pageSize > 0 && rowCount >= pageSize;
+  private boolean isFullPage(int rowCount, int pageSize) {
+    return pageSize > 0 && rowCount >= pageSize;
+  }
+
+  /**
+   * Resolves the {@code page[size]} a walk should request: the caller's override when it is
+   * positive, else the configured default, else 200.
+   *
+   * <p>A non-positive override is treated as absent rather than sent on the wire, so a
+   * misconfiguration degrades to the default instead of asking the upstream for zero rows and
+   * reading the empty answer as an outage.
+   *
+   * @param pageSizeOverride the per-call override, or {@code null}
+   * @return the page size to request
+   */
+  private int effectivePageSize(Integer pageSizeOverride) {
+    if (pageSizeOverride != null && pageSizeOverride > 0) {
+      return pageSizeOverride;
+    }
+    Integer configured = properties.getPageSize();
+    return configured != null && configured > 0 ? configured : 200;
+  }
+
+  /**
+   * Counts how many <em>distinct</em> rows a page walk actually enumerated, keyed on {@link
+   * ScWikiRow#uuid()}.
+   *
+   * <p>This is the census measure, and the merged row count is not: a walk over a feed that is
+   * being written to re-serves rows it has already passed and skips others, so the two counts
+   * diverge exactly when the merged list stops being a faithful enumeration. Comparing sizes alone
+   * cannot see that — one duplicate and one omission cancel out — which is why the caller compares
+   * this number, not {@code accumulated.size()}, against the upstream's stated total, and treats
+   * any repetition at all as a census failure in its own right.
+   *
+   * <p>A row the upstream served without a UUID cannot be deduplicated, so each one counts as its
+   * own row rather than collapsing every id-less row into a single "duplicate" — an endpoint that
+   * omits UUIDs must not read as a feed that repeated itself hundreds of times.
+   *
+   * @param <T> per-row payload type
+   * @param rows the merged rows across every fetched page
+   * @return the number of distinct UUIDs plus the number of rows that carried no UUID
+   */
+  private static <T extends ScWikiRow> int countDistinctRows(List<T> rows) {
+    Set<UUID> seenIds = HashSet.newHashSet(rows.size());
+    int idlessRows = 0;
+    for (T row : rows) {
+      UUID id = row == null ? null : row.uuid();
+      if (id == null) {
+        idlessRows++;
+      } else {
+        seenIds.add(id);
+      }
+    }
+    return seenIds.size() + idlessRows;
   }
 
   /**
@@ -581,13 +758,16 @@ public class ScWikiClient {
    * @param include optional eager-load string, or {@code null} / blank
    * @param filters optional {@code filter[<key>]=<value>} pairs, or {@code null} / empty; entries
    *     with a blank key or value are skipped
+   * @param pageSize the {@code page[size]} to request — already resolved by {@link
+   *     #effectivePageSize}, so every page of one walk asks for the same size and the ETag cache
+   *     key stays stable
    * @return relative URI string passed to the WebClient via {@code .uri(String)}
    */
   private String buildPagedUri(
-      String endpoint, int pageNumber, String include, Map<String, String> filters) {
+      String endpoint, int pageNumber, String include, Map<String, String> filters, int pageSize) {
     StringBuilder sb = new StringBuilder(endpoint);
     sb.append("?page[number]=").append(pageNumber);
-    sb.append("&page[size]=").append(properties.getPageSize());
+    sb.append("&page[size]=").append(pageSize);
     if (include != null && !include.isBlank()) {
       sb.append("&include=").append(include);
     }
@@ -640,17 +820,19 @@ public class ScWikiClient {
    *
    * <p>{@link #complete()} is the separate, stricter question: did the page walk actually enumerate
    * the whole feed? It is {@code false} whenever a page failed mid-walk, page 1 itself failed, the
-   * pagination metadata went missing on a full first page, or {@code meta.total} disagreed with the
-   * merged row count. <b>Only a {@code complete} result may drive a tombstone sweep</b> — rows that
-   * were never fetched are indistinguishable from rows the Wiki dropped, and an ungated sweep would
-   * mark the whole un-fetched remainder {@code scwiki_deleted}. {@code ScWikiOrphanSweep} enforces
-   * this; the syncs with an inline sweep check the flag themselves.
+   * pagination metadata went missing on a full first page, a row came back on two pages, the
+   * distinct rows fell short of {@code meta.total}, or the feed announced more pages by the end of
+   * the walk than it did on page 1. <b>Only a {@code complete} result may drive a tombstone
+   * sweep</b> — rows that were never fetched are indistinguishable from rows the Wiki dropped, and
+   * an ungated sweep would mark the whole un-fetched remainder {@code scwiki_deleted}. {@code
+   * ScWikiOrphanSweep} enforces this; the syncs with an inline sweep check the flag themselves.
    *
    * @param <T> per-row payload type inside {@link ScWikiResponseDto#data()}
    * @param data the merged rows across all pages; empty on 304 / error
    * @param notModified {@code true} iff page 1 answered 304 Not Modified
-   * @param complete {@code true} iff the page walk enumerated the whole feed and the merged row
-   *     count agreed with the upstream's own {@code meta.total}
+   * @param complete {@code true} iff the page walk enumerated the whole feed: every announced page
+   *     fetched, no row served twice, and no shortfall against the upstream's own {@code
+   *     meta.total}
    */
   public record FetchResult<T>(List<T> data, boolean notModified, boolean complete) {
 
@@ -668,9 +850,10 @@ public class ScWikiClient {
 
     /**
      * Wraps a list the page walk could not finish (failed page, missing pagination metadata on a
-     * full page, or a {@code meta.total} mismatch) as an <em>incomplete</em> result. The rows are
-     * still returned — they are valid, they are just not the whole feed — so upserts proceed while
-     * every tombstone sweep stands down.
+     * full page, a repeated row, a shortfall against {@code meta.total}, or a page count that grew
+     * past the walk's bound) as an <em>incomplete</em> result. The rows are still returned — they
+     * are valid, they are just not the whole feed — so upserts proceed while every tombstone sweep
+     * stands down.
      *
      * @param <T> per-row payload type
      * @param data the rows merged before the walk was abandoned (possibly empty)

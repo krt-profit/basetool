@@ -49,4 +49,5 @@ public record ScWikiVehicleDto(
     @JsonProperty("game_name") String gameName,
     @JsonProperty("class_name") String className,
     @JsonProperty("vehicle_inventory") Double vehicleInventory,
-    @JsonProperty("description") Map<String, String> description) {}
+    @JsonProperty("description") Map<String, String> description)
+    implements ScWikiRow {}

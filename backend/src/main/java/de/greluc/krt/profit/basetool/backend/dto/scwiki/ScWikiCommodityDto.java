@@ -67,4 +67,5 @@ public record ScWikiCommodityDto(
     String kind,
     @JsonProperty("density_g_per_cc") Double densityGramPerCc,
     @JsonProperty("is_mineable") Boolean isMineable,
-    @JsonProperty("has_harvestables") Boolean hasHarvestables) {}
+    @JsonProperty("has_harvestables") Boolean hasHarvestables)
+    implements ScWikiRow {}

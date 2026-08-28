@@ -61,7 +61,8 @@ import org.springframework.util.StringUtils;
  *
  * <p>R9 Step 2: the legacy synthesized {@code description} column is no longer written — readers
  * source the ship-type description from {@code descriptionEn} / {@code descriptionDe} instead (the
- * column is dropped in R9 Step 4).
+ * column is dropped in R9 Step 4). Neither of those two is written <em>here</em>: UEX serves no
+ * description at all, so both come from the SC-Wiki vehicle sync (REQ-DATA-015).
  *
  * <p>Empty UEX response short-circuits without wiping local data. Orphan handling via {@link
  * ShipTypeRepository#markUexDeletedExcept(java.util.Collection, Instant)} gated on a non-empty
@@ -213,30 +214,28 @@ public class UexVehicleService {
     shipType.setUexSlug(dto.slug());
     shipType.setNameFull(dto.nameFull());
     shipType.setScu(dto.scu());
-    shipType.setCrewMin(dto.crewMin());
-    shipType.setCrewMax(dto.crewMax());
+    // UEX serves the crew complement as one compact string ("1", "1,2"), not as crew_min/crew_max
+    // (REQ-DATA-015): binding those two decoded to null and cleared both columns on every run.
+    UexValues.CrewRange crew = UexValues.parseCrew(dto.crew());
+    shipType.setCrewMin(crew.min());
+    shipType.setCrewMax(crew.max());
     shipType.setMass(dto.mass());
-    shipType.setMassTotal(dto.massTotal());
     shipType.setWidth(dto.width());
     shipType.setHeight(dto.height());
     shipType.setLengthM(dto.length());
     shipType.setPadType(dto.padType());
     shipType.setFuelQuantum(dto.fuelQuantum());
     shipType.setFuelHydrogen(dto.fuelHydrogen());
-    shipType.setVehicleInventoryScu(dto.vehicleInventory());
-    shipType.setOreCapacity(dto.oreCapacity());
     shipType.setContainerSizes(dto.containerSizes());
-    shipType.setMaxMedicalTier(dto.maxMedicalTier());
-    shipType.setHealth(dto.health());
-    shipType.setShieldHp(dto.shieldHp());
     shipType.setUrlStore(dto.urlStore());
     shipType.setUrlBrochure(dto.urlBrochure());
     shipType.setUrlHotsite(dto.urlHotsite());
     shipType.setUrlPhoto(dto.urlPhoto());
     shipType.setUrlVideo(dto.urlVideo());
-    shipType.setUrlWiki(dto.urlWiki());
-    shipType.setDescriptionEn(dto.descriptionEn());
-    // descriptionDe stays from a prior R4 Wiki sync; UEX does not expose a DE description.
+    // NOT written here, because UEX's /vehicles payload does not carry them (REQ-DATA-015):
+    // mass_total, ore_capacity, max_medical_tier, health, shield_hp, url_wiki, description and
+    // description_de. Writing them cleared eight columns outright and — for vehicle_inventory_scu
+    // and description_en — undid what the SC-Wiki vehicle sync had filled in, every single run.
 
     shipType.setIsAddon(UexValues.asBooleanOrNull(dto.isAddon()));
     shipType.setIsBoarding(UexValues.asBooleanOrNull(dto.isBoarding()));
