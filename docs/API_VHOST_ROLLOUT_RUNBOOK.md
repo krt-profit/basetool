@@ -480,6 +480,11 @@ if ($uri = "/api/v1/inventory") { set $krt_api_allowed 1; }
 # Phase 3 - the entry level of the tree. A member cannot book out what they cannot select, and the
 # two levels phase 2 admitted stop at the stack. Read-only, and NOT /inventory/all beside it.
 if ($uri = "/api/v1/inventory/all/stack/entries") { set $krt_api_allowed 1; }
+# Phase 5 - one material's entries, flat and paged: the app's tablet detail pane, and the same read
+# the web's /inventory/material/{id} page makes. GET only, and scoped by the chain exactly as the
+# tree's own reads are - the pane shows what the caller may already see in the tree, laid out
+# differently. UUID-shaped and $-anchored, so nothing beneath it is opened.
+if ($uri ~ "^/api/v1/inventory/material/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/inventory/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(book-out|personal-rebook|note)$") { set $krt_api_allowed 1; }
 # Phase 3 - the four pickers the booking form needs. All reads.
 if ($uri = "/api/v1/materials/search") { set $krt_api_allowed 1; }
@@ -725,6 +730,7 @@ The safe order, and the reason for it:
    | `/api/v1/locations/home-locations`                    | **403**                                                             | `permitAll` chain + method guard — refused at the method seam, like the Finanzen paths                   |
    | `/api/v1/inventory` (POST)                            | **401**                                                             | chain requires a member role                                                                             |
    | `/api/v1/inventory/all/stack/entries`                 | **401**                                                             | chain requires a member role                                                                             |
+   | `/api/v1/inventory/material/<uuid>`                   | **401**                                                             | same; one material's entries, for the app's tablet pane                                                  |
    | `/api/v1/inventory/<uuid>/book-out`                   | **401**                                                             | same, plus `canEditInventoryItem`                                                                        |
    | `/api/v1/inventory/<uuid>/personal-rebook`            | **401**                                                             | same                                                                                                     |
    | `/api/v1/inventory/<uuid>/note`                       | **401**                                                             | same                                                                                                     |
@@ -994,6 +1000,7 @@ merge order, so the block can be reviewed against this list rather than diffed b
 | Lager         | `/api/v1/inventory`, `/api/v1/inventory/<uuid>/{book-out,personal-rebook,note}`                                      | POST, PUT              |
 | Lager         | `/api/v1/materials/search`, `/api/v1/locations/search`, `/api/v1/users/search`, `/api/v1/materials/<uuid>/terminals` | GET                    |
 | Lager         | `/api/v1/inventory/all/stack/entries`                                                                                | GET                    |
+| Lager         | `/api/v1/inventory/material/{materialId}`                                                                            | GET                    |
 | Aufträge      | `/api/v1/orders/<uuid>/assignees/<uuid>`, `…/note`                                                                   | POST, PUT, DELETE      |
 | Aufträge      | `/api/v1/orders/<uuid>/status`                                                                                       | PUT                    |
 | Einsatz       | `/api/v1/missions/<uuid>/join`                                                                                       | POST                   |

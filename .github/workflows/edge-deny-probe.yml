@@ -119,6 +119,7 @@ jobs:
           # Phase 5 - the item order, the other half of the same form as the unit pickers. The
           # two catalogue reads and the create, all authenticated since ADR-0149. Same joining
           # rule as above: red until the block is pasted, and one paste covers both halves.
+          probe GET "/api/v1/inventory/material/00000000-0000-4000-8000-00000000cafe" 401
           probe GET /api/v1/orders/item-catalog 401
           probe GET "/api/v1/orders/item-catalog/00000000-0000-4000-8000-00000000cafe/blueprints" 401
           probe POST /api/v1/orders/items 401
