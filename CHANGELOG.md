@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.6.8](https://github.com/krt-profit/basetool/releases/tag/v1.6.8) - 2026-08-28
+
 ## [v1.6.7](https://github.com/krt-profit/basetool/releases/tag/v1.6.7) - 2026-08-28
 
 ### Removed
