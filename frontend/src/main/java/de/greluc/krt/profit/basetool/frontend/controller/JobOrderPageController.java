@@ -782,8 +782,7 @@ public class JobOrderPageController {
       List<BlueprintReferenceDto> result =
           backendApiClient.get(
               "/api/v1/orders/item-catalog/" + gameItemId + "/blueprints",
-              LIST_OF_BLUEPRINT_REFERENCE,
-              true);
+              LIST_OF_BLUEPRINT_REFERENCE);
       return result != null ? result : List.of();
     } catch (Exception e) {
       log.error("Failed to fetch blueprints for item {}", gameItemId, e);
@@ -807,8 +806,7 @@ public class JobOrderPageController {
     try {
       return backendApiClient.get(
           "/api/v1/orders/item-catalog/blueprints/" + blueprintId + "/derivation?amount=" + amount,
-          ItemDerivationDto.class,
-          true);
+          ItemDerivationDto.class);
     } catch (Exception e) {
       log.error("Failed to derive materials for blueprint {}", blueprintId, e);
       return null;
@@ -833,7 +831,7 @@ public class JobOrderPageController {
   public List<GameItemReferenceDto> itemSearch(@RequestParam(required = false) String q) {
     try {
       PageResponse<GameItemReferenceDto> page =
-          backendApiClient.getPublic(
+          backendApiClient.get(
               "/api/v1/orders/item-catalog?search={q}&size="
                   + PickerSearch.PAGE_SIZE
                   + "&sort=name,asc",
@@ -933,7 +931,7 @@ public class JobOrderPageController {
   private boolean hasOrderableItems() {
     try {
       PageResponse<GameItemReferenceDto> page =
-          backendApiClient.getCached(CachedCatalog.ITEM_CATALOG, PAGE_OF_GAME_ITEM_REFERENCE, true);
+          backendApiClient.getCached(CachedCatalog.ITEM_CATALOG, PAGE_OF_GAME_ITEM_REFERENCE);
       return page == null || page.content() == null || !page.content().isEmpty();
     } catch (Exception e) {
       log.error("Failed to probe orderable items", e);

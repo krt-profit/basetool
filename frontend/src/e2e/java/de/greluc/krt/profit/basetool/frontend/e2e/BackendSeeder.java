@@ -2356,35 +2356,30 @@ public final class BackendSeeder {
   }
 
   /**
-   * Files a Job Order as an ANONYMOUS guest (no bearer token) via {@code POST /api/v1/orders}
-   * ({@code permitAll}) and returns the parsed response body, so a test can assert the guest
-   * redaction's retained fields — notably {@code responsibleOrgUnit} (honoured when
-   * profit-eligible, else the configured intake SK) and {@code requestingOrgUnit}. A {@code null}
-   * responsibleOrgUnitId is sent as a JSON {@code null}, exercising the omitted-responsible
-   * fallback. Throws on a non-2xx status.
+   * Posts a material job order to {@code POST /api/v1/orders} with <strong>no</strong> credentials
+   * and returns the HTTP status.
    *
-   * @param responsibleOrgUnitId the responsible (processing) OrgUnit id to request, or {@code null}
-   *     to omit it (guest fallback to the intake SK)
-   * @param requestingOrgUnitId the requesting (customer) OrgUnit id (mandatory)
+   * <p>It used to create one: the endpoint was {@code permitAll} — the public request form — and
+   * this helper returned the parsed body so a test could assert the guest redaction and the intake
+   * Spezialkommando fallback. Creating an order requires a login since ADR-0149, so the only thing
+   * left worth asserting is the refusal, and the helper returns a status rather than a body.
+   *
+   * <p>The payload is deliberately well-formed. A refusal that depended on a malformed body would
+   * pass for the wrong reason, and keep passing if the endpoint were ever reopened.
+   *
+   * @param requestingOrgUnitId the requesting (customer) OrgUnit id
    * @param handle the order contact handle
    * @param materialId the requested material id
    * @param minQuality the minimum quality ({@code >= 650})
    * @param amount the requested amount
-   * @return the created order as a {@link JsonObject} (guest-redacted but org-unit-bearing)
+   * @return the HTTP status the backend answered with; {@code 401} is the expected one
    */
-  public JsonObject anonymousCreateMaterialOrder(
-      String responsibleOrgUnitId,
-      String requestingOrgUnitId,
-      String handle,
-      String materialId,
-      int minQuality,
-      double amount) {
-    String responsibleJson =
-        responsibleOrgUnitId == null ? "null" : "\"" + responsibleOrgUnitId + "\"";
+  public int anonymousCreateMaterialOrderStatus(
+      String requestingOrgUnitId, String handle, String materialId, int minQuality, double amount) {
     String body =
-        "{\"responsibleOrgUnitId\":"
-            + responsibleJson
-            + ",\"requestingOrgUnitId\":\""
+        "{\"responsibleOrgUnitId\":\""
+            + requestingOrgUnitId
+            + "\",\"requestingOrgUnitId\":\""
             + requestingOrgUnitId
             + "\",\"handle\":\""
             + handle
@@ -2401,16 +2396,9 @@ public final class BackendSeeder {
               .header("Content-Type", "application/json")
               .POST(HttpRequest.BodyPublishers.ofString(body))
               .build();
-      HttpResponse<String> response = http.send(request, BodyHandlers.ofString());
-      if (response.statusCode() < 200 || response.statusCode() >= 300) {
-        throw new IllegalStateException(
-            "Anonymous order create failed: HTTP " + response.statusCode() + " " + response.body());
-      }
-      return JsonParser.parseString(response.body()).getAsJsonObject();
-    } catch (IllegalStateException e) {
-      throw e;
+      return http.send(request, BodyHandlers.ofString()).statusCode();
     } catch (Exception e) {
-      throw new IllegalStateException("BackendSeeder.anonymousCreateMaterialOrder failed", e);
+      throw new IllegalStateException("BackendSeeder.anonymousCreateMaterialOrderStatus failed", e);
     }
   }
 
