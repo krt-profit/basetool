@@ -253,7 +253,7 @@ public class KeycloakService {
    * Logs a swallowed {@link #fetchUsers(Collection, Set)} failure, upgrading the generic message to
    * an operator-actionable hint when the Admin API answered {@code 401}/{@code 403}. A persistent
    * authorization rejection is a permission misconfiguration, not a transient outage: since the
-   * role-indexed refactor (ADR-0085 / REQ-SEC-018) the sync lists realm roles ({@code GET
+   * role-indexed refactor (ADR-0085 / REQ-SEC-043) the sync lists realm roles ({@code GET
    * /admin/realms/{realm}/roles}) and reads their members ({@code GET /roles/{name}/users}), which
    * require the {@code view-realm} realm-management role on top of the {@code view-users} the
    * roster listing already needs — so a service account provisioned with only {@code view-users}

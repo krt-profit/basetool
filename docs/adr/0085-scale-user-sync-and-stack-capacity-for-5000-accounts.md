@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-09
 - **Deciders:** @greluc
-- **Related:** `KeycloakService` · `UserSyncService` · `UserSyncTask` · `KeycloakSyncProperties` · `UserRepository.findIdsWithDiscordLink` · `RoleRepository.findAllNames` · `docker-compose.yml` (keycloak / db-keycloak / db-backend / redis) · REQ-SEC-018 · REQ-DATA-006 · ADR-0036 · ADR-0078 · ADR-0079 · the 2026-07-09 native-thread exhaustion incident
+- **Related:** `KeycloakService` · `UserSyncService` · `UserSyncTask` · `KeycloakSyncProperties` · `UserRepository.findIdsWithDiscordLink` · `RoleRepository.findAllNames` · `docker-compose.yml` (keycloak / db-keycloak / db-backend / redis) · REQ-SEC-043 · REQ-DATA-006 · ADR-0036 · ADR-0078 · ADR-0079 · the 2026-07-09 native-thread exhaustion incident
 
 ## Context
 
@@ -25,7 +25,7 @@ incident; even at an off-peak cadence a 10k-call burst is the wrong shape at 500
 (`spring.threads.virtual.enabled`), so 200 concurrent users are trivial for threads and the
 `pids: 2048` cgroup cap; the Hikari pool (100, ADR-0078) plus Postgres `max_connections=150` sit
 well above what 200 concurrent users drive (they never open more than the 100-slot pool); the roster
-fetch already pages (REQ-SEC-018); user-list reads are squadron-scoped; the SSE stream cap is 5 per
+fetch already pages (REQ-SEC-043); user-list reads are squadron-scoped; the SSE stream cap is 5 per
 user. None of these are 5000-account blockers.
 
 ## Decision
@@ -42,7 +42,7 @@ reconstructed `user → roles` sets are equivalent — the call count is now bou
 number of mappable roles × their page count, not by the user count.
 
 > **Refinement (2026-07-10, Discord account-creation regression audit).** Two hardening tweaks to
-> the role read, both pinned by REQ-SEC-018: (1) the local catalog names are matched
+> the role read, both pinned by REQ-SEC-043: (1) the local catalog names are matched
 > **case-insensitively** against the realm's actual role names — resolved once via a paged `GET
 > /roles` — before the member read, so a role whose Keycloak casing differs from the local name is
 > still resolved (removing a scheduled-vs-interactive asymmetry, since the JWT path already maps via
@@ -233,7 +233,7 @@ owner later wants a shorter login window, that is a separate product decision.
 ## Consequences
 
 - The daily sync is a bounded off-peak burst even at 5000 accounts; Keycloak is no longer hammered.
-- Role resolution stays faithful (directly-assigned realm roles), and the REQ-SEC-018 completeness
+- Role resolution stays faithful (directly-assigned realm roles), and the REQ-SEC-043 completeness
   invariant is unchanged — role-indexing only changes how the paged roster is *annotated*.
 - The incremental Discord back-fill is bounded by the *unlinked* population, not the full roster; a
   relink is caught at next login rather than by the daily sync (acceptable — the sync is a safety
