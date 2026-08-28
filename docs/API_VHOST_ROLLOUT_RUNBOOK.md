@@ -1285,11 +1285,11 @@ matched. A `401` in the second group would mean something was opened by accident
 **App decision, design chapter 11 artboards 4–5.** The app could read a run and book its yield but
 not record one; the form that closes that gap needs three paths the vhost has never named.
 
-|      Screen       |               Paths               | Verbs |
-|-------------------|-----------------------------------|-------|
-| Neuer Auftrag     | `/api/v1/refinery-orders`         | POST  |
-| Raffinerie-Picker | `/api/v1/locations/refineries`    | GET   |
-| Methoden-Picker   | `/api/v1/refining-methods`        | GET   |
+|      Screen       |             Paths              | Verbs |
+|-------------------|--------------------------------|-------|
+| Neuer Auftrag     | `/api/v1/refinery-orders`      | POST  |
+| Raffinerie-Picker | `/api/v1/locations/refineries` | GET   |
+| Methoden-Picker   | `/api/v1/refining-methods`     | GET   |
 
 **Why the bare stem is safe to name.** `refinery-orders` is not in the read-only family, so the line
 opens every verb the backend serves on that exact path — which is the create `POST` and the
