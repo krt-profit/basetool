@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.6.7](https://github.com/krt-profit/basetool/releases/tag/v1.6.7) - 2026-08-28
+
 ### Removed
 
 - **Aufträge lassen sich nicht mehr ohne Login anlegen.** Das öffentliche Anfrageformular ist
