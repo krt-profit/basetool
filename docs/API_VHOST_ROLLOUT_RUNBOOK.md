@@ -376,6 +376,17 @@ if ($uri = "/api/v1/orders") { set $krt_api_allowed 1; }
 # to be fillable anonymously. The payload carries no PII - name, shorthand, kind and the profit
 # flag.
 if ($uri = "/api/v1/org-units/active-all-kinds") { set $krt_api_allowed 1; }
+# Phase 5 - the item order's three paths, the other half of the same „Neuer Auftrag" form. The
+# catalogue and its blueprints are GET-only reads of the game catalogue: no member data, no org
+# data, and both require a login since ADR-0149. The create is an exact match, so it opens the
+# collection POST and nothing beneath it - the same shape /api/v1/orders has, and for the same
+# reason. They join the same paste as the unit pickers above; one application covers both.
+#
+# Neither catalogue line is reachable through the /orders/<uuid> pattern above: "item-catalog" and
+# "items" are not uuids, so the two families cannot collide however they are ordered.
+if ($uri = "/api/v1/orders/item-catalog") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/orders/item-catalog/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/blueprints$") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/orders/items") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
 # Phase 3 - the two things a member does to an order they can see: put their own name on it and
 # write the note that says which part they take. Plus the status change, which is LOGISTICIAN-only
@@ -570,6 +581,9 @@ if ($uri ~ "^/api/v1/inventory/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9
 if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/assignees/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(/note)?$") { set $krt_readonly_family ""; }
 if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/status$") { set $krt_readonly_family ""; }
 if ($uri = "/api/v1/orders") { set $krt_readonly_family ""; }
+# The item order's create, the same shape as the material one. The two catalogue reads above are
+# GET and need no carve-out; naming them here would open a POST the backend does not serve.
+if ($uri = "/api/v1/orders/items") { set $krt_readonly_family ""; }
 # /notifications stays in the family because the prefix also carries /notification-rules, the
 # admin surface that creates and deletes the rules every member's inbox is generated from. Only
 # the four me-scoped inbox mutations are named. Naming a path opens every verb the backend serves
@@ -678,6 +692,9 @@ The safe order, and the reason for it:
    | `/api/v1/inventory/aggregated`                        | **401**                                                             | chain requires a member role                                                                             |
    | `/api/v1/inventory/all/grouped`                       | **401**                                                             | same                                                                                                     |
    | `/api/v1/orders`                                      | **401**                                                             | `isAuthenticated()`; the `POST` on the same path is refused by the read-only guard                       |
+   | `/api/v1/orders/item-catalog`                         | **401**                                                             | `isAuthenticated()` since ADR-0149; the orderable finished items                                         |
+   | `/api/v1/orders/item-catalog/<uuid>/blueprints`       | **401**                                                             | same; the blueprints one item may be built from                                                          |
+   | `/api/v1/orders/items` (POST)                         | **401**                                                             | `isAuthenticated()`; raises an item order                                                                |
    | `/api/v1/orders/<uuid>`                               | **401**                                                             | `isAuthenticated()` + scope                                                                              |
    | `/api/v1/orders/<uuid>/assignees/<uuid>`              | **401**                                                             | `isAuthenticated()` + scope; self-assignment is open to every member, anyone else needs LOGISTICIAN      |
    | `/api/v1/orders/<uuid>/assignees/<uuid>/note`         | **401**                                                             | same, and locked on the assignee edge's own version                                                      |
