@@ -23,10 +23,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.model.Notification;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
+import de.greluc.krt.profit.basetool.backend.model.User;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -45,10 +48,52 @@ class NotificationRepositoryIntegrationTest {
 
   @Autowired private NotificationRepository repository;
   @Autowired private TransactionTemplate transactionTemplate;
+  @Autowired private UserRepository userRepository;
+
+  /** Ids of the {@code app_user} rows this class created, removed again after each test. */
+  private final Set<UUID> seededRecipients = new HashSet<>();
+
+  /**
+   * Creates the {@code app_user} row the recipient id has to point at, unless it already exists.
+   *
+   * <p>Needed since V235: {@code recipient_sub} is a foreign key to {@code app_user(id)}
+   * (REQ-DATA-008), so the random per-test recipient ids no longer insert on their own. Called from
+   * both {@code save} helpers so every call site keeps working unchanged.
+   *
+   * @param recipient the notification's recipient id
+   */
+  private void ensureRecipient(UUID recipient) {
+    if (userRepository.existsById(recipient)) {
+      return;
+    }
+    User user = new User();
+    user.setId(recipient);
+    user.setUsername("recipient-" + recipient);
+    userRepository.save(user);
+    seededRecipients.add(recipient);
+  }
+
+  /**
+   * Removes the users this class created.
+   *
+   * <p>These rows commit (the helpers write through a {@link TransactionTemplate}) into a database
+   * shared by the whole suite, and a leftover login-capable user shifts the totals other classes
+   * assert over -- the terms-acceptance overview counts every one of them. Deleting the user takes
+   * its notifications with it (V235, {@code ON DELETE CASCADE}).
+   */
+  @AfterEach
+  void removeSeededRecipients() {
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          userRepository.deleteAllById(seededRecipients);
+          seededRecipients.clear();
+        });
+  }
 
   private Notification save(UUID recipient, boolean read, Instant readAt) {
     return transactionTemplate.execute(
         status -> {
+          ensureRecipient(recipient);
           Notification n =
               Notification.builder()
                   .recipientSub(recipient)
@@ -65,15 +110,17 @@ class NotificationRepositoryIntegrationTest {
   private Notification save(
       UUID recipient, NotificationType type, String entityType, UUID entityId) {
     return transactionTemplate.execute(
-        status ->
-            repository.save(
-                Notification.builder()
-                    .recipientSub(recipient)
-                    .type(type)
-                    .entityType(entityType)
-                    .entityId(entityId)
-                    .read(false)
-                    .build()));
+        status -> {
+          ensureRecipient(recipient);
+          return repository.save(
+              Notification.builder()
+                  .recipientSub(recipient)
+                  .type(type)
+                  .entityType(entityType)
+                  .entityId(entityId)
+                  .read(false)
+                  .build());
+        });
   }
 
   @Test

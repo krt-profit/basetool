@@ -55,7 +55,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class BlueprintProductServiceTest {
 
-  private static final String SUB = "owner-1";
+  private static final UUID SUB = UUID.fromString("0e000001-0000-4000-8000-000000000001");
 
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private PersonalBlueprintRepository personalBlueprintRepository;

@@ -71,7 +71,7 @@ public class AdminPersonalInventoryController {
   /**
    * Lists a target user's personal-inventory items.
    *
-   * @param userSub target user's Keycloak {@code sub}
+   * @param userSub target user's {@code app_user.id}
    * @return paged response DTOs
    */
   @GetMapping("/{userSub}")
@@ -81,7 +81,7 @@ public class AdminPersonalInventoryController {
     @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
   })
   public PageResponse<PersonalInventoryItemResponse> listForUser(
-      @PathVariable String userSub,
+      @PathVariable UUID userSub,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
@@ -100,7 +100,7 @@ public class AdminPersonalInventoryController {
   /**
    * Creates an item on behalf of the target user.
    *
-   * @param userSub target user's Keycloak {@code sub}
+   * @param userSub target user's {@code app_user.id}
    * @param request create payload
    * @return the persisted DTO
    */
@@ -114,8 +114,7 @@ public class AdminPersonalInventoryController {
     @ApiResponse(responseCode = "404", description = "Referenced UEX location does not exist.")
   })
   public PersonalInventoryItemResponse createForUser(
-      @PathVariable String userSub,
-      @Valid @RequestBody PersonalInventoryItemCreateRequest request) {
+      @PathVariable UUID userSub, @Valid @RequestBody PersonalInventoryItemCreateRequest request) {
     return service.createForUser(userSub, request);
   }
 

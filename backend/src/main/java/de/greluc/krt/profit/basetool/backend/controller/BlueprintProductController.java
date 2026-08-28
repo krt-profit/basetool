@@ -21,13 +21,14 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService;
-import de.greluc.krt.profit.basetool.backend.web.CurrentUserSub;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -58,7 +59,7 @@ public class BlueprintProductController {
    *
    * @param q optional case-insensitive product-name substring; blank returns the first products
    * @param limit optional maximum number of results; clamped to {@code [1, MAX_LIMIT]}
-   * @param ownerSub the caller's JWT {@code sub} claim
+   * @param ownerSub the caller's {@code app_user.id}
    * @return up to {@code limit} matching products, alphabetically by name
    */
   @GetMapping("/search")
@@ -75,7 +76,7 @@ public class BlueprintProductController {
   public List<BlueprintProductDto> search(
       @RequestParam(required = false) String q,
       @RequestParam(required = false) Integer limit,
-      @CurrentUserSub String ownerSub) {
+      @CurrentUserId UUID ownerSub) {
     int effectiveLimit = limit == null ? BlueprintProductService.DEFAULT_LIMIT : limit;
     return blueprintProductService.searchProducts(q, effectiveLimit, ownerSub);
   }

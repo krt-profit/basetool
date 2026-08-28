@@ -84,7 +84,7 @@ public class AdminPersonalBlueprintController {
   /**
    * Lists a target user's owned blueprints (paginated, sortable, optional name filter).
    *
-   * @param userSub target user's Keycloak {@code sub}
+   * @param userSub target user's {@code app_user.id}
    * @param page optional zero-based page index
    * @param size optional page size
    * @param sort optional sort expression over the whitelist
@@ -98,7 +98,7 @@ public class AdminPersonalBlueprintController {
     @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
   })
   public PageResponse<PersonalBlueprintResponse> listForUser(
-      @PathVariable String userSub,
+      @PathVariable UUID userSub,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
@@ -117,7 +117,7 @@ public class AdminPersonalBlueprintController {
   /**
    * Adds a single blueprint on behalf of the target user.
    *
-   * @param userSub target user's Keycloak {@code sub}
+   * @param userSub target user's {@code app_user.id}
    * @param request the add payload
    * @return the persisted DTO
    */
@@ -132,14 +132,14 @@ public class AdminPersonalBlueprintController {
     @ApiResponse(responseCode = "409", description = "Blueprint already owned.")
   })
   public PersonalBlueprintResponse addForUser(
-      @PathVariable String userSub, @Valid @RequestBody PersonalBlueprintCreateRequest request) {
+      @PathVariable UUID userSub, @Valid @RequestBody PersonalBlueprintCreateRequest request) {
     return service.addForUser(userSub, request);
   }
 
   /**
    * Multi-select add on behalf of the target user; already-owned / unresolvable keys are skipped.
    *
-   * @param userSub target user's Keycloak {@code sub}
+   * @param userSub target user's {@code app_user.id}
    * @param request the batch of product keys
    * @return a summary of added vs. skipped keys
    */
@@ -151,8 +151,7 @@ public class AdminPersonalBlueprintController {
     @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
   })
   public PersonalBlueprintBatchResult addBatchForUser(
-      @PathVariable String userSub,
-      @Valid @RequestBody PersonalBlueprintBatchCreateRequest request) {
+      @PathVariable UUID userSub, @Valid @RequestBody PersonalBlueprintBatchCreateRequest request) {
     return service.addBatchForUser(userSub, request.productKeys());
   }
 
@@ -220,7 +219,7 @@ public class AdminPersonalBlueprintController {
    * Previews a blueprint export import (SCMDB or Basetool BP Extractor) on behalf of the target
    * user. Nothing is persisted.
    *
-   * @param userSub target user's Keycloak {@code sub}
+   * @param userSub target user's {@code app_user.id}
    * @param file the uploaded blueprint export JSON
    * @return the per-name resolution preview
    */
@@ -232,14 +231,14 @@ public class AdminPersonalBlueprintController {
     @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
   })
   public BlueprintImportPreviewDto previewImportForUser(
-      @PathVariable String userSub, @RequestParam("file") @NotNull MultipartFile file) {
+      @PathVariable UUID userSub, @RequestParam("file") @NotNull MultipartFile file) {
     return importService.previewImport(userSub, file);
   }
 
   /**
    * Applies reviewed blueprint-import resolutions on behalf of the target user.
    *
-   * @param userSub target user's Keycloak {@code sub}
+   * @param userSub target user's {@code app_user.id}
    * @param request the per-name resolutions
    * @return a summary of added / learned / skipped / already-owned counts
    */
@@ -251,7 +250,7 @@ public class AdminPersonalBlueprintController {
     @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
   })
   public BlueprintImportResultDto applyImportForUser(
-      @PathVariable String userSub, @Valid @RequestBody BlueprintImportApplyRequest request) {
+      @PathVariable UUID userSub, @Valid @RequestBody BlueprintImportApplyRequest request) {
     return importService.applyImport(userSub, request.resolutions());
   }
 }

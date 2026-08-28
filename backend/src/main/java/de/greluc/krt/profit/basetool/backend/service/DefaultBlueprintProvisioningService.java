@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -46,11 +47,11 @@ public class DefaultBlueprintProvisioningService {
   /**
    * Grants every default blueprint the given user does not yet own. Idempotent.
    *
-   * @param ownerSub Keycloak {@code sub} of the user to provision
+   * @param ownerSub {@code app_user.id} of the user to provision
    * @return the number of newly inserted owned-blueprint rows
    */
   @Transactional
-  public int grantDefaultsToUser(@NotNull String ownerSub) {
+  public int grantDefaultsToUser(@NotNull UUID ownerSub) {
     int granted = personalBlueprintRepository.grantDefaultBlueprintsToUser(ownerSub);
     if (granted > 0) {
       log.info("Granted {} default blueprint(s) to ownerSub={}", granted, ownerSub);

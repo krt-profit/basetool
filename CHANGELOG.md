@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Die Daten eines gelöschten Kontos überleben es nicht mehr.** Fünf Spalten hielten eine
+  Mitglieds-ID ohne Fremdschlüssel: persönliches Inventar, persönliche Blueprints,
+  Benachrichtigungen, deren Empfänger-Regeln und die Beförderungs-Bewertungen — vergaß ein
+  Löschpfad eine davon, blieben die Zeilen unsichtbar liegen und wurden von einem zurückkehrenden
+  Keycloak-Konto wieder übernommen. Die Datenbank erzwingt das Aufräumen jetzt selbst
+  (Migration V235); am wichtigsten bei den Empfänger-Regeln, die sonst weiter Benachrichtigungen
+  für ein nicht mehr existierendes Mitglied erzeugen.
+
 ## [v1.6.8](https://github.com/krt-profit/basetool/releases/tag/v1.6.8) - 2026-08-28
 
 ## [v1.6.7](https://github.com/krt-profit/basetool/releases/tag/v1.6.7) - 2026-08-28

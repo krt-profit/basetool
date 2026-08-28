@@ -3793,7 +3793,8 @@
           "in" : "path",
           "required" : true,
           "schema" : {
-            "type" : "string"
+            "type" : "string",
+            "format" : "uuid"
           }
         }, {
           "name" : "categoryId",
@@ -30336,7 +30337,8 @@
           "in" : "path",
           "required" : true,
           "schema" : {
-            "type" : "string"
+            "type" : "string",
+            "format" : "uuid"
           }
         }, {
           "name" : "page",
@@ -30471,7 +30473,8 @@
           "in" : "path",
           "required" : true,
           "schema" : {
-            "type" : "string"
+            "type" : "string",
+            "format" : "uuid"
           }
         } ],
         "requestBody" : {
@@ -30571,7 +30574,8 @@
           "in" : "path",
           "required" : true,
           "schema" : {
-            "type" : "string"
+            "type" : "string",
+            "format" : "uuid"
           }
         }, {
           "name" : "page",
@@ -30706,7 +30710,8 @@
           "in" : "path",
           "required" : true,
           "schema" : {
-            "type" : "string"
+            "type" : "string",
+            "format" : "uuid"
           }
         } ],
         "requestBody" : {
@@ -30806,7 +30811,8 @@
           "in" : "path",
           "required" : true,
           "schema" : {
-            "type" : "string"
+            "type" : "string",
+            "format" : "uuid"
           }
         } ],
         "requestBody" : {
@@ -30912,7 +30918,8 @@
           "in" : "path",
           "required" : true,
           "schema" : {
-            "type" : "string"
+            "type" : "string",
+            "format" : "uuid"
           }
         } ],
         "requestBody" : {
@@ -31012,7 +31019,8 @@
           "in" : "path",
           "required" : true,
           "schema" : {
-            "type" : "string"
+            "type" : "string",
+            "format" : "uuid"
           }
         } ],
         "requestBody" : {
@@ -38502,7 +38510,8 @@
           "in" : "path",
           "required" : true,
           "schema" : {
-            "type" : "string"
+            "type" : "string",
+            "format" : "uuid"
           }
         } ],
         "responses" : {
@@ -55247,7 +55256,8 @@
             "format" : "int64"
           },
           "userId" : {
-            "type" : "string"
+            "type" : "string",
+            "format" : "uuid"
           },
           "categoryId" : {
             "type" : "string",
@@ -61860,7 +61870,8 @@
         "type" : "object",
         "properties" : {
           "userId" : {
-            "type" : "string"
+            "type" : "string",
+            "format" : "uuid"
           },
           "fromRank" : {
             "type" : "integer",

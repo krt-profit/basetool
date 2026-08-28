@@ -54,7 +54,7 @@ import org.springframework.web.multipart.MultipartFile;
 @ExtendWith(MockitoExtension.class)
 class AdminPersonalBlueprintControllerTest {
 
-  private static final String TARGET = "target-user-sub";
+  private static final UUID TARGET = UUID.fromString("7a76e700-0000-4000-8000-000000000001");
 
   @Mock private PersonalBlueprintService service;
   @Mock private BlueprintImportService importService;

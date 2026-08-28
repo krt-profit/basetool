@@ -45,7 +45,7 @@ class PersonalInventoryItemMapperTest {
     PersonalInventoryItem entity =
         PersonalInventoryItem.builder()
             .id(id)
-            .ownerSub("user-sub-123")
+            .ownerSub(UUID.fromString("12312312-3123-4123-8123-123123123123"))
             .name("Medkit")
             .note("First aid")
             .locationUexId(42)
@@ -106,7 +106,7 @@ class PersonalInventoryItemMapperTest {
     PersonalInventoryItem managed =
         PersonalInventoryItem.builder()
             .id(UUID.randomUUID())
-            .ownerSub("preserved-sub")
+            .ownerSub(UUID.fromString("9e5e5e5e-0000-4000-8000-000000000001"))
             .name("Old")
             .note("Old note")
             .locationUexId(1)
@@ -130,7 +130,7 @@ class PersonalInventoryItemMapperTest {
     assertEquals(PersonalInventoryLocationType.SPACE_STATION, managed.getLocationType());
     assertEquals(9, managed.getQuantity());
     assertEquals(
-        "preserved-sub",
+        UUID.fromString("9e5e5e5e-0000-4000-8000-000000000001"),
         managed.getOwnerSub(),
         "ownerSub must NEVER be overwritten by an update request");
     assertEquals(

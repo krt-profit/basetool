@@ -68,7 +68,12 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 @ExtendWith(MockitoExtension.class)
 class PersonalBlueprintServiceTest {
 
-  private static final String SUB = "owner-1";
+  private static final UUID SUB = UUID.fromString("0e000001-0000-4000-8000-000000000001");
+
+  /** A second member, and the admin endpoints' path-addressed target. */
+  private static final UUID OTHER_USER = UUID.fromString("0e000002-0000-4000-8000-000000000002");
+
+  private static final UUID TARGET = UUID.fromString("0e000003-0000-4000-8000-000000000003");
 
   @Mock private PersonalBlueprintRepository repository;
   @Mock private PersonalBlueprintMapper mapper;
@@ -367,18 +372,18 @@ class PersonalBlueprintServiceTest {
 
   @Test
   void listForUser_delegatesToOwnerLookupWithTargetSub() {
-    when(repository.findAllByOwnerSub(eq("target"), any())).thenReturn(new PageImpl<>(List.of()));
+    when(repository.findAllByOwnerSub(eq(TARGET), any())).thenReturn(new PageImpl<>(List.of()));
 
-    service.listForUser("target", null, PageRequest.of(0, 10));
+    service.listForUser(TARGET, null, PageRequest.of(0, 10));
 
-    verify(repository).findAllByOwnerSub(eq("target"), any());
+    verify(repository).findAllByOwnerSub(eq(TARGET), any());
   }
 
   @Test
   void updateForUser_appliesByIdAlone_whenVersionMatches() {
     UUID id = UUID.randomUUID();
     PersonalBlueprint entity =
-        PersonalBlueprint.builder().id(id).ownerSub("other-user").productKey("k").build();
+        PersonalBlueprint.builder().id(id).ownerSub(OTHER_USER).productKey("k").build();
     entity.setVersion(5L);
     when(repository.findById(id)).thenReturn(Optional.of(entity));
     when(repository.save(entity)).thenReturn(entity);
@@ -403,7 +408,7 @@ class PersonalBlueprintServiceTest {
   @Test
   void deleteForUser_removesById() {
     UUID id = UUID.randomUUID();
-    PersonalBlueprint entity = PersonalBlueprint.builder().id(id).ownerSub("other-user").build();
+    PersonalBlueprint entity = PersonalBlueprint.builder().id(id).ownerSub(OTHER_USER).build();
     when(repository.findById(id)).thenReturn(Optional.of(entity));
 
     service.deleteForUser(id);
@@ -423,7 +428,7 @@ class PersonalBlueprintServiceTest {
   void deleteForUser_throwsConflict_andDoesNotDelete_whenEntryIsDefault() {
     UUID id = UUID.randomUUID();
     PersonalBlueprint entity =
-        PersonalBlueprint.builder().id(id).ownerSub("other-user").productKey("p4-ar rifle").build();
+        PersonalBlueprint.builder().id(id).ownerSub(OTHER_USER).productKey("p4-ar rifle").build();
     when(repository.findById(id)).thenReturn(Optional.of(entity));
     when(defaultBlueprintKeyService.isDefault("p4-ar rifle")).thenReturn(true);
 

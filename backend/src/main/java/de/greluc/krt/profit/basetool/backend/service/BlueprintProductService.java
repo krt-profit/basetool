@@ -81,12 +81,12 @@ public class BlueprintProductService {
    *
    * @param query case-insensitive product-name substring; {@code null} / blank returns all products
    * @param limit requested maximum number of products; clamped to {@code [1, MAX_LIMIT]}
-   * @param ownerSub Keycloak {@code sub} of the caller, used to compute the owned flag
+   * @param ownerSub {@code app_user.id} of the caller, used to compute the owned flag
    * @return the matching products, alphabetically by name, capped to the effective limit
    */
   @NotNull
   public List<BlueprintProductDto> searchProducts(
-      @Nullable String query, int limit, @NotNull String ownerSub) {
+      @Nullable String query, int limit, @NotNull UUID ownerSub) {
     int cap = Math.max(1, Math.min(limit, MAX_LIMIT));
     String q = query == null ? "" : query.trim();
 
@@ -363,11 +363,11 @@ public class BlueprintProductService {
   /**
    * Returns the subset of {@code keys} the owner already owns, via a single bulk lookup.
    *
-   * @param ownerSub Keycloak {@code sub} of the owner
+   * @param ownerSub {@code app_user.id} of the owner
    * @param keys the product keys to test
    * @return the owned product keys
    */
-  private Set<String> ownedKeys(String ownerSub, List<String> keys) {
+  private Set<String> ownedKeys(UUID ownerSub, List<String> keys) {
     if (keys.isEmpty()) {
       return Set.of();
     }

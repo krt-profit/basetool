@@ -58,8 +58,8 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 @ExtendWith(MockitoExtension.class)
 class PersonalInventoryItemServiceTest {
 
-  private static final String OWNER = "owner-sub-1";
-  private static final String OTHER = "other-sub-2";
+  private static final UUID OWNER = UUID.fromString("0e000001-0000-4000-8000-000000000001");
+  private static final UUID OTHER = UUID.fromString("0e000002-0000-4000-8000-000000000002");
 
   @Mock private PersonalInventoryItemRepository repository;
 
@@ -324,7 +324,7 @@ class PersonalInventoryItemServiceTest {
 
   // ------------------------------------------------------ helpers
 
-  private static PersonalInventoryItem sample(String ownerSub, long version) {
+  private static PersonalInventoryItem sample(UUID ownerSub, long version) {
     PersonalInventoryItem e =
         PersonalInventoryItem.builder()
             .ownerSub(ownerSub)

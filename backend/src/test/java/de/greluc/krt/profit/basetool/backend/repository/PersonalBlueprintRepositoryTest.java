@@ -24,9 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.model.DefaultBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
+import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,18 +48,40 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class PersonalBlueprintRepositoryTest {
 
-  private static final String OWNER_A = "11111111-1111-1111-1111-111111111111";
-  private static final String OWNER_B = "22222222-2222-2222-2222-222222222222";
-  private static final String OWNER_C = "33333333-3333-3333-3333-333333333333";
+  private static final UUID OWNER_A = UUID.fromString("11111111-1111-1111-1111-111111111111");
+  private static final UUID OWNER_B = UUID.fromString("22222222-2222-2222-2222-222222222222");
+  private static final UUID OWNER_C = UUID.fromString("33333333-3333-3333-3333-333333333333");
 
   private static final String DEFAULT_KEY = "test-default-blueprint";
 
   @Autowired private PersonalBlueprintRepository repository;
   @Autowired private DefaultBlueprintRepository defaultBlueprintRepository;
+  @Autowired private UserRepository userRepository;
 
   @BeforeEach
   void clean() {
     repository.deleteAll();
+    // owner_sub is a foreign key to app_user(id) since V235 (REQ-DATA-008), so the three owners
+    // have to exist before any blueprint can reference them.
+    seedOwner(OWNER_A);
+    seedOwner(OWNER_B);
+    seedOwner(OWNER_C);
+  }
+
+  /**
+   * Creates the {@code app_user} row a blueprint owner id has to point at, unless it already
+   * exists.
+   *
+   * @param id the owner id used as {@code owner_sub}
+   */
+  private void seedOwner(UUID id) {
+    if (userRepository.existsById(id)) {
+      return;
+    }
+    User user = new User();
+    user.setId(id);
+    user.setUsername("owner-" + id);
+    userRepository.save(user);
   }
 
   @Test
@@ -102,7 +126,7 @@ class PersonalBlueprintRepositoryTest {
     List<PersonalBlueprint> rows =
         repository.findAllByProductKeyAndOwnerSubIn("aurora", Set.of(OWNER_A, OWNER_B));
 
-    Set<String> owners =
+    Set<UUID> owners =
         rows.stream().map(PersonalBlueprint::getOwnerSub).collect(Collectors.toSet());
     assertEquals(Set.of(OWNER_A, OWNER_B), owners);
   }
@@ -152,7 +176,7 @@ class PersonalBlueprintRepositoryTest {
     assertTrue(remaining.stream().allMatch(r -> DEFAULT_KEY.equals(r.getProductKey())));
   }
 
-  private static PersonalBlueprint bp(String ownerSub, String productKey, String productName) {
+  private static PersonalBlueprint bp(UUID ownerSub, String productKey, String productName) {
     return PersonalBlueprint.builder()
         .ownerSub(ownerSub)
         .productKey(productKey)

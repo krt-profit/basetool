@@ -178,6 +178,12 @@ The log is readable **only by admins**: the `/api/v1/audit/**` URL matcher requi
 
 Reference columns are plain UUIDs (no FKs) so audit rows **outlive** every referenced aggregate
 (job orders are hard-deleted, inventory rows are depleted) without delete-ordering constraints.
+`audit_event.target_user_id` and `bank_audit_event.target_user_id` are the two deliberate exemptions
+from ADR-0142 point 3's "every user-id column carries a foreign key" rule, and V235 states that in a
+`COMMENT ON COLUMN` rather than leaving it as an absence: a foreign key would either delete the
+evidence with the member or block the deletion outright. Both tables snapshot a `NOT NULL` handle
+beside the id, so a dangling target still renders. `actor_user_id` is *not* exempt — it carries a
+foreign key on both tables.
 
 **Acceptance**
 
