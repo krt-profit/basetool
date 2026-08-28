@@ -408,6 +408,13 @@ if ($uri = "/api/v1/app/version-policy") { set $krt_api_allowed 1; }
 # create -- is reachable at all. That is the same choice `live-sync` made, and it is available here
 # for the same reason: the app touches three of that controller's eleven paths.
 if ($uri = "/api/v1/refinery-orders/my-orders") { set $krt_api_allowed 1; }
+# Phase M - the app can now record a run itself (app REQ-APP-REF-009). The bare stem is the create
+# POST; `refinery-orders` is NOT in the read-only family, so naming it opens the verbs the backend
+# serves there - which for the stem is exactly POST plus the caller-scoped GET. The two picker reads
+# below are mandatory fields of that form: without them the member has nothing to choose from.
+if ($uri = "/api/v1/refinery-orders") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/locations/refineries") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/refining-methods") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/refinery-orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/refinery-orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/store$") { set $krt_api_allowed 1; }
 # Phase 4: Materialboerse. Same stance -- neither `material-exchange` nor `material-requests` is a
@@ -508,6 +515,12 @@ if ($uri ~ "^/api/v1/bank/holders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[
 if ($uri ~ "^/api/v1/bank/holders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/transactions$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/bank/transactions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/reversal$") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/bank/export/three-month-report") { set $krt_api_allowed 1; }
+# Phase L - the grantee picker of artboard 7's create modal. The bank twin of /users/search two
+# groups up, and the app must use THIS one: the two run the same query over the same scope with the
+# same peer-redacted projection, and differ only in the role gate, which here is widened to
+# BANK_EMPLOYEE (so BANK_MANAGEMENT via the hierarchy). A bank manager who holds no org role gets
+# 403 on /users/search and would have no picker at all. Read-only.
+if ($uri = "/api/v1/users/search-bank") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- The missions and operations families are READ-ONLY on this vhost ---------
@@ -1248,6 +1261,7 @@ being true when `REQ-APP-BANK-007` was amended.
 | Konto-Detail      | `/api/v1/bank/transactions/<uuid>/reversal`                       | POST             |
 | Konto-Detail      | `/api/v1/bank/export/three-month-report`                          | GET              |
 | Grants (ab. 7)    | `/api/v1/bank/grants`                                             | GET, POST        |
+| Grants            | `/api/v1/users/search-bank`                                       | GET              |
 | Grants            | `…/grants/<uuid>/<uuid>`                                          | PATCH, DELETE    |
 | Halter (ab. 6/8)  | `/api/v1/bank/holders`, `…/<uuid>`, `…/<uuid>/transactions`       | GET, POST, PATCH |
 | Halter-Umbuchung  | `/api/v1/bank/holders/transfer`                                   | POST             |
@@ -1258,6 +1272,13 @@ exactly that — GET+PATCH on an account, PATCH+DELETE on a grant — and the sa
 allow-list's `404` default rather than from a verb guard. That is the same stance
 `/personal-inventory` takes, and it is available here **only** because every path is named
 individually and anchored: the admin half of the stem is never named, so it is never reachable.
+
+**Why the grantee picker needs its own path.** `/api/v1/users/search` is already admitted, but the
+app cannot use it here: it is gated on ADMIN/OFFICER/KRT_MEMBER, and a bank manager who holds no org
+role — the exact caller this tab exists for — gets 403. `/users/search-bank` is the same search with
+`BANK_EMPLOYEE` added to the gate and nothing else changed (same query, same scope, same
+peer-redacted projection), which is why the backend keeps it as a separate path rather than widening
+the first one. Admitting it widens the mobile surface by no rows: both answer the same set.
 
 **What stays 404, and is probed for it:** `/api/v1/bank/admin/wipe-reset`,
 `/api/v1/bank/admin/audit`, `/api/v1/bank/deposits`, `/api/v1/bank/withdrawals`,
@@ -1270,6 +1291,38 @@ Every admitted path answers **401** anonymously — the entry point refuses befo
 and every excluded one answers **404**. A `405` anywhere in the first group would mean the
 read-only guard swallowed a write this phase opens; a `404` there would mean the line never
 matched. A `401` in the second group would mean something was opened by accident.
+
+---
+
+## Phase M — creating a refinery order
+
+**App decision, design chapter 11 artboards 4–5.** The app could read a run and book its yield but
+not record one; the form that closes that gap needs three paths the vhost has never named.
+
+|      Screen       |             Paths              | Verbs |
+|-------------------|--------------------------------|-------|
+| Neuer Auftrag     | `/api/v1/refinery-orders`      | POST  |
+| Raffinerie-Picker | `/api/v1/locations/refineries` | GET   |
+| Methoden-Picker   | `/api/v1/refining-methods`     | GET   |
+
+**Why the bare stem is safe to name.** `refinery-orders` is not in the read-only family, so the line
+opens every verb the backend serves on that exact path — which is the create `POST` and the
+caller-scoped `GET`. The id-bearing paths beneath it were already admitted in phase 3 and are
+unaffected; `/refinery-orders/all` stays unnamed and therefore still `404`, because it is the
+org-wide list the app does not show.
+
+**The two picker reads are mandatory fields, not conveniences.** The form refuses to submit without
+a refinery and a method, so a 404 on either leaves it permanently unsendable — the failure would
+look like a broken form rather than a missing allow-list line.
+
+**No extractor import.** `/api/v1/refinery-orders/import-extract` stays out permanently: the
+Extractor's handoff is consumed once in a browser through the ingest gateway and a phone cannot
+receive it.
+
+### What to expect afterwards
+
+The three admitted paths answer **401** anonymously; `/api/v1/refinery-orders/all` and
+`/api/v1/refinery-orders/import-extract` answer **404**.
 
 ---
 

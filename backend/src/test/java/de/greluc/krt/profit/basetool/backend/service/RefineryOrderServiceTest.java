@@ -562,6 +562,39 @@ class RefineryOrderServiceTest {
     }
 
     @Test
+    void sameMaterialAtTwoGrades_eachGoodTakesItsOwnAmount() {
+      // A run yields Agricium at 733 and Agricium at 874 — one material, two goods. Matching on
+      // the material alone put BOTH items on the first good: the later one overwrote the earlier
+      // and the second good was never updated at all. Invisible while clients sent the computed
+      // amounts back; the Android Einlagern form corrects them per line, which surfaced it.
+      Material scuMaterial = newMaterial(QuantityType.SCU);
+      RefineryGood low = newGoodWithOutput(scuMaterial);
+      low.setQuality(733);
+      RefineryGood high = newGoodWithOutput(scuMaterial);
+      high.setQuality(874);
+      order.setGoods(new HashSet<>(Set.of(low, high)));
+
+      lenient().when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      lenient()
+          .when(materialRepository.findById(eq(scuMaterial.getId())))
+          .thenReturn(Optional.of(scuMaterial));
+      lenient().when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(location));
+      refineryOrderService.storeRefineryOrder(
+          OWNER_ID,
+          ORDER_ID,
+          new RefineryOrderStoreDto(
+              List.of(
+                  new RefineryOrderStoreItemDto(
+                      scuMaterial.getId(), LOCATION_ID, 733, 1.9, null, null, null, null, null),
+                  new RefineryOrderStoreItemDto(
+                      scuMaterial.getId(), LOCATION_ID, 874, 2.88, null, null, null, null, null))),
+          false);
+
+      assertEquals(190, low.getOutputQuantity());
+      assertEquals(288, high.getOutputQuantity());
+    }
+
+    @Test
     void nullQuantityType_amountUsedDirectly() {
       Material untyped = newMaterial(null);
       RefineryGood good = newGoodWithOutput(untyped);
