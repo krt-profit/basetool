@@ -4,6 +4,29 @@ Backend-specific guidance. Loads when Claude works with files under `backend/`. 
 cross-cutting rules (requirements, i18n, Git, documentation, the fine-grained-locking
 principle) stay in the [root `CLAUDE.md`](../CLAUDE.md).
 
+## The knowledge base (HARD RULE)
+
+**Read the Basetool Knowledge Base before you start, and update it with what you change.** Binding
+on every AI agent, without exception. Full text: [root `CLAUDE.md`](../CLAUDE.md#the-knowledge-base-hard-rule--read-before-every-task).
+
+It is the single source of truth about this project — the `basetool-knowledge` vault beside this
+repository — and the backend is the half of it that carries the most load-bearing facts: the
+authorization chain, the scope predicate, the audited areas, the aggregates and their locking.
+
+- **Before**: read the notes for what you are touching (`Backend`, `Request Authorization`,
+  `Scoping`, `Org Units`, the domain note). They state who may do what, what talks to what, and what
+  broke last time.
+- **With every change**: a new endpoint, a changed `@PreAuthorize`, a new scope escape, a new
+  migration, a new audited event, a new scheduled job — each moves with its notes, in the same unit
+  of work.
+- **It must never drift.** If a note is wrong, thin, or missing, fix or extend it there and then —
+  including when the gap sits outside your task. The code is the authority when the two disagree,
+  and the note gets corrected in the same session.
+- **Never write a secret or personal data into the vault.**
+- **If you cannot find the vault, ask the user where it is at the start of the session.** It is not
+  a submodule, so a worktree or a fresh machine may not have it. Never guess a path and never treat
+  its absence as the rule not applying.
+
 ## Concurrency — read this before touching multi-step transactions
 
 The codebase has been bitten by optimistic-locking traps several times. The rules below exist

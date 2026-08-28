@@ -4,6 +4,28 @@ Frontend-specific guidance. Loads when Claude works with files under `frontend/`
 cross-cutting rules (requirements, i18n, Git, documentation) stay in the
 [root `CLAUDE.md`](../CLAUDE.md).
 
+## The knowledge base (HARD RULE)
+
+**Read the Basetool Knowledge Base before you start, and update it with what you change.** Binding
+on every AI agent, without exception. Full text: [root `CLAUDE.md`](../CLAUDE.md#the-knowledge-base-hard-rule--read-before-every-task).
+
+It is the single source of truth about this project — the `basetool-knowledge` vault beside this
+repository — and the frontend is also the **parity reference** the Android app is measured against,
+so what is written about a screen here is what the app must reproduce.
+
+- **Before**: read the notes for what you are touching (`Frontend`, `Session Lifecycle`,
+  `Anonymous Surface`, `Live Sync`, `Design System`, the domain note). They state what a screen
+  does, who may see it, and which of its behaviours are load-bearing rather than incidental.
+- **With every change**: a new route, a changed `permitAll`, a live-update wiring, a picker's
+  remote source, a CSP or session behaviour — each moves with its notes, in the same unit of work.
+- **It must never drift.** If a note is wrong, thin, or missing, fix or extend it there and then —
+  including when the gap sits outside your task. The code is the authority when the two disagree,
+  and the note gets corrected in the same session.
+- **Never write a secret or personal data into the vault.**
+- **If you cannot find the vault, ask the user where it is at the start of the session.** It is not
+  a submodule, so a worktree or a fresh machine may not have it. Never guess a path and never treat
+  its absence as the rule not applying.
+
 ## UI & design system
 
 The UI is a **binding requirement**: follow the DAS KARTELL design system. The rules —
