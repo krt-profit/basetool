@@ -119,7 +119,8 @@ network only.
   only from the scrape network and the container-local healthcheck — so the **public** connector
   exposes only the two `/v1` ingest endpoints; `/actuator/**` there answers 404.)
 - [x] An ingest call results in exactly one forwarded call to the matching backend import
-  endpoint, carrying the caller's bearer, and no backend write.
+  endpoint, carrying the gateway's own service-account bearer and the `X-Ingest-On-Behalf-Of`
+  header naming the caller (ADR-0129), and no backend write.
 - [x] The gateway declares no `DataSource`/JPA and runs no schema migration (architecture
   test / startup assertion).
 - [x] The gateway serves **HTTPS** on 11262 (`server.ssl.enabled=true`), mirroring backend/frontend.
@@ -134,7 +135,7 @@ network only.
 **Enforced by:** `ArchitectureTest` (no JPA / no relational persistence; every controller +
 `@PostMapping` is `@PreAuthorize`-annotated), `IngestControllerTest` (exactly the two endpoints,
 forward-only relay, backend 4xx relayed verbatim, 502 on backend-unreachable), `BackendImportClientTest`
-(the caller's bearer is forwarded) · **Code:** `IngestController`, `IngestService`, `BackendImportClient`,
+(the backend is called as the gateway, naming the caller) · **Code:** `IngestController`, `IngestService`, `BackendImportClient`,
 `IngestApplication`, `application.yml` (`server.port: 11262`, `server.ssl.enabled: true`) · **Issues:** #642
 
 ### REQ-INGEST-002 — Authentication & authorization
@@ -144,8 +145,9 @@ new **public** Keycloak client (`basetool-sc-extractor`) via the **Device Author
 Grant** (RFC 8628) with PKCE and **no client secret**. The gateway requires
 `isAuthenticated()` — no elevated role; any member may ingest, mirroring `REQ-REFINERY-011`.
 The token carries `aud=basetool-backend` (stamped by the dedicated `extractor-ingest` client
-scope, #641); the **same** bearer is forwarded to and accepted by the backend. All data is scoped to
-the token's `sub`; the gateway never acts for a different user.
+scope, #641) and is consumed here: since ADR-0129 it is **not** forwarded, and the backend is called
+with the gateway's own service-account token. All data is scoped to the caller's `sub`; the gateway
+never acts for a user other than the one it authenticated.
 
 > **Amended (ADR-0018 amendment 1, `REQ-INGEST-011`).** This requirement originally stated that *no
 > separate ingest audience is provisioned*, on the grounds that the gateway only relays. That is

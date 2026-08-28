@@ -1,11 +1,17 @@
 # ADR-0127 — Terms-of-Use consent is versioned by a content hash, enforced in the backend
 
-- **Status:** Accepted
+- **Status:** Accepted — the content-hash versioning and the backend-side enforcement stand. The
+  *premise* §2 gives for enforcing in the backend — that the gateway relays the caller's own bearer
+  — is **superseded by
+  [ADR-0129](0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md)** (2026-08-04): the
+  gateway calls under its own service account and names the member, and `ActingMemberFilter`
+  substitutes that member before the gate runs. The conclusion is unchanged — the extractor still
+  never passes through frontend code — so the decision holds as written.
 - **Date:** 2026-08-03
 - **Related:** spec `REQ-SEC-028` ([`security-and-access.md`](../specs/security-and-access.md)) ·
   builds on `REQ-SEC-027` (the approved-client obligation the consent makes enforceable) ·
   ADR-0047 (acyclic backend packages) · ADR-0088 (30-day authenticated session) ·
-  `REQ-INGEST-001` (the gateway relays the caller's own bearer)
+  `REQ-INGEST-001` (then: the gateway relays the caller's own bearer — superseded by ADR-0129)
 
 ## Context
 

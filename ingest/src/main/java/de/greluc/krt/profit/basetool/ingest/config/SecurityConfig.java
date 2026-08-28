@@ -76,9 +76,16 @@ public class SecurityConfig {
   /**
    * Expected JWT {@code aud} values for the opt-in audience check. Empty by default → no audience
    * enforcement (signature/issuer/expiry still apply). Set {@code
-   * app.security.jwt.expected-audiences=basetool-backend} to require it — but only once the realm's
-   * clients actually emit that audience (see {@code docs/INGEST_KEYCLOAK_SETUP.md}); the same value
-   * the backend uses, because the gateway forwards the same bearer to the backend.
+   * app.security.jwt.expected-audiences=basetool-ingest} to require it — but only once the realm's
+   * {@code extractor-ingest-only} scope actually stamps that audience (see {@code
+   * docs/INGEST_KEYCLOAK_SETUP.md} step 7a).
+   *
+   * <p><strong>Deliberately NOT the backend's {@code basetool-backend}.</strong> Every {@code
+   * basetool-frontend} session token carries that audience, so checking it here would admit exactly
+   * the tokens this interface exists to refuse (ADR-0018 amendment 1, REQ-INGEST-011). The two
+   * modules checking different values is the point; it is not a copy-paste omission. Nor does the
+   * gateway inherit the backend's value by forwarding anything: since ADR-0129 the caller's token
+   * stops here and the backend is called with the gateway's own.
    */
   @Value("${app.security.jwt.expected-audiences:}")
   private List<String> expectedAudiences;

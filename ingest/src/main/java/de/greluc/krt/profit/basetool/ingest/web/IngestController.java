@@ -50,10 +50,13 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * The gateway's entire public surface: exactly two forward-only ingest endpoints (REQ-INGEST-001).
  * Both require only an authenticated caller (class- and method-level {@code @PreAuthorize},
- * mirroring the backend import endpoints), forward the caller's own bearer to the backend, stage
- * the returned draft for a one-time browser pickup, and return the handoff. Nothing here interprets
- * the draft or persists squadron data — saving happens later, in the browser, through the unchanged
- * create path (REQ-INGEST-004, REQ-REFINERY-002).
+ * mirroring the backend import endpoints), forward the payload to the backend under the gateway's
+ * own service-account identity while naming the caller in an on-behalf-of header (ADR-0129), stage
+ * the returned draft for a one-time browser pickup, and return the handoff. The caller's token
+ * stops here — only its {@code sub} travels on, which is why both methods take the {@link Jwt} and
+ * hand the service a subject rather than a credential. Nothing here interprets the draft or
+ * persists squadron data — saving happens later, in the browser, through the unchanged create path
+ * (REQ-INGEST-004, REQ-REFINERY-002).
  */
 @RestController
 @RequestMapping("/v1")
@@ -62,8 +65,9 @@ import tools.jackson.databind.ObjectMapper;
 @Tag(
     name = "Ingest",
     description =
-        "Forward-only ingest of extractor payloads. Both endpoints relay to the backend with the"
-            + " caller's own bearer and answer with a single-use browser handoff.\n\n"
+        "Forward-only ingest of extractor payloads. Both endpoints validate the caller's token —"
+            + " which stops here — relay the payload to the backend and answer with a single-use"
+            + " browser handoff.\n\n"
             + "**RESTRICTED INTERFACE — APPROVED CLIENTS ONLY.** This API is published so that the"
             + " official basetool SC extractor can be developed against a stable contract. It is"
             + " NOT an open integration API. Only client software explicitly approved by the"
@@ -101,8 +105,9 @@ public class IngestController {
    * Accepts a validated {@code RefineryExtract}, forwards it to the backend refinery import, and
    * returns the handoff the extractor opens.
    *
-   * @param jwt the authenticated caller's token (its {@code sub} scopes the handoff; its raw value
-   *     is the bearer forwarded to the backend)
+   * @param jwt the authenticated caller's token; only its {@code sub} is read — it scopes the
+   *     handoff and names the member the backend call acts for (ADR-0129). The token itself is not
+   *     forwarded.
    * @param acceptLanguage the caller's locale, relayed so backend problems are localized
    * @param extract the validated extract payload
    * @return the handoff id, kind and frontend URL
@@ -115,9 +120,9 @@ public class IngestController {
               + " browser pickup.",
       description =
           "Accepts the frozen RefineryExtract JSON contract v1 (ADR-0008). The gateway validates"
-              + " the envelope, forwards it to the backend refinery import with the caller's own"
-              + " bearer, and stages the returned draft under the caller's subject. No screenshot"
-              + " and no image bytes are ever transmitted or stored.",
+              + " the envelope, forwards it to the backend refinery import as itself while naming"
+              + " the calling member, and stages the returned draft under the caller's subject. No"
+              + " screenshot and no image bytes are ever transmitted or stored.",
       parameters =
           @Parameter(
               name = CORRELATION_ID_HEADER,
@@ -180,8 +185,9 @@ public class IngestController {
    * be a JSON object" sanity check (mirroring the frontend proxy); the backend parses and matches
    * it.
    *
-   * @param jwt the authenticated caller's token (its {@code sub} scopes the handoff; its raw value
-   *     is the bearer forwarded to the backend)
+   * @param jwt the authenticated caller's token; only its {@code sub} is read — it scopes the
+   *     handoff and names the member the backend call acts for (ADR-0129). The token itself is not
+   *     forwarded.
    * @param acceptLanguage the caller's locale, relayed so backend problems are localized
    * @param export the blueprint export JSON; must be a JSON object
    * @return the handoff id, kind and frontend URL

@@ -28,11 +28,12 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
  * authenticated entry the desktop extractor uses to push its locally produced JSON into the
  * basetool (epic #639, ADR-0018).
  *
- * <p>The gateway is deliberately tiny: it validates the caller's Keycloak JWT, forwards the same
- * bearer to the backend's existing import endpoints over the internal network, stages the returned
- * draft in Redis for a one-time browser pickup, and returns a handoff id. It owns no database, runs
- * no Flyway migration and serves no HTML. {@code @ConfigurationPropertiesScan} registers the {@code
- * config/*Properties} classes without an explicit enable list.
+ * <p>The gateway is deliberately tiny: it validates the caller's Keycloak JWT, calls the backend's
+ * existing import endpoints over the internal network under its OWN service-account identity while
+ * naming the caller in an on-behalf-of header (ADR-0129), stages the returned draft in Redis for a
+ * one-time browser pickup, and returns a handoff id. It owns no database, runs no Flyway migration
+ * and serves no HTML. {@code @ConfigurationPropertiesScan} registers the {@code config/*Properties}
+ * classes without an explicit enable list.
  */
 @SpringBootApplication(
     exclude = {

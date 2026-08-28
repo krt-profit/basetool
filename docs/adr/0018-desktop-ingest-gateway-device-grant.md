@@ -1,6 +1,13 @@
 # ADR-0018 — Desktop one-click ingest: dedicated gateway + Keycloak device grant
 
-- **Status:** Accepted — implemented (epic [#639](https://github.com/krt-profit/basetool/issues/639))
+- **Status:** Accepted — implemented (epic [#639](https://github.com/krt-profit/basetool/issues/639)).
+  The **bearer-relay** half of decision 1 (“forwards the same bearer”, and with it “no separate
+  ingest audience is provisioned — the gateway only relays”) is **superseded**: the audience by
+  Amendment 1 below (2026-08-03), and the relay itself by
+  [ADR-0129](0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md) (2026-08-04), which
+  has the gateway call the backend under its own service account and name the member in
+  `X-Ingest-On-Behalf-Of`. Everything else — the dedicated gateway, the device grant, the
+  forward-only two-endpoint surface, the Redis handoff — stands.
 - **Date:** 2026-06-16
 - **Deciders:** Lucas Greuloch (@greluc)
 - **Related:** epic [#639](https://github.com/krt-profit/basetool/issues/639) · spec [`desktop-ingest.md`](../specs/desktop-ingest.md) (`REQ-INGEST-*`) · runbook [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md) · [`refinery-screenshot-import.md`](../specs/refinery-screenshot-import.md) `REQ-REFINERY-018` · [ADR-0007](0007-client-side-vlm-screenshot-extraction.md) · [ADR-0008](0008-refinery-extract-json-contract.md) · supersedes the deferred direct-upload phase [#437](https://github.com/krt-profit/basetool/issues/437)

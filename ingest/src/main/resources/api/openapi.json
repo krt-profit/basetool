@@ -14,14 +14,14 @@
   } ],
   "tags" : [ {
     "name" : "Ingest",
-    "description" : "Forward-only ingest of extractor payloads. Both endpoints relay to the backend with the caller's own bearer and answer with a single-use browser handoff.\n\n**RESTRICTED INTERFACE — APPROVED CLIENTS ONLY.** This API is published so that the official basetool SC extractor can be developed against a stable contract. It is NOT an open integration API. Only client software explicitly approved by the basetool developer (@greluc) may use it; approval means a dedicated Keycloak client registration plus an entry on the gateway's client allowlist. Any other tool is rejected with 403 CLIENT_NOT_ALLOWED, is unsupported, and may break without notice. Building or distributing an unapproved client is not permitted — if you want to integrate, ask first."
+    "description" : "Forward-only ingest of extractor payloads. Both endpoints validate the caller's token — which stops here — relay the payload to the backend and answer with a single-use browser handoff.\n\n**RESTRICTED INTERFACE — APPROVED CLIENTS ONLY.** This API is published so that the official basetool SC extractor can be developed against a stable contract. It is NOT an open integration API. Only client software explicitly approved by the basetool developer (@greluc) may use it; approval means a dedicated Keycloak client registration plus an entry on the gateway's client allowlist. Any other tool is rejected with 403 CLIENT_NOT_ALLOWED, is unsupported, and may break without notice. Building or distributing an unapproved client is not permitted — if you want to integrate, ask first."
   } ],
   "paths" : {
     "/v1/refinery-extract" : {
       "post" : {
         "tags" : [ "Ingest" ],
         "summary" : "Forward a RefineryExtract to the backend import and stage the draft for one-click browser pickup.",
-        "description" : "Accepts the frozen RefineryExtract JSON contract v1 (ADR-0008). The gateway validates the envelope, forwards it to the backend refinery import with the caller's own bearer, and stages the returned draft under the caller's subject. No screenshot and no image bytes are ever transmitted or stored.",
+        "description" : "Accepts the frozen RefineryExtract JSON contract v1 (ADR-0008). The gateway validates the envelope, forwards it to the backend refinery import as itself while naming the calling member, and stages the returned draft under the caller's subject. No screenshot and no image bytes are ever transmitted or stored.",
         "operationId" : "ingestRefineryExtract",
         "parameters" : [ {
           "name" : "X-Correlation-Id",

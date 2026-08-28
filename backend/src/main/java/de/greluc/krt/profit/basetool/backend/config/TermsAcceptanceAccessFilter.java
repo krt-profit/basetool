@@ -52,9 +52,13 @@ import tools.jackson.databind.ObjectMapper;
  * Refuses the API to a caller who has not accepted the Terms of Use (REQ-SEC-028).
  *
  * <p>This is the boundary, not the frontend's redirect. It is enforced here because the backend is
- * the only place every caller passes through: the web UI, and — since the ingest gateway relays the
- * caller's own bearer (REQ-INGEST-001) — the desktop extractor too. One filter therefore covers
- * both, and the gateway inherits the refusal without needing its own copy of the rule.
+ * the only place every caller passes through: the web UI, and — since {@link ActingMemberFilter}
+ * runs ahead of this one and makes an ingest-gateway request carry the sending member's identity
+ * (ADR-0129) — the desktop extractor too. The gateway does not relay that member's token: it
+ * authenticates with its own service account and names the member in an on-behalf-of header, so it
+ * is the identity substitution, not a relayed bearer, that puts a person in front of this gate. One
+ * filter therefore covers both, and the gateway inherits the refusal without needing its own copy
+ * of the rule.
  *
  * <p>Mirrors {@link PendingApprovalAccessFilter} in shape: RFC 7807 body, stable {@code code},
  * minted correlation id, {@code basetool_http_error_total} increment, and the JWT {@code sub}

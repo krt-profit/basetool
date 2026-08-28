@@ -1381,10 +1381,24 @@ public.
 
    ```dotenv
    IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend
-   IRI_INGEST_EXPECTED_AUDIENCES=basetool-backend
+   IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest
    ```
 
-   Both together — the ingest gateway's tokens are validated by the same rule.
+   > **⚠️ The two values differ, and this step used to get the gateway's wrong.** As written until
+   > 2026-08-28 it set **both** to `basetool-backend`. That is the backend's audience and every
+   > `basetool-frontend` session token carries it, so on the gateway the check passes for exactly
+   > the tokens the ingest interface exists to refuse — which is what ADR-0018 amendment 1
+   > (`REQ-INGEST-011`) reversed on 2026-08-03, and what
+   > [`INGEST_KEYCLOAK_SETUP.md`](INGEST_KEYCLOAK_SETUP.md) step 7a has forbidden in a boxed warning
+   > ever since. The realm has carried the correct `extractor-ingest-only` scope — stamping
+   > `aud=basetool-ingest` on the extractor's tokens and on no one else's — since before this
+   > rollout.
+   >
+   > **If this step was executed as originally written, the deployed gateway carries the wrong
+   > value and needs correcting** — check it before assuming otherwise. The backend's half was and
+   > remains right. Verify a live extractor token actually carries `aud=basetool-ingest` before
+   > correcting the gateway: the value is already enforcing, so a wrong one answers `401` on every
+   > send.
 
 3. Apply. An `.env` change is host state: the deploy timer sees no digest change and exits as a
    no-op, so it must be applied by hand.
@@ -1408,10 +1422,13 @@ public.
      pull above and left `ingest` behind, with the backend enforcing and the gateway not:
 
      ```bash
-     for c in backend ingest; do echo -n "$c: "; docker inspect $c --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -c 'APP_SECURITY_JWT_EXPECTED_AUDIENCES=basetool-backend'; done
+     docker inspect backend --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -c 'APP_SECURITY_JWT_EXPECTED_AUDIENCES=basetool-backend'; docker inspect ingest --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -c 'APP_SECURITY_JWT_EXPECTED_AUDIENCES=basetool-ingest'
      ```
 
-     Two `1`s. A `0` means that container was not recreated, whatever the compose output said;
+     A `1` from each — note that the two greps look for **different** audiences, per the warning
+     above; the earlier `for c in backend ingest` one-liner checked both against the backend's value
+     and so reported the wrong gateway setting as a pass. A `0` means either that container was not
+     recreated, whatever the compose output said, or that it carries the other module's value;
 
    - the web app still works (log in, open a page that loads data) — that proves the frontend's
      tokens carry the audience;
