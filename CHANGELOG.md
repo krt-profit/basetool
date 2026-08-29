@@ -2,14 +2,7 @@
 
 ## [Unreleased]
 
-### Fixed
-
-- **Vier Alarmregeln konnten nie auslösen.** Der Circuit-Breaker-, Bulkhead- und Retry-Alarm sowie
-  der Alarm für fehlgeschlagene systemd-Units standen zwar in der Konfiguration, ihre Metriken
-  wurden aber gar nicht erhoben — sie schwiegen also nicht, weil alles in Ordnung war, sondern
-  weil sie nichts sehen konnten. Ein fehlgeschlagener Deploy oder Backup meldete sich dadurch nur
-  über den zweiten Weg. Die Metriken werden jetzt wieder publiziert, und ein Test bricht den Build,
-  wenn eine Alarmregel künftig ins Leere zeigt.
+## [v1.6.9](https://github.com/krt-profit/basetool/releases/tag/v1.6.9) - 2026-08-29
 
 ### Added
 
@@ -21,6 +14,13 @@
   Kassenbücher zu raten.
 
 ### Fixed
+
+- **Vier Alarmregeln konnten nie auslösen.** Der Circuit-Breaker-, Bulkhead- und Retry-Alarm sowie
+  der Alarm für fehlgeschlagene systemd-Units standen zwar in der Konfiguration, ihre Metriken
+  wurden aber gar nicht erhoben — sie schwiegen also nicht, weil alles in Ordnung war, sondern
+  weil sie nichts sehen konnten. Ein fehlgeschlagener Deploy oder Backup meldete sich dadurch nur
+  über den zweiten Weg. Die Metriken werden jetzt wieder publiziert, und ein Test bricht den Build,
+  wenn eine Alarmregel künftig ins Leere zeigt.
 
 - **Die Daten eines gelöschten Kontos überleben es nicht mehr.** Fünf Spalten hielten eine
   Mitglieds-ID ohne Fremdschlüssel: persönliches Inventar, persönliche Blueprints,
