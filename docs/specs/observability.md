@@ -1820,11 +1820,38 @@ therefore alerts on:
   “already sent”, default 120 h — so the compose file pins `--data.retention=744 h`; raising
   one without the other silently degrades the cadence back to the retention window.
 
+**A rule whose metric has no series is a dead alert, and the build says so.** The failure mode this
+requirement exists for has a quieter form than a broken reload: a rule that is syntactically fine,
+deployed, and simply never able to match. It never pages, never looks broken, and the only symptom
+is silence — which is indistinguishable from "nothing has gone wrong".
+
+Four were found that way on 2026-08-29, by reading the production Prometheus rather than the rule
+files:
+
+| Rule | Metric | Why it had no series |
+| --- | --- | --- |
+| `CircuitBreakerOpen` | `resilience4j_circuitbreaker_state` | Resilience4j's metrics auto-configuration is `@ConditionalOnBean(MeterRegistry)` and orders itself with `@AutoConfigureAfter(name = "…actuate.autoconfigure.metrics.MetricsAutoConfiguration")`. Spring Boot 4 moved that class into `spring-boot-micrometer-metrics`, and `name =` **ignores a class it cannot find** — so the ordering hint evaporated, the condition ran before the registry existed, and no publisher was created |
+| the bulkhead rule | `resilience4j_bulkhead_available_concurrent_calls` | same |
+| the retry rule | `resilience4j_retry_calls_total` | same |
+| `SystemdUnitFailed` | `node_systemd_unit_state` | the systemd collector talks to systemd over dbus on `/run/systemd/private`, which `--path.rootfs` does not redirect and the container did not mount |
+
+The distinction that makes this checkable: **a lazily-created counter with no series is good news**
+— `basetool_*_errors_total` being absent means the error branch has never been taken, which is
+exactly how the #1238 baseline read the live-sync drop counters. **A gauge with no series is a
+defect**: it is not being published at all. So the guard is written against the meters whose
+*absence* is a defect, not against every metric a rule names.
+
+`AlertedMeterPresenceTest` boots the frontend context and fails the build when a meter an alert
+rule depends on is not registered. It is what would have caught the three Resilience4j rules on the
+day the Boot 4 upgrade landed, instead of a year later in a production read.
+
 All labels stay bounded (REQ-OBS-006): these alerts read only the exporters' own low-cardinality
 series (`job` / `instance` / `reason` / `name` / `path` / `health_type` / `component`), never per-user
 or free-text values.
 
-**Enforced by:** `monitoring/prometheus/alerts/meta.yml` (`meta-self-health` + `meta-log-pipeline`
+**Enforced by:** `AlertedMeterPresenceTest` (dead-alert guard: a meter an alert rule names must be
+registered) · `frontend/.../config/Resilience4jMetricsConfig` (publishes the three meters Boot 4
+silently stopped publishing) · `monitoring/prometheus/alerts/meta.yml` (`meta-self-health` + `meta-log-pipeline`
 groups, incl. `MonitoringReconcileDisabled`) · `monitoring/prometheus/alerts/infrastructure.yml`
 (container guards, incl. `ContainerPidsHigh` + the `changes()`-based `ContainerRestartLoop`) ·
 `monitoring/alertmanager/alertmanager.yml.tmpl` (route grouping + the five root-cause `inhibit_rules`) ·
