@@ -80,7 +80,7 @@ public class MemberEvaluationService {
    * scoped to the caller's active squadron so a multi-squadron member's "my evaluations" only shows
    * the active squadron's grades.
    */
-  public List<MemberEvaluationResponse> listForUser(@NotNull String userId) {
+  public List<MemberEvaluationResponse> listForUser(@NotNull UUID userId) {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
         || !ownerScopeService.hasPromotionReadAccess()) {
       return List.of();
@@ -93,7 +93,7 @@ public class MemberEvaluationService {
 
   /** Returns paginated evaluations for the given user, scoped to the active squadron. */
   public Page<MemberEvaluationResponse> listForUserPaged(
-      @NotNull String userId, @NotNull Pageable pageable) {
+      @NotNull UUID userId, @NotNull Pageable pageable) {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
         || !ownerScopeService.hasPromotionReadAccess()) {
       return Page.empty(pageable);
@@ -120,7 +120,7 @@ public class MemberEvaluationService {
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public MemberEvaluationResponse upsert(
-      @NotNull String userId,
+      @NotNull UUID userId,
       @NotNull UUID categoryId,
       @NotNull MemberEvaluationUpdateRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
@@ -151,7 +151,7 @@ public class MemberEvaluationService {
             : AuditEventType.PROMOTION_EVALUATION_UPDATED,
         category.getId(),
         categoryLabel(category),
-        parseUserUuid(userId),
+        userId,
         AuditDetails.of("level", request.assignedLevel()));
     log.info(
         "Upserted MemberEvaluation userId={} categoryId={} level={}",
@@ -175,7 +175,7 @@ public class MemberEvaluationService {
     PromotionCategory category = entity.getCategory();
     UUID subjectId = category != null ? category.getId() : null;
     String label = categoryLabel(category);
-    UUID targetUserId = parseUserUuid(entity.getUserId());
+    UUID targetUserId = entity.getUserId();
     repository.delete(entity);
     auditService.record(
         AuditEventType.PROMOTION_EVALUATION_DELETED, subjectId, label, targetUserId, null);
@@ -196,22 +196,6 @@ public class MemberEvaluationService {
     }
     var topic = category.getTopic();
     return (topic != null ? topic.getName() + " / " : "") + category.getName();
-  }
-
-  /**
-   * Parses a member's JWT-{@code sub} string into the {@code targetUserId} UUID for the audit row,
-   * returning {@code null} for a malformed id rather than throwing — a non-parseable id must never
-   * roll back the business mutation it accompanies.
-   *
-   * @param userId the member's Keycloak sub (== app_user id) string; never {@code null}
-   * @return the parsed UUID, or {@code null} when {@code userId} is not a valid UUID
-   */
-  private static @Nullable UUID parseUserUuid(@NotNull String userId) {
-    try {
-      return UUID.fromString(userId);
-    } catch (IllegalArgumentException e) {
-      return null;
-    }
   }
 
   private void assertCallerMayEditCategory(PromotionCategory category) {
@@ -241,21 +225,14 @@ public class MemberEvaluationService {
    * — the caller may evaluate the member as soon as it can edit ANY one of the member's Staffeln,
    * so a shared second Staffel is honoured rather than silently dropped.
    *
-   * @param userId the Keycloak sub (== app_user id) of the member being evaluated; never {@code
-   *     null}.
+   * @param userId the {@code app_user.id} of the member being evaluated; never {@code null}.
    */
-  private void assertCallerMayEvaluateUser(@NotNull String userId) {
+  private void assertCallerMayEvaluateUser(@NotNull UUID userId) {
     if (authHelperService.isAdmin()) {
       return;
     }
-    UUID targetUserId;
-    try {
-      targetUserId = UUID.fromString(userId);
-    } catch (IllegalArgumentException e) {
-      throw new AccessDeniedException("Evaluated member id is not a valid identifier");
-    }
     java.util.List<UUID> staffelIds =
-        orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(targetUserId);
+        orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId);
     if (staffelIds.stream().noneMatch(ownerScopeService::canEditSquadron)) {
       throw new AccessDeniedException(
           "Caller's squadron context does not allow evaluating this member");

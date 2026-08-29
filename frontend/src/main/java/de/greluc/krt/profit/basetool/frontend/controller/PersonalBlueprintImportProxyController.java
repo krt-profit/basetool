@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportResultDto
 import de.greluc.krt.profit.basetool.frontend.model.dto.HandoffKind;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
+import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -101,7 +102,7 @@ public class PersonalBlueprintImportProxyController {
   @PostMapping("/staged")
   public BlueprintImportPreviewDto staged(
       @RequestParam("handoff") String handoff, @AuthenticationPrincipal OidcUser principal) {
-    String sub = principal != null ? principal.getSubject() : null;
+    String sub = CurrentUser.userIdText(principal);
     return ingestHandoffService
         .consume(sub, handoff, HandoffKind.BLUEPRINT, BlueprintImportPreviewDto.class)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));

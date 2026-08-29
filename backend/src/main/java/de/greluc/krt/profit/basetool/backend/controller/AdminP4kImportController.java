@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.P4kImportJobDto;
 import de.greluc.krt.profit.basetool.backend.service.P4kImportJobRunner;
 import de.greluc.krt.profit.basetool.backend.service.P4kImportJobService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -42,8 +43,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -95,7 +94,7 @@ public class AdminP4kImportController {
    * #getJob(UUID)} for the result.
    *
    * @param file the uploaded P4K catalog JSON
-   * @param jwt the authenticated administrator (for the audit {@code created_by})
+   * @param adminUserId the authenticated administrator (for the audit {@code created_by})
    * @return {@code 202 Accepted} with the enqueued job
    */
   @PostMapping(value = "/jobs", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -107,11 +106,9 @@ public class AdminP4kImportController {
   })
   @NotNull
   public ResponseEntity<P4kImportJobDto> enqueuePreview(
-      @RequestParam("file") @NotNull MultipartFile file,
-      @AuthenticationPrincipal @NotNull Jwt jwt) {
+      @RequestParam("file") @NotNull MultipartFile file, @CurrentUserId @NotNull UUID adminUserId) {
     byte[] bytes = readBytes(file);
-    P4kImportJob job =
-        jobService.createPreviewJob(bytes, file.getOriginalFilename(), currentUserId(jwt));
+    P4kImportJob job = jobService.createPreviewJob(bytes, file.getOriginalFilename(), adminUserId);
     jobRunner.run(job.getId(), P4kImportJobKind.PREVIEW, false);
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(jobMapper.toDto(job));
   }
@@ -158,7 +155,7 @@ public class AdminP4kImportController {
    * @param id the SUCCEEDED preview job to apply
    * @param seedNew {@code true} to insert new {@code source = P4K} rows for unmatched player-facing
    *     records; {@code false} (default) to enrich existing rows only
-   * @param jwt the authenticated administrator (for the audit {@code created_by})
+   * @param adminUserId the authenticated administrator (for the audit {@code created_by})
    * @return {@code 202 Accepted} with the enqueued apply job
    */
   @PostMapping("/jobs/{id}/apply")
@@ -175,8 +172,8 @@ public class AdminP4kImportController {
   public ResponseEntity<P4kImportJobDto> enqueueApply(
       @PathVariable("id") @NotNull UUID id,
       @RequestParam(value = "seedNew", defaultValue = "false") boolean seedNew,
-      @AuthenticationPrincipal @NotNull Jwt jwt) {
-    P4kImportJob job = jobService.createApplyJob(id, seedNew, currentUserId(jwt));
+      @CurrentUserId @NotNull UUID adminUserId) {
+    P4kImportJob job = jobService.createApplyJob(id, seedNew, adminUserId);
     jobRunner.run(job.getId(), P4kImportJobKind.APPLY, seedNew);
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(jobMapper.toDto(job));
   }
@@ -194,23 +191,6 @@ public class AdminP4kImportController {
       return file.getBytes();
     } catch (IOException e) {
       throw new BadRequestException("The uploaded file could not be read.");
-    }
-  }
-
-  /**
-   * Extracts the enqueuing administrator's user id from the validated JWT {@code sub} (which equals
-   * {@code app_user.id}).
-   *
-   * @param jwt the authenticated principal
-   * @return the user id
-   * @throws BadRequestException if the subject is not a UUID
-   */
-  @NotNull
-  private UUID currentUserId(@NotNull Jwt jwt) {
-    try {
-      return UUID.fromString(jwt.getSubject());
-    } catch (IllegalArgumentException e) {
-      throw new BadRequestException("The authenticated subject is not a valid user id.");
     }
   }
 }

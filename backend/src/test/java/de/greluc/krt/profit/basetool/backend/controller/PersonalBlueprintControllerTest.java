@@ -59,7 +59,7 @@ import org.springframework.web.multipart.MultipartFile;
 @ExtendWith(MockitoExtension.class)
 class PersonalBlueprintControllerTest {
 
-  private static final String SUB = "user-sub-1";
+  private static final UUID SUB = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
   @Mock private PersonalBlueprintService service;
   @Mock private BlueprintImportService importService;
@@ -150,15 +150,14 @@ class PersonalBlueprintControllerTest {
   }
 
   @Test
-  void craftability_relaysSubUserIdAndFlag() {
-    UUID userId = UUID.randomUUID();
+  void craftability_relaysCallerIdAndFlag() {
     List<BlueprintCraftabilityDto> expected = List.of();
-    when(craftabilityService.computeForOwner(SUB, userId, true)).thenReturn(expected);
+    when(craftabilityService.computeForOwner(SUB, true)).thenReturn(expected);
 
-    List<BlueprintCraftabilityDto> result = controller.craftability(true, SUB, userId);
+    List<BlueprintCraftabilityDto> result = controller.craftability(true, SUB);
 
     assertSame(expected, result);
-    verify(craftabilityService).computeForOwner(SUB, userId, true);
+    verify(craftabilityService).computeForOwner(SUB, true);
   }
 
   @Test

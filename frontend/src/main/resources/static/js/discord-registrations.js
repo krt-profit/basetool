@@ -49,10 +49,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const modal = document.getElementById('reject-modal');
     const reasonInput = document.getElementById('reject-reason');
     const linkModal = document.getElementById('link-modal');
+    const mergeModal = document.getElementById('merge-modal');
     const reopenModal = document.getElementById('reopen-modal');
     const reopenReasonInput = document.getElementById('reopen-reason');
     let rejectTarget = null;
     let linkTarget = null;
+    let mergeTarget = null;
     let reopenTarget = null;
 
     // The account picker's <select> is progressively enhanced by krt-searchable-select.js, which
@@ -60,6 +62,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // load time (the cached reference would point at the removed original <select>).
     function linkPicker() {
         return document.getElementById('link-target');
+    }
+
+    function mergePicker() {
+        return document.getElementById('merge-source');
     }
 
     // Table-agnostic: the pending queue and the rejected table differ only in their tbody, their
@@ -219,6 +225,20 @@ document.addEventListener('DOMContentLoaded', function () {
         linkTarget = null;
     }
 
+    function openMerge(row) {
+        mergeTarget = row;
+        const picker = mergePicker();
+        if (picker && picker.krtCombobox) {
+            picker.krtCombobox.setValue('');
+        }
+        mergeModal.style.display = 'flex';
+    }
+
+    function closeMerge() {
+        mergeModal.style.display = 'none';
+        mergeTarget = null;
+    }
+
     function openReopen(row) {
         reopenTarget = row;
         if (reopenReasonInput) {
@@ -246,6 +266,8 @@ document.addEventListener('DOMContentLoaded', function () {
             approve(row);
         } else if (action === 'link') {
             openLink(row);
+        } else if (action === 'merge') {
+            openMerge(row);
         } else {
             openReject(row);
         }
@@ -334,6 +356,53 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                     closeLink();
                     removeRow(row);
+                },
+            });
+        });
+    }
+
+    const mergeCancelBtn = document.getElementById('merge-cancel');
+    if (mergeCancelBtn) {
+        mergeCancelBtn.addEventListener('click', closeMerge);
+    }
+
+    const mergeConfirmBtn = document.getElementById('merge-confirm');
+    if (mergeConfirmBtn) {
+        mergeConfirmBtn.addEventListener('click', function () {
+            if (!mergeTarget) {
+                return;
+            }
+            const picker = mergePicker();
+            const sourceUserId = picker && picker.value ? picker.value : '';
+            if (!sourceUserId) {
+                if (window.showFrontendErrorToast) {
+                    window.showFrontendErrorToast(DISCORD_MSG.mergeNoSource);
+                }
+                return;
+            }
+            const row = mergeTarget;
+            const id = row.getAttribute('data-id');
+            const version = row.getAttribute('data-version');
+            window.krtFetch.write({
+                method: 'POST',
+                url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/merge',
+                payload: {
+                    sourceUserId: sourceUserId,
+                    version: version == null ? null : Number(version),
+                },
+                toast: false,
+                errorMessage: DISCORD_MSG.mergeError,
+                onSuccess: function (data) {
+                    if (window.showFrontendSuccessToast) {
+                        window.showFrontendSuccessToast(DISCORD_MSG.merged);
+                    }
+                    // The row STAYS: merging repairs the data, approving admits the member, and
+                    // the second decision is still the admin's to make. Only the optimistic-lock
+                    // version moves on, so the next action on this row does not 409.
+                    if (data && data.version != null) {
+                        row.setAttribute('data-version', String(data.version));
+                    }
+                    closeMerge();
                 },
             });
         });

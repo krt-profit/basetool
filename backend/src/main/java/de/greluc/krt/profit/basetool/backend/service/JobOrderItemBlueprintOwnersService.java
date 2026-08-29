@@ -44,7 +44,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,7 +58,7 @@ import org.springframework.transaction.annotation.Transactional;
  * entirely in Java, mirroring {@link PersonalBlueprintOverviewService}: it reduces each item line's
  * chosen-blueprint output name to its <em>match key</em> via {@link
  * BlueprintVariantFamilyResolver}, resolves the responsible org unit's member ids to their {@code
- * sub} form (the {@code owner_sub} stored on {@link PersonalBlueprint} equals {@code User.id}),
+ * sub} form (the {@code owner_user_id} stored on {@link PersonalBlueprint} equals {@code User.id}),
  * loads the members' owned blueprints, and matches them by the same key. The coverage count is the
  * distinct members owning any matching blueprint; each owner row lists the concrete variants they
  * hold.
@@ -141,24 +140,20 @@ public class JobOrderItemBlueprintOwnersService {
       return new JobOrderItemBlueprintOwnersDto(List.of(), List.of());
     }
 
-    // Owner subs of the responsible org unit's members, unioned with the users who opted into
+    // Owner ids of the responsible org unit's members, unioned with the users who opted into
     // global blueprint sharing (REQ-INV-018) so an opted-in owner is counted toward this order's
     // coverage even when they are not a member of the responsible org unit. A null responsible
     // (legacy pre-backfill row) contributes no members; the endpoint gate already rejects such
     // orders, but global sharers would still be considered here.
     OrgUnit responsible = order.getResponsibleOrgUnit();
-    Set<String> memberSubs = new LinkedHashSet<>();
+    Set<UUID> memberSubs = new LinkedHashSet<>();
     if (responsible != null) {
-      orgUnitMembershipRepository
-          .findDistinctUserIdsByOrgUnitIdIn(Set.of(responsible.getId()))
-          .stream()
-          .map(UUID::toString)
-          .forEach(memberSubs::add);
+      memberSubs.addAll(
+          orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(
+              Set.of(responsible.getId())));
     }
-    Set<String> ownerSubs = new LinkedHashSet<>(memberSubs);
-    userRepository.findIdsBySharingBlueprintsGlobally().stream()
-        .map(UUID::toString)
-        .forEach(ownerSubs::add);
+    Set<UUID> ownerUserIds = new LinkedHashSet<>(memberSubs);
+    ownerUserIds.addAll(userRepository.findIdsBySharingBlueprintsGlobally());
 
     // Load the members' owned blueprints and keep the ones whose match key is required. The match
     // key is a Java-computed reduction of the product name (no SQL form), so the match runs in
@@ -168,17 +163,14 @@ public class JobOrderItemBlueprintOwnersService {
     // (distinct members owning any matching blueprint).
     Map<UUID, Set<String>> ownedNamesByOwnerId = new LinkedHashMap<>();
     Map<String, Set<UUID>> ownersByFamily = new HashMap<>();
-    if (!ownerSubs.isEmpty()) {
+    if (!ownerUserIds.isEmpty()) {
       for (BlueprintOwnerProduct bp :
-          personalBlueprintRepository.findOwnerProductByOwnerSubIn(ownerSubs)) {
+          personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(ownerUserIds)) {
         String matchKey = familyResolver.matchKey(bp.productName(), countWithVariants);
         if (!requiredByFamily.containsKey(matchKey)) {
           continue;
         }
-        UUID ownerId = parseUuid(bp.ownerSub());
-        if (ownerId == null) {
-          continue;
-        }
+        UUID ownerId = bp.ownerUserId();
         ownedNamesByOwnerId
             .computeIfAbsent(ownerId, id -> new LinkedHashSet<>())
             .add(bp.productName());
@@ -213,14 +205,14 @@ public class JobOrderItemBlueprintOwnersService {
    *
    * @param ownedNamesByOwnerId owner id → the owned blueprint display names that matched a required
    *     family
-   * @param memberSubs the {@code owner_sub}s of the responsible org unit's members, used to flag
+   * @param memberSubs the {@code app_user.id}s of the responsible org unit's members, used to flag
    *     each owner as a unit member ({@code true}) or a global sharer who is not a member ({@code
    *     false}, REQ-INV-018) so the UI can mark the latter
    * @return the owning-member rows, sorted case-insensitively by name; never {@code null}
    */
   @NotNull
   private List<JobOrderBlueprintOwnerDto> buildOwners(
-      @NotNull Map<UUID, Set<String>> ownedNamesByOwnerId, @NotNull Set<String> memberSubs) {
+      @NotNull Map<UUID, Set<String>> ownedNamesByOwnerId, @NotNull Set<UUID> memberSubs) {
     if (ownedNamesByOwnerId.isEmpty()) {
       return List.of();
     }
@@ -234,7 +226,7 @@ public class JobOrderItemBlueprintOwnersService {
                 new JobOrderBlueprintOwnerDto(
                     nameById.get(e.getKey()),
                     e.getValue().stream().sorted(String.CASE_INSENSITIVE_ORDER).toList(),
-                    memberSubs.contains(e.getKey().toString())))
+                    memberSubs.contains(e.getKey())))
         .sorted(
             Comparator.comparing(
                 JobOrderBlueprintOwnerDto::ownerName, String.CASE_INSENSITIVE_ORDER))
@@ -250,20 +242,4 @@ public class JobOrderItemBlueprintOwnersService {
    * @param variantInclusive whether the coverage count includes owners of cosmetic variants
    */
   private record RequiredFamily(@NotNull String displayName, boolean variantInclusive) {}
-
-  /**
-   * Parses a stored {@code owner_sub} back into a {@link UUID}, returning {@code null} for the
-   * (theoretical) malformed value so it is filtered out instead of aborting the aggregation.
-   *
-   * @param raw the {@code owner_sub} string
-   * @return the parsed id, or {@code null} when {@code raw} is not a UUID
-   */
-  @Nullable
-  private static UUID parseUuid(String raw) {
-    try {
-      return UUID.fromString(raw);
-    } catch (IllegalArgumentException ex) {
-      return null;
-    }
-  }
 }

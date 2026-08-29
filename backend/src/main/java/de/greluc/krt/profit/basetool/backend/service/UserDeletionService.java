@@ -88,9 +88,11 @@ public class UserDeletionService {
   private final AuditService auditService;
 
   /**
-   * The five stores keyed by the departing user's Keycloak subject rather than by a foreign key to
-   * {@code app_user}. Nothing in the database links them to the account, so {@link
-   * #deleteUser(UUID)} is the only thing that can ever remove them (REQ-DATA-008).
+   * The five stores keyed by a plain {@code app_user.id} column rather than by a {@code @ManyToOne
+   * User} association. Since V235 each column carries a foreign key with {@code ON DELETE CASCADE}
+   * (REQ-DATA-008, ADR-0142), so the database removes them with the account; {@link
+   * #deleteUser(UUID)} still deletes them explicitly, because that is where the audit event's row
+   * counts come from -- a cascade reports none.
    */
   private final PersonalInventoryItemRepository personalInventoryItemRepository;
 
@@ -219,18 +221,24 @@ public class UserDeletionService {
     int inventoryDeleted = inventoryItemRepository.deleteByUserId(userId);
     int shipsDeleted = shipRepository.deleteByOwnerId(userId);
 
-    // The five identity columns that carry no foreign key to app_user, so nothing cascades and no
-    // retention job reaches them. Left behind they outlive the account indefinitely (free-text
-    // notes included), stay undiscoverable because every lookup is keyed by the departed subject,
-    // and are silently re-adopted should the same Keycloak subject return. The rule selectors are
-    // the worst of them: left in place they keep minting NEW notifications for a recipient that no
-    // longer exists. owner_sub / user_id hold app_user.id rendered as text.
-    final String ownerSub = userId.toString();
-    int personalInventoryDeleted = personalInventoryItemRepository.deleteByOwnerSub(ownerSub);
-    int blueprintsDeleted = personalBlueprintRepository.deleteAllByOwnerSub(ownerSub);
+    // The five identity columns that used to carry no foreign key to app_user. Since V235 each
+    // declares ON DELETE CASCADE (REQ-DATA-008, ADR-0142), so the database would remove these rows
+    // on its own -- these statements are NOT dead code, they are what the summary audit event
+    // below counts: Postgres reports no row count for a cascade, and dropping them would leave
+    // PERSONAL_DATA_PURGED_ON_USER_DELETION with nothing to record. The constraint is the
+    // guarantee, the statement is the number. Deleting explicitly first also keeps the rows out of
+    // the cascade entirely, so the ordering below stays the only thing that has to be right.
+    //
+    // What the constraint buys: a future delete path that forgets one of the five can no longer
+    // leak rows that outlive the account, stay undiscoverable because every lookup is keyed by a
+    // departed member, and are re-adopted should the same Keycloak subject return. The rule
+    // selectors were the worst of them -- left in place they keep minting NEW notifications for a
+    // recipient that no longer exists.
+    int personalInventoryDeleted = personalInventoryItemRepository.deleteByOwnerUserId(userId);
+    int blueprintsDeleted = personalBlueprintRepository.deleteAllByOwnerUserId(userId);
     int notificationsDeleted = notificationRepository.deleteAllForRecipient(userId);
-    int ruleSelectorsDeleted = notificationRuleRepository.deleteSelectorsByUserSub(userId);
-    int evaluationsDeleted = memberEvaluationRepository.deleteAllByUserId(ownerSub);
+    int ruleSelectorsDeleted = notificationRuleRepository.deleteSelectorsByUserId(userId);
+    int evaluationsDeleted = memberEvaluationRepository.deleteAllByUserId(userId);
 
     // ---- Shared / historical aggregates: these survive, only their ownership moves ----
     // Refinery orders and missions are not account data: they feed operation finances and the

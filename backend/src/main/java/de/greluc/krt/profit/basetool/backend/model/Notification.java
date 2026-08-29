@@ -38,7 +38,7 @@ import lombok.Setter;
 /**
  * A single notification addressed to exactly one recipient.
  *
- * <p>Notifications form a per-user inbox isolated by {@link #recipientSub} (the Keycloak {@code
+ * <p>Notifications form a per-user inbox isolated by {@link #recipientUserId} (the Keycloak {@code
  * sub}, which equals {@code app_user.id}); they are deliberately <b>not</b> org-unit scoped, so
  * this entity carries no owning org unit and is excluded from the staffel-scoped service whitelist
  * (REQ-NOTIF-004, mirrors the bank per-grant model). The {@link #type} plus the JSON {@link
@@ -62,8 +62,8 @@ public class Notification extends AbstractEntity<UUID> {
   private UUID id;
 
   /** Keycloak {@code sub} of the sole recipient; every inbox query filters on this column. */
-  @Column(name = "recipient_sub", nullable = false)
-  private UUID recipientSub;
+  @Column(name = "recipient_user_id", nullable = false)
+  private UUID recipientUserId;
 
   /**
    * Machine type of the notification, rendered by the frontend via {@code notifications.type.*}.

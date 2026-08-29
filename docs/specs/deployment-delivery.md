@@ -596,6 +596,15 @@ applying a **percentage or a ratio** where a **budget** was needed:
    (they routinely disagree by two orders of magnitude). A quota is a burst ceiling, not a
    reservation: overcommitting the sum past the physical core count is permitted and expected.
 6. **Record what would trigger a re-review** — the growth that would invalidate the multiple.
+   And when a re-review finds a rise, **attribute it before reading it as load**: split the peak by
+   container generation first, because a resident set that stepped at an image bump did not grow
+   with traffic. Tempo's 2026-08-29 re-measurement (#1705) is the worked example — its three
+   **3.0.2** container generations peaked at 479.8 / 486.0 / 523.1 MiB and both **3.0.3**
+   generations at 595.3 / 665.3 MiB, a ~27 % step at the version boundary that the previous reading
+   had attributed to trace volume. (Bare versions on purpose: written as a full `image:tag` this
+   sentence reads as a pin, and the image-pin gate would rewrite the historical 3.0.2 to today's
+   tag — erasing the very comparison it makes.) `max_over_time(container_memory_rss{name="…"}[30d])` returns one
+   series per generation, so the split costs nothing.
 7. **The sum of all limits across both compose files stays under the host budget with real
    headroom** (ADR-0085's `~14 GB` review trigger on the 16 GB CPX42). Exceeding it is not
    forbidden but requires an explicit owner decision recorded in ADR-0085, because the sum bounds

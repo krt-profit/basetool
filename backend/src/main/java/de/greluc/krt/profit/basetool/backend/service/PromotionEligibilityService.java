@@ -96,13 +96,13 @@ public class PromotionEligibilityService {
    * when no requirement is configured for the transition, so the UI can distinguish "missing
    * configuration" from "configured but not met".
    *
-   * @param userId the JWT-sub identifier of the member being evaluated
+   * @param userId the {@code app_user.id} of the member being evaluated
    * @param fromRank the rank the member currently holds
    * @param toRank the rank the member would be promoted to
    * @return the per-rule outcome plus an aggregate {@code eligible} flag
    */
   public PromotionEligibilityResponse evaluateForRanks(
-      @NotNull String userId, int fromRank, int toRank) {
+      @NotNull UUID userId, int fromRank, int toRank) {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
         || !ownerScopeService.hasPromotionReadAccess()) {
       return new PromotionEligibilityResponse(userId, fromRank, toRank, false, false, List.of());
@@ -118,7 +118,7 @@ public class PromotionEligibilityService {
    * re-querying it 2×T times. The public {@link #evaluateForRanks(String, int, int)} owns the gate
    * check and builds the index for a single transition.
    *
-   * @param userId the member's JWT-sub.
+   * @param userId the member's {@code app_user.id}.
    * @param fromRank the source rank.
    * @param toRank the target rank.
    * @param scope the promotion scope (squadron id) the requirements and evaluation are read in.
@@ -126,7 +126,7 @@ public class PromotionEligibilityService {
    * @return the per-rule outcome plus the aggregate {@code eligible} flag.
    */
   private PromotionEligibilityResponse evaluateForRanks(
-      @NotNull String userId,
+      @NotNull UUID userId,
       int fromRank,
       int toRank,
       @Nullable UUID scope,
@@ -164,10 +164,10 @@ public class PromotionEligibilityService {
    * RankRequirementRepository#findDistinctRankTransitions()} – senior transitions first – so the UI
    * can show the next reachable promotion at the top.
    *
-   * @param userId the JWT-sub identifier of the member being evaluated
+   * @param userId the {@code app_user.id} of the member being evaluated
    * @return eligibility entries for every configured transition, possibly empty
    */
-  public List<PromotionEligibilityResponse> evaluateAllForUser(@NotNull String userId) {
+  public List<PromotionEligibilityResponse> evaluateAllForUser(@NotNull UUID userId) {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
         || !ownerScopeService.hasPromotionReadAccess()) {
       return List.of();
@@ -191,11 +191,11 @@ public class PromotionEligibilityService {
    * user id. Authorisation is enforced via {@code @PreAuthorize} so personal views keep using
    * {@link #evaluateAllForUser(String)} without a role check.
    *
-   * @param userId the JWT-sub identifier of the member being evaluated
+   * @param userId the {@code app_user.id} of the member being evaluated
    * @return eligibility entries for every configured transition, possibly empty
    */
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  public List<PromotionEligibilityResponse> evaluateAllForUserAsAdmin(@NotNull String userId) {
+  public List<PromotionEligibilityResponse> evaluateAllForUserAsAdmin(@NotNull UUID userId) {
     return evaluateAllForUser(userId);
   }
 
@@ -217,11 +217,11 @@ public class PromotionEligibilityService {
    * round-trips per call, multiplied across every rank transition; this collapses them to one
    * (REQ-DATA-003).
    *
-   * @param userId the member's JWT-sub.
+   * @param userId the member's {@code app_user.id}.
    * @param scope the promotion scope (squadron id) to read the evaluation in, or {@code null}.
    * @return the assigned-level and category→topic maps for the member.
    */
-  private EvaluationIndex loadEvaluationIndex(@NotNull String userId, @Nullable UUID scope) {
+  private EvaluationIndex loadEvaluationIndex(@NotNull UUID userId, @Nullable UUID scope) {
     Map<UUID, PromotionLevel> levels = new HashMap<>();
     Map<UUID, UUID> topics = new HashMap<>();
     for (MemberEvaluation evaluation :

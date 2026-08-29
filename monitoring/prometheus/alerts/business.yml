@@ -14,6 +14,26 @@ groups:
           summary: "Bank ledger integrity violation: {{ $labels.category }}"
           description: "The hourly integrity sweep found {{ $value }} rows in category '{{ $labels.category }}'. A bank ledger invariant is broken — investigate before any further bank mutation."
 
+      # ADR-0142 point 5 / #1639: a login presented a subject no account carries while another
+      # account holds the same callsign. Until that release the login silently ADOPTED that account
+      # -- the caller then acted as someone else, and the case had no signal at all. Now a new
+      # PENDING registration is created instead and the admin queue marks it, so this alert is the
+      # second pair of eyes rather than the only one.
+      #
+      # Warning, not critical: nothing is broken, and a single occurrence has a benign reading (a
+      # member re-provisioned in Keycloak). What it must not do is stay invisible -- a Keycloak
+      # username is reusable after a deletion, so a repeated collision on one callsign is how a
+      # recreated account would end up claiming a departed member's identity. Threshold is
+      # deliberately low: the counter is normally flat zero.
+      - alert: UserCallsignCollision
+        expr: increase(basetool_user_callsign_collisions_total[1h]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Callsign collision at login: {{ $value }} in the last hour"
+          description: "A login presented an unknown subject while another account holds the same callsign, so a NEW pending registration was created and nothing was inherited. Check the admin registration queue: the affected row carries the duplicate-callsign marker, and the remedy is an explicit merge, never an approval that leaves two accounts for one member. The backend log names both account ids (never the callsign itself)."
+
       # REQ-ORDERS-033: an ordered-item line's blueprint no longer produces the ordered item, so the
       # order is showing a FOREIGN recipe's materials as its demand. People collect and book against
       # those numbers, so this is wrong-data-in-production, not a cosmetic drift. Warning rather than
@@ -64,8 +84,18 @@ groups:
       # safety-net job — while never tripping on the ordinary 24h cycle. An admin-triggered "Sync
       # now" (POST /api/v1/users/sync) refreshes the same last-success gauge, so a manual run also
       # clears this alert.
+      # The `or absent(...)` companion (#1707, 2026-08-29): the last-success gauge is registered
+      # LAZILY, on a job's first success, and lives in the backend process — so a job that fails on
+      # EVERY run since the last restart publishes no series at all, `time() - gauge` has nothing to
+      # evaluate, and this alert stayed silent on exactly the failure it exists for. The companion is
+      # gated on backend uptime exceeding this rule's own window rather than being a bare absent():
+      # a bare one would fire after every deploy, since (unlike the textfile metrics behind the
+      # ops-automation alerts) this gauge does not survive a restart. Written per task, never once
+      # over an alternation — absent() is 1 only when the selector matches NOTHING, so a combined
+      # guard would stay false while one of two tasks was dead. Pinned by
+      # tests/scheduled_job_never_succeeded_test.yml.
       - alert: UserSyncStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"} > 0)) > 93600
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600)
         for: 10m
         labels:
           severity: warning
@@ -78,8 +108,9 @@ groups:
       # minutes is not staleness at all — it is the never-succeeded sentinel above (check
       # `changes(process_start_time_seconds[1h])` for a restart, and whether the fire lands one
       # `krt.scwiki.scheduler-initial-delay` after it). A real one stays up until someone acts.
+      # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: ExternalSyncStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"uex_sync|scwiki_sync"} > 0)) > 172800
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"uex_sync|scwiki_sync"} > 0)) > 172800 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="uex_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 172800) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="scwiki_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 172800)
         for: 10m
         labels:
           severity: warning
@@ -240,8 +271,9 @@ groups:
       # by TaskMetrics only on a job's first SUCCESS, so a job whose bean is config-gated off (or that
       # has not yet completed a run in this process) never publishes it and cannot report a false
       # stale (deliberate, per the issue; see the sentinel-guard note at the top of this group).
+      # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: ScheduledJobStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning"} > 0)) > 93600
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="notification_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="default_blueprint_provisioning"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600)
         for: 10m
         labels:
           severity: warning
@@ -254,8 +286,9 @@ groups:
       # BankLedgerIntegrityViolation (critical) can never fire — a broken bank invariant would go
       # undetected. Tighter 6h window (the sweep is hourly) and critical, matching the severity of the
       # invariant it guards.
+      # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: BankLedgerIntegritySweepStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"} > 0)) > 21600
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"} > 0)) > 21600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 21600)
         for: 10m
         labels:
           severity: critical
@@ -266,8 +299,9 @@ groups:
       # Same false-silence trap as the bank sweep (REQ-ORDERS-033): a stale job-order integrity sweep
       # freezes basetool_job_order_integrity_violations, so JobOrderItemBlueprintDrift can never fire
       # and a "0 drifted lines" reading means nothing. Warning, matching the alert it guards.
+      # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: JobOrderIntegritySweepStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"} > 0)) > 21600
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"} > 0)) > 21600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 21600)
         for: 10m
         labels:
           severity: warning
@@ -278,8 +312,9 @@ groups:
       # (#1041 item 3) BusinessMetricsCollector.refresh() (every 60s) feeds every approval/work-queue
       # depth gauge. If it wedges, the gauges FREEZE and the *ApprovalOverdue alerts silently consume
       # stale numbers. A last-success age > 10 min means ~10 missed samples — the sampler is stuck.
+      # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: BusinessMetricsStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"} > 0)) > 600
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"} > 0)) > 600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 600)
         for: 5m
         labels:
           severity: warning
@@ -419,8 +454,16 @@ groups:
       # Human work queues (JobOrder OPEN, Operation PLANNED, RefineryOrder OPEN) move on human time,
       # so the threshold is a "someone forgot this exists" floor, not an SLA. baseline-tune: raise/lower
       # once the real queue-age distribution is known for the active org. JobOrder is tuned to 180d for
-      # the current org cadence (long-running orders are normal); Refinery/Operation stay at the 30d
-      # baseline.
+      # the current org cadence (long-running orders are normal).
+      #
+      # Refinery/Operation moved 30d -> 90d on 2026-08-29, the first time the queue was actually
+      # measured (#1707): the oldest open refinery order stood at 29.65d against the 30d floor, i.e.
+      # the alert was hours from firing on a queue of five orders (1 OPEN, 4 IN_PROGRESS) that nobody
+      # had called abandoned. A floor a live queue reaches in normal operation is not a floor. 90d
+      # keeps the "someone forgot this exists" intent while clearing the observed working range; it is
+      # still a baseline, and the same measurement is the way to revisit it. OperationStale is moved
+      # with it deliberately: it shares the queue's cadence, it had no open operations at all when
+      # measured, and leaving the two thresholds to diverge on no evidence would be the worse default.
       - alert: JobOrderStale
         expr: basetool_job_order_open_oldest_age_seconds > 15552000
         for: 1h
@@ -431,22 +474,22 @@ groups:
           description: "A job order has been OPEN for more than 180 days — likely abandoned. Close or reassign it (threshold is a baseline; tune to the org's cadence)."
 
       - alert: RefineryOrderStale
-        expr: basetool_refinery_order_open_oldest_age_seconds > 2592000
+        expr: basetool_refinery_order_open_oldest_age_seconds > 7776000
         for: 1h
         labels:
           severity: warning
         annotations:
-          summary: "Oldest open refinery order >30d"
-          description: "A refinery order has been OPEN for more than 30 days — likely abandoned. Close or reassign it (threshold is a baseline; tune to the org's cadence)."
+          summary: "Oldest open refinery order >90d"
+          description: "A refinery order has been OPEN for more than 90 days — likely abandoned. Close or reassign it (threshold is a baseline; tune to the org's cadence)."
 
       - alert: OperationStale
-        expr: basetool_operation_open_oldest_age_seconds > 2592000
+        expr: basetool_operation_open_oldest_age_seconds > 7776000
         for: 1h
         labels:
           severity: warning
         annotations:
-          summary: "Oldest planned operation >30d"
-          description: "An operation has been PLANNED for more than 30 days — likely abandoned. Execute, reschedule or cancel it (threshold is a baseline; tune to the org's cadence)."
+          summary: "Oldest planned operation >90d"
+          description: "An operation has been PLANNED for more than 90 days — likely abandoned. Execute, reschedule or cancel it (threshold is a baseline; tune to the org's cadence)."
 
       # (#1041 item 15) P4K import terminal failures. The pending-queue gauge drains back to 0 after a
       # failed run, so a reliably-failing import looks like a healthy empty queue. This counter is
@@ -765,6 +808,15 @@ groups:
       # Everything NOT named above is alerted, so a newly added AuditDomain is covered by default and
       # exempting it has to be a deliberate edit here rather than an omission. A domain that never
       # emitted has no series and cannot fire; only one that WAS active and went silent 14d does.
+      #
+      # TRIAGE (#1707, 2026-08-29): this alert SELF-CLEARS on a deploy, and a cleared one is not
+      # evidence that anything was fixed. The counter is per-process, so a deploy resets it; once the
+      # pre-deploy samples age out of the 14d window the domain has no series at all, and a rule that
+      # needs `sum by (domain)` to produce a group goes quiet while the silence it reports continues.
+      # `or vector(0)` cannot patch this — vector(0) carries no `domain` label — so closing it means
+      # pinning the expected domain set in the rule, which is exactly the upkeep the covered-by-default
+      # design above exists to avoid. Deliberately left as-is (@greluc, 2026-08-29); the 07 dashboard's
+      # per-domain 14d/60d tables are the authoritative view when this alert disappears.
       # baseline-tune: the 14d window suits an active org; a very quiet squadron may need it widened.
       - alert: AuditDomainSilenceAnomaly
         expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"ROLE|PROMOTION|PERSONAL_INVENTORY|MARKET"}[14d])) == 0) and on() (up{job="basetool-backend"} == 1)

@@ -32,7 +32,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -52,8 +51,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>{@link PersonalBlueprint} carries no org-unit column — it is a pure per-user aggregate keyed
  * by the Keycloak {@code sub}. This service bridges to org units in two steps, entirely in Java (no
- * cross-type SQL join between the {@code String owner_sub} and the {@code UUID} membership key): it
- * resolves the in-scope member user ids from {@link OrgUnitMembershipRepository} using the
+ * cross-type SQL join between the {@code String owner_user_id} and the {@code UUID} membership
+ * key): it resolves the in-scope member user ids from {@link OrgUnitMembershipRepository} using the
  * oversight {@link ScopePredicate} from {@link OwnerScopeService#currentOversightScope()}, then
  * loads and groups those members' owned-blueprint rows by <em>variant family</em> (via {@link
  * BlueprintVariantFamilyResolver}, so a base item and its cosmetic variants collapse onto one row
@@ -103,8 +102,8 @@ public class PersonalBlueprintOverviewService {
   @NotNull
   public Page<BlueprintOverviewEntryDto> listAvailableBlueprints(
       @NotNull Pageable pageable, @Nullable String search) {
-    Set<String> ownerSubs = inScopeOwnerSubs();
-    if (ownerSubs.isEmpty()) {
+    Set<UUID> ownerUserIds = inScopeOwnerUserIds();
+    if (ownerUserIds.isEmpty()) {
       return new PageImpl<>(List.of(), pageable, 0);
     }
     // Group owned rows by variant family (not raw product key), so a base item and its cosmetic
@@ -114,7 +113,7 @@ public class PersonalBlueprintOverviewService {
     // member's blueprint, so a family owned only via a variant still reads as its base.
     Map<String, ProductAggregate> byKey = new LinkedHashMap<>();
     for (BlueprintOwnerProduct bp :
-        personalBlueprintRepository.findOwnerProductByOwnerSubIn(ownerSubs)) {
+        personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(ownerUserIds)) {
       String familyKey = familyResolver.familyKey(bp.productName());
       if (familyKey.isEmpty()) {
         continue;
@@ -124,7 +123,7 @@ public class PersonalBlueprintOverviewService {
               familyKey,
               key -> new ProductAggregate(familyResolver.displayBaseName(bp.productName())))
           .owners
-          .add(bp.ownerSub());
+          .add(bp.ownerUserId());
     }
     String needle =
         search == null || search.isBlank() ? null : search.trim().toLowerCase(Locale.ROOT);
@@ -172,7 +171,7 @@ public class PersonalBlueprintOverviewService {
     ScopePredicate scope = ownerScopeService.currentOversightScope();
     boolean adminAll = scope.adminAllScope();
     List<PersonalBlueprint> owned;
-    Set<String> memberSubs;
+    Set<UUID> memberSubs;
     if (adminAll) {
       // Admin "all org units" has no single unit to be a member of, so no owner is flagged
       // external (every owner is in scope by definition).
@@ -183,19 +182,18 @@ public class PersonalBlueprintOverviewService {
       // shows in the drill-down, keeping the owner names consistent with the bumped count. The
       // oversight members are kept separate so each owner can be flagged member vs global sharer.
       memberSubs = oversightMemberSubs(scope);
-      Set<String> ownerSubs = new LinkedHashSet<>(memberSubs);
-      ownerSubs.addAll(globalSharerSubs());
-      if (ownerSubs.isEmpty()) {
+      Set<UUID> ownerUserIds = new LinkedHashSet<>(memberSubs);
+      ownerUserIds.addAll(globalSharerSubs());
+      if (ownerUserIds.isEmpty()) {
         return List.of();
       }
       owned =
-          personalBlueprintRepository.findAllByProductKeyInAndOwnerSubIn(productKeys, ownerSubs);
+          personalBlueprintRepository.findAllByProductKeyInAndOwnerUserIdIn(
+              productKeys, ownerUserIds);
     }
     Set<UUID> ownerIds =
         owned.stream()
-            .map(PersonalBlueprint::getOwnerSub)
-            .map(PersonalBlueprintOverviewService::parseUuid)
-            .filter(Objects::nonNull)
+            .map(PersonalBlueprint::getOwnerUserId)
             .collect(Collectors.toCollection(LinkedHashSet::new));
     if (ownerIds.isEmpty()) {
       return List.of();
@@ -204,8 +202,7 @@ public class PersonalBlueprintOverviewService {
         .map(
             user ->
                 new BlueprintOverviewOwnerDto(
-                    user.getEffectiveName(),
-                    adminAll || memberSubs.contains(user.getId().toString())))
+                    user.getEffectiveName(), adminAll || memberSubs.contains(user.getId())))
         .sorted(
             Comparator.comparing(
                 BlueprintOverviewOwnerDto::ownerName, String.CASE_INSENSITIVE_ORDER))
@@ -213,57 +210,55 @@ public class PersonalBlueprintOverviewService {
   }
 
   /**
-   * Resolves the Keycloak {@code sub}s of every user in the caller's oversight scope. For the admin
+   * Resolves the {@code app_user.id}s of every user in the caller's oversight scope. For the admin
    * "all org units" scope this is every blueprint owner in the system (via {@link
-   * PersonalBlueprintRepository#findAllDistinctOwnerSubs()}) — including owners with no org-unit
+   * PersonalBlueprintRepository#findAllDistinctOwnerUserIds()}) — including owners with no org-unit
    * membership (e.g. a squadron-less admin), which the previous member-list resolution dropped so
    * the admin's own blueprints went missing (#371 fix). For a pinned or member-union scope it is
-   * the {@code sub} form of the in-scope org units' member ids (the {@code owner_sub} stored on
-   * {@link PersonalBlueprint} equals {@code User.id}).
+   * the in-scope org units' member ids (the {@code owner_user_id} stored on {@link
+   * PersonalBlueprint} is a foreign key to {@code app_user(id)} since V235).
    *
-   * @return the in-scope owner {@code sub}s; empty when a non-admin caller oversees no org unit
+   * @return the in-scope owner ids; empty when a non-admin caller oversees no org unit
    */
   @NotNull
-  private Set<String> inScopeOwnerSubs() {
+  private Set<UUID> inScopeOwnerUserIds() {
     ScopePredicate scope = ownerScopeService.currentOversightScope();
     if (scope.adminAllScope()) {
       // Admin all-scope already spans every owner, so the global-share opt-in adds nothing here.
-      return personalBlueprintRepository.findAllDistinctOwnerSubs();
+      return personalBlueprintRepository.findAllDistinctOwnerUserIds();
     }
     // Union the global sharers (REQ-INV-018) into the oversight member set so an opted-in user is
     // counted even when no oversight org unit contains them — including the sharer-only case where
     // the caller's oversight membership set is otherwise empty.
-    Set<String> subs = new LinkedHashSet<>(oversightMemberSubs(scope));
+    Set<UUID> subs = new LinkedHashSet<>(oversightMemberSubs(scope));
     subs.addAll(globalSharerSubs());
     return subs;
   }
 
   /**
-   * Resolves the {@code owner_sub}s of every user who opted into global blueprint sharing
+   * Resolves the {@code owner_user_id}s of every user who opted into global blueprint sharing
    * (REQ-INV-018). These are unioned into the oversight member set so an opted-in user's blueprints
    * surface in the availability overview for every leadership viewer, regardless of org-unit
-   * membership. The id stored on {@link PersonalBlueprint#getOwnerSub()} equals {@code User.id} as
-   * text, so the ids are rendered via {@link UUID#toString()}.
+   * membership. The id stored on {@link PersonalBlueprint#getOwnerUserId()} is {@code app_user.id}.
    *
-   * @return the global sharers' {@code owner_sub}s; never {@code null}, possibly empty
+   * @return the global sharers' owner ids; never {@code null}, possibly empty
    */
   @NotNull
-  private Set<String> globalSharerSubs() {
-    return userRepository.findIdsBySharingBlueprintsGlobally().stream()
-        .map(UUID::toString)
-        .collect(Collectors.toCollection(LinkedHashSet::new));
+  private Set<UUID> globalSharerSubs() {
+    return new LinkedHashSet<>(userRepository.findIdsBySharingBlueprintsGlobally());
   }
 
   /**
-   * Resolves the member {@code sub}s of a non-admin oversight scope: the pinned org unit's members
-   * when a valid pin is active, otherwise the union over all oversight org units (the {@code
-   * owner_sub} stored on {@link PersonalBlueprint} equals {@code User.id}).
+   * Resolves the member ids of a non-admin oversight scope: the pinned org unit's members when a
+   * valid pin is active, otherwise the union over all oversight org units (the {@code
+   * owner_user_id} stored on {@link PersonalBlueprint} is a foreign key to {@code app_user(id)}
+   * since V235).
    *
    * @param scope the caller's non-admin oversight scope
-   * @return the in-scope member {@code sub}s; empty when the caller oversees no org unit
+   * @return the in-scope member ids; empty when the caller oversees no org unit
    */
   @NotNull
-  private Set<String> oversightMemberSubs(@NotNull ScopePredicate scope) {
+  private Set<UUID> oversightMemberSubs(@NotNull ScopePredicate scope) {
     Set<UUID> userIds;
     if (scope.activeOrgUnitId() != null) {
       userIds =
@@ -275,9 +270,7 @@ public class PersonalBlueprintOverviewService {
     } else {
       return Set.of();
     }
-    return userIds.stream()
-        .map(UUID::toString)
-        .collect(Collectors.toCollection(LinkedHashSet::new));
+    return new LinkedHashSet<>(userIds);
   }
 
   /**
@@ -316,28 +309,12 @@ public class PersonalBlueprintOverviewService {
   }
 
   /**
-   * Parses a stored {@code owner_sub} back into a {@link UUID}, returning {@code null} for the
-   * (theoretical) malformed value so it is filtered out instead of aborting the drill-down.
-   *
-   * @param raw the {@code owner_sub} string
-   * @return the parsed id, or {@code null} when {@code raw} is not a UUID
-   */
-  @Nullable
-  private static UUID parseUuid(String raw) {
-    try {
-      return UUID.fromString(raw);
-    } catch (IllegalArgumentException ex) {
-      return null;
-    }
-  }
-
-  /**
    * Mutable per-family accumulator used while grouping owned-blueprint rows: holds the family's
-   * display label and the set of distinct owner {@code sub}s seen across the family.
+   * display label and the set of distinct owner ids seen across the family.
    */
   private static final class ProductAggregate {
     private final String productName;
-    private final Set<String> owners = new LinkedHashSet<>();
+    private final Set<UUID> owners = new LinkedHashSet<>();
 
     /**
      * Starts an accumulator for one variant family.

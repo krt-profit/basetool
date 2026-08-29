@@ -1845,7 +1845,8 @@
             "uid": "prometheus"
           }
         }
-      ]
+      ],
+      "description": "Keycloak SPI account-existence prechecks per hour by outcome (basetool_discord_precheck_total: ok / unauthorized / disabled). The endpoint sits outside /api/**, outside the rate limiter and outside the basetool_http_error funnel, so without this counter a secret-guessing attempt or a shared secret broken by rotation is log-only (#1041 item 19). The counter is created on first use, so an EMPTY panel is the ordinary state: no Discord-linked registration has been attempted since the last backend restart. What matters is the shape once it does populate -- a rising `unauthorized` line is the signal, and DiscordPrecheckUnauthorizedSpike alerts on it."
     },
     {
       "id": 34,
@@ -2148,7 +2149,7 @@
       },
       "type": "timeseries",
       "title": "Redis fan-out pub/sub & errors/hour",
-      "description": "Cross-replica Redis fan-out for live delivery (ADR-0094/ADR-0126): the live-sync changed-relay (basetool_livesync_redis_*), the editor-presence gossip (basetool_livesync_presence_*) and the notification SSE fan-out (basetool_sse_redis_*). Publishing is fire-and-forget after the local relay/broadcast, so a rising `errors` stream means cross-replica delivery is silently degraded to single-instance — watched by the LiveSyncRedisFanoutBroken alert, which covers the changed relay and the SSE fan-out only (a lost changed frame costs correctness; a lost presence gossip costs a cosmetic dot, so it is a panel row, not a page). Note the presence rows are a PERIODIC gossip — one message per actively-edited topic per 10 s per replica — so a steady non-zero floor is normal there and a flat zero simply means nobody has a mission panel focused.",
+      "description": "Cross-replica Redis fan-out for live delivery (ADR-0094/ADR-0126): the live-sync changed-relay (basetool_livesync_redis_*), the editor-presence gossip (basetool_livesync_presence_*) and the notification SSE fan-out (basetool_sse_redis_*). Publishing is fire-and-forget after the local relay/broadcast, so a rising `errors` stream means cross-replica delivery is silently degraded to single-instance — watched by the LiveSyncRedisFanoutBroken alert, which covers the changed relay and the SSE fan-out only (a lost changed frame costs correctness; a lost presence gossip costs a cosmetic dot, so it is a panel row, not a page). Note the presence rows are a PERIODIC gossip — one message per actively-edited topic per 10 s per replica — so a steady non-zero floor is normal there and a flat zero simply means nobody has a mission panel focused. Which rows CAN populate depends on how many processes sit on the channel, and the difference is invisible in the panel: basetool_sse_redis_consumed_total counts peer-origin messages only (own-origin excluded), and production runs a single backend replica -- so that row, and its errors row, are permanently absent here and their absence is correct. The live-sync rows do populate on the same single-replica host, because backend and frontend are two DIFFERENT processes on one channel. Read side by side, one bridge looks alive and the other looks dead while both are healthy; a genuinely broken SSE fan-out shows up as `published` continuing while notifications stop arriving, not as this row going flat (the #1488 lesson, on a second metric).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

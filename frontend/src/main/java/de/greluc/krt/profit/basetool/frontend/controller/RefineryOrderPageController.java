@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.IngestHandoffService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -307,7 +308,10 @@ public class RefineryOrderPageController {
     RefineryImportDraftDto draft =
         ingestHandoffService
             .consume(
-                principal.getSubject(), handoff, HandoffKind.REFINERY, RefineryImportDraftDto.class)
+                CurrentUser.userIdText(principal),
+                handoff,
+                HandoffKind.REFINERY,
+                RefineryImportDraftDto.class)
             .orElse(null);
     if (draft == null || draft.order() == null) {
       return null;
@@ -1146,7 +1150,7 @@ public class RefineryOrderPageController {
     }
     try {
       // Try the subject directly (fastest path)
-      return UUID.fromString(principal.getSubject());
+      return CurrentUser.userId(principal);
     } catch (Exception e) {
       // Fallback: ask the backend for our id
       try {

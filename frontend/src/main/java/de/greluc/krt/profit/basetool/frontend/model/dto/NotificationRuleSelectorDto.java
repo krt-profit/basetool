@@ -28,7 +28,7 @@ import java.util.UUID;
  *
  * @param id selector id
  * @param kind selector kind ({@code SPECIFIC_USER} / {@code ROLE} / {@code ORG_RELATIVE_ROLE})
- * @param userSub target user for {@code SPECIFIC_USER}, else {@code null}
+ * @param userId target user for {@code SPECIFIC_USER}, else {@code null}
  * @param roleCode role code for {@code ROLE}, else {@code null}
  * @param orgRelativeRole org-relative role for {@code ORG_RELATIVE_ROLE}, else {@code null}
  * @param contextRole context org unit for {@code ORG_RELATIVE_ROLE}, else {@code null}
@@ -36,7 +36,7 @@ import java.util.UUID;
 public record NotificationRuleSelectorDto(
     UUID id,
     @BackendEnumAsString String kind,
-    UUID userSub,
+    UUID userId,
     String roleCode,
     @BackendEnumAsString String orgRelativeRole,
     @BackendEnumAsString String contextRole) {}

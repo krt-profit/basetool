@@ -60,7 +60,12 @@
                 <tbody id="registrationsBody">
                     <tr th:each="reg : ${registrations}" th:id="'reg-row-' + ${reg.id}"
                         th:attr="data-id=${reg.id},data-version=${reg.version}">
-                        <td th:text="${reg.username}">Nutzer</td>
+                        <td>
+                            <span th:text="${reg.username}">Nutzer</span>
+                            <span th:if="${reg.callsignCollision}" class="chip chip--warning"
+                                  th:text="#{admin.discordRegistrations.callsignCollision}"
+                                  th:title="#{admin.discordRegistrations.callsignCollision.hint}">Callsign doppelt</span>
+                        </td>
                         <td>
                             <span th:if="${reg.serverNickname}" th:text="${reg.serverNickname}">Server-Nickname</span>
                             <span th:unless="${reg.serverNickname}" class="reg-when" aria-hidden="true">&mdash;</span>
@@ -72,6 +77,9 @@
                                         th:text="#{admin.discordRegistrations.approve}">Freigeben</button>
                                 <button type="button" class="btn btn-outline" data-action="link"
                                         th:text="#{admin.discordRegistrations.link}">Verknüpfen</button>
+                                <button type="button" class="btn btn-outline" data-action="merge"
+                                        th:title="#{admin.discordRegistrations.merge.hint}"
+                                        th:text="#{admin.discordRegistrations.merge}">Konten zusammenführen</button>
                                 <button type="button" class="btn btn-outline-danger" data-action="reject"
                                         th:text="#{admin.discordRegistrations.reject}">Ablehnen</button>
                             </div>
@@ -105,7 +113,12 @@
                 <tbody id="rejectedBody">
                     <tr th:each="reg : ${rejected}" th:id="'rejected-row-' + ${reg.id}"
                         th:attr="data-id=${reg.id},data-version=${reg.version}">
-                        <td th:text="${reg.username}">Nutzer</td>
+                        <td>
+                            <span th:text="${reg.username}">Nutzer</span>
+                            <span th:if="${reg.callsignCollision}" class="chip chip--warning"
+                                  th:text="#{admin.discordRegistrations.callsignCollision}"
+                                  th:title="#{admin.discordRegistrations.callsignCollision.hint}">Callsign doppelt</span>
+                        </td>
                         <td>
                             <span th:if="${reg.serverNickname}" th:text="${reg.serverNickname}">Server-Nickname</span>
                             <span th:unless="${reg.serverNickname}" class="reg-when" aria-hidden="true">&mdash;</span>
@@ -176,6 +189,26 @@
             </div>
         </div>
     </div>
+    <!-- Merge-an-older-account modal (no native dialogs, REQ-UI). The remedy for the queue's
+         duplicate-callsign marker: a login whose subject matches no account no longer adopts one
+         found by name, so a member who ended up with two accounts needs their data moved onto the
+         one they can reach (REQ-SEC-045). Same server-searched account picker as the link modal --
+         the two differ in what moves, not in how the account is chosen. -->
+    <div id="merge-modal" class="modal krtm-display-none-z-index-3100-25fb">
+        <div class="modal-content hud-box krtm-max-width-520px-acb4">
+            <h2 class="mt-0" th:text="#{admin.discordRegistrations.merge.modal.title}">Konten zusammenführen</h2>
+            <label for="merge-source" th:text="#{admin.discordRegistrations.merge.modal.accountLabel}">Älteres Konto</label>
+            <select id="merge-source" data-krt-combobox="remote-users"
+                    th:attr="data-combobox-placeholder=#{admin.discordRegistrations.merge.modal.accountPlaceholder}">
+                <option value="" th:text="#{admin.discordRegistrations.merge.modal.accountPlaceholder}">-- Konto wählen --</option>
+            </select>
+            <p class="reg-when mt-2" th:text="#{admin.discordRegistrations.merge.modal.hint}">Alles, was dem älteren Konto gehört, wandert herüber.</p>
+            <div class="flex-center-gap krtm-margin-top-1rem-a6cb">
+                <button type="button" class="btn btn-ghost" id="merge-cancel" th:text="#{general.cancel}">Abbrechen</button>
+                <button type="button" class="btn btn--cta" id="merge-confirm" th:text="#{admin.discordRegistrations.merge}">Zusammenführen</button>
+            </div>
+        </div>
+    </div>
 </main>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
@@ -191,6 +224,10 @@
         reopenError: /*[[#{error.admin.discordRegistrations.reopen}]]*/ 'Wiederöffnen fehlgeschlagen.',
         approve: /*[[#{admin.discordRegistrations.approve}]]*/ 'Freigeben',
         link: /*[[#{admin.discordRegistrations.link}]]*/ 'Verknüpfen',
+        merge: /*[[#{admin.discordRegistrations.merge}]]*/ 'Zusammenführen',
+        merged: /*[[#{admin.discordRegistrations.merged}]]*/ 'Konten zusammengeführt.',
+        mergeError: /*[[#{error.admin.discordRegistrations.merge}]]*/ 'Zusammenführen fehlgeschlagen.',
+        mergeNoSource: /*[[#{error.admin.discordRegistrations.merge.noSource}]]*/ 'Bitte ein Konto auswählen.',
         reject: /*[[#{admin.discordRegistrations.reject}]]*/ 'Ablehnen',
         empty: /*[[#{admin.discordRegistrations.empty}]]*/ 'Keine offenen Registrierungen.',
         rejectedEmpty: /*[[#{admin.discordRegistrations.rejected.empty}]]*/ 'Keine abgelehnten Registrierungen.'

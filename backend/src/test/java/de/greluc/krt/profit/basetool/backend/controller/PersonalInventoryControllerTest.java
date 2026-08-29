@@ -46,14 +46,14 @@ import org.springframework.data.domain.PageRequest;
 @ExtendWith(MockitoExtension.class)
 class PersonalInventoryControllerTest {
 
-  private static final String SUB = "user-sub-42";
+  private static final UUID SUB = UUID.fromString("42424242-4242-4242-4242-424242424242");
 
   @Mock private PersonalInventoryItemService service;
 
   @InjectMocks private PersonalInventoryController controller;
 
   @Test
-  void listShouldDeriveOwnerSubFromJwtAndReturnPageResponse() {
+  void listShouldDeriveOwnerUserIdFromJwtAndReturnPageResponse() {
     // Given
     Page<PersonalInventoryItemResponse> page =
         new PageImpl<>(List.of(sampleResponse()), PageRequest.of(0, 10), 1);
@@ -82,12 +82,12 @@ class PersonalInventoryControllerTest {
 
     // Then
     assertSame(expected, result);
-    ArgumentCaptor<String> subCaptor = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<UUID> subCaptor = ArgumentCaptor.forClass(UUID.class);
     verify(service).createOwn(subCaptor.capture(), eq(req));
     assertEquals(
         SUB,
         subCaptor.getValue(),
-        "Owner identifier must come from JWT 'sub', never from the request body.");
+        "Owner identifier must come from the authenticated caller, never from the request body.");
   }
 
   @Test

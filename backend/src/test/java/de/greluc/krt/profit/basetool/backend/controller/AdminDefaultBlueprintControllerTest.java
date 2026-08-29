@@ -39,6 +39,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class AdminDefaultBlueprintControllerTest {
 
+  /** The acting admin's {@code app_user.id}, bound by {@code @CurrentUserId}. */
+  private static final UUID ADMIN = UUID.fromString("ad311111-0000-4000-8000-000000000001");
+
   @Mock private DefaultBlueprintService service;
   @InjectMocks private AdminDefaultBlueprintController controller;
 
@@ -56,12 +59,12 @@ class AdminDefaultBlueprintControllerTest {
   }
 
   @Test
-  void add_passesProductKeyAndAdminSub() {
-    when(service.add("k", "admin-sub")).thenReturn(sample());
+  void add_passesProductKeyAndAdminId() {
+    when(service.add("k", ADMIN.toString())).thenReturn(sample());
 
-    controller.add(new DefaultBlueprintCreateRequest("k"), "admin-sub");
+    controller.add(new DefaultBlueprintCreateRequest("k"), ADMIN);
 
-    verify(service).add("k", "admin-sub");
+    verify(service).add("k", ADMIN.toString());
   }
 
   @Test

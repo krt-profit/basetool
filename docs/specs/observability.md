@@ -559,8 +559,14 @@ rule — no blanket "everything is masked" claim:
   retention, **no** REQ-OBS-010 IP-retention impact. This **reverses** the original file-only shipping
   decision for these three modules (ADR-0072); the reversal has owner sign-off (2026-07-12) and its
   rationale/cost live in ADR-0095. The `JvmNativeThreadExhaustion` Loki rule that consumes this stream
-  ships **staged** (commented) until the native line is verified present on the test stack (REQ-OBS-014
-  dead-alert guard).
+  shipped **staged** (commented) under the REQ-OBS-014 dead-alert guard until the signature was
+  verified rather than assumed. **Enabled 2026-08-29**: a JVM under a cgroup pids cap on the same
+  digest-pinned image production runs writes `pthread_create failed (EAGAIN)` and `unable to create
+  native thread`, both matched by the filter; the three `<svc>-stdout` streams were measured
+  carrying 1k–43k lines/24h on the host; and neither the single `older_than = "167h"` drop stage nor
+  any of the three masking replaces can touch a fresh line or either phrase. The observed line is
+  recorded verbatim beside the rule, because its wording is JVM-version-dependent and a Temurin bump
+  is the thing that would silently invalidate it.
 - **Keycloak file log** (`app="keycloak"`) — masked **in the shipper** (Alloy stages scrub
   `username=` / `ipAddress=` before ingestion).
 - **Keycloak container stdout** (`app="keycloak-stdout"`) — Keycloak runs `--log=console,file`, so
@@ -699,7 +705,13 @@ Tracing on the OTel SDK) behind a hard master gate:
 - **Export path:** spans go via OTLP/HTTP (`MONITORING_OTLP_ENDPOINT`, Phase 2:
   `http://alloy:4318/v1/traces` on the scrape network) to Alloy, which forwards to Tempo on
   the core network — apps never reach the trace store directly. Sampling probability comes
-  from `MONITORING_TRACING_SAMPLING_PROBABILITY` (default 1.0; revisited in Phase-3 tuning).
+  from `MONITORING_TRACING_SAMPLING_PROBABILITY`, which **stays at `1.0`** — the Phase-3 review
+  it was flagged for happened on 2026-08-29 (#1705) and found nothing to buy. The deciding
+  number is CPU, not memory: tempo's **entire** container CPU over seven days is 0.0181 cores,
+  1.81 % of one core, which bounds whatever share of it is GC. Reducing sampling would trade
+  trace fidelity for a cost that is not being paid. The variable is **one setting for all three
+  modules** (`docker-compose.yml:580`, `:825`, `:971` all read it), so per-module sampling is a
+  design change and not a configuration one.
 - **No user-identifying span data:** span names and the low-cardinality `uri` attribute use
   templated routes (`/api/v1/locations/{id}`). Each module's `ObservationPrivacyFilter`
   scrubs every URL-carrying observation key-value before it becomes a metric tag or span
@@ -898,6 +910,41 @@ transaction per pass) rather than per-scrape.
   **Triage corollary:** a staleness alert that resolves on its own within minutes is not staleness at
   all — a genuine one persists until someone acts.
 
+- **Never-succeeded companion on the same six rules (2026-08-29).** The fix above has a corollary
+  nobody drew at the time: if leaving the series **absent** until a real success is what makes the
+  sentinel safe, then an absent series is also indistinguishable from a job that has *never*
+  succeeded — and subtracting an absent series still yields an empty vector, so the rule stays
+  silent. Every one of the six staleness alerts was therefore blind to exactly the failure it exists
+  for: a job that fails on every run publishes no gauge, so `time() - gauge` has nothing to evaluate.
+  A job wedged since the last deploy looked identical to a healthy one. Found by the #1707 sweep,
+  which read every rule's left-hand side against production and found `user_sync` and `scwiki_sync`
+  with no series at all — a perfectly normal post-restart state on a daily cron and a
+  1 h-initial-delay job, and that is the whole problem. Each rule now carries a per-task companion:
+
+  ```promql
+  or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="scwiki_sync"})
+      and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 172800)
+  ```
+
+  Three properties are load-bearing. It is **not** the bare `or absent(…)` the ops-automation
+  alerts use: those read node_exporter **textfile** metrics, which outlive a restart, so a bare
+  `absent()` means "really never ran" there and would mean "just restarted" here — firing after
+  every deploy. Gating on the backend having been up longer than that rule's *own* window is what
+  separates the two. It is written **per task**, never once over the `uex_sync|scwiki_sync`
+  alternation, for the same reason `LogStreamSilent` is one rule per path (REQ-OBS-014):
+  `absent()` returns 1 only when the selector matches *nothing*, so a combined guard would stay
+  false while one of the two tasks was dead. And `process_start_time_seconds` is wrapped in `max()`
+  with `and on()` so the join carries no labels from the uptime side and survives a rolling deploy
+  briefly exposing two backend processes. Covered by
+  `monitoring/prometheus/tests/scheduled_job_never_succeeded_test.yml`, whose cases pin both
+  directions — fires when the window has passed, silent right after a restart.
+
+  **Reading rule, generally:** an absent *counter* is good news (Micrometer registers one lazily, so
+  absence means the branch was never taken), while an absent *gauge* is a defect — it means the
+  thing that was supposed to publish a level never got far enough to publish one. Any alert whose
+  left-hand side reads a lazily-registered gauge needs this companion; one that reads a counter
+  does not.
+
 - `basetool_sync_events_total{source,event_type}` counter at the three `SyncReportService`
   `log*Event` write sites (`source` = `SyncSourceSystem`, `event_type` = `SyncEventType`; both
   bounded enums — never the external asset name/uuid/detail).
@@ -1092,8 +1139,13 @@ transaction per pass) rather than per-scrape.
   `_oldest_age_seconds` companion. Every oldest-age gauge now drives a stuck-queue alert: the
   registration + bank pairs the "oldest pending > 48 h" `*ApprovalOverdue` alerts, and (since #1041
   item 15) the four work queues `P4kImportStuck` (> 6 h — imports finish in minutes), `JobOrderStale`
-  / `RefineryOrderStale` / `OperationStale` (> 30 d, baseline-tune). An empty queue reports `0`, so
-  there is no `absent()` ambiguity.
+  (> 180 d) / `RefineryOrderStale` / `OperationStale` (> 90 d since 2026-08-29, raised from 30 d the
+  first time the queue was measured — the oldest open refinery order stood at 29.65 d, hours from
+  firing on five orders nobody had called abandoned; #1707). All three are baselines, and measuring
+  the queue is how they get revisited. Every one of these gauges is registered eagerly in
+  `BusinessMetricsCollector.registerGauges()` (`@PostConstruct`), so an empty queue reports `0` and
+  there is no `absent()` ambiguity — unlike the last-success gauge, which is registered lazily and
+  needed the never-succeeded companion above.
 
 - `basetool_p4k_import_jobs_total{outcome,kind}` counter (`P4kImportJobService`, #1041 item 15),
   bumped at each terminal transition — `outcome` = `succeeded` / `failed` (the lowercased terminal
@@ -1721,6 +1773,34 @@ therefore alerts on:
   per-target `loki_source_file_read_lines_total` series to take `absent()` of, and a native-error
   breadcrumb is rare by design, so a `rate()`/`absent()` liveness check on such a quiet stream would
   be a permanent false alarm. Whole-pipeline silence is still caught by `LokiIngestSilent`.
+- **Dashboard provisioning.** The 13 dashboards under `monitoring/grafana/dashboards/` are
+  provisioned as code with `allowUiUpdates: false`, and until 2026-08-29 (#1708) **nothing validated
+  them** — no Gradle test, no CI job, no lint script. Every way they can be wrong is silent: invalid
+  JSON makes Grafana skip that dashboard with only a line in its own startup log, a duplicate
+  dashboard `uid` makes provisioning last-writer-wins so one silently replaces the other, an
+  unprovisioned datasource `uid` renders "Datasource not found" on every panel (which reads as "no
+  data"), and a duplicate panel `id` makes panel deep links resolve to whichever Grafana finds first.
+  `scripts/check-grafana-dashboards.py` gates all four in `repo-lint → grafana-dashboards`, walking
+  panels nested in **collapsed rows** as well — those are the panels least likely to be opened and
+  so the most likely to have rotted. Its `.test.sh` runs first and asserts each failure mode is still
+  detected, so the gate cannot pass vacuously. The check is deliberately **structural**: whether a
+  panel's metric has series is a production question and a judgement call (see the counter/gauge
+  reading rule above), which is why that stays a periodic review rather than a gate.
+- **A panel that is empty by design reads as a broken panel.** The #1708 review found no unit, axis
+  or encoding defect in any of the 170 panels — every `*100` panel declares `percent`, none
+  double-scales, and all 13 files are clean UTF-8. What it found was the dashboard half of the
+  staleness problem: panels that *cannot* populate, sitting next to panels that merely happen to be
+  quiet, with nothing to tell a reader which is which. Six now say so in their own description,
+  chosen because each has already misled someone: the three resilience4j panels and *Failed systemd
+  Units* (blank was the #1713 defect, not a healthy zero), *Discord precheck/hour* (a lazily created
+  counter — empty means no linked registration since the last restart), and *Redis fan-out
+  pub/sub & errors/hour*. That last one is the sharpest: `basetool_sse_redis_consumed_total` counts
+  peer-origin messages only, and production runs a **single backend replica**, so that row is
+  permanently absent and correct — while the live-sync rows beside it *do* populate on the same host,
+  because backend and frontend are two different processes on one channel. One bridge looks alive and
+  the other looks dead, and both are healthy. Describing the panels is the fix; the rest were left
+  undescribed on purpose, because 136 blanket descriptions would bury exactly these six.
+
 - **Container-metric blackout.** cAdvisor can stay "up" while emitting zero name-labelled series (a
   real incident, CHANGELOG v1.1.1), silently blinding the container alerts. `ContainerMetricsMissing`
   (critical) and `CoreContainerMetricsMissing` (warning) guard the named-series count;
@@ -1820,11 +1900,38 @@ therefore alerts on:
   “already sent”, default 120 h — so the compose file pins `--data.retention=744 h`; raising
   one without the other silently degrades the cadence back to the retention window.
 
+**A rule whose metric has no series is a dead alert, and the build says so.** The failure mode this
+requirement exists for has a quieter form than a broken reload: a rule that is syntactically fine,
+deployed, and simply never able to match. It never pages, never looks broken, and the only symptom
+is silence — which is indistinguishable from "nothing has gone wrong".
+
+Four were found that way on 2026-08-29, by reading the production Prometheus rather than the rule
+files:
+
+| Rule | Metric | Why it had no series |
+| --- | --- | --- |
+| `CircuitBreakerOpen` | `resilience4j_circuitbreaker_state` | Resilience4j's metrics auto-configuration is `@ConditionalOnBean(MeterRegistry)` and orders itself with `@AutoConfigureAfter(name = "…actuate.autoconfigure.metrics.MetricsAutoConfiguration")`. Spring Boot 4 moved that class into `spring-boot-micrometer-metrics`, and `name =` **ignores a class it cannot find** — so the ordering hint evaporated, the condition ran before the registry existed, and no publisher was created |
+| the bulkhead rule | `resilience4j_bulkhead_available_concurrent_calls` | same |
+| the retry rule | `resilience4j_retry_calls_total` | same |
+| `SystemdUnitFailed` | `node_systemd_unit_state` | the systemd collector talks to systemd over dbus on `/run/systemd/private`, which `--path.rootfs` does not redirect and the container did not mount |
+
+The distinction that makes this checkable: **a lazily-created counter with no series is good news**
+— `basetool_*_errors_total` being absent means the error branch has never been taken, which is
+exactly how the #1238 baseline read the live-sync drop counters. **A gauge with no series is a
+defect**: it is not being published at all. So the guard is written against the meters whose
+*absence* is a defect, not against every metric a rule names.
+
+`AlertedMeterPresenceTest` boots the frontend context and fails the build when a meter an alert
+rule depends on is not registered. It is what would have caught the three Resilience4j rules on the
+day the Boot 4 upgrade landed, instead of a year later in a production read.
+
 All labels stay bounded (REQ-OBS-006): these alerts read only the exporters' own low-cardinality
 series (`job` / `instance` / `reason` / `name` / `path` / `health_type` / `component`), never per-user
 or free-text values.
 
-**Enforced by:** `monitoring/prometheus/alerts/meta.yml` (`meta-self-health` + `meta-log-pipeline`
+**Enforced by:** `AlertedMeterPresenceTest` (dead-alert guard: a meter an alert rule names must be
+registered) · `frontend/.../config/Resilience4jMetricsConfig` (publishes the three meters Boot 4
+silently stopped publishing) · `monitoring/prometheus/alerts/meta.yml` (`meta-self-health` + `meta-log-pipeline`
 groups, incl. `MonitoringReconcileDisabled`) · `monitoring/prometheus/alerts/infrastructure.yml`
 (container guards, incl. `ContainerPidsHigh` + the `changes()`-based `ContainerRestartLoop`) ·
 `monitoring/alertmanager/alertmanager.yml.tmpl` (route grouping + the five root-cause `inhibit_rules`) ·

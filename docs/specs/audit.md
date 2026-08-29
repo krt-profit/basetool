@@ -116,7 +116,11 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   never a user handle or free text (the group name is a non-personal structure label, like an order
   title). Account deletion by an admin records `USER_DELETED` here (REQ-DATA-008): the
   deletion mutates several audited areas at once, so this marker is written unconditionally and
-  anchors the per-area purge events above; its payload holds row counts and ids only.
+  anchors the per-area purge events above; its payload holds row counts and ids only. The admin
+  account merge records `USER_MERGED` here the same way (REQ-SEC-046) — one marker for an operation
+  that moves rows across two dozen tables, naming **both** account ids and the per-table counts, and
+  never the callsign: a shared username is what makes a merge necessary, so writing it into the
+  payload would put a member's handle in the trail.
 - **Beförderung** (`PromotionTopic` / `PromotionCategory` / `PromotionLevelContent` /
   `RankRequirement` / `MemberEvaluation`) — every promotion-catalogue and member-grading mutation:
   topic create / edit / delete; category create / edit / delete; level-content create / edit /
@@ -178,6 +182,12 @@ The log is readable **only by admins**: the `/api/v1/audit/**` URL matcher requi
 
 Reference columns are plain UUIDs (no FKs) so audit rows **outlive** every referenced aggregate
 (job orders are hard-deleted, inventory rows are depleted) without delete-ordering constraints.
+`audit_event.target_user_id` and `bank_audit_event.target_user_id` are the two deliberate exemptions
+from ADR-0142 point 3's "every user-id column carries a foreign key" rule, and V235 states that in a
+`COMMENT ON COLUMN` rather than leaving it as an absence: a foreign key would either delete the
+evidence with the member or block the deletion outright. Both tables snapshot a `NOT NULL` handle
+beside the id, so a dangling target still renders. `actor_user_id` is *not* exempt — it carries a
+foreign key on both tables.
 
 **Acceptance**
 

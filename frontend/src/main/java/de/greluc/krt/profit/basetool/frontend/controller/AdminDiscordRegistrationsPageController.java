@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.ApproveRegistrationRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LinkRegistrationRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MergeAccountRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PendingRegistrationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RejectRegistrationRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ReopenRegistrationRequest;
@@ -205,6 +206,36 @@ public class AdminDiscordRegistrationsPageController {
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Reopen registration {} failed", id, e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+  }
+
+  /**
+   * Relays the account merge (REQ-SEC-045): move an older account's own data onto this
+   * registration.
+   *
+   * <p>The remedy for the queue's duplicate-callsign marker. Unlike the link relay beside it, a
+   * successful merge does <b>not</b> retire the row: the registration still has to be approved, and
+   * folding the two decisions together would make repairing the data imply admitting the member.
+   *
+   * @param id the surviving registration
+   * @param body the JSON-bound source account id + optimistic-lock version
+   * @return the surviving account on success, the relayed backend status on conflict/failure
+   */
+  @ResponseBody
+  @PostMapping(value = "/{id}/merge", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> mergeAjax(
+      @PathVariable @NotNull UUID id,
+      @Nullable @RequestBody(required = false) MergeAccountRequest body) {
+    try {
+      return ResponseEntity.ok(
+          backendApiClient.post(
+              BACKEND_BASE + "/" + id + "/merge", body, PendingRegistrationDto.class));
+    } catch (BackendServiceException e) {
+      log.debug("Merge into registration {} failed", id, e);
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Merge into registration {} failed", id, e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }

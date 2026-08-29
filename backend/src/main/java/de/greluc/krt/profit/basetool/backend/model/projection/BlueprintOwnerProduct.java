@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.model.projection;
 
+import java.util.UUID;
+
 /**
  * Lightweight JPQL constructor projection of a {@code personal_blueprint} row carrying only the two
  * columns the availability-overview aggregation and the item-order owner drill-down actually read:
@@ -27,7 +29,7 @@ package de.greluc.krt.profit.basetool.backend.model.projection;
  * just to read these two fields is wasted I/O and heap (REQ-DATA-003) — the projection scales with
  * the two needed columns instead.
  *
- * @param ownerSub the Keycloak {@code sub} of the blueprint's owner.
+ * @param ownerUserId the {@code app_user.id} of the blueprint's owner.
  * @param productName the product name as stored on the blueprint (case-preserving).
  */
-public record BlueprintOwnerProduct(String ownerSub, String productName) {}
+public record BlueprintOwnerProduct(UUID ownerUserId, String productName) {}

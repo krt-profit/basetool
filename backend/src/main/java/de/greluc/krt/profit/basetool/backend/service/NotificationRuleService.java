@@ -146,7 +146,7 @@ public class NotificationRuleService {
       rule.addSelector(
           NotificationRuleSelector.builder()
               .kind(selectorRequest.kind())
-              .userSub(selectorRequest.userSub())
+              .userId(selectorRequest.userId())
               .roleCode(trimToNull(selectorRequest.roleCode()))
               .orgRelativeRole(selectorRequest.orgRelativeRole())
               .contextRole(selectorRequest.contextRole())
@@ -157,8 +157,8 @@ public class NotificationRuleService {
   private void validateSelector(@NotNull NotificationRuleSelectorWriteRequest selector) {
     switch (selector.kind()) {
       case SPECIFIC_USER -> {
-        if (selector.userSub() == null) {
-          throw new IllegalArgumentException("SPECIFIC_USER selector requires userSub");
+        if (selector.userId() == null) {
+          throw new IllegalArgumentException("SPECIFIC_USER selector requires a user id");
         }
       }
       case ROLE -> {

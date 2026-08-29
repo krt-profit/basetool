@@ -26,8 +26,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Binds the authenticated caller's {@code sub} claim, parsed to a {@link java.util.UUID}, to a
- * controller method parameter — the UUID-typed twin of {@link CurrentUserSub}.
+ * Binds the authenticated caller's {@code app_user.id} to a controller method parameter.
+ *
+ * <p>The value comes from the token's {@code sub} claim, which is what the id is written from at
+ * provisioning — but that is an authentication detail, not a name for the parameter (ADR-0142 point
+ * 2). A String-typed twin, {@code @CurrentUserSub}, handed the same value out unparsed until #1640
+ * removed it.
  *
  * <p>Resolved by {@link CurrentUserArgumentResolver}, which reads the subject rather than the
  * authentication type — so this also binds for the member an ingest-gateway call acts for, who

@@ -45,6 +45,11 @@ public interface NotificationRuleMapper {
   /**
    * Maps one selector entity to its read DTO.
    *
+   * <p>Name-matched again since #1640 renamed the DTO property to {@code userId} alongside the
+   * column. It briefly needed an explicit {@code @Mapping} bridge, and the reason is worth keeping:
+   * MapStruct matches by name, so while the two disagreed it mapped the property to {@code null}
+   * <em>silently</em>, with a green build. {@code NotificationRuleMapperTest} is what catches that.
+   *
    * @param selector the selector entity
    * @return the read DTO
    */

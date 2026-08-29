@@ -49,6 +49,11 @@ import org.springframework.security.access.AccessDeniedException;
 @ExtendWith(MockitoExtension.class)
 class MemberEvaluationServiceTest {
 
+  /** Stand-in {@code app_user.id}s; the column is a UUID foreign key since V235. */
+  private static final UUID USER_A = UUID.fromString("00000000-0000-4000-8000-0000000000aa");
+
+  private static final UUID USER_B = UUID.fromString("00000000-0000-4000-8000-0000000000bb");
+
   @Mock private MemberEvaluationRepository repository;
 
   @Mock private PromotionCategoryRepository categoryRepository;
@@ -79,8 +84,8 @@ class MemberEvaluationServiceTest {
   @Test
   void listForUser_shouldOnlyReturnOwnEvaluationsScopedToSquadron() {
     // Given – data isolation: only evaluations for "user-A" in the active squadron are returned
-    String userA = "user-A";
-    String userB = "user-B";
+    UUID userA = USER_A;
+    UUID userB = USER_B;
     UUID scopeId = UUID.randomUUID();
     MemberEvaluation evalA =
         MemberEvaluation.builder().userId(userA).assignedLevel(PromotionLevel.LEVEL_A).build();
@@ -114,7 +119,7 @@ class MemberEvaluationServiceTest {
   @Test
   void upsert_shouldCreateNewEvaluation_whenNoneExists() {
     // Given
-    String userId = "user-A";
+    UUID userId = USER_A;
     UUID categoryId = UUID.randomUUID();
     PromotionCategory category =
         PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
@@ -150,14 +155,16 @@ class MemberEvaluationServiceTest {
     // Then
     assertEquals(PromotionLevel.LEVEL_B, result.assignedLevel());
     verify(repository).save(any(MemberEvaluation.class));
-    // A brand-new (user, category) grading records a CREATED event; the unparseable test sub and
-    // the id-less fixture category leave target + subject id null.
+    // A brand-new (user, category) grading records a CREATED event; the id-less fixture category
+    // leaves the subject id null, while the target now always carries the evaluated member's id --
+    // it used to be null here because the fixture's sub was an unparseable string and the service
+    // swallowed that (V235 / ADR-0142 made the column a UUID, so there is nothing left to fail).
     verify(auditService)
         .record(
             eq(AuditEventType.PROMOTION_EVALUATION_CREATED),
             isNull(),
             eq("Flug Kenntnisse"),
-            isNull(),
+            eq(userId),
             argThat(d -> d != null && d.toString().equals("level=LEVEL_B")));
   }
 
@@ -165,7 +172,7 @@ class MemberEvaluationServiceTest {
   void upsert_shouldRecordUpdated_whenExistingEvaluationVersionMatches() {
     // Given: an existing grading for a member with a parseable sub; the version matches so the
     // upsert overwrites the level and records an UPDATED event carrying the member as target.
-    String userId = UUID.randomUUID().toString();
+    UUID userId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     UUID evalId = UUID.randomUUID();
     PromotionCategory category =
@@ -208,14 +215,14 @@ class MemberEvaluationServiceTest {
             eq(AuditEventType.PROMOTION_EVALUATION_UPDATED),
             isNull(),
             eq("Flug Kenntnisse"),
-            eq(UUID.fromString(userId)),
+            eq(userId),
             argThat(d -> d != null && d.toString().equals("level=LEVEL_B")));
   }
 
   @Test
   void upsert_shouldThrow_whenVersionMismatch() {
     // Given
-    String userId = "user-A";
+    UUID userId = USER_A;
     UUID categoryId = UUID.randomUUID();
     UUID evalId = UUID.randomUUID();
     PromotionCategory category =
@@ -252,7 +259,7 @@ class MemberEvaluationServiceTest {
         EntityNotFoundException.class,
         () ->
             service.upsert(
-                "user-A",
+                USER_A,
                 categoryId,
                 new MemberEvaluationUpdateRequest(null, PromotionLevel.LEVEL_A)));
   }
@@ -262,7 +269,7 @@ class MemberEvaluationServiceTest {
     // Gap-fill security audit: an OFFICER may not write an evaluation for a member whose home
     // Staffel is outside the caller's editable scope, even when the category belongs to the
     // officer's own squadron. Without the target-member scope check this was a cross-tenant write.
-    String foreignMemberId = UUID.randomUUID().toString();
+    UUID foreignMemberId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     UUID foreignStaffelId = UUID.randomUUID();
     PromotionCategory category =
@@ -272,8 +279,7 @@ class MemberEvaluationServiceTest {
 
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(
-            UUID.fromString(foreignMemberId)))
+    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(foreignMemberId))
         .thenReturn(java.util.List.of(foreignStaffelId));
     when(ownerScopeService.canEditSquadron(foreignStaffelId)).thenReturn(false);
 
@@ -286,7 +292,7 @@ class MemberEvaluationServiceTest {
   @Test
   void upsert_shouldAllowOfficer_evaluatingOwnSquadronMember() {
     // The legitimate path: an OFFICER evaluating a member of a Staffel within their editable scope.
-    String memberId = UUID.randomUUID().toString();
+    UUID memberId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     UUID ownStaffelId = UUID.randomUUID();
     PromotionCategory category =
@@ -314,7 +320,7 @@ class MemberEvaluationServiceTest {
 
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
     when(authHelperService.isAdmin()).thenReturn(false);
-    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(UUID.fromString(memberId)))
+    when(orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(memberId))
         .thenReturn(java.util.List.of(ownStaffelId));
     when(ownerScopeService.canEditSquadron(ownStaffelId)).thenReturn(true);
     when(repository.findByUserIdAndCategoryId(memberId, categoryId)).thenReturn(Optional.empty());
@@ -334,7 +340,7 @@ class MemberEvaluationServiceTest {
     // Given
     UUID id = UUID.randomUUID();
     MemberEvaluation entity =
-        MemberEvaluation.builder().userId("user-A").assignedLevel(PromotionLevel.LEVEL_A).build();
+        MemberEvaluation.builder().userId(USER_A).assignedLevel(PromotionLevel.LEVEL_A).build();
     when(repository.findById(id)).thenReturn(Optional.of(entity));
     when(authHelperService.isAdmin()).thenReturn(true);
 

@@ -332,7 +332,7 @@ class UserDeletionForeignKeyIntegrityTest {
 
   /**
    * The FK-less personal stores must be purged by the delete, not left behind. {@code
-   * personal_blueprint.owner_sub}, {@code personal_inventory_item.owner_sub} and {@code
+   * personal_blueprint.owner_user_id}, {@code personal_inventory_item.owner_user_id} and {@code
    * member_evaluation.user_id} hold the Keycloak subject as plain text with no foreign key to
    * {@code app_user}, so nothing cascades and no retention job reaches them — before REQ-DATA-008
    * required the explicit purge they survived the account indefinitely (production carried 16
@@ -368,18 +368,19 @@ class UserDeletionForeignKeyIntegrityTest {
     exMember.setInKeycloak(false);
     exMember = userRepository.save(exMember);
     final UUID exMemberId = exMember.getId();
-    // owner_sub / user_id store app_user.id rendered as text — the JWT subject IS the primary key.
-    final String ownerSub = exMemberId.toString();
+    // owner_user_id / user_id store app_user.id rendered as text — the JWT subject IS the primary
+    // key.
+    final UUID ownerUserId = exMemberId;
 
     personalBlueprintRepository.save(
         PersonalBlueprint.builder()
-            .ownerSub(ownerSub)
+            .ownerUserId(ownerUserId)
             .productKey("purge-product-" + tag)
             .productName("Purge Product " + tag)
             .build());
     personalInventoryItemRepository.save(
         PersonalInventoryItem.builder()
-            .ownerSub(ownerSub)
+            .ownerUserId(ownerUserId)
             .name("Purge Item " + tag)
             .note("a free-text note that must not outlive the account")
             .locationUexId(1)
@@ -391,10 +392,11 @@ class UserDeletionForeignKeyIntegrityTest {
     entityManager.flush();
     entityManager.clear();
 
-    assertThat(personalBlueprintRepository.findAllByOwnerSub(ownerSub, Pageable.unpaged()))
+    assertThat(personalBlueprintRepository.findAllByOwnerUserId(ownerUserId, Pageable.unpaged()))
         .as("precondition: the ex-member owns a personal blueprint")
         .hasSize(1);
-    assertThat(personalInventoryItemRepository.findAllByOwnerSub(ownerSub, Pageable.unpaged()))
+    assertThat(
+            personalInventoryItemRepository.findAllByOwnerUserId(ownerUserId, Pageable.unpaged()))
         .as("precondition: the ex-member owns a Mein-Inventar row")
         .hasSize(1);
 
@@ -407,10 +409,11 @@ class UserDeletionForeignKeyIntegrityTest {
     entityManager.clear();
 
     assertThat(userRepository.findById(exMemberId)).isEmpty();
-    assertThat(personalBlueprintRepository.findAllByOwnerSub(ownerSub, Pageable.unpaged()))
+    assertThat(personalBlueprintRepository.findAllByOwnerUserId(ownerUserId, Pageable.unpaged()))
         .as("personal blueprints are purged, auto-granted defaults included")
         .isEmpty();
-    assertThat(personalInventoryItemRepository.findAllByOwnerSub(ownerSub, Pageable.unpaged()))
+    assertThat(
+            personalInventoryItemRepository.findAllByOwnerUserId(ownerUserId, Pageable.unpaged()))
         .as("Mein Inventar is purged, free-text notes and all")
         .isEmpty();
   }

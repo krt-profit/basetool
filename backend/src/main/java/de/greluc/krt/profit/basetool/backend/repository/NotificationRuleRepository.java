@@ -85,10 +85,10 @@ public interface NotificationRuleRepository extends JpaRepository<NotificationRu
    * selectors, and an emptied rule is an admin-visible configuration question rather than something
    * a user deletion should silently decide.
    *
-   * @param userSub the departing user's Keycloak {@code sub} (equal to {@code app_user.id})
+   * @param userId the departing user's Keycloak {@code sub} (equal to {@code app_user.id})
    * @return the number of selectors removed, for the audit summary event
    */
   @Modifying
-  @Query("DELETE FROM NotificationRuleSelector s WHERE s.userSub = :userSub")
-  int deleteSelectorsByUserSub(@Param("userSub") UUID userSub);
+  @Query("DELETE FROM NotificationRuleSelector s WHERE s.userId = :userId")
+  int deleteSelectorsByUserId(@Param("userId") UUID userId);
 }

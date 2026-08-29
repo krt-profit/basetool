@@ -257,6 +257,7 @@ public class AdminAuditLogPageController {
               "KOMMANDO_GROUP_UPDATED",
               "KOMMANDO_GROUP_DELETED",
               "USER_DELETED",
+              "USER_MERGED",
               "ROLE_AUDIT_EXPORTED",
               "ROLE_AUDIT_PURGED"),
           "PROMOTION",

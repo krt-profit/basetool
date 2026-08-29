@@ -869,7 +869,7 @@ class BankBookingRequestServiceTest {
     verify(eventPublisher).publishEvent(event.capture());
     // The non-split deposit hands a non-split payload to the ledger.
     assertThat(booked.getValue().splitEnabled()).isFalse();
-    assertThat(event.getValue().contextRecipientSub()).isEqualTo(requester);
+    assertThat(event.getValue().contextRecipientUserId()).isEqualTo(requester);
     assertThat(event.getValue().actorSub()).isEqualTo(decider);
     // REQ-BANK-026/-034: the event carries the account id so the ACCOUNT_RESPONSIBLE selector can
     // notify the account's responsible holder.

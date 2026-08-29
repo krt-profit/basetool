@@ -28,7 +28,7 @@ package de.greluc.krt.profit.basetool.backend.model;
  */
 public enum SelectorKind {
 
-  /** Resolves to a single explicit user, named by {@code userSub}. */
+  /** Resolves to a single explicit user, named by {@code userId}. */
   SPECIFIC_USER,
 
   /** Resolves to every holder of a global role, named by {@code roleCode}. */
@@ -50,7 +50,7 @@ public enum SelectorKind {
 
   /**
    * Resolves to the single user the event is directed at ({@link
-   * de.greluc.krt.profit.basetool.backend.event.NotificationEvent#contextRecipientSub()}) — e.g.
+   * de.greluc.krt.profit.basetool.backend.event.NotificationEvent#contextRecipientUserId()}) — e.g.
    * the officer/lead who raised a booking request, notified when it is confirmed or rejected. Reads
    * no selector columns — the recipient comes from the event.
    */

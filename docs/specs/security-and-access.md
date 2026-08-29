@@ -2203,6 +2203,107 @@ participant" rule.
 **Code:** `MissionSecurityService#canCreateFinanceEntry`,
 `MissionFinanceEntryController#createFinanceEntry` · **Related:** REQ-SEC-006, REQ-SEC-009
 
+### REQ-SEC-045 — A login binds a session to the token's own subject, never to a callsign
+
+`UserReconciliationService#syncUser(Jwt)` looks the caller up by `app_user.id` = the token's `sub`
+and by **nothing else**. A subject that matches no row is a new registration — never an account
+matched on `preferred_username`.
+
+Until this rule was written the lookup fell back to `findByUsername` and associated the session with
+whatever row that returned. Both consequences were silent:
+
+1. **The invariant ended for that member.** Everything else in the system — 39 foreign keys, the
+   frontend's own `userId` comparisons, `/users/me`, the audit trail — rests on `app_user.id` being
+   the caller's subject. After a name-matched login it was not, for one row, with no way to notice
+   until something compared the two.
+2. **A callsign decided which account a token acted as.** Keycloak usernames are neither immutable
+   nor unique, and are reusable after a deletion, so a recreated account with a previous member's
+   callsign inherited their inventory, their bank grants and their notifications.
+
+**The rule.** No implicit inheritance, ever. The caller is provisioned through the ordinary
+first-login path, which stamps `PENDING` and notifies every admin (REQ-SEC-017, REQ-NOTIF-012), so a
+collision surfaces as a **decision** rather than as an adoption. `app_user.username` carries no
+unique constraint, so two accounts may legitimately hold one callsign until an admin resolves it.
+
+**What a person actually sees.** The registration queue marks such a row (`callsignCollision` on
+`PendingRegistrationDto`, resolved for the whole page in one query) so the admin knows that approving
+it creates a *second* account for a callsign rather than admitting a new member. The log line names
+both account ids and **never the callsign** (REQ-OBS-004), and
+`basetool_user_callsign_collisions_total` counts the event — untagged, because a username is both
+unbounded and PII (REQ-OBS-011). The `UserCallsignCollision` alert is the second pair of eyes.
+
+**Acceptance**
+
+- [x] A token whose `sub` matches no row never returns a row found by username, whatever that row
+  contains.
+- [x] The entity-loading by-name lookup is not consulted at all on the login path, so it cannot come
+  back as an optimisation that restores the adoption.
+- [x] The collision is counted; an ordinary first login counts nothing.
+- [x] Exactly the colliding row carries the queue marker.
+- [x] An admin can merge the two accounts explicitly, moving the member's data — REQ-SEC-046.
+
+**Enforced by:** `UserReconciliationServiceTest`, `AdminDiscordRegistrationsNicknameRenderTest` ·
+**Code:** `UserReconciliationService#syncUser`, `UserRegistrationService#findCollidingCallsigns` ·
+**Related:** ADR-0142 point 5, REQ-SEC-017, REQ-DATA-006
+
+### REQ-SEC-046 — Merging two accounts of one member is an admin decision, and it moves belongings only
+
+A login whose subject matches no row must never adopt an account found by callsign (ADR-0142
+point 5, #1639). Removing that silent inheritance is right — but the outcome it produced was not
+always *wrong*, only unsafe because nobody chose it. Left without a remedy, a member who ends up
+with two accounts has their data stranded on the one they can no longer reach, and the admin has
+nothing to do about it.
+
+`UserAccountMergeService`, reached at `POST /api/v1/admin/registrations/{id}/merge` (ADMIN only),
+is that remedy. The registration in the path is the account that **survives**; the body names the
+older account to empty.
+
+**One rule decides every table: ownership follows the member, attribution stays with the act.** A
+row saying "this belongs to X" moves. A row saying "X did this, then" does not — re-pointing it
+would not repair an identity, it would falsify history.
+
+|                                               Follows                                               |                                                         Stays                                                         |
+|-----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| Stock, hangar, refinery orders, personal inventory and blueprints                                   | The audit trail, in both its forms                                                                                    |
+| Org-unit memberships, org-chart positions, the Grand-Admiral office                                 | Who granted, requested, decided, initiated, executed, paid out                                                        |
+| Missions owned, party-lead and unit responsibility, manager and participant rows, order assignments | The account's own approval history, and who decided it                                                                |
+| Exchange offers, requests and interest                                                              | `user_roles` — re-derived from the token and the roster sync, not owned (REQ-SEC-013, REQ-SEC-036)                    |
+| Bank grants, view grants, approval limits, the holder row                                           | `terms_acceptance` — consent is recorded per account; the member is asked once more rather than having one back-dated |
+| Notifications, rule selectors, promotion evaluations                                                |                                                                                                                       |
+
+**The classification is exhaustive by construction.** `UserAccountMergeCoverageTest` reads every
+foreign key into `app_user` out of the live schema, adds the two deliberately FK-less audit target
+columns, and fails the build unless each appears in exactly one of the two lists — and unless every
+listed column still exists. A new user-referencing column cannot be forgotten here; it can only be
+classified, by someone who had to decide which side it belongs on.
+
+**Conflicts are deduplicated where they are duplicates and refused where they are not.** Thirteen
+moved tables carry a unique constraint over the user column, so one member may legitimately hold a
+row on both accounts (two sign-ups for one Einsatz, the same blueprint owned twice). The source's
+row is dropped where the target already has an equivalent — safe precisely because the two accounts
+are one person, so the duplicate carries nothing the survivor lacks. `bank_holder` is unique on the
+user **alone**, so a holder on both means two ledgers; that is an accounting decision with money in
+it, and the merge aborts with `409` rather than guessing which postings belong to whom.
+
+**What it deliberately does not do.** It does not approve the registration — repairing the data must
+not imply admitting the member — and it does not delete the emptied source row, which is the
+user-deletion flow's job and carries its own fail-closed Keycloak probe (REQ-DATA-008).
+
+**Acceptance**
+
+- [x] What the source owns lands on the target; a row only the source has moves rather than being
+  dropped.
+- [x] A row the target already has is dropped instead of violating the unique constraint.
+- [x] A row recording an act stays on the source.
+- [x] Two bank ledgers refuse the merge; an account cannot be merged into itself.
+- [x] Every column referencing a member is classified, and no classification names a column that no
+  longer exists.
+- [x] One `USER_MERGED` audit event names both ids and the per-table counts, never the callsign.
+
+**Enforced by:** `UserAccountMergeServiceTest`, `UserAccountMergeCoverageTest` ·
+**Code:** `UserAccountMergeService`, `DiscordRegistrationAdminController#merge` ·
+**Related:** REQ-SEC-045, ADR-0142 point 5, REQ-DATA-008, REQ-AUDIT-001
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the

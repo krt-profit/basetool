@@ -79,7 +79,7 @@ class PromotionEligibilityServiceTest {
 
   @InjectMocks private PromotionEligibilityService service;
 
-  private static final String USER = "user-A";
+  private static final UUID USER = UUID.fromString("0e000009-0000-4000-8000-000000000009");
 
   @Test
   void evaluateForRanks_shouldReturnNotEligibleWithNoRules_whenNoRequirementsConfigured() {
@@ -551,7 +551,7 @@ class PromotionEligibilityServiceTest {
   }
 
   private MemberEvaluation evaluation(
-      String userId, PromotionCategory category, PromotionLevel level) {
+      UUID userId, PromotionCategory category, PromotionLevel level) {
     MemberEvaluation e =
         MemberEvaluation.builder().userId(userId).category(category).assignedLevel(level).build();
     e.setId(UUID.randomUUID());

@@ -26,14 +26,14 @@ import java.util.UUID;
  * are sent as {@link String}; field names match the backend record (mirror-DTO rule).
  *
  * @param kind selector kind
- * @param userSub target user for {@code SPECIFIC_USER}
+ * @param userId target user for {@code SPECIFIC_USER}
  * @param roleCode role code for {@code ROLE}
  * @param orgRelativeRole org-relative role for {@code ORG_RELATIVE_ROLE}
  * @param contextRole context org unit for {@code ORG_RELATIVE_ROLE}
  */
 public record NotificationRuleSelectorWriteRequest(
     @BackendEnumAsString String kind,
-    UUID userSub,
+    UUID userId,
     String roleCode,
     @BackendEnumAsString String orgRelativeRole,
     @BackendEnumAsString String contextRole) {}

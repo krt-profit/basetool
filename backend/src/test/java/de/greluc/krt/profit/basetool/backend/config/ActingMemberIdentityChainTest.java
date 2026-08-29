@@ -214,7 +214,7 @@ class ActingMemberIdentityChainTest {
                 .header(ActingMemberHeader.ON_BEHALF_OF_HEADER, MEMBER.toString()))
         .andExpect(status().isOk());
 
-    verify(blueprintImportService).previewImport(eq(MEMBER.toString()), any());
+    verify(blueprintImportService).previewImport(eq(MEMBER), any());
   }
 
   /**

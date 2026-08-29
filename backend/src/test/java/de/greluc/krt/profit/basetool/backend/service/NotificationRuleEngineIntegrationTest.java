@@ -120,6 +120,12 @@ class NotificationRuleEngineIntegrationTest {
     NotificationRule extraRule =
         transactionTemplate.execute(
             status -> {
+              // notification_rule_selector.user_id is a foreign key to app_user(id) since V235
+              // (REQ-DATA-008): a selector pointing at an invented member no longer inserts.
+              User target = new User();
+              target.setId(recipient);
+              target.setUsername("specific-user-" + recipient);
+              userRepository.save(target);
               NotificationRule rule =
                   NotificationRule.builder()
                       .eventType(NotificationEventType.JOB_ORDER_CREATED)
@@ -131,7 +137,7 @@ class NotificationRuleEngineIntegrationTest {
               rule.addSelector(
                   NotificationRuleSelector.builder()
                       .kind(SelectorKind.SPECIFIC_USER)
-                      .userSub(recipient)
+                      .userId(recipient)
                       .build());
               return notificationRuleRepository.saveAndFlush(rule);
             });
@@ -141,7 +147,7 @@ class NotificationRuleEngineIntegrationTest {
       Set<UUID> recipients = flatten(notificationCreationService.createFromEvent(event));
 
       assertThat(recipients).isNotEmpty();
-      assertThat(notificationRepository.findAllByRecipientSub(recipient, Pageable.unpaged()))
+      assertThat(notificationRepository.findAllByRecipientUserId(recipient, Pageable.unpaged()))
           .singleElement()
           .satisfies(
               n -> {
@@ -151,7 +157,13 @@ class NotificationRuleEngineIntegrationTest {
               });
     } finally {
       transactionTemplate.executeWithoutResult(
-          status -> notificationRuleRepository.deleteById(extraRule.getId()));
+          status -> {
+            notificationRuleRepository.deleteById(extraRule.getId());
+            // The seeded target must go too: the test database is shared across the suite, and a
+            // leftover login-capable user shifts the counts other classes assert over. Deleting it
+            // takes its notifications with it (V235, ON DELETE CASCADE).
+            userRepository.deleteById(recipient);
+          });
     }
   }
 
@@ -198,7 +210,7 @@ class NotificationRuleEngineIntegrationTest {
                   new DiscordRegistrationPendingEvent(newUserId, "newbie")));
 
       assertThat(recipients).isNotEmpty();
-      assertThat(notificationRepository.findAllByRecipientSub(adminSub, Pageable.unpaged()))
+      assertThat(notificationRepository.findAllByRecipientUserId(adminSub, Pageable.unpaged()))
           .singleElement()
           .satisfies(
               n -> {
@@ -212,7 +224,7 @@ class NotificationRuleEngineIntegrationTest {
       transactionTemplate.executeWithoutResult(
           status -> {
             notificationRepository
-                .findAllByRecipientSub(adminSub, Pageable.unpaged())
+                .findAllByRecipientUserId(adminSub, Pageable.unpaged())
                 .forEach(n -> notificationRepository.deleteById(n.getId()));
             userRepository.deleteById(adminSub);
           });

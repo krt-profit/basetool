@@ -38,9 +38,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * A crafting blueprint a single user (identified by the Keycloak {@code sub} claim, stored in
- * {@link #ownerSub}) has unlocked in-game. Part of the Personal Inventory area (#327), alongside
- * {@link PersonalInventoryItem}.
+ * A crafting blueprint a single user (identified by their {@code app_user.id}, stored in {@link
+ * #ownerUserId}) has unlocked in-game. Part of the Personal Inventory area (#327), alongside {@link
+ * PersonalInventoryItem}.
  *
  * <p>Ownership is modelled <strong>per product</strong>, not per recipe: several SC Wiki blueprint
  * recipes can share one product name, and the SCMDB import only knows the product name, so a single
@@ -49,8 +49,8 @@ import lombok.Setter;
  * display spelling and {@link #outputItem} optionally links the resolved {@link GameItem} for later
  * cross-feature use — it is informational, not the identity.
  *
- * <p>The unique constraint on {@code (owner_sub, product_key)} guarantees a user owns each product
- * at most once. Optimistic locking is inherited via {@link AbstractEntity#getVersion()}.
+ * <p>The unique constraint on {@code (owner_user_id, product_key)} guarantees a user owns each
+ * product at most once. Optimistic locking is inherited via {@link AbstractEntity#getVersion()}.
  */
 @Entity
 @Table(
@@ -58,7 +58,7 @@ import lombok.Setter;
     uniqueConstraints =
         @UniqueConstraint(
             name = "uk_personal_blueprint_owner_product",
-            columnNames = {"owner_sub", "product_key"}))
+            columnNames = {"owner_user_id", "product_key"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -71,9 +71,16 @@ public class PersonalBlueprint extends AbstractEntity<UUID> {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  /** Keycloak JWT {@code sub} of the owning user. Never expose to clients. */
-  @Column(name = "owner_sub", nullable = false, length = 64)
-  private String ownerSub;
+  /**
+   * {@code app_user.id} of the owning user. Never expose to clients.
+   *
+   * <p>A plain id rather than a {@code @ManyToOne User}: the column carries a foreign key with
+   * {@code ON DELETE CASCADE} (V235, REQ-DATA-008), and an association would make every row the
+   * cascade removes a managed entity holding a reference to the user being deleted -- the {@code
+   * TransientPropertyValueException} landmine REQ-DATA-008 documents.
+   */
+  @Column(name = "owner_user_id", nullable = false)
+  private UUID ownerUserId;
 
   /**
    * Normalized product identity (lowercased, collapsed whitespace, normalized punctuation of the SC

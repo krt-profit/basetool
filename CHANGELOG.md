@@ -2,6 +2,74 @@
 
 ## [Unreleased]
 
+## [v1.6.11](https://github.com/krt-profit/basetool/releases/tag/v1.6.11) - 2026-08-29
+
+### Fixed
+
+- **Sechs Diagramme im Betriebs-Dashboard sagen jetzt, warum sie leer sind.** Ein Diagramm, das
+  planmäßig nichts anzeigt, sah bisher genauso aus wie eines, dessen Messwert kaputt ist — bei
+  den drei Resilience-Diagrammen war die Leere monatelang genau das. Außerdem prüft der Build die
+  13 Dashboards jetzt überhaupt erst: bis eben hätte eine kaputte Datei Grafana das Dashboard
+  stillschweigend weglassen lassen.
+
+## [v1.6.10](https://github.com/krt-profit/basetool/releases/tag/v1.6.10) - 2026-08-29
+
+### Added
+
+- **Ein Alarm für erschöpfte JVM-Threads ist jetzt scharf.** Er lag seit dem Vorfall im Juli
+  bewusst stillgelegt, weil niemand geprüft hatte, ob die Zeile, auf die er hört, überhaupt in der
+  Protokollsammlung ankommt — ein Alarm, der nie auslösen kann, sieht wie Absicherung aus und ist
+  keine. Die Zeile wurde jetzt auf demselben Java-Abbild nachgestellt, das in Produktion läuft,
+  und steht im Wortlaut neben der Regel.
+
+### Fixed
+
+- **Sechs Alarme für hängengebliebene Hintergrund-Jobs waren blind, wenn ein Job noch nie lief.**
+  Sie verglichen den Zeitpunkt des letzten Erfolgs mit der Uhr — den es aber erst gibt, sobald ein
+  Job einmal erfolgreich war. Ein Job, der seit dem letzten Neustart bei jedem Lauf scheiterte, sah
+  damit genauso aus wie ein gesunder. Die Regeln schlagen jetzt auch bei fehlender Rückmeldung an,
+  sobald der Server länger läuft als das jeweilige Zeitfenster.
+
+- **Raffinerie- und Operations-Aufträge gelten erst nach 90 statt nach 30 Tagen als liegengeblieben.**
+  Beim ersten Messen der Warteschlange stand der älteste offene Raffinerie-Auftrag bei 29,65 Tagen —
+  der Alarm war also Stunden davon entfernt, bei fünf laufenden Aufträgen anzuschlagen, die niemand
+  aufgegeben hatte. Eine Grenze, die der normale Betrieb erreicht, ist keine Grenze.
+
+## [v1.6.9](https://github.com/krt-profit/basetool/releases/tag/v1.6.9) - 2026-08-29
+
+### Added
+
+- **Admins können zwei Konten eines Mitglieds zusammenführen.** Wer mit einer neuen Kennung
+  ankommt, bekommt ein neues Konto — das alte behält bis dahin Lager, Hangar, Inventar,
+  Mitgliedschaften, Bankrechte und Benachrichtigungen. Die neue Aktion in der Freigabeliste
+  schiebt genau das herüber; was festhält, *wer etwas getan hat*, bleibt stehen — das ist
+  Historie und keine Habe. Halten beide Konten ein Bank-Konto, bricht die Aktion ab, statt zwei
+  Kassenbücher zu raten.
+
+### Fixed
+
+- **Vier Alarmregeln konnten nie auslösen.** Der Circuit-Breaker-, Bulkhead- und Retry-Alarm sowie
+  der Alarm für fehlgeschlagene systemd-Units standen zwar in der Konfiguration, ihre Metriken
+  wurden aber gar nicht erhoben — sie schwiegen also nicht, weil alles in Ordnung war, sondern
+  weil sie nichts sehen konnten. Ein fehlgeschlagener Deploy oder Backup meldete sich dadurch nur
+  über den zweiten Weg. Die Metriken werden jetzt wieder publiziert, und ein Test bricht den Build,
+  wenn eine Alarmregel künftig ins Leere zeigt.
+
+- **Die Daten eines gelöschten Kontos überleben es nicht mehr.** Fünf Spalten hielten eine
+  Mitglieds-ID ohne Fremdschlüssel: persönliches Inventar, persönliche Blueprints,
+  Benachrichtigungen, deren Empfänger-Regeln und die Beförderungs-Bewertungen — vergaß ein
+  Löschpfad eine davon, blieben die Zeilen unsichtbar liegen und wurden von einem zurückkehrenden
+  Keycloak-Konto wieder übernommen. Die Datenbank erzwingt das Aufräumen jetzt selbst
+  (Migration V235); am wichtigsten bei den Empfänger-Regeln, die sonst weiter Benachrichtigungen
+  für ein nicht mehr existierendes Mitglied erzeugen.
+
+- **Eine Anmeldung übernimmt kein fremdes Konto mehr, nur weil der Callsign passt.** Fand die
+  Anmeldung kein Konto zur Kennung des Tokens, band sie die Sitzung bisher an das Konto mit dem
+  gleichen Benutzernamen — und da Keycloak-Benutzernamen nach einer Löschung wiederverwendbar
+  sind, erbte ein neu angelegtes Konto so Lager, Bankrechte und Benachrichtigungen des früheren
+  Mitglieds. Es entsteht jetzt eine normale neue Registrierung; die Freigabeliste markiert sie mit
+  „Callsign doppelt“, damit die Admins entscheiden statt zu erben.
+
 ## [v1.6.8](https://github.com/krt-profit/basetool/releases/tag/v1.6.8) - 2026-08-28
 
 ## [v1.6.7](https://github.com/krt-profit/basetool/releases/tag/v1.6.7) - 2026-08-28

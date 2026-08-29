@@ -32,39 +32,38 @@ import org.springframework.stereotype.Repository;
 
 /**
  * Spring Data repository for {@link PersonalInventoryItem}. All non-admin lookups MUST use one of
- * the {@code *ByOwnerSub*} variants in order to enforce the multi-user data isolation rule (see
+ * the {@code *ByOwnerUserId*} variants in order to enforce the multi-user data isolation rule (see
  * AGENTS.md "MULTI-USER DATA ISOLATION").
  */
 @Repository
 public interface PersonalInventoryItemRepository
     extends JpaRepository<PersonalInventoryItem, UUID> {
 
-  /** Returns every entity matching the derived {@code findAllByOwnerSub} criteria. */
-  Page<PersonalInventoryItem> findAllByOwnerSub(String ownerSub, Pageable pageable);
+  /** Returns every entity matching the derived {@code findAllByOwnerUserId} criteria. */
+  Page<PersonalInventoryItem> findAllByOwnerUserId(UUID ownerUserId, Pageable pageable);
 
   /**
-   * Returns every entity matching the derived {@code findAllByOwnerSubAndNameContainingIgnoreCase}
-   * criteria.
+   * Returns every entity matching the derived {@code
+   * findAllByOwnerUserIdAndNameContainingIgnoreCase} criteria.
    */
-  Page<PersonalInventoryItem> findAllByOwnerSubAndNameContainingIgnoreCase(
-      String ownerSub, String nameFragment, Pageable pageable);
+  Page<PersonalInventoryItem> findAllByOwnerUserIdAndNameContainingIgnoreCase(
+      UUID ownerUserId, String nameFragment, Pageable pageable);
 
-  /** Derived Spring-Data query - returns entities matching {@code IdAndOwnerSub}. */
-  Optional<PersonalInventoryItem> findByIdAndOwnerSub(UUID id, String ownerSub);
+  /** Derived Spring-Data query - returns entities matching {@code IdAndOwnerUserId}. */
+  Optional<PersonalInventoryItem> findByIdAndOwnerUserId(UUID id, UUID ownerUserId);
 
   /**
    * Deletes every "Mein Inventar" row of the given owner as part of the hard account deletion
-   * (REQ-DATA-008). {@code owner_sub} carries no foreign key to {@code app_user} (V65 declares none
-   * at all), so nothing cascades and nothing else in the system would ever remove these rows:
+   * (REQ-DATA-008). {@code owner_user_id} carries no foreign key to {@code app_user} (V65 declares
+   * none at all), so nothing cascades and nothing else in the system would ever remove these rows:
    * before this method existed they survived the account indefinitely, free-text {@code note}
    * included, and were undiscoverable afterwards because every lookup is keyed by the owner sub
    * that no roster can still offer. A returning Keycloak subject would silently re-adopt them.
    *
-   * @param ownerSub the departing owner's Keycloak subject (equal to {@code app_user.id} rendered
-   *     as text); never {@code null}.
+   * @param ownerUserId the departing owner's {@code app_user.id}; never {@code null}.
    * @return the number of deleted rows, for the audit summary event.
    */
   @Modifying
-  @Query("DELETE FROM PersonalInventoryItem p WHERE p.ownerSub = :ownerSub")
-  int deleteByOwnerSub(@Param("ownerSub") String ownerSub);
+  @Query("DELETE FROM PersonalInventoryItem p WHERE p.ownerUserId = :ownerUserId")
+  int deleteByOwnerUserId(@Param("ownerUserId") UUID ownerUserId);
 }

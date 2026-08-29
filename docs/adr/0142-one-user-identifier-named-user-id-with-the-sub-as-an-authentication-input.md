@@ -22,7 +22,7 @@ What is genuinely inconsistent is everything *around* that value:
 |       Dimension       |                                                                                         State found (2026-08-22)                                                                                         |
 |-----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Column name           | 34 columns named `*_user_id` / `user_id`, 5 named `*_sub` (`notification.recipient_sub`, `notification_rule_selector.user_sub`, `personal_blueprint.owner_sub`, `personal_inventory_item.owner_sub`)     |
-| Column type           | 37 `UUID`, 2 `VARCHAR(64)` (`personal_blueprint.owner_sub`, `personal_inventory_item.owner_sub`)                                                                                                         |
+| Column type           | 36 `UUID`, 3 `VARCHAR(64)` (`personal_blueprint.owner_sub`, `personal_inventory_item.owner_sub`, `member_evaluation.user_id` — see the correction below)                                                 |
 | Referential integrity | 39 columns carry a foreign key to `app_user(id)`; 5 do not — the four above plus `member_evaluation.user_id`. The two audit *target* columns are FK-less deliberately, so the trail outlives the account |
 | API property          | `userId` on 26 schemas, `userSub` on 2                                                                                                                                                                   |
 | Backend access path   | `@CurrentUserId` (15), `@CurrentUserSub` (25), `AuthenticatedSubject` (12 files), inline `jwt.getSubject()` (4)                                                                                          |
@@ -56,6 +56,47 @@ rests on is broken silently, for one row, at login time.
 5. **The `preferred_username` fallback stops rebinding sessions.** A token whose `sub` matches no
    row provisions a new user or fails; it never adopts a row found by name.
 
+> [!warning] Corrected 2026-08-28
+> The inventory above originally counted `member_evaluation.user_id` as a `UUID`, leaving two
+> `VARCHAR(64)` columns. It is `VARCHAR(64)` too (`V72__add_promotion_system.sql`), which V227's own
+> comment had right all along — so point 3 needed **three** casts, not two. Found while implementing
+> it (issue #1638); the code was the authority and the ADR is corrected here rather than quietly.
+
+## Status of the decision
+
+Point 3 is **implemented**: `V235__add_foreign_keys_to_user_identity_columns.sql` recasts the three
+`VARCHAR(64)` columns to `UUID` and gives all five a foreign key to `app_user(id)` with
+`ON DELETE CASCADE`, states the two audit-target exemptions in `COMMENT ON COLUMN`, and adds the
+partial index the rule-selector column was missing. `UserIdentityColumnForeignKeyTest` holds the
+line for columns added later.
+
+Points 1 and 2 are **implemented, including the wire format** (#1640).
+`V236__rename_sub_columns_to_user_id.sql` renames the four `*_sub` columns; the backend, the
+frontend, the OpenAPI path variables and the two notification-rule-selector schemas follow;
+`@CurrentUserSub` is gone and `@CurrentUserId` is the one annotation; the frontend's fifteen
+`principal.getSubject()` calls go through a single `CurrentUser` helper.
+
+The selector schemas were renamed **outright rather than dual-served**, for the reason in the
+correction below: they sit on an admin surface a shipped client cannot reach. `NotificationRuleMapper`
+needed an explicit `@Mapping` bridge for exactly as long as the two names disagreed, and the lesson
+outlived it — MapStruct matches by name, so during that window it mapped the property to `null`
+*silently*, with a green build, and the admin rule editor would have rendered every `SPECIFIC_USER`
+selector as empty. `NotificationRuleMapperTest` is what would catch a future divergence.
+
+One direct `jwt.getSubject()` read stays on purpose: `UserService#getUserIdFromJwt(Jwt)`. It runs
+during authentication, before a `SecurityContext` exists, so it cannot go through
+`AuthenticatedSubject` — it *is* the seam point 2 asks for, on the authentication-time side.
+
+Point 5 is **implemented**, in both halves (#1639). The `preferred_username` fallback is gone: a
+subject matching no row is a new registration, never an account found by name, and the collision is
+logged without the callsign, counted, alerted on and marked on the admin queue (`REQ-SEC-045`). And
+because reporting a collision without a remedy would strand the member's data, an admin can merge
+the two accounts explicitly — ownership follows the member, attribution stays with the act, and the
+classification is enforced against the live schema rather than trusted (`REQ-SEC-046`).
+
+Point 4 is not a change to make: it keeps a door open at the price of one migration, and is not
+worth walking through while the values agree.
+
 ## Consequences
 
 **What gets better.** One name for one thing, in four components and in the wire format. The
@@ -63,10 +104,25 @@ FK-less columns stop outliving accounts. The frontend's `getName()`-versus-`getS
 its second half, because there is nothing left called `sub` to confuse with a name. And the identity
 provider stops being welded to the schema: if Keycloak is ever replaced, one column changes.
 
-**What it costs.** Renaming `userSub` → `userId` on two API schemas is a **breaking change to the
+**What it costs.** ~~Renaming `userSub` → `userId` on two API schemas is a **breaking change to the
 frozen external contract** (`REQ-API-009`, `ExternalContractTest`) and to the Android app's generated
 DTOs. It has to ship as a deprecation window — both properties served, the old one marked
-`@ApiDeprecation` — not as a rename, because a shipped app cannot be asked to update in step.
+`@ApiDeprecation` — not as a rename, because a shipped app cannot be asked to update in step.~~
+
+> [!warning] Corrected 2026-08-29 — the deprecation window was never needed
+> The two schemas are `NotificationRuleSelectorDto` and `NotificationRuleSelectorWriteRequest`, and
+> they belong to the **`/api/v1/notification-rules` admin surface**. That surface is not in
+> `ExternalContractTest`'s frozen set, and the public API vhost's allow-list **deliberately does not
+> admit it** — `docs/API_VHOST_ROLLOUT_RUNBOOK.md` verifies it answers `404` there, and
+> `ExternalContractTest` says in as many words that the three notification paths are admitted "by
+>
+>> name without admitting the family or the `/notification-rules` admin surface next to it".
+>
+> A shipped Android build therefore cannot reach these properties at all, and REQ-API-001's
+> carve-out applies: frontend and backend deploy atomically. This shipped as a **plain rename**
+> (#1640), not a dual-served window. The original paragraph counted "two API schemas" without
+> checking which surface they sit on — the cost it priced in was real for the schema count and
+> wrong for these two.
 
 **What is deliberately not decided here.** Whether `app_user` eventually gets a generated primary
 key with `keycloak_sub` beside it. Point 4 keeps that door open at the price of one migration; it is

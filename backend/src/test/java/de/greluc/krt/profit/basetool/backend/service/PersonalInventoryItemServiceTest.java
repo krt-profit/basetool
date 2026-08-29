@@ -58,14 +58,14 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 @ExtendWith(MockitoExtension.class)
 class PersonalInventoryItemServiceTest {
 
-  private static final String OWNER = "owner-sub-1";
-  private static final String OTHER = "other-sub-2";
+  private static final UUID OWNER = UUID.fromString("0e000001-0000-4000-8000-000000000001");
+  private static final UUID OTHER = UUID.fromString("0e000002-0000-4000-8000-000000000002");
 
   @Mock private PersonalInventoryItemRepository repository;
 
   /**
    * Use the real MapStruct-generated mapper – its behavior is part of the service's contract (e.g.,
-   * snapshot vs. ownerSub propagation) and we do not want a stub to mask wiring mistakes.
+   * snapshot vs. ownerUserId propagation) and we do not want a stub to mask wiring mistakes.
    */
   @Spy
   private PersonalInventoryItemMapper mapper = Mappers.getMapper(PersonalInventoryItemMapper.class);
@@ -97,10 +97,10 @@ class PersonalInventoryItemServiceTest {
   // -------------------------------------------------------------------- listOwn
 
   @Test
-  void listOwnShouldQueryRepositoryWithOwnerSubFilter() {
+  void listOwnShouldQueryRepositoryWithOwnerUserIdFilter() {
     // Given
     Pageable pageable = PageRequest.of(0, 10);
-    when(repository.findAllByOwnerSub(eq(OWNER), eq(pageable)))
+    when(repository.findAllByOwnerUserId(eq(OWNER), eq(pageable)))
         .thenReturn(new PageImpl<>(List.of(sample(OWNER, 1L))));
 
     // When
@@ -108,27 +108,27 @@ class PersonalInventoryItemServiceTest {
 
     // Then
     assertEquals(1, result.getTotalElements());
-    verify(repository).findAllByOwnerSub(OWNER, pageable);
+    verify(repository).findAllByOwnerUserId(OWNER, pageable);
     verify(repository, never()).findAll(any(Pageable.class));
   }
 
   @Test
   void listOwnShouldDelegateToFilteredQueryWhenSearchTermIsProvided() {
     Pageable pageable = PageRequest.of(0, 10);
-    when(repository.findAllByOwnerSubAndNameContainingIgnoreCase(
+    when(repository.findAllByOwnerUserIdAndNameContainingIgnoreCase(
             eq(OWNER), eq("med"), eq(pageable)))
         .thenReturn(new PageImpl<>(List.of()));
 
     service.listOwn(OWNER, "  med  ", pageable);
 
-    verify(repository).findAllByOwnerSubAndNameContainingIgnoreCase(OWNER, "med", pageable);
-    verify(repository, never()).findAllByOwnerSub(any(), any());
+    verify(repository).findAllByOwnerUserIdAndNameContainingIgnoreCase(OWNER, "med", pageable);
+    verify(repository, never()).findAllByOwnerUserId(any(), any());
   }
 
   // -------------------------------------------------------------------- createOwn
 
   @Test
-  void createOwnShouldStampOwnerSubFromAuthAndResolveSnapshotFromUex() {
+  void createOwnShouldStampOwnerUserIdFromAuthAndResolveSnapshotFromUex() {
     // Given
     when(cityRepository.findByIdCity(42)).thenReturn(Optional.of(lorville));
     when(repository.save(any(PersonalInventoryItem.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -147,8 +147,8 @@ class PersonalInventoryItemServiceTest {
     PersonalInventoryItem persisted = captor.getValue();
     assertEquals(
         OWNER,
-        persisted.getOwnerSub(),
-        "ownerSub must be taken from the JWT, not from the request");
+        persisted.getOwnerUserId(),
+        "ownerUserId must be taken from the JWT, not from the request");
     assertEquals(
         "Lorville",
         persisted.getLocationNameSnapshot(),
@@ -189,7 +189,7 @@ class PersonalInventoryItemServiceTest {
     managed.setLocationType(PersonalInventoryLocationType.CITY);
     managed.setLocationNameSnapshot("Lorville");
 
-    when(repository.findByIdAndOwnerSub(id, OWNER)).thenReturn(Optional.of(managed));
+    when(repository.findByIdAndOwnerUserId(id, OWNER)).thenReturn(Optional.of(managed));
     when(repository.save(any(PersonalInventoryItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
     PersonalInventoryItemUpdateRequest req =
@@ -211,7 +211,7 @@ class PersonalInventoryItemServiceTest {
     UUID id = UUID.randomUUID();
     PersonalInventoryItem managed = sample(OWNER, 5L);
     managed.setId(id);
-    when(repository.findByIdAndOwnerSub(id, OWNER)).thenReturn(Optional.of(managed));
+    when(repository.findByIdAndOwnerUserId(id, OWNER)).thenReturn(Optional.of(managed));
 
     PersonalInventoryItemUpdateRequest staleReq =
         new PersonalInventoryItemUpdateRequest(
@@ -232,7 +232,7 @@ class PersonalInventoryItemServiceTest {
     managed.setLocationType(PersonalInventoryLocationType.CITY);
     managed.setLocationNameSnapshot("Lorville");
 
-    when(repository.findByIdAndOwnerSub(id, OWNER)).thenReturn(Optional.of(managed));
+    when(repository.findByIdAndOwnerUserId(id, OWNER)).thenReturn(Optional.of(managed));
     when(spaceStationRepository.findByIdSpaceStation(99)).thenReturn(Optional.of(portOlisar));
     when(repository.save(any(PersonalInventoryItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -255,7 +255,7 @@ class PersonalInventoryItemServiceTest {
   void anotherUserMustNotSeeForeignItem() {
     UUID id = UUID.randomUUID();
     // The repository correctly returns empty when filtered by the wrong owner.
-    when(repository.findByIdAndOwnerSub(id, OTHER)).thenReturn(Optional.empty());
+    when(repository.findByIdAndOwnerUserId(id, OTHER)).thenReturn(Optional.empty());
 
     assertThrows(EntityNotFoundException.class, () -> service.getOwn(OTHER, id));
   }
@@ -263,7 +263,7 @@ class PersonalInventoryItemServiceTest {
   @Test
   void anotherUserMustNotUpdateForeignItem() {
     UUID id = UUID.randomUUID();
-    when(repository.findByIdAndOwnerSub(id, OTHER)).thenReturn(Optional.empty());
+    when(repository.findByIdAndOwnerUserId(id, OTHER)).thenReturn(Optional.empty());
 
     PersonalInventoryItemUpdateRequest req =
         new PersonalInventoryItemUpdateRequest(
@@ -276,7 +276,7 @@ class PersonalInventoryItemServiceTest {
   @Test
   void anotherUserMustNotDeleteForeignItem() {
     UUID id = UUID.randomUUID();
-    when(repository.findByIdAndOwnerSub(id, OTHER)).thenReturn(Optional.empty());
+    when(repository.findByIdAndOwnerUserId(id, OTHER)).thenReturn(Optional.empty());
 
     assertThrows(EntityNotFoundException.class, () -> service.deleteOwn(OTHER, id));
     verify(repository, never()).delete(any());
@@ -304,7 +304,7 @@ class PersonalInventoryItemServiceTest {
 
     assertEquals("Admin Touched", result.name());
     // Owner sub on the entity is preserved, even though the admin is a different user.
-    assertEquals(OWNER, foreign.getOwnerSub());
+    assertEquals(OWNER, foreign.getOwnerUserId());
   }
 
   // ------------------------------------------------------ UEX search
@@ -324,10 +324,10 @@ class PersonalInventoryItemServiceTest {
 
   // ------------------------------------------------------ helpers
 
-  private static PersonalInventoryItem sample(String ownerSub, long version) {
+  private static PersonalInventoryItem sample(UUID ownerUserId, long version) {
     PersonalInventoryItem e =
         PersonalInventoryItem.builder()
-            .ownerSub(ownerSub)
+            .ownerUserId(ownerUserId)
             .name("Item")
             .note(null)
             .locationUexId(42)

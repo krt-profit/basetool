@@ -47,7 +47,7 @@ class PersonalBlueprintMapperTest {
     PersonalBlueprint entity =
         PersonalBlueprint.builder()
             .id(id)
-            .ownerSub("user-sub-1")
+            .ownerUserId(UUID.fromString("11111111-1111-1111-1111-111111111111"))
             .productKey("arclight pistol")
             .productName("Arclight Pistol")
             .outputItem(item)
@@ -73,7 +73,7 @@ class PersonalBlueprintMapperTest {
     PersonalBlueprint entity =
         PersonalBlueprint.builder()
             .id(UUID.randomUUID())
-            .ownerSub("user-sub-1")
+            .ownerUserId(UUID.fromString("11111111-1111-1111-1111-111111111111"))
             .productKey("aril core")
             .productName("Aril Core")
             .build();

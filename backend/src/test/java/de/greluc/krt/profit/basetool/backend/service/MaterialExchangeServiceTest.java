@@ -328,7 +328,7 @@ class MaterialExchangeServiceTest {
     ArgumentCaptor<MaterialExchangeInterestRegisteredEvent> captor = ArgumentCaptor.captor();
     verify(eventPublisher).publishEvent(captor.capture());
     MaterialExchangeInterestRegisteredEvent event = captor.getValue();
-    assertThat(event.contextRecipientSub()).as("recipient is the owner").isEqualTo(ownerId);
+    assertThat(event.contextRecipientUserId()).as("recipient is the owner").isEqualTo(ownerId);
     assertThat(event.actorSub()).as("actor is the interessent").isEqualTo(otherId);
     assertThat(event.entityId()).isEqualTo(offerId);
     assertThat(event.entityType()).isEqualTo("MATERIAL_EXCHANGE_OFFER");

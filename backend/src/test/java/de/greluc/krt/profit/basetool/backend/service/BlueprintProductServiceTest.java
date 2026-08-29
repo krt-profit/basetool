@@ -55,7 +55,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class BlueprintProductServiceTest {
 
-  private static final String SUB = "owner-1";
+  private static final UUID SUB = UUID.fromString("0e000001-0000-4000-8000-000000000001");
 
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private PersonalBlueprintRepository personalBlueprintRepository;
@@ -85,7 +85,7 @@ class BlueprintProductServiceTest {
   }
 
   private void noneOwned() {
-    when(personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(
+    when(personalBlueprintRepository.findAllByOwnerUserIdAndProductKeyIn(
             eq(SUB), org.mockito.ArgumentMatchers.any()))
         .thenReturn(List.of());
   }
@@ -153,7 +153,7 @@ class BlueprintProductServiceTest {
   void searchProducts_marksProductsOwnedByCaller() {
     when(blueprintRepository.findActiveProductRows(""))
         .thenReturn(List.of(row("Alpha", "A", null, null), row("Bravo", "B", null, null)));
-    when(personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(
+    when(personalBlueprintRepository.findAllByOwnerUserIdAndProductKeyIn(
             eq(SUB), org.mockito.ArgumentMatchers.any()))
         .thenReturn(List.of(PersonalBlueprint.builder().productKey("alpha").build()));
 
