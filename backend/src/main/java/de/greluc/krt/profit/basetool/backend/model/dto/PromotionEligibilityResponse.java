@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Result of evaluating all configured rank requirements for a single rank transition (e.g. 20
@@ -39,7 +40,7 @@ import java.util.List;
  * @param checks per-requirement evaluation, in stable display order
  */
 public record PromotionEligibilityResponse(
-    String userId,
+    UUID userId,
     int fromRank,
     int toRank,
     boolean eligible,

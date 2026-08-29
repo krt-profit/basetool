@@ -369,7 +369,7 @@ class UserDeletionForeignKeyIntegrityTest {
     exMember = userRepository.save(exMember);
     final UUID exMemberId = exMember.getId();
     // owner_sub / user_id store app_user.id rendered as text — the JWT subject IS the primary key.
-    final String ownerSub = exMemberId.toString();
+    final UUID ownerSub = exMemberId;
 
     personalBlueprintRepository.save(
         PersonalBlueprint.builder()

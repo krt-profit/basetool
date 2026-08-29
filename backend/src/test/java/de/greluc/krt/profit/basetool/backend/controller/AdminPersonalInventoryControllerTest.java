@@ -45,6 +45,9 @@ import org.springframework.data.domain.PageImpl;
 @ExtendWith(MockitoExtension.class)
 class AdminPersonalInventoryControllerTest {
 
+  /** The {@code app_user.id} the admin endpoints address, taken from the path. */
+  private static final UUID TARGET = UUID.fromString("7a76e700-0000-4000-8000-000000000002");
+
   @Mock private PersonalInventoryItemService service;
 
   @InjectMocks private AdminPersonalInventoryController controller;
@@ -53,26 +56,26 @@ class AdminPersonalInventoryControllerTest {
   void listForUserShouldDelegateToServiceWithPathSub() {
     // Given
     Page<PersonalInventoryItemResponse> page = new PageImpl<>(List.of(sampleResponse()));
-    when(service.listForUser(eq("target-sub"), any(), any())).thenReturn(page);
+    when(service.listForUser(eq(TARGET), any(), any())).thenReturn(page);
 
     // When
     PageResponse<PersonalInventoryItemResponse> result =
-        controller.listForUser("target-sub", 0, 10, null, null);
+        controller.listForUser(TARGET, 0, 10, null, null);
 
     // Then
     assertEquals(1, result.content().size());
-    verify(service).listForUser(eq("target-sub"), any(), any());
+    verify(service).listForUser(eq(TARGET), any(), any());
   }
 
   @Test
   void createForUserShouldUsePathSubAsOwner() {
     PersonalInventoryItemCreateRequest req =
         new PersonalInventoryItemCreateRequest("x", null, 1, PersonalInventoryLocationType.CITY, 1);
-    when(service.createForUser("target-sub", req)).thenReturn(sampleResponse());
+    when(service.createForUser(TARGET, req)).thenReturn(sampleResponse());
 
-    controller.createForUser("target-sub", req);
+    controller.createForUser(TARGET, req);
 
-    verify(service).createForUser("target-sub", req);
+    verify(service).createForUser(TARGET, req);
   }
 
   @Test

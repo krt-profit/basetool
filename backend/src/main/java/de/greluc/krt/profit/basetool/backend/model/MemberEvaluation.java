@@ -39,9 +39,9 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * Stores the evaluation level assigned to a member (identified by JWT {@code sub}) for a specific
- * {@link PromotionCategory}. {@link #assignedLevel} may be {@code null} to indicate that no level
- * has been assigned yet.
+ * Stores the evaluation level assigned to a member (identified by their {@code app_user.id}) for a
+ * specific {@link PromotionCategory}. {@link #assignedLevel} may be {@code null} to indicate that
+ * no level has been assigned yet.
  */
 @Entity
 @Table(name = "member_evaluation")
@@ -61,8 +61,16 @@ public class MemberEvaluation extends AbstractEntity<UUID> {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  @Column(name = "user_id", nullable = false, length = 64)
-  private String userId;
+  /**
+   * {@code app_user.id} of the evaluated member.
+   *
+   * <p>A plain id rather than a {@code @ManyToOne User}: the column carries a foreign key with
+   * {@code ON DELETE CASCADE} (V235, REQ-DATA-008), and an association would make every row the
+   * cascade removes a managed entity holding a reference to the user being deleted -- the {@code
+   * TransientPropertyValueException} landmine REQ-DATA-008 documents.
+   */
+  @Column(name = "user_id", nullable = false)
+  private UUID userId;
 
   // Excluded from {@code @ToString} because the LAZY parent association would either trigger a
   // LazyInitializationException outside a Hibernate session or recurse back through

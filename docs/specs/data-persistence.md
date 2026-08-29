@@ -341,17 +341,31 @@ Concrete handling, in order:
   squadron pool, in which `user_id` marks only the contributor — so this removes stock the org unit
   may still physically hold. That is the intended semantics as of this release; a member's
   contribution is not inherited by the squadron.
-- **Purged** (the FK-less identity columns): `personal_inventory_item.owner_sub`,
+- **Purged** (the five identity columns): `personal_inventory_item.owner_sub`,
   `personal_blueprint.owner_sub`, `notification.recipient_sub`,
-  `notification_rule_selector.user_sub` and `member_evaluation.user_id`. None of them declares a
-  foreign key to `app_user`, so nothing cascades and no retention job reaches them — the
-  notification sweep only reaps *read* rows. Left in place they survive the account indefinitely
-  (free-text notes included), become undiscoverable because every lookup is keyed by a subject no
-  roster can still offer, and are silently re-adopted if the same Keycloak subject returns. The rule
-  selectors additionally keep *manufacturing* new orphans: the engine returns the dead subject with
-  no existence check and mints a notification row for it on every subsequent matching event. All
-  five hold `app_user.id` (as text for the `VARCHAR` columns, natively for the `UUID` ones).
-  V227 purges what earlier deletions already leaked.
+  `notification_rule_selector.user_sub` and `member_evaluation.user_id`. **Since V235 each carries a
+  foreign key to `app_user(id)` with `ON DELETE CASCADE`** (ADR-0142 point 3, issue #1638), so the
+  database removes them with the account. The explicit deletes stay: PostgreSQL reports no row count
+  for a cascade, and those counts are what the `PERSONAL_DATA_PURGED_ON_USER_DELETION` audit event
+  records. **The constraint is the guarantee; the statement is the number.**
+  Until V235 none of the five declared a foreign key, so nothing cascaded and no retention job
+  reached them — the notification sweep only reaps *read* rows. Left in place they survived the
+  account indefinitely (free-text notes included), became undiscoverable because every lookup is
+  keyed by a subject no roster can still offer, and were silently re-adopted if the same Keycloak
+  subject returned. The rule selectors additionally kept *manufacturing* new orphans: the engine
+  returns the dead subject with no existence check and mints a notification row for it on every
+  subsequent matching event. V227 purged what earlier deletions had already leaked; V235 re-runs
+  that purge before adding the constraints (`ADD CONSTRAINT` validates the whole table, and a
+  surviving orphan would abort the deploy) and recasts the three `VARCHAR(64)` columns —
+  `personal_blueprint.owner_sub`, `personal_inventory_item.owner_sub` and `member_evaluation.user_id`
+  — to `UUID` so they can reference the key at all. All five now hold `app_user.id` natively.
+  `notification_rule_selector.user_sub` also gained the partial index the cascade needs
+  (`idx_notification_rule_selector_user`); the other four already led one.
+  **A new user-identity column without a foreign key fails the build**:
+  `UserIdentityColumnForeignKeyTest` sweeps `information_schema` for every column named `user_id`,
+  `*_user_id` or `*_sub` and requires a foreign key to `app_user(id)`, a recorded exemption, or —
+  for `app_user.discord_user_id`, which holds a Discord snowflake — a recorded statement that it is
+  not a user id at all.
 - **Reassigned to the admin** (shared aggregates that must outlive the member):
   `refinery_order.owner_id`, `mission.owner_id`, and — paired with the last — the 1:1 companion
   `mission_ownership.owner_id`. These are not account data: they carry operation finances and

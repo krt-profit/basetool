@@ -47,6 +47,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -60,7 +61,7 @@ import tools.jackson.databind.json.JsonMapper;
 @ExtendWith(MockitoExtension.class)
 class BlueprintImportServiceTest {
 
-  private static final String SUB = "owner-1";
+  private static final UUID SUB = UUID.fromString("0e000001-0000-4000-8000-000000000001");
   private static final BlueprintExternalAliasSource SCMDB = BlueprintExternalAliasSource.SCMDB;
 
   @Mock private BlueprintProductService blueprintProductService;

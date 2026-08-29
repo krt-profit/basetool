@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionEligibilityResponse;
 import de.greluc.krt.profit.basetool.backend.service.PromotionEligibilityService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
-import de.greluc.krt.profit.basetool.backend.web.CurrentUserSub;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -30,6 +30,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -62,7 +63,7 @@ public class PromotionEligibilityController {
   /**
    * Returns the eligibility outcome for every configured rank transition for the calling user.
    *
-   * @param ownerSub the caller's JWT {@code sub} claim
+   * @param ownerSub the caller's {@code app_user.id}
    * @return one entry per configured transition, possibly empty
    */
   @GetMapping("/my")
@@ -71,7 +72,7 @@ public class PromotionEligibilityController {
     @ApiResponse(responseCode = "200", description = "Per-transition eligibility for the caller."),
     @ApiResponse(responseCode = "401", description = "Authentication required.")
   })
-  public List<PromotionEligibilityResponse> myEligibility(@CurrentUserSub String ownerSub) {
+  public List<PromotionEligibilityResponse> myEligibility(@CurrentUserId UUID ownerSub) {
     return service.evaluateAllForUser(ownerSub);
   }
 
@@ -81,7 +82,7 @@ public class PromotionEligibilityController {
    *
    * @param fromRank the rank the caller currently holds
    * @param toRank the rank the caller would be promoted to
-   * @param ownerSub the caller's JWT {@code sub} claim
+   * @param ownerSub the caller's {@code app_user.id}
    * @return the per-rule outcome plus an aggregate {@code eligible} flag
    */
   @GetMapping("/my/by-ranks")
@@ -92,7 +93,7 @@ public class PromotionEligibilityController {
   public PromotionEligibilityResponse myEligibilityForRanks(
       @Parameter(description = "Current rank of the caller.") @RequestParam int fromRank,
       @Parameter(description = "Target rank for the promotion.") @RequestParam int toRank,
-      @CurrentUserSub String ownerSub) {
+      @CurrentUserId UUID ownerSub) {
     return service.evaluateForRanks(ownerSub, fromRank, toRank);
   }
 
@@ -100,7 +101,7 @@ public class PromotionEligibilityController {
    * Officer/admin view: returns the eligibility outcome for every configured rank transition for an
    * arbitrary member.
    *
-   * @param userId the JWT-sub identifier of the member to inspect
+   * @param userId the {@code app_user.id} of the member to inspect
    * @return one entry per configured transition, possibly empty
    */
   @GetMapping("/user/{userId}")
@@ -112,7 +113,7 @@ public class PromotionEligibilityController {
         description = "Per-transition eligibility for the target member."),
     @ApiResponse(responseCode = "403", description = "Insufficient permissions.")
   })
-  public List<PromotionEligibilityResponse> eligibilityForUser(@PathVariable String userId) {
+  public List<PromotionEligibilityResponse> eligibilityForUser(@PathVariable UUID userId) {
     return service.evaluateAllForUserAsAdmin(userId);
   }
 }

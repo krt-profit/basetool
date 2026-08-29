@@ -82,22 +82,20 @@ class DefaultBlueprintProvisioningIntegrationTest {
     String keyA = createDefault();
     String keyB = createDefault();
 
-    int firstRun = provisioningService.grantDefaultsToUser(user.toString());
+    int firstRun = provisioningService.grantDefaultsToUser(user);
     assertThat(firstRun).isGreaterThanOrEqualTo(2);
-    assertThat(personalBlueprintRepository.existsByOwnerSubAndProductKey(user.toString(), keyA))
-        .isTrue();
-    assertThat(personalBlueprintRepository.existsByOwnerSubAndProductKey(user.toString(), keyB))
-        .isTrue();
+    assertThat(personalBlueprintRepository.existsByOwnerSubAndProductKey(user, keyA)).isTrue();
+    assertThat(personalBlueprintRepository.existsByOwnerSubAndProductKey(user, keyB)).isTrue();
 
     // Re-running grants nothing new for the keys already owned (ON CONFLICT DO NOTHING).
     int beforeKeys =
         personalBlueprintRepository
-            .findAllByOwnerSubAndProductKeyIn(user.toString(), java.util.List.of(keyA, keyB))
+            .findAllByOwnerSubAndProductKeyIn(user, java.util.List.of(keyA, keyB))
             .size();
-    provisioningService.grantDefaultsToUser(user.toString());
+    provisioningService.grantDefaultsToUser(user);
     int afterKeys =
         personalBlueprintRepository
-            .findAllByOwnerSubAndProductKeyIn(user.toString(), java.util.List.of(keyA, keyB))
+            .findAllByOwnerSubAndProductKeyIn(user, java.util.List.of(keyA, keyB))
             .size();
     assertThat(afterKeys).isEqualTo(beforeKeys).isEqualTo(2);
   }
@@ -110,9 +108,7 @@ class DefaultBlueprintProvisioningIntegrationTest {
 
     provisioningService.grantDefaultsToAllUsers();
 
-    assertThat(personalBlueprintRepository.existsByOwnerSubAndProductKey(active.toString(), key))
-        .isTrue();
-    assertThat(personalBlueprintRepository.existsByOwnerSubAndProductKey(inactive.toString(), key))
-        .isFalse();
+    assertThat(personalBlueprintRepository.existsByOwnerSubAndProductKey(active, key)).isTrue();
+    assertThat(personalBlueprintRepository.existsByOwnerSubAndProductKey(inactive, key)).isFalse();
   }
 }

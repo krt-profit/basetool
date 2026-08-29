@@ -24,7 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemCrea
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalInventoryItemUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.service.PersonalInventoryItemService;
-import de.greluc.krt.profit.basetool.backend.web.CurrentUserSub;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -84,7 +84,7 @@ public class PersonalInventoryController {
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
       @RequestParam(required = false) String q,
-      @CurrentUserSub String ownerSub) {
+      @CurrentUserId UUID ownerSub) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -109,7 +109,7 @@ public class PersonalInventoryController {
     @ApiResponse(responseCode = "200", description = "Item found."),
     @ApiResponse(responseCode = "404", description = "Not found or not owned by caller.")
   })
-  public PersonalInventoryItemResponse get(@PathVariable UUID id, @CurrentUserSub String ownerSub) {
+  public PersonalInventoryItemResponse get(@PathVariable UUID id, @CurrentUserId UUID ownerSub) {
     return service.getOwn(ownerSub, id);
   }
 
@@ -129,7 +129,7 @@ public class PersonalInventoryController {
   })
   public PersonalInventoryItemResponse create(
       @Valid @RequestBody PersonalInventoryItemCreateRequest request,
-      @CurrentUserSub String ownerSub) {
+      @CurrentUserId UUID ownerSub) {
     return service.createOwn(ownerSub, request);
   }
 
@@ -153,7 +153,7 @@ public class PersonalInventoryController {
   public PersonalInventoryItemResponse update(
       @PathVariable UUID id,
       @Valid @RequestBody PersonalInventoryItemUpdateRequest request,
-      @CurrentUserSub String ownerSub) {
+      @CurrentUserId UUID ownerSub) {
     return service.updateOwn(ownerSub, id, request);
   }
 
@@ -169,7 +169,7 @@ public class PersonalInventoryController {
     @ApiResponse(responseCode = "204", description = "Item deleted."),
     @ApiResponse(responseCode = "404", description = "Not found or not owned by caller.")
   })
-  public void delete(@PathVariable UUID id, @CurrentUserSub String ownerSub) {
+  public void delete(@PathVariable UUID id, @CurrentUserId UUID ownerSub) {
     service.deleteOwn(ownerSub, id);
   }
 }

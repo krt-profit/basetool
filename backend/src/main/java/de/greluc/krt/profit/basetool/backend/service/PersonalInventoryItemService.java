@@ -100,13 +100,13 @@ public class PersonalInventoryItemService {
    * Owner-scoped paged list. Every row is filtered by {@code ownerSub} so a caller can never see
    * another user's items even if they craft the query parameters.
    *
-   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param ownerSub {@code app_user.id} of the caller
    * @param query optional case-insensitive substring filter on the item name
    * @param pageable page request (sort fields whitelisted by {@link #SORTABLE_FIELDS})
    * @return paged response DTOs
    */
   public Page<PersonalInventoryItemResponse> listOwn(
-      @NotNull String ownerSub, @Nullable String query, @NotNull Pageable pageable) {
+      @NotNull UUID ownerSub, @Nullable String query, @NotNull Pageable pageable) {
     Page<PersonalInventoryItem> page =
         (query == null || query.isBlank())
             ? repository.findAllByOwnerSub(ownerSub, pageable)
@@ -120,12 +120,12 @@ public class PersonalInventoryItemService {
    * to a different user (the two cases are deliberately indistinguishable in the response so a
    * caller cannot probe for other users' item ids).
    *
-   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param ownerSub {@code app_user.id} of the caller
    * @param id item primary key
    * @return response DTO
    * @throws EntityNotFoundException when the item is missing or owned by someone else
    */
-  public PersonalInventoryItemResponse getOwn(@NotNull String ownerSub, @NotNull UUID id) {
+  public PersonalInventoryItemResponse getOwn(@NotNull UUID ownerSub, @NotNull UUID id) {
     return mapper.toResponse(loadOwn(ownerSub, id));
   }
 
@@ -134,13 +134,13 @@ public class PersonalInventoryItemService {
    * and stored as a snapshot so a future UEX rename of the city/station does not silently change
    * the displayed location.
    *
-   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param ownerSub {@code app_user.id} of the caller
    * @param request create payload
    * @return the persisted DTO
    */
   @Transactional
   public PersonalInventoryItemResponse createOwn(
-      @NotNull String ownerSub, @NotNull PersonalInventoryItemCreateRequest request) {
+      @NotNull UUID ownerSub, @NotNull PersonalInventoryItemCreateRequest request) {
     String snapshot = resolveLocationName(request.locationType(), request.locationUexId());
     PersonalInventoryItem entity = mapper.toEntity(request);
     entity.setOwnerSub(ownerSub);
@@ -154,7 +154,7 @@ public class PersonalInventoryItemService {
         AuditEventType.PERSONAL_INVENTORY_CREATED,
         saved.getId(),
         personalLabel(saved),
-        parseSub(ownerSub),
+        ownerSub,
         AuditDetails.of("qty", saved.getQuantity()).with("loc", saved.getLocationNameSnapshot()));
     return mapper.toResponse(saved);
   }
@@ -163,7 +163,7 @@ public class PersonalInventoryItemService {
    * Updates an owner-scoped item with explicit optimistic-lock check. Re-resolves the location
    * snapshot only when the location reference actually changed.
    *
-   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param ownerSub {@code app_user.id} of the caller
    * @param id item primary key
    * @param request update payload (carries the expected version)
    * @return the persisted DTO
@@ -172,7 +172,7 @@ public class PersonalInventoryItemService {
    */
   @Transactional
   public PersonalInventoryItemResponse updateOwn(
-      @NotNull String ownerSub,
+      @NotNull UUID ownerSub,
       @NotNull UUID id,
       @NotNull PersonalInventoryItemUpdateRequest request) {
     PersonalInventoryItem entity = loadOwn(ownerSub, id);
@@ -182,18 +182,18 @@ public class PersonalInventoryItemService {
   /**
    * Deletes an owner-scoped item. 404 for unknown id / cross-owner attempts.
    *
-   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param ownerSub {@code app_user.id} of the caller
    * @param id item primary key
    * @throws EntityNotFoundException when the item is missing or owned by someone else
    */
   @Transactional
-  public void deleteOwn(@NotNull String ownerSub, @NotNull UUID id) {
+  public void deleteOwn(@NotNull UUID ownerSub, @NotNull UUID id) {
     PersonalInventoryItem entity = loadOwn(ownerSub, id);
     String label = personalLabel(entity);
     repository.delete(entity);
     log.info("Deleted personal inventory item id={} for ownerSub={}", id, ownerSub);
     auditService.record(
-        AuditEventType.PERSONAL_INVENTORY_DELETED, id, label, parseSub(ownerSub), "scope=own");
+        AuditEventType.PERSONAL_INVENTORY_DELETED, id, label, ownerSub, "scope=own");
   }
 
   // ---------------------------------------------------------------------------------
@@ -207,13 +207,13 @@ public class PersonalInventoryItemService {
    * supplies the filter — but exposed under a separate name so the controller boundary is
    * unambiguous: admins call this, regular users never can.
    *
-   * @param targetSub Keycloak {@code sub} of the user being inspected
+   * @param targetSub {@code app_user.id} of the user being inspected
    * @param query optional name filter
    * @param pageable page request
    * @return paged response DTOs
    */
   public Page<PersonalInventoryItemResponse> listForUser(
-      @NotNull String targetSub, @Nullable String query, @NotNull Pageable pageable) {
+      @NotNull UUID targetSub, @Nullable String query, @NotNull Pageable pageable) {
     return listOwn(targetSub, query, pageable);
   }
 
@@ -221,13 +221,13 @@ public class PersonalInventoryItemService {
    * Admin-scoped create. Delegates to {@link #createOwn}; the controller layer is responsible for
    * enforcing the ADMIN role.
    *
-   * @param targetSub Keycloak {@code sub} of the user to create the item for
+   * @param targetSub {@code app_user.id} of the user to create the item for
    * @param request create payload
    * @return the persisted DTO
    */
   @Transactional
   public PersonalInventoryItemResponse createForUser(
-      @NotNull String targetSub, @NotNull PersonalInventoryItemCreateRequest request) {
+      @NotNull UUID targetSub, @NotNull PersonalInventoryItemCreateRequest request) {
     return createOwn(targetSub, request);
   }
 
@@ -267,11 +267,11 @@ public class PersonalInventoryItemService {
             .orElseThrow(
                 () -> new EntityNotFoundException("PersonalInventoryItem not found: " + id));
     String label = personalLabel(entity);
-    String ownerSub = entity.getOwnerSub();
+    UUID ownerSub = entity.getOwnerSub();
     repository.delete(entity);
     log.info("Admin deleted personal inventory item id={} ownerSub={}", id, entity.getOwnerSub());
     auditService.record(
-        AuditEventType.PERSONAL_INVENTORY_DELETED, id, label, parseSub(ownerSub), "scope=admin");
+        AuditEventType.PERSONAL_INVENTORY_DELETED, id, label, ownerSub, "scope=admin");
   }
 
   // ---------------------------------------------------------------------------------
@@ -328,7 +328,7 @@ public class PersonalInventoryItemService {
   // ---------------------------------------------------------------------------------
 
   @NotNull
-  private PersonalInventoryItem loadOwn(@NotNull String ownerSub, @NotNull UUID id) {
+  private PersonalInventoryItem loadOwn(@NotNull UUID ownerSub, @NotNull UUID id) {
     return repository
         .findByIdAndOwnerSub(id, ownerSub)
         .orElseThrow(
@@ -364,7 +364,7 @@ public class PersonalInventoryItemService {
         AuditEventType.PERSONAL_INVENTORY_UPDATED,
         saved.getId(),
         personalLabel(saved),
-        parseSub(saved.getOwnerSub()),
+        saved.getOwnerSub(),
         AuditDetails.of("qty", saved.getQuantity()).with("loc", saved.getLocationNameSnapshot()));
     return mapper.toResponse(saved);
   }
@@ -377,26 +377,6 @@ public class PersonalInventoryItemService {
    */
   private static String personalLabel(PersonalInventoryItem item) {
     return item.getName() + " @ " + item.getLocationNameSnapshot();
-  }
-
-  /**
-   * Parses the owner's Keycloak {@code sub} into a {@link UUID} for the audit {@code
-   * target_user_id} column. Real Keycloak subs are UUIDs (the app's user ids are the subs); a
-   * non-UUID sub yields {@code null} rather than failing the write.
-   *
-   * @param sub the Keycloak {@code sub}, or {@code null}
-   * @return the parsed UUID, or {@code null} when absent/non-UUID
-   */
-  @Nullable
-  private static UUID parseSub(@Nullable String sub) {
-    if (sub == null || sub.isBlank()) {
-      return null;
-    }
-    try {
-      return UUID.fromString(sub.trim());
-    } catch (IllegalArgumentException e) {
-      return null;
-    }
   }
 
   /**

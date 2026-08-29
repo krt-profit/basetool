@@ -23,7 +23,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryLocationType;
+import de.greluc.krt.profit.basetool.backend.model.User;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,14 +41,34 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class PersonalInventoryItemRepositoryTest {
 
-  private static final String OWNER_A = "owner-a";
-  private static final String OWNER_B = "owner-b";
+  private static final UUID OWNER_A = UUID.fromString("aaaaaaaa-0000-0000-0000-00000000000a");
+  private static final UUID OWNER_B = UUID.fromString("bbbbbbbb-0000-0000-0000-00000000000b");
 
   @Autowired private PersonalInventoryItemRepository repository;
+  @Autowired private UserRepository userRepository;
 
   @BeforeEach
   void clean() {
     repository.deleteAll();
+    // owner_sub is a foreign key to app_user(id) since V235 (REQ-DATA-008), so both owners have to
+    // exist before an item can reference them.
+    seedOwner(OWNER_A);
+    seedOwner(OWNER_B);
+  }
+
+  /**
+   * Creates the {@code app_user} row an item owner id has to point at, unless it already exists.
+   *
+   * @param id the owner id used as {@code owner_sub}
+   */
+  private void seedOwner(UUID id) {
+    if (userRepository.existsById(id)) {
+      return;
+    }
+    User user = new User();
+    user.setId(id);
+    user.setUsername("owner-" + id);
+    userRepository.save(user);
   }
 
   @Test
@@ -119,7 +141,7 @@ class PersonalInventoryItemRepositoryTest {
         "JPA must increment @Version on each update – this is the basis for the 409 contract.");
   }
 
-  private static PersonalInventoryItem item(String ownerSub, String name) {
+  private static PersonalInventoryItem item(UUID ownerSub, String name) {
     return PersonalInventoryItem.builder()
         .ownerSub(ownerSub)
         .name(name)

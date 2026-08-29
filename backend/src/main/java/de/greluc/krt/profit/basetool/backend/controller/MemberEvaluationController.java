@@ -27,7 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.service.MemberEvaluationService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
-import de.greluc.krt.profit.basetool.backend.web.CurrentUserSub;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -77,7 +77,7 @@ public class MemberEvaluationController {
    * Returns every {@link MemberEvaluationResponse} owned by the calling member, filtered by the JWT
    * {@code sub} claim so callers see only their own promotion evaluations.
    *
-   * @param ownerSub the caller's JWT {@code sub} claim
+   * @param ownerSub the caller's {@code app_user.id}
    * @return the calling member's evaluations
    */
   @GetMapping("/my")
@@ -86,7 +86,7 @@ public class MemberEvaluationController {
     @ApiResponse(responseCode = "200", description = "Own evaluations."),
     @ApiResponse(responseCode = "401", description = "Authentication required.")
   })
-  public List<MemberEvaluationResponse> listMy(@CurrentUserSub String ownerSub) {
+  public List<MemberEvaluationResponse> listMy(@CurrentUserId UUID ownerSub) {
     return service.listForUser(ownerSub);
   }
 
@@ -99,7 +99,7 @@ public class MemberEvaluationController {
    * @param size page size, or {@code null} for the default
    * @param sort comma-separated sort spec ({@code field,direction}), or {@code null} for the
    *     default
-   * @param ownerSub the caller's JWT {@code sub} claim
+   * @param ownerSub the caller's {@code app_user.id}
    * @return a {@link PageResponse} of the caller's evaluations
    */
   @GetMapping("/my/paged")
@@ -109,7 +109,7 @@ public class MemberEvaluationController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
-      @CurrentUserSub String ownerSub) {
+      @CurrentUserId UUID ownerSub) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -195,7 +195,7 @@ public class MemberEvaluationController {
    * body carries the new score and notes; the optimistic-locking {@code version} echoed back by the
    * client guards against concurrent edits and surfaces as HTTP 409 on conflict.
    *
-   * @param userId Keycloak {@code sub} of the member being evaluated
+   * @param userId {@code app_user.id} of the member being evaluated
    * @param categoryId identifier of the {@link
    *     de.greluc.krt.profit.basetool.backend.model.PromotionCategory}
    * @param request validated payload carrying the new score, notes, and {@code version}
@@ -214,7 +214,7 @@ public class MemberEvaluationController {
     @ApiResponse(responseCode = "409", description = "Optimistic lock conflict.")
   })
   public MemberEvaluationResponse upsert(
-      @PathVariable String userId,
+      @PathVariable UUID userId,
       @PathVariable UUID categoryId,
       @Valid @RequestBody MemberEvaluationUpdateRequest request) {
     return service.upsert(userId, categoryId, request);

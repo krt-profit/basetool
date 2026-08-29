@@ -212,7 +212,7 @@ class UserReconciliationServiceTest {
       assertEquals("Guest", result.getRoles().iterator().next().getName());
       verify(userRepository, times(1)).save(any(User.class));
       // A brand-new user is granted the default blueprints synchronously (REQ-INV-016).
-      verify(defaultBlueprintProvisioningService).grantDefaultsToUser(USER_ID.toString());
+      verify(defaultBlueprintProvisioningService).grantDefaultsToUser(USER_ID);
     }
 
     /**

@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionEligibilityResponse;
 import de.greluc.krt.profit.basetool.backend.service.PromotionEligibilityService;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -48,13 +49,13 @@ class PromotionEligibilityControllerTest {
 
   @InjectMocks private PromotionEligibilityController controller;
 
-  private static PromotionEligibilityResponse eligibility(String userId, int from, int to) {
+  private static PromotionEligibilityResponse eligibility(UUID userId, int from, int to) {
     return new PromotionEligibilityResponse(userId, from, to, true, true, List.of());
   }
 
   @Test
   void myEligibility_forwardsCallerSubToService() {
-    String sub = "alice-uuid";
+    UUID sub = UUID.fromString("a11ce000-0000-4000-8000-000000000001");
     List<PromotionEligibilityResponse> expected = List.of(eligibility(sub, 20, 19));
     when(service.evaluateAllForUser(sub)).thenReturn(expected);
 
@@ -66,7 +67,7 @@ class PromotionEligibilityControllerTest {
 
   @Test
   void myEligibilityForRanks_forwardsSubAndRanks() {
-    String sub = "bob-uuid";
+    UUID sub = UUID.fromString("b0b00000-0000-4000-8000-000000000002");
     PromotionEligibilityResponse expected = eligibility(sub, 20, 19);
     when(service.evaluateForRanks(sub, 20, 19)).thenReturn(expected);
 
@@ -78,7 +79,7 @@ class PromotionEligibilityControllerTest {
 
   @Test
   void eligibilityForUser_forwardsTargetUserIdToService() {
-    String targetUserId = "carol-uuid";
+    UUID targetUserId = UUID.fromString("ca401000-0000-4000-8000-000000000003");
     List<PromotionEligibilityResponse> expected = List.of(eligibility(targetUserId, 20, 19));
     when(service.evaluateAllForUserAsAdmin(targetUserId)).thenReturn(expected);
 

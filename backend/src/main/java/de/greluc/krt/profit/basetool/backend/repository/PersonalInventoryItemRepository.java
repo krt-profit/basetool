@@ -40,17 +40,17 @@ public interface PersonalInventoryItemRepository
     extends JpaRepository<PersonalInventoryItem, UUID> {
 
   /** Returns every entity matching the derived {@code findAllByOwnerSub} criteria. */
-  Page<PersonalInventoryItem> findAllByOwnerSub(String ownerSub, Pageable pageable);
+  Page<PersonalInventoryItem> findAllByOwnerSub(UUID ownerSub, Pageable pageable);
 
   /**
    * Returns every entity matching the derived {@code findAllByOwnerSubAndNameContainingIgnoreCase}
    * criteria.
    */
   Page<PersonalInventoryItem> findAllByOwnerSubAndNameContainingIgnoreCase(
-      String ownerSub, String nameFragment, Pageable pageable);
+      UUID ownerSub, String nameFragment, Pageable pageable);
 
   /** Derived Spring-Data query - returns entities matching {@code IdAndOwnerSub}. */
-  Optional<PersonalInventoryItem> findByIdAndOwnerSub(UUID id, String ownerSub);
+  Optional<PersonalInventoryItem> findByIdAndOwnerSub(UUID id, UUID ownerSub);
 
   /**
    * Deletes every "Mein Inventar" row of the given owner as part of the hard account deletion
@@ -60,11 +60,10 @@ public interface PersonalInventoryItemRepository
    * included, and were undiscoverable afterwards because every lookup is keyed by the owner sub
    * that no roster can still offer. A returning Keycloak subject would silently re-adopt them.
    *
-   * @param ownerSub the departing owner's Keycloak subject (equal to {@code app_user.id} rendered
-   *     as text); never {@code null}.
+   * @param ownerSub the departing owner's {@code app_user.id}; never {@code null}.
    * @return the number of deleted rows, for the audit summary event.
    */
   @Modifying
   @Query("DELETE FROM PersonalInventoryItem p WHERE p.ownerSub = :ownerSub")
-  int deleteByOwnerSub(@Param("ownerSub") String ownerSub);
+  int deleteByOwnerSub(@Param("ownerSub") UUID ownerSub);
 }

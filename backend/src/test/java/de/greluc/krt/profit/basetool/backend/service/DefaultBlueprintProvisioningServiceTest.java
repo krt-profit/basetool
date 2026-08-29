@@ -24,6 +24,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -34,15 +35,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class DefaultBlueprintProvisioningServiceTest {
 
+  /** The {@code app_user.id} the provisioning call is made for. */
+  private static final UUID SUB_1 = UUID.fromString("0e000001-0000-4000-8000-000000000001");
+
   @Mock private PersonalBlueprintRepository repository;
   @InjectMocks private DefaultBlueprintProvisioningService service;
 
   @Test
   void grantDefaultsToUser_delegatesToRepositoryAndReturnsCount() {
-    when(repository.grantDefaultBlueprintsToUser("sub-1")).thenReturn(3);
+    when(repository.grantDefaultBlueprintsToUser(SUB_1)).thenReturn(3);
 
-    assertEquals(3, service.grantDefaultsToUser("sub-1"));
-    verify(repository).grantDefaultBlueprintsToUser("sub-1");
+    assertEquals(3, service.grantDefaultsToUser(SUB_1));
+    verify(repository).grantDefaultBlueprintsToUser(SUB_1);
   }
 
   @Test

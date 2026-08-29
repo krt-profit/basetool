@@ -135,11 +135,11 @@ class UserDeletionServiceTest {
 
     verify(inventoryItemRepository).deleteByUserId(userId);
     verify(shipRepository).deleteByOwnerId(userId);
-    verify(personalInventoryItemRepository).deleteByOwnerSub(userId.toString());
-    verify(personalBlueprintRepository).deleteAllByOwnerSub(userId.toString());
+    verify(personalInventoryItemRepository).deleteByOwnerSub(userId);
+    verify(personalBlueprintRepository).deleteAllByOwnerSub(userId);
     verify(notificationRepository).deleteAllForRecipient(userId);
     verify(notificationRuleRepository).deleteSelectorsByUserSub(userId);
-    verify(memberEvaluationRepository).deleteAllByUserId(userId.toString());
+    verify(memberEvaluationRepository).deleteAllByUserId(userId);
     // ...while the shared/historical aggregates only change owner.
     verify(refineryOrderRepository).updateOwner(user, admin);
     verify(missionRepository).updateOwner(user, admin);
@@ -161,7 +161,7 @@ class UserDeletionServiceTest {
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
     when(inventoryItemRepository.deleteByUserId(userId)).thenReturn(3);
     when(shipRepository.deleteByOwnerId(userId)).thenReturn(7);
-    when(personalBlueprintRepository.deleteAllByOwnerSub(userId.toString())).thenReturn(8);
+    when(personalBlueprintRepository.deleteAllByOwnerSub(userId)).thenReturn(8);
     when(refineryOrderRepository.updateOwner(user, admin)).thenReturn(2);
 
     // When

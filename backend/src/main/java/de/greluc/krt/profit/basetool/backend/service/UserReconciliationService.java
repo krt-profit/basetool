@@ -309,7 +309,7 @@ public class UserReconciliationService {
         // CONFLICT touching only personal_blueprint (never the app_user row), so it neither bumps
         // the user's @Version nor collides with the converter's retry. The id is the Keycloak sub,
         // set before the first save.
-        defaultBlueprintProvisioningService.grantDefaultsToUser(user.getId().toString());
+        defaultBlueprintProvisioningService.grantDefaultsToUser(user.getId());
       }
       if (newPendingRegistration) {
         // After-commit listener notifies every admin of the new pending registration
@@ -429,7 +429,7 @@ public class UserReconciliationService {
       userRepository.save(user);
       if (created) {
         // Grant the default blueprints synchronously on first creation (REQ-INV-016); idempotent.
-        defaultBlueprintProvisioningService.grantDefaultsToUser(user.getId().toString());
+        defaultBlueprintProvisioningService.grantDefaultsToUser(user.getId());
       }
       if (newPendingRegistration) {
         // A registration first materialised by the scheduled reconciler (rather than by the

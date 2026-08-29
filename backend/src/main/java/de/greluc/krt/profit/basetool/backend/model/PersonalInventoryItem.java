@@ -35,7 +35,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Personal inventory entry owned by exactly one user (identified by the Keycloak {@code sub} claim,
+ * Personal inventory entry owned by exactly one user (identified by their {@code app_user.id},
  * stored in {@link #ownerSub}). Belongs to the user's personal inventory; not to be confused with
  * {@link InventoryItem}, which represents material/location-bound squadron stock.
  *
@@ -60,9 +60,16 @@ public class PersonalInventoryItem extends AbstractEntity<UUID> {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  /** Keycloak JWT {@code sub} of the owning user. Never expose to clients. */
-  @Column(name = "owner_sub", nullable = false, length = 64)
-  private String ownerSub;
+  /**
+   * {@code app_user.id} of the owning user. Never expose to clients.
+   *
+   * <p>A plain id rather than a {@code @ManyToOne User}: the column carries a foreign key with
+   * {@code ON DELETE CASCADE} (V235, REQ-DATA-008), and an association would make every row the
+   * cascade removes a managed entity holding a reference to the user being deleted -- the {@code
+   * TransientPropertyValueException} landmine REQ-DATA-008 documents.
+   */
+  @Column(name = "owner_sub", nullable = false)
+  private UUID ownerSub;
 
   @Column(nullable = false, length = 120)
   private String name;

@@ -4,13 +4,20 @@
 
 ### Fixed
 
+- **Die Daten eines gelöschten Kontos überleben es nicht mehr.** Fünf Spalten hielten eine
+  Mitglieds-ID ohne Fremdschlüssel: persönliches Inventar, persönliche Blueprints,
+  Benachrichtigungen, deren Empfänger-Regeln und die Beförderungs-Bewertungen — vergaß ein
+  Löschpfad eine davon, blieben die Zeilen unsichtbar liegen und wurden von einem zurückkehrenden
+  Keycloak-Konto wieder übernommen. Die Datenbank erzwingt das Aufräumen jetzt selbst
+  (Migration V235); am wichtigsten bei den Empfänger-Regeln, die sonst weiter Benachrichtigungen
+  für ein nicht mehr existierendes Mitglied erzeugen.
+
 - **Eine Anmeldung übernimmt kein fremdes Konto mehr, nur weil der Callsign passt.** Fand die
   Anmeldung kein Konto zur Kennung des Tokens, band sie die Sitzung bisher an das Konto mit dem
   gleichen Benutzernamen — und da Keycloak-Benutzernamen nach einer Löschung wiederverwendbar
   sind, erbte ein neu angelegtes Konto so Lager, Bankrechte und Benachrichtigungen des früheren
   Mitglieds. Es entsteht jetzt eine normale neue Registrierung; die Freigabeliste markiert sie mit
   „Callsign doppelt“, damit die Admins entscheiden statt zu erben.
-
 
 ## [v1.6.8](https://github.com/krt-profit/basetool/releases/tag/v1.6.8) - 2026-08-28
 
