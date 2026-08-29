@@ -145,13 +145,55 @@ jobs:
         # release-images off an arbitrary feature branch is NOT promotable to testing
         # either. Testing exists to rehearse what may later become production; a path
         # that accepts weaker provenance would make it a rehearsal of something else.
+        #
+        # A signature is uploaded to the registry AFTER the digest it covers, so a
+        # promotion fired while the release run is still signing reads a digest
+        # that exists and a signature that does not yet. That is exactly how the
+        # v1.6.11 promotion died: `cosign sign` logged "Signing artifact..." at
+        # 14:00:20.69 and this step reported "no signatures found" at 14:00:20.81
+        # — 120 ms apart, on the identical digest. The image was never unsigned.
+        #
+        # `cosign sign` in release-images.yml has retried since day one; this side
+        # did not, which left one half of an eventually-consistent registry
+        # hardened and the other half racing it.
+        #
+        # The retry is NARROW on purpose. Only an ABSENT signature is transient.
+        # A signature that is present and fails the identity check fails at once:
+        # retrying that would mean waiting for somebody to publish a matching one,
+        # which is the failure mode this gate exists to catch (REQ-OPS-002).
         run: |
           set -euo pipefail
-          cosign verify "${IMAGE_REF}" \
-            --certificate-identity-regexp "https://github.com/${REPO}/\\.github/workflows/release-images\\.yml@refs/(heads/main|tags/v.+)" \
-            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-            > /dev/null
-          echo "Signature OK"
+          attempts=6
+          delay=5
+          for i in $(seq 1 "$attempts"); do
+            if err="$(cosign verify "${IMAGE_REF}" \
+                 --certificate-identity-regexp "https://github.com/${REPO}/\\.github/workflows/release-images\\.yml@refs/(heads/main|tags/v.+)" \
+                 --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+                 2>&1 >/dev/null)"; then
+              echo "Signature OK"
+              exit 0
+            fi
+            case "$err" in
+              *"no signatures found"*|*"no matching signatures"*|*MANIFEST_UNKNOWN*|*NAME_UNKNOWN*)
+                if [ "$i" -lt "$attempts" ]; then
+                  echo "::warning::no signature on ${IMAGE_REF} yet (attempt ${i}/${attempts}) — a release run may still be uploading it; retrying in ${delay}s" >&2
+                  sleep "$delay"
+                  delay=$((delay * 2))
+                  continue
+                fi
+                ;;
+              *)
+                # Present but wrong — wrong identity, wrong issuer, bad chain.
+                # Not a race, and not something a later attempt can improve.
+                echo "::error::signature on ${IMAGE_REF} did not verify against this repository's release workflow identity" >&2
+                echo "$err" >&2
+                exit 1
+                ;;
+            esac
+          done
+          echo "::error::no signature appeared on ${IMAGE_REF} after ${attempts} attempts" >&2
+          echo "$err" >&2
+          exit 1
 
       - name: Re-tag digest as :testing
         env:
