@@ -10,6 +10,14 @@
   keine. Die Zeile wurde jetzt auf demselben Java-Abbild nachgestellt, das in Produktion läuft,
   und steht im Wortlaut neben der Regel.
 
+### Fixed
+
+- **Sechs Alarme für hängengebliebene Hintergrund-Jobs waren blind, wenn ein Job noch nie lief.**
+  Sie verglichen den Zeitpunkt des letzten Erfolgs mit der Uhr — den es aber erst gibt, sobald ein
+  Job einmal erfolgreich war. Ein Job, der seit dem letzten Neustart bei jedem Lauf scheiterte, sah
+  damit genauso aus wie ein gesunder. Die Regeln schlagen jetzt auch bei fehlender Rückmeldung an,
+  sobald der Server länger läuft als das jeweilige Zeitfenster.
+
 ## [v1.6.9](https://github.com/krt-profit/basetool/releases/tag/v1.6.9) - 2026-08-29
 
 ### Added

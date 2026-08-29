@@ -84,8 +84,18 @@ groups:
       # safety-net job — while never tripping on the ordinary 24h cycle. An admin-triggered "Sync
       # now" (POST /api/v1/users/sync) refreshes the same last-success gauge, so a manual run also
       # clears this alert.
+      # The `or absent(...)` companion (#1707, 2026-08-29): the last-success gauge is registered
+      # LAZILY, on a job's first success, and lives in the backend process — so a job that fails on
+      # EVERY run since the last restart publishes no series at all, `time() - gauge` has nothing to
+      # evaluate, and this alert stayed silent on exactly the failure it exists for. The companion is
+      # gated on backend uptime exceeding this rule's own window rather than being a bare absent():
+      # a bare one would fire after every deploy, since (unlike the textfile metrics behind the
+      # ops-automation alerts) this gauge does not survive a restart. Written per task, never once
+      # over an alternation — absent() is 1 only when the selector matches NOTHING, so a combined
+      # guard would stay false while one of two tasks was dead. Pinned by
+      # tests/scheduled_job_never_succeeded_test.yml.
       - alert: UserSyncStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"} > 0)) > 93600
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600)
         for: 10m
         labels:
           severity: warning
@@ -98,8 +108,9 @@ groups:
       # minutes is not staleness at all — it is the never-succeeded sentinel above (check
       # `changes(process_start_time_seconds[1h])` for a restart, and whether the fire lands one
       # `krt.scwiki.scheduler-initial-delay` after it). A real one stays up until someone acts.
+      # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: ExternalSyncStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"uex_sync|scwiki_sync"} > 0)) > 172800
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"uex_sync|scwiki_sync"} > 0)) > 172800 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="uex_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 172800) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="scwiki_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 172800)
         for: 10m
         labels:
           severity: warning
@@ -260,8 +271,9 @@ groups:
       # by TaskMetrics only on a job's first SUCCESS, so a job whose bean is config-gated off (or that
       # has not yet completed a run in this process) never publishes it and cannot report a false
       # stale (deliberate, per the issue; see the sentinel-guard note at the top of this group).
+      # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: ScheduledJobStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning"} > 0)) > 93600
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="notification_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="default_blueprint_provisioning"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600)
         for: 10m
         labels:
           severity: warning
@@ -274,8 +286,9 @@ groups:
       # BankLedgerIntegrityViolation (critical) can never fire — a broken bank invariant would go
       # undetected. Tighter 6h window (the sweep is hourly) and critical, matching the severity of the
       # invariant it guards.
+      # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: BankLedgerIntegritySweepStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"} > 0)) > 21600
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"} > 0)) > 21600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 21600)
         for: 10m
         labels:
           severity: critical
@@ -286,8 +299,9 @@ groups:
       # Same false-silence trap as the bank sweep (REQ-ORDERS-033): a stale job-order integrity sweep
       # freezes basetool_job_order_integrity_violations, so JobOrderItemBlueprintDrift can never fire
       # and a "0 drifted lines" reading means nothing. Warning, matching the alert it guards.
+      # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: JobOrderIntegritySweepStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"} > 0)) > 21600
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"} > 0)) > 21600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 21600)
         for: 10m
         labels:
           severity: warning
@@ -298,8 +312,9 @@ groups:
       # (#1041 item 3) BusinessMetricsCollector.refresh() (every 60s) feeds every approval/work-queue
       # depth gauge. If it wedges, the gauges FREEZE and the *ApprovalOverdue alerts silently consume
       # stale numbers. A last-success age > 10 min means ~10 missed samples — the sampler is stuck.
+      # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: BusinessMetricsStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"} > 0)) > 600
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"} > 0)) > 600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 600)
         for: 5m
         labels:
           severity: warning

@@ -904,6 +904,41 @@ transaction per pass) rather than per-scrape.
   **Triage corollary:** a staleness alert that resolves on its own within minutes is not staleness at
   all — a genuine one persists until someone acts.
 
+- **Never-succeeded companion on the same six rules (2026-08-29).** The fix above has a corollary
+  nobody drew at the time: if leaving the series **absent** until a real success is what makes the
+  sentinel safe, then an absent series is also indistinguishable from a job that has *never*
+  succeeded — and subtracting an absent series still yields an empty vector, so the rule stays
+  silent. Every one of the six staleness alerts was therefore blind to exactly the failure it exists
+  for: a job that fails on every run publishes no gauge, so `time() - gauge` has nothing to evaluate.
+  A job wedged since the last deploy looked identical to a healthy one. Found by the #1707 sweep,
+  which read every rule's left-hand side against production and found `user_sync` and `scwiki_sync`
+  with no series at all — a perfectly normal post-restart state on a daily cron and a
+  1 h-initial-delay job, and that is the whole problem. Each rule now carries a per-task companion:
+
+  ```promql
+  or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="scwiki_sync"})
+      and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 172800)
+  ```
+
+  Three properties are load-bearing. It is **not** the bare `or absent(…)` the ops-automation
+  alerts use: those read node_exporter **textfile** metrics, which outlive a restart, so a bare
+  `absent()` means "really never ran" there and would mean "just restarted" here — firing after
+  every deploy. Gating on the backend having been up longer than that rule's *own* window is what
+  separates the two. It is written **per task**, never once over the `uex_sync|scwiki_sync`
+  alternation, for the same reason `LogStreamSilent` is one rule per path (REQ-OBS-014):
+  `absent()` returns 1 only when the selector matches *nothing*, so a combined guard would stay
+  false while one of the two tasks was dead. And `process_start_time_seconds` is wrapped in `max()`
+  with `and on()` so the join carries no labels from the uptime side and survives a rolling deploy
+  briefly exposing two backend processes. Covered by
+  `monitoring/prometheus/tests/scheduled_job_never_succeeded_test.yml`, whose cases pin both
+  directions — fires when the window has passed, silent right after a restart.
+
+  **Reading rule, generally:** an absent *counter* is good news (Micrometer registers one lazily, so
+  absence means the branch was never taken), while an absent *gauge* is a defect — it means the
+  thing that was supposed to publish a level never got far enough to publish one. Any alert whose
+  left-hand side reads a lazily-registered gauge needs this companion; one that reads a counter
+  does not.
+
 - `basetool_sync_events_total{source,event_type}` counter at the three `SyncReportService`
   `log*Event` write sites (`source` = `SyncSourceSystem`, `event_type` = `SyncEventType`; both
   bounded enums — never the external asset name/uuid/detail).
