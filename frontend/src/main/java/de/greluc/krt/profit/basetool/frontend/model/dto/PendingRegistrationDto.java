@@ -32,6 +32,8 @@ import java.util.UUID;
  * @param registeredAt when the registration first appeared
  * @param decidedAt when an admin last decided this registration, i.e. the rejection time for a row
  *     in the rejected list (REQ-SEC-034); {@code null} for a row awaiting a decision
+ * @param callsignCollision whether another account already holds this callsign — approving the row
+ *     then creates a <b>second</b> account for it rather than admitting a new member (#1639)
  * @param version optimistic-lock version, echoed back on approve/reject
  */
 public record PendingRegistrationDto(
@@ -40,4 +42,5 @@ public record PendingRegistrationDto(
     String serverNickname,
     Instant registeredAt,
     Instant decidedAt,
+    boolean callsignCollision,
     Long version) {}

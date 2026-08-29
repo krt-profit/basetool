@@ -32,10 +32,14 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -131,6 +135,36 @@ public class UserRegistrationService {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Of the given registrations' callsigns, the ones a second account already holds.
+   *
+   * <p>Backs the "same callsign, different account" marker on the admin queue (#1639, ADR-0142
+   * point 5). Since a login whose subject matches no row no longer adopts an account found by name,
+   * the caller arrives as a new registration instead — and this is what tells the admin that
+   * approving it creates a <b>second</b> account for a callsign rather than admitting a new member.
+   * The remedy is an explicit merge, never an implicit inheritance.
+   *
+   * <p>One query for the whole page rather than a lookup per row (REQ-DATA-003). Keyed on {@code
+   * username} rather than on the displayed effective name: the collision that matters is the one a
+   * login can be confused by, and that is the Keycloak {@code preferred_username}. Matching is
+   * case-insensitive, because Keycloak treats usernames that way and an admin comparing two rows by
+   * eye does too.
+   *
+   * @param users the registrations being rendered
+   * @return the lower-cased colliding callsigns; empty when none collides
+   */
+  @NotNull
+  public Set<String> findCollidingCallsigns(@NotNull Collection<User> users) {
+    Set<String> names =
+        users.stream()
+            .map(User::getUsername)
+            .filter(Objects::nonNull)
+            .map(name -> name.toLowerCase(Locale.ROOT))
+            .collect(Collectors.toSet());
+    // JPQL rejects an empty IN list, and a page with no named rows has nothing to collide anyway.
+    return names.isEmpty() ? Set.of() : userRepository.findUsernamesHeldByMoreThanOneAccount(names);
   }
 
   /**

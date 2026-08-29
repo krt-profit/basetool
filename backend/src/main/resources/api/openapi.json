@@ -60507,6 +60507,9 @@
             "type" : "string",
             "format" : "date-time"
           },
+          "callsignCollision" : {
+            "type" : "boolean"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
