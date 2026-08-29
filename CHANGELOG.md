@@ -18,6 +18,11 @@
   damit genauso aus wie ein gesunder. Die Regeln schlagen jetzt auch bei fehlender Rückmeldung an,
   sobald der Server länger läuft als das jeweilige Zeitfenster.
 
+- **Raffinerie- und Operations-Aufträge gelten erst nach 90 statt nach 30 Tagen als liegengeblieben.**
+  Beim ersten Messen der Warteschlange stand der älteste offene Raffinerie-Auftrag bei 29,65 Tagen —
+  der Alarm war also Stunden davon entfernt, bei fünf laufenden Aufträgen anzuschlagen, die niemand
+  aufgegeben hatte. Eine Grenze, die der normale Betrieb erreicht, ist keine Grenze.
+
 ## [v1.6.9](https://github.com/krt-profit/basetool/releases/tag/v1.6.9) - 2026-08-29
 
 ### Added

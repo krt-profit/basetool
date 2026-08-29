@@ -454,8 +454,16 @@ groups:
       # Human work queues (JobOrder OPEN, Operation PLANNED, RefineryOrder OPEN) move on human time,
       # so the threshold is a "someone forgot this exists" floor, not an SLA. baseline-tune: raise/lower
       # once the real queue-age distribution is known for the active org. JobOrder is tuned to 180d for
-      # the current org cadence (long-running orders are normal); Refinery/Operation stay at the 30d
-      # baseline.
+      # the current org cadence (long-running orders are normal).
+      #
+      # Refinery/Operation moved 30d -> 90d on 2026-08-29, the first time the queue was actually
+      # measured (#1707): the oldest open refinery order stood at 29.65d against the 30d floor, i.e.
+      # the alert was hours from firing on a queue of five orders (1 OPEN, 4 IN_PROGRESS) that nobody
+      # had called abandoned. A floor a live queue reaches in normal operation is not a floor. 90d
+      # keeps the "someone forgot this exists" intent while clearing the observed working range; it is
+      # still a baseline, and the same measurement is the way to revisit it. OperationStale is moved
+      # with it deliberately: it shares the queue's cadence, it had no open operations at all when
+      # measured, and leaving the two thresholds to diverge on no evidence would be the worse default.
       - alert: JobOrderStale
         expr: basetool_job_order_open_oldest_age_seconds > 15552000
         for: 1h
@@ -466,22 +474,22 @@ groups:
           description: "A job order has been OPEN for more than 180 days — likely abandoned. Close or reassign it (threshold is a baseline; tune to the org's cadence)."
 
       - alert: RefineryOrderStale
-        expr: basetool_refinery_order_open_oldest_age_seconds > 2592000
+        expr: basetool_refinery_order_open_oldest_age_seconds > 7776000
         for: 1h
         labels:
           severity: warning
         annotations:
-          summary: "Oldest open refinery order >30d"
-          description: "A refinery order has been OPEN for more than 30 days — likely abandoned. Close or reassign it (threshold is a baseline; tune to the org's cadence)."
+          summary: "Oldest open refinery order >90d"
+          description: "A refinery order has been OPEN for more than 90 days — likely abandoned. Close or reassign it (threshold is a baseline; tune to the org's cadence)."
 
       - alert: OperationStale
-        expr: basetool_operation_open_oldest_age_seconds > 2592000
+        expr: basetool_operation_open_oldest_age_seconds > 7776000
         for: 1h
         labels:
           severity: warning
         annotations:
-          summary: "Oldest planned operation >30d"
-          description: "An operation has been PLANNED for more than 30 days — likely abandoned. Execute, reschedule or cancel it (threshold is a baseline; tune to the org's cadence)."
+          summary: "Oldest planned operation >90d"
+          description: "An operation has been PLANNED for more than 90 days — likely abandoned. Execute, reschedule or cancel it (threshold is a baseline; tune to the org's cadence)."
 
       # (#1041 item 15) P4K import terminal failures. The pending-queue gauge drains back to 0 after a
       # failed run, so a reliably-failing import looks like a healthy empty queue. This counter is
@@ -800,6 +808,15 @@ groups:
       # Everything NOT named above is alerted, so a newly added AuditDomain is covered by default and
       # exempting it has to be a deliberate edit here rather than an omission. A domain that never
       # emitted has no series and cannot fire; only one that WAS active and went silent 14d does.
+      #
+      # TRIAGE (#1707, 2026-08-29): this alert SELF-CLEARS on a deploy, and a cleared one is not
+      # evidence that anything was fixed. The counter is per-process, so a deploy resets it; once the
+      # pre-deploy samples age out of the 14d window the domain has no series at all, and a rule that
+      # needs `sum by (domain)` to produce a group goes quiet while the silence it reports continues.
+      # `or vector(0)` cannot patch this — vector(0) carries no `domain` label — so closing it means
+      # pinning the expected domain set in the rule, which is exactly the upkeep the covered-by-default
+      # design above exists to avoid. Deliberately left as-is (@greluc, 2026-08-29); the 07 dashboard's
+      # per-domain 14d/60d tables are the authoritative view when this alert disappears.
       # baseline-tune: the 14d window suits an active org; a very quiet squadron may need it widened.
       - alert: AuditDomainSilenceAnomaly
         expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"ROLE|PROMOTION|PERSONAL_INVENTORY|MARKET"}[14d])) == 0) and on() (up{job="basetool-backend"} == 1)
