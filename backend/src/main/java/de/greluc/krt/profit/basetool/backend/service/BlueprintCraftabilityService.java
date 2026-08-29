@@ -100,17 +100,18 @@ public class BlueprintCraftabilityService {
   /**
    * Computes the craftability of every blueprint the caller owns.
    *
-   * @param ownerSub the caller's Keycloak {@code sub} (owns the personal blueprints)
-   * @param userId the caller's user id (owns the inventory + refinery rows; equals the {@code sub})
+   * @param userId the caller's {@code app_user.id}: it owns both the personal blueprints and the
+   *     inventory + refinery rows. Two parameters carried this one value until V235 made the
+   *     blueprint owner column a UUID foreign key like every other (ADR-0142).
    * @param includeRefinery whether to fold the caller's open refinery yield into the {@code
    *     *WithRefinery} figures; when {@code false} those equal the inventory-only figures
    * @return one craftability entry per owned blueprint; never {@code null}
    */
   @NotNull
   public List<BlueprintCraftabilityDto> computeForOwner(
-      @NotNull String ownerSub, @NotNull UUID userId, boolean includeRefinery) {
+      @NotNull UUID userId, boolean includeRefinery) {
     List<PersonalBlueprintResponse> owned =
-        personalBlueprintService.listOwn(ownerSub, null, Pageable.unpaged()).getContent();
+        personalBlueprintService.listOwn(userId, null, Pageable.unpaged()).getContent();
     if (owned.isEmpty()) {
       return List.of();
     }

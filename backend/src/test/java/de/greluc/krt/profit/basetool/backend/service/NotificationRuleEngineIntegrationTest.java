@@ -120,6 +120,12 @@ class NotificationRuleEngineIntegrationTest {
     NotificationRule extraRule =
         transactionTemplate.execute(
             status -> {
+              // notification_rule_selector.user_sub is a foreign key to app_user(id) since V235
+              // (REQ-DATA-008): a selector pointing at an invented member no longer inserts.
+              User target = new User();
+              target.setId(recipient);
+              target.setUsername("specific-user-" + recipient);
+              userRepository.save(target);
               NotificationRule rule =
                   NotificationRule.builder()
                       .eventType(NotificationEventType.JOB_ORDER_CREATED)
@@ -151,7 +157,13 @@ class NotificationRuleEngineIntegrationTest {
               });
     } finally {
       transactionTemplate.executeWithoutResult(
-          status -> notificationRuleRepository.deleteById(extraRule.getId()));
+          status -> {
+            notificationRuleRepository.deleteById(extraRule.getId());
+            // The seeded target must go too: the test database is shared across the suite, and a
+            // leftover login-capable user shifts the counts other classes assert over. Deleting it
+            // takes its notifications with it (V235, ON DELETE CASCADE).
+            userRepository.deleteById(recipient);
+          });
     }
   }
 

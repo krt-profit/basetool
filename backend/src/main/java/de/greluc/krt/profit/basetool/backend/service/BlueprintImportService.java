@@ -44,6 +44,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -104,14 +105,14 @@ public class BlueprintImportService {
    * the master product list for {@code ownerSub} — scmdb.net entries first try their structural
    * {@code tag}, then every entry falls through the name chain. No rows are persisted.
    *
-   * @param ownerSub Keycloak {@code sub} the import is being previewed for (owned-flag computation)
+   * @param ownerSub {@code app_user.id} the import is being previewed for (owned-flag computation)
    * @param file the uploaded blueprint export JSON
    * @return the preview with per-name rows and per-status counts
    * @throws BadRequestException if the file is empty, not valid JSON, or carries no blueprint array
    */
   @NotNull
   public BlueprintImportPreviewDto previewImport(
-      @NotNull String ownerSub, @NotNull MultipartFile file) {
+      @NotNull UUID ownerSub, @NotNull MultipartFile file) {
     List<BlueprintExportParser.ParsedEntry> parsed =
         BlueprintExportParser.parse(objectMapper, file);
 
@@ -198,14 +199,14 @@ public class BlueprintImportService {
    * leaves it untouched). That earlier value is written by mutating the managed entity and relying
    * on dirty-checking — no {@code save()} / {@code flush()} — per the CLAUDE.md concurrency rules.
    *
-   * @param ownerSub Keycloak {@code sub} the rows are created for
+   * @param ownerSub {@code app_user.id} the rows are created for
    * @param resolutions the per-name decisions (see {@link BlueprintImportApplyRequest})
    * @return a summary of added / learned / skipped / already-owned counts
    */
   @Transactional
   @NotNull
   public BlueprintImportResultDto applyImport(
-      @NotNull String ownerSub, @NotNull List<BlueprintImportResolutionDto> resolutions) {
+      @NotNull UUID ownerSub, @NotNull List<BlueprintImportResolutionDto> resolutions) {
     Map<String, ResolvedProduct> productByKey = productIndex();
 
     int added = 0;
@@ -280,14 +281,14 @@ public class BlueprintImportService {
    * tag match REQ-INV-019 can route here for differently-cased display names) from inserting two
    * rows that the {@code Optional}-returning resolution lookup would then choke on.
    *
-   * @param ownerSub Keycloak {@code sub} stamped as the alias creator
+   * @param ownerSub {@code app_user.id} stamped as the alias creator
    * @param externalName the SCMDB / scmdb.net name being resolved (exact, trimmed)
    * @param product the chosen product
    * @param aliasNamesSeen lower-cased external names already aliased in this request (mutated)
    * @return {@code true} if a new alias row was persisted
    */
   private boolean learnAliasIfManual(
-      @NotNull String ownerSub,
+      @NotNull UUID ownerSub,
       @NotNull String externalName,
       @NotNull ResolvedProduct product,
       @NotNull Set<String> aliasNamesSeen) {
@@ -308,7 +309,7 @@ public class BlueprintImportService {
     if (product.outputItemId() != null) {
       alias.setOutputItem(gameItemRepository.getReferenceById(product.outputItemId()));
     }
-    alias.setCreatedBy(ownerSub);
+    alias.setCreatedBy(ownerSub.toString());
     aliasRepository.save(alias);
     log.info(
         "Learned blueprint alias: external='{}' -> productKey='{}' by={}",
@@ -463,12 +464,12 @@ public class BlueprintImportService {
   /**
    * Returns the subset of {@code keys} the owner already owns via a single bulk lookup.
    *
-   * @param ownerSub Keycloak {@code sub} of the owner
+   * @param ownerSub {@code app_user.id} of the owner
    * @param keys the product keys to test
    * @return the owned product keys (empty if {@code keys} is empty)
    */
   @NotNull
-  private Set<String> ownedKeys(@NotNull String ownerSub, @NotNull Set<String> keys) {
+  private Set<String> ownedKeys(@NotNull UUID ownerSub, @NotNull Set<String> keys) {
     return new HashSet<>(ownedByKey(ownerSub, keys).keySet());
   }
 
@@ -478,13 +479,13 @@ public class BlueprintImportService {
    * refresh; the returned entities are managed, so mutating one (e.g. its {@code acquiredAt}) is
    * flushed by dirty-checking without an explicit {@code save()}.
    *
-   * @param ownerSub Keycloak {@code sub} of the owner
+   * @param ownerSub {@code app_user.id} of the owner
    * @param keys the product keys to load
    * @return owned rows indexed by product key (empty if {@code keys} is empty)
    */
   @NotNull
   private Map<String, PersonalBlueprint> ownedByKey(
-      @NotNull String ownerSub, @NotNull Set<String> keys) {
+      @NotNull UUID ownerSub, @NotNull Set<String> keys) {
     if (keys.isEmpty()) {
       return new HashMap<>();
     }
@@ -518,7 +519,7 @@ public class BlueprintImportService {
    * Builds a new, unsaved owned-blueprint entity stamped with the resolved product, attaching the
    * output item as a lazy reference when the product carries one.
    *
-   * @param ownerSub Keycloak {@code sub} of the owner
+   * @param ownerSub {@code app_user.id} of the owner
    * @param product the chosen product to stamp
    * @param acquiredAt optional acquisition time
    * @param note optional note
@@ -526,7 +527,7 @@ public class BlueprintImportService {
    */
   @NotNull
   private PersonalBlueprint newOwned(
-      @NotNull String ownerSub,
+      @NotNull UUID ownerSub,
       @NotNull ResolvedProduct product,
       @Nullable Instant acquiredAt,
       @Nullable String note) {

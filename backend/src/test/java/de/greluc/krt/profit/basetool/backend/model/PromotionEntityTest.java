@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.model;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -119,13 +120,13 @@ class PromotionEntityTest {
     // When
     MemberEvaluation evaluation =
         MemberEvaluation.builder()
-            .userId("user-sub-123")
+            .userId(UUID.fromString("12312312-3123-4123-8123-123123123123"))
             .category(category)
             .assignedLevel(null)
             .build();
 
     // Then
-    assertEquals("user-sub-123", evaluation.getUserId());
+    assertEquals(UUID.fromString("12312312-3123-4123-8123-123123123123"), evaluation.getUserId());
     assertSame(category, evaluation.getCategory());
     assertNull(evaluation.getAssignedLevel());
   }
@@ -139,7 +140,7 @@ class PromotionEntityTest {
     // When
     MemberEvaluation evaluation =
         MemberEvaluation.builder()
-            .userId("user-sub-456")
+            .userId(UUID.fromString("45645645-6456-4456-8456-456456456456"))
             .category(category)
             .assignedLevel(PromotionLevel.LEVEL_B)
             .build();

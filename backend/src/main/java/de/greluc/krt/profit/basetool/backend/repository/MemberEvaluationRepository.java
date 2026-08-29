@@ -47,26 +47,26 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
    * Returns every evaluation belonging to the given JWT-sub, without eager joins. Used for the
    * user-facing "my evaluations" list where category / topic data is rendered separately.
    *
-   * @param userId the JWT-sub identifier of the member
+   * @param userId the {@code app_user.id} of the member
    * @return every evaluation row for that member, possibly empty
    */
-  List<MemberEvaluation> findAllByUserId(String userId);
+  List<MemberEvaluation> findAllByUserId(UUID userId);
 
   /**
    * Paginated variant of {@link #findAllByUserId(String)} for the personal view.
    *
-   * @param userId the JWT-sub identifier of the member
+   * @param userId the {@code app_user.id} of the member
    * @param pageable Spring Data pagination/sort instructions
    * @return a page of evaluations for the member
    */
-  Page<MemberEvaluation> findAllByUserId(String userId, Pageable pageable);
+  Page<MemberEvaluation> findAllByUserId(UUID userId, Pageable pageable);
 
   /**
    * Squadron-scoped variant of {@link #findAllByUserId(String)} for the "my evaluations" list, so a
    * member who belongs to more than one squadron only sees the active squadron's grades. {@code
    * null} scope spans every squadron.
    *
-   * @param userId the JWT-sub identifier of the member
+   * @param userId the {@code app_user.id} of the member
    * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
    * @return the member's evaluations visible in the scope, possibly empty
    */
@@ -76,12 +76,12 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
       e.category.topic.owningSquadron.id = :owningSquadronId)
       """)
   List<MemberEvaluation> findAllByUserIdScoped(
-      @Param("userId") String userId, @Param("owningSquadronId") UUID owningSquadronId);
+      @Param("userId") UUID userId, @Param("owningSquadronId") UUID owningSquadronId);
 
   /**
    * Paginated squadron-scoped variant of {@link #findAllByUserIdScoped(String, UUID)}.
    *
-   * @param userId the JWT-sub identifier of the member
+   * @param userId the {@code app_user.id} of the member
    * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
    * @param pageable Spring Data pagination/sort instructions
    * @return a page of the member's evaluations visible in the scope
@@ -92,7 +92,7 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
       e.category.topic.owningSquadron.id = :owningSquadronId)
       """)
   Page<MemberEvaluation> findAllByUserIdScoped(
-      @Param("userId") String userId,
+      @Param("userId") UUID userId,
       @Param("owningSquadronId") UUID owningSquadronId,
       Pageable pageable);
 
@@ -116,28 +116,28 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
   /**
    * Looks up a single evaluation by its primary key components.
    *
-   * @param userId the JWT-sub identifier of the member
+   * @param userId the {@code app_user.id} of the member
    * @param categoryId the category the evaluation refers to
    * @return the evaluation if one exists for the pair, otherwise empty
    */
-  Optional<MemberEvaluation> findByUserIdAndCategoryId(String userId, UUID categoryId);
+  Optional<MemberEvaluation> findByUserIdAndCategoryId(UUID userId, UUID categoryId);
 
   /**
    * Existence probe used by the upsert flow to decide between insert and update without loading the
    * row.
    *
-   * @param userId the JWT-sub identifier of the member
+   * @param userId the {@code app_user.id} of the member
    * @param categoryId the category the potential evaluation would refer to
    * @return {@code true} iff a row exists for the pair
    */
-  boolean existsByUserIdAndCategoryId(String userId, UUID categoryId);
+  boolean existsByUserIdAndCategoryId(UUID userId, UUID categoryId);
 
   /**
    * Returns every evaluation for a user with the parent {@code PromotionCategory} and its {@code
    * PromotionTopic} eagerly fetched. The eligibility evaluator uses this method to avoid N+1 lazy
    * loads when grouping evaluations by topic.
    *
-   * @param userId the JWT-sub identifier of the member
+   * @param userId the {@code app_user.id} of the member
    * @return evaluations with category+topic already populated, possibly empty
    */
   @Query(
@@ -147,7 +147,7 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
       JOIN FETCH c.topic
       WHERE e.userId = :userId
       """)
-  List<MemberEvaluation> findAllByUserIdWithCategoryAndTopic(String userId);
+  List<MemberEvaluation> findAllByUserIdWithCategoryAndTopic(UUID userId);
 
   /**
    * Squadron-scoped variant of {@link #findAllByUserIdWithCategoryAndTopic(String)} used by the
@@ -155,7 +155,7 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
    * ("any N categories") rank requirement from counting grades the member earned in a different
    * squadron's catalog. {@code null} scope spans every squadron (admin "all squadrons" mode).
    *
-   * @param userId the JWT-sub identifier of the member
+   * @param userId the {@code app_user.id} of the member
    * @param owningSquadronId the active squadron scope, or {@code null} for all squadrons
    * @return the member's evaluations (category+topic fetched) within the scope, possibly empty
    */
@@ -168,7 +168,7 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
       AND (:owningSquadronId IS NULL OR t.owningSquadron.id = :owningSquadronId)
       """)
   List<MemberEvaluation> findAllByUserIdWithCategoryAndTopicScoped(
-      @Param("userId") String userId, @Param("owningSquadronId") UUID owningSquadronId);
+      @Param("userId") UUID userId, @Param("owningSquadronId") UUID owningSquadronId);
 
   /**
    * Deletes every promotion grade of the given member as part of the hard account deletion
@@ -179,10 +179,10 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
    * <p>Set-based and without {@code clearAutomatically}, because it runs inside the user-deletion
    * transaction where evicting the persistence context would detach the {@code User} being deleted.
    *
-   * @param userId the departing member's JWT-sub identifier (equal to {@code app_user.id} as text)
+   * @param userId the departing member's {@code app_user.id}
    * @return the number of grades removed, for the audit summary event
    */
   @Modifying
   @Query("DELETE FROM MemberEvaluation e WHERE e.userId = :userId")
-  int deleteAllByUserId(@Param("userId") String userId);
+  int deleteAllByUserId(@Param("userId") UUID userId);
 }

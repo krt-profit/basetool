@@ -25,12 +25,12 @@ import java.util.UUID;
 
 /**
  * Read DTO for {@code MemberEvaluation}. Note: {@code userId} is included for admin views; personal
- * views should filter by JWT sub.
+ * views are already scoped to the caller.
  */
 public record MemberEvaluationResponse(
     UUID id,
     Long version,
-    String userId,
+    UUID userId,
     UUID categoryId,
     String categoryName,
     UUID topicId,

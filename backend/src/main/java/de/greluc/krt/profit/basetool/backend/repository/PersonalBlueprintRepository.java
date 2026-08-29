@@ -45,74 +45,74 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
   /**
    * Page of the blueprints owned by one user.
    *
-   * @param ownerSub Keycloak {@code sub} of the owner
+   * @param ownerSub {@code app_user.id} of the owner
    * @param pageable page request with a whitelisted sort
    * @return the owner's blueprints
    */
-  Page<PersonalBlueprint> findAllByOwnerSub(String ownerSub, Pageable pageable);
+  Page<PersonalBlueprint> findAllByOwnerSub(UUID ownerSub, Pageable pageable);
 
   /**
    * Page of the blueprints owned by one user whose product name contains the given fragment
    * (case-insensitive) — backs the owned-list filter box.
    *
-   * @param ownerSub Keycloak {@code sub} of the owner
+   * @param ownerSub {@code app_user.id} of the owner
    * @param nameFragment case-insensitive product-name substring
    * @param pageable page request with a whitelisted sort
    * @return the owner's matching blueprints
    */
   Page<PersonalBlueprint> findAllByOwnerSubAndProductNameContainingIgnoreCase(
-      String ownerSub, String nameFragment, Pageable pageable);
+      UUID ownerSub, String nameFragment, Pageable pageable);
 
   /**
    * Owner-scoped single lookup for detail / update / delete; returns empty for a foreign or unknown
    * id so the service can answer 404 without leaking another user's ownership.
    *
    * @param id the entry id
-   * @param ownerSub Keycloak {@code sub} of the owner
+   * @param ownerSub {@code app_user.id} of the owner
    * @return the entry if it belongs to the owner, empty otherwise
    */
-  Optional<PersonalBlueprint> findByIdAndOwnerSub(UUID id, String ownerSub);
+  Optional<PersonalBlueprint> findByIdAndOwnerSub(UUID id, UUID ownerSub);
 
   /**
    * Owner-scoped product lookup; used by add / import to detect an existing ownership row before
    * the {@code (owner_sub, product_key)} unique constraint fires.
    *
-   * @param ownerSub Keycloak {@code sub} of the owner
+   * @param ownerSub {@code app_user.id} of the owner
    * @param productKey normalized product key
    * @return the entry if the owner already owns the product, empty otherwise
    */
-  Optional<PersonalBlueprint> findByOwnerSubAndProductKey(String ownerSub, String productKey);
+  Optional<PersonalBlueprint> findByOwnerSubAndProductKey(UUID ownerSub, String productKey);
 
   /**
    * Fast owner-scoped existence check for the product, used to short-circuit duplicate adds with a
    * 409 before hitting the unique constraint.
    *
-   * @param ownerSub Keycloak {@code sub} of the owner
+   * @param ownerSub {@code app_user.id} of the owner
    * @param productKey normalized product key
    * @return {@code true} if the owner already owns the product
    */
-  boolean existsByOwnerSubAndProductKey(String ownerSub, String productKey);
+  boolean existsByOwnerSubAndProductKey(UUID ownerSub, String productKey);
 
   /**
    * Owner-scoped bulk product lookup, used to compute the "already owned" flag for a page of search
    * results and to dedupe a batch add / import in a single query.
    *
-   * @param ownerSub Keycloak {@code sub} of the owner
+   * @param ownerSub {@code app_user.id} of the owner
    * @param productKeys the product keys to test
    * @return the owner's entries whose product key is in the given set
    */
   List<PersonalBlueprint> findAllByOwnerSubAndProductKeyIn(
-      String ownerSub, Collection<String> productKeys);
+      UUID ownerSub, Collection<String> productKeys);
 
   /**
    * Bulk owner lookup across several owners — backs the org-unit blueprint availability aggregation
-   * (#364): given the Keycloak {@code sub}s of every in-scope org-unit member, returns all their
+   * (#364): given the {@code app_user.id}s of every in-scope org-unit member, returns all their
    * owned-blueprint rows for grouping by product in the service layer.
    *
-   * @param ownerSubs the Keycloak {@code sub}s of the in-scope owners
+   * @param ownerSubs the {@code app_user.id}s of the in-scope owners
    * @return every owned-blueprint row whose owner is in the given set; never {@code null}
    */
-  List<PersonalBlueprint> findAllByOwnerSubIn(Collection<String> ownerSubs);
+  List<PersonalBlueprint> findAllByOwnerSubIn(Collection<UUID> ownerSubs);
 
   /**
    * Projection variant of {@link #findAllByOwnerSubIn(Collection)} for the family-grouping
@@ -121,7 +121,7 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
    * two-column {@link BlueprintOwnerProduct} projection instead of hydrating every full blueprint
    * row of an admin all-scope view (REQ-DATA-003).
    *
-   * @param ownerSubs the Keycloak {@code sub}s of the in-scope owners
+   * @param ownerSubs the {@code app_user.id}s of the in-scope owners
    * @return one {@code (ownerSub, productName)} projection per owned-blueprint row; never {@code
    *     null}
    */
@@ -130,19 +130,19 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
       SELECT new de.greluc.krt.profit.basetool.backend.model.projection.BlueprintOwnerProduct(b.ownerSub, b.productName) FROM PersonalBlueprint b WHERE b.ownerSub IN :ownerSubs
       """)
   List<BlueprintOwnerProduct> findOwnerProductByOwnerSubIn(
-      @Param("ownerSubs") Collection<String> ownerSubs);
+      @Param("ownerSubs") Collection<UUID> ownerSubs);
 
   /**
    * Owner-restricted product lookup — backs the availability drill-down (#364): given one product
-   * key and the Keycloak {@code sub}s of every in-scope member, returns the rows that pin which of
+   * key and the {@code app_user.id}s of every in-scope member, returns the rows that pin which of
    * those members own the product.
    *
    * @param productKey the normalized product key to match
-   * @param ownerSubs the Keycloak {@code sub}s of the in-scope owners
+   * @param ownerSubs the {@code app_user.id}s of the in-scope owners
    * @return the matching rows (one per owning in-scope member); never {@code null}
    */
   List<PersonalBlueprint> findAllByProductKeyAndOwnerSubIn(
-      String productKey, Collection<String> ownerSubs);
+      String productKey, Collection<UUID> ownerSubs);
 
   /**
    * Unrestricted product lookup — backs the admin "all org units" branch of the availability
@@ -174,45 +174,45 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
 
   /**
    * Owner-restricted bulk product lookup — backs the scoped branch of the variant-family owner
-   * drill-down (#364): given a family's product-key set and the Keycloak {@code sub}s of every
+   * drill-down (#364): given a family's product-key set and the {@code app_user.id}s of every
    * in-scope member, returns the rows that pin which of those members own any product in the
    * family. The family-aware generalization of {@link #findAllByProductKeyAndOwnerSubIn(String,
    * Collection)}; keeping the owner restriction server-side preserves the multi-user data-isolation
    * rule.
    *
    * @param productKeys the normalized product keys making up the family
-   * @param ownerSubs the Keycloak {@code sub}s of the in-scope owners
+   * @param ownerSubs the {@code app_user.id}s of the in-scope owners
    * @return the matching rows (one per owning in-scope member × owned family product); never {@code
    *     null}
    */
   List<PersonalBlueprint> findAllByProductKeyInAndOwnerSubIn(
-      Collection<String> productKeys, Collection<String> ownerSubs);
+      Collection<String> productKeys, Collection<UUID> ownerSubs);
 
   /**
    * Bulk owner + product lookup — backs the item job-order blueprint-coverage view: given the
-   * Keycloak {@code sub}s of every member of the order's responsible org unit and the set of
+   * {@code app_user.id}s of every member of the order's responsible org unit and the set of
    * normalized product keys the order's item lines resolve to, returns exactly the owned-blueprint
    * rows that match both, so the service can group them by owner and by product in one query.
    *
-   * @param ownerSubs the Keycloak {@code sub}s of the responsible org unit's members
+   * @param ownerSubs the {@code app_user.id}s of the responsible org unit's members
    * @param productKeys the normalized product keys of the order's required items
    * @return the matching rows (one per owning member × owned required product); never {@code null}
    */
   List<PersonalBlueprint> findAllByOwnerSubInAndProductKeyIn(
-      Collection<String> ownerSubs, Collection<String> productKeys);
+      Collection<UUID> ownerSubs, Collection<String> productKeys);
 
   /**
-   * Returns the distinct Keycloak {@code sub} of every blueprint owner in the table. Backs the
-   * admin "all org units" branch of the availability overview (#364, #371 fix): that scope spans
-   * every owner — including a user with no org-unit membership (e.g. an admin without a Staffel) —
-   * which a membership-derived member list silently dropped. The owned rows are still fetched
-   * through {@link #findAllByOwnerSubIn(Collection)}, so the owner-isolation contract is unchanged.
+   * Returns the distinct {@code app_user.id} of every blueprint owner in the table. Backs the admin
+   * "all org units" branch of the availability overview (#364, #371 fix): that scope spans every
+   * owner — including a user with no org-unit membership (e.g. an admin without a Staffel) — which
+   * a membership-derived member list silently dropped. The owned rows are still fetched through
+   * {@link #findAllByOwnerSubIn(Collection)}, so the owner-isolation contract is unchanged.
    *
    * @return every distinct {@code owner_sub} present in the table; never {@code null}, possibly
    *     empty.
    */
   @Query("SELECT DISTINCT pb.ownerSub FROM PersonalBlueprint pb")
-  Set<String> findAllDistinctOwnerSubs();
+  Set<UUID> findAllDistinctOwnerSubs();
 
   /**
    * Bulk-removes every <em>removable</em> owned blueprint of one user — the "delete all my
@@ -224,7 +224,7 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
    * and no per-row {@code load}; {@code clearAutomatically} detaches any owned rows loaded earlier
    * in the transaction so a later read reflects the removal.
    *
-   * @param ownerSub Keycloak {@code sub} of the owner whose removable blueprints are cleared
+   * @param ownerSub the {@code app_user.id} of the owner whose removable blueprints are cleared
    * @return the number of rows removed (never counts a preserved default)
    */
   @Modifying(clearAutomatically = true, flushAutomatically = true)
@@ -234,7 +234,7 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
       WHERE b.ownerSub = :ownerSub
         AND b.productKey NOT IN (SELECT d.productKey FROM DefaultBlueprint d)
       """)
-  int deleteRemovableByOwnerSub(@Param("ownerSub") String ownerSub);
+  int deleteRemovableByOwnerSub(@Param("ownerSub") UUID ownerSub);
 
   /**
    * Bulk-removes every <em>removable</em> owned blueprint of <strong>all</strong> users — the admin
@@ -270,13 +270,12 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
    * subsequent {@code delete} into a {@code merge} of a detached instance. Nothing loads {@code
    * PersonalBlueprint} rows in that transaction, so there is nothing stale to evict.
    *
-   * @param ownerSub Keycloak {@code sub} of the departing owner (equal to {@code app_user.id} as
-   *     text)
+   * @param ownerSub the departing owner's {@code app_user.id}
    * @return the number of rows removed, for the audit summary event
    */
   @Modifying
   @Query("DELETE FROM PersonalBlueprint b WHERE b.ownerSub = :ownerSub")
-  int deleteAllByOwnerSub(@Param("ownerSub") String ownerSub);
+  int deleteAllByOwnerSub(@Param("ownerSub") UUID ownerSub);
 
   /**
    * Materialises the admin-curated default blueprints (REQ-INV-016) for a single user: inserts one
@@ -286,7 +285,7 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
    * updated_at} fall to their column defaults. {@code flushAutomatically} flushes any pending
    * persistence-context writes first so a default just added in the same transaction is visible.
    *
-   * @param ownerSub Keycloak {@code sub} (= {@code app_user.id} as text) of the user to provision
+   * @param ownerSub the {@code app_user.id} of the user to provision
    * @return the number of newly inserted rows
    */
   @Modifying(flushAutomatically = true)
@@ -294,12 +293,12 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
       value =
           """
           INSERT INTO personal_blueprint (id, owner_sub, product_key, product_name, output_item_id)
-          SELECT gen_random_uuid(), :ownerSub, d.product_key, d.product_name, d.output_item_id
+          SELECT gen_random_uuid(), CAST(:ownerSub AS uuid), d.product_key, d.product_name, d.output_item_id
           FROM default_blueprint d
           ON CONFLICT (owner_sub, product_key) DO NOTHING
           """,
       nativeQuery = true)
-  int grantDefaultBlueprintsToUser(@Param("ownerSub") String ownerSub);
+  int grantDefaultBlueprintsToUser(@Param("ownerSub") UUID ownerSub);
 
   /**
    * Materialises the admin-curated default blueprints (REQ-INV-016) for every active user in one
@@ -316,7 +315,7 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
       value =
           """
           INSERT INTO personal_blueprint (id, owner_sub, product_key, product_name, output_item_id)
-          SELECT gen_random_uuid(), u.id::text, d.product_key, d.product_name, d.output_item_id
+          SELECT gen_random_uuid(), u.id, d.product_key, d.product_name, d.output_item_id
           FROM app_user u
           CROSS JOIN default_blueprint d
           WHERE u.in_keycloak = true

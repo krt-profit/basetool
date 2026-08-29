@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -43,7 +44,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class BlueprintProductControllerTest {
 
-  private static final String SUB = "user-sub-1";
+  private static final UUID SUB = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
   @Mock private BlueprintProductService service;
   @InjectMocks private BlueprintProductController controller;

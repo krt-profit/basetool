@@ -83,13 +83,13 @@ public class PersonalBlueprintService {
    * Owner-scoped paged list of owned blueprints, optionally filtered by a case-insensitive product
    * name substring.
    *
-   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param ownerSub {@code app_user.id} of the caller
    * @param query optional case-insensitive product-name filter
    * @param pageable page request (sort fields whitelisted by {@link #SORTABLE_FIELDS})
    * @return paged response DTOs
    */
   public Page<PersonalBlueprintResponse> listOwn(
-      @NotNull String ownerSub, @Nullable String query, @NotNull Pageable pageable) {
+      @NotNull UUID ownerSub, @Nullable String query, @NotNull Pageable pageable) {
     Page<PersonalBlueprint> page =
         (query == null || query.isBlank())
             ? repository.findAllByOwnerSub(ownerSub, pageable)
@@ -102,7 +102,7 @@ public class PersonalBlueprintService {
    * Adds a single blueprint to the caller's owned set. The product key is resolved against the
    * active master list and the canonical name + output item are stamped onto the new row.
    *
-   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param ownerSub {@code app_user.id} of the caller
    * @param request the add payload (product key + optional acquisition date / note)
    * @return the persisted DTO
    * @throws EntityNotFoundException if the product key matches no active product
@@ -110,7 +110,7 @@ public class PersonalBlueprintService {
    */
   @Transactional
   public PersonalBlueprintResponse add(
-      @NotNull String ownerSub, @NotNull PersonalBlueprintCreateRequest request) {
+      @NotNull UUID ownerSub, @NotNull PersonalBlueprintCreateRequest request) {
     ResolvedProduct product =
         blueprintProductService
             .resolveByProductKey(request.productKey())
@@ -137,13 +137,13 @@ public class PersonalBlueprintService {
    * the caller already owns, keys repeated within the request, and keys that resolve to no active
    * product. Bulk-safe — only new entities are persisted, no detaching bulk update runs.
    *
-   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param ownerSub {@code app_user.id} of the caller
    * @param productKeys the product keys to add
    * @return a summary of how many keys were added vs. skipped and why
    */
   @Transactional
   public PersonalBlueprintBatchResult addBatch(
-      @NotNull String ownerSub, @NotNull List<String> productKeys) {
+      @NotNull UUID ownerSub, @NotNull List<String> productKeys) {
     int added = 0;
     int alreadyOwned = 0;
     int unresolved = 0;
@@ -177,7 +177,7 @@ public class PersonalBlueprintService {
    * Updates the mutable fields ({@code acquiredAt}, {@code note}) of an owned blueprint with an
    * explicit optimistic-lock check.
    *
-   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param ownerSub {@code app_user.id} of the caller
    * @param id entry primary key
    * @param request the update payload (carries the expected version)
    * @return the persisted DTO
@@ -186,7 +186,7 @@ public class PersonalBlueprintService {
    */
   @Transactional
   public PersonalBlueprintResponse update(
-      @NotNull String ownerSub, @NotNull UUID id, @NotNull PersonalBlueprintUpdateRequest request) {
+      @NotNull UUID ownerSub, @NotNull UUID id, @NotNull PersonalBlueprintUpdateRequest request) {
     PersonalBlueprint entity = loadOwn(ownerSub, id);
     PersonalBlueprintResponse response = applyUpdate(entity, request);
     log.info("Updated personal blueprint id={} ownerSub={}", id, ownerSub);
@@ -196,12 +196,12 @@ public class PersonalBlueprintService {
   /**
    * Deletes an owned blueprint. 404 for an unknown id or a cross-owner attempt.
    *
-   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param ownerSub {@code app_user.id} of the caller
    * @param id entry primary key
    * @throws EntityNotFoundException when the entry is missing or owned by someone else
    */
   @Transactional
-  public void delete(@NotNull String ownerSub, @NotNull UUID id) {
+  public void delete(@NotNull UUID ownerSub, @NotNull UUID id) {
     PersonalBlueprint entity = loadOwn(ownerSub, id);
     requireRemovable(entity);
     repository.delete(entity);
@@ -216,11 +216,11 @@ public class PersonalBlueprintService {
    * sweep. Idempotent: clearing an already-empty (or default-only) set removes nothing and returns
    * {@code 0}.
    *
-   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param ownerSub {@code app_user.id} of the caller
    * @return the number of blueprints removed (never counts a preserved default)
    */
   @Transactional
-  public int deleteAllOwn(@NotNull String ownerSub) {
+  public int deleteAllOwn(@NotNull UUID ownerSub) {
     int removed = repository.deleteRemovableByOwnerSub(ownerSub);
     log.info("Cleared {} personal blueprint(s) for ownerSub={}", removed, ownerSub);
     return removed;
@@ -233,13 +233,13 @@ public class PersonalBlueprintService {
    * If the master no longer lists the product the view degrades to an empty graph carrying the
    * owned-row product name, so the UI still has a label to show.
    *
-   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param ownerSub {@code app_user.id} of the caller
    * @param id owned-blueprint entry id
    * @return the recipe view (never {@code null}; empty graph when the product is unresolved)
    * @throws EntityNotFoundException when the entry is missing or owned by someone else
    */
   @NotNull
-  public PersonalBlueprintRecipeResponse recipeForOwn(@NotNull String ownerSub, @NotNull UUID id) {
+  public PersonalBlueprintRecipeResponse recipeForOwn(@NotNull UUID ownerSub, @NotNull UUID id) {
     PersonalBlueprint entity = loadOwn(ownerSub, id);
     return blueprintProductService
         .resolveRecipe(entity.getProductKey())
@@ -260,26 +260,26 @@ public class PersonalBlueprintService {
    * Admin-scoped list of a target user's owned blueprints. Delegates to {@link #listOwn}; the ADMIN
    * gate lives on the controller.
    *
-   * @param targetSub Keycloak {@code sub} of the user being inspected
+   * @param targetSub {@code app_user.id} of the user being inspected
    * @param query optional case-insensitive product-name filter
    * @param pageable page request
    * @return paged response DTOs
    */
   public Page<PersonalBlueprintResponse> listForUser(
-      @NotNull String targetSub, @Nullable String query, @NotNull Pageable pageable) {
+      @NotNull UUID targetSub, @Nullable String query, @NotNull Pageable pageable) {
     return listOwn(targetSub, query, pageable);
   }
 
   /**
    * Admin-scoped single add on behalf of a target user. Delegates to {@link #add}.
    *
-   * @param targetSub Keycloak {@code sub} of the user to add the blueprint for
+   * @param targetSub {@code app_user.id} of the user to add the blueprint for
    * @param request the add payload
    * @return the persisted DTO
    */
   @Transactional
   public PersonalBlueprintResponse addForUser(
-      @NotNull String targetSub, @NotNull PersonalBlueprintCreateRequest request) {
+      @NotNull UUID targetSub, @NotNull PersonalBlueprintCreateRequest request) {
     PersonalBlueprintResponse response = add(targetSub, request);
     // The raw, client-supplied key — not the resolved product's — so it goes through LogSafe: a
     // member could otherwise paste a newline plus a fake log prefix and forge a second line
@@ -294,13 +294,13 @@ public class PersonalBlueprintService {
   /**
    * Admin-scoped multi-select add on behalf of a target user. Delegates to {@link #addBatch}.
    *
-   * @param targetSub Keycloak {@code sub} of the user to add the blueprints for
+   * @param targetSub {@code app_user.id} of the user to add the blueprints for
    * @param productKeys the product keys to add
    * @return a summary of added vs. skipped keys
    */
   @Transactional
   public PersonalBlueprintBatchResult addBatchForUser(
-      @NotNull String targetSub, @NotNull List<String> productKeys) {
+      @NotNull UUID targetSub, @NotNull List<String> productKeys) {
     PersonalBlueprintBatchResult result = addBatch(targetSub, productKeys);
     log.info("Admin batch add for ownerSub={}: {}", targetSub, result);
     return result;
@@ -420,7 +420,7 @@ public class PersonalBlueprintService {
    */
   @NotNull
   private PersonalBlueprint newOwned(
-      String ownerSub, ResolvedProduct product, java.time.Instant acquiredAt, String note) {
+      UUID ownerSub, ResolvedProduct product, java.time.Instant acquiredAt, String note) {
     PersonalBlueprint entity = new PersonalBlueprint();
     entity.setOwnerSub(ownerSub);
     entity.setProductKey(product.productKey());
@@ -437,12 +437,12 @@ public class PersonalBlueprintService {
    * Owner-scoped load; 404 (via {@link EntityNotFoundException}) for an unknown id or a row owned
    * by a different user — the two cases are deliberately indistinguishable on the wire.
    *
-   * @param ownerSub Keycloak {@code sub} of the caller
+   * @param ownerSub {@code app_user.id} of the caller
    * @param id entry primary key
    * @return the managed entity
    */
   @NotNull
-  private PersonalBlueprint loadOwn(@NotNull String ownerSub, @NotNull UUID id) {
+  private PersonalBlueprint loadOwn(@NotNull UUID ownerSub, @NotNull UUID id) {
     return repository
         .findByIdAndOwnerSub(id, ownerSub)
         .orElseThrow(

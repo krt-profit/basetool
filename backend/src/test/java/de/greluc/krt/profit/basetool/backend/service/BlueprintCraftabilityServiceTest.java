@@ -62,8 +62,7 @@ import org.springframework.data.domain.Pageable;
 @ExtendWith(MockitoExtension.class)
 class BlueprintCraftabilityServiceTest {
 
-  private static final String SUB = "11111111-1111-1111-1111-111111111111";
-  private static final UUID USER_ID = UUID.fromString(SUB);
+  private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
   private static final UUID BP_ID = UUID.randomUUID();
   private static final UUID MAT_A = UUID.randomUUID();
   private static final UUID MAT_B = UUID.randomUUID();
@@ -92,7 +91,7 @@ class BlueprintCraftabilityServiceTest {
                 new OwnedStockSlice(MAT_A, 300, 100.0), // excluded — below the no-degradation floor
                 new OwnedStockSlice(MAT_B, 600, 12.0)));
 
-    BlueprintCraftabilityDto dto = only(service.computeForOwner(SUB, USER_ID, false));
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
 
     assertEquals(BP_ID, dto.blueprintId());
     assertTrue(dto.recipeResolved());
@@ -132,7 +131,7 @@ class BlueprintCraftabilityServiceTest {
                 new OwnedStockSlice(MAT_A, 300, 100.0), // below the no-degradation floor → excluded
                 new OwnedStockSlice(MAT_B, 600, 50.0)));
 
-    BlueprintCraftabilityDto dto = only(service.computeForOwner(SUB, USER_ID, false));
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
 
     assertEquals(0, dto.craftable());
     assertEquals("Iron", dto.limitingMaterialName());
@@ -156,7 +155,7 @@ class BlueprintCraftabilityServiceTest {
     when(refineryOrderService.getOwnedOpenRefineryYieldSlices(USER_ID))
         .thenReturn(List.of(new OwnedStockSlice(MAT_A, 900, 8.0)));
 
-    BlueprintCraftabilityDto dto = only(service.computeForOwner(SUB, USER_ID, true));
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, true));
 
     assertEquals(0, dto.craftable()); // inventory alone
     assertEquals(1, dto.craftableWithRefinery()); // 6 + 8 = 14 → floor(14/10)
@@ -185,7 +184,7 @@ class BlueprintCraftabilityServiceTest {
     when(inventoryItemService.getOwnedStockSlices(USER_ID))
         .thenReturn(List.of(new OwnedStockSlice(MAT_A, 400, 7.0)));
 
-    BlueprintCraftabilityDto dto = only(service.computeForOwner(SUB, USER_ID, false));
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
 
     assertEquals(2, dto.craftable());
     assertEquals("Hadanite", dto.limitingMaterialName());
@@ -220,7 +219,7 @@ class BlueprintCraftabilityServiceTest {
     when(inventoryItemService.getOwnedStockSlices(USER_ID))
         .thenReturn(List.of(new OwnedStockSlice(MAT_A, 400, 7.0)));
 
-    BlueprintCraftabilityDto dto = only(service.computeForOwner(SUB, USER_ID, false));
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
 
     assertTrue(dto.recipeResolved());
     assertTrue(dto.hasResourceIngredients()); // the bridged ITEM counts as an evaluable requirement
@@ -260,7 +259,7 @@ class BlueprintCraftabilityServiceTest {
     when(blueprintRepository.findCraftableOutputItemIds(any())).thenReturn(List.of(GI_A));
     when(inventoryItemService.getOwnedStockSlices(USER_ID)).thenReturn(List.of());
 
-    BlueprintCraftabilityDto dto = only(service.computeForOwner(SUB, USER_ID, false));
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
 
     assertTrue(dto.recipeResolved());
     assertTrue(dto.hasItemIngredients());
@@ -278,7 +277,7 @@ class BlueprintCraftabilityServiceTest {
         .thenReturn(
             List.of(new OwnedStockSlice(MAT_A, 1000, 25.0), new OwnedStockSlice(MAT_B, 600, 12.0)));
 
-    BlueprintCraftabilityDto dto = only(service.computeForOwner(SUB, USER_ID, false));
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
 
     assertEquals(QuantityType.SCU, material(dto, MAT_A).quantityType());
     assertEquals(QuantityType.SCU, material(dto, MAT_B).quantityType());
@@ -301,7 +300,7 @@ class BlueprintCraftabilityServiceTest {
     when(blueprintProductService.resolveRepresentativeBlueprints(any()))
         .thenReturn(Map.of("widget", bp));
 
-    BlueprintCraftabilityDto dto = only(service.computeForOwner(SUB, USER_ID, false));
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
 
     assertTrue(dto.recipeResolved());
     assertTrue(dto.hasItemIngredients());
@@ -316,7 +315,7 @@ class BlueprintCraftabilityServiceTest {
     when(blueprintProductService.resolveRepresentativeBlueprints(any())).thenReturn(Map.of());
     when(inventoryItemService.getOwnedStockSlices(USER_ID)).thenReturn(List.of());
 
-    BlueprintCraftabilityDto dto = only(service.computeForOwner(SUB, USER_ID, false));
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
 
     assertFalse(dto.recipeResolved());
     assertFalse(dto.hasResourceIngredients());
@@ -325,16 +324,16 @@ class BlueprintCraftabilityServiceTest {
 
   @Test
   void computeForOwner_returnsEmptyWhenNoBlueprintsOwned() {
-    when(personalBlueprintService.listOwn(eq(SUB), isNull(), any(Pageable.class)))
+    when(personalBlueprintService.listOwn(eq(USER_ID), isNull(), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of()));
 
-    assertTrue(service.computeForOwner(SUB, USER_ID, false).isEmpty());
+    assertTrue(service.computeForOwner(USER_ID, false).isEmpty());
   }
 
   /* ----------------------------------------------------------------- fixtures */
 
   private void stubOwned(PersonalBlueprintResponse... owned) {
-    when(personalBlueprintService.listOwn(eq(SUB), isNull(), any(Pageable.class)))
+    when(personalBlueprintService.listOwn(eq(USER_ID), isNull(), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(owned)));
   }
 

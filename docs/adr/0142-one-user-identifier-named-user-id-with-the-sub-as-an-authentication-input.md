@@ -22,7 +22,7 @@ What is genuinely inconsistent is everything *around* that value:
 |       Dimension       |                                                                                         State found (2026-08-22)                                                                                         |
 |-----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Column name           | 34 columns named `*_user_id` / `user_id`, 5 named `*_sub` (`notification.recipient_sub`, `notification_rule_selector.user_sub`, `personal_blueprint.owner_sub`, `personal_inventory_item.owner_sub`)     |
-| Column type           | 37 `UUID`, 2 `VARCHAR(64)` (`personal_blueprint.owner_sub`, `personal_inventory_item.owner_sub`)                                                                                                         |
+| Column type           | 36 `UUID`, 3 `VARCHAR(64)` (`personal_blueprint.owner_sub`, `personal_inventory_item.owner_sub`, `member_evaluation.user_id` — see the correction below)                                                 |
 | Referential integrity | 39 columns carry a foreign key to `app_user(id)`; 5 do not — the four above plus `member_evaluation.user_id`. The two audit *target* columns are FK-less deliberately, so the trail outlives the account |
 | API property          | `userId` on 26 schemas, `userSub` on 2                                                                                                                                                                   |
 | Backend access path   | `@CurrentUserId` (15), `@CurrentUserSub` (25), `AuthenticatedSubject` (12 files), inline `jwt.getSubject()` (4)                                                                                          |
@@ -55,6 +55,20 @@ rests on is broken silently, for one row, at login time.
    one-table change instead of a 39-table one.
 5. **The `preferred_username` fallback stops rebinding sessions.** A token whose `sub` matches no
    row provisions a new user or fails; it never adopts a row found by name.
+
+> [!warning] Corrected 2026-08-28
+> The inventory above originally counted `member_evaluation.user_id` as a `UUID`, leaving two
+> `VARCHAR(64)` columns. It is `VARCHAR(64)` too (`V72__add_promotion_system.sql`), which V227's own
+> comment had right all along — so point 3 needed **three** casts, not two. Found while implementing
+> it (issue #1638); the code was the authority and the ADR is corrected here rather than quietly.
+
+## Status of the decision
+
+Point 3 is **implemented**: `V235__add_foreign_keys_to_user_identity_columns.sql` recasts the three
+`VARCHAR(64)` columns to `UUID` and gives all five a foreign key to `app_user(id)` with
+`ON DELETE CASCADE`, states the two audit-target exemptions in `COMMENT ON COLUMN`, and adds the
+partial index `notification_rule_selector.user_sub` was missing. `UserIdentityColumnForeignKeyTest`
+holds the line for columns added later. Points 1, 2 and 5 are still open (issues #1640 and #1639).
 
 ## Consequences
 
