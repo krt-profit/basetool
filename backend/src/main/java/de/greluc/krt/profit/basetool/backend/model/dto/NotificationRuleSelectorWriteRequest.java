@@ -26,19 +26,19 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 /**
- * Write payload for one recipient selector. Which of {@code userSub} / {@code roleCode} / ({@code
+ * Write payload for one recipient selector. Which of {@code userId} / {@code roleCode} / ({@code
  * orgRelativeRole} + {@code contextRole}) must be set follows from {@link #kind}; the service
  * validates the combination.
  *
  * @param kind how the selector resolves recipients (required)
- * @param userSub target user for {@code SPECIFIC_USER}
+ * @param userId target user for {@code SPECIFIC_USER}
  * @param roleCode role code for {@code ROLE}
  * @param orgRelativeRole org-relative role for {@code ORG_RELATIVE_ROLE}
  * @param contextRole context org unit for {@code ORG_RELATIVE_ROLE}
  */
 public record NotificationRuleSelectorWriteRequest(
     @NotNull SelectorKind kind,
-    UUID userSub,
+    UUID userId,
     String roleCode,
     OrgRelativeRole orgRelativeRole,
     NotificationContextRole contextRole) {}
