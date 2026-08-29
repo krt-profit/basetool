@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.event.DiscordRegistrationPendingEvent;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -28,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.PartialRoleScopeProperties;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
@@ -107,15 +109,20 @@ public class UserReconciliationService {
   private final UserService userService;
   private final PartialRoleScopeProperties partialRoleScopeProperties;
 
+  /** Counts callsign collisions, the case the removed name-matching fallback used to hide. */
+  private final MeterRegistry meterRegistry;
+
   /**
    * Reconciles the local user record with the supplied JWT — creates the row on first login,
    * updates username / email / displayName / roles when they have changed. Called by {@link
    * CustomJwtGrantedAuthoritiesConverter} on every authentication.
    *
-   * <p>Two-step lookup: first by id (the UUID-shaped subject), then by {@code preferred_username} —
-   * handles legacy rows where the local id pre-dated the Keycloak migration to UUID subjects. Roles
-   * default to "Guest" when the JWT carries none so an unconfigured Keycloak doesn't lock everyone
-   * out.
+   * <p>The lookup is <b>by id only</b>. A subject that matches no row is a new registration, never
+   * an existing account found by name (ADR-0142 point 5) — a Keycloak username is neither immutable
+   * nor unique after a deletion, so matching on it let a callsign decide which account a token
+   * acted as. A row holding the same username under a different id is logged and counted; the admin
+   * queue shows it as a collision, and merging the two is an explicit admin action. Roles default
+   * to "Guest" when the JWT carries none so an unconfigured Keycloak doesn't lock everyone out.
    *
    * <p>Roles are the one field this does not always write. A client whose realm-role claim is
    * deliberately incomplete (REQ-SEC-036) leaves the stored set untouched, and the returned {@link
@@ -133,30 +140,41 @@ public class UserReconciliationService {
     String username = jwt.getClaimAsString("preferred_username");
 
     // A Discord federated login is recognised ONLY by the Keycloak subject / discord_user_id link,
-    // never by username. Reading the claim up-front lets us suppress the legacy preferred_username
-    // fallback below for a Discord login (REQ-SEC-017 / REQ-DATA-006 hardening): the brokered
-    // Discord
-    // username is attacker-influenced, so matching a fresh Discord identity onto a pre-existing
-    // (possibly privileged, already-ACTIVE) row by username would both bypass the PENDING approval
-    // gate and silently link the attacker's Discord account to someone else's user. Track 1 does no
-    // auto-linking of an existing account to a Discord identity (spec open decision #2), so a
-    // Discord
-    // login that finds no row by subject is always treated as a brand-new registration.
+    // never by username (REQ-SEC-017 / REQ-DATA-006). That used to need an explicit carve-out here,
+    // because the name-matching fallback below would otherwise have linked a brokered -- i.e.
+    // attacker-influenced -- Discord username onto a pre-existing, possibly privileged, already
+    // ACTIVE row, bypassing the PENDING gate. The fallback is gone (#1639), so the rule the
+    // carve-out enforced now holds for every login path by construction rather than by exception.
     final String discordUserId = jwt.getClaimAsString("discord_user_id");
     final boolean viaDiscord = discordUserId != null && !discordUserId.isBlank();
 
     Optional<User> existingUser = userRepository.findById(finalUserId);
-    if (existingUser.isEmpty() && username != null && !viaDiscord) {
-      existingUser = userRepository.findByUsername(username);
-      if (existingUser.isPresent()) {
+    if (existingUser.isEmpty() && username != null) {
+      // A token whose subject matches no row NEVER adopts one found by name (ADR-0142 point 5,
+      // #1639). Until this release it did, and the consequences were both silent: from that login
+      // on, app_user.id was not the caller's subject for that one row -- the invariant 39 foreign
+      // keys, the frontend's own comparisons, /users/me and the audit trail all rest on -- and a
+      // Keycloak username, which is neither immutable nor unique after a deletion, decided which
+      // account a token acted as. A recreated account with a previous member's callsign inherited
+      // their inventory, their bank grants and their notifications.
+      //
+      // The caller is provisioned as a brand-new registration below instead. That lands PENDING
+      // and notifies every admin (REQ-SEC-017, REQ-NOTIF-012), so the collision surfaces as a
+      // decision rather than as an inheritance. It is still worth a log line -- this is exactly
+      // the case the fallback used to hide.
+      List<UUID> sameCallsign = userRepository.findIdsByUsername(username);
+      if (!sameCallsign.isEmpty()) {
+        meterRegistry.counter(MetricNames.USER_CALLSIGN_COLLISIONS).increment();
         // REQ-OBS-004: never log names/handles. preferred_username can be a real callsign that the
         // PiiMasker cannot scrub (it only matches JWTs, e-mails and token keywords), so log the
-        // matched row's UUID instead — same non-PII fix already applied to UserSyncTask (M-4).
+        // row ids and omit the value.
         log.warn(
-            "User lookup by ID {} failed; matched an existing row by preferred_username (value"
-                + " omitted, PII). Associating session with existing user id {}.",
+            "Callsign collision: subject {} is unknown, but {} existing account(s) hold the same"
+                + " preferred_username (value omitted, PII), e.g. {}. Provisioning a NEW pending"
+                + " registration; nothing is inherited. An admin merges the two explicitly.",
             finalUserId,
-            existingUser.get().getId());
+            sameCallsign.size(),
+            sameCallsign.getFirst());
       }
     }
 

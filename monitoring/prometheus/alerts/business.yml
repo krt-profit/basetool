@@ -14,6 +14,26 @@ groups:
           summary: "Bank ledger integrity violation: {{ $labels.category }}"
           description: "The hourly integrity sweep found {{ $value }} rows in category '{{ $labels.category }}'. A bank ledger invariant is broken — investigate before any further bank mutation."
 
+      # ADR-0142 point 5 / #1639: a login presented a subject no account carries while another
+      # account holds the same callsign. Until that release the login silently ADOPTED that account
+      # -- the caller then acted as someone else, and the case had no signal at all. Now a new
+      # PENDING registration is created instead and the admin queue marks it, so this alert is the
+      # second pair of eyes rather than the only one.
+      #
+      # Warning, not critical: nothing is broken, and a single occurrence has a benign reading (a
+      # member re-provisioned in Keycloak). What it must not do is stay invisible -- a Keycloak
+      # username is reusable after a deletion, so a repeated collision on one callsign is how a
+      # recreated account would end up claiming a departed member's identity. Threshold is
+      # deliberately low: the counter is normally flat zero.
+      - alert: UserCallsignCollision
+        expr: increase(basetool_user_callsign_collisions_total[1h]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Callsign collision at login: {{ $value }} in the last hour"
+          description: "A login presented an unknown subject while another account holds the same callsign, so a NEW pending registration was created and nothing was inherited. Check the admin registration queue: the affected row carries the duplicate-callsign marker, and the remedy is an explicit merge, never an approval that leaves two accounts for one member. The backend log names both account ids (never the callsign itself)."
+
       # REQ-ORDERS-033: an ordered-item line's blueprint no longer produces the ordered item, so the
       # order is showing a FOREIGN recipe's materials as its demand. People collect and book against
       # those numbers, so this is wrong-data-in-production, not a cosmetic drift. Warning rather than

@@ -60,7 +60,12 @@
                 <tbody id="registrationsBody">
                     <tr th:each="reg : ${registrations}" th:id="'reg-row-' + ${reg.id}"
                         th:attr="data-id=${reg.id},data-version=${reg.version}">
-                        <td th:text="${reg.username}">Nutzer</td>
+                        <td>
+                            <span th:text="${reg.username}">Nutzer</span>
+                            <span th:if="${reg.callsignCollision}" class="chip chip--warning"
+                                  th:text="#{admin.discordRegistrations.callsignCollision}"
+                                  th:title="#{admin.discordRegistrations.callsignCollision.hint}">Callsign doppelt</span>
+                        </td>
                         <td>
                             <span th:if="${reg.serverNickname}" th:text="${reg.serverNickname}">Server-Nickname</span>
                             <span th:unless="${reg.serverNickname}" class="reg-when" aria-hidden="true">&mdash;</span>
@@ -108,7 +113,12 @@
                 <tbody id="rejectedBody">
                     <tr th:each="reg : ${rejected}" th:id="'rejected-row-' + ${reg.id}"
                         th:attr="data-id=${reg.id},data-version=${reg.version}">
-                        <td th:text="${reg.username}">Nutzer</td>
+                        <td>
+                            <span th:text="${reg.username}">Nutzer</span>
+                            <span th:if="${reg.callsignCollision}" class="chip chip--warning"
+                                  th:text="#{admin.discordRegistrations.callsignCollision}"
+                                  th:title="#{admin.discordRegistrations.callsignCollision.hint}">Callsign doppelt</span>
+                        </td>
                         <td>
                             <span th:if="${reg.serverNickname}" th:text="${reg.serverNickname}">Server-Nickname</span>
                             <span th:unless="${reg.serverNickname}" class="reg-when" aria-hidden="true">&mdash;</span>
