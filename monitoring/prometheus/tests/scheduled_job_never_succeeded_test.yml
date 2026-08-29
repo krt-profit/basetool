@@ -1,0 +1,93 @@
+# promtool unit test for the never-succeeded companion on the scheduled-job staleness alerts
+# (REQ-OBS-014, 2026-08-29).
+#
+# `basetool_scheduled_job_last_success_timestamp_seconds` is registered LAZILY, on a job's first
+# success, and it lives in the backend process. So `time() - gauge` has no series at all until a job
+# has succeeded once since the last restart -- and never, if a job never succeeds. Every one of the
+# six staleness alerts was therefore blind to exactly the case it exists for: a job failing every
+# run produces no gauge, so the rule has nothing to compare and stays silent.
+#
+# Found by sweeping the rules against production (#1707): `user_sync` and `scwiki_sync` had no
+# series, which on a daily cron and a 1h-initial-delay job is a perfectly normal post-restart state
+# -- and that is the point. The alert cannot tell that state apart from a job failing for a week.
+#
+# The companion is deliberately NOT the bare `or absent(...)` the ops-automation alerts use. Those
+# read TEXTFILE metrics, which survive a restart, so a bare absent() means "really never ran" there.
+# Here it would mean "just restarted" and would fire after every deploy. This one is gated on the
+# backend having been up longer than the job's own window instead.
+#
+# Run locally (no promtool on the host -- use an ephemeral container, see monitoring/README.md):
+#   docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.14.0 test rules tests/scheduled_job_never_succeeded_test.yml
+
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  # THE blind spot. business_metrics runs about every 60s, so a backend up for 30 minutes
+  # with no success gauge has failed every run. Before the companion the rule had no series
+  # to evaluate and said nothing at all.
+  - name: fires - business_metrics has never succeeded and the backend is past its window
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="basetool-backend"}'
+        values: "0x40"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: BusinessMetricsStale
+        exp_alerts:
+          - exp_labels:
+              severity: "warning"
+              task: "business_metrics"
+            exp_annotations:
+              summary: "Business-metrics sampler stale >10min"
+              description: "BusinessMetricsCollector.refresh() has not completed successfully in over 10 minutes \u2014 the approval/work-queue depth gauges are frozen and the queue-overdue alerts may be evaluating stale values. Check the backend logs for the sampler's failure."
+
+  # The false positive a bare `or absent(...)` would have introduced: 4 minutes of uptime,
+  # the sampler simply has not run yet. Must stay quiet.
+  - name: silent - the gauge is absent but the backend only just restarted
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="basetool-backend"}'
+        values: "60x40"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: BusinessMetricsStale
+        exp_alerts: []
+
+  # The original behaviour has to survive: a fresh success keeps the alert quiet, and the
+  # companion must not fire alongside a healthy gauge.
+  - name: silent - the job is succeeding, however long the backend has been up
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="basetool-backend"}'
+        values: "0x40"
+      - series: 'basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"}'
+        values: "0+60x40"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: BusinessMetricsStale
+        exp_alerts: []
+
+  # A multi-task rule must notice ONE missing task, not only both. A single absent() over the
+  # whole `uex_sync|scwiki_sync` selector would stay false here and hide scwiki_sync entirely,
+  # which is why the companion is written per task.
+  - name: fires - one of two tasks has never succeeded while the other is healthy
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="basetool-backend"}'
+        values: "0x3100"
+      - series: 'basetool_scheduled_job_last_success_timestamp_seconds{task="uex_sync"}'
+        values: "0+60x3100"
+    alert_rule_test:
+      - eval_time: 50h
+        alertname: ExternalSyncStale
+        exp_alerts:
+          - exp_labels:
+              severity: "warning"
+              task: "scwiki_sync"
+            exp_annotations:
+              summary: "External sync stale >48h (scwiki_sync)"
+              description: "The scwiki_sync catalogue sync last succeeded more than 48 hours ago."
