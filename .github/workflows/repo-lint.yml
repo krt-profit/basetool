@@ -158,3 +158,31 @@ jobs:
         run: |
           chmod +x scripts/check-monitoring-image-pins.sh
           scripts/check-monitoring-image-pins.sh
+
+  grafana-dashboards:
+    name: grafana-dashboards
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The 13 provisioned dashboards had NO validation of any kind until 2026-08-29 (#1708) — not a
+      # Gradle test, not a CI job, not a lint script. Every way they can be wrong is silent: invalid
+      # JSON makes Grafana skip the dashboard with only a line in its own startup log, a duplicate
+      # uid makes provisioning last-writer-wins so one dashboard replaces another, and an
+      # unprovisioned datasource uid renders "Datasource not found" on every panel — which reads as
+      # "no data" to anyone not looking closely. This is the dashboard half of what #1707 found in
+      # the alert rules: a monitoring surface nothing checks drifts silently, and its silence is
+      # indistinguishable from health.
+      #
+      # The suite runs FIRST so the gate can never pass vacuously: it asserts each failure mode is
+      # still detected, including a panel nested in a collapsed row, before the repository's own
+      # dashboards are checked.
+      - name: Self-test the dashboard checker
+        run: |
+          chmod +x scripts/check-grafana-dashboards.py scripts/check-grafana-dashboards.test.sh
+          scripts/check-grafana-dashboards.test.sh
+
+      - name: Check provisioned Grafana dashboards
+        run: python3 scripts/check-grafana-dashboards.py

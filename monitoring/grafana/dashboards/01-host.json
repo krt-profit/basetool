@@ -319,7 +319,8 @@
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "description": "Failed systemd units on the host (node_systemd_unit_state{state=\"failed\"}), backing the SystemdUnitFailed alert. Reads 0 when nothing has failed -- but this panel was empty rather than 0 until 2026-08-29 (#1707/#1713): the systemd collector talks to systemd over dbus on /run/systemd/private, --path.rootfs does not redirect a socket, and node-exporter never mounted it. So the ONE reading to distrust here is no series at all. `or vector(0)` makes a healthy host show a flat 0; if the panel is blank, the collector is not reporting and a failed deploy or backup unit would be invisible here."
     },
     {
       "id": 10,

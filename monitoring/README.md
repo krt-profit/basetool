@@ -576,7 +576,13 @@ docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.18.1 \
 # Compose project — syntax/interpolation check
 docker compose -f docker-compose.monitoring.yml config -q
 
-# Dashboards — valid JSON
-jq . monitoring/grafana/dashboards/*.json > /dev/null
+# Dashboards — JSON validity, unique dashboard uids, unique panel ids (rows walked), and every
+# referenced datasource uid actually provisioned. Each of those fails SILENTLY in Grafana: a bad
+# file is skipped with only a line in the Grafana startup log, a duplicate uid makes
+# provisioning last-writer-wins, and an unprovisioned datasource renders "Datasource not found",
+# which reads as "no data". Gated in CI (repo-lint → grafana-dashboards); the .test.sh runs first
+# so the gate cannot pass vacuously.
+python3 scripts/check-grafana-dashboards.py
+scripts/check-grafana-dashboards.test.sh
 ```
 
