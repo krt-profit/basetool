@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sechs Diagramme im Betriebs-Dashboard sagen jetzt, warum sie leer sind.** Ein Diagramm, das
+  planmäßig nichts anzeigt, sah bisher genauso aus wie eines, dessen Messwert kaputt ist — bei
+  den drei Resilience-Diagrammen war die Leere monatelang genau das. Außerdem prüft der Build die
+  13 Dashboards jetzt überhaupt erst: bis eben hätte eine kaputte Datei Grafana das Dashboard
+  stillschweigend weglassen lassen.
+
 ## [v1.6.10](https://github.com/krt-profit/basetool/releases/tag/v1.6.10) - 2026-08-29
 
 ### Added

@@ -1767,6 +1767,34 @@ therefore alerts on:
   per-target `loki_source_file_read_lines_total` series to take `absent()` of, and a native-error
   breadcrumb is rare by design, so a `rate()`/`absent()` liveness check on such a quiet stream would
   be a permanent false alarm. Whole-pipeline silence is still caught by `LokiIngestSilent`.
+- **Dashboard provisioning.** The 13 dashboards under `monitoring/grafana/dashboards/` are
+  provisioned as code with `allowUiUpdates: false`, and until 2026-08-29 (#1708) **nothing validated
+  them** — no Gradle test, no CI job, no lint script. Every way they can be wrong is silent: invalid
+  JSON makes Grafana skip that dashboard with only a line in its own startup log, a duplicate
+  dashboard `uid` makes provisioning last-writer-wins so one silently replaces the other, an
+  unprovisioned datasource `uid` renders "Datasource not found" on every panel (which reads as "no
+  data"), and a duplicate panel `id` makes panel deep links resolve to whichever Grafana finds first.
+  `scripts/check-grafana-dashboards.py` gates all four in `repo-lint → grafana-dashboards`, walking
+  panels nested in **collapsed rows** as well — those are the panels least likely to be opened and
+  so the most likely to have rotted. Its `.test.sh` runs first and asserts each failure mode is still
+  detected, so the gate cannot pass vacuously. The check is deliberately **structural**: whether a
+  panel's metric has series is a production question and a judgement call (see the counter/gauge
+  reading rule above), which is why that stays a periodic review rather than a gate.
+- **A panel that is empty by design reads as a broken panel.** The #1708 review found no unit, axis
+  or encoding defect in any of the 170 panels — every `*100` panel declares `percent`, none
+  double-scales, and all 13 files are clean UTF-8. What it found was the dashboard half of the
+  staleness problem: panels that *cannot* populate, sitting next to panels that merely happen to be
+  quiet, with nothing to tell a reader which is which. Six now say so in their own description,
+  chosen because each has already misled someone: the three resilience4j panels and *Failed systemd
+  Units* (blank was the #1713 defect, not a healthy zero), *Discord precheck/hour* (a lazily created
+  counter — empty means no linked registration since the last restart), and *Redis fan-out
+  pub/sub & errors/hour*. That last one is the sharpest: `basetool_sse_redis_consumed_total` counts
+  peer-origin messages only, and production runs a **single backend replica**, so that row is
+  permanently absent and correct — while the live-sync rows beside it *do* populate on the same host,
+  because backend and frontend are two different processes on one channel. One bridge looks alive and
+  the other looks dead, and both are healthy. Describing the panels is the fix; the rest were left
+  undescribed on purpose, because 136 blanket descriptions would bury exactly these six.
+
 - **Container-metric blackout.** cAdvisor can stay "up" while emitting zero name-labelled series (a
   real incident, CHANGELOG v1.1.1), silently blinding the container alerts. `ContainerMetricsMissing`
   (critical) and `CoreContainerMetricsMissing` (warning) guard the named-series count;

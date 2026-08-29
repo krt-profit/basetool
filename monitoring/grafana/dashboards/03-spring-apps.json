@@ -373,7 +373,8 @@
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "description": "Resilience4j circuit-breaker state per backend call (0 closed / 1 open / 2 half-open). Empty is NOT \"all breakers closed\" -- a closed breaker publishes a 0 series. A blank panel means the resilience4j metrics are not being published at all, which is exactly what happened until 2026-08-29 (#1713): Spring Boot 4 moved the class resilience4j's @AutoConfigureAfter(name = ...) pointed at, `name =` fails silently when it cannot resolve, and the binder was never created. This panel and the two beside it went blank together, and their three alert rules went with them. Blank on all three at once is the signature -- AlertedMeterPresenceTest now fails the build on it."
     },
     {
       "id": 11,
@@ -585,7 +586,8 @@
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "description": "Retry attempts per second by backend-call kind (resilience4j_retry_calls_total). A low steady rate is healthy; a step up means the backend is flapping under the retry policy rather than failing outright. Blank means the resilience4j metrics are not published -- see the Circuit Breaker State panel; the three go blank together."
     },
     {
       "id": 17,
@@ -618,7 +620,8 @@
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "description": "Free slots in each backend-call bulkhead (minimum over the window). Falling toward 0 means calls are queueing on the concurrency limit and latency is about to follow. Blank means the resilience4j metrics are not published -- see the Circuit Breaker State panel; the three go blank together."
     },
     {
       "id": 18,
