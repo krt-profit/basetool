@@ -2240,11 +2240,69 @@ unbounded and PII (REQ-OBS-011). The `UserCallsignCollision` alert is the second
   back as an optimisation that restores the adoption.
 - [x] The collision is counted; an ordinary first login counts nothing.
 - [x] Exactly the colliding row carries the queue marker.
-- [ ] An admin can merge the two accounts explicitly, moving the member's data (#1639, follow-up).
+- [x] An admin can merge the two accounts explicitly, moving the member's data — REQ-SEC-046.
 
 **Enforced by:** `UserReconciliationServiceTest`, `AdminDiscordRegistrationsNicknameRenderTest` ·
 **Code:** `UserReconciliationService#syncUser`, `UserRegistrationService#findCollidingCallsigns` ·
 **Related:** ADR-0142 point 5, REQ-SEC-017, REQ-DATA-006
+
+### REQ-SEC-046 — Merging two accounts of one member is an admin decision, and it moves belongings only
+
+A login whose subject matches no row must never adopt an account found by callsign (ADR-0142
+point 5, #1639). Removing that silent inheritance is right — but the outcome it produced was not
+always *wrong*, only unsafe because nobody chose it. Left without a remedy, a member who ends up
+with two accounts has their data stranded on the one they can no longer reach, and the admin has
+nothing to do about it.
+
+`UserAccountMergeService`, reached at `POST /api/v1/admin/registrations/{id}/merge` (ADMIN only),
+is that remedy. The registration in the path is the account that **survives**; the body names the
+older account to empty.
+
+**One rule decides every table: ownership follows the member, attribution stays with the act.** A
+row saying "this belongs to X" moves. A row saying "X did this, then" does not — re-pointing it
+would not repair an identity, it would falsify history.
+
+|                                               Follows                                               |                                                         Stays                                                         |
+|-----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| Stock, hangar, refinery orders, personal inventory and blueprints                                   | The audit trail, in both its forms                                                                                    |
+| Org-unit memberships, org-chart positions, the Grand-Admiral office                                 | Who granted, requested, decided, initiated, executed, paid out                                                        |
+| Missions owned, party-lead and unit responsibility, manager and participant rows, order assignments | The account's own approval history, and who decided it                                                                |
+| Exchange offers, requests and interest                                                              | `user_roles` — re-derived from the token and the roster sync, not owned (REQ-SEC-013, REQ-SEC-036)                    |
+| Bank grants, view grants, approval limits, the holder row                                           | `terms_acceptance` — consent is recorded per account; the member is asked once more rather than having one back-dated |
+| Notifications, rule selectors, promotion evaluations                                                |                                                                                                                       |
+
+**The classification is exhaustive by construction.** `UserAccountMergeCoverageTest` reads every
+foreign key into `app_user` out of the live schema, adds the two deliberately FK-less audit target
+columns, and fails the build unless each appears in exactly one of the two lists — and unless every
+listed column still exists. A new user-referencing column cannot be forgotten here; it can only be
+classified, by someone who had to decide which side it belongs on.
+
+**Conflicts are deduplicated where they are duplicates and refused where they are not.** Thirteen
+moved tables carry a unique constraint over the user column, so one member may legitimately hold a
+row on both accounts (two sign-ups for one Einsatz, the same blueprint owned twice). The source's
+row is dropped where the target already has an equivalent — safe precisely because the two accounts
+are one person, so the duplicate carries nothing the survivor lacks. `bank_holder` is unique on the
+user **alone**, so a holder on both means two ledgers; that is an accounting decision with money in
+it, and the merge aborts with `409` rather than guessing which postings belong to whom.
+
+**What it deliberately does not do.** It does not approve the registration — repairing the data must
+not imply admitting the member — and it does not delete the emptied source row, which is the
+user-deletion flow's job and carries its own fail-closed Keycloak probe (REQ-DATA-008).
+
+**Acceptance**
+
+- [x] What the source owns lands on the target; a row only the source has moves rather than being
+  dropped.
+- [x] A row the target already has is dropped instead of violating the unique constraint.
+- [x] A row recording an act stays on the source.
+- [x] Two bank ledgers refuse the merge; an account cannot be merged into itself.
+- [x] Every column referencing a member is classified, and no classification names a column that no
+  longer exists.
+- [x] One `USER_MERGED` audit event names both ids and the per-table counts, never the callsign.
+
+**Enforced by:** `UserAccountMergeServiceTest`, `UserAccountMergeCoverageTest` ·
+**Code:** `UserAccountMergeService`, `DiscordRegistrationAdminController#merge` ·
+**Related:** REQ-SEC-045, ADR-0142 point 5, REQ-DATA-008, REQ-AUDIT-001
 
 ## Out of scope
 

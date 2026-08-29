@@ -453,6 +453,21 @@ public enum AuditEventType {
    */
   USER_DELETED(AuditDomain.ROLE),
 
+  /**
+   * Two accounts of one member were merged by an admin (REQ-SEC-045, ADR-0142 point 5): everything
+   * the source account <em>owned</em> was moved onto the target and the source was left empty.
+   *
+   * <p>The marker event for an operation that mutates several audited areas at once. Its payload
+   * names <b>both account ids</b> and the per-table row counts, and never the callsign — the
+   * collision that makes a merge necessary is a shared username, so writing it here would put a
+   * member's handle in the audit payload (REQ-OBS-004, REQ-BANK-012's no-free-text rule).
+   *
+   * <p>What did <em>not</em> move is as much a part of the record as what did: rows that attribute
+   * an act to whoever performed it at the time stay on the source, because rewriting them would
+   * falsify history rather than repair an identity.
+   */
+  USER_MERGED(AuditDomain.ROLE),
+
   /** The role &amp; membership audit log was exported as a PDF or JSON for a period. */
   ROLE_AUDIT_EXPORTED(AuditDomain.ROLE),
 
