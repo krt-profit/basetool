@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.6.10](https://github.com/krt-profit/basetool/releases/tag/v1.6.10) - 2026-08-29
+
 ### Added
 
 - **Ein Alarm für erschöpfte JVM-Threads ist jetzt scharf.** Er lag seit dem Vorfall im Juli
