@@ -67,8 +67,25 @@ rests on is broken silently, for one row, at login time.
 Point 3 is **implemented**: `V235__add_foreign_keys_to_user_identity_columns.sql` recasts the three
 `VARCHAR(64)` columns to `UUID` and gives all five a foreign key to `app_user(id)` with
 `ON DELETE CASCADE`, states the two audit-target exemptions in `COMMENT ON COLUMN`, and adds the
-partial index `notification_rule_selector.user_sub` was missing. `UserIdentityColumnForeignKeyTest`
-holds the line for columns added later. Points 1, 2 and 5 are still open (issues #1640 and #1639).
+partial index the rule-selector column was missing. `UserIdentityColumnForeignKeyTest` holds the
+line for columns added later.
+
+Points 1 and 2 are **implemented except for the wire format** (#1640):
+`V236__rename_sub_columns_to_user_id.sql` renames the four `*_sub` columns; the backend, the
+frontend and the OpenAPI path variables follow; `@CurrentUserSub` is gone and `@CurrentUserId` is
+the one annotation; the frontend's fifteen `principal.getSubject()` calls go through a single
+`CurrentUser` helper. **What is deliberately left:** `userSub` on the two notification-rule-selector
+schemas. Renaming a served property breaks the frozen external contract (`REQ-API-009`) and needs a
+dual-served deprecation window with an `@ApiDeprecation` sunset, which is its own change. Until then
+`NotificationRuleMapper` carries the one explicit mapping that bridges the entity's `userId` onto
+the DTO's `userSub`, with a test — MapStruct matches by name, so the rename mapped it to `null`
+silently and the build stayed green.
+
+One direct `jwt.getSubject()` read stays on purpose: `UserService#getUserIdFromJwt(Jwt)`. It runs
+during authentication, before a `SecurityContext` exists, so it cannot go through
+`AuthenticatedSubject` — it *is* the seam point 2 asks for, on the authentication-time side.
+
+Point 5 is still open (issue #1639).
 
 ## Consequences
 

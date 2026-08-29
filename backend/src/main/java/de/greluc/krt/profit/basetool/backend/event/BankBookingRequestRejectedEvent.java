@@ -33,7 +33,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Domain event published right after a bank employee rejects a booking request (epic #666 F2,
  * REQ-BANK-026). It is directed at the requesting officer/lead so they learn the outcome and the
- * reason: the {@code EVENT_RECIPIENT} selector resolves to {@link #contextRecipientSub()} (the
+ * reason: the {@code EVENT_RECIPIENT} selector resolves to {@link #contextRecipientUserId()} (the
  * requester), while the rejecting employee is the {@link #actorSub()}. It additionally carries the
  * account id ({@link #contextAccountId()}) so the {@code ACCOUNT_RESPONSIBLE} selector can notify
  * the account's responsible holder (REQ-BANK-034). Carries only scalars so the after-commit
@@ -68,7 +68,7 @@ public record BankBookingRequestRejectedEvent(
   }
 
   @Override
-  public UUID contextRecipientSub() {
+  public UUID contextRecipientUserId() {
     return requesterSub;
   }
 

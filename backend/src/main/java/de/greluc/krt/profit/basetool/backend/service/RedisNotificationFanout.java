@@ -99,15 +99,16 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
 
   /** {@inheritDoc} */
   @Override
-  public void publish(@NotNull Collection<UUID> recipientSubs, @NotNull NotificationSignal signal) {
+  public void publish(
+      @NotNull Collection<UUID> recipientUserIds, @NotNull NotificationSignal signal) {
     // Deliver to this instance's emitters first — a Redis failure then only degrades peer delivery.
-    notificationStreamService.publish(recipientSubs, signal);
+    notificationStreamService.publish(recipientUserIds, signal);
     try {
       ObjectNode root = jsonMapper.createObjectNode();
       root.put("v", PAYLOAD_VERSION);
       root.put("origin", instanceId);
       ArrayNode recipients = root.putArray("recipients");
-      for (UUID sub : recipientSubs) {
+      for (UUID sub : recipientUserIds) {
         recipients.add(sub.toString());
       }
       // Optional by design, and the version stays at 1. A peer on an older build ignores the field

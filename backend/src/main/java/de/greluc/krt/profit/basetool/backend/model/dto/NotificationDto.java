@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Read DTO for a single notification. The {@code recipientSub} is intentionally NOT exposed —
+ * Read DTO for a single notification. The {@code recipientUserId} is intentionally NOT exposed —
  * callers only ever see their own notifications via the JWT-scoped endpoints.
  *
  * @param id notification id

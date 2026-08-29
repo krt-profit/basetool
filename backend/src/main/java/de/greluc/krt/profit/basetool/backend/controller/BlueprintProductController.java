@@ -59,7 +59,7 @@ public class BlueprintProductController {
    *
    * @param q optional case-insensitive product-name substring; blank returns the first products
    * @param limit optional maximum number of results; clamped to {@code [1, MAX_LIMIT]}
-   * @param ownerSub the caller's {@code app_user.id}
+   * @param ownerUserId the caller's {@code app_user.id}
    * @return up to {@code limit} matching products, alphabetically by name
    */
   @GetMapping("/search")
@@ -76,8 +76,8 @@ public class BlueprintProductController {
   public List<BlueprintProductDto> search(
       @RequestParam(required = false) String q,
       @RequestParam(required = false) Integer limit,
-      @CurrentUserId UUID ownerSub) {
+      @CurrentUserId UUID ownerUserId) {
     int effectiveLimit = limit == null ? BlueprintProductService.DEFAULT_LIMIT : limit;
-    return blueprintProductService.searchProducts(q, effectiveLimit, ownerSub);
+    return blueprintProductService.searchProducts(q, effectiveLimit, ownerUserId);
   }
 }

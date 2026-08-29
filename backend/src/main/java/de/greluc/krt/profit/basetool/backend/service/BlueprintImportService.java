@@ -71,11 +71,11 @@ import tools.jackson.databind.ObjectMapper;
  *       missing {@code personal_blueprint} rows, and — for every manual pick (where the name did
  *       not already match by normalization) — learns a {@code blueprint_external_alias} so the next
  *       import auto-resolves it. Re-importing an already-owned blueprint never inserts a duplicate
- *       (also guarded by the {@code (owner_sub, product_key)} unique constraint); it only pulls the
- *       stored acquisition time earlier when the import carries an earlier timestamp.
+ *       (also guarded by the {@code (owner_user_id, product_key)} unique constraint); it only pulls
+ *       the stored acquisition time earlier when the import carries an earlier timestamp.
  * </ol>
  *
- * <p>The engine is {@code ownerSub}-parameterised and never reads the security context, so the
+ * <p>The engine is {@code ownerUserId}-parameterised and never reads the security context, so the
  * Phase 7 admin surface can drive an import on behalf of a target user.
  *
  * <p>Apply is bulk-safe per the CLAUDE.md detach-clear rule: it issues no {@code @Modifying
@@ -102,17 +102,18 @@ public class BlueprintImportService {
   /**
    * Parses an uploaded blueprint export (SCMDB log-watcher, Basetool Blueprint Extractor, or
    * scmdb.net profile / tracking export) and previews how each unique blueprint resolves against
-   * the master product list for {@code ownerSub} — scmdb.net entries first try their structural
+   * the master product list for {@code ownerUserId} — scmdb.net entries first try their structural
    * {@code tag}, then every entry falls through the name chain. No rows are persisted.
    *
-   * @param ownerSub {@code app_user.id} the import is being previewed for (owned-flag computation)
+   * @param ownerUserId {@code app_user.id} the import is being previewed for (owned-flag
+   *     computation)
    * @param file the uploaded blueprint export JSON
    * @return the preview with per-name rows and per-status counts
    * @throws BadRequestException if the file is empty, not valid JSON, or carries no blueprint array
    */
   @NotNull
   public BlueprintImportPreviewDto previewImport(
-      @NotNull UUID ownerSub, @NotNull MultipartFile file) {
+      @NotNull UUID ownerUserId, @NotNull MultipartFile file) {
     List<BlueprintExportParser.ParsedEntry> parsed =
         BlueprintExportParser.parse(objectMapper, file);
 
@@ -138,7 +139,7 @@ public class BlueprintImportService {
     }
 
     // Second pass: a single bulk lookup decides which resolved products are already owned.
-    Set<String> ownedKeys = ownedKeys(ownerSub, resolvedKeys);
+    Set<String> ownedKeys = ownedKeys(ownerUserId, resolvedKeys);
 
     List<BlueprintImportEntryDto> entries = new ArrayList<>(resolutions.size());
     int matched = 0;
@@ -174,9 +175,9 @@ public class BlueprintImportService {
     }
 
     log.info(
-        "Blueprint import preview for ownerSub={}: total={} matched={} alias={} suggested={}"
+        "Blueprint import preview for ownerUserId={}: total={} matched={} alias={} suggested={}"
             + " unmatched={} alreadyOwned={}",
-        ownerSub,
+        ownerUserId,
         entries.size(),
         matched,
         matchedByAlias,
@@ -193,20 +194,20 @@ public class BlueprintImportService {
    * Repeated names / products within one request are de-duplicated, so re-submitting a preview is
    * idempotent.
    *
-   * <p>An already-owned blueprint is never duplicated (also guarded by the {@code (owner_sub,
+   * <p>An already-owned blueprint is never duplicated (also guarded by the {@code (owner_user_id,
    * product_key)} unique constraint); re-importing it only pulls the stored acquisition time
    * earlier when the current import carries an earlier timestamp (a missing or later timestamp
    * leaves it untouched). That earlier value is written by mutating the managed entity and relying
    * on dirty-checking — no {@code save()} / {@code flush()} — per the CLAUDE.md concurrency rules.
    *
-   * @param ownerSub {@code app_user.id} the rows are created for
+   * @param ownerUserId {@code app_user.id} the rows are created for
    * @param resolutions the per-name decisions (see {@link BlueprintImportApplyRequest})
    * @return a summary of added / learned / skipped / already-owned counts
    */
   @Transactional
   @NotNull
   public BlueprintImportResultDto applyImport(
-      @NotNull UUID ownerSub, @NotNull List<BlueprintImportResolutionDto> resolutions) {
+      @NotNull UUID ownerUserId, @NotNull List<BlueprintImportResolutionDto> resolutions) {
     Map<String, ResolvedProduct> productByKey = productIndex();
 
     int added = 0;
@@ -214,7 +215,7 @@ public class BlueprintImportService {
     int skipped = 0;
     int alreadyOwned = 0;
     int acquiredAtUpdated = 0;
-    Map<String, PersonalBlueprint> ownedByKey = ownedByKey(ownerSub, productByKey.keySet());
+    Map<String, PersonalBlueprint> ownedByKey = ownedByKey(ownerUserId, productByKey.keySet());
     Set<String> aliasNamesSeen = new HashSet<>();
 
     for (BlueprintImportResolutionDto resolution : resolutions) {
@@ -232,14 +233,15 @@ public class BlueprintImportService {
         continue;
       }
 
-      if (learnAliasIfManual(ownerSub, externalName, product, aliasNamesSeen)) {
+      if (learnAliasIfManual(ownerUserId, externalName, product, aliasNamesSeen)) {
         aliasesLearned++;
       }
 
       PersonalBlueprint existing = ownedByKey.get(product.productKey());
       if (existing != null) {
         // Re-import of an already-owned blueprint: never insert a duplicate (also guarded by the
-        // (owner_sub, product_key) unique constraint); only pull the acquisition time earlier when
+        // (owner_user_id, product_key) unique constraint); only pull the acquisition time earlier
+        // when
         // this import carries an earlier timestamp. Mutating the managed entity relies on
         // dirty-checking — no save()/flush() — per the CLAUDE.md concurrency rules.
         if (isEarlierAcquiredAt(resolution.acquiredAt(), existing.getAcquiredAt())) {
@@ -252,14 +254,14 @@ public class BlueprintImportService {
       ownedByKey.put(
           product.productKey(),
           personalBlueprintRepository.save(
-              newOwned(ownerSub, product, resolution.acquiredAt(), resolution.note())));
+              newOwned(ownerUserId, product, resolution.acquiredAt(), resolution.note())));
       added++;
     }
 
     log.info(
-        "Blueprint import apply for ownerSub={}: added={} aliasesLearned={} skipped={}"
+        "Blueprint import apply for ownerUserId={}: added={} aliasesLearned={} skipped={}"
             + " alreadyOwned={} acquiredAtUpdated={}",
-        ownerSub,
+        ownerUserId,
         added,
         aliasesLearned,
         skipped,
@@ -281,14 +283,14 @@ public class BlueprintImportService {
    * tag match REQ-INV-019 can route here for differently-cased display names) from inserting two
    * rows that the {@code Optional}-returning resolution lookup would then choke on.
    *
-   * @param ownerSub {@code app_user.id} stamped as the alias creator
+   * @param ownerUserId {@code app_user.id} stamped as the alias creator
    * @param externalName the SCMDB / scmdb.net name being resolved (exact, trimmed)
    * @param product the chosen product
    * @param aliasNamesSeen lower-cased external names already aliased in this request (mutated)
    * @return {@code true} if a new alias row was persisted
    */
   private boolean learnAliasIfManual(
-      @NotNull UUID ownerSub,
+      @NotNull UUID ownerUserId,
       @NotNull String externalName,
       @NotNull ResolvedProduct product,
       @NotNull Set<String> aliasNamesSeen) {
@@ -309,13 +311,13 @@ public class BlueprintImportService {
     if (product.outputItemId() != null) {
       alias.setOutputItem(gameItemRepository.getReferenceById(product.outputItemId()));
     }
-    alias.setCreatedBy(ownerSub.toString());
+    alias.setCreatedBy(ownerUserId.toString());
     aliasRepository.save(alias);
     log.info(
         "Learned blueprint alias: external='{}' -> productKey='{}' by={}",
         externalName,
         product.productKey(),
-        ownerSub);
+        ownerUserId);
     return true;
   }
 
@@ -464,13 +466,13 @@ public class BlueprintImportService {
   /**
    * Returns the subset of {@code keys} the owner already owns via a single bulk lookup.
    *
-   * @param ownerSub {@code app_user.id} of the owner
+   * @param ownerUserId {@code app_user.id} of the owner
    * @param keys the product keys to test
    * @return the owned product keys (empty if {@code keys} is empty)
    */
   @NotNull
-  private Set<String> ownedKeys(@NotNull UUID ownerSub, @NotNull Set<String> keys) {
-    return new HashSet<>(ownedByKey(ownerSub, keys).keySet());
+  private Set<String> ownedKeys(@NotNull UUID ownerUserId, @NotNull Set<String> keys) {
+    return new HashSet<>(ownedByKey(ownerUserId, keys).keySet());
   }
 
   /**
@@ -479,20 +481,20 @@ public class BlueprintImportService {
    * refresh; the returned entities are managed, so mutating one (e.g. its {@code acquiredAt}) is
    * flushed by dirty-checking without an explicit {@code save()}.
    *
-   * @param ownerSub {@code app_user.id} of the owner
+   * @param ownerUserId {@code app_user.id} of the owner
    * @param keys the product keys to load
    * @return owned rows indexed by product key (empty if {@code keys} is empty)
    */
   @NotNull
   private Map<String, PersonalBlueprint> ownedByKey(
-      @NotNull UUID ownerSub, @NotNull Set<String> keys) {
+      @NotNull UUID ownerUserId, @NotNull Set<String> keys) {
     if (keys.isEmpty()) {
       return new HashMap<>();
     }
     Map<String, PersonalBlueprint> owned = new HashMap<>();
     for (PersonalBlueprint pb :
-        personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(
-            ownerSub, new ArrayList<>(keys))) {
+        personalBlueprintRepository.findAllByOwnerUserIdAndProductKeyIn(
+            ownerUserId, new ArrayList<>(keys))) {
       owned.putIfAbsent(pb.getProductKey(), pb);
     }
     return owned;
@@ -519,7 +521,7 @@ public class BlueprintImportService {
    * Builds a new, unsaved owned-blueprint entity stamped with the resolved product, attaching the
    * output item as a lazy reference when the product carries one.
    *
-   * @param ownerSub {@code app_user.id} of the owner
+   * @param ownerUserId {@code app_user.id} of the owner
    * @param product the chosen product to stamp
    * @param acquiredAt optional acquisition time
    * @param note optional note
@@ -527,12 +529,12 @@ public class BlueprintImportService {
    */
   @NotNull
   private PersonalBlueprint newOwned(
-      @NotNull UUID ownerSub,
+      @NotNull UUID ownerUserId,
       @NotNull ResolvedProduct product,
       @Nullable Instant acquiredAt,
       @Nullable String note) {
     PersonalBlueprint entity = new PersonalBlueprint();
-    entity.setOwnerSub(ownerSub);
+    entity.setOwnerUserId(ownerUserId);
     entity.setProductKey(product.productKey());
     entity.setProductName(product.productName());
     if (product.outputItemId() != null) {

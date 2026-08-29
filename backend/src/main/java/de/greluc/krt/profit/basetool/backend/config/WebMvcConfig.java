@@ -34,9 +34,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * {@link DeprecationInterceptor} so deprecated endpoints emit the {@code Deprecation}/{@code
  * Sunset}/{@code Link} response headers documented in CLAUDE.md, and wires {@link
  * CurrentUserArgumentResolver} / {@link UserZoneArgumentResolver} so controllers can bind the JWT
- * subject ({@code @CurrentUserSub}/{@code @CurrentUserId}) and the {@code X-User-Time-Zone} header
- * ({@code @UserZone}) declaratively. Kept as a dedicated configuration class so future interceptor
- * or resolver additions land here rather than scattered across feature configs.
+ * user id ({@code @CurrentUserId}) and the {@code X-User-Time-Zone} header ({@code @UserZone})
+ * declaratively. Kept as a dedicated configuration class so future interceptor or resolver
+ * additions land here rather than scattered across feature configs.
  */
 @Configuration
 @RequiredArgsConstructor

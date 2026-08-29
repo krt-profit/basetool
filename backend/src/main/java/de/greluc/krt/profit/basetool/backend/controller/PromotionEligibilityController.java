@@ -63,7 +63,7 @@ public class PromotionEligibilityController {
   /**
    * Returns the eligibility outcome for every configured rank transition for the calling user.
    *
-   * @param ownerSub the caller's {@code app_user.id}
+   * @param ownerUserId the caller's {@code app_user.id}
    * @return one entry per configured transition, possibly empty
    */
   @GetMapping("/my")
@@ -72,8 +72,8 @@ public class PromotionEligibilityController {
     @ApiResponse(responseCode = "200", description = "Per-transition eligibility for the caller."),
     @ApiResponse(responseCode = "401", description = "Authentication required.")
   })
-  public List<PromotionEligibilityResponse> myEligibility(@CurrentUserId UUID ownerSub) {
-    return service.evaluateAllForUser(ownerSub);
+  public List<PromotionEligibilityResponse> myEligibility(@CurrentUserId UUID ownerUserId) {
+    return service.evaluateAllForUser(ownerUserId);
   }
 
   /**
@@ -82,7 +82,7 @@ public class PromotionEligibilityController {
    *
    * @param fromRank the rank the caller currently holds
    * @param toRank the rank the caller would be promoted to
-   * @param ownerSub the caller's {@code app_user.id}
+   * @param ownerUserId the caller's {@code app_user.id}
    * @return the per-rule outcome plus an aggregate {@code eligible} flag
    */
   @GetMapping("/my/by-ranks")
@@ -93,8 +93,8 @@ public class PromotionEligibilityController {
   public PromotionEligibilityResponse myEligibilityForRanks(
       @Parameter(description = "Current rank of the caller.") @RequestParam int fromRank,
       @Parameter(description = "Target rank for the promotion.") @RequestParam int toRank,
-      @CurrentUserId UUID ownerSub) {
-    return service.evaluateForRanks(ownerSub, fromRank, toRank);
+      @CurrentUserId UUID ownerUserId) {
+    return service.evaluateForRanks(ownerUserId, fromRank, toRank);
   }
 
   /**

@@ -61,7 +61,7 @@ class NotificationServiceTest {
   private static Notification unread(UUID id) {
     Notification n =
         Notification.builder()
-            .recipientSub(RECIPIENT)
+            .recipientUserId(RECIPIENT)
             .type(NotificationType.JOB_ORDER_CREATED)
             .entityType("JOB_ORDER")
             .entityId(UUID.randomUUID())
@@ -82,7 +82,7 @@ class NotificationServiceTest {
     UUID id = UUID.randomUUID();
     Notification n = unread(id);
     NotificationDto dto = dummyDto(id);
-    when(repository.findByIdAndRecipientSub(id, RECIPIENT)).thenReturn(Optional.of(n));
+    when(repository.findByIdAndRecipientUserId(id, RECIPIENT)).thenReturn(Optional.of(n));
     when(repository.saveAndFlush(n)).thenReturn(n);
     when(mapper.toDto(n)).thenReturn(dto);
 
@@ -104,7 +104,7 @@ class NotificationServiceTest {
     Instant readAt = Instant.parse("2026-01-01T00:00:00Z");
     n.setRead(true);
     n.setReadAt(readAt);
-    when(repository.findByIdAndRecipientSub(id, RECIPIENT)).thenReturn(Optional.of(n));
+    when(repository.findByIdAndRecipientUserId(id, RECIPIENT)).thenReturn(Optional.of(n));
     when(repository.saveAndFlush(n)).thenReturn(n);
     when(mapper.toDto(n)).thenReturn(dummyDto(id));
 
@@ -119,7 +119,7 @@ class NotificationServiceTest {
   void markReadForeignOrUnknownThrowsNotFound() {
     // Given
     UUID id = UUID.randomUUID();
-    when(repository.findByIdAndRecipientSub(id, RECIPIENT)).thenReturn(Optional.empty());
+    when(repository.findByIdAndRecipientUserId(id, RECIPIENT)).thenReturn(Optional.empty());
 
     // When / Then
     assertThrows(EntityNotFoundException.class, () -> service.markRead(RECIPIENT, id));
@@ -131,7 +131,7 @@ class NotificationServiceTest {
     // Given
     UUID id = UUID.randomUUID();
     Notification n = unread(id);
-    when(repository.findByIdAndRecipientSub(id, RECIPIENT)).thenReturn(Optional.of(n));
+    when(repository.findByIdAndRecipientUserId(id, RECIPIENT)).thenReturn(Optional.of(n));
 
     // When
     service.deleteOwn(RECIPIENT, id);
@@ -144,7 +144,7 @@ class NotificationServiceTest {
   void deleteOwnForeignOrUnknownThrowsNotFound() {
     // Given
     UUID id = UUID.randomUUID();
-    when(repository.findByIdAndRecipientSub(id, OTHER)).thenReturn(Optional.empty());
+    when(repository.findByIdAndRecipientUserId(id, OTHER)).thenReturn(Optional.empty());
 
     // When / Then
     assertThrows(EntityNotFoundException.class, () -> service.deleteOwn(OTHER, id));
@@ -165,31 +165,31 @@ class NotificationServiceTest {
 
   @Test
   void unreadCountDelegates() {
-    when(repository.countByRecipientSubAndReadFalse(RECIPIENT)).thenReturn(5L);
+    when(repository.countByRecipientUserIdAndReadFalse(RECIPIENT)).thenReturn(5L);
     assertEquals(5L, service.unreadCount(RECIPIENT));
   }
 
   @Test
   void listRecentOwnClampsLimitToFifty() {
-    when(repository.findByRecipientSubOrderByCreatedAtDesc(eq(RECIPIENT), any(Pageable.class)))
+    when(repository.findByRecipientUserIdOrderByCreatedAtDesc(eq(RECIPIENT), any(Pageable.class)))
         .thenReturn(java.util.List.of());
 
     service.listRecentOwn(RECIPIENT, 1000);
 
     ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
-    verify(repository).findByRecipientSubOrderByCreatedAtDesc(eq(RECIPIENT), captor.capture());
+    verify(repository).findByRecipientUserIdOrderByCreatedAtDesc(eq(RECIPIENT), captor.capture());
     assertEquals(50, captor.getValue().getPageSize());
   }
 
   @Test
   void listRecentOwnClampsNonPositiveLimitToOne() {
-    when(repository.findByRecipientSubOrderByCreatedAtDesc(eq(RECIPIENT), any(Pageable.class)))
+    when(repository.findByRecipientUserIdOrderByCreatedAtDesc(eq(RECIPIENT), any(Pageable.class)))
         .thenReturn(java.util.List.of());
 
     service.listRecentOwn(RECIPIENT, 0);
 
     ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
-    verify(repository).findByRecipientSubOrderByCreatedAtDesc(eq(RECIPIENT), captor.capture());
+    verify(repository).findByRecipientUserIdOrderByCreatedAtDesc(eq(RECIPIENT), captor.capture());
     assertEquals(1, captor.getValue().getPageSize());
   }
 

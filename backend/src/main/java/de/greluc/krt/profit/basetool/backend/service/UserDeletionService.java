@@ -234,10 +234,10 @@ public class UserDeletionService {
     // departed member, and are re-adopted should the same Keycloak subject return. The rule
     // selectors were the worst of them -- left in place they keep minting NEW notifications for a
     // recipient that no longer exists.
-    int personalInventoryDeleted = personalInventoryItemRepository.deleteByOwnerSub(userId);
-    int blueprintsDeleted = personalBlueprintRepository.deleteAllByOwnerSub(userId);
+    int personalInventoryDeleted = personalInventoryItemRepository.deleteByOwnerUserId(userId);
+    int blueprintsDeleted = personalBlueprintRepository.deleteAllByOwnerUserId(userId);
     int notificationsDeleted = notificationRepository.deleteAllForRecipient(userId);
-    int ruleSelectorsDeleted = notificationRuleRepository.deleteSelectorsByUserSub(userId);
+    int ruleSelectorsDeleted = notificationRuleRepository.deleteSelectorsByUserId(userId);
     int evaluationsDeleted = memberEvaluationRepository.deleteAllByUserId(userId);
 
     // ---- Shared / historical aggregates: these survive, only their ownership moves ----

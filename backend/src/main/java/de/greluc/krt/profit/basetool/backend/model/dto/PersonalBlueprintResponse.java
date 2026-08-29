@@ -23,7 +23,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Boundary DTO for one of the caller's owned blueprints (#327). The internal {@code ownerSub} is
+ * Boundary DTO for one of the caller's owned blueprints (#327). The internal {@code ownerUserId} is
  * intentionally never exposed.
  *
  * @param id entry primary key

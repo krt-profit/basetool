@@ -140,8 +140,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * Returns the ids of every user who has opted into sharing their blueprints globally ({@link
    * User#isShareBlueprintsGlobally()}). The blueprint-availability aggregations union these ids
    * into their org-unit member set so an opted-in user is counted regardless of org-unit membership
-   * (REQ-INV-018). The id equals the stored {@code PersonalBlueprint.owner_sub} once rendered as
-   * text, so callers convert via {@link UUID#toString()}.
+   * (REQ-INV-018). The id equals the stored {@code PersonalBlueprint.owner_user_id} once rendered
+   * as text, so callers convert via {@link UUID#toString()}.
    *
    * @return the user ids of global blueprint sharers; never {@code null}, possibly empty
    */

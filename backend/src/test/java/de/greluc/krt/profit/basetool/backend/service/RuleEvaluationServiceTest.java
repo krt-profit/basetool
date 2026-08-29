@@ -162,7 +162,7 @@ class RuleEvaluationServiceTest {
     rule.addSelector(
         NotificationRuleSelector.builder()
             .kind(SelectorKind.SPECIFIC_USER)
-            .userSub(OFFICER_A)
+            .userId(OFFICER_A)
             .build());
     when(notificationRuleRepository.findEnabledByEventTypeWithSelectors(
             NotificationEventType.JOB_ORDER_CREATED))
@@ -324,7 +324,8 @@ class RuleEvaluationServiceTest {
 
   @Test
   void eventRecipientWithNullRecipientResolvesToNobody() {
-    // The job-order event carries no directed recipient (contextRecipientSub() defaults to null),
+    // The job-order event carries no directed recipient (contextRecipientUserId() defaults to
+    // null),
     // so an EVENT_RECIPIENT selector must resolve to nobody rather than adding null.
     NotificationRule rule =
         jobOrderRule(
@@ -438,7 +439,7 @@ class RuleEvaluationServiceTest {
             false,
             NotificationRuleSelector.builder()
                 .kind(SelectorKind.SPECIFIC_USER)
-                .userSub(OFFICER_A)
+                .userId(OFFICER_A)
                 .build());
     NotificationRule ruleB =
         jobOrderRule(
@@ -446,7 +447,7 @@ class RuleEvaluationServiceTest {
             false,
             NotificationRuleSelector.builder()
                 .kind(SelectorKind.SPECIFIC_USER)
-                .userSub(ADMIN_B)
+                .userId(ADMIN_B)
                 .build());
     when(notificationRuleRepository.findEnabledByEventTypeWithSelectors(
             NotificationEventType.JOB_ORDER_CREATED))
@@ -468,7 +469,7 @@ class RuleEvaluationServiceTest {
             false,
             NotificationRuleSelector.builder()
                 .kind(SelectorKind.SPECIFIC_USER)
-                .userSub(OFFICER_A)
+                .userId(OFFICER_A)
                 .build());
     NotificationRule updatedRule =
         jobOrderRule(
@@ -476,7 +477,7 @@ class RuleEvaluationServiceTest {
             false,
             NotificationRuleSelector.builder()
                 .kind(SelectorKind.SPECIFIC_USER)
-                .userSub(ADMIN_B)
+                .userId(ADMIN_B)
                 .build());
     when(notificationRuleRepository.findEnabledByEventTypeWithSelectors(
             NotificationEventType.JOB_ORDER_CREATED))

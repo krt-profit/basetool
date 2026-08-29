@@ -30,7 +30,7 @@ import org.jetbrains.annotations.Nullable;
  * Domain event published right after a member registers interest in a Materialbörse offer (#1187,
  * REQ-MARKET-011). It is directed at the offer's owner (the Anbieter) so they learn about the
  * interested party without having to poll the board: the {@code EVENT_RECIPIENT} selector resolves
- * to {@link #contextRecipientSub()} (the owner), while the registering member is the {@link
+ * to {@link #contextRecipientUserId()} (the owner), while the registering member is the {@link
  * #actorSub()} (excluded when the rule sets {@code excludeActor} — harmless here since a member can
  * never register interest in their own offer, so actor and recipient are always distinct).
  *
@@ -43,14 +43,14 @@ import org.jetbrains.annotations.Nullable;
  * @param offerId the offer whose interest was registered (also the notification's loose entity id)
  * @param materialName the offered material's name, for rendering
  * @param interestedUserName the registering member's effective name, for rendering (owner-only)
- * @param ownerSub the offer owner's sub — the directed recipient
+ * @param ownerUserId the offer owner's sub — the directed recipient
  * @param actorSub the registering member's sub
  */
 public record MaterialExchangeInterestRegisteredEvent(
     UUID offerId,
     String materialName,
     String interestedUserName,
-    @Nullable UUID ownerSub,
+    @Nullable UUID ownerUserId,
     @Nullable UUID actorSub)
     implements NotificationEvent {
 
@@ -68,8 +68,8 @@ public record MaterialExchangeInterestRegisteredEvent(
   }
 
   @Override
-  public UUID contextRecipientSub() {
-    return ownerSub;
+  public UUID contextRecipientUserId() {
+    return ownerUserId;
   }
 
   @Override

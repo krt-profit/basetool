@@ -84,18 +84,18 @@ class DefaultBlueprintProvisioningIntegrationTest {
 
     int firstRun = provisioningService.grantDefaultsToUser(user);
     assertThat(firstRun).isGreaterThanOrEqualTo(2);
-    assertThat(personalBlueprintRepository.existsByOwnerSubAndProductKey(user, keyA)).isTrue();
-    assertThat(personalBlueprintRepository.existsByOwnerSubAndProductKey(user, keyB)).isTrue();
+    assertThat(personalBlueprintRepository.existsByOwnerUserIdAndProductKey(user, keyA)).isTrue();
+    assertThat(personalBlueprintRepository.existsByOwnerUserIdAndProductKey(user, keyB)).isTrue();
 
     // Re-running grants nothing new for the keys already owned (ON CONFLICT DO NOTHING).
     int beforeKeys =
         personalBlueprintRepository
-            .findAllByOwnerSubAndProductKeyIn(user, java.util.List.of(keyA, keyB))
+            .findAllByOwnerUserIdAndProductKeyIn(user, java.util.List.of(keyA, keyB))
             .size();
     provisioningService.grantDefaultsToUser(user);
     int afterKeys =
         personalBlueprintRepository
-            .findAllByOwnerSubAndProductKeyIn(user, java.util.List.of(keyA, keyB))
+            .findAllByOwnerUserIdAndProductKeyIn(user, java.util.List.of(keyA, keyB))
             .size();
     assertThat(afterKeys).isEqualTo(beforeKeys).isEqualTo(2);
   }
@@ -108,7 +108,8 @@ class DefaultBlueprintProvisioningIntegrationTest {
 
     provisioningService.grantDefaultsToAllUsers();
 
-    assertThat(personalBlueprintRepository.existsByOwnerSubAndProductKey(active, key)).isTrue();
-    assertThat(personalBlueprintRepository.existsByOwnerSubAndProductKey(inactive, key)).isFalse();
+    assertThat(personalBlueprintRepository.existsByOwnerUserIdAndProductKey(active, key)).isTrue();
+    assertThat(personalBlueprintRepository.existsByOwnerUserIdAndProductKey(inactive, key))
+        .isFalse();
   }
 }

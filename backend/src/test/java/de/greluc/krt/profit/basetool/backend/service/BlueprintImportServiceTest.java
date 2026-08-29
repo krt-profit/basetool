@@ -207,8 +207,8 @@ class BlueprintImportServiceTest {
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
     PersonalBlueprint owned =
-        PersonalBlueprint.builder().ownerSub(SUB).productKey("arclight pistol").build();
-    when(personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(eq(SUB), any()))
+        PersonalBlueprint.builder().ownerUserId(SUB).productKey("arclight pistol").build();
+    when(personalBlueprintRepository.findAllByOwnerUserIdAndProductKeyIn(eq(SUB), any()))
         .thenReturn(List.of(owned));
 
     BlueprintImportPreviewDto preview =
@@ -649,8 +649,8 @@ class BlueprintImportServiceTest {
                 product("arclight pistol", "Arclight Pistol"),
                 product("calico legs", "Calico Legs")));
     PersonalBlueprint owned =
-        PersonalBlueprint.builder().ownerSub(SUB).productKey("arclight pistol").build();
-    when(personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(eq(SUB), any()))
+        PersonalBlueprint.builder().ownerUserId(SUB).productKey("arclight pistol").build();
+    when(personalBlueprintRepository.findAllByOwnerUserIdAndProductKeyIn(eq(SUB), any()))
         .thenReturn(List.of(owned));
     when(personalBlueprintRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -764,11 +764,11 @@ class BlueprintImportServiceTest {
     Instant earlier = Instant.parse("2025-01-01T00:00:00Z");
     PersonalBlueprint owned =
         PersonalBlueprint.builder()
-            .ownerSub(SUB)
+            .ownerUserId(SUB)
             .productKey("arclight pistol")
             .acquiredAt(later)
             .build();
-    when(personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(eq(SUB), any()))
+    when(personalBlueprintRepository.findAllByOwnerUserIdAndProductKeyIn(eq(SUB), any()))
         .thenReturn(List.of(owned));
 
     BlueprintImportResultDto result =
@@ -794,11 +794,11 @@ class BlueprintImportServiceTest {
     Instant later = Instant.parse("2026-03-26T16:00:00Z");
     PersonalBlueprint owned =
         PersonalBlueprint.builder()
-            .ownerSub(SUB)
+            .ownerUserId(SUB)
             .productKey("arclight pistol")
             .acquiredAt(earlier)
             .build();
-    when(personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(eq(SUB), any()))
+    when(personalBlueprintRepository.findAllByOwnerUserIdAndProductKeyIn(eq(SUB), any()))
         .thenReturn(List.of(owned));
 
     BlueprintImportResultDto result =
@@ -819,11 +819,11 @@ class BlueprintImportServiceTest {
     Instant existing = Instant.parse("2025-01-01T00:00:00Z");
     PersonalBlueprint owned =
         PersonalBlueprint.builder()
-            .ownerSub(SUB)
+            .ownerUserId(SUB)
             .productKey("arclight pistol")
             .acquiredAt(existing)
             .build();
-    when(personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(eq(SUB), any()))
+    when(personalBlueprintRepository.findAllByOwnerUserIdAndProductKeyIn(eq(SUB), any()))
         .thenReturn(List.of(owned));
 
     BlueprintImportResultDto result =
@@ -843,8 +843,8 @@ class BlueprintImportServiceTest {
         .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
     Instant incoming = Instant.parse("2025-01-01T00:00:00Z");
     PersonalBlueprint owned =
-        PersonalBlueprint.builder().ownerSub(SUB).productKey("arclight pistol").build();
-    when(personalBlueprintRepository.findAllByOwnerSubAndProductKeyIn(eq(SUB), any()))
+        PersonalBlueprint.builder().ownerUserId(SUB).productKey("arclight pistol").build();
+    when(personalBlueprintRepository.findAllByOwnerUserIdAndProductKeyIn(eq(SUB), any()))
         .thenReturn(List.of(owned));
 
     BlueprintImportResultDto result =

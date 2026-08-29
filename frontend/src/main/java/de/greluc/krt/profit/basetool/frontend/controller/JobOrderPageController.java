@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
@@ -1264,16 +1265,18 @@ public class JobOrderPageController {
     if (principal == null) {
       return null;
     }
+    UUID fromToken = CurrentUser.userId(principal);
+    if (fromToken != null) {
+      return fromToken;
+    }
+    // Only reached for a subject that is not a UUID -- the backend refuses such a token at its own
+    // seam, so this is a floor rather than a supported state.
     try {
-      return UUID.fromString(principal.getSubject());
-    } catch (Exception e) {
-      try {
-        UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
-        return me != null ? me.id() : null;
-      } catch (Exception ex) {
-        log.warn("Failed to get current user ID from backend: {}", ex.getMessage());
-        return null;
-      }
+      UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
+      return me != null ? me.id() : null;
+    } catch (Exception ex) {
+      log.warn("Failed to get current user ID from backend: {}", ex.getMessage());
+      return null;
     }
   }
 

@@ -96,7 +96,7 @@ class NotificationCreationServiceTest {
               assertThat(n.getParams()).isEqualTo("{\"displayId\":\"9\"}");
               assertThat(n.isRead()).isFalse();
             });
-    assertThat(saved).extracting(Notification::getRecipientSub).containsExactlyInAnyOrder(A, B);
+    assertThat(saved).extracting(Notification::getRecipientUserId).containsExactlyInAnyOrder(A, B);
   }
 
   @Test
@@ -119,7 +119,8 @@ class NotificationCreationServiceTest {
 
     service.createFromEvent(event);
 
-    verify(notificationRepository, never()).findRecipientSubsByTypeInAndEntity(any(), any(), any());
+    verify(notificationRepository, never())
+        .findRecipientUserIdsByTypeInAndEntity(any(), any(), any());
     verify(notificationRepository, never()).deleteByTypeInAndEntity(any(), any(), any());
   }
 
@@ -136,7 +137,7 @@ class NotificationCreationServiceTest {
         new BankBookingRequestConfirmedEvent(
             requestId, UUID.randomUUID(), "KB-0001", new BigDecimal("500"), requester, staffA);
     Set<NotificationType> superseded = Set.of(NotificationType.BANK_BOOKING_REQUEST_CREATED);
-    when(notificationRepository.findRecipientSubsByTypeInAndEntity(
+    when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
             superseded, "BANK_BOOKING_REQUEST", requestId))
         .thenReturn(List.of(staffA, staffB));
     when(notificationRepository.deleteByTypeInAndEntity(
@@ -159,7 +160,7 @@ class NotificationCreationServiceTest {
         .satisfies(
             n -> {
               assertThat(n.getType()).isEqualTo(NotificationType.BANK_BOOKING_REQUEST_CONFIRMED);
-              assertThat(n.getRecipientSub()).isEqualTo(requester);
+              assertThat(n.getRecipientUserId()).isEqualTo(requester);
             });
   }
 
@@ -172,7 +173,7 @@ class NotificationCreationServiceTest {
     BankBookingRequestCancelledEvent event =
         new BankBookingRequestCancelledEvent(requestId, UUID.randomUUID(), UUID.randomUUID());
     Set<NotificationType> superseded = Set.of(NotificationType.BANK_BOOKING_REQUEST_CREATED);
-    when(notificationRepository.findRecipientSubsByTypeInAndEntity(
+    when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
             superseded, "BANK_BOOKING_REQUEST", requestId))
         .thenReturn(List.of(staff));
     when(notificationRepository.deleteByTypeInAndEntity(
@@ -192,7 +193,7 @@ class NotificationCreationServiceTest {
     UUID requestId = UUID.fromString("00000000-0000-0000-0000-00000000e999");
     BankBookingRequestCancelledEvent event =
         new BankBookingRequestCancelledEvent(requestId, UUID.randomUUID(), UUID.randomUUID());
-    when(notificationRepository.findRecipientSubsByTypeInAndEntity(
+    when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
             eq(Set.of(NotificationType.BANK_BOOKING_REQUEST_CREATED)),
             eq("BANK_BOOKING_REQUEST"),
             eq(requestId)))

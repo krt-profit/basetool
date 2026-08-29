@@ -47,7 +47,7 @@ users outside the requested family.
   `findAllByProductKeyInAndOwnerSubIn`), resolved server-side: the client cannot widen the scope,
   the multi-user data-isolation rule is unaffected, and the opt-in widens only *whose* blueprints
   are counted, never *who may open* the overview.
-- [ ] The list count aggregation loads only the `(ownerSub, productName)` pair it groups on, via the
+- [ ] The list count aggregation loads only the `(ownerUserId, productName)` pair it groups on, via the
   `findOwnerProductByOwnerSubIn` projection — never the full `PersonalBlueprint` rows — so an admin
   all-scope view does not hydrate the entire `personal_blueprint` table (every column of every
   owner's blueprints) just to count owners per family (REQ-DATA-003). The item-order owner

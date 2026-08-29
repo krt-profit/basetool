@@ -63,7 +63,7 @@ import org.springframework.web.multipart.MultipartFile;
 /**
  * Admin-only counterpart of {@link PersonalBlueprintController} (#327, Phase 7): lets
  * administrators manage any user's acquired blueprints and run the import on their behalf. The
- * target user is taken from the URL path ({@code /{userSub}}) instead of from the JWT; the {@code
+ * target user is taken from the URL path ({@code /{userId}}) instead of from the JWT; the {@code
  * ADMIN} role is enforced at this boundary while the delegated services stay {@code
  * sub}-parameterised.
  */
@@ -84,21 +84,21 @@ public class AdminPersonalBlueprintController {
   /**
    * Lists a target user's owned blueprints (paginated, sortable, optional name filter).
    *
-   * @param userSub target user's {@code app_user.id}
+   * @param userId target user's {@code app_user.id}
    * @param page optional zero-based page index
    * @param size optional page size
    * @param sort optional sort expression over the whitelist
    * @param q optional case-insensitive product-name filter
    * @return paged response DTOs
    */
-  @GetMapping("/{userSub}")
+  @GetMapping("/{userId}")
   @Operation(summary = "List a specific user's owned blueprints.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Paginated list."),
     @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
   })
   public PageResponse<PersonalBlueprintResponse> listForUser(
-      @PathVariable UUID userSub,
+      @PathVariable UUID userId,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
@@ -110,18 +110,18 @@ public class AdminPersonalBlueprintController {
             sort,
             PersonalBlueprintService.SORTABLE_FIELDS,
             PersonalBlueprintService.DEFAULT_SORT_FIELD);
-    Page<PersonalBlueprintResponse> result = service.listForUser(userSub, q, pageable);
+    Page<PersonalBlueprintResponse> result = service.listForUser(userId, q, pageable);
     return PageResponse.of(result);
   }
 
   /**
    * Adds a single blueprint on behalf of the target user.
    *
-   * @param userSub target user's {@code app_user.id}
+   * @param userId target user's {@code app_user.id}
    * @param request the add payload
    * @return the persisted DTO
    */
-  @PostMapping("/{userSub}")
+  @PostMapping("/{userId}")
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(summary = "Add a blueprint on behalf of the given user.")
   @ApiResponses({
@@ -132,18 +132,18 @@ public class AdminPersonalBlueprintController {
     @ApiResponse(responseCode = "409", description = "Blueprint already owned.")
   })
   public PersonalBlueprintResponse addForUser(
-      @PathVariable UUID userSub, @Valid @RequestBody PersonalBlueprintCreateRequest request) {
-    return service.addForUser(userSub, request);
+      @PathVariable UUID userId, @Valid @RequestBody PersonalBlueprintCreateRequest request) {
+    return service.addForUser(userId, request);
   }
 
   /**
    * Multi-select add on behalf of the target user; already-owned / unresolvable keys are skipped.
    *
-   * @param userSub target user's {@code app_user.id}
+   * @param userId target user's {@code app_user.id}
    * @param request the batch of product keys
    * @return a summary of added vs. skipped keys
    */
-  @PostMapping("/{userSub}/batch")
+  @PostMapping("/{userId}/batch")
   @Operation(summary = "Add several blueprints on behalf of the given user (multi-select).")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Batch processed; see the summary."),
@@ -151,8 +151,8 @@ public class AdminPersonalBlueprintController {
     @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
   })
   public PersonalBlueprintBatchResult addBatchForUser(
-      @PathVariable UUID userSub, @Valid @RequestBody PersonalBlueprintBatchCreateRequest request) {
-    return service.addBatchForUser(userSub, request.productKeys());
+      @PathVariable UUID userId, @Valid @RequestBody PersonalBlueprintBatchCreateRequest request) {
+    return service.addBatchForUser(userId, request.productKeys());
   }
 
   /**
@@ -219,11 +219,11 @@ public class AdminPersonalBlueprintController {
    * Previews a blueprint export import (SCMDB or Basetool BP Extractor) on behalf of the target
    * user. Nothing is persisted.
    *
-   * @param userSub target user's {@code app_user.id}
+   * @param userId target user's {@code app_user.id}
    * @param file the uploaded blueprint export JSON
    * @return the per-name resolution preview
    */
-  @PostMapping(value = "/{userSub}/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PostMapping(value = "/{userId}/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @Operation(summary = "Preview a blueprint import for the given user (no writes).")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Preview computed."),
@@ -231,18 +231,18 @@ public class AdminPersonalBlueprintController {
     @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
   })
   public BlueprintImportPreviewDto previewImportForUser(
-      @PathVariable UUID userSub, @RequestParam("file") @NotNull MultipartFile file) {
-    return importService.previewImport(userSub, file);
+      @PathVariable UUID userId, @RequestParam("file") @NotNull MultipartFile file) {
+    return importService.previewImport(userId, file);
   }
 
   /**
    * Applies reviewed blueprint-import resolutions on behalf of the target user.
    *
-   * @param userSub target user's {@code app_user.id}
+   * @param userId target user's {@code app_user.id}
    * @param request the per-name resolutions
    * @return a summary of added / learned / skipped / already-owned counts
    */
-  @PostMapping("/{userSub}/import/apply")
+  @PostMapping("/{userId}/import/apply")
   @Operation(summary = "Apply reviewed import resolutions for the given user.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Import applied; see the summary."),
@@ -250,7 +250,7 @@ public class AdminPersonalBlueprintController {
     @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
   })
   public BlueprintImportResultDto applyImportForUser(
-      @PathVariable UUID userSub, @Valid @RequestBody BlueprintImportApplyRequest request) {
-    return importService.applyImport(userSub, request.resolutions());
+      @PathVariable UUID userId, @Valid @RequestBody BlueprintImportApplyRequest request) {
+    return importService.applyImport(userId, request.resolutions());
   }
 }

@@ -201,11 +201,13 @@ here: it removes the property from the document without touching Jackson or Bean
 Cross-cutting controller boilerplate is factored into `backend/.../web` rather than re-hand-rolled
 per controller (S11, #917). Use the shared seams; do not re-derive them inline:
 
-- **`@CurrentUserSub String` / `@CurrentUserId UUID`** — resolved by `CurrentUserArgumentResolver`
-  from the authenticated caller's JWT `sub` claim (read via `NativeWebRequest#getUserPrincipal()`,
-  so no `SecurityContextHolder` coupling is introduced). A missing/non-JWT principal, a missing or
-  blank subject, or (for `@CurrentUserId`) a non-UUID subject each raise `AccessDeniedException` →
-  HTTP 403. These replace the per-controller `requireSub(JwtAuthenticationToken)` guards.
+- **`@CurrentUserId UUID`** — resolved by `CurrentUserArgumentResolver` from the authenticated
+  caller's JWT `sub` claim (read via `NativeWebRequest#getUserPrincipal()`, so no
+  `SecurityContextHolder` coupling is introduced). A missing/non-JWT principal, a missing or blank
+  subject, or a non-UUID subject each raise `AccessDeniedException` → HTTP 403. It replaces the
+  per-controller `requireSub(JwtAuthenticationToken)` guards, and — since ADR-0142 point 2 (#1640)
+  — its String-typed twin `@CurrentUserSub`, which handed the same value out unparsed under the
+  identity provider's name for it. A controller must not read `jwt.getSubject()` itself.
 - **`@UserZone ZoneId`** — resolved by `UserZoneArgumentResolver` from the `X-User-Time-Zone`
   header, tolerating an absent/blank/invalid IANA zone as `null` (the report services fall back to
   UTC). Each site re-declares the header for the OpenAPI document via a method-level `@Parameter`.

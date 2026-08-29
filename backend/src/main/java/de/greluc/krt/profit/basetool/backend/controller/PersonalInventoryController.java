@@ -84,7 +84,7 @@ public class PersonalInventoryController {
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
       @RequestParam(required = false) String q,
-      @CurrentUserId UUID ownerSub) {
+      @CurrentUserId UUID ownerUserId) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -92,7 +92,7 @@ public class PersonalInventoryController {
             sort,
             PersonalInventoryItemService.SORTABLE_FIELDS,
             PersonalInventoryItemService.DEFAULT_SORT_FIELD);
-    Page<PersonalInventoryItemResponse> result = service.listOwn(ownerSub, q, pageable);
+    Page<PersonalInventoryItemResponse> result = service.listOwn(ownerUserId, q, pageable);
     return PageResponse.of(result);
   }
 
@@ -109,8 +109,8 @@ public class PersonalInventoryController {
     @ApiResponse(responseCode = "200", description = "Item found."),
     @ApiResponse(responseCode = "404", description = "Not found or not owned by caller.")
   })
-  public PersonalInventoryItemResponse get(@PathVariable UUID id, @CurrentUserId UUID ownerSub) {
-    return service.getOwn(ownerSub, id);
+  public PersonalInventoryItemResponse get(@PathVariable UUID id, @CurrentUserId UUID ownerUserId) {
+    return service.getOwn(ownerUserId, id);
   }
 
   /**
@@ -129,8 +129,8 @@ public class PersonalInventoryController {
   })
   public PersonalInventoryItemResponse create(
       @Valid @RequestBody PersonalInventoryItemCreateRequest request,
-      @CurrentUserId UUID ownerSub) {
-    return service.createOwn(ownerSub, request);
+      @CurrentUserId UUID ownerUserId) {
+    return service.createOwn(ownerUserId, request);
   }
 
   /**
@@ -153,8 +153,8 @@ public class PersonalInventoryController {
   public PersonalInventoryItemResponse update(
       @PathVariable UUID id,
       @Valid @RequestBody PersonalInventoryItemUpdateRequest request,
-      @CurrentUserId UUID ownerSub) {
-    return service.updateOwn(ownerSub, id, request);
+      @CurrentUserId UUID ownerUserId) {
+    return service.updateOwn(ownerUserId, id, request);
   }
 
   /**
@@ -169,7 +169,7 @@ public class PersonalInventoryController {
     @ApiResponse(responseCode = "204", description = "Item deleted."),
     @ApiResponse(responseCode = "404", description = "Not found or not owned by caller.")
   })
-  public void delete(@PathVariable UUID id, @CurrentUserId UUID ownerSub) {
-    service.deleteOwn(ownerSub, id);
+  public void delete(@PathVariable UUID id, @CurrentUserId UUID ownerUserId) {
+    service.deleteOwn(ownerUserId, id);
   }
 }
