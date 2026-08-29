@@ -1,0 +1,25 @@
+fix(monitoring): a stale-order floor the live queue reaches is not a floor
+
+RefineryOrderStale and OperationStale move 30d -> 90d, the first time the queue
+was actually measured (#1707). The oldest open refinery order stood at 29.65d
+against the 30d threshold -- hours from firing on a queue of five orders (1 OPEN,
+4 IN_PROGRESS) that nobody had called abandoned. The rule comment already carried
+''baseline-tune: raise/lower once the real queue-age distribution is known'';
+this is that measurement. JobOrderStale was retuned to 180d for the same reason
+in an earlier pass. OperationStale moves with Refinery deliberately: it shares
+the queue cadence and had no open items when measured, so letting the two
+diverge on no evidence would be the worse default.
+
+Also records the AuditDomainSilenceAnomaly triage note (@greluc, 2026-08-29):
+the alert SELF-CLEARS on a deploy, because the counter is per-process and once
+the pre-deploy samples age out of the 14d window the domain has no series for
+ to group. A cleared alert is not evidence of a fix. Left as-is
+--  cannot patch it (no domain label) and pinning the expected
+domain set would reintroduce exactly the upkeep the covered-by-default design
+avoids. The 07 dashboard's per-domain tables are the authoritative view.
+
+The spec gains the reason these queue gauges need no absent() companion, unlike
+the last-success gauge fixed in the previous commit: BusinessMetricsCollector
+registers them eagerly in @PostConstruct, so an empty queue reports 0.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

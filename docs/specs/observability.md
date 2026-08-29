@@ -1133,8 +1133,13 @@ transaction per pass) rather than per-scrape.
   `_oldest_age_seconds` companion. Every oldest-age gauge now drives a stuck-queue alert: the
   registration + bank pairs the "oldest pending > 48 h" `*ApprovalOverdue` alerts, and (since #1041
   item 15) the four work queues `P4kImportStuck` (> 6 h — imports finish in minutes), `JobOrderStale`
-  / `RefineryOrderStale` / `OperationStale` (> 30 d, baseline-tune). An empty queue reports `0`, so
-  there is no `absent()` ambiguity.
+  (> 180 d) / `RefineryOrderStale` / `OperationStale` (> 90 d since 2026-08-29, raised from 30 d the
+  first time the queue was measured — the oldest open refinery order stood at 29.65 d, hours from
+  firing on five orders nobody had called abandoned; #1707). All three are baselines, and measuring
+  the queue is how they get revisited. Every one of these gauges is registered eagerly in
+  `BusinessMetricsCollector.registerGauges()` (`@PostConstruct`), so an empty queue reports `0` and
+  there is no `absent()` ambiguity — unlike the last-success gauge, which is registered lazily and
+  needed the never-succeeded companion above.
 
 - `basetool_p4k_import_jobs_total{outcome,kind}` counter (`P4kImportJobService`, #1041 item 15),
   bumped at each terminal transition — `outcome` = `succeeded` / `failed` (the lowercased terminal
