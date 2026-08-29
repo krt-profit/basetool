@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Ein Alarm für erschöpfte JVM-Threads ist jetzt scharf.** Er lag seit dem Vorfall im Juli
+  bewusst stillgelegt, weil niemand geprüft hatte, ob die Zeile, auf die er hört, überhaupt in der
+  Protokollsammlung ankommt — ein Alarm, der nie auslösen kann, sieht wie Absicherung aus und ist
+  keine. Die Zeile wurde jetzt auf demselben Java-Abbild nachgestellt, das in Produktion läuft,
+  und steht im Wortlaut neben der Regel.
+
 ## [v1.6.9](https://github.com/krt-profit/basetool/releases/tag/v1.6.9) - 2026-08-29
 
 ### Added
