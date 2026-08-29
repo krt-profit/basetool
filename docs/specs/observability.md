@@ -559,8 +559,14 @@ rule — no blanket "everything is masked" claim:
   retention, **no** REQ-OBS-010 IP-retention impact. This **reverses** the original file-only shipping
   decision for these three modules (ADR-0072); the reversal has owner sign-off (2026-07-12) and its
   rationale/cost live in ADR-0095. The `JvmNativeThreadExhaustion` Loki rule that consumes this stream
-  ships **staged** (commented) until the native line is verified present on the test stack (REQ-OBS-014
-  dead-alert guard).
+  shipped **staged** (commented) under the REQ-OBS-014 dead-alert guard until the signature was
+  verified rather than assumed. **Enabled 2026-08-29**: a JVM under a cgroup pids cap on the same
+  digest-pinned image production runs writes `pthread_create failed (EAGAIN)` and `unable to create
+  native thread`, both matched by the filter; the three `<svc>-stdout` streams were measured
+  carrying 1k–43k lines/24h on the host; and neither the single `older_than = "167h"` drop stage nor
+  any of the three masking replaces can touch a fresh line or either phrase. The observed line is
+  recorded verbatim beside the rule, because its wording is JVM-version-dependent and a Temurin bump
+  is the thing that would silently invalidate it.
 - **Keycloak file log** (`app="keycloak"`) — masked **in the shipper** (Alloy stages scrub
   `username=` / `ipAddress=` before ingestion).
 - **Keycloak container stdout** (`app="keycloak-stdout"`) — Keycloak runs `--log=console,file`, so

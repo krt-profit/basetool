@@ -70,20 +70,40 @@ groups:
       # the JVM-only JvmThreadsHigh was blind to) and the root cause is fixed by init:true zombie reaping
       # (#1274), so a crash should not recur — this only leaves the native line in Loki when one does.
       #
-      # STAGED, NOT ACTIVE (dead-alert guard, REQ-OBS-014): enable ONLY after verifying on the test/prod
-      # stack that the native line actually lands in this stream once <svc>-stdout is shipped — i.e. that
-      # `{app=~"(backend|frontend|ingest)-stdout"}` returns the `docker logs` stderr line (the JVM console
-      # appender is active in prod, so the stream flows, but the native line is emitted outside logback
-      # and its presence in the shipped stream must be confirmed, not assumed). See the Alloy stdout-stream
-      # verification step in docs/MONITORING_ROLLOUT_RUNBOOK.md. Uncomment once confirmed.
-      # - alert: JvmNativeThreadExhaustion
-      #   expr: 'sum(count_over_time({app=~"(backend|frontend|ingest)-stdout"} |~ "pthread_create failed|unable to create native thread" [5m])) > 0'
-      #   for: 0m
-      #   labels:
-      #     severity: critical
-      #   annotations:
-      #     summary: "JVM native-thread exhaustion in a container ({{ $labels.app }})"
-      #     description: "A JVM app's container stderr logged 'pthread_create failed' / 'unable to create native thread' — the container hit its cgroup pids cap and the JVM can no longer create OS threads (the 2026-07-12 native-thread OOM). Check the pids trend and container restarts; the leading warning is ContainerPidsHigh."
+      # ENABLED 2026-08-29 (was staged under the REQ-OBS-014 dead-alert guard). The signature was
+      # verified rather than assumed, in four steps — recorded here because the line is
+      # JVM-version-dependent and the next Temurin bump should be re-checked against it:
+      #
+      #   1. THE LINE, observed. A JVM run under a cgroup pids cap on the SAME digest-pinned image
+      #      production runs (eclipse-temurin:25-jre-alpine@sha256:28db6fdf…) writes, verbatim:
+      #
+      #        [0.053s][warning][os,thread] Failed to start thread "Unknown thread" -
+      #          pthread_create failed (EAGAIN) for attributes: stacksize: 1024k, guardsize: 0k, detached.
+      #        [0.055s][warning][os,thread] Failed to start the native thread for java.lang.Thread "Thread-47"
+      #        Exception in thread "main" java.lang.OutOfMemoryError: unable to create native thread:
+      #          possibly out of memory or process/resource limits reached
+      #
+      #      The first and third match the filter below; the second does NOT, and does not need to —
+      #      it never appears alone.
+      #   2. THE STREAM, observed in production: backend-stdout ~30k, frontend-stdout ~43k and
+      #      ingest-stdout ~1k lines per 24h. The pipeline demonstrably carries these apps' console
+      #      output (Appendix B step 1).
+      #   3. NOTHING DROPS IT: the only stage.drop in config.alloy is `older_than = "167h"`, which a
+      #      fresh line cannot hit.
+      #   4. NOTHING REWRITES IT: the three masking replaces on `(backend|frontend|ingest|keycloak)-stdout`
+      #      match a JWT, an e-mail address, and a bearer/token/session-id keyword. None occurs in either
+      #      phrase, so the filter still matches after masking.
+      #
+      # Step 1 is a local observation and steps 3-4 are a config reading; only step 2 was measured on
+      # the host. Say so rather than implying all four were watched live.
+      - alert: JvmNativeThreadExhaustion
+        expr: 'sum(count_over_time({app=~"(backend|frontend|ingest)-stdout"} |~ "pthread_create failed|unable to create native thread" [5m])) > 0'
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "JVM native-thread exhaustion in a container ({{ $labels.app }})"
+          description: "A JVM app's container stderr logged 'pthread_create failed' / 'unable to create native thread' — the container hit its cgroup pids cap and the JVM can no longer create OS threads (the 2026-07-12 native-thread OOM). Check the pids trend and container restarts; the leading warning is ContainerPidsHigh."
 
   - name: log-alerts-warning
     rules:

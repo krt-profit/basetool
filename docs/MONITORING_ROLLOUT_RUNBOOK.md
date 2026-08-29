@@ -893,6 +893,24 @@ source in this authoring session.
 
 ## Appendix B — Enabling the staged `JvmNativeThreadExhaustion` Loki rule
 
+> [!note] Done on 2026-08-29 — the rule is enabled; this appendix is kept as the re-check procedure
+> The signature was verified in four steps and the observed line is recorded verbatim next to the
+> rule in `monitoring/loki/rules/fake/basetool-log-alerts.yml`. **Re-run step 2 below after a Temurin
+> bump**, because the wording is JVM-version-dependent:
+>
+> 1. **The line, observed.** A JVM run under a cgroup pids cap on the same digest-pinned image
+>    production runs writes `pthread_create failed (EAGAIN)` and `unable to create native thread` —
+>    both matched by the rule's filter. Reproduce with a thread-spawning class in
+>    `docker run --pids-limit 60 eclipse-temurin:25-jre-alpine@sha256:28db6fdf…`; no stack needed.
+> 2. **The stream, measured on the host:** `backend-stdout` ~30k, `frontend-stdout` ~43k,
+>    `ingest-stdout` ~1k lines / 24 h. Step 1 of this appendix is therefore satisfied.
+> 3. **Nothing drops it:** the only `stage.drop` in `config.alloy` is `older_than = "167h"`.
+> 4. **Nothing rewrites it:** the three masking replaces match a JWT, an e-mail and a
+>    bearer/token/session-id keyword; none occurs in either phrase.
+>
+> Steps 1, 3 and 4 are a local observation and a config reading; only step 2 was measured on the
+> host. If you want the end-to-end observation as well, the original procedure below still stands.
+
 ADR-0095 ships backend/frontend/ingest container stdout/stderr to Loki under the distinct
 `app="<svc>-stdout"` labels so the JVM/glibc **native** errors that bypass logback
 (`pthread_create failed` / `unable to create native thread`, the `hs_err` preamble) become visible.
