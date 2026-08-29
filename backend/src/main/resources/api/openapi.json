@@ -30327,13 +30327,13 @@
         }
       }
     },
-    "/api/v1/admin/personal-inventory/{userSub}" : {
+    "/api/v1/admin/personal-inventory/{userId}" : {
       "get" : {
         "tags" : [ "Admin – Personal Inventory" ],
         "summary" : "List a specific user's personal inventory entries.",
         "operationId" : "listForUser",
         "parameters" : [ {
-          "name" : "userSub",
+          "name" : "userId",
           "in" : "path",
           "required" : true,
           "schema" : {
@@ -30469,7 +30469,7 @@
         "summary" : "Create a personal inventory entry on behalf of the given user.",
         "operationId" : "createForUser",
         "parameters" : [ {
-          "name" : "userSub",
+          "name" : "userId",
           "in" : "path",
           "required" : true,
           "schema" : {
@@ -30564,13 +30564,13 @@
         } ]
       }
     },
-    "/api/v1/admin/personal-blueprints/{userSub}" : {
+    "/api/v1/admin/personal-blueprints/{userId}" : {
       "get" : {
         "tags" : [ "Admin – Personal Blueprints" ],
         "summary" : "List a specific user's owned blueprints.",
         "operationId" : "listForUser_1",
         "parameters" : [ {
-          "name" : "userSub",
+          "name" : "userId",
           "in" : "path",
           "required" : true,
           "schema" : {
@@ -30706,7 +30706,7 @@
         "summary" : "Add a blueprint on behalf of the given user.",
         "operationId" : "addForUser",
         "parameters" : [ {
-          "name" : "userSub",
+          "name" : "userId",
           "in" : "path",
           "required" : true,
           "schema" : {
@@ -30801,13 +30801,13 @@
         } ]
       }
     },
-    "/api/v1/admin/personal-blueprints/{userSub}/import/preview" : {
+    "/api/v1/admin/personal-blueprints/{userId}/import/preview" : {
       "post" : {
         "tags" : [ "Admin – Personal Blueprints" ],
         "summary" : "Preview a blueprint import for the given user (no writes).",
         "operationId" : "previewImportForUser",
         "parameters" : [ {
-          "name" : "userSub",
+          "name" : "userId",
           "in" : "path",
           "required" : true,
           "schema" : {
@@ -30908,13 +30908,13 @@
         } ]
       }
     },
-    "/api/v1/admin/personal-blueprints/{userSub}/import/apply" : {
+    "/api/v1/admin/personal-blueprints/{userId}/import/apply" : {
       "post" : {
         "tags" : [ "Admin – Personal Blueprints" ],
         "summary" : "Apply reviewed import resolutions for the given user.",
         "operationId" : "applyImportForUser",
         "parameters" : [ {
-          "name" : "userSub",
+          "name" : "userId",
           "in" : "path",
           "required" : true,
           "schema" : {
@@ -31009,13 +31009,13 @@
         } ]
       }
     },
-    "/api/v1/admin/personal-blueprints/{userSub}/batch" : {
+    "/api/v1/admin/personal-blueprints/{userId}/batch" : {
       "post" : {
         "tags" : [ "Admin – Personal Blueprints" ],
         "summary" : "Add several blueprints on behalf of the given user (multi-select).",
         "operationId" : "addBatchForUser",
         "parameters" : [ {
-          "name" : "userSub",
+          "name" : "userId",
           "in" : "path",
           "required" : true,
           "schema" : {

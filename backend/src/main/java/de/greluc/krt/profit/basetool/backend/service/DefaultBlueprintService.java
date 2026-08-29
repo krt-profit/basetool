@@ -79,7 +79,8 @@ public class DefaultBlueprintService {
    * onto the new row.
    *
    * @param productKey normalized product key of the product to mark as default
-   * @param createdBy Keycloak {@code sub} of the admin performing the add (audit trail)
+   * @param createdBy the adding admin's {@code app_user.id} rendered as text, or {@code "system"}
+   *     for a seeded row (provenance, not a foreign key)
    * @return the persisted DTO
    * @throws EntityNotFoundException if the product key matches no active product
    * @throws DuplicateEntityException if the product is already a default

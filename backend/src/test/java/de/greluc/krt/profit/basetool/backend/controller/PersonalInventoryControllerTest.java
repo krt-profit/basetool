@@ -53,7 +53,7 @@ class PersonalInventoryControllerTest {
   @InjectMocks private PersonalInventoryController controller;
 
   @Test
-  void listShouldDeriveOwnerSubFromJwtAndReturnPageResponse() {
+  void listShouldDeriveOwnerUserIdFromJwtAndReturnPageResponse() {
     // Given
     Page<PersonalInventoryItemResponse> page =
         new PageImpl<>(List.of(sampleResponse()), PageRequest.of(0, 10), 1);

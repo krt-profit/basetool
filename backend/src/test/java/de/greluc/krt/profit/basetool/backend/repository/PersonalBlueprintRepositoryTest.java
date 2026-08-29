@@ -39,9 +39,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for the multi-owner finders {@link PersonalBlueprintRepository} grew for the
- * blueprint availability overview (#364): {@link PersonalBlueprintRepository#findAllByOwnerSubIn},
- * its two-column {@link PersonalBlueprintRepository#findOwnerProductByOwnerSubIn} projection, and
- * {@link PersonalBlueprintRepository#findAllByProductKeyAndOwnerSubIn}.
+ * blueprint availability overview (#364): {@link
+ * PersonalBlueprintRepository#findAllByOwnerUserIdIn}, its two-column {@link
+ * PersonalBlueprintRepository#findOwnerProductByOwnerUserIdIn} projection, and {@link
+ * PersonalBlueprintRepository#findAllByProductKeyAndOwnerUserIdIn}.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -61,7 +62,7 @@ class PersonalBlueprintRepositoryTest {
   @BeforeEach
   void clean() {
     repository.deleteAll();
-    // owner_sub is a foreign key to app_user(id) since V235 (REQ-DATA-008), so the three owners
+    // owner_user_id is a foreign key to app_user(id) since V235 (REQ-DATA-008), so the three owners
     // have to exist before any blueprint can reference them.
     seedOwner(OWNER_A);
     seedOwner(OWNER_B);
@@ -72,7 +73,7 @@ class PersonalBlueprintRepositoryTest {
    * Creates the {@code app_user} row a blueprint owner id has to point at, unless it already
    * exists.
    *
-   * @param id the owner id used as {@code owner_sub}
+   * @param id the owner id used as {@code owner_user_id}
    */
   private void seedOwner(UUID id) {
     if (userRepository.existsById(id)) {
@@ -85,29 +86,30 @@ class PersonalBlueprintRepositoryTest {
   }
 
   @Test
-  void findAllByOwnerSubIn_returnsRowsForGivenOwnersOnly() {
+  void findAllByOwnerUserIdIn_returnsRowsForGivenOwnersOnly() {
     repository.save(bp(OWNER_A, "aurora", "Aurora MR"));
     repository.save(bp(OWNER_B, "aurora", "Aurora MR"));
     repository.save(bp(OWNER_C, "cutlass", "Cutlass Black"));
 
-    List<PersonalBlueprint> rows = repository.findAllByOwnerSubIn(Set.of(OWNER_A, OWNER_B));
+    List<PersonalBlueprint> rows = repository.findAllByOwnerUserIdIn(Set.of(OWNER_A, OWNER_B));
 
     assertEquals(2, rows.size());
-    assertTrue(rows.stream().allMatch(r -> Set.of(OWNER_A, OWNER_B).contains(r.getOwnerSub())));
+    assertTrue(rows.stream().allMatch(r -> Set.of(OWNER_A, OWNER_B).contains(r.getOwnerUserId())));
   }
 
   @Test
-  void findOwnerProductByOwnerSubIn_projectsOwnerAndNameForGivenOwnersOnly() {
+  void findOwnerProductByOwnerUserIdIn_projectsOwnerAndNameForGivenOwnersOnly() {
     repository.save(bp(OWNER_A, "aurora", "Aurora MR"));
     repository.save(bp(OWNER_B, "cutlass", "Cutlass Black"));
     repository.save(bp(OWNER_C, "gladius", "Gladius")); // owner out of scope
 
     List<BlueprintOwnerProduct> rows =
-        repository.findOwnerProductByOwnerSubIn(Set.of(OWNER_A, OWNER_B));
+        repository.findOwnerProductByOwnerUserIdIn(Set.of(OWNER_A, OWNER_B));
 
-    // Assert the exact (ownerSub, productName) pairs for the in-scope owners only. Comparing the
+    // Assert the exact (ownerUserId, productName) pairs for the in-scope owners only. Comparing the
     // whole projection (not just the owner subs) pins the constructor-argument order, so a swapped
-    // projection — product name landing in ownerSub — fails here instead of silently mis-grouping
+    // projection — product name landing in ownerUserId — fails here instead of silently
+    // mis-grouping
     // the family aggregation downstream; the absence of OWNER_C also proves the owner restriction.
     assertEquals(
         Set.of(
@@ -117,46 +119,46 @@ class PersonalBlueprintRepositoryTest {
   }
 
   @Test
-  void findAllByProductKeyAndOwnerSubIn_restrictsToProductAndOwners() {
+  void findAllByProductKeyAndOwnerUserIdIn_restrictsToProductAndOwners() {
     repository.save(bp(OWNER_A, "aurora", "Aurora MR"));
     repository.save(bp(OWNER_B, "aurora", "Aurora MR"));
     repository.save(bp(OWNER_C, "aurora", "Aurora MR")); // owner out of scope
     repository.save(bp(OWNER_A, "cutlass", "Cutlass Black")); // other product
 
     List<PersonalBlueprint> rows =
-        repository.findAllByProductKeyAndOwnerSubIn("aurora", Set.of(OWNER_A, OWNER_B));
+        repository.findAllByProductKeyAndOwnerUserIdIn("aurora", Set.of(OWNER_A, OWNER_B));
 
     Set<UUID> owners =
-        rows.stream().map(PersonalBlueprint::getOwnerSub).collect(Collectors.toSet());
+        rows.stream().map(PersonalBlueprint::getOwnerUserId).collect(Collectors.toSet());
     assertEquals(Set.of(OWNER_A, OWNER_B), owners);
   }
 
   @Test
-  void deleteRemovableByOwnerSub_removesOwnersRemovableRowsButKeepsDefaultsAndOtherOwners() {
+  void deleteRemovableByOwnerUserId_removesOwnersRemovableRowsButKeepsDefaultsAndOtherOwners() {
     defaultBlueprintRepository.save(defaultBp(DEFAULT_KEY, "Test Default"));
     repository.save(bp(OWNER_A, "test-removable-1", "Removable One"));
     repository.save(bp(OWNER_A, "test-removable-2", "Removable Two"));
     repository.save(bp(OWNER_A, DEFAULT_KEY, "Test Default")); // granted default — must survive
     repository.save(bp(OWNER_B, "test-removable-1", "Removable One")); // other owner — untouched
 
-    int removed = repository.deleteRemovableByOwnerSub(OWNER_A);
+    int removed = repository.deleteRemovableByOwnerUserId(OWNER_A);
 
     assertEquals(2, removed);
-    List<PersonalBlueprint> ownerA = repository.findAllByOwnerSubIn(Set.of(OWNER_A));
+    List<PersonalBlueprint> ownerA = repository.findAllByOwnerUserIdIn(Set.of(OWNER_A));
     assertEquals(1, ownerA.size());
     assertEquals(DEFAULT_KEY, ownerA.get(0).getProductKey());
-    assertEquals(1, repository.findAllByOwnerSubIn(Set.of(OWNER_B)).size());
+    assertEquals(1, repository.findAllByOwnerUserIdIn(Set.of(OWNER_B)).size());
   }
 
   @Test
-  void deleteRemovableByOwnerSub_removesAllWhenOwnerHoldsNoDefaults() {
+  void deleteRemovableByOwnerUserId_removesAllWhenOwnerHoldsNoDefaults() {
     repository.save(bp(OWNER_A, "test-removable-1", "Removable One"));
     repository.save(bp(OWNER_A, "test-removable-2", "Removable Two"));
 
-    int removed = repository.deleteRemovableByOwnerSub(OWNER_A);
+    int removed = repository.deleteRemovableByOwnerUserId(OWNER_A);
 
     assertEquals(2, removed);
-    assertTrue(repository.findAllByOwnerSubIn(Set.of(OWNER_A)).isEmpty());
+    assertTrue(repository.findAllByOwnerUserIdIn(Set.of(OWNER_A)).isEmpty());
   }
 
   @Test
@@ -171,14 +173,14 @@ class PersonalBlueprintRepositoryTest {
 
     assertEquals(2, removed);
     List<PersonalBlueprint> remaining =
-        repository.findAllByOwnerSubIn(Set.of(OWNER_A, OWNER_B, OWNER_C));
+        repository.findAllByOwnerUserIdIn(Set.of(OWNER_A, OWNER_B, OWNER_C));
     assertEquals(2, remaining.size());
     assertTrue(remaining.stream().allMatch(r -> DEFAULT_KEY.equals(r.getProductKey())));
   }
 
-  private static PersonalBlueprint bp(UUID ownerSub, String productKey, String productName) {
+  private static PersonalBlueprint bp(UUID ownerUserId, String productKey, String productName) {
     return PersonalBlueprint.builder()
-        .ownerSub(ownerSub)
+        .ownerUserId(ownerUserId)
         .productKey(productKey)
         .productName(productName)
         .build();

@@ -341,9 +341,10 @@ Concrete handling, in order:
   squadron pool, in which `user_id` marks only the contributor — so this removes stock the org unit
   may still physically hold. That is the intended semantics as of this release; a member's
   contribution is not inherited by the squadron.
-- **Purged** (the five identity columns): `personal_inventory_item.owner_sub`,
-  `personal_blueprint.owner_sub`, `notification.recipient_sub`,
-  `notification_rule_selector.user_sub` and `member_evaluation.user_id`. **Since V235 each carries a
+- **Purged** (the five identity columns): `personal_inventory_item.owner_user_id`,
+  `personal_blueprint.owner_user_id`, `notification.recipient_user_id`,
+  `notification_rule_selector.user_id` and `member_evaluation.user_id` (the first four were named
+  `*_sub` until V236 renamed them — ADR-0142 point 1, #1640). **Since V235 each carries a
   foreign key to `app_user(id)` with `ON DELETE CASCADE`** (ADR-0142 point 3, issue #1638), so the
   database removes them with the account. The explicit deletes stay: PostgreSQL reports no row count
   for a cascade, and those counts are what the `PERSONAL_DATA_PURGED_ON_USER_DELETION` audit event
@@ -357,9 +358,10 @@ Concrete handling, in order:
   subsequent matching event. V227 purged what earlier deletions had already leaked; V235 re-runs
   that purge before adding the constraints (`ADD CONSTRAINT` validates the whole table, and a
   surviving orphan would abort the deploy) and recasts the three `VARCHAR(64)` columns —
-  `personal_blueprint.owner_sub`, `personal_inventory_item.owner_sub` and `member_evaluation.user_id`
+  `personal_blueprint.owner_user_id`, `personal_inventory_item.owner_user_id` and
+  `member_evaluation.user_id`
   — to `UUID` so they can reference the key at all. All five now hold `app_user.id` natively.
-  `notification_rule_selector.user_sub` also gained the partial index the cascade needs
+  `notification_rule_selector.user_id` also gained the partial index the cascade needs
   (`idx_notification_rule_selector_user`); the other four already led one.
   **A new user-identity column without a foreign key fails the build**:
   `UserIdentityColumnForeignKeyTest` sweeps `information_schema` for every column named `user_id`,

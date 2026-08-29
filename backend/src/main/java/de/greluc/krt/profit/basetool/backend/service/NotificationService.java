@@ -44,7 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <em>or</em> owned by someone else yields {@link EntityNotFoundException} (→ HTTP 404) so a caller
  * can neither read, mark, nor delete a peer's notification (REQ-NOTIF-004). The inbox is not
  * org-unit scoped and so injects neither {@code OwnerScopeService} nor {@code AuthHelperService} —
- * the {@code recipientSub} the controller passes in <em>is</em> the authorization boundary.
+ * the {@code recipientUserId} the controller passes in <em>is</em> the authorization boundary.
  */
 @Service
 @RequiredArgsConstructor
@@ -72,26 +72,28 @@ public class NotificationService {
   /**
    * Owner-scoped paged list of the caller's notifications.
    *
-   * @param recipientSub Keycloak {@code sub} of the caller
+   * @param recipientUserId Keycloak {@code sub} of the caller
    * @param pageable page request (sort fields whitelisted by {@link #SORTABLE_FIELDS})
    * @return the page of notification DTOs
    */
-  public Page<NotificationDto> listOwn(@NotNull UUID recipientSub, @NotNull Pageable pageable) {
-    return notificationRepository.findAllByRecipientSub(recipientSub, pageable).map(mapper::toDto);
+  public Page<NotificationDto> listOwn(@NotNull UUID recipientUserId, @NotNull Pageable pageable) {
+    return notificationRepository
+        .findAllByRecipientUserId(recipientUserId, pageable)
+        .map(mapper::toDto);
   }
 
   /**
    * Returns the caller's most recent notifications (newest first), capped at {@code limit}. Backs
    * the bell dropdown.
    *
-   * @param recipientSub Keycloak {@code sub} of the caller
+   * @param recipientUserId Keycloak {@code sub} of the caller
    * @param limit maximum number of entries to return (clamped to a sane range)
    * @return the most-recent-first list of DTOs
    */
-  public List<NotificationDto> listRecentOwn(@NotNull UUID recipientSub, int limit) {
+  public List<NotificationDto> listRecentOwn(@NotNull UUID recipientUserId, int limit) {
     int capped = Math.max(1, Math.min(limit, 50));
     return notificationRepository
-        .findByRecipientSubOrderByCreatedAtDesc(recipientSub, PageRequest.of(0, capped))
+        .findByRecipientUserIdOrderByCreatedAtDesc(recipientUserId, PageRequest.of(0, capped))
         .stream()
         .map(mapper::toDto)
         .toList();
@@ -100,24 +102,24 @@ public class NotificationService {
   /**
    * Counts the caller's unread notifications; backs the always-on bell badge.
    *
-   * @param recipientSub Keycloak {@code sub} of the caller
+   * @param recipientUserId Keycloak {@code sub} of the caller
    * @return the number of unread notifications
    */
-  public long unreadCount(@NotNull UUID recipientSub) {
-    return notificationRepository.countByRecipientSubAndReadFalse(recipientSub);
+  public long unreadCount(@NotNull UUID recipientUserId) {
+    return notificationRepository.countByRecipientUserIdAndReadFalse(recipientUserId);
   }
 
   /**
    * Marks one of the caller's notifications read (idempotent: a no-op when already read).
    *
-   * @param recipientSub Keycloak {@code sub} of the caller
+   * @param recipientUserId Keycloak {@code sub} of the caller
    * @param id notification id
    * @return the persisted DTO
    * @throws EntityNotFoundException when the id is unknown or owned by someone else
    */
   @Transactional
-  public NotificationDto markRead(@NotNull UUID recipientSub, @NotNull UUID id) {
-    Notification entity = loadOwn(recipientSub, id);
+  public NotificationDto markRead(@NotNull UUID recipientUserId, @NotNull UUID id) {
+    Notification entity = loadOwn(recipientUserId, id);
     if (!entity.isRead()) {
       entity.setRead(true);
       entity.setReadAt(Instant.now());
@@ -130,41 +132,41 @@ public class NotificationService {
   /**
    * Marks every unread notification of the caller read in one atomic statement.
    *
-   * @param recipientSub Keycloak {@code sub} of the caller
+   * @param recipientUserId Keycloak {@code sub} of the caller
    * @return the number of notifications updated
    */
   @Transactional
-  public int markAllRead(@NotNull UUID recipientSub) {
-    int updated = notificationRepository.markAllReadForRecipient(recipientSub, Instant.now());
-    log.debug("Marked {} notification(s) read for recipientSub={}", updated, recipientSub);
+  public int markAllRead(@NotNull UUID recipientUserId) {
+    int updated = notificationRepository.markAllReadForRecipient(recipientUserId, Instant.now());
+    log.debug("Marked {} notification(s) read for recipientUserId={}", updated, recipientUserId);
     return updated;
   }
 
   /**
    * Deletes one of the caller's notifications, regardless of its read state (REQ-NOTIF-005).
    *
-   * @param recipientSub Keycloak {@code sub} of the caller
+   * @param recipientUserId Keycloak {@code sub} of the caller
    * @param id notification id
    * @throws EntityNotFoundException when the id is unknown or owned by someone else
    */
   @Transactional
-  public void deleteOwn(@NotNull UUID recipientSub, @NotNull UUID id) {
-    Notification entity = loadOwn(recipientSub, id);
+  public void deleteOwn(@NotNull UUID recipientUserId, @NotNull UUID id) {
+    Notification entity = loadOwn(recipientUserId, id);
     notificationRepository.delete(entity);
-    log.debug("Deleted notification id={} for recipientSub={}", id, recipientSub);
+    log.debug("Deleted notification id={} for recipientUserId={}", id, recipientUserId);
   }
 
   /**
    * Deletes every read notification of the caller in one atomic statement (the "clear read"
    * action); unread notifications are kept.
    *
-   * @param recipientSub Keycloak {@code sub} of the caller
+   * @param recipientUserId Keycloak {@code sub} of the caller
    * @return the number of notifications deleted
    */
   @Transactional
-  public int deleteAllRead(@NotNull UUID recipientSub) {
-    int deleted = notificationRepository.deleteAllReadForRecipient(recipientSub);
-    log.debug("Cleared {} read notification(s) for recipientSub={}", deleted, recipientSub);
+  public int deleteAllRead(@NotNull UUID recipientUserId) {
+    int deleted = notificationRepository.deleteAllReadForRecipient(recipientUserId);
+    log.debug("Cleared {} read notification(s) for recipientUserId={}", deleted, recipientUserId);
     return deleted;
   }
 
@@ -185,14 +187,14 @@ public class NotificationService {
   }
 
   @NotNull
-  private Notification loadOwn(@NotNull UUID recipientSub, @NotNull UUID id) {
+  private Notification loadOwn(@NotNull UUID recipientUserId, @NotNull UUID id) {
     return notificationRepository
-        .findByIdAndRecipientSub(id, recipientSub)
+        .findByIdAndRecipientUserId(id, recipientUserId)
         .orElseThrow(
             () -> {
               log.warn(
-                  "Notification access denied or not found: recipientSub={} requested id={}",
-                  recipientSub,
+                  "Notification access denied or not found: recipientUserId={} requested id={}",
+                  recipientUserId,
                   id);
               return new EntityNotFoundException("Notification not found: " + id);
             });

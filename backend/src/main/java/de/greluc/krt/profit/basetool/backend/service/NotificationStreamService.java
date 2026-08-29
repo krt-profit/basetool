@@ -110,11 +110,11 @@ public class NotificationStreamService {
    * Registers a new SSE subscription for a recipient and returns its emitter. The emitter
    * de-registers itself on completion, timeout or error.
    *
-   * @param recipientSub the subscribing caller's {@code sub}
+   * @param recipientUserId the subscribing caller's {@code sub}
    * @return the registered emitter
    */
   @NotNull
-  public SseEmitter subscribe(@NotNull UUID recipientSub) {
+  public SseEmitter subscribe(@NotNull UUID recipientUserId) {
     SseEmitter emitter = newEmitter();
     // #1157: register under the map entry's bin lock so an old stream completing concurrently
     // cannot
@@ -124,7 +124,7 @@ public class NotificationStreamService {
     // when full, evict the OLDEST (queue head) — retired outside the lambda below.
     List<SseEmitter> evicted = new ArrayList<>();
     emittersBySub.compute(
-        recipientSub,
+        recipientUserId,
         (key, queue) -> {
           Queue<SseEmitter> q = (queue != null) ? queue : new ConcurrentLinkedQueue<>();
           while (q.size() >= MAX_EMITTERS_PER_SUB) {
@@ -150,11 +150,11 @@ public class NotificationStreamService {
       meterRegistry.counter(MetricNames.SSE_EMITTERS_EVICTED).increment();
       log.debug(
           "Evicting oldest SSE emitter for recipient {}: per-recipient cap {} reached",
-          recipientSub,
+          recipientUserId,
           MAX_EMITTERS_PER_SUB);
       retireReplaced(old);
     }
-    emitter.onCompletion(() -> remove(recipientSub, emitter));
+    emitter.onCompletion(() -> remove(recipientUserId, emitter));
     emitter.onTimeout(
         () -> {
           // Complete the emitter on timeout so Spring MVC records a NORMAL async completion rather
@@ -165,15 +165,15 @@ public class NotificationStreamService {
           // inflates the frontend's 5xx rate (REQ-NOTIF-010). Removal also runs via the
           // onCompletion
           // callback complete() triggers; the extra remove() here is idempotent.
-          remove(recipientSub, emitter);
+          remove(recipientUserId, emitter);
           emitter.complete();
         });
-    emitter.onError(error -> remove(recipientSub, emitter));
+    emitter.onError(error -> remove(recipientUserId, emitter));
     try {
       emitter.send(SseEmitter.event().name("connected").data("ok"));
     } catch (IOException | RuntimeException e) {
-      recordSendFailure(MetricNames.SSE_EVENT_CONNECTED, recipientSub, e);
-      remove(recipientSub, emitter);
+      recordSendFailure(MetricNames.SSE_EVENT_CONNECTED, recipientUserId, e);
+      remove(recipientUserId, emitter);
     }
     return emitter;
   }
@@ -188,13 +188,14 @@ public class NotificationStreamService {
    * app's handler takes no argument and is unaffected; the Android app files the shade entry by
    * kind and deep-links the tap by entity (REQ-APP-UI-007).
    *
-   * @param recipientSubs the recipients whose connections to notify
+   * @param recipientUserIds the recipients whose connections to notify
    * @param signal what those recipients are being told
    */
-  public void publish(@NotNull Collection<UUID> recipientSubs, @NotNull NotificationSignal signal) {
+  public void publish(
+      @NotNull Collection<UUID> recipientUserIds, @NotNull NotificationSignal signal) {
     String payload = serialize(signal);
-    for (UUID recipientSub : recipientSubs) {
-      Queue<SseEmitter> emitters = emittersBySub.get(recipientSub);
+    for (UUID recipientUserId : recipientUserIds) {
+      Queue<SseEmitter> emitters = emittersBySub.get(recipientUserId);
       if (emitters == null) {
         continue;
       }
@@ -202,8 +203,8 @@ public class NotificationStreamService {
         try {
           emitter.send(SseEmitter.event().name("notification").data(payload));
         } catch (IOException | RuntimeException e) {
-          recordSendFailure(MetricNames.SSE_EVENT_NOTIFICATION, recipientSub, e);
-          remove(recipientSub, emitter);
+          recordSendFailure(MetricNames.SSE_EVENT_NOTIFICATION, recipientUserId, e);
+          remove(recipientUserId, emitter);
         }
       }
     }
@@ -255,14 +256,14 @@ public class NotificationStreamService {
   @Scheduled(fixedRateString = "${app.notifications.sse.heartbeat-interval:PT20S}")
   public void heartbeat() {
     emittersBySub.forEach(
-        (recipientSub, emitters) ->
+        (recipientUserId, emitters) ->
             emitters.forEach(
                 emitter -> {
                   try {
                     emitter.send(SseEmitter.event().name("heartbeat").data("ok"));
                   } catch (IOException | RuntimeException e) {
-                    recordSendFailure(MetricNames.SSE_EVENT_HEARTBEAT, recipientSub, e);
-                    remove(recipientSub, emitter);
+                    recordSendFailure(MetricNames.SSE_EVENT_HEARTBEAT, recipientUserId, e);
+                    remove(recipientUserId, emitter);
                   }
                 }));
   }
@@ -292,11 +293,11 @@ public class NotificationStreamService {
    * a "my notifications stopped" report answerable.
    *
    * @param event the SSE event name whose send failed
-   * @param recipientSub the {@code sub} of the recipient whose emitter died
+   * @param recipientUserId the {@code sub} of the recipient whose emitter died
    * @param cause the exception the emitter write threw — logged, not swallowed
    */
   private void recordSendFailure(
-      @NotNull String event, @NotNull UUID recipientSub, @NotNull Throwable cause) {
+      @NotNull String event, @NotNull UUID recipientUserId, @NotNull Throwable cause) {
     meterRegistry
         .counter(
             MetricNames.SSE_SEND_FAILURES,
@@ -307,7 +308,7 @@ public class NotificationStreamService {
         .increment();
     log.debug(
         "Dropping SSE emitter of recipient {} after a failed '{}' push",
-        recipientSub,
+        recipientUserId,
         event,
         cause);
   }
@@ -355,12 +356,12 @@ public class NotificationStreamService {
     }
   }
 
-  private void remove(@NotNull UUID recipientSub, @NotNull SseEmitter emitter) {
+  private void remove(@NotNull UUID recipientUserId, @NotNull SseEmitter emitter) {
     // #1157: remove-and-maybe-evict atomically under the entry's bin lock, so the empty-check
     // cannot
     // race a concurrent subscribe() into an orphaned queue.
     emittersBySub.compute(
-        recipientSub,
+        recipientUserId,
         (key, queue) -> {
           if (queue == null) {
             return null;

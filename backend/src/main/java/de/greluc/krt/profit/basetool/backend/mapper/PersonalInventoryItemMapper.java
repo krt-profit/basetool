@@ -32,8 +32,8 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
 /**
  * Entity ↔ DTO mapper for {@link PersonalInventoryItem}.
  *
- * <p>The {@code ownerSub} is intentionally never copied to/from the response DTO: it is an internal
- * isolation key (see AGENTS.md "MULTI-USER DATA ISOLATION") and must not leak to clients.
+ * <p>The {@code ownerUserId} is intentionally never copied to/from the response DTO: it is an
+ * internal isolation key (see AGENTS.md "MULTI-USER DATA ISOLATION") and must not leak to clients.
  */
 @Mapper(config = CentralMapperConfig.class)
 public interface PersonalInventoryItemMapper {
@@ -47,19 +47,19 @@ public interface PersonalInventoryItemMapper {
   PersonalInventoryItemResponse toResponse(PersonalInventoryItem entity);
 
   /**
-   * Builds a new {@link PersonalInventoryItem} from the create-request. {@code ownerSub} is
+   * Builds a new {@link PersonalInventoryItem} from the create-request. {@code ownerUserId} is
    * assigned by the service from the JWT sub claim; the location name snapshot is set by the
    * service after a UEX lookup, never by the client.
    */
   // Note: inherited fields from AbstractEntity (id, version, createdAt, updatedAt) are
   // not part of the Lombok @Builder generated for this class and are therefore covered
   // by the global unmappedTargetPolicy = IGNORE rather than by explicit @Mapping(ignore).
-  @Mapping(target = "ownerSub", ignore = true)
+  @Mapping(target = "ownerUserId", ignore = true)
   @Mapping(target = "locationNameSnapshot", ignore = true)
   PersonalInventoryItem toEntity(PersonalInventoryItemCreateRequest request);
 
   /**
-   * Applies an update request to an already-managed entity. {@code id}, {@code ownerSub}, {@code
+   * Applies an update request to an already-managed entity. {@code id}, {@code ownerUserId}, {@code
    * version}, {@code createdAt} and {@code locationNameSnapshot} are excluded: version is owned by
    * JPA optimistic locking; the location name snapshot must be set by the service after a
    * successful UEX lookup.
@@ -69,7 +69,7 @@ public interface PersonalInventoryItemMapper {
   @Mapping(target = "version", ignore = true)
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
-  @Mapping(target = "ownerSub", ignore = true)
+  @Mapping(target = "ownerUserId", ignore = true)
   @Mapping(target = "locationNameSnapshot", ignore = true)
   void updateEntity(
       @MappingTarget PersonalInventoryItem entity, PersonalInventoryItemUpdateRequest request);

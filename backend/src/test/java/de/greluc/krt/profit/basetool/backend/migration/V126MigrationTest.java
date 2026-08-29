@@ -37,7 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * TestContainers-backed migration test for {@code V126__create_personal_blueprint.sql}. Asserts the
- * {@code personal_blueprint} table exists with its columns and types, the {@code (owner_sub,
+ * {@code personal_blueprint} table exists with its columns and types, the {@code (owner_user_id,
  * product_key)} UNIQUE constraint, and that the unique constraint actually rejects a duplicate
  * product for the same owner while allowing the same product for a different owner.
  */
@@ -57,11 +57,12 @@ class V126MigrationTest {
     assertEquals("bigint", types.get("version"));
     assertEquals("timestamp with time zone", types.get("created_at"));
     assertEquals("timestamp with time zone", types.get("updated_at"));
-    // V235 (issue #1638) recast owner_sub to UUID so it can carry a foreign key to app_user(id);
+    // V235 (issue #1638) recast owner_user_id to UUID so it can carry a foreign key to
+    // app_user(id);
     // V126 created it as VARCHAR(64). The later migration wins -- this asserts the schema as it
     // actually stands after the full chain, which is what ddl-auto=validate checks the entity
     // against.
-    assertEquals("uuid", types.get("owner_sub"));
+    assertEquals("uuid", types.get("owner_user_id"));
     assertEquals("character varying", types.get("product_key"));
     assertEquals("character varying", types.get("product_name"));
     assertEquals("uuid", types.get("output_item_id"));
@@ -74,7 +75,8 @@ class V126MigrationTest {
                 + "WHERE table_name = 'personal_blueprint' AND constraint_type = 'UNIQUE' "
                 + "AND constraint_name = 'uk_personal_blueprint_owner_product'",
             Integer.class);
-    assertEquals(1, uk == null ? 0 : uk, "(owner_sub, product_key) UNIQUE constraint must exist");
+    assertEquals(
+        1, uk == null ? 0 : uk, "(owner_user_id, product_key) UNIQUE constraint must exist");
   }
 
   @Test
@@ -99,10 +101,10 @@ class V126MigrationTest {
   /**
    * Creates an {@code app_user} row and returns its id.
    *
-   * <p>Needed since V235: {@code owner_sub} is a foreign key to {@code app_user(id)}, so a
+   * <p>Needed since V235: {@code owner_user_id} is a foreign key to {@code app_user(id)}, so a
    * blueprint for an invented owner no longer inserts at all.
    *
-   * @return the new user's id, usable as an {@code owner_sub}
+   * @return the new user's id, usable as an {@code owner_user_id}
    */
   private UUID owner() {
     UUID id = UUID.randomUUID();
@@ -110,12 +112,12 @@ class V126MigrationTest {
     return id;
   }
 
-  private void insertOwned(UUID ownerSub, String productKey) {
+  private void insertOwned(UUID ownerUserId, String productKey) {
     jdbcTemplate.update(
         "INSERT INTO personal_blueprint "
-            + "(id, owner_sub, product_key, product_name) VALUES (?, ?, ?, ?)",
+            + "(id, owner_user_id, product_key, product_name) VALUES (?, ?, ?, ?)",
         UUID.randomUUID(),
-        ownerSub,
+        ownerUserId,
         productKey,
         productKey);
   }

@@ -159,12 +159,12 @@ class NotificationStreamServiceTest {
   void publish_sendsNamedNotificationEventToSubscribersOfThatRecipient() throws Exception {
     // Given a subscriber for a specific recipient
     CapturingStreamService service = new CapturingStreamService();
-    UUID recipientSub = UUID.randomUUID();
-    service.subscribe(recipientSub);
+    UUID recipientUserId = UUID.randomUUID();
+    service.subscribe(recipientUserId);
     clearInvocations(service.emitter); // drop the `connected` send from subscribe()
 
     // When a notification is published to that recipient
-    service.publish(List.of(recipientSub), NotificationSignal.refreshOnly());
+    service.publish(List.of(recipientUserId), NotificationSignal.refreshOnly());
 
     // Then a named `notification` event is pushed so the client refreshes its unread state
     ArgumentCaptor<SseEmitter.SseEventBuilder> captor =
@@ -177,12 +177,12 @@ class NotificationStreamServiceTest {
   void publish_refreshOnlySignal_keepsTheHistoricPayload() throws Exception {
     // Given a subscriber
     CapturingStreamService service = new CapturingStreamService();
-    UUID recipientSub = UUID.randomUUID();
-    service.subscribe(recipientSub);
+    UUID recipientUserId = UUID.randomUUID();
+    service.subscribe(recipientUserId);
     clearInvocations(service.emitter);
 
     // When an event that only CLEARED stale items is published
-    service.publish(List.of(recipientSub), NotificationSignal.refreshOnly());
+    service.publish(List.of(recipientUserId), NotificationSignal.refreshOnly());
 
     // Then the payload is still the literal the event carried before it carried anything, so a
     // client written against the old contract sees no change at all.
@@ -196,14 +196,14 @@ class NotificationStreamServiceTest {
   void publish_signalWithAType_carriesKindEntityAndParams() throws Exception {
     // Given a subscriber
     CapturingStreamService service = new CapturingStreamService();
-    UUID recipientSub = UUID.randomUUID();
+    UUID recipientUserId = UUID.randomUUID();
     UUID entityId = UUID.randomUUID();
-    service.subscribe(recipientSub);
+    service.subscribe(recipientUserId);
     clearInvocations(service.emitter);
 
     // When a real notification is pushed
     service.publish(
-        List.of(recipientSub),
+        List.of(recipientUserId),
         new NotificationSignal(
             NotificationType.DISCORD_REGISTRATION_PENDING,
             "USER",
@@ -257,15 +257,15 @@ class NotificationStreamServiceTest {
   @Test
   void publish_sendFailure_recordsSseSendFailureCounterAndDropsEmitter() throws Exception {
     CapturingStreamService service = new CapturingStreamService();
-    UUID recipientSub = UUID.randomUUID();
-    service.subscribe(recipientSub); // `connected` send succeeds, emitter registered
+    UUID recipientUserId = UUID.randomUUID();
+    service.subscribe(recipientUserId); // `connected` send succeeds, emitter registered
     clearInvocations(service.emitter);
     doThrow(new IOException("broken pipe"))
         .when(service.emitter)
         .send(any(SseEmitter.SseEventBuilder.class));
 
     // When the notification push fails on a dead emitter
-    service.publish(List.of(recipientSub), NotificationSignal.refreshOnly());
+    service.publish(List.of(recipientUserId), NotificationSignal.refreshOnly());
 
     // Then the failure is counted under the `notification` event and the emitter is dropped
     assertEquals(
@@ -338,8 +338,8 @@ class NotificationStreamServiceTest {
   void heartbeat_sendFailure_countsUnderHeartbeatAndDropsEmitter() throws Exception {
     // Given a registered subscriber whose stream then goes half-open.
     CapturingStreamService service = new CapturingStreamService();
-    UUID recipientSub = UUID.randomUUID();
-    service.subscribe(recipientSub); // `connected` send succeeds, emitter registered
+    UUID recipientUserId = UUID.randomUUID();
+    service.subscribe(recipientUserId); // `connected` send succeeds, emitter registered
     clearInvocations(service.emitter); // drop the `connected` send from subscribe()
     doThrow(new IOException("broken pipe"))
         .when(service.emitter)
@@ -367,15 +367,15 @@ class NotificationStreamServiceTest {
     // The three push branches used to catch `e` and never reference it: an ordinary client
     // hang-up and a registry lifecycle bug were the same, unattributable number.
     CapturingStreamService service = new CapturingStreamService();
-    UUID recipientSub = UUID.randomUUID();
-    service.subscribe(recipientSub);
+    UUID recipientUserId = UUID.randomUUID();
+    service.subscribe(recipientUserId);
     clearInvocations(service.emitter);
     IOException brokenPipe = new IOException("broken pipe");
     doThrow(brokenPipe).when(service.emitter).send(any(SseEmitter.SseEventBuilder.class));
 
     List<ILoggingEvent> events =
         withStreamLogAppender(
-            () -> service.publish(List.of(recipientSub), NotificationSignal.refreshOnly()));
+            () -> service.publish(List.of(recipientUserId), NotificationSignal.refreshOnly()));
 
     assertEquals(
         1.0,
@@ -391,7 +391,7 @@ class NotificationStreamServiceTest {
     // client-triggerable log flood (REQ-OBS-001).
     assertEquals(Level.DEBUG, logged.getLevel());
     assertNotNull(logged.getThrowableProxy(), "the caught exception must reach the log line");
-    assertTrue(logged.getFormattedMessage().contains(recipientSub.toString()));
+    assertTrue(logged.getFormattedMessage().contains(recipientUserId.toString()));
   }
 
   @Test
@@ -399,8 +399,8 @@ class NotificationStreamServiceTest {
     // A write against a completed emitter is a registry lifecycle race, not a dead client — the
     // whole point of the bounded cause tag is telling the two apart without flipping a logger.
     CapturingStreamService service = new CapturingStreamService();
-    UUID recipientSub = UUID.randomUUID();
-    service.subscribe(recipientSub);
+    UUID recipientUserId = UUID.randomUUID();
+    service.subscribe(recipientUserId);
     clearInvocations(service.emitter);
     doThrow(new IllegalStateException("already completed"))
         .when(service.emitter)
@@ -422,12 +422,12 @@ class NotificationStreamServiceTest {
   @Test
   void sendFailure_onAnUnexpectedRuntimeException_fallsBackToTheOtherCause() throws Exception {
     CapturingStreamService service = new CapturingStreamService();
-    UUID recipientSub = UUID.randomUUID();
+    UUID recipientUserId = UUID.randomUUID();
     doThrow(new IllegalArgumentException("odd"))
         .when(service.emitter)
         .send(any(SseEmitter.SseEventBuilder.class));
 
-    service.subscribe(recipientSub);
+    service.subscribe(recipientUserId);
 
     assertEquals(
         1.0,

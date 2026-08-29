@@ -103,10 +103,10 @@ public class NotificationCreationService {
     List<Notification> toCreate = new ArrayList<>();
     for (Map.Entry<NotificationType, Set<UUID>> entry : recipientsByType.entrySet()) {
       NotificationType type = entry.getKey();
-      for (UUID recipientSub : entry.getValue()) {
+      for (UUID recipientUserId : entry.getValue()) {
         toCreate.add(
             Notification.builder()
-                .recipientSub(recipientSub)
+                .recipientUserId(recipientUserId)
                 .type(type)
                 .params(paramsJson)
                 .entityType(event.entityType())
@@ -149,7 +149,7 @@ public class NotificationCreationService {
     // context) so their badge/inbox can be refreshed live after commit.
     Set<UUID> affected =
         new HashSet<>(
-            notificationRepository.findRecipientSubsByTypeInAndEntity(
+            notificationRepository.findRecipientUserIdsByTypeInAndEntity(
                 supersededTypes, event.entityType(), event.entityId()));
     if (affected.isEmpty()) {
       return Set.of();

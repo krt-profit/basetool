@@ -82,7 +82,7 @@ public class NotificationController {
    * the guarantee travels with the endpoint instead of depending on a vhost's defaults; the API
    * vhost the Android app uses is a second proxy host whose defaults nobody verified.
    *
-   * @param recipientSub the caller's id, resolved from the JWT subject claim
+   * @param recipientUserId the caller's id, resolved from the JWT subject claim
    * @param response the servlet response, used only to set the no-buffering header
    * @return the SSE emitter registered for the caller
    */
@@ -92,9 +92,9 @@ public class NotificationController {
     @ApiResponse(responseCode = "200", description = "SSE stream opened."),
     @ApiResponse(responseCode = "401", description = "Authentication required.")
   })
-  public SseEmitter stream(@CurrentUserId UUID recipientSub, HttpServletResponse response) {
+  public SseEmitter stream(@CurrentUserId UUID recipientUserId, HttpServletResponse response) {
     response.setHeader("X-Accel-Buffering", "no");
-    return streamService.subscribe(recipientSub);
+    return streamService.subscribe(recipientUserId);
   }
 
   /**
@@ -103,7 +103,7 @@ public class NotificationController {
    * @param page zero-based page index (optional)
    * @param size page size (optional)
    * @param sort sort expression (optional; whitelisted fields only)
-   * @param recipientSub the caller's id, resolved from the JWT subject claim
+   * @param recipientUserId the caller's id, resolved from the JWT subject claim
    * @return a page of the caller's notifications
    */
   @GetMapping
@@ -118,7 +118,7 @@ public class NotificationController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
-      @CurrentUserId UUID recipientSub) {
+      @CurrentUserId UUID recipientUserId) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -126,7 +126,7 @@ public class NotificationController {
             sort,
             NotificationService.SORTABLE_FIELDS,
             NotificationService.DEFAULT_SORT_FIELD);
-    Page<NotificationDto> result = service.listOwn(recipientSub, pageable);
+    Page<NotificationDto> result = service.listOwn(recipientUserId, pageable);
     return PageResponse.of(result);
   }
 
@@ -134,7 +134,7 @@ public class NotificationController {
    * Returns the caller's most recent notifications for the bell dropdown.
    *
    * @param limit maximum number of entries (optional; clamped server-side)
-   * @param recipientSub the caller's id, resolved from the JWT subject claim
+   * @param recipientUserId the caller's id, resolved from the JWT subject claim
    * @return the most-recent-first list of notifications
    */
   @GetMapping("/recent")
@@ -145,14 +145,14 @@ public class NotificationController {
   })
   public List<NotificationDto> recent(
       @RequestParam(required = false, defaultValue = "10") int limit,
-      @CurrentUserId UUID recipientSub) {
-    return service.listRecentOwn(recipientSub, limit);
+      @CurrentUserId UUID recipientUserId) {
+    return service.listRecentOwn(recipientUserId, limit);
   }
 
   /**
    * Returns the caller's unread count for the always-on bell badge.
    *
-   * @param recipientSub the caller's id, resolved from the JWT subject claim
+   * @param recipientUserId the caller's id, resolved from the JWT subject claim
    * @return the unread count payload
    */
   @GetMapping("/unread-count")
@@ -161,15 +161,15 @@ public class NotificationController {
     @ApiResponse(responseCode = "200", description = "Unread count."),
     @ApiResponse(responseCode = "401", description = "Authentication required.")
   })
-  public NotificationUnreadCountDto unreadCount(@CurrentUserId UUID recipientSub) {
-    return new NotificationUnreadCountDto(service.unreadCount(recipientSub));
+  public NotificationUnreadCountDto unreadCount(@CurrentUserId UUID recipientUserId) {
+    return new NotificationUnreadCountDto(service.unreadCount(recipientUserId));
   }
 
   /**
    * Marks one of the caller's notifications read.
    *
    * @param id notification id
-   * @param recipientSub the caller's id, resolved from the JWT subject claim
+   * @param recipientUserId the caller's id, resolved from the JWT subject claim
    * @return the updated notification DTO
    */
   @PostMapping("/{id}/read")
@@ -178,14 +178,14 @@ public class NotificationController {
     @ApiResponse(responseCode = "200", description = "Notification marked read."),
     @ApiResponse(responseCode = "404", description = "Not found or not owned by caller.")
   })
-  public NotificationDto markRead(@PathVariable UUID id, @CurrentUserId UUID recipientSub) {
-    return service.markRead(recipientSub, id);
+  public NotificationDto markRead(@PathVariable UUID id, @CurrentUserId UUID recipientUserId) {
+    return service.markRead(recipientUserId, id);
   }
 
   /**
    * Marks every unread notification of the caller read.
    *
-   * @param recipientSub the caller's id, resolved from the JWT subject claim
+   * @param recipientUserId the caller's id, resolved from the JWT subject claim
    * @return the bulk result (count updated + resulting unread count of zero)
    */
   @PostMapping("/read-all")
@@ -194,16 +194,16 @@ public class NotificationController {
     @ApiResponse(responseCode = "200", description = "All notifications marked read."),
     @ApiResponse(responseCode = "401", description = "Authentication required.")
   })
-  public NotificationBulkResultDto markAllRead(@CurrentUserId UUID recipientSub) {
-    int affected = service.markAllRead(recipientSub);
-    return new NotificationBulkResultDto(affected, service.unreadCount(recipientSub));
+  public NotificationBulkResultDto markAllRead(@CurrentUserId UUID recipientUserId) {
+    int affected = service.markAllRead(recipientUserId);
+    return new NotificationBulkResultDto(affected, service.unreadCount(recipientUserId));
   }
 
   /**
    * Deletes one of the caller's notifications, whether read or unread (REQ-NOTIF-005).
    *
    * @param id notification id
-   * @param recipientSub the caller's id, resolved from the JWT subject claim
+   * @param recipientUserId the caller's id, resolved from the JWT subject claim
    */
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -212,14 +212,14 @@ public class NotificationController {
     @ApiResponse(responseCode = "204", description = "Notification deleted."),
     @ApiResponse(responseCode = "404", description = "Not found or not owned by caller.")
   })
-  public void delete(@PathVariable UUID id, @CurrentUserId UUID recipientSub) {
-    service.deleteOwn(recipientSub, id);
+  public void delete(@PathVariable UUID id, @CurrentUserId UUID recipientUserId) {
+    service.deleteOwn(recipientUserId, id);
   }
 
   /**
    * Deletes every <em>read</em> notification of the caller (the "clear read" action).
    *
-   * @param recipientSub the caller's id, resolved from the JWT subject claim
+   * @param recipientUserId the caller's id, resolved from the JWT subject claim
    * @return the bulk result (count deleted + remaining unread count)
    */
   @DeleteMapping("/read")
@@ -228,8 +228,8 @@ public class NotificationController {
     @ApiResponse(responseCode = "200", description = "Read notifications cleared."),
     @ApiResponse(responseCode = "401", description = "Authentication required.")
   })
-  public NotificationBulkResultDto deleteAllRead(@CurrentUserId UUID recipientSub) {
-    int affected = service.deleteAllRead(recipientSub);
-    return new NotificationBulkResultDto(affected, service.unreadCount(recipientSub));
+  public NotificationBulkResultDto deleteAllRead(@CurrentUserId UUID recipientUserId) {
+    int affected = service.deleteAllRead(recipientUserId);
+    return new NotificationBulkResultDto(affected, service.unreadCount(recipientUserId));
   }
 }

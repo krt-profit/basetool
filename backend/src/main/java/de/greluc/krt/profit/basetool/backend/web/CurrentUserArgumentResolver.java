@@ -32,14 +32,15 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 /**
- * Resolves {@link CurrentUserSub}-annotated {@link String} and {@link CurrentUserId}-annotated
- * {@link UUID} controller parameters from the authenticated caller's subject.
+ * Resolves {@link CurrentUserId}-annotated {@link UUID} controller parameters from the
+ * authenticated caller's subject.
  *
- * <p>This is the single implementation of the {@code requireSub(JwtAuthenticationToken)} guard that
- * six controllers previously hand-rolled (five returning the raw subject, {@code
- * NotificationController} returning a parsed UUID). The principal is read via {@link
- * NativeWebRequest#getUserPrincipal()} — the exact source Spring MVC used to populate the {@code
- * JwtAuthenticationToken} method parameters these annotations replace — so no {@link
+ * <p>This is the single implementation of the {@code requireSub(JwtAuthenticationToken)} guard six
+ * controllers once hand-rolled. It had a String-typed twin, {@code @CurrentUserSub}, which returned
+ * the same value unparsed; ADR-0142 point 2 removed it, because a controller that says "sub" is
+ * naming the identity provider for a value that is simply the user id. The principal is read via
+ * {@link NativeWebRequest#getUserPrincipal()} — the exact source Spring MVC used to populate the
+ * {@code JwtAuthenticationToken} method parameters these annotations replace — so no {@link
  * org.springframework.security.core.context.SecurityContextHolder} coupling is introduced.
  *
  * <p>The subject comes from {@link
@@ -48,38 +49,33 @@ import org.springframework.web.method.support.ModelAndViewContainer;
  * ADR-0129 — resolves like any other. Demanding a {@code JwtAuthenticationToken} here refused every
  * such call during argument resolution, one layer past the gate it used to fail at.
  *
- * <p>An absent subject and (for {@link CurrentUserId}) a non-UUID subject each raise {@link
- * AccessDeniedException}, which the security layer renders as RFC 7807 {@code 403}.
+ * <p>An absent subject and a non-UUID subject each raise {@link AccessDeniedException}, which the
+ * security layer renders as RFC 7807 {@code 403}.
  */
 public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolver {
 
   /**
-   * Claims {@link String} parameters annotated with {@link CurrentUserSub} and {@link UUID}
-   * parameters annotated with {@link CurrentUserId}; the type check guards against the annotation
-   * being placed on a parameter of the wrong type.
+   * Claims {@link UUID} parameters annotated with {@link CurrentUserId}; the type check guards
+   * against the annotation being placed on a parameter of the wrong type.
    *
    * @param parameter the candidate controller parameter
-   * @return {@code true} for a correctly-typed {@code @CurrentUserSub}/{@code @CurrentUserId}
-   *     parameter
+   * @return {@code true} for a correctly-typed {@code @CurrentUserId} parameter
    */
   @Override
   public boolean supportsParameter(@NotNull MethodParameter parameter) {
-    return (parameter.hasParameterAnnotation(CurrentUserSub.class)
-            && String.class.equals(parameter.getParameterType()))
-        || (parameter.hasParameterAnnotation(CurrentUserId.class)
-            && UUID.class.equals(parameter.getParameterType()));
+    return parameter.hasParameterAnnotation(CurrentUserId.class)
+        && UUID.class.equals(parameter.getParameterType());
   }
 
   /**
-   * Returns the caller's subject as a {@link String} for {@link CurrentUserSub} parameters, or as a
-   * {@link UUID} for {@link CurrentUserId} parameters.
+   * Returns the caller's subject parsed into the {@link UUID} that is their {@code app_user.id}.
    *
-   * @param parameter the parameter being resolved (drives the String-vs-UUID return type)
+   * @param parameter the parameter being resolved
    * @param mavContainer unused MVC container
    * @param webRequest the current request, source of the authenticated principal
    * @param binderFactory unused data-binder factory
-   * @return the subject String or its parsed UUID
-   * @throws AccessDeniedException if the JWT/subject is missing or, for a UUID target, malformed
+   * @return the caller's user id
+   * @throws AccessDeniedException if the JWT/subject is missing or malformed
    */
   @Override
   @NotNull
@@ -89,14 +85,11 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
       @NotNull NativeWebRequest webRequest,
       WebDataBinderFactory binderFactory) {
     String sub = requireSubject(webRequest);
-    if (parameter.hasParameterAnnotation(CurrentUserId.class)) {
-      try {
-        return UUID.fromString(sub);
-      } catch (IllegalArgumentException ex) {
-        throw new AccessDeniedException("JWT subject claim is not a valid identifier.");
-      }
+    try {
+      return UUID.fromString(sub);
+    } catch (IllegalArgumentException ex) {
+      throw new AccessDeniedException("JWT subject claim is not a valid identifier.");
     }
-    return sub;
   }
 
   /**

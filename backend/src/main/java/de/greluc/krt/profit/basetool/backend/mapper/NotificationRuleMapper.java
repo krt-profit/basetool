@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.NotificationRuleSelector;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleSelectorDto;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 /**
  * MapStruct mapper from notification-rule entities to their outbound DTOs. Write requests are
@@ -45,8 +46,15 @@ public interface NotificationRuleMapper {
   /**
    * Maps one selector entity to its read DTO.
    *
+   * <p>The one explicit mapping in this file bridges the deprecation window ADR-0142 opened: the
+   * entity column is {@code user_id} (#1640), while the DTO property is still {@code userSub}
+   * because renaming it breaks the frozen external contract (REQ-API-009) and needs its own
+   * {@code @ApiDeprecation} sunset. Without this line MapStruct maps the property to {@code null}
+   * silently -- it name-matches, and there is no longer a name to match.
+   *
    * @param selector the selector entity
    * @return the read DTO
    */
+  @Mapping(target = "userSub", source = "userId")
   NotificationRuleSelectorDto toDto(NotificationRuleSelector selector);
 }

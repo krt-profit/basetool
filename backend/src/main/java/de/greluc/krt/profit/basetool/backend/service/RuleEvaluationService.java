@@ -86,8 +86,7 @@ public class RuleEvaluationService {
   private Set<UUID> resolveSelector(
       @NotNull NotificationRuleSelector selector, @NotNull NotificationEvent event) {
     return switch (selector.getKind()) {
-      case SPECIFIC_USER ->
-          selector.getUserSub() == null ? Set.of() : Set.of(selector.getUserSub());
+      case SPECIFIC_USER -> selector.getUserId() == null ? Set.of() : Set.of(selector.getUserId());
       case ROLE ->
           selector.getRoleCode() == null
               ? Set.of()
@@ -125,14 +124,14 @@ public class RuleEvaluationService {
 
   @NotNull
   private Set<UUID> resolveEventRecipient(@NotNull NotificationEvent event) {
-    UUID recipientSub = event.contextRecipientSub();
-    if (recipientSub == null) {
+    UUID recipientUserId = event.contextRecipientUserId();
+    if (recipientUserId == null) {
       log.debug(
           "Event {} carries no directed recipient; EVENT_RECIPIENT selector resolves to nobody",
           event.eventType());
       return Set.of();
     }
-    return Set.of(recipientSub);
+    return Set.of(recipientUserId);
   }
 
   @NotNull

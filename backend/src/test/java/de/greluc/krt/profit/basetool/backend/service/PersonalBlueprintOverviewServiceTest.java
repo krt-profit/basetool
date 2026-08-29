@@ -95,7 +95,7 @@ class PersonalBlueprintOverviewServiceTest {
     PersonalBlueprint b = new PersonalBlueprint();
     b.setProductKey(key);
     b.setProductName(name);
-    b.setOwnerSub(owner);
+    b.setOwnerUserId(owner);
     return b;
   }
 
@@ -121,8 +121,9 @@ class PersonalBlueprintOverviewServiceTest {
     // Admin "all org units" must span EVERY blueprint owner — including USER_2, who holds no
     // org-unit membership. Resolving via the org-unit member list (the #371 bug) silently dropped
     // such owners, so a squadron-less admin's own blueprints went missing.
-    when(personalBlueprintRepository.findAllDistinctOwnerSubs()).thenReturn(Set.of(USER_1, USER_2));
-    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(any()))
+    when(personalBlueprintRepository.findAllDistinctOwnerUserIds())
+        .thenReturn(Set.of(USER_1, USER_2));
+    when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(any()))
         .thenReturn(
             List.of(op("Aurora MR", USER_1), op("Aurora MR", USER_2), op("Cutlass Black", USER_1)));
 
@@ -140,9 +141,10 @@ class PersonalBlueprintOverviewServiceTest {
   void list_collapsesCosmeticVariantsIntoOneFamilyRow() {
     when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
-    when(personalBlueprintRepository.findAllDistinctOwnerSubs()).thenReturn(Set.of(USER_1, USER_2));
+    when(personalBlueprintRepository.findAllDistinctOwnerUserIds())
+        .thenReturn(Set.of(USER_1, USER_2));
     // USER_1 owns the base, USER_2 owns a cosmetic variant — one family row, count 2, base label.
-    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(any()))
+    when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(any()))
         .thenReturn(
             List.of(op("Fresnel Energy LMG", USER_1), op("Fresnel \"Molten\" Energy LMG", USER_2)));
 
@@ -161,7 +163,7 @@ class PersonalBlueprintOverviewServiceTest {
         .thenReturn(new ScopePredicate(false, ORG_A, Set.of()));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
         .thenReturn(Set.of(USER_1));
-    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(any()))
+    when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(any()))
         .thenReturn(List.of(op("Aurora MR", USER_1)));
 
     Page<BlueprintOverviewEntryDto> page = service.listAvailableBlueprints(byName(), null);
@@ -179,15 +181,15 @@ class PersonalBlueprintOverviewServiceTest {
 
     assertTrue(page.getContent().isEmpty());
     assertEquals(0, page.getTotalElements());
-    verify(personalBlueprintRepository, never()).findOwnerProductByOwnerSubIn(any());
+    verify(personalBlueprintRepository, never()).findOwnerProductByOwnerUserIdIn(any());
   }
 
   @Test
   void list_descendingSort_reversesByName() {
     when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
-    when(personalBlueprintRepository.findAllDistinctOwnerSubs()).thenReturn(Set.of(USER_1));
-    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(any()))
+    when(personalBlueprintRepository.findAllDistinctOwnerUserIds()).thenReturn(Set.of(USER_1));
+    when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(any()))
         .thenReturn(List.of(op("Aurora MR", USER_1), op("Cutlass Black", USER_1)));
 
     Page<BlueprintOverviewEntryDto> page =
@@ -204,8 +206,8 @@ class PersonalBlueprintOverviewServiceTest {
   void list_search_filtersByProductNameCaseInsensitive_beforePagination() {
     when(ownerScopeService.currentOversightScope())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
-    when(personalBlueprintRepository.findAllDistinctOwnerSubs()).thenReturn(Set.of(USER_1));
-    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(any()))
+    when(personalBlueprintRepository.findAllDistinctOwnerUserIds()).thenReturn(Set.of(USER_1));
+    when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(any()))
         .thenReturn(
             List.of(op("Aurora MR", USER_1), op("Scattergun", USER_1), op("Caterpillar", USER_1)));
 
@@ -229,7 +231,7 @@ class PersonalBlueprintOverviewServiceTest {
         .thenReturn(new ScopePredicate(false, null, Set.of(ORG_A)));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
         .thenReturn(Set.of(USER_1, USER_2));
-    when(personalBlueprintRepository.findAllByProductKeyInAndOwnerSubIn(any(), any()))
+    when(personalBlueprintRepository.findAllByProductKeyInAndOwnerUserIdIn(any(), any()))
         .thenReturn(
             List.of(
                 bp("custodian smg", "Custodian SMG", USER_1),
@@ -252,7 +254,8 @@ class PersonalBlueprintOverviewServiceTest {
 
     assertTrue(service.listOwnersForProduct("gone").isEmpty());
     verify(ownerScopeService, never()).currentOversightScope();
-    verify(personalBlueprintRepository, never()).findAllByProductKeyInAndOwnerSubIn(any(), any());
+    verify(personalBlueprintRepository, never())
+        .findAllByProductKeyInAndOwnerUserIdIn(any(), any());
     verify(userRepository, never()).findAllById(any());
   }
 
@@ -263,7 +266,8 @@ class PersonalBlueprintOverviewServiceTest {
         .thenReturn(new ScopePredicate(false, null, Set.of()));
 
     assertTrue(service.listOwnersForProduct("aurora mr").isEmpty());
-    verify(personalBlueprintRepository, never()).findAllByProductKeyInAndOwnerSubIn(any(), any());
+    verify(personalBlueprintRepository, never())
+        .findAllByProductKeyInAndOwnerUserIdIn(any(), any());
     verify(userRepository, never()).findAllById(any());
   }
 
@@ -274,7 +278,7 @@ class PersonalBlueprintOverviewServiceTest {
         .thenReturn(new ScopePredicate(false, null, Set.of(ORG_A)));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
         .thenReturn(Set.of(USER_1));
-    when(personalBlueprintRepository.findAllByProductKeyInAndOwnerSubIn(any(), any()))
+    when(personalBlueprintRepository.findAllByProductKeyInAndOwnerUserIdIn(any(), any()))
         .thenReturn(List.of());
 
     assertTrue(service.listOwnersForProduct("aurora mr").isEmpty());
@@ -305,8 +309,9 @@ class PersonalBlueprintOverviewServiceTest {
     // Admin "all org units" has no single unit, so no owner is flagged external (no hint).
     assertTrue(owners.stream().allMatch(BlueprintOverviewOwnerDto::orgUnitMember));
     verify(orgUnitMembershipRepository, never()).findDistinctUserIdsByOrgUnitIdIn(any());
-    verify(personalBlueprintRepository, never()).findAllDistinctOwnerSubs();
-    verify(personalBlueprintRepository, never()).findAllByProductKeyInAndOwnerSubIn(any(), any());
+    verify(personalBlueprintRepository, never()).findAllDistinctOwnerUserIds();
+    verify(personalBlueprintRepository, never())
+        .findAllByProductKeyInAndOwnerUserIdIn(any(), any());
   }
 
   // covers REQ-INV-018 — a user who opted into global sharing is counted in the availability
@@ -320,16 +325,16 @@ class PersonalBlueprintOverviewServiceTest {
         .thenReturn(Set.of(USER_1));
     // USER_2 is not a member of ORG_A but opted into global sharing — they must still be counted.
     when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of(USER_2));
-    ArgumentCaptor<Collection<UUID>> ownerSubs = ArgumentCaptor.captor();
-    when(personalBlueprintRepository.findOwnerProductByOwnerSubIn(ownerSubs.capture()))
+    ArgumentCaptor<Collection<UUID>> ownerUserIds = ArgumentCaptor.captor();
+    when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(ownerUserIds.capture()))
         .thenReturn(List.of(op("Aurora MR", USER_1), op("Aurora MR", USER_2)));
 
     Page<BlueprintOverviewEntryDto> page = service.listAvailableBlueprints(byName(), null);
 
     assertEquals(1, page.getTotalElements());
     assertEquals(2L, page.getContent().get(0).ownerCount());
-    assertTrue(ownerSubs.getValue().contains(USER_1));
-    assertTrue(ownerSubs.getValue().contains(USER_2));
+    assertTrue(ownerUserIds.getValue().contains(USER_1));
+    assertTrue(ownerUserIds.getValue().contains(USER_2));
   }
 
   // covers REQ-INV-018 — the owner drill-down includes a global sharer who is not an oversight
@@ -342,8 +347,9 @@ class PersonalBlueprintOverviewServiceTest {
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_A)))
         .thenReturn(Set.of(USER_1));
     when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of(USER_2));
-    ArgumentCaptor<Collection<UUID>> ownerSubs = ArgumentCaptor.captor();
-    when(personalBlueprintRepository.findAllByProductKeyInAndOwnerSubIn(any(), ownerSubs.capture()))
+    ArgumentCaptor<Collection<UUID>> ownerUserIds = ArgumentCaptor.captor();
+    when(personalBlueprintRepository.findAllByProductKeyInAndOwnerUserIdIn(
+            any(), ownerUserIds.capture()))
         .thenReturn(
             List.of(bp("aurora mr", "Aurora MR", USER_1), bp("aurora mr", "Aurora MR", USER_2)));
     when(userRepository.findAllById(any()))
@@ -354,7 +360,7 @@ class PersonalBlueprintOverviewServiceTest {
     assertEquals(
         List.of("Alpha", "Bravo"),
         owners.stream().map(BlueprintOverviewOwnerDto::ownerName).toList());
-    assertTrue(ownerSubs.getValue().contains(USER_2));
+    assertTrue(ownerUserIds.getValue().contains(USER_2));
     // The global sharer (USER_2 → "Alpha") is flagged not-a-member; the oversight member
     // (USER_1 → "Bravo") is flagged a member, so the UI marks only the former.
     BlueprintOverviewOwnerDto alpha = ownerByName(owners, "Alpha");

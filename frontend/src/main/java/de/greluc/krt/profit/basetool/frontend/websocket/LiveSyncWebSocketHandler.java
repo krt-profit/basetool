@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.websocket;
 import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.service.LiveSyncPresenceService;
+import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -1893,8 +1894,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   private static String resolveUserId(@NotNull Principal principal) {
     if (principal instanceof AbstractAuthenticationToken token) {
       Object p = token.getPrincipal();
-      if (p instanceof OidcUser oidc && oidc.getSubject() != null && !oidc.getSubject().isBlank()) {
-        return oidc.getSubject();
+      if (p instanceof OidcUser oidc
+          && CurrentUser.userIdText(oidc) != null
+          && !CurrentUser.userIdText(oidc).isBlank()) {
+        return CurrentUser.userIdText(oidc);
       }
     }
     String name = principal.getName();

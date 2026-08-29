@@ -53,7 +53,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Admin-only counterpart of {@link PersonalInventoryController}: lets administrators manage the
  * personal inventory of any user. The owner identifier is taken from the URL path ({@code
- * /{userSub}}) instead of from the JWT.
+ * /{userId}}) instead of from the JWT.
  */
 @RestController
 @RequestMapping("/api/v1/admin/personal-inventory")
@@ -71,17 +71,17 @@ public class AdminPersonalInventoryController {
   /**
    * Lists a target user's personal-inventory items.
    *
-   * @param userSub target user's {@code app_user.id}
+   * @param userId target user's {@code app_user.id}
    * @return paged response DTOs
    */
-  @GetMapping("/{userSub}")
+  @GetMapping("/{userId}")
   @Operation(summary = "List a specific user's personal inventory entries.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Paginated list."),
     @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
   })
   public PageResponse<PersonalInventoryItemResponse> listForUser(
-      @PathVariable UUID userSub,
+      @PathVariable UUID userId,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
@@ -93,18 +93,18 @@ public class AdminPersonalInventoryController {
             sort,
             PersonalInventoryItemService.SORTABLE_FIELDS,
             PersonalInventoryItemService.DEFAULT_SORT_FIELD);
-    Page<PersonalInventoryItemResponse> result = service.listForUser(userSub, q, pageable);
+    Page<PersonalInventoryItemResponse> result = service.listForUser(userId, q, pageable);
     return PageResponse.of(result);
   }
 
   /**
    * Creates an item on behalf of the target user.
    *
-   * @param userSub target user's {@code app_user.id}
+   * @param userId target user's {@code app_user.id}
    * @param request create payload
    * @return the persisted DTO
    */
-  @PostMapping("/{userSub}")
+  @PostMapping("/{userId}")
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(summary = "Create a personal inventory entry on behalf of the given user.")
   @ApiResponses({
@@ -114,8 +114,8 @@ public class AdminPersonalInventoryController {
     @ApiResponse(responseCode = "404", description = "Referenced UEX location does not exist.")
   })
   public PersonalInventoryItemResponse createForUser(
-      @PathVariable UUID userSub, @Valid @RequestBody PersonalInventoryItemCreateRequest request) {
-    return service.createForUser(userSub, request);
+      @PathVariable UUID userId, @Valid @RequestBody PersonalInventoryItemCreateRequest request) {
+    return service.createForUser(userId, request);
   }
 
   /**

@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
+import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -451,7 +452,7 @@ public class MissionPageController {
                 true));
       }
       model.addAttribute("isNew", false);
-      model.addAttribute("authUserId", principal != null ? principal.getSubject() : null);
+      model.addAttribute("authUserId", CurrentUser.userIdText(principal));
       // Prefill the "join as me" participant form (an uncached /users/me read) only on a full-page
       // render — fragment refetches never paint the add-participant modal it feeds (#1142).
       addFormsToModel(model, principal, fullRender);
@@ -652,10 +653,9 @@ public class MissionPageController {
     // robustly decide whether a participant row belongs to the current user
     // and enable self-edit on the member's own entry.
     // NOTE: currentAuth.getName() returns the preferred_username (configured via
-    // user-name-attribute),
-    // NOT the Keycloak UUID. We must use principal.getSubject() to get the sub (UUID) that matches
-    // p.user.id in the participant list.
-    model.addAttribute("authUserId", principal != null ? principal.getSubject() : null);
+    // user-name-attribute), NOT the user id. CurrentUser.userIdText is the app_user.id that
+    // matches p.user.id in the participant list.
+    model.addAttribute("authUserId", CurrentUser.userIdText(principal));
     // In-place AJAX swap (epic #571): re-render only the section the caller mutated. The model is
     // built fragment-gated above (see fullRender), so each fragment renders with exactly the
     // attributes its own section needs — a section refetch no longer pays the full page's read

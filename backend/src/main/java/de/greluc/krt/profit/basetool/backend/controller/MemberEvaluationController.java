@@ -77,7 +77,7 @@ public class MemberEvaluationController {
    * Returns every {@link MemberEvaluationResponse} owned by the calling member, filtered by the JWT
    * {@code sub} claim so callers see only their own promotion evaluations.
    *
-   * @param ownerSub the caller's {@code app_user.id}
+   * @param ownerUserId the caller's {@code app_user.id}
    * @return the calling member's evaluations
    */
   @GetMapping("/my")
@@ -86,8 +86,8 @@ public class MemberEvaluationController {
     @ApiResponse(responseCode = "200", description = "Own evaluations."),
     @ApiResponse(responseCode = "401", description = "Authentication required.")
   })
-  public List<MemberEvaluationResponse> listMy(@CurrentUserId UUID ownerSub) {
-    return service.listForUser(ownerSub);
+  public List<MemberEvaluationResponse> listMy(@CurrentUserId UUID ownerUserId) {
+    return service.listForUser(ownerUserId);
   }
 
   /**
@@ -99,7 +99,7 @@ public class MemberEvaluationController {
    * @param size page size, or {@code null} for the default
    * @param sort comma-separated sort spec ({@code field,direction}), or {@code null} for the
    *     default
-   * @param ownerSub the caller's {@code app_user.id}
+   * @param ownerUserId the caller's {@code app_user.id}
    * @return a {@link PageResponse} of the caller's evaluations
    */
   @GetMapping("/my/paged")
@@ -109,7 +109,7 @@ public class MemberEvaluationController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
-      @CurrentUserId UUID ownerSub) {
+      @CurrentUserId UUID ownerUserId) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page,
@@ -117,7 +117,7 @@ public class MemberEvaluationController {
             sort,
             MemberEvaluationService.SORTABLE_FIELDS,
             MemberEvaluationService.DEFAULT_SORT_FIELD);
-    return PageResponse.of(service.listForUserPaged(ownerSub, pageable));
+    return PageResponse.of(service.listForUserPaged(ownerUserId, pageable));
   }
 
   /**

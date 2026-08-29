@@ -40,9 +40,9 @@ import lombok.ToString;
 
 /**
  * One recipient selector of a {@link NotificationRule}. Which columns are meaningful depends on
- * {@link #kind}: {@code SPECIFIC_USER} reads {@link #userSub}; {@code ROLE} reads {@link
- * #roleCode}; {@code ORG_RELATIVE_ROLE} reads {@link #orgRelativeRole} + {@link #contextRole}. The
- * unused columns stay {@code null}.
+ * {@link #kind}: {@code SPECIFIC_USER} reads {@link #userId}; {@code ROLE} reads {@link #roleCode};
+ * {@code ORG_RELATIVE_ROLE} reads {@link #orgRelativeRole} + {@link #contextRole}. The unused
+ * columns stay {@code null}.
  */
 @Entity
 @Table(name = "notification_rule_selector")
@@ -72,8 +72,8 @@ public class NotificationRuleSelector extends AbstractEntity<UUID> {
   private SelectorKind kind;
 
   /** Target user {@code sub} for a {@code SPECIFIC_USER} selector; {@code null} otherwise. */
-  @Column(name = "user_sub")
-  private UUID userSub;
+  @Column(name = "user_id")
+  private UUID userId;
 
   /** Stable role code for a {@code ROLE} selector; {@code null} otherwise. */
   @Column(name = "role_code", length = 64)

@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionD
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -138,9 +139,9 @@ public class BankManagePageController {
     // NOTE: authentication.getName() returns the preferred_username (the frontend OAuth2
     // user-name-attribute), NOT the Keycloak sub — comparing it against the holder's userId
     // (== app_user.id == sub) never matched, so a plain bank employee never saw the link to their
-    // own holder. principal.getSubject() is the sub (UUID) that equals BankHolderDto.userId; same
+    // own holder. CurrentUser.userIdText is the id that equals BankHolderDto.userId; same
     // fix as the mission participant self-edit carve-out (MissionPageController#authUserId).
-    model.addAttribute("selfUserId", principal != null ? principal.getSubject() : null);
+    model.addAttribute("selfUserId", CurrentUser.userIdText(principal));
     // Halter is the default-open tab (it sits first/left in the tab nav); ?tab=konten opens the
     // accounts tab and ?tab=krt-freigaben the Bankleitung-only KRT approval-thresholds tab
     // (REQ-BANK-047) — the latter only for a management caller, so a plain employee forcing the

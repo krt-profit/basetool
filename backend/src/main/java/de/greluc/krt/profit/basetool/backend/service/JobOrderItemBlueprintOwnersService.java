@@ -58,7 +58,7 @@ import org.springframework.transaction.annotation.Transactional;
  * entirely in Java, mirroring {@link PersonalBlueprintOverviewService}: it reduces each item line's
  * chosen-blueprint output name to its <em>match key</em> via {@link
  * BlueprintVariantFamilyResolver}, resolves the responsible org unit's member ids to their {@code
- * sub} form (the {@code owner_sub} stored on {@link PersonalBlueprint} equals {@code User.id}),
+ * sub} form (the {@code owner_user_id} stored on {@link PersonalBlueprint} equals {@code User.id}),
  * loads the members' owned blueprints, and matches them by the same key. The coverage count is the
  * distinct members owning any matching blueprint; each owner row lists the concrete variants they
  * hold.
@@ -152,8 +152,8 @@ public class JobOrderItemBlueprintOwnersService {
           orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(
               Set.of(responsible.getId())));
     }
-    Set<UUID> ownerSubs = new LinkedHashSet<>(memberSubs);
-    ownerSubs.addAll(userRepository.findIdsBySharingBlueprintsGlobally());
+    Set<UUID> ownerUserIds = new LinkedHashSet<>(memberSubs);
+    ownerUserIds.addAll(userRepository.findIdsBySharingBlueprintsGlobally());
 
     // Load the members' owned blueprints and keep the ones whose match key is required. The match
     // key is a Java-computed reduction of the product name (no SQL form), so the match runs in
@@ -163,14 +163,14 @@ public class JobOrderItemBlueprintOwnersService {
     // (distinct members owning any matching blueprint).
     Map<UUID, Set<String>> ownedNamesByOwnerId = new LinkedHashMap<>();
     Map<String, Set<UUID>> ownersByFamily = new HashMap<>();
-    if (!ownerSubs.isEmpty()) {
+    if (!ownerUserIds.isEmpty()) {
       for (BlueprintOwnerProduct bp :
-          personalBlueprintRepository.findOwnerProductByOwnerSubIn(ownerSubs)) {
+          personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(ownerUserIds)) {
         String matchKey = familyResolver.matchKey(bp.productName(), countWithVariants);
         if (!requiredByFamily.containsKey(matchKey)) {
           continue;
         }
-        UUID ownerId = bp.ownerSub();
+        UUID ownerId = bp.ownerUserId();
         ownedNamesByOwnerId
             .computeIfAbsent(ownerId, id -> new LinkedHashSet<>())
             .add(bp.productName());

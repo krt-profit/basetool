@@ -56,7 +56,7 @@ class NotificationRepositoryIntegrationTest {
   /**
    * Creates the {@code app_user} row the recipient id has to point at, unless it already exists.
    *
-   * <p>Needed since V235: {@code recipient_sub} is a foreign key to {@code app_user(id)}
+   * <p>Needed since V235: {@code recipient_user_id} is a foreign key to {@code app_user(id)}
    * (REQ-DATA-008), so the random per-test recipient ids no longer insert on their own. Called from
    * both {@code save} helpers so every call site keeps working unchanged.
    *
@@ -96,7 +96,7 @@ class NotificationRepositoryIntegrationTest {
           ensureRecipient(recipient);
           Notification n =
               Notification.builder()
-                  .recipientSub(recipient)
+                  .recipientUserId(recipient)
                   .type(NotificationType.JOB_ORDER_CREATED)
                   .entityType("JOB_ORDER")
                   .entityId(UUID.randomUUID())
@@ -114,7 +114,7 @@ class NotificationRepositoryIntegrationTest {
           ensureRecipient(recipient);
           return repository.save(
               Notification.builder()
-                  .recipientSub(recipient)
+                  .recipientUserId(recipient)
                   .type(type)
                   .entityType(entityType)
                   .entityId(entityId)
@@ -124,13 +124,13 @@ class NotificationRepositoryIntegrationTest {
   }
 
   @Test
-  void findByIdAndRecipientSubIsolatesByRecipient() {
+  void findByIdAndRecipientUserIdIsolatesByRecipient() {
     UUID a = UUID.randomUUID();
     UUID b = UUID.randomUUID();
     Notification n = save(a, false, null);
 
-    assertThat(repository.findByIdAndRecipientSub(n.getId(), a)).isPresent();
-    assertThat(repository.findByIdAndRecipientSub(n.getId(), b)).isEmpty();
+    assertThat(repository.findByIdAndRecipientUserId(n.getId(), a)).isPresent();
+    assertThat(repository.findByIdAndRecipientUserId(n.getId(), b)).isEmpty();
   }
 
   @Test
@@ -142,8 +142,8 @@ class NotificationRepositoryIntegrationTest {
     save(a, true, Instant.now());
     save(b, false, null);
 
-    assertThat(repository.countByRecipientSubAndReadFalse(a)).isEqualTo(2);
-    assertThat(repository.countByRecipientSubAndReadFalse(b)).isEqualTo(1);
+    assertThat(repository.countByRecipientUserIdAndReadFalse(a)).isEqualTo(2);
+    assertThat(repository.countByRecipientUserIdAndReadFalse(b)).isEqualTo(1);
   }
 
   @Test
@@ -158,8 +158,8 @@ class NotificationRepositoryIntegrationTest {
         transactionTemplate.execute(status -> repository.markAllReadForRecipient(a, Instant.now()));
 
     assertThat(updated).isEqualTo(2);
-    assertThat(repository.countByRecipientSubAndReadFalse(a)).isZero();
-    assertThat(repository.countByRecipientSubAndReadFalse(b)).isEqualTo(1);
+    assertThat(repository.countByRecipientUserIdAndReadFalse(a)).isZero();
+    assertThat(repository.countByRecipientUserIdAndReadFalse(b)).isEqualTo(1);
   }
 
   @Test
@@ -172,7 +172,8 @@ class NotificationRepositoryIntegrationTest {
 
     assertThat(deleted).isEqualTo(1);
     assertThat(
-            repository.findAllByRecipientSub(a, org.springframework.data.domain.Pageable.unpaged()))
+            repository.findAllByRecipientUserId(
+                a, org.springframework.data.domain.Pageable.unpaged()))
         .extracting(Notification::getId)
         .containsExactly(unread.getId());
   }
@@ -190,9 +191,9 @@ class NotificationRepositoryIntegrationTest {
             status -> repository.deleteReadOlderThan(now.minus(90, ChronoUnit.DAYS)));
 
     assertThat(deleted).isEqualTo(1);
-    assertThat(repository.findByIdAndRecipientSub(old.getId(), a)).isEmpty();
-    assertThat(repository.findByIdAndRecipientSub(recent.getId(), a)).isPresent();
-    assertThat(repository.findByIdAndRecipientSub(unread.getId(), a)).isPresent();
+    assertThat(repository.findByIdAndRecipientUserId(old.getId(), a)).isEmpty();
+    assertThat(repository.findByIdAndRecipientUserId(recent.getId(), a)).isPresent();
+    assertThat(repository.findByIdAndRecipientUserId(unread.getId(), a)).isPresent();
   }
 
   @Test
@@ -233,7 +234,7 @@ class NotificationRepositoryIntegrationTest {
             otherRequestId);
 
     assertThat(
-            repository.findRecipientSubsByTypeInAndEntity(
+            repository.findRecipientUserIdsByTypeInAndEntity(
                 created, "BANK_BOOKING_REQUEST", requestId))
         .containsExactlyInAnyOrder(staffA, staffB);
 
@@ -243,9 +244,9 @@ class NotificationRepositoryIntegrationTest {
                 repository.deleteByTypeInAndEntity(created, "BANK_BOOKING_REQUEST", requestId));
 
     assertThat(deleted).isEqualTo(2);
-    assertThat(repository.findByIdAndRecipientSub(a.getId(), staffA)).isEmpty();
-    assertThat(repository.findByIdAndRecipientSub(b.getId(), staffB)).isEmpty();
-    assertThat(repository.findByIdAndRecipientSub(decision.getId(), staffA)).isPresent();
-    assertThat(repository.findByIdAndRecipientSub(otherRequest.getId(), staffA)).isPresent();
+    assertThat(repository.findByIdAndRecipientUserId(a.getId(), staffA)).isEmpty();
+    assertThat(repository.findByIdAndRecipientUserId(b.getId(), staffB)).isEmpty();
+    assertThat(repository.findByIdAndRecipientUserId(decision.getId(), staffA)).isPresent();
+    assertThat(repository.findByIdAndRecipientUserId(otherRequest.getId(), staffA)).isPresent();
   }
 }
