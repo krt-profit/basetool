@@ -562,6 +562,24 @@ services:
       - --no-collector.wifi
     volumes:
       - /:/host:ro,rslave
+      # The systemd collector does NOT read the filesystem: it talks to systemd over dbus on
+      # /run/systemd/private, and --path.rootfs does not redirect a socket path. Without this
+      # mount the collector finds no socket, emits nothing, and says so nowhere -- which is how
+      # `node_systemd_unit_state` came to have ZERO series in production (read 2026-08-29), so the
+      # `SystemdUnitFailed` rule in alerts/infrastructure.yml has never been able to fire. A failed
+      # iri-deploy / iri-backup / iri-restore-drill unit alerted through the textfile metrics only,
+      # never through this path (REQ-OBS-014: a dead alert reads as coverage, which is worse than
+      # no alert).
+      #
+      # VERIFY AFTER APPLYING, and do not assume the mount alone is enough: this image runs as
+      # `nobody` (65534) and /run/systemd/private is mode 0600 root:root, so the collector may
+      # still be unable to open it. Check with
+      #   curl -s <node-exporter>:9100/metrics | grep -c node_systemd_unit_state
+      # A zero there means the socket is mounted but unreadable, and the remaining options are to
+      # run this one service as root -- which costs part of the hardening posture the rest of this
+      # file sets -- or to retire the rule. Do not leave it silently at zero: that is the state
+      # this comment exists to end.
+      - /run/systemd/private:/run/systemd/private:ro
     deploy:
       resources:
         limits:
