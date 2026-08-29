@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.6.11](https://github.com/krt-profit/basetool/releases/tag/v1.6.11) - 2026-08-29
+
 ### Fixed
 
 - **Sechs Diagramme im Betriebs-Dashboard sagen jetzt, warum sie leer sind.** Ein Diagramm, das
