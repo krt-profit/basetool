@@ -705,7 +705,13 @@ Tracing on the OTel SDK) behind a hard master gate:
 - **Export path:** spans go via OTLP/HTTP (`MONITORING_OTLP_ENDPOINT`, Phase 2:
   `http://alloy:4318/v1/traces` on the scrape network) to Alloy, which forwards to Tempo on
   the core network — apps never reach the trace store directly. Sampling probability comes
-  from `MONITORING_TRACING_SAMPLING_PROBABILITY` (default 1.0; revisited in Phase-3 tuning).
+  from `MONITORING_TRACING_SAMPLING_PROBABILITY`, which **stays at `1.0`** — the Phase-3 review
+  it was flagged for happened on 2026-08-29 (#1705) and found nothing to buy. The deciding
+  number is CPU, not memory: tempo's **entire** container CPU over seven days is 0.0181 cores,
+  1.81 % of one core, which bounds whatever share of it is GC. Reducing sampling would trade
+  trace fidelity for a cost that is not being paid. The variable is **one setting for all three
+  modules** (`docker-compose.yml:580`, `:825`, `:971` all read it), so per-module sampling is a
+  design change and not a configuration one.
 - **No user-identifying span data:** span names and the low-cardinality `uri` attribute use
   templated routes (`/api/v1/locations/{id}`). Each module's `ObservationPrivacyFilter`
   scrubs every URL-carrying observation key-value before it becomes a metric tag or span

@@ -353,6 +353,26 @@ services:
       # and resident sits at 54 % of the container), but tempo is THE service to re-measure first
       # whenever tracing volume changes — raise the limit and re-derive 75 % of it, never re-apply
       # a percentage to a limit that did not move.
+      #
+      # #1705 re-measurement (2026-08-29, 7-day) — STILL 768MiB, and the reading above is now
+      # corrected on two counts.
+      #
+      # (1) "Live heap approaching GOMEMLIMIT" largely measures its own ceiling. The 7d heap peak is
+      # 641.6 MiB = 83.5 % of this value, worse than the 1.65x the note above worried about — but
+      # `heap_alloc` is a SAWTOOTH (live heap plus everything allocated since the last collection),
+      # and how high it may climb before Go collects is decided by GOMEMLIMIT itself. Between the 7d
+      # floor and median the heap moved +228 % while the span rate moved +39 %: a figure that tripled
+      # while its supposed driver moved by a third is not being driven by it. This is the same trap
+      # the sys_bytes note two paragraphs up warns about, one metric over.
+      #
+      # (2) The heap did not "track trace volume" — it stepped with the IMAGE. Resident peaks per
+      # container generation: 3.0.2 -> 479.8 / 486.0 / 523.1 MiB, 3.0.3 -> 595.3 / 665.3 MiB. All
+      # three old generations below 525, both new ones above 595: a ~27 % step at the version
+      # boundary, not a volume curve. Re-check this at the next tempo bump before reading a rise as
+      # traffic.
+      #
+      # The number that decides an OOM is the resident set against the CONTAINER limit, not the heap
+      # against this one — see the `memory:` note below.
       GOMEMLIMIT: "768MiB"
       # Consumed by the metrics-generator remote_write basic_auth (reuses the Prometheus `grafana`
       # web-auth user — owner decision, #1041 item 22a). Same value Grafana uses for its datasource.
@@ -386,6 +406,19 @@ services:
           # the OOM risk the 512M was nor dead capacity worth reclaiming (the stack now sits
           # 1.97 GiB under the host budget without touching it). See the GOMEMLIMIT note above for
           # why tempo is nonetheless the service to re-measure first.
+          #
+          # #1705 re-measured it (7 days ending 2026-08-29): `rss` peak **665.3 MiB = 65.0 %** of
+          # this limit, mean 221.6 MiB = 21.6 %, working set peak 819.5 MiB = 80.0 %. The peak rose
+          # 20.6 % against #937 and headroom fell 46 % -> 35 %, so the direction is real — but rss is
+          # what an OOM kill is decided on, ContainerMemoryHigh guards it at 90 %, and 65 % is not
+          # that. STAYS at 1G. Read the working-set figure the way ContainerMemoryHigh was amended to
+          # (2026-08-02): it counts the mapped binary and is not the OOM predictor.
+          #
+          # #1705 also settled the question that was open against this limit — whether trace sampling
+          # should be reduced to buy headroom. It should not, and the deciding number is CPU, not
+          # memory: tempo's ENTIRE container CPU over those 7 days is 0.0181 cores, 1.81 % of ONE
+          # core. Whatever share of that is GC is bounded above by it, so there is no cost to buy
+          # back and nothing to trade trace fidelity for. Sampling stays at 1.0.
           memory: 1G
           pids: 512
     networks:
