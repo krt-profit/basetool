@@ -37,6 +37,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
@@ -107,7 +109,8 @@ public class DiscordRegistrationAdminController {
               throw new BadRequestException(
                   "Only PENDING and REJECTED registrations can be listed here");
         };
-    return users.stream().map(this::toDto).toList();
+    Set<String> colliding = userRegistrationService.findCollidingCallsigns(users);
+    return users.stream().map(user -> toDto(user, colliding)).toList();
   }
 
   /**
@@ -204,13 +207,35 @@ public class DiscordRegistrationAdminController {
             id, body.targetUserId(), body.version(), userService.getUserIdFromJwt(jwt)));
   }
 
+  /**
+   * Maps one registration, resolving its callsign collision on its own.
+   *
+   * <p>For the single-row responses of approve / reject / reopen / link. The list path uses {@link
+   * #toDto(User, Set)} with a set resolved once for the whole page instead (REQ-DATA-003).
+   *
+   * @param user the registration to map
+   * @return the DTO, with {@code callsignCollision} resolved for this row
+   */
   private PendingRegistrationDto toDto(User user) {
+    return toDto(user, userRegistrationService.findCollidingCallsigns(List.of(user)));
+  }
+
+  /**
+   * Maps one registration against a pre-resolved set of colliding callsigns.
+   *
+   * @param user the registration to map
+   * @param collidingCallsigns lower-cased usernames held by more than one account
+   * @return the DTO
+   */
+  private PendingRegistrationDto toDto(User user, Set<String> collidingCallsigns) {
     return new PendingRegistrationDto(
         user.getId(),
         user.getEffectiveName(),
         user.getDiscordGuildNickname(),
         user.getCreatedAt(),
         user.getApprovedAt(),
+        user.getUsername() != null
+            && collidingCallsigns.contains(user.getUsername().toLowerCase(Locale.ROOT)),
         user.getVersion());
   }
 }

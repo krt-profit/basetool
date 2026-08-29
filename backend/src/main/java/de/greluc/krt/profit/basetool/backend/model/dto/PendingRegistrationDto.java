@@ -35,6 +35,12 @@ import java.util.UUID;
  * @param decidedAt when an admin last decided this registration, i.e. the rejection time for a row
  *     in the rejected list (REQ-SEC-034); {@code null} for a row awaiting a decision, including one
  *     just reopened — reopening clears the stale decision stamp
+ * @param callsignCollision whether another account already holds this registration's callsign
+ *     (case-insensitively). Since #1639 a login whose subject matches no row never adopts an
+ *     account found by name, so the caller arrives here as a new registration instead — and this
+ *     flag is what tells the admin that approving it creates a <b>second</b> account for a callsign
+ *     rather than admitting a new member. The remedy is the explicit merge, never an implicit
+ *     inheritance
  * @param version optimistic-lock version, echoed back on approve/reject
  */
 public record PendingRegistrationDto(
@@ -43,4 +49,5 @@ public record PendingRegistrationDto(
     String serverNickname,
     Instant registeredAt,
     Instant decidedAt,
+    boolean callsignCollision,
     Long version) {}

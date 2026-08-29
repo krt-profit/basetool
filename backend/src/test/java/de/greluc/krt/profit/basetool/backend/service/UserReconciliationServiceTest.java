@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,6 +38,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.event.DiscordRegistrationPendingEvent;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -45,6 +47,8 @@ import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserApprovalEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.PartialRoleScopeProperties;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -81,6 +85,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
  */
 @ExtendWith(MockitoExtension.class)
 class UserReconciliationServiceTest {
+
+  /** A real registry: a mock cannot record a counter, and the assertions read one back. */
+  private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   @Mock private UserRepository userRepository;
   @Mock private RoleRepository roleRepository;
@@ -125,7 +132,8 @@ class UserReconciliationServiceTest {
             eventPublisher,
             userRegistrationService,
             userService,
-            partialRoleScopeProperties);
+            partialRoleScopeProperties,
+            meterRegistry);
     // The identity seam stays in UserService; reconciliation delegates the JWT-subject parse to it.
     lenient()
         .when(userService.getUserIdFromJwt(any(Jwt.class)))
@@ -190,7 +198,7 @@ class UserReconciliationServiceTest {
                   "email", "alice@example.com"));
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(userRepository.findByUsername("alice")).thenReturn(Optional.empty());
+      when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
       when(roleRepository.findByNameIgnoreCase("Guest"))
           .thenReturn(Optional.of(role(99L, "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -207,23 +215,75 @@ class UserReconciliationServiceTest {
       verify(defaultBlueprintProvisioningService).grantDefaultsToUser(USER_ID);
     }
 
+    /**
+     * The core guarantee of #1639 / ADR-0142 point 5: an unknown subject is a <b>new</b>
+     * registration, never an account matched by callsign.
+     *
+     * <p>Until this release the login adopted that row, and both consequences were silent. From
+     * then on {@code app_user.id} was not the caller's subject for that one row — the invariant 39
+     * foreign keys, the frontend's own comparisons and the audit trail all rest on — and since a
+     * Keycloak username is neither immutable nor unique after a deletion, a recreated account with
+     * a previous member's callsign inherited their inventory, bank grants and notifications.
+     *
+     * <p>The assertion is deliberately on identity, not on a field: a returned row that <em>is</em>
+     * the pre-existing one is the defect, whatever its contents look like afterwards.
+     */
     @Test
-    void usesUsernameFallback_whenIdLookupFails_butUsernameMatches() {
-      // The "warn-and-recover" path: ID changed (rare, Keycloak realm import,
-      // imports, ...) but username still matches a legacy local row.
+    void neverAdoptsAnAccountMatchedByCallsign_whenTheSubjectIsUnknown() {
       Jwt jwt = newJwt(USER_ID.toString(), Map.of("preferred_username", "alice"));
-      User existing = newUser(UUID.randomUUID(), "alice");
-      existing.setVersion(1L); // not new
+      UUID otherAccountId = UUID.randomUUID();
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(userRepository.findByUsername("alice")).thenReturn(Optional.of(existing));
+      when(userRepository.findIdsByUsername("alice")).thenReturn(List.of(otherAccountId));
       when(roleRepository.findByNameIgnoreCase("Guest"))
           .thenReturn(Optional.of(role(99L, "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       User result = userReconciliationService.syncUser(jwt).user();
 
-      assertSame(existing, result, "must reuse the looked-up legacy user");
+      assertEquals(
+          USER_ID,
+          result.getId(),
+          "the session must belong to the token's own subject, not to the callsign match");
+      assertNotEquals(otherAccountId, result.getId());
+      // The old code path is gone entirely: the entity-loading lookup is never consulted, so it
+      // cannot come back as an "optimisation" that silently restores the adoption.
+      verify(userRepository, never()).findByUsername(any());
+    }
+
+    /** The collision is counted, so a case the fallback used to hide has a signal at all. */
+    @Test
+    void countsTheCallsignCollision_soTheHiddenCaseHasASignal() {
+      Jwt jwt = newJwt(USER_ID.toString(), Map.of("preferred_username", "alice"));
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+      when(userRepository.findIdsByUsername("alice")).thenReturn(List.of(UUID.randomUUID()));
+      when(roleRepository.findByNameIgnoreCase("Guest"))
+          .thenReturn(Optional.of(role(99L, "Guest")));
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      userReconciliationService.syncUser(jwt);
+
+      assertEquals(
+          1.0,
+          meterRegistry.counter(MetricNames.USER_CALLSIGN_COLLISIONS).count(),
+          "a callsign collision must be counted");
+    }
+
+    /** No collision, no counter: an ordinary first login must not look like an incident. */
+    @Test
+    void doesNotCountAnythingForAnOrdinaryFirstLogin() {
+      Jwt jwt = newJwt(USER_ID.toString(), Map.of("preferred_username", "alice"));
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+      when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
+      when(roleRepository.findByNameIgnoreCase("Guest"))
+          .thenReturn(Optional.of(role(99L, "Guest")));
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      userReconciliationService.syncUser(jwt);
+
+      assertEquals(0.0, meterRegistry.counter(MetricNames.USER_CALLSIGN_COLLISIONS).count());
     }
 
     @Test
@@ -338,7 +398,7 @@ class UserReconciliationServiceTest {
       existing.setRoles(new HashSet<>(Set.of(guest)));
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      lenient().when(userRepository.findByUsername(any())).thenReturn(Optional.empty());
+      lenient().when(userRepository.findIdsByUsername(any())).thenReturn(List.of());
       when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -390,7 +450,7 @@ class UserReconciliationServiceTest {
      * otherwise a verified guild member could link their Discord identity to someone else's
      * (possibly privileged, already-ACTIVE) account and bypass the PENDING gate. The Discord
      * identity is a brand-new PENDING registration keyed by its own subject, and {@code
-     * findByUsername} is never consulted.
+     * findIdsByUsername} is consulted only to log and count the collision -- never to pick a row.
      */
     @Test
     void newDiscordLogin_ignoresMatchingCredentialUsername_landsPending() {
@@ -405,6 +465,8 @@ class UserReconciliationServiceTest {
       assertEquals(ApprovalStatus.PENDING, result.getApprovalStatus());
       assertEquals(DISCORD_ID, result.getDiscordUserId());
       // The core guarantee: a Discord login is recognised only by subject, never by username.
+      // The entity-loading by-name lookup no longer exists at all (#1639) -- the remaining
+      // by-name query returns ids for the collision log and can never pick a row to act as.
       verify(userRepository, never()).findByUsername(any());
       verify(eventPublisher).publishEvent(any(DiscordRegistrationPendingEvent.class));
     }
@@ -417,7 +479,7 @@ class UserReconciliationServiceTest {
       // claim mapper is absent/misconfigured — still lands PENDING (fail-safe, REQ-SEC-017) AND
       // still notifies every admin.
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(userRepository.findByUsername("discorduser")).thenReturn(Optional.empty());
+      when(userRepository.findIdsByUsername("discorduser")).thenReturn(List.of());
       when(roleRepository.findByNameIgnoreCase("Guest"))
           .thenReturn(Optional.of(codeRole("GUEST", "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -434,7 +496,7 @@ class UserReconciliationServiceTest {
       // ADMIN bootstrap carve-out: a brand-new Keycloak ADMIN-realm-role holder is ACTIVE even
       // without Discord, so the first admin can never be locked out by the fail-safe default.
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(userRepository.findByUsername("discorduser")).thenReturn(Optional.empty());
+      when(userRepository.findIdsByUsername("discorduser")).thenReturn(List.of());
       when(roleRepository.findByNameIgnoreCase("Admin"))
           .thenReturn(Optional.of(codeRole("ADMIN", "Admin")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -469,7 +531,7 @@ class UserReconciliationServiceTest {
       // created ACTIVE rather than PENDING — the gate lives on the shared UserRegistrationService.
       setField(userRegistrationService, "requireApproval", false);
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(userRepository.findByUsername("discorduser")).thenReturn(Optional.empty());
+      when(userRepository.findIdsByUsername("discorduser")).thenReturn(List.of());
       when(roleRepository.findByNameIgnoreCase("Guest"))
           .thenReturn(Optional.of(codeRole("GUEST", "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -664,7 +726,7 @@ class UserReconciliationServiceTest {
     @Test
     void persistsTheRoles_whenThePartialClaimCreatesTheRow() {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(userRepository.findByUsername("alice")).thenReturn(Optional.empty());
+      when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
       when(roleRepository.findByNameIgnoreCase("KRT Member"))
           .thenReturn(Optional.of(role(2L, "KRT Member")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -971,7 +1033,7 @@ class UserReconciliationServiceTest {
                 Map.of("roles", List.of("UNKNOWN_ROLE_FROM_OTHER_REALM"))));
 
     when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-    when(userRepository.findByUsername("alice")).thenReturn(Optional.empty());
+    when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
     when(roleRepository.findByNameIgnoreCase("UNKNOWN_ROLE_FROM_OTHER_REALM"))
         .thenReturn(Optional.empty());
     when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(role(99L, "Guest")));

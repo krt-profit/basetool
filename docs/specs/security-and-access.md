@@ -2203,6 +2203,49 @@ participant" rule.
 **Code:** `MissionSecurityService#canCreateFinanceEntry`,
 `MissionFinanceEntryController#createFinanceEntry` · **Related:** REQ-SEC-006, REQ-SEC-009
 
+### REQ-SEC-045 — A login binds a session to the token's own subject, never to a callsign
+
+`UserReconciliationService#syncUser(Jwt)` looks the caller up by `app_user.id` = the token's `sub`
+and by **nothing else**. A subject that matches no row is a new registration — never an account
+matched on `preferred_username`.
+
+Until this rule was written the lookup fell back to `findByUsername` and associated the session with
+whatever row that returned. Both consequences were silent:
+
+1. **The invariant ended for that member.** Everything else in the system — 39 foreign keys, the
+   frontend's own `userId` comparisons, `/users/me`, the audit trail — rests on `app_user.id` being
+   the caller's subject. After a name-matched login it was not, for one row, with no way to notice
+   until something compared the two.
+2. **A callsign decided which account a token acted as.** Keycloak usernames are neither immutable
+   nor unique, and are reusable after a deletion, so a recreated account with a previous member's
+   callsign inherited their inventory, their bank grants and their notifications.
+
+**The rule.** No implicit inheritance, ever. The caller is provisioned through the ordinary
+first-login path, which stamps `PENDING` and notifies every admin (REQ-SEC-017, REQ-NOTIF-012), so a
+collision surfaces as a **decision** rather than as an adoption. `app_user.username` carries no
+unique constraint, so two accounts may legitimately hold one callsign until an admin resolves it.
+
+**What a person actually sees.** The registration queue marks such a row (`callsignCollision` on
+`PendingRegistrationDto`, resolved for the whole page in one query) so the admin knows that approving
+it creates a *second* account for a callsign rather than admitting a new member. The log line names
+both account ids and **never the callsign** (REQ-OBS-004), and
+`basetool_user_callsign_collisions_total` counts the event — untagged, because a username is both
+unbounded and PII (REQ-OBS-011). The `UserCallsignCollision` alert is the second pair of eyes.
+
+**Acceptance**
+
+- [x] A token whose `sub` matches no row never returns a row found by username, whatever that row
+  contains.
+- [x] The entity-loading by-name lookup is not consulted at all on the login path, so it cannot come
+  back as an optimisation that restores the adoption.
+- [x] The collision is counted; an ordinary first login counts nothing.
+- [x] Exactly the colliding row carries the queue marker.
+- [ ] An admin can merge the two accounts explicitly, moving the member's data (#1639, follow-up).
+
+**Enforced by:** `UserReconciliationServiceTest`, `AdminDiscordRegistrationsNicknameRenderTest` ·
+**Code:** `UserReconciliationService#syncUser`, `UserRegistrationService#findCollidingCallsigns` ·
+**Related:** ADR-0142 point 5, REQ-SEC-017, REQ-DATA-006
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the
