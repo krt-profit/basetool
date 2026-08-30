@@ -82,7 +82,7 @@ public record InventoryItemBookOutDto(
     UUID targetUserId,
     UUID targetLocationId,
     CheckoutType type,
-    String terminal,
+    @jakarta.validation.constraints.Size(max = 120) String terminal,
     @Min(0) BigDecimal sellAmount,
     @NotNull Long version,
     @Nullable UUID targetOwningOrgUnitId,

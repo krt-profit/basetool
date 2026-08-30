@@ -93,6 +93,8 @@ public class MissionParticipantService {
   /** Records the state-mutating participant activities into the audit log (REQ-AUDIT-001). */
   private final AuditService auditService;
 
+  private final MissionSecurityService missionSecurityService;
+
   /**
    * Adds an authenticated user as a participant on a mission. Convenience overload that delegates
    * to the full-form {@link #addParticipant(UUID, ParticipantForm)} with default values for the
@@ -374,6 +376,12 @@ public class MissionParticipantService {
    * the wider mission's version is NOT bumped, so concurrent participant edits don't collide with
    * each other or with mission-level edits.
    *
+   * @param authentication the caller's authentication, used to answer "may this caller manage the
+   *     mission" against the mission this method has already loaded. A caller who may not - in
+   *     practice an anonymous guest holding only their row's capability token - may edit their own
+   *     desired job type, comment, payout preference and guest name, but may neither set nor clear
+   *     the planned mission job type (the Einsatzleiter designation), and may not rename their row
+   *     onto a registered member or onto another guest of the same mission.
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the participant
    *     or any referenced id is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when stale
@@ -390,7 +398,8 @@ public class MissionParticipantService {
       java.util.List<UUID> orgUnitIds,
       PayoutPreference payoutPreference,
       String guestName,
-      Long version) {
+      Long version,
+      org.springframework.security.core.Authentication authentication) {
     Mission mission =
         missionRepository
             .findById(missionId)
@@ -406,6 +415,19 @@ public class MissionParticipantService {
       throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
           MissionParticipant.class, participant.getId());
     }
+
+    // Answered here, and the position is load-bearing twice over.
+    //
+    // NOT at the HTTP boundary: the id-taking canManageMission re-reads the mission, and calling it
+    // in the controller ahead of this method's findById put a second copy of the aggregate into the
+    // open-session persistence context. NOT before the optimistic-lock check either: any query this
+    // gate runs auto-flushes the persistence context, which bumps the in-memory @Version of the row
+    // about to be compared - so the caller's correct version lost against a value the gate itself
+    // had just incremented, and the edit failed with a 409 nobody had caused. Both are the #1139
+    // hazard in different clothes. After the version check, with the mission already in hand, the
+    // gate reads only what it needs and changes nothing.
+    final boolean callerMayManageMission =
+        missionSecurityService.canManageLoadedMission(mission, authentication);
 
     if (payoutPreference != null) {
       // #1135: no mid-method flush here. The single end-of-method saveAndFlush is the only flush,
@@ -447,12 +469,60 @@ public class MissionParticipantService {
       // nothing either.
       log.info("Updating guest participant: {}", participant.getId());
       if (guestName != null) {
+        // Both anonymous CREATE paths refuse a guestName that resolves to a registered member, and
+        // refuse a name already used by another guest on the same mission. This update path had
+        // neither, so the rename was the loophole around both: sign up with a throwaway name, then
+        // PUT the byte-exact callsign of a real member. The row then renders under that member's
+        // name in the lead-type list, the ship crew and - with no "Gast" chip - the operation
+        // payout table; and because the payout key is "guest_" + guestName, the rename also merged
+        // two guest rows into one payout bucket and orphaned an already-settled
+        // OperationPayoutStatus, flipping a "Bezahlt" back to unpaid.
+        //
+        // Only enforced for a caller who cannot manage the mission: a mission manager renaming a
+        // guest row to a member's name is the documented promote-to-member flow, not spoofing.
+        if (!callerMayManageMission) {
+          String candidate = guestName.trim();
+          if (!candidate.isEmpty()
+              && !userRepository
+                  .findAllByUsernameIgnoreCaseOrDisplayNameIgnoreCase(candidate, candidate)
+                  .isEmpty()) {
+            throw new de.greluc.krt.profit.basetool.backend.exception.BadRequestException(
+                "Guest name is already taken.");
+          }
+          boolean clashesWithAnotherGuest =
+              mission.getParticipants().stream()
+                  .anyMatch(
+                      other ->
+                          !other.getId().equals(participant.getId())
+                              && candidate.equalsIgnoreCase(other.getGuestName()));
+          if (clashesWithAnotherGuest) {
+            throw new de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException(
+                "error.mission.participant.duplicate.guest");
+          }
+        }
         participant.setGuestName(guestName);
       }
       participant.setOrgUnits(resolveGuestSubmittedOrgUnits(orgUnitIds));
     }
 
-    if (plannedMissionJobTypeId != null) {
+    // The PLANNED mission job type is the organisation's assignment - it carries the Einsatzleiter
+    // designation - while the DESIRED one is the participant's own wish. Only the desired one is
+    // part of a guest's payload. This block had no caller distinction at all, so a guest presenting
+    // their row's capability token could designate THEMSELVES Einsatzleiter, and the single-lead
+    // rule (REQ-MISSION-013) then worked against the organisation: naming the real leader failed
+    // with a 409 until somebody cleared the guest's row. The symmetric half matters just as much -
+    // a null here used to CLEAR the assignment, so a guest's ordinary edit silently undid a
+    // manager's designation. A caller who may not manage the mission therefore neither sets nor
+    // clears it: the field is left exactly as the manager left it.
+    //
+    // The UI already encodes this intent, but only client-side: the planned-job select sits under
+    // th:if="${mission.canEdit}" while the desired-job select above it is ungated.
+    if (!callerMayManageMission) {
+      if (plannedMissionJobTypeId != null) {
+        throw new org.springframework.security.access.AccessDeniedException(
+            "Only a mission manager may assign the planned mission job type");
+      }
+    } else if (plannedMissionJobTypeId != null) {
       JobType jt =
           jobTypeRepository
               .findById(plannedMissionJobTypeId)

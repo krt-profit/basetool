@@ -63,7 +63,7 @@ else requires authentication.
 | **Page through missions** — only **non-internal** missions, detail view **redacted** (without description + PII; organization, participant list, units, frequencies, payout preference visible; see §1.3) | `GET /api/v1/missions`, `/search`, `/next`, `/{id}`                                                                                        | `@ownerScopeService.canSeeMission` (internal = invisible)                                                                               |
 | **Sign up to a (non-internal) mission as a guest** — with a freely chosen `guestName`                                                                                                                     | `POST /api/v1/missions/{id}/participants/add`, `/participants/slim`                                                                        | `@ownerScopeService.canSeeMission`                                                                                                      |
 | **Check in / out** of the mission                                                                                                                                                                         | `POST /api/v1/missions/{id}/participants/{pid}/check-in[/slim]`, `…/check-out[/slim]`                                                      | `@missionSecurityService.canAccessParticipant`                                                                                          |
-| **Edit own guest participant** (job type, ship, comment, times)                                                                                                                                           | `PUT /api/v1/missions/{id}/participants/{pid}[/slim]`                                                                                      | `canAccessParticipant`                                                                                                                  |
+| **Edit own guest participant** (**desired** job type, ship, comment, times, guest name — **not** the *planned* job type / Einsatzleiter designation)                                                      | `PUT /api/v1/missions/{id}/participants/{pid}[/slim]`                                                                                      | `canAccessParticipant`                                                                                                                  |
 | **Change payout preference** (e.g. `DONATE`)                                                                                                                                                              | `PUT /api/v1/missions/{id}/participants/{pid}/payout-preference[/slim]`                                                                    | `canAccessParticipant`                                                                                                                  |
 | **Remove own guest participant**                                                                                                                                                                          | `DELETE /api/v1/missions/{id}/participants/{pid}[/slim]`                                                                                   | `canAccessParticipant`                                                                                                                  |
 
@@ -428,9 +428,16 @@ Notes are visible to everyone who sees the job order.
 
 ¹ Only as owner of the respective order.
 ² The per-item `userId` names the receiving stock owner, so it is gated separately from the
-order-ownership check: a non-Logistician may only book onto themselves and any other value is
-refused with `403` (REQ-SEC-039) — the same privilege the Einbuchen path requires for a foreign
-target user. The store dialog therefore shows the receiver picker only to a Logistician.
+order-ownership check: naming anybody but yourself requires
+`@ownerScopeService.canManageUserInventory(<receiver>)` — admin, self, or a **shared editable org
+unit** with that receiver — and any other value is refused with `403` (REQ-SEC-039). The Einbuchen
+path (`POST /api/v1/inventory`) and the `owner` override of `POST /api/v1/refinery-orders` carry the
+same gate. **Amended 2026-08-30:** all three previously accepted the flat `ROLE_LOGISTICIAN`, which
+is the OR-union over every membership and carries no org unit, so a logistician of any Staffel could
+write into any other Staffel's member ledger (REQ-SEC-005). The store dialog therefore shows the
+receiver picker only to a Logistician, and the receiver must additionally be in scope. Einbuchen
+additionally refuses `personal = true` for a foreign target; the specified personal-for-someone-else
+capability stays in the refinery store dialog (REQ-INV-035).
 
 ### 3.5 Missions
 
@@ -439,10 +446,18 @@ target user. The store dialog therefore shows the receiver picker only to a Logi
 | Read non-internal missions (`canSeeMission`; outsider-redacted, §1.3)                                           |    ✅⁴     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | **Create** mission (`isAuthenticated()`)                                                                        |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Register as (guest) participant / check in/out / change payout preference / unregister (`canAccessParticipant`) |    ✅¹     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| **Manage** mission (edit, participants/units/crew/frequencies, party lead) (`canManageMission`)                 |     ❌     |   ✅²   |  ✅²  | ✅³ |   ✅³    |   ✅   |
-| Set manager / owner (`canManageManagers` / `canChangeOwner`)                                                    |     ❌     |   ✅²   |  ✅²  | ✅² |   ✅³    |   ✅   |
-| Reassign **owning org unit** ("Zugeordnete Einheit"; `canChangeOwner` + assignable-target scope⁵, REQ-ORG-018)  |     ❌     |   ✅²   |  ✅²  | ✅² |   ✅³    |   ✅   |
-| **Delete** mission (`hasRole('ADMIN')`)                                                                         |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+
+> **The guest capability token (REQ-SEC-018) is narrower since 2026-08-30.** It authorises a write
+> only while `canSeeMission` still holds, so it stops working once the Einsatz is flipped to
+> internal or reaches `COMPLETED` / `CANCELLED` — previously it stayed valid forever, and a
+> back-dated attendance shifted the payout of every other participant on a settled operation. A
+> token-only caller may also **not** set or clear `plannedMissionJobTypeId` (the Einsatzleiter
+> designation), and may not rename their row onto a registered member or onto another guest of the
+> same mission — the same two refusals the anonymous *create* paths already applied.
+> | **Manage** mission (edit, participants/units/crew/frequencies, party lead) (`canManageMission`)                 |     ❌     |   ✅²   |  ✅²  | ✅³ |   ✅³    |   ✅   |
+> | Set manager / owner (`canManageManagers` / `canChangeOwner`)                                                    |     ❌     |   ✅²   |  ✅²  | ✅² |   ✅³    |   ✅   |
+> | Reassign **owning org unit** ("Zugeordnete Einheit"; `canChangeOwner` + assignable-target scope⁵, REQ-ORG-018)  |     ❌     |   ✅²   |  ✅²  | ✅² |   ✅³    |   ✅   |
+> | **Delete** mission (`hasRole('ADMIN')`)                                                                         |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 ¹ Anonymous only on **unlinked guest participants**; logged-in users only on
 their own linked participant. ² Only as **owner/co-manager** of the mission.
@@ -467,13 +482,15 @@ or to ownerless; a non-admin may only pick a direct membership or a unit within 
 
 ### 3.6 Operations (mission bracket, finances & payouts)
 
-| Function (gate)                                                                            | Anonymous | Member | Log. | MM | Officer | Admin |
-|:-------------------------------------------------------------------------------------------|:---------:|:------:|:----:|:--:|:-------:|:-----:|
-| Read operations (list/detail/finances/payouts) (`isAuthenticated()` [+ `canSeeOperation`]) |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Create/edit operation (`hasRole('MISSION_MANAGER')` [+ `canEditOperation`])                |     ❌     |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
-| **Mark payout as paid-out** (`hasRole('MISSION_MANAGER')` + `canEditOperation`)            |     ❌     |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
-| **Revoke** paid-out (additionally `hasAnyRole('ADMIN','OFFICER')`)                         |     ❌     |   ❌    |  ❌   | ❌  |    ✅    |   ✅   |
-| **Delete** operation (`hasRole('ADMIN')` + `canEditOperation`)                             |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Function (gate)                                                                           | Anonymous | Member | Log. | MM | Officer | Admin |
+|:------------------------------------------------------------------------------------------|:---------:|:------:|:----:|:--:|:-------:|:-----:|
+| Read operation (list/detail) (`isAuthenticated()` [+ `canSeeOperation`])                  |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Read payout breakdown (`canSeeOperation`; escape-only caller sees **only their own row**) |     ❌     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Read finances / finance-summary (`canSeeOperationLedger` — **scope only**, ADR-0150)      |     ❌     |   ✅³   |  ✅³  | ✅³ |   ✅³    |   ✅   |
+| Create/edit operation (`hasRole('MISSION_MANAGER')` [+ `canEditOperation`])               |     ❌     |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
+| **Mark payout as paid-out** (`hasRole('MISSION_MANAGER')` + `canEditOperation`)           |     ❌     |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
+| **Revoke** paid-out (additionally `hasAnyRole('ADMIN','OFFICER')`)                        |     ❌     |   ❌    |  ❌   | ❌  |    ✅    |   ✅   |
+| **Delete** operation (`hasRole('ADMIN')` + `canEditOperation`)                            |     ❌     |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 > Payout asymmetry: every Mission-Manager may set `paidOut=true`,
 > but only Officer/Admin may reset a confirmed paid-out back to
@@ -485,8 +502,15 @@ or to ownerless; a non-admin may only pick a direct membership or a unit within 
 > V145, ADR-0005) is visible to **all member-or-above** — operations have
 > no public escape, it stays invisible to guests/anonymous;
 > **(3)** **participant visibility** (ADR-0006): whoever took part in one of the linked
-> missions sees the operation and their payout even across Staffeln
+> missions sees the operation and **their own** payout row even across Staffeln
 > (anonymous callers never — no `currentUserId`).
+>
+> ³ **The third path does not carry the ledger (ADR-0150, REQ-ORG-021).** It is self-issuable —
+> `POST /api/v1/missions/{id}/join` is open for every non-internal mission of every org unit — so
+> `/finances`, `/finances/{missionId}` and `/finance-summary` require org-unit scope
+> (`canSeeOperationLedger`), and `/payouts` reduces an escape-only caller to their own row. Before
+> 2026-08-30 that caller received every participant's callsign, percentage, expenses, share,
+> donation, transfer fee, net payout and confirming officer.
 > Creating an ownerless operation is open to any Mission-Manager **without**
 > org unit (Bereichsleitung); editing it is allowed for any Mission-Manager,
 > deleting it for any admin (`canEditOperation` is a no-op for ownerless

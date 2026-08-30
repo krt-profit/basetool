@@ -85,6 +85,37 @@ public record JobOrderDto(
     boolean redacted) {
 
   /**
+   * Returns a copy of this DTO with the assignee rows replaced and every other component unchanged.
+   * Used by the read path to apply the shared peer projection to each assignee's nested {@code
+   * UserDto}, which otherwise carries the full member record to every viewer of the order.
+   *
+   * @param value the replacement assignee rows
+   * @return a copy differing only in {@code assignees}
+   */
+  public JobOrderDto withAssignees(List<JobOrderAssigneeDto> value) {
+    return new JobOrderDto(
+        id,
+        displayId,
+        responsibleOrgUnit,
+        requestingOrgUnit,
+        handle,
+        comment,
+        priority,
+        status,
+        type,
+        countBlueprintsWithVariants,
+        materials,
+        items,
+        aggregatedMaterials,
+        value,
+        handovers,
+        itemHandovers,
+        createdAt,
+        version,
+        redacted);
+  }
+
+  /**
    * Returns a copy of this DTO with the {@link #redacted()} flag overridden and every other
    * component unchanged. Used by the read path to stamp the per-order redaction decision onto an
    * otherwise-complete projection without re-listing all eighteen preceding fields at the call

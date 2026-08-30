@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
@@ -50,6 +51,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class MissionEinsatzleiterConstraintTest {
 
   @Mock private MissionRepository missionRepository;
+
+  @Mock private MissionSecurityService missionSecurityService;
+
+  @Mock private org.springframework.security.core.Authentication authentication;
   @Mock private JobTypeRepository jobTypeRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private AuditService auditService;
@@ -86,6 +91,7 @@ class MissionEinsatzleiterConstraintTest {
 
   @Test
   void assigningEinsatzleiterToASecondParticipant_throws409() {
+    when(missionSecurityService.canManageLoadedMission(any(), any())).thenReturn(true);
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(jobTypeRepository.findById(einsatzleiter.getId())).thenReturn(Optional.of(einsatzleiter));
 
@@ -103,11 +109,13 @@ class MissionEinsatzleiterConstraintTest {
                 null,
                 null,
                 null,
-                0L));
+                0L,
+                authentication)); // the Einsatzleiter designation is manager-only
   }
 
   @Test
   void assigningEinsatzleiterWhenNobodyElseHoldsIt_succeeds() {
+    when(missionSecurityService.canManageLoadedMission(any(), any())).thenReturn(true);
     p1.setPlannedMissionJobType(null); // nobody is the Einsatzleiter yet
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(jobTypeRepository.findById(einsatzleiter.getId())).thenReturn(Optional.of(einsatzleiter));
@@ -125,6 +133,7 @@ class MissionEinsatzleiterConstraintTest {
                 null,
                 null,
                 null,
-                0L));
+                0L,
+                authentication)); // the Einsatzleiter designation is manager-only
   }
 }

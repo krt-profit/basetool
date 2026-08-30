@@ -762,26 +762,11 @@ public class UserController {
    * @return the slim peer-view DTO
    */
   private UserDto redactToPeerShape(@NotNull UserDto dto) {
-    return new UserDto(
-        dto.id(),
-        dto.username(),
-        dto.displayName(),
-        dto.effectiveName(),
-        null, // email
-        dto.rank(),
-        null, // description
-        null, // roles
-        null, // permissions
-        null, // lastReadAnnouncementId
-        false, // isLogistician
-        false, // isMissionManager
-        dto.inKeycloak(),
-        dto.squadron(),
-        dto.squadrons(),
-        dto.version(),
-        null, // joinDate
-        null // discordLinked – Discord-link status is not exposed to peers (admin-only column)
-        );
+    // The projection itself moved to the shared support class: every surface that NESTS a UserDto
+    // must apply the same shape, and while it lived here as a private helper only this controller
+    // did - so the same caller got the slim record from GET /users/{id} and the full one from any
+    // aggregate that embedded it.
+    return de.greluc.krt.profit.basetool.backend.support.UserDtoRedaction.toPeerShape(dto);
   }
 
   /**

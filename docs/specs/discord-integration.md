@@ -76,8 +76,14 @@ boolean `UserDto.discordLinked` — `true` iff the user has a non-blank `discord
 in any DTO**; only the boolean fact of the link leaves the backend, consistent with the
 never-log/never-expose-Discord-id posture of REQ-SEC-016. The page is already `@PreAuthorize(ADMIN)`
 (frontend) so the indicator is admin-only; every peer/guest redaction shape that strips PII leaves
-`discordLinked` `null`, so the link status never reaches non-admins through any shared-`UserDto`
-path (mission participants, pickers, etc.). The visual treatment follows the monochrome-icon
+`discordLinked` `null`. **Corrected 2026-08-30:** this sentence used to claim the link status
+"never reaches non-admins through any shared-`UserDto` path (mission participants, pickers, etc.)",
+and that was false for its own example. Only surfaces that apply the peer projection strip it — `GET
+/api/v1/users/{id}`, the user list/search, and (since the 2026-08-30 audit) the job-order assignees.
+`GET /api/v1/missions/{id}` still hands every member the full nested `UserDto` for participants and
+ship owners, by the documented member tier of `UserMapper#toDto`. Closing that is a separate change
+with a wider blast radius than the orders instance had; until it lands, the honest statement is that
+`discordLinked` is admin-only **on the surfaces that redact**, not on every nested one. The visual treatment follows the monochrome-icon
 design-system convention: linked → the Discord brand mark in the inherited link/text colour
 (`currentColor`, like the sibling GitHub mark), not linked → a muted em-dash.
 

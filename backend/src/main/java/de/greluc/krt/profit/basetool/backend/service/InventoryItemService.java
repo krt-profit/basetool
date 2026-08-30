@@ -414,7 +414,11 @@ public class InventoryItemService {
    */
   @Transactional(readOnly = true)
   public List<InventoryItemDto> getMissionInventory(UUID missionId) {
-    return inventoryItemRepository.findByMissionId(missionId).stream()
+    ScopePredicate scope = ownerScopeService.currentScopePredicate();
+    return inventoryItemRepository
+        .findByMissionIdScoped(
+            missionId, scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds())
+        .stream()
         .map(inventoryItemMapper::toDto)
         .toList();
   }
@@ -436,12 +440,40 @@ public class InventoryItemService {
    *     reference
    */
   @Transactional
-  public InventoryItemDto createInventoryItem(
-      InventoryItemCreateDto dto, UUID currentUserId, boolean isAdmin) {
+  public InventoryItemDto createInventoryItem(InventoryItemCreateDto dto, UUID currentUserId) {
     UUID targetUserId = dto.userId() != null ? dto.userId() : currentUserId;
-    if (!targetUserId.equals(currentUserId) && !isAdmin) {
+    final boolean onBehalfOfSomeoneElse = !targetUserId.equals(currentUserId);
+    // REQ-SEC-005 / REQ-ORG-016: the receiver decides whose ledger this row lands in, so it is an
+    // AUTHORIZATION input and has to be answered against THIS target - not against a role.
+    //
+    // This used to be a flat `isLogisticianOrAbove()` boolean handed down from the controller (into
+    // a parameter this method still called `isAdmin`, which is how it survived review). That
+    // authority is the OR-union over all of the caller's memberships and carries no org-unit
+    // context, so a logistician of any Staffel could fabricate stock for a member of any other one.
+    // The sibling endpoint POST /api/v1/refinery-orders/users/{userId} had already closed exactly
+    // this with canManageUserRefineryOrders; this is the same gate for the same kind of write.
+    //
+    // Checked on the REQUESTED id and BEFORE the user lookup below, so an unauthorised caller
+    // cannot tell "user does not exist" from "access denied" and use the endpoint as an existence
+    // oracle.
+    if (onBehalfOfSomeoneElse && !ownerScopeService.canManageUserInventory(targetUserId)) {
       throw new AccessDeniedException(
           "You are not allowed to create inventory items for other users");
+    }
+    // A foreign member's PRIVATE pool is not an on-behalf target on this endpoint. The scope check
+    // above already bounds WHO may be booked for; this bounds WHERE. It matters because the
+    // write-time stock merge (REQ-INV-026) keys on the physical stack identity INCLUDING `personal`
+    // and returns the surviving row: a personal on-behalf create therefore folds the target's own
+    // private rows - amounts, free-text notes, earmarks - into the response, which is stock the
+    // `personal = true` flag exists to keep out of every shared view.
+    //
+    // Deliberately narrow, and it removes no documented flow: the ordinary on-behalf Einbuchen is a
+    // SHARED booking (the dialog's "isGlobal" branch) and is untouched, and the one specified
+    // personal-for-someone-else capability lives in the refinery store dialog (REQ-INV-035), which
+    // goes through storeRefineryOrder and keeps it.
+    if (onBehalfOfSomeoneElse && Boolean.TRUE.equals(dto.personal())) {
+      throw new AccessDeniedException(
+          "You are not allowed to create personal inventory items for other users");
     }
 
     final User user =

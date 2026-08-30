@@ -39,6 +39,14 @@ non-admins see the union of their memberships unless they pin one.
 > `repository.ScopeSpecifications` (one compile-time-constant fragment per aggregate) rather than
 > hand-copied per query — see [`data-persistence.md`](data-persistence.md) REQ-DATA-010. This is an
 > implementation detail; the scope semantics documented here are unchanged.
+>
+> [!important] `InventoryItem`'s mission link is **not** a cross-staffel escape
+> `GET /api/v1/inventory/mission/{missionId}` was unscoped, and because a mission is visible
+> cross-staffel whenever `is_internal = false`, that made the mission link a third, undocumented
+> widener: any member could read a foreign Staffel's mission stock — owner callsign, location,
+> material, quantity, quality, linked job-order ids — by enumerating public missions. It now carries
+> the standard scope triple (`findByMissionIdScoped`), so the two named wideners below (the
+> REQ-ORG-011 owner escape and the job-order link) remain the only ones.
 
 - **Strict-staffel** (no cross-staffel escape): `Ship`, `InventoryItem` (direct Lager-View),
   `RefineryOrder`. List/CRUD filter by `owning_org_unit_id`; detail gates on
@@ -427,7 +435,9 @@ extended:
   `canEditOrgUnit` on the caller while the membership set is the target user's, so the two coincide for
   every **self-service** create (caller = target) — there an ordinary member, whose `canEditOrgUnit`
   reach equals their own memberships, is byte-identical to today — and diverge only on the two
-  **create-on-behalf** paths where caller ≠ target (inventory book-out/transfer, refinery store): there
+  **create-on-behalf** paths where caller ≠ target (inventory book-out/transfer, refinery store, and
+  the Einbuchen create `POST /api/v1/inventory` — a third path this clause did not name until the
+  2026-08-30 audit found it ungated): there
   the accepted set is `(target's memberships) ∪ (caller's editable scope)` by design, so a leader may
   place the recipient's row in any unit the leader already controls (never widening what the caller can
   see; the REQ-ORG-011 owner-escape keeps the recipient's own visibility). The same `canEditOrgUnit` gate
@@ -639,3 +649,40 @@ badge in place (REQ-FE-001).
 `MissionServiceLifecycleTest` (happy path, 409, target validation, audit), `OwnerScopeServiceTest`
 (`resolveReassignTargetOrgUnit`), `MissionControllerSecurityTest` (the `canChangeOwner` gate).
 
+### REQ-ORG-021 — The participant escape opens the operation, not its ledger
+
+`OwnerScopeService.canSeeOperation` admits a caller either through org-unit scope (or the
+ownerless-leadership case of REQ-ORG-009) **or** through the participant escape of ADR-0006. The
+second key is **self-issuable**: `POST /api/v1/missions/{id}/join` is gated only on
+`isAuthenticated() and canSeeMission(#id)`, and `canSeeMission` is `true` for every non-internal
+mission of every org unit, so one request enrols a member of Staffel A in a public mission of
+Staffel B and unlocks that Staffel's operation.
+
+The operation's **financial** surface MUST therefore be gated on scope alone, through the sibling
+predicate `canSeeOperationLedger` (the same two branches **minus** the participant escape):
+
+- `GET /api/v1/operations/{id}/finances`, `/{id}/finances/{missionId}` and `/{id}/finance-summary`
+  require `canSeeOperationLedger`. They are org-unit financial records with no per-caller
+  projection, and `/finance-summary` additionally aggregates the operation's **internal** child
+  missions, which `canSeeMission` would refuse the same caller directly.
+- `GET /api/v1/operations/{id}/payouts` keeps `canSeeOperation`, and a caller who passes **only**
+  through the escape receives **their own payout row and nothing else**. `totalDonations` is
+  recomputed over the reduced list, so the operation-wide aggregate does not leak either.
+
+Until this requirement, the escape carried the full breakdown: per participant across every mission
+of the operation the callsign, participation percentage, `personalExpenses`, `shareAmount`,
+`donatedAmount`, `transferFee`, `payoutAmount` and the confirming officer. ADR-0006 rejected "make
+every operation visible to all organisation members" because *participation is the right, minimal
+key* — reasoning that assumes participation is granted rather than claimed.
+
+**Acceptance**
+
+- [x] A member who joined a foreign unit's public mission can open the operation and read their own
+  payout row.
+- [x] The same caller sees no other participant's payout row, and `totalDonations` reflects only
+  what they can see.
+- [x] The same caller is refused `/finances`, `/finances/{missionId}` and `/finance-summary` (403).
+- [x] A caller inside the operation's scope is unaffected on all five endpoints.
+
+**Decided by:** ADR-0150. **Enforced by:** `OperationPayoutServiceTest`
+(`summary_escapeOnlyCaller_seesOnlyTheirOwnRow`), `AccessGateService#canSeeOperationLedger`.

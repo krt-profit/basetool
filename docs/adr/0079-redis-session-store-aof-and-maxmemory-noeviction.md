@@ -11,7 +11,12 @@ Redis holds exactly two things, both with a low-but-non-zero cost on loss:
 
 - the **Spring Session** store (frontend): `OidcUser` + `OAuth2AuthorizedClient` (incl. the OAuth2
   **refresh token**) + flash attributes, behind a rolling 30-day login;
-- the **ingest handoff** staging (ingest): a single-use, 5-minute-TTL draft pointer.
+- the **ingest handoff** staging (ingest): a single-use draft, TTL **30 minutes** since ADR-0110.
+  This line said "5-minute-TTL draft **pointer**" until 2026-08-30; it is neither. The entry holds
+  the **full draft body**, which is why the sizing argument below needed the per-subject quota
+  REQ-INGEST-003 now mandates (`max-handoffs-per-subject`, `max-handoff-bytes`) — without it one
+  caller could hold 900 entries of up to the 2 MiB ingress cap in a `noeviction` Redis shared
+  with the session store, which refuses writes at the ceiling rather than evicting.
 
 Two aspects of the runtime config were suboptimal:
 

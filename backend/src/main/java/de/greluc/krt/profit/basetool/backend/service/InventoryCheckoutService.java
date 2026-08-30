@@ -567,9 +567,17 @@ public class InventoryCheckoutService {
           sourceId,
           sourceLabel,
           ownerId,
+          // The audit trail carries NO user free text (REQ-AUDIT-001, AuditEvent's own javadoc,
+          // V179__create_audit_event.sql). `terminal` is an unvalidated String that no catalogue
+          // resolves, so writing it verbatim broke that invariant and let a member forge key=value
+          // pairs inside an audit row's details - self-attributed, but pollution of a binding
+          // record, and repeatable with amount=0 (which consumes nothing yet still records).
+          // Its sibling `material` in this very builder chain IS a server-side snapshot
+          // (catalogName(item)); the length follows the bound-fact template used for job-order
+          // notes (JobOrderAssigneeService: .with("noteLength", ...)).
           AuditDetails.of("material", materialName)
               .with("amount", dto.amount())
-              .with("terminal", dto.terminal())
+              .with("terminalLength", dto.terminal() == null ? 0 : dto.terminal().trim().length())
               .with("sellAmount", dto.sellAmount())
               .with(
                   "financeEntries",

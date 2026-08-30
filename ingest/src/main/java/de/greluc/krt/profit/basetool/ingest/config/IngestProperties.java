@@ -93,4 +93,30 @@ public class IngestProperties {
    */
   @Min(1024)
   private long maxPayloadBytes = 2L * 1024 * 1024;
+
+  /**
+   * Hard upper bound on a single <em>staged</em> handoff document, in bytes.
+   *
+   * <p>Deliberately far below {@link #maxPayloadBytes}: that one is an ingress guard on what the
+   * gateway will forward, and reusing it as the staging budget was the mistake. A real draft is a
+   * few KB, while the 2&nbsp;MB ingress cap let one caller park up to 2&nbsp;MB per stage in the
+   * <em>shared</em> Redis - the same instance that holds the frontend's Spring Session store, run
+   * with {@code --maxmemory-policy noeviction}, where reaching the ceiling does not evict but
+   * refuses writes, i.e. nobody can log in any more. Overridable via {@code
+   * APP_INGEST_MAX_HANDOFF_BYTES}.
+   */
+  @Min(1024)
+  private long maxHandoffBytes = 256L * 1024;
+
+  /**
+   * Maximum number of live staged handoffs per subject; the oldest are evicted beyond it.
+   *
+   * <p>The rate limiter bounds requests per minute, not live entries: at 30 requests/minute against
+   * a 30-minute TTL a single caller could hold 900 of them at once. A member legitimately has one
+   * or two in flight - they stage a draft and open it - so a small cap costs nothing and turns an
+   * unbounded per-subject footprint into {@code maxHandoffsPerSubject × maxHandoffBytes}.
+   * Overridable via {@code APP_INGEST_MAX_HANDOFFS_PER_SUBJECT}.
+   */
+  @Min(1)
+  private int maxHandoffsPerSubject = 10;
 }

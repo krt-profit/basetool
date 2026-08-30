@@ -58,8 +58,11 @@ public class OpenApiConfig {
                 .version("1.0")
                 .description(
                     "Forward-only ingest gateway for the KRT Basetool. It validates the caller's"
-                        + " Keycloak JWT, relays the payload to the backend's import endpoints with"
-                        + " that same bearer, stages the returned draft in Redis for a single-use"
+                        + " Keycloak JWT, relays the payload to the backend's import endpoints"
+                        + " under its OWN service-account identity while naming the member it"
+                        + " acts for in an on-behalf-of header (ADR-0129 - the caller's token"
+                        + " stops here, because a sender-constrained token cannot survive a"
+                        + " second hop), stages the returned draft in Redis for a single-use"
                         + " browser pickup, and returns the handoff the desktop extractor opens."
                         + " Nothing is interpreted or persisted here.\n\n"
                         + "## Restricted interface — approved clients only\n\n"

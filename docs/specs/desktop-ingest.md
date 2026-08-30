@@ -179,7 +179,17 @@ entropy). The entry has a short TTL (~30 minutes) and is **single-use**: the fir
 read for the correct `sub` consumes (deletes) it. A second read, a wrong `sub`, an expired
 entry, or an unknown id all return "not found" with no draft. No screenshots and no raw
 image bytes are ever staged — only the already-matched draft DTO (ADR-0007/0008: images
-never leave the machine). The single-use consume is triggered off an explicit `POST`, never the
+never leave the machine).
+
+Staging MUST be **quota-bounded per subject**, in both count and size
+(`app.ingest.max-handoffs-per-subject`, default 10; `app.ingest.max-handoff-bytes`, default 256 KiB;
+the oldest entries are evicted, an oversized draft is refused with `400`). The rate limiter bounds
+requests per minute, not live entries: at 30 requests/minute against the 30-minute TTL one caller
+could hold **900** entries of up to the 2 MiB *ingress* cap each. That ingress cap is a guard on what
+the gateway will forward and was never a staging policy — and the store shares the Redis instance
+that holds the frontend's Spring Session data, run with `--maxmemory-policy noeviction`, where
+reaching the ceiling **refuses writes** rather than evicting. The failure mode was therefore not a
+slow import but a login outage for everybody. The single-use consume is triggered off an explicit `POST`, never the
 navigational pre-fill GET, so a browser prefetch or a duplicate page load cannot burn the token
 before the real pickup (REQ-INGEST-004, ADR-0110).
 

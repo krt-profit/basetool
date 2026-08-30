@@ -81,6 +81,8 @@ class OperationPayoutServiceTest {
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private OperationPayoutStatusRepository payoutStatusRepository;
   @Mock private UserService userService;
+  @Mock private OwnerScopeService ownerScopeService;
+  @Mock private AuthHelperService authHelperService;
   @Mock private SystemSettingService systemSettingService;
 
   @Mock private AuditService auditService;
@@ -993,6 +995,9 @@ class OperationPayoutServiceTest {
       stubOperation(Set.of(m));
       stubFinances(
           List.of(newEntry(m, bobP, FinanceType.INCOME, new BigDecimal("900.00"))), List.of());
+      // A scope-visible reader sees the whole breakdown; the escape-only reduction is asserted in
+      // its own test below.
+      when(ownerScopeService.canSeeOperationLedger(OPERATION_ID)).thenReturn(true);
 
       OperationPayoutSummaryDto summary =
           operationPayoutService.getOperationPayoutSummary(OPERATION_ID);
@@ -1018,11 +1023,42 @@ class OperationPayoutServiceTest {
       stubOperation(Set.of(m));
       stubFinances(
           List.of(newEntry(m, aliceP, FinanceType.INCOME, new BigDecimal("500.00"))), List.of());
+      when(ownerScopeService.canSeeOperationLedger(OPERATION_ID)).thenReturn(true);
 
       OperationPayoutSummaryDto summary =
           operationPayoutService.getOperationPayoutSummary(OPERATION_ID);
 
       assertEquals(new BigDecimal("0.00"), summary.totalDonations());
+    }
+
+    /**
+     * Audit MEDIUM-1: a caller who reached the operation only through the participant escape gets
+     * their own row and nothing else.
+     *
+     * <p>The escape is self-issuable - {@code POST /api/v1/missions/&#123;id&#125;/join} is open
+     * for every non-internal mission of every org unit - so honouring it with the full breakdown
+     * meant one request bought a foreign unit's entire payout table, callsigns and amounts
+     * included.
+     */
+    @Test
+    void summary_escapeOnlyCaller_seesOnlyTheirOwnRow() {
+      Mission m = newMission(T0, T0_PLUS_60M);
+      User alice = newUser("alice");
+      User bob = newUser("bob");
+      addUserParticipantWithUser(m, alice, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
+      MissionParticipant bobP =
+          addUserParticipantWithUser(m, bob, T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
+      stubOperation(Set.of(m));
+      stubFinances(
+          List.of(newEntry(m, bobP, FinanceType.INCOME, new BigDecimal("900.00"))), List.of());
+      when(ownerScopeService.canSeeOperationLedger(OPERATION_ID)).thenReturn(false);
+      when(authHelperService.currentUserId()).thenReturn(java.util.Optional.of(bob.getId()));
+
+      OperationPayoutSummaryDto summary =
+          operationPayoutService.getOperationPayoutSummary(OPERATION_ID);
+
+      assertEquals(1, summary.payouts().size(), "only the caller's own payout row");
+      assertEquals(bob.getId().toString(), summary.payouts().get(0).participantId());
     }
 
     // ----- helpers ---------------------------------------------------

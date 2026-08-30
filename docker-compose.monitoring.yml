@@ -8,8 +8,14 @@
 # failure logs but never rolls back the apps.
 #
 # Image pins are the latest stable lines verified 2026-07 against the official release pages (owner
-# version directive); Dependabot's docker-compose ecosystem (directory /) maintains the pins and
-# adds @sha256 digests afterwards. Contains ZERO secrets — every credential is a host-side file
+# version directive), and every one of them is DIGEST-pinned as required by ADR-0072. This file used
+# to say Dependabot "adds @sha256 digests afterwards"; it does not and structurally cannot -
+# Dependabot MAINTAINS a digest that is already there and never introduces one, so all thirteen
+# references sat on mutable tags while the comment claimed otherwise. That gap mattered most for
+# docker-socket-proxy, whose POST/EXEC deny-list is enforced by the image itself: a substituted
+# image talks straight to the mounted /var/run/docker.sock, which is root-equivalent. Resolve a new
+# digest with `docker buildx imagetools inspect <repo>:<tag> --format '{{.Manifest.Digest}}'` and
+# move it in the same commit as the tag. Contains ZERO secrets — every credential is a host-side file
 # under /var/iri/monitoring/secrets/ or an .env value, provisioned by
 # docs/MONITORING_ROLLOUT_RUNBOOK.md.
 #
@@ -129,7 +135,7 @@ services:
   prometheus:
     <<: *mon-base
     container_name: prometheus
-    image: prom/prometheus:v3.14.0
+    image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
     cap_drop: [ALL]
     # GOMEMLIMIT (Go soft memory limit): as the Go heap nears this, the runtime GC gets aggressive
     # to stay under it, so a WAL-replay / peak spike trades CPU for memory instead of hitting the
@@ -201,7 +207,7 @@ services:
     # NOTHING in the 13.1.x line — 13.0.2 remains its newest tag. Do not take a version from the
     # GitHub release feed; the only authority for this pin is what grafana-oss has actually pushed
     # (`curl -s 'https://hub.docker.com/v2/repositories/grafana/grafana-oss/tags?name=13.'`).
-    image: grafana/grafana-oss:13.0.2
+    image: grafana/grafana-oss:13.0.2@sha256:5dad0df181cb644a14e13617b913b261a54f7d4fd4510721dba420929f35bea2
     cap_drop: [ALL]
     environment:
       # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 768MiB = 75% of the 1024M limit.
@@ -287,7 +293,7 @@ services:
   loki:
     <<: *mon-base
     container_name: loki
-    image: grafana/loki:3.7.6
+    image: grafana/loki:3.7.6@sha256:efd47c67f9bac88ca29bcf8cb997d9ab29d1848bd0aff579282295542a745952
     cap_drop: [ALL]
     # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 288MiB = 75% of the 384M limit;
     # measured live heap 76.7 MiB, so the ceiling is ~3.8x actual demand. Loki is the one place where
@@ -333,7 +339,7 @@ services:
   tempo:
     <<: *mon-base
     container_name: tempo
-    image: grafana/tempo:3.0.3
+    image: grafana/tempo:3.0.3@sha256:0296560ac66f8a3600d7fb3014a52c189d4d9c3549ad6ff441bf2409855d68d5
     cap_drop: [ALL]
     # -config.expand-env: expand ${PROMETHEUS_WEB_PASSWORD} in tempo.yaml so the metrics-generator's
     # remote_write can basic-auth to Prometheus as the shared `grafana` user (#1041 item 22a).
@@ -431,7 +437,7 @@ services:
   alloy:
     <<: *mon-base
     container_name: alloy
-    image: grafana/alloy:v1.18.1
+    image: grafana/alloy:v1.18.1@sha256:0f4434c92b3e6cdac38bb129b344e1790c246f7b6e2eaffcc16a5fa363240e33
     # 1.18.0 (taken 2026-07-28) also pulled in Prometheus 3.12 and otel-collector 0.153 upstream. If the
     # working set drifts up after this bump with NO config change of ours, that dependency jump is the
     # first suspect before the "Alloy-side leak" verdict at the end of the sizing note below — and the
@@ -536,7 +542,7 @@ services:
   alertmanager:
     <<: *mon-base
     container_name: alertmanager
-    image: quay.io/prometheus/alertmanager:v0.34.0
+    image: quay.io/prometheus/alertmanager:v0.34.0@sha256:690c7b525f4367aa91f73e2f91c632206d32e97c6384bdbf2fb7a861b420340d
     cap_drop: [ALL]
     # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 36MiB = 75% of the 48M limit;
     # measured live heap 7.7 MiB, so the ceiling is ~4.7x actual demand. Preventive, not remedial:
@@ -580,7 +586,7 @@ services:
   node-exporter:
     <<: *mon-base
     container_name: node-exporter
-    image: quay.io/prometheus/node-exporter:v1.12.1
+    image: quay.io/prometheus/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
     pid: host
     # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 24MiB = 75% of the 32M limit;
     # measured live heap 2.6 MiB, so the ceiling is ~9.2x actual demand — the widest margin here,
@@ -635,7 +641,7 @@ services:
   cadvisor:
     <<: *mon-base
     container_name: cadvisor
-    image: ghcr.io/google/cadvisor:v0.60.5
+    image: ghcr.io/google/cadvisor:v0.60.5@sha256:763aecf1c32c2be8a1a75f9abfc2fc461005c9dbbaa39cb356b354aac1296dbe
     # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 96MiB = 75% of the 128M limit;
     # measured live heap 21.9 MiB, so the ceiling is ~4.4x actual demand. cAdvisor had ample headroom
     # either way (working-set peak 55.6%, anon 30.6%); this is purely preventive, so its per-container
@@ -700,7 +706,7 @@ services:
   socket-proxy:
     <<: *mon-base
     container_name: socket-proxy
-    image: tecnativa/docker-socket-proxy:v0.5.0
+    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
     environment:
       CONTAINERS: "1"
       NETWORKS: "1"
@@ -746,7 +752,7 @@ services:
   postgres-exporter-backend:
     <<: *mon-base
     container_name: postgres-exporter-backend
-    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1@sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e
     cap_drop: [ALL]
     command:
       - --no-collector.stat_replication
@@ -771,7 +777,7 @@ services:
   postgres-exporter-keycloak:
     <<: *mon-base
     container_name: postgres-exporter-keycloak
-    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1@sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e
     cap_drop: [ALL]
     # --no-collector.stat_replication: see the backend exporter above — upstream slot_name bug.
     # --collector.database_wraparound + --collector.long_running_transactions: see the backend exporter.
@@ -802,7 +808,7 @@ services:
   redis-exporter:
     <<: *mon-base
     container_name: redis-exporter
-    image: oliver006/redis_exporter:v1.89.0
+    image: oliver006/redis_exporter:v1.89.0@sha256:fed773ffd2bb2eac706e0ed9cc2fff41651193ee4977e2a4f6919658ad2313f4
     cap_drop: [ALL]
     environment:
       # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 24MiB = 75% of the 32M limit.
@@ -831,7 +837,7 @@ services:
   blackbox-exporter:
     <<: *mon-base
     container_name: blackbox-exporter
-    image: prom/blackbox-exporter:v0.28.0
+    image: prom/blackbox-exporter:v0.28.0@sha256:e753ff9f3fc458d02cca5eddab5a77e1c175eee484a8925ac7d524f04366c2fc
     cap_drop: [ALL]
     # GOMEMLIMIT, same soft-cap rationale as prometheus/alloy above: without it the Go runtime has no
     # idea a cgroup ceiling exists. It sizes the heap off GOGC alone (target 2x live heap) and returns

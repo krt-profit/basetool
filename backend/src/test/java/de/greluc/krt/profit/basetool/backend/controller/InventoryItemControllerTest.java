@@ -972,47 +972,12 @@ class InventoryItemControllerTest {
   // ── POST /inventory (create) ─────────────────────────────────────────
 
   @Test
-  void createInventoryItem_logisticianBranch_passesTrueToService() {
+  void createInventoryItem_delegatesWithoutAnyRoleBoolean() {
     Jwt jwt = jwt("alice-sub");
-    UUID ownerId = UUID.randomUUID();
-    UUID materialId = UUID.randomUUID();
-    UUID locationId = UUID.randomUUID();
+    UUID callerId = UUID.randomUUID();
     InventoryItemCreateDto createDto =
         new InventoryItemCreateDto(
-            null,
-            materialId,
-            null,
-            locationId,
-            750,
-            25.0,
-            false,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null);
-    InventoryItemDto persisted = inventoryItem(UUID.randomUUID());
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
-    when(inventoryItemService.createInventoryItem(createDto, ownerId, true)).thenReturn(persisted);
-
-    InventoryItemDto result = controller.createInventoryItem(jwt, createDto);
-
-    // LOGISTICIAN branch — the boolean MUST reach the service so the service can decide whether
-    // the caller-supplied userId (impersonation) is honoured. The decision lives at the HTTP
-    // boundary so the service stays free of SecurityContextHolder reads (ArchUnit rule).
-    assertThat(result).isSameAs(persisted);
-    verify(inventoryItemService).createInventoryItem(createDto, ownerId, true);
-  }
-
-  @Test
-  void createInventoryItem_nonLogisticianBranch_passesFalseToService() {
-    Jwt jwt = jwt("alice-sub");
-    UUID ownerId = UUID.randomUUID();
-    InventoryItemCreateDto createDto =
-        new InventoryItemCreateDto(
-            UUID.randomUUID(), // caller tried to set an explicit owner ...
+            UUID.randomUUID(), // an explicit, foreign receiver ...
             UUID.randomUUID(),
             null,
             UUID.randomUUID(),
@@ -1026,16 +991,19 @@ class InventoryItemControllerTest {
             null,
             null);
     InventoryItemDto persisted = inventoryItem(UUID.randomUUID());
-    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
-    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
-    when(inventoryItemService.createInventoryItem(createDto, ownerId, false)).thenReturn(persisted);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
+    when(inventoryItemService.createInventoryItem(createDto, callerId)).thenReturn(persisted);
 
     InventoryItemDto result = controller.createInventoryItem(jwt, createDto);
 
-    // ... but the service receives isLogistician=false, so the impersonation attempt will be
-    // collapsed inside the service. The controller does NOT decide on its own which owner wins.
+    // ... and the controller decides NOTHING about it. The receiver is an authorization input that
+    // can only be answered against the target id, so the gate lives in the service
+    // (canManageUserInventory). This test pins that no role boolean is computed here any more: the
+    // predecessor passed isLogisticianOrAbove() down, which is org-unit-less and let a logistician
+    // of any Staffel write into any other Staffel's member ledger (REQ-SEC-005).
     assertThat(result).isSameAs(persisted);
-    verify(inventoryItemService).createInventoryItem(createDto, ownerId, false);
+    verify(inventoryItemService).createInventoryItem(createDto, callerId);
+    verify(authHelperService, never()).isLogisticianOrAbove();
   }
 
   // ── POST /inventory/{id}/book-out (200 / 204 split) ──────────────────

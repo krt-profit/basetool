@@ -55,7 +55,11 @@ Give `frontend` and `ingest` a dedicated **internal-only management port** in **
 bind-mounted `keystore.p12` (`management.server.ssl.*`), so the Prometheus scrape stays HTTPS with
 the pinned CA (REQ-OBS-008 unchanged). The port is reachable only where the container already sits —
 `net-monitoring-scrape` for the scrape and `localhost` for the healthcheck — and is **never**
-host-published and **never** exposed on any `net-proxy-*` network, so NPM cannot route to it.
+host-published and **never** exposed on a `net-proxy-*` network *that NPM is attached to*, so NPM
+cannot route to it. (Wording tightened 2026-08-30: ADR-0135 put the backend on `net-proxy-api`, so
+the older absolute phrasing "on any `net-proxy-*` network" is no longer literally true. The
+load-bearing conclusion — the management port is neither host-published nor routable from the edge —
+is unchanged; only a formulation a later decision might have built on has been corrected.)
 
 Actuator on that management port is **unauthenticated** — the Keycloak port-9000 model. A new
 `ManagementPortSecurityConfig` (per module) contributes an `@Order(0)` permit-all `SecurityFilterChain`
@@ -72,7 +76,8 @@ monitoring plane. The Prometheus `basetool-frontend` / `basetool-ingest` jobs th
 unchanged**: in dev/test/e2e no management port is set, so `ManagementPortSecurityConfig` is absent,
 Actuator stays on the app port, and those main-context chains still fail-close it exactly as before.
 In prod they simply guard a path the public connector no longer serves (harmless). **`backend` is unchanged** — it is off every
-`net-proxy-*` network and is not internet-reachable at all, so it keeps its app-port scrape with
+`net-proxy-*` network NPM routes from and its management surface is not internet-reachable, so it
+keeps its app-port scrape with
 fail-closed basic auth; moving it would add risk with no external-exposure benefit.
 
 Codified as an amendment to **REQ-OBS-005** (metrics endpoint isolation + the frontend/ingest

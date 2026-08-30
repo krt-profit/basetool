@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -33,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -55,9 +58,15 @@ class MissionParticipantServiceValidationTest {
 
   @Mock private MissionRepository missionRepository;
 
+  @Mock private MissionSecurityService missionSecurityService;
+
+  @Mock private org.springframework.security.core.Authentication authentication;
+
   @Mock private MissionParticipantRepository missionParticipantRepository;
 
   @Mock private JobTypeRepository jobTypeRepository;
+
+  @Mock private UserRepository userRepository;
 
   @Mock private AuditService auditService;
 
@@ -97,13 +106,15 @@ class MissionParticipantServiceValidationTest {
                 null, // orgUnitIds
                 null, // payoutPreference
                 null, // guestName
-                null)); // version — null skips the optimistic-lock check
+                null, // version — null skips the optimistic-lock check
+                authentication)); // the manager path; the gate is answered inside the service
 
     verify(missionParticipantRepository, never()).saveAndFlush(any(MissionParticipant.class));
   }
 
   @Test
   void updateParticipantAttributes_rejectsStartAfterEnd() {
+    when(missionSecurityService.canManageLoadedMission(any(), any())).thenReturn(true);
     // An inverted window (start after end) would store a negative credited duration and corrupt the
     // payout breakdown. The start-after-end guard must reject it.
     // Given
@@ -138,13 +149,15 @@ class MissionParticipantServiceValidationTest {
                 null,
                 null,
                 null,
-                null));
+                null,
+                authentication));
 
     verify(missionParticipantRepository, never()).saveAndFlush(any(MissionParticipant.class));
   }
 
   @Test
   void updateParticipantAttributes_rejectsNonMissionArchetypeDesiredJobType() {
+    when(missionSecurityService.canManageLoadedMission(any(), any())).thenReturn(true);
     // A desired mission role must be a MISSION-archetype job type. A CREW (or any other) archetype
     // must be rejected so a non-mission role is never stored as a participant's desired role.
     // Given
@@ -182,13 +195,15 @@ class MissionParticipantServiceValidationTest {
                 null,
                 null,
                 null,
-                null));
+                null,
+                authentication));
 
     verify(missionParticipantRepository, never()).saveAndFlush(any(MissionParticipant.class));
   }
 
   @Test
   void updateParticipantAttributes_rejectsNonMissionArchetypePlannedJobType() {
+    when(missionSecurityService.canManageLoadedMission(any(), any())).thenReturn(true);
     // A planned mission role must also be a MISSION-archetype job type — a CREW archetype planned
     // role must be rejected so it cannot corrupt the role model / isMissionLead constraint.
     // Given
@@ -226,7 +241,8 @@ class MissionParticipantServiceValidationTest {
                 null,
                 null,
                 null,
-                null));
+                null,
+                authentication));
 
     verify(missionParticipantRepository, never()).saveAndFlush(any(MissionParticipant.class));
   }
@@ -257,5 +273,157 @@ class MissionParticipantServiceValidationTest {
         () -> missionParticipantService.addParticipant(missionId, userId));
 
     verify(missionParticipantRepository, never()).save(any(MissionParticipant.class));
+  }
+
+  /**
+   * REQ-MISSION-013 / audit MEDIUM-9: the planned mission job type is the organisation's assignment
+   * - it carries the Einsatzleiter designation - and is not part of a guest's payload.
+   *
+   * <p>Before this gate the block had no caller distinction at all, so a guest presenting their
+   * row's capability token could designate themselves Einsatzleiter; the single-lead rule then
+   * blocked the real leader with a 409 until somebody cleared the guest row.
+   */
+  @Test
+  void updateParticipantAttributes_refusesPlannedJobTypeFromACallerWhoCannotManageTheMission() {
+    UUID missionId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
+    Mission mission = new Mission();
+    mission.setId(missionId);
+    MissionParticipant p = new MissionParticipant();
+    p.setId(participantId);
+    p.setMission(mission);
+    mission.getParticipants().add(p);
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+
+    assertThrows(
+        org.springframework.security.access.AccessDeniedException.class,
+        () ->
+            missionParticipantService.updateParticipantAttributes(
+                missionId,
+                participantId,
+                null,
+                UUID.randomUUID(), // plannedMissionJobTypeId - manager-only
+                "comment",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+    verify(missionParticipantRepository, never()).saveAndFlush(any(MissionParticipant.class));
+  }
+
+  /**
+   * The symmetric half, which matters just as much: a {@code null} used to CLEAR the designation,
+   * so an ordinary guest edit silently undid a manager's assignment. A caller who may not manage
+   * the mission must leave the field exactly as it was.
+   */
+  @Test
+  void updateParticipantAttributes_doesNotClearThePlannedJobTypeForANonManagingCaller() {
+    UUID missionId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
+    Mission mission = new Mission();
+    mission.setId(missionId);
+    JobType lead = new JobType();
+    lead.setId(UUID.randomUUID());
+    lead.setArchetype(JobTypeArchetype.MISSION);
+    lead.setMissionLead(true);
+    MissionParticipant p = new MissionParticipant();
+    p.setId(participantId);
+    p.setMission(mission);
+    p.setPlannedMissionJobType(lead);
+    p.setMissionLeadParticipant(true);
+    mission.getParticipants().add(p);
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(missionParticipantRepository.saveAndFlush(any(MissionParticipant.class)))
+        .thenAnswer(i -> i.getArgument(0));
+
+    missionParticipantService.updateParticipantAttributes(
+        missionId, participantId, null, null, "comment", null, null, null, null, null, null, null);
+
+    assertSame(lead, p.getPlannedMissionJobType());
+    assertTrue(p.isMissionLeadParticipant());
+  }
+
+  /**
+   * Audit MEDIUM-10: both anonymous CREATE paths refuse a guest name that resolves to a registered
+   * member; the UPDATE path did not, so a guest could sign up under a throwaway name and then
+   * rename the row to a member's byte-exact callsign.
+   */
+  @Test
+  void updateParticipantAttributes_refusesRenamingAGuestRowOntoARegisteredMember() {
+    UUID missionId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
+    Mission mission = new Mission();
+    mission.setId(missionId);
+    MissionParticipant p = new MissionParticipant();
+    p.setId(participantId);
+    p.setMission(mission);
+    p.setGuestName("zz-throwaway");
+    mission.getParticipants().add(p);
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(userRepository.findAllByUsernameIgnoreCaseOrDisplayNameIgnoreCase(
+            "Bob Officer", "Bob Officer"))
+        .thenReturn(java.util.List.of(new de.greluc.krt.profit.basetool.backend.model.User()));
+
+    assertThrows(
+        de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
+        () ->
+            missionParticipantService.updateParticipantAttributes(
+                missionId,
+                participantId,
+                null,
+                null,
+                "comment",
+                null,
+                null,
+                null,
+                null,
+                "Bob Officer",
+                null,
+                null));
+
+    verify(missionParticipantRepository, never()).saveAndFlush(any(MissionParticipant.class));
+  }
+
+  /** ... and it must not collide with another guest of the same mission either. */
+  @Test
+  void updateParticipantAttributes_refusesRenamingOntoAnotherGuestOfTheSameMission() {
+    UUID missionId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
+    Mission mission = new Mission();
+    mission.setId(missionId);
+    MissionParticipant mine = new MissionParticipant();
+    mine.setId(participantId);
+    mine.setMission(mission);
+    mine.setGuestName("zz-throwaway");
+    MissionParticipant other = new MissionParticipant();
+    other.setId(UUID.randomUUID());
+    other.setMission(mission);
+    other.setGuestName("Dusty");
+    mission.getParticipants().add(mine);
+    mission.getParticipants().add(other);
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
+    when(userRepository.findAllByUsernameIgnoreCaseOrDisplayNameIgnoreCase("Dusty", "Dusty"))
+        .thenReturn(java.util.List.of());
+
+    assertThrows(
+        de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException.class,
+        () ->
+            missionParticipantService.updateParticipantAttributes(
+                missionId,
+                participantId,
+                null,
+                null,
+                "comment",
+                null,
+                null,
+                null,
+                null,
+                "Dusty",
+                null,
+                null));
   }
 }

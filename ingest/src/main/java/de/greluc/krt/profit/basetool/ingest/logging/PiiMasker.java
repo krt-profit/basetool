@@ -54,8 +54,12 @@ public final class PiiMasker {
   // Domain uses possessive label groups (?:label\.)++TLD so adjacent quantifiers cannot overlap —
   // avoids the O(n^2) backtracking the previous [a-zA-Z0-9.-]+\.[a-zA-Z]{2,} exhibited on long
   // no-TLD '@'-strings, which run on every log line (security audit L5).
+  // The LOCAL part is possessive and length-bounded too, and the L5 fix was incomplete without it:
+  // it stayed a greedy `+`, so Matcher.find() restarting at every index still walked a long
+  // local-part run quadratically. {1,64}+ is RFC 5321's local-part limit, so bounding it rejects
+  // nothing real (security audit MEDIUM-8).
   private static final String EMAIL_PATTERN =
-      "([a-zA-Z0-9_!#$%&'*+/=?`{|}~^.-]+@(?:[a-zA-Z0-9-]++\\.)++[a-zA-Z]{2,})";
+      "([a-zA-Z0-9_!#$%&'*+/=?`{|}~^.-]{1,64}+@(?:[a-zA-Z0-9-]++\\.)++[a-zA-Z]{2,})";
   // Value class includes the standard-base64 alphabet (+, /, =) so a base64 secret logged next to
   // one of these keywords is masked in full, not truncated at the first +/=/ (security audit L6).
   // The keyword must be followed by a real separator - ":", "=" or whitespace. With the

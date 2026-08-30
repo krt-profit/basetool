@@ -324,7 +324,12 @@ class MissionAccessControlTest {
             .findFirst()
             .orElseThrow();
 
-    String updateJson =
+    // The PLANNED job type is the organisation's assignment - it carries the Einsatzleiter
+    // designation - so a self-editing participant who cannot manage the mission is refused it
+    // (audit MEDIUM-9). This test asserted the opposite until then: it drove a ROLE_GUEST setting
+    // their OWN planned job type and expected 200, which is precisely the self-designation the
+    // single-lead rule then held against the real leader.
+    String plannedAttempt =
         String.format(
             "{\"desiredMissionJobTypeId\": \"%s\", \"plannedMissionJobTypeId\": \"%s\","
                 + " \"comment\": \"Full Update\", \"version\": 0}",
@@ -338,7 +343,25 @@ class MissionAccessControlTest {
                         .jwt(builder -> builder.subject(guestUser.getId().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_GUEST")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(updateJson))
+                .content(plannedAttempt))
+        .andExpect(status().isForbidden());
+
+    // The rest of the payload is still the participant's own to edit.
+    String ownFieldsUpdate =
+        String.format(
+            "{\"desiredMissionJobTypeId\": \"%s\", \"comment\": \"Full Update\","
+                + " \"version\": 0}",
+            testJobType.getId());
+
+    mockMvc
+        .perform(
+            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(guestUser.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_GUEST")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ownFieldsUpdate))
         .andExpect(status().isOk());
 
     // Verification via Repository
@@ -350,8 +373,9 @@ class MissionAccessControlTest {
 
     org.junit.jupiter.api.Assertions.assertEquals(
         testJobType.getId(), participant.getDesiredMissionJobType().getId());
-    org.junit.jupiter.api.Assertions.assertEquals(
-        testJobType.getId(), participant.getPlannedMissionJobType().getId());
+    org.junit.jupiter.api.Assertions.assertNull(
+        participant.getPlannedMissionJobType(),
+        "a self-editing non-manager must not have been able to assign the planned job type");
     org.junit.jupiter.api.Assertions.assertEquals("Full Update", participant.getComment());
   }
 

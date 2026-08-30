@@ -276,9 +276,11 @@ class RefineryOrderServiceTest {
       when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(location));
       when(userRepository.findById(OTHER_USER_ID)).thenReturn(Optional.empty());
 
-      // Driven as a LOGISTICIAN: since REQ-SEC-039 a plain member naming a foreign assignee is
-      // refused before the lookup, so the unknown-user path is only reachable for a caller who is
-      // actually allowed to book on someone else's behalf.
+      // Driven as a caller who IS in scope for the foreign assignee: since REQ-SEC-039 a caller
+      // naming a foreign assignee is refused before the lookup, so the unknown-user path is only
+      // reachable for a caller actually allowed to book on that member's behalf. The gate is
+      // canManageUserInventory (per target), not the org-unit-less ROLE_LOGISTICIAN it replaced.
+      when(ownerScopeService.canManageUserInventory(OTHER_USER_ID)).thenReturn(true);
       assertThrows(
           NotFoundException.class,
           () ->
@@ -335,8 +337,9 @@ class RefineryOrderServiceTest {
       stubLookupsForSingleItem();
       when(userRepository.findById(OTHER_USER_ID)).thenReturn(Optional.of(other));
 
-      // Booking someone else's stock is a LOGISTICIAN act (REQ-SEC-039) — the same privilege the
-      // Einbuchen path requires for a foreign target user.
+      // Booking someone else's stock requires editable org-unit scope on THAT member
+      // (REQ-SEC-005/-039) — the same gate the Einbuchen path applies to a foreign target user.
+      when(ownerScopeService.canManageUserInventory(OTHER_USER_ID)).thenReturn(true);
       refineryOrderService.storeRefineryOrder(
           OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(OTHER_USER_ID, null))), true);
 
@@ -371,6 +374,35 @@ class RefineryOrderServiceTest {
       // Nothing was written: neither the victim's inventory row nor the order's completion.
       verify(inventoryItemRepository, never()).save(any());
       verify(refineryOrderRepository, never()).save(any());
+    }
+
+    /**
+     * REQ-SEC-005 regression: holding LOGISTICIAN is not an answer about a member of a DIFFERENT
+     * org unit.
+     *
+     * <p>The caller here owns the order (so the ownership check passes) and holds the flat {@code
+     * ROLE_LOGISTICIAN} - which is exactly the state that used to authorise this write, because the
+     * guard was a role boolean with no org-unit context. The receiver is a member of another
+     * Staffel, so {@code canManageUserInventory} says no and the write must be refused before the
+     * victim's row or the order completion is touched.
+     */
+    @Test
+    void throwsAccessDenied_whenLogisticianNamesAnAssigneeOutsideTheirOrgUnitScope() {
+      stubLookupsForSingleItem();
+      when(ownerScopeService.canManageUserInventory(OTHER_USER_ID)).thenReturn(false);
+
+      assertThrows(
+          AccessDeniedException.class,
+          () ->
+              refineryOrderService.storeRefineryOrder(
+                  OWNER_ID,
+                  ORDER_ID,
+                  new RefineryOrderStoreDto(List.of(item(OTHER_USER_ID, null))),
+                  true));
+
+      verify(inventoryItemRepository, never()).save(any());
+      verify(refineryOrderRepository, never()).save(any());
+      verify(userRepository, never()).findById(OTHER_USER_ID);
     }
 
     /**

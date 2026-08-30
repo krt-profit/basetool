@@ -56,8 +56,10 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>Stateless and static-only; it takes the caller's {@link ObjectMapper} as a parameter rather
  * than injecting one, so {@code BlueprintImportService} passes its own configured mapper. The
- * 8&nbsp;MB pre-{@code readTree} size cap ({@link #MAX_IMPORT_BYTES}) is the security backstop
- * against a multi-MB array expanding into hundreds of MB of transient heap.
+ * 8&nbsp;MB pre-{@code readTree} size cap ({@link #MAX_IMPORT_BYTES}) bounds the transient heap a
+ * multi-MB array expands into; the per-entry work downstream is bounded separately by {@link
+ * #MAX_IMPORT_ENTRIES}, because de-dup keys on the name and therefore does not bound the entry
+ * count at all.
  */
 @Slf4j
 public final class BlueprintExportParser {
@@ -69,6 +71,22 @@ public final class BlueprintExportParser {
    * multipart cap (sized for the admin-only P4K catalogue).
    */
   private static final long MAX_IMPORT_BYTES = 8L * 1024 * 1024;
+
+  /**
+   * Cap on the number of <em>distinct</em> entries one import may carry, enforced after de-dup.
+   *
+   * <p>The byte cap above is not the backstop its javadoc claimed. De-duplication keys on the name
+   * (or tag), so every distinct name survives it: an 8&nbsp;MiB upload of ~14-byte minimal records
+   * yields on the order of half a million entries, and {@code BlueprintImportService} then runs one
+   * alias lookup plus one full-catalogue fuzzy scan <em>per entry</em> - inside a single
+   * {@code @Transactional(readOnly = true)}, so one request also parks one Hikari connection for
+   * the whole run. Enough concurrent requests exhaust the pool for everybody, from any
+   * authenticated account.
+   *
+   * <p>A real export is in the hundreds; 20&nbsp;000 leaves three orders of magnitude of headroom
+   * over the largest plausible library while removing the unbounded loop.
+   */
+  private static final int MAX_IMPORT_ENTRIES = 20_000;
 
   private BlueprintExportParser() {}
 
@@ -160,6 +178,15 @@ public final class BlueprintExportParser {
           earliestByKey.put(dedupKey, acquiredAt);
         }
       }
+    }
+
+    if (earliestByKey.size() > MAX_IMPORT_ENTRIES) {
+      throw new BadRequestException(
+          "The blueprint export carries "
+              + earliestByKey.size()
+              + " distinct entries; at most "
+              + MAX_IMPORT_ENTRIES
+              + " are accepted per import.");
     }
 
     List<ParsedEntry> entries = new ArrayList<>(earliestByKey.size());

@@ -118,7 +118,19 @@ public class MissionSecurityService {
       // (created before V177) only passes via (b) — the gate fails closed.
       if (guestParticipantTokenService.matches(
           request.getHeader(GUEST_EDIT_TOKEN_HEADER), p.getGuestEditTokenHash())) {
-        return true;
+        // The token proves WHICH row, never WHETHER the mission is still open to a guest. Without
+        // the visibility re-check the capability outlived the surface that granted it: a guest who
+        // signed up while the mission was public kept PUT / DELETE / check-in on their row after
+        // the mission was flipped to isInternal, and after it reached COMPLETED / CANCELLED - and
+        // since OperationPayoutService recomputes the time split on every read, back-dating
+        // start/end on a settled operation moved real money away from every other participant.
+        //
+        // canSeeMission is exactly the missing predicate and covers both halves: it denies an
+        // internal mission to a non-member, and (audit hardening M-2) denies a terminal mission to
+        // an unauthenticated caller - which is what a token-only guest is. It is the same gate the
+        // READ path already applied, whose own javadoc gives this as its reason: "so a guest cannot
+        // (re-)write the participant list / finance ledger of an already-archived mission".
+        return ownerScopeService.canSeeMission(missionId);
       }
       return canManageMission(missionId, authentication);
     }
@@ -436,6 +448,45 @@ public class MissionSecurityService {
         .map(Mission::getOwner)
         .map(owner -> owner.getId().equals(userId))
         .orElse(false);
+  }
+
+  /**
+   * {@link #canManageMission(UUID, Authentication)} for a mission the caller <em>already
+   * holds</em>, with no second load of the aggregate.
+   *
+   * <p>The id-taking variant re-reads the mission through {@code findByIdForAuthorization}. Calling
+   * it from a controller, ahead of the writing service's own {@code findById}, put a second copy of
+   * the aggregate into the open-session persistence context and the subsequent write then compared
+   * against a stale participant version - a spurious {@code 409} on an edit nobody else had
+   * touched. That is the #1139 hazard the scope loads were reshaped to avoid, and it is why the
+   * payload-level "may this caller manage the mission" question is answered inside the service,
+   * from the entity it has just loaded, rather than at the HTTP boundary.
+   *
+   * @param mission the already-loaded mission.
+   * @param authentication current Spring Security authentication.
+   * @return {@code true} if the caller may manage this mission.
+   */
+  public boolean canManageLoadedMission(Mission mission, Authentication authentication) {
+    if (authentication == null || !authentication.isAuthenticated()) {
+      return false;
+    }
+    Collection<? extends GrantedAuthority> reachable =
+        roleHierarchy.getReachableGrantedAuthorities(authentication.getAuthorities());
+    if (reachable.stream().anyMatch(a -> a.getAuthority().equals(Roles.authority(Roles.ADMIN)))) {
+      return true;
+    }
+    boolean hasElevatedMissionAuthority =
+        reachable.stream()
+            .anyMatch(
+                a ->
+                    a.getAuthority().equals(Roles.authority(Roles.MISSION_MANAGER))
+                        || a.getAuthority().equals(Roles.MISSION_MANAGER)
+                        || a.getAuthority().equals(Permissions.MISSION_MANAGE)
+                        || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
+    if (hasElevatedMissionAuthority && ownerScopeService.canEditMission(mission.getId())) {
+      return true;
+    }
+    return isOwnerOrManager(mission, authentication);
   }
 
   /**

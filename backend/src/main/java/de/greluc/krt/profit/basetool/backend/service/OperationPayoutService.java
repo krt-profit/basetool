@@ -125,6 +125,8 @@ public class OperationPayoutService {
   private final RefineryOrderRepository refineryOrderRepository;
   private final OperationPayoutStatusRepository payoutStatusRepository;
   private final UserService userService;
+  private final OwnerScopeService ownerScopeService;
+  private final AuthHelperService authHelperService;
   private final SystemSettingService systemSettingService;
   private final AuditService auditService;
 
@@ -308,13 +310,49 @@ public class OperationPayoutService {
    * @throws NotFoundException when no operation matches the id
    */
   public OperationPayoutSummaryDto getOperationPayoutSummary(@NotNull UUID id) {
-    List<OperationPayoutDto> payouts = getOperationPayouts(id);
+    List<OperationPayoutDto> payouts = restrictToOwnRowIfEscapeOnly(id, getOperationPayouts(id));
     BigDecimal totalDonations =
         payouts.stream()
             .map(OperationPayoutDto::donatedAmount)
             .reduce(BigDecimal.ZERO, BigDecimal::add)
             .setScale(2, RoundingMode.HALF_UP);
     return new OperationPayoutSummaryDto(totalDonations, payouts);
+  }
+
+  /**
+   * Reduces the breakdown to the caller's own row when they reached the operation <em>only</em>
+   * through the participant escape.
+   *
+   * <p>{@code canSeeOperation} - the endpoint's gate - admits two very different callers: somebody
+   * in the operation's org-unit scope, and somebody who merely participated in one of its linked
+   * missions. The second key is self-issuable ({@code POST /api/v1/missions/&#123;id&#125;/join} is
+   * open for every non-internal mission of every org unit), so honouring it with the full breakdown
+   * meant one request bought a foreign unit's entire payout table: per participant the callsign,
+   * share percentage, personal expenses, share and donated amounts, transfer fee, net payout and
+   * the confirming officer.
+   *
+   * <p>The escape itself stays - a participant may still open the operation and read <strong>their
+   * own</strong> payout, which is what ADR-0006 granted it for. What changes is that the escape no
+   * longer carries everybody else's row with it. {@code totalDonations} is recomputed over the
+   * reduced list by the caller, so the operation-wide aggregate does not leak either.
+   *
+   * @param operationId the operation being read.
+   * @param payouts the full breakdown.
+   * @return the full list for a scope-visible caller, otherwise only the caller's own row.
+   */
+  private List<OperationPayoutDto> restrictToOwnRowIfEscapeOnly(
+      @NotNull UUID operationId, @NotNull List<OperationPayoutDto> payouts) {
+    if (ownerScopeService.canSeeOperationLedger(operationId)) {
+      return payouts;
+    }
+    // The participant key is the user id for a registered member (OperationPayoutCalculator
+    // #participantKey); an escape-only caller is always registered, since the escape requires an
+    // authenticated participation row.
+    String ownKey = authHelperService.currentUserId().map(UUID::toString).orElse(null);
+    if (ownKey == null) {
+      return List.of();
+    }
+    return payouts.stream().filter(row -> ownKey.equals(row.participantId())).toList();
   }
 
   /**

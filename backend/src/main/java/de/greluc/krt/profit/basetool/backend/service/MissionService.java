@@ -887,6 +887,12 @@ public class MissionService {
    * the wider mission's version is NOT bumped, so concurrent participant edits don't collide with
    * each other or with mission-level edits.
    *
+   * @param authentication the caller's authentication, used to answer "may this caller manage the
+   *     mission" against the mission this method has already loaded. A caller who may not - in
+   *     practice an anonymous guest holding only their row's capability token - may edit their own
+   *     desired job type, comment, payout preference and guest name, but may neither set nor clear
+   *     the planned mission job type (the Einsatzleiter designation), and may not rename their row
+   *     onto a registered member or onto another guest of the same mission.
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the participant
    *     or any referenced id is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when stale
@@ -903,7 +909,8 @@ public class MissionService {
       java.util.List<UUID> orgUnitIds,
       PayoutPreference payoutPreference,
       String guestName,
-      Long version) {
+      Long version,
+      org.springframework.security.core.Authentication authentication) {
     return missionParticipantService.updateParticipantAttributes(
         missionId,
         participantId,
@@ -915,7 +922,8 @@ public class MissionService {
         orgUnitIds,
         payoutPreference,
         guestName,
-        version);
+        version,
+        authentication);
   }
 
   /**

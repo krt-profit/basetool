@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.time.Instant;
@@ -68,6 +69,7 @@ class RefineryOrderControllerTest {
   @Mock private UserService userService;
   @Mock private RefineryOrderMapper mapper;
   @Mock private AuthHelperService authHelperService;
+  @Mock private OwnerScopeService ownerScopeService;
   @Mock private Jwt jwt;
 
   @InjectMocks private RefineryOrderController controller;
@@ -233,8 +235,11 @@ class RefineryOrderControllerTest {
   class CreateMyRefineryOrderTests {
 
     @Test
-    void logisticianCanCreateForAnotherUser() {
-      when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    void inScopeCallerCanCreateForAnotherUser() {
+      // REQ-SEC-005: the override is gated on the TARGET, not on the flat ROLE_LOGISTICIAN, which
+      // is the OR-union over every membership and let a logistician of any Staffel stamp an order
+      // into any other Staffel's member ledger.
+      when(ownerScopeService.canManageUserRefineryOrders(OTHER_USER_ID)).thenReturn(true);
 
       RefineryOrderDto incoming = dtoWithOwner(OTHER_USER_ID);
       RefineryOrder mapped = new RefineryOrder();
@@ -249,14 +254,16 @@ class RefineryOrderControllerTest {
       assertEquals(
           OTHER_USER_ID,
           userIdCaptor.getValue(),
-          "Logistician + body.owner.id -> create attributed to body's owner");
+          "in-scope caller + body.owner.id -> create attributed to body's owner");
     }
 
     @Test
-    void nonLogistician_withBodyOwner_isIgnored_useCallerInstead() {
-      // SECURITY: a normal user attempting to create-on-behalf-of-someone-else
-      // (by putting another id in body.owner) must NOT succeed in re-attribution.
-      when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    void outOfScopeCaller_withBodyOwner_isIgnored_useCallerInstead() {
+      // SECURITY: a caller attempting to create-on-behalf-of-someone-else outside their editable
+      // org-unit scope (by putting another id in body.owner) must NOT succeed in re-attribution.
+      // This now also covers a LOGISTICIAN of a different Staffel, which the previous role-only
+      // check waved through.
+      when(ownerScopeService.canManageUserRefineryOrders(OTHER_USER_ID)).thenReturn(false);
 
       RefineryOrderDto incoming = dtoWithOwner(OTHER_USER_ID); // spoof attempt
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
@@ -270,7 +277,7 @@ class RefineryOrderControllerTest {
       assertEquals(
           CALLER_ID,
           userIdCaptor.getValue(),
-          "non-logistician spoofing body.owner.id must be ignored -> caller wins");
+          "out-of-scope caller spoofing body.owner.id must be ignored -> caller wins");
     }
 
     @Test

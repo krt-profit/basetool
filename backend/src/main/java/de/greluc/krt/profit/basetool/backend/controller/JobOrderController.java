@@ -386,22 +386,20 @@ public class JobOrderController {
    * anonymousReadableMissionEndpointsMustRedactGuestPii}.
    *
    * @param dto create payload
-   * @param jwt the caller's JWT, or {@code null} for anonymous callers
    * @return the persisted DTO (redacted for anonymous callers)
    */
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(
       summary = "Create a new job order",
-      description = "Allows anyone to create a job order.")
-  @PreAuthorize("permitAll()")
-  public JobOrderDto createJobOrder(
-      @RequestBody @Valid CreateJobOrderDto dto, @AuthenticationPrincipal Jwt jwt) {
-    JobOrderDto created = jobOrderService.createJobOrder(dto);
-    if (jwt == null) {
-      created = cleanupJobOrderForGuest(created);
-    }
-    return created;
+      description = "Creates a job order. Requires an authenticated member (ADR-0149).")
+  // ADR-0149 closed the anonymous create at the URL matrix; this method gate and the guest
+  // redaction below it stayed behind, still saying the opposite in a PUBLISHED contract. Harmless
+  // on its own - the matrix decides, and the edge-deny probe asserts the 401 - but a later
+  // "consistency" pass could as easily have widened the matrix to match the annotation.
+  @PreAuthorize("isAuthenticated()")
+  public JobOrderDto createJobOrder(@RequestBody @Valid CreateJobOrderDto dto) {
+    return jobOrderService.createJobOrder(dto);
   }
 
   /**
@@ -411,7 +409,6 @@ public class JobOrderController {
    * the derived per-item materials and the aggregated material view.
    *
    * @param dto item-order create payload (ordered finished items + per-material quality choices)
-   * @param jwt the caller's JWT, or {@code null} for anonymous callers
    * @return the persisted DTO (redacted for anonymous callers)
    */
   @PostMapping("/items")
@@ -421,14 +418,11 @@ public class JobOrderController {
       description =
           "Creates an item-based job order; the required materials are derived from each ordered"
               + " item's blueprint.")
-  @PreAuthorize("permitAll()")
-  public JobOrderDto createItemJobOrder(
-      @RequestBody @Valid CreateJobOrderItemRequestDto dto, @AuthenticationPrincipal Jwt jwt) {
-    JobOrderDto created = jobOrderService.createItemJobOrder(dto);
-    if (jwt == null) {
-      created = cleanupJobOrderForGuest(created);
-    }
-    return created;
+  // Same as the material-order create above: ADR-0149 requires a login, so the permitAll() method
+  // gate and the anonymous redaction that followed it are gone.
+  @PreAuthorize("isAuthenticated()")
+  public JobOrderDto createItemJobOrder(@RequestBody @Valid CreateJobOrderItemRequestDto dto) {
+    return jobOrderService.createItemJobOrder(dto);
   }
 
   /**
@@ -502,44 +496,6 @@ public class JobOrderController {
   }
 
   /**
-   * Strips fields from a job-order DTO that an anonymous caller has no business seeing or that
-   * carry no value for them: the {@code assignees} list (would expose member PII if the order ever
-   * had assignees at create time — defence-in-depth), the {@code handovers} list (logistician audit
-   * trail) and the optimistic-lock {@code version} (anonymous cannot update the order). The {@code
-   * id} / {@code displayId} / squadron references / {@code type} / {@code materials} / {@code
-   * items} / {@code aggregatedMaterials} / status are preserved so the public form can show a
-   * confirmation page with the order number for either order kind. The order's own free-text {@code
-   * comment} is preserved — it is the order's own note, not collaborator-identifying data.
-   *
-   * @param dto the persisted job-order DTO
-   * @return a slim acknowledgement DTO safe for anonymous callers
-   */
-  private JobOrderDto cleanupJobOrderForGuest(JobOrderDto dto) {
-    return new JobOrderDto(
-        dto.id(),
-        dto.displayId(),
-        dto.responsibleOrgUnit(),
-        dto.requestingOrgUnit(),
-        dto.handle(),
-        dto.comment(),
-        dto.priority(),
-        dto.status(),
-        dto.type(),
-        dto.countBlueprintsWithVariants(),
-        dto.materials(),
-        dto.items(),
-        dto.aggregatedMaterials(),
-        java.util.Collections.emptyList(),
-        java.util.Collections.emptyList(),
-        java.util.Collections.emptyList(),
-        dto.createdAt(),
-        null,
-        // Not the requesting-owner redacted view (this is the anonymous create acknowledgement, a
-        // separate redaction); the `redacted` flag drives the requester detail page only.
-        false);
-  }
-
-  /**
    * Redacts a job-order DTO for a requester-only viewer (REQ-ORDERS-023): a member of the order's
    * requesting org unit who is not otherwise a full viewer. Drops the Bearbeiter list ({@code
    * assignees}), the materials summary ({@code aggregatedMaterials}), the delivery events ({@code
@@ -548,8 +504,8 @@ public class JobOrderController {
    * ordering squad must not see. The ordered lines the requester may edit ({@code materials} with
    * their quantity + min-quality, and {@code items}), the {@code comment}, the org-unit references,
    * the status and the optimistic-lock {@code version} (the requester CAN edit, so it is kept) are
-   * preserved. Follows the {@code cleanup…For…} redactor convention of {@link
-   * #cleanupJobOrderForGuest(JobOrderDto)}.
+   * preserved. The sibling {@code cleanupJobOrderForGuest} this convention was named after is gone
+   * with the anonymous create (ADR-0149).
    *
    * @param dto the full job-order DTO
    * @return the redacted DTO safe for a requester-only viewer
@@ -749,7 +705,15 @@ public class JobOrderController {
     // so no second canSeeJobOrder load here — review finding 4). A requester-only viewer's DTO
     // carries redacted=true; strip the processing-side surfaces (Bearbeiter section, materials
     // summary, collection progress) at this HTTP boundary. A full viewer keeps the complete view.
-    return dto.redacted() ? cleanupJobOrderForRequester(dto) : dto;
+    JobOrderDto tiered = dto.redacted() ? cleanupJobOrderForRequester(dto) : dto;
+    // The assignee chips render effectiveName and nothing else, but the nested UserDto carried the
+    // full member record - roles, permissions, description, joinDate, discordLinked - to every
+    // viewer, including a member of another Staffel reading through the SK public escape. The same
+    // caller asking GET /api/v1/users/{id} for the same person gets the peer shape unconditionally
+    // (audit finding H-3), so this door was the wider one.
+    return tiered.withAssignees(
+        de.greluc.krt.profit.basetool.backend.support.UserDtoRedaction.toPeerShapedAssignees(
+            tiered.assignees()));
   }
 
   /**
@@ -1230,8 +1194,8 @@ public class JobOrderController {
    * Enforces the self-or-logistician rule for assignee mutations. Throws {@link
    * AccessDeniedException} when a non-LOGISTICIAN caller tries to modify someone else's assignment.
    *
-   * @param jwt caller's JWT
    * @param targetUserId user id being added/removed
+   * @param jwt caller's JWT
    */
   private void verifyAssigneeAccess(Jwt jwt, UUID targetUserId) {
     UUID currentUserId = userService.getUserIdFromJwt(jwt);
@@ -1273,9 +1237,9 @@ public class JobOrderController {
    *
    * @param id job-order id
    * @param userId the assignee whose note is cleared
+   * @param jwt caller's JWT
    * @param version the assignee edge version last seen by the client, or {@code null} to skip the
    *     check
-   * @param jwt caller's JWT
    * @return the persisted DTO with the refreshed assignee list
    */
   @DeleteMapping("/{id}/assignees/{userId}/note")

@@ -724,7 +724,8 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @RequestBody @jakarta.validation.Valid @NotNull UpdateParticipantRequest request,
-      @AuthenticationPrincipal Jwt jwt) {
+      @AuthenticationPrincipal Jwt jwt,
+      Authentication authentication) {
     MissionDto dto =
         missionMapper.toDto(
             missionService.updateParticipantAttributes(
@@ -738,7 +739,8 @@ public class MissionController {
                 request.orgUnitIds(),
                 request.payoutPreference(),
                 request.guestName(),
-                request.version()));
+                request.version(),
+                authentication));
     // Outsiders (anonymous OR authenticated role-less GUEST) get the strict mission redaction; the
     // jwt == null fast-path keeps the common anonymous case cheap, the role check additionally
     // catches guest accounts (treat guest like anonymous on the mission surface).
@@ -1897,7 +1899,8 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @RequestBody @jakarta.validation.Valid @NotNull UpdateParticipantRequest request,
-      @AuthenticationPrincipal Jwt jwt) {
+      @AuthenticationPrincipal Jwt jwt,
+      Authentication authentication) {
     var mission =
         missionService.updateParticipantAttributes(
             id,
@@ -1910,7 +1913,8 @@ public class MissionController {
             request.orgUnitIds(),
             request.payoutPreference(),
             request.guestName(),
-            request.version());
+            request.version(),
+            authentication);
     MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
     // The {@code cleanupParticipantForGuest} call here satisfies the ArchUnit rule {@code
     // anonymousReadableMissionEndpointsMustRedactGuestPii} (audit finding C-1): the participant

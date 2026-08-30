@@ -154,10 +154,31 @@ does so by delegating its management branch to `canManageMission` rather than sh
 bare `ROLE_MISSION_MANAGER` authority. (Unlinked **guest** participants stay openly editable per
 REQ-SEC-009; this scope gate applies only to *user-linked* participants.)
 
+The same rule binds every **create-stock-for-another-member** path. `POST /api/v1/inventory`, `POST
+/api/v1/refinery-orders` (its `owner` override) and the per-item receiver of `POST
+/api/v1/refinery-orders/{id}/store` MUST each authorise the **target**, through
+`OwnerScopeService.canManageUserInventory(...)` / `canManageUserRefineryOrders(...)`, and MUST NOT
+substitute a bare `AuthHelperService.isLogisticianOrAbove()` for it. All three did until the
+2026-08-30 audit, which made them cross-tenant writes by construction; the fourth entry point,
+`POST /api/v1/refinery-orders/users/{userId}`, had been closed in PR #808 and is the shape the other
+three now follow. `POST /api/v1/inventory` additionally refuses `personal = true` for a foreign
+target: the write-time stock merge (REQ-INV-026) keys on `personal` and returns the surviving row,
+so a personal on-behalf create folded the target's own private rows — amounts, notes, earmarks —
+into the response. The specified personal-for-someone-else capability lives in the refinery store
+dialog (REQ-INV-035) and is unaffected.
+
 **Authority resolution is memoised per token, not per request (#1141).** `CustomJwtGrantedAuthoritiesConverter`
 runs on *every* authenticated API call, and each miss pays `UserService.syncUser` (a write-capable
 transaction) plus ~5–8 SELECTs (user load, `user_roles`, one role lookup per realm role, and the
-membership read). The assembled authority collection is memoised in-process keyed on `(sub, token
+membership read). The memoisation key MUST include the token's `azp` alongside `(sub, iat)`. Since REQ-SEC-036 the
+assembly branches on the authorized party twice — the ingest-gateway short-circuit and the
+partial-role-scope client list — so the set is no longer a pure function of `(sub, iat)`, and `iat`
+is a NumericDate in **seconds**: two tokens for the same person minted by different clients inside
+one wall-clock second collided on the key and the first arrival decided the authorities for both.
+That is exactly the admin demotion (and, mirrored, elevation) REQ-SEC-036 exists to prevent. A
+memoisation key must be a superset of the inputs the memoised computation reads.
+
+The assembled authority collection is memoised in-process keyed on `(sub, token
 issuedAt)` for a short window (~30&nbsp;s), so that work is paid once per token issuance instead of on
 every fragment refetch / live-sync burst / check-in. Keying on `issuedAt` makes a freshly issued token
 (re-login, refresh) a distinct key and therefore a miss, so an authority change takes effect on
@@ -816,6 +837,29 @@ not an authorization secret.
   `X-Guest-Edit-Token`) that hashes to the stored hash, OR (b) holds a mission-management role in scope
   (`canManageMission`). A guest row with no stored hash (pre-V177) is editable only via (b) — the gate
   **fails closed**.
+- **The token proves *which row*, never *whether the mission is still open*.** Branch (a) MUST
+  additionally require `OwnerScopeService.canSeeMission(missionId)`. Without it the capability
+  outlived the surface that granted it: a guest who signed up while the mission was public kept
+  `PUT` / `DELETE` / check-in on their row after the mission was flipped to `isInternal = true` and
+  after it reached `COMPLETED` / `CANCELLED`. Because `OperationPayoutService` recomputes the time
+  split on **every read**, back-dating `startTime` / `endTime` on a settled operation moved aUEC away
+  from every other participant. `canSeeMission` covers both halves — it denies an internal mission
+  to a non-member, and (audit hardening M-2) a terminal mission to an unauthenticated caller, which
+  is what a token-only guest is. It is the same gate the read path already applied for this reason.
+- **A token-only caller owns their row, not the organisation's fields on it.** Such a caller MAY
+  edit `desiredMissionJobTypeId`, `comment`, `payoutPreference` and `guestName`. They MUST NOT set
+  *or clear* `plannedMissionJobTypeId` — that is the Einsatzleiter designation, and setting it made
+  the single-lead rule (REQ-MISSION-013) work against the organisation: once a guest held the lead,
+  naming the real leader failed with `409` until somebody cleared the guest row. Clearing it by
+  omission was the symmetric half, silently undoing a manager's assignment on an ordinary edit. The
+  UI gates the planned-job select on `mission.canEdit`, which is presentation, not the boundary.
+- **A rename MUST pass the same checks as the create.** A `guestName` change by a token-only caller
+  is refused when it resolves to a registered member (`findMatchesByExactName`) or collides with
+  another guest on the same mission. Both anonymous *create* paths already refused exactly that; the
+  update path did not, so signing up under a throwaway name and renaming to a member's byte-exact
+  callsign was the loophole around both — and because the payout key is `"guest_" + guestName`, the
+  rename also merged two guest rows into one payout bucket and orphaned an already-settled
+  `OperationPayoutStatus`, flipping a "Bezahlt" back to unpaid.
 - The frontend stores the token client-side (localStorage, keyed by participant id) and replays it via
   the `X-Guest-Edit-Token` header, relayed browser→frontend→backend by the
   `GuestEditTokenContext`/`GuestEditTokenContextFilter`/`GuestEditTokenRelayFilter` trio (Reactor
@@ -1533,6 +1577,20 @@ so the carve-out costs nothing. Because Spring Security takes the **first** matc
 authenticated matcher MUST stay above the catalog block; moving it below re-opens the surface with
 no other symptom.
 
+The matcher MUST be **verb-agnostic**, not scoped to `GET`. Spring Security compares the method with
+`String.equals`, so a `HttpMethod.GET`-scoped tightening does not claim `HEAD` — which then falls
+through to the all-verb catalog `permitAll` underneath, and Spring MVC answers `HEAD` from the
+`@GetMapping` handler. The query therefore ran anonymously and the response's `Content-Length` came
+back. The general rule: **a method-scoped tightening placed above an all-verb `permitAll` grants
+every verb it does not claim.**
+
+The anonymous page-size ceiling MUST be evaluated with **the same parser Spring's binder uses**
+(`NumberUtils#parseNumber`), and a value that parser rejects MUST be refused rather than allowed.
+`Integer.parseInt` is stricter: it throws on `0x186A0`, `#186A0` and on embedded whitespace, all of
+which the binder accepts (it strips whitespace and honours the hex spellings). Treating
+"unparseable" as "within the limit" therefore made the ceiling bypassable with three characters. An
+**empty** `size=` stays exempt — it binds to `null` and is a legal request for the default page.
+
 `GET /api/v1/materials/{id}/terminals` — the per-material slice of that same matrix, which the
 inventory page uses to suggest where to sell — is covered by the identical reasoning and was
 **missing from the rule until it was caught in production**. Its only consumer is authenticated, so
@@ -1897,16 +1955,16 @@ endpoint answers exactly as cheerfully as an authenticated one.
 
 The anonymous surface, complete:
 
-|               Operation                |                                                                   Why it is anonymous                                                                   |                                                                             What an anonymous caller gets                                                                              |
-|----------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `GET /api/v1/terms/document`           | ADR-0138 — wording everyone must read *before* agreeing cannot require having agreed                                                                    | the same text already world-readable at `/terms`                                                                                                                                       |
-| `GET /api/v1/missions/search`          | the public home page (`/`, `permitAll`) renders its upcoming-Einsatz tiles from this very endpoint                                                      | `PLANNED` + `ACTIVE`, **non-internal** rows only, through the outsider redaction in `MissionController#searchMissions`                                                                 |
-| `GET /api/v1/missions/{id}`            | the same public surface, one Einsatz deep                                                                                                               | the redacted DTO of ADR-0034 — no description, no owner, no managers, participants without payout preference or comment; an **internal** or **terminal** Einsatz is refused with `403` |
-| `GET /api/v1/ship-types`               | phase 3's Hangar editor needs the hull catalogue before a member has picked anything, and `/api/v1/ship-types/**` is `permitAll` in the chain           | game data — hull names, manufacturers, SCU — already rendered without a session by the public web frontend; no member, org unit or ship of anyone's is reachable through it            |
-| `GET /api/v1/materials/search`         | phase 3's Lager form needs the material catalogue, and `/api/v1/materials/**` is `permitAll` in the chain                                               | material names, their unit and their category — the same catalogue the public web frontend renders; no stock figure and no member is reachable through it                              |
-| `GET /api/v1/locations/search`         | the same form needs the place catalogue, under the same `permitAll` prefix                                                                              | place names and ids; what is *stored* at a place needs a token                                                                                                                         |
-| `GET /api/v1/materials/{id}/terminals` | the sell half of the book-out needs the terminals that buy a material, same prefix                                                                      | terminal names and their sell price — public market data                                                                                                                               |
-| `GET /api/v1/app/version-policy`       | REQ-API-010 — an app too old to authenticate must still be able to learn that it is too old; a token-gated gate is silent in the one case it exists for | three integers and the public GitHub release URL. No caller identity goes in and none comes out — the rare `/api` path with nothing to redact                                          |
+|                 Operation                  |                                                                                                                     Why it is anonymous                                                                                                                      |                                                                             What an anonymous caller gets                                                                              |
+|--------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `GET /api/v1/terms/document`               | ADR-0138 — wording everyone must read *before* agreeing cannot require having agreed                                                                                                                                                                         | the same text already world-readable at `/terms`                                                                                                                                       |
+| `GET /api/v1/missions/search`              | the public home page (`/`, `permitAll`) renders its upcoming-Einsatz tiles from this very endpoint                                                                                                                                                           | `PLANNED` + `ACTIVE`, **non-internal** rows only, through the outsider redaction in `MissionController#searchMissions`                                                                 |
+| `GET /api/v1/missions/{id}`                | the same public surface, one Einsatz deep                                                                                                                                                                                                                    | the redacted DTO of ADR-0034 — no description, no owner, no managers, participants without payout preference or comment; an **internal** or **terminal** Einsatz is refused with `403` |
+| `GET /api/v1/ship-types`                   | phase 3's Hangar editor needs the hull catalogue before a member has picked anything, and `/api/v1/ship-types/**` is `permitAll` in the chain                                                                                                                | game data — hull names, manufacturers, SCU — already rendered without a session by the public web frontend; no member, org unit or ship of anyone's is reachable through it            |
+| `GET /api/v1/materials/search`             | phase 3's Lager form needs the material catalogue, and `/api/v1/materials/**` is `permitAll` in the chain                                                                                                                                                    | material names, their unit and their category — the same catalogue the public web frontend renders; no stock figure and no member is reachable through it                              |
+| `GET /api/v1/locations/search`             | the same form needs the place catalogue, under the same `permitAll` prefix                                                                                                                                                                                   | place names and ids; what is *stored* at a place needs a token                                                                                                                         |
+| ~~`GET /api/v1/materials/{id}/terminals`~~ | **No longer anonymous.** Carved out with `/api/v1/materials/matrix` under REQ-SEC-032 (verb-agnostic): its only consumer is the authenticated inventory page, and leaving it open published UEX trade prices per material to the internet from the API vhost | n/a — the path answers `401` without a token, which the nightly edge-deny probe had (correctly) been asserting all along                                                               |
+| `GET /api/v1/app/version-policy`           | REQ-API-010 — an app too old to authenticate must still be able to learn that it is too old; a token-gated gate is silent in the one case it exists for                                                                                                      | three integers and the public GitHub release URL. No caller identity goes in and none comes out — the rare `/api` path with nothing to redact                                          |
 
 **This one was decided, not inherited.** Every other row above is anonymous because something
 already public depends on it; `version-policy` is anonymous because the owner chose it on
@@ -2080,10 +2138,24 @@ consumer) · **Decision:** [ADR-0135](../adr/0135-public-api-vhost-not-a-gateway
 
 `POST /api/v1/refinery-orders/{id}/store` takes a `userId` per stored item that names the
 **receiving stock owner**. Because it decides whose ledger the output lands in, it MUST be
-authorized against the caller: a caller who is not a `LOGISTICIAN` may only name **themselves**,
-and any other value is refused with `403`. The check runs on the **requested** id and **before**
-the user is loaded, so an unauthorised caller cannot distinguish an existing member id from an
-unknown one.
+authorized against **the caller and that target together**: naming somebody else requires
+`@ownerScopeService.canManageUserInventory(<receiver>)` — admin, self, or at least one shared
+**editable** org unit with the receiver — and any other value is refused with `403`. The check runs
+on the **requested** id and **before** the user is loaded, so an unauthorised caller cannot
+distinguish an existing member id from an unknown one.
+
+> [!warning] Amended 2026-08-30 — the role was never an answer about the target
+> This requirement originally read "a caller who is not a `LOGISTICIAN` may only name themselves",
+> and that closed only the **caller-vs-owner** axis. `ROLE_LOGISTICIAN` is the OR-union over *all*
+> of a caller's memberships and carries no org-unit context whatsoever, so the org-unit axis stayed
+> wide open: a logistician of any Staffel could fabricate stock — shared, or with `personal`
+> private — in the ledger of a member of any *other* Staffel, which REQ-SEC-005 forbids. The same
+> hole existed in all three on-behalf entry points (`POST /api/v1/inventory`, `POST
+> /api/v1/refinery-orders`, and this one) while the fourth, `POST
+> /api/v1/refinery-orders/users/{userId}`, had already been closed with `canManageUserRefineryOrders`
+> in PR #808. **A role that says "may act on behalf of somebody" is not an answer to "may act on
+>
+>> behalf of *this* somebody."**
 
 The order-ownership check that already guarded this endpoint does **not** cover it: it constrains
 *which order* may be stored, not *who the stock is booked for*. Until this requirement, a member

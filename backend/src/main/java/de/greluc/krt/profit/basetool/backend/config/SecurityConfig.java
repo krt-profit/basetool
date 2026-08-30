@@ -545,8 +545,14 @@ public class SecurityConfig {
                     // stay ahead of any broader /api/v1/app rule and the authenticated catch-all.
                     .requestMatchers(HttpMethod.GET, "/api/v1/app/version-policy")
                     .permitAll()
+                    // Deliberately NOT method-scoped. A tightening placed above an all-verb
+                    // permitAll must itself be all-verb, or the rule underneath grants every verb
+                    // the tightening does not claim: with HttpMethod.GET here, a HEAD fell through
+                    // to the catalogue permitAll below, and Spring MVC answers HEAD from the
+                    // @GetMapping handler - so the query ran anonymously and the response's
+                    // Content-Length leaked back, on the two paths REQ-SEC-032 exists to close.
+                    // Both paths serve only GET, so all-verb authenticated() costs nothing here.
                     .requestMatchers(
-                        HttpMethod.GET,
                         "/api/v1/materials/matrix",
                         // Same carve-out, same reason, and it was meant to land with the line
                         // above: the per-material slice of that price matrix. Its only consumer is

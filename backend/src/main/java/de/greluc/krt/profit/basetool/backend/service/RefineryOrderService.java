@@ -687,7 +687,18 @@ public class RefineryOrderService {
           itemDto.userId() != null
               ? itemDto.userId()
               : (order.getOwner() != null ? order.getOwner().getId() : null);
-      if (!isLogistician && !userId.equals(targetUserId)) {
+      // The flat ROLE_LOGISTICIAN that used to stand here is org-unit-less (the OR-union over ALL
+      // of the caller's memberships), so it authorised booking into ANY member of ANY Staffel -
+      // shared or, with `personal`, private. REQ-SEC-039 closed the caller-vs-owner axis and never
+      // looked at the org-unit axis. canManageUserInventory is the same gate the Einbuchen path now
+      // uses for the same operation, evaluated per item because the receiver is per item.
+      if (targetUserId != null
+          && !userId.equals(targetUserId)
+          && !ownerScopeService.canManageUserInventory(targetUserId)) {
+        throw new AccessDeniedException(
+            "Access denied: You are not allowed to store refinery output for other users");
+      }
+      if (targetUserId == null && !isLogistician) {
         throw new AccessDeniedException(
             "Access denied: You are not allowed to store refinery output for other users");
       }

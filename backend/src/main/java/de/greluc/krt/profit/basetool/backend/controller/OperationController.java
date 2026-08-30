@@ -253,7 +253,7 @@ public class OperationController {
    * @return finance summary DTO with the full per-mission breakdown
    */
   @GetMapping("/{id}/finances")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeOperation(#id)")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeOperationLedger(#id)")
   @Operation(
       summary = "Get aggregated finances for an operation (full breakdown)",
       description =
@@ -284,7 +284,7 @@ public class OperationController {
    * @return the operation-wide total plus the capped per-mission roll-up lines
    */
   @GetMapping("/{id}/finance-summary")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeOperation(#id)")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeOperationLedger(#id)")
   @Operation(
       summary = "Get the finance roll-up for an operation (totals only)",
       description =
@@ -314,7 +314,7 @@ public class OperationController {
    * @return the mission's finance detail (entries + refinery orders + recomputed total)
    */
   @GetMapping("/{id}/finances/{missionId}")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeOperation(#id)")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeOperationLedger(#id)")
   @Operation(
       summary = "Get one mission's finance detail within an operation",
       description =

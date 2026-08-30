@@ -702,8 +702,16 @@ public class InventoryItemController {
   }
 
   /**
-   * Creates an inventory item. Logistician role lets the caller set an arbitrary owner; everyone
-   * else gets the calling user as owner.
+   * Creates an inventory item. A caller may always book for themselves; booking for somebody else
+   * additionally requires shared editable org-unit scope with that member, which the service checks
+   * against the requested receiver (REQ-SEC-005).
+   *
+   * <p>The receiver check deliberately does <strong>not</strong> live here as a role boolean any
+   * more. It used to be {@code authHelperService.isLogisticianOrAbove()} passed down to the service
+   * - an org-unit-less authority that answered "may act for somebody" where the question is "may
+   * act for <em>this</em> somebody" - which let a logistician of any Staffel write into any other
+   * Staffel's member ledger. The decision needs the target id, so it belongs where the target is
+   * resolved.
    *
    * @return the persisted DTO
    */
@@ -711,9 +719,7 @@ public class InventoryItemController {
   @PreAuthorize("isAuthenticated()")
   public InventoryItemDto createInventoryItem(
       @AuthenticationPrincipal Jwt jwt, @RequestBody @Valid InventoryItemCreateDto dto) {
-    boolean isLogistician = authHelperService.isLogisticianOrAbove();
-    return inventoryItemService.createInventoryItem(
-        dto, userService.getUserIdFromJwt(jwt), isLogistician);
+    return inventoryItemService.createInventoryItem(dto, userService.getUserIdFromJwt(jwt));
   }
 
   /**
