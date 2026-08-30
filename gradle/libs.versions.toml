@@ -26,7 +26,7 @@ testcontainers = "2.0.5"
 # replacement hits nothing (no profile sets it; all three set only enabled + locations). Note the
 # Redgate release-notes page lists NO breaking changes for 13.0.0 — they are documented only in the
 # "Looking forward to Flyway V13" blog post, so do not clear a future major from that page alone.
-flyway = "13.3.0"
+flyway = "13.4.0"
 # Held at 1.6.3 on purpose: the only newer builds refreshVersions sees are 1.7.0 BETAS. The markers
 # below are left in place so the next sweep does not have to re-derive that — clear them when 1.7.0
 # goes final, not before.
@@ -57,7 +57,7 @@ spotbugs = "6.5.11"
 pitest = "1.19.0"
 pitestJunit5 = "1.2.3"
 nodeGradle = "7.1.0"
-spotless = "8.10.0"
+spotless = "8.10.1"
 # 13.0.0 (2026-07): the single breaking change is a no-op here — the plugin's default report
 # directory moved to `build/reports/dependency-check` to stop clashing with other reports, and the
 # root build script already sets exactly that path explicitly. The other `!`-flagged item (dropping
