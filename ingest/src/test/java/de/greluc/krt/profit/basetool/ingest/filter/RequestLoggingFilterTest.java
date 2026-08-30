@@ -159,4 +159,36 @@ class RequestLoggingFilterTest {
                 .shouldNotFilter(ingestRequest()))
         .isFalse();
   }
+
+  /**
+   * Audit MEDIUM-8: the request URI is the only client-supplied value this module logs, and it was
+   * the only one logged raw and unbounded.
+   *
+   * <p>This filter sits at {@code HIGHEST_PRECEDENCE + 15} — ahead of the rate limiter and the
+   * whole security chain — and writes from a {@code finally} block, so an anonymous probe gets a
+   * line even when the request is answered with {@code 401} or already refused with {@code 429}. An
+   * 8 KB request line therefore reached every appender and was run through {@code PiiMasker} on the
+   * request thread (the console appender is synchronous by design). {@code LogSafe.text} is what
+   * every other client-supplied value in this module already passes through.
+   */
+  @Test
+  void truncatesAnOverlongRequestUriInTheAccessLine() throws Exception {
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    response.setStatus(401);
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/v1/refinery-extract");
+    request.setRequestURI("/v1/" + "a".repeat(8000));
+
+    List<ILoggingEvent> events =
+        LogCapture.capture(
+            RequestLoggingFilter.class,
+            Level.INFO,
+            () ->
+                new RequestLoggingFilter(TestLoggingProperties.defaults())
+                    .doFilter(request, response, new MockFilterChain()));
+
+    assertThat(events).isNotEmpty();
+    assertThat(events.get(0).getFormattedMessage())
+        .describedAs("the access line must not carry an unbounded caller-supplied URI")
+        .hasSizeLessThan(512);
+  }
 }

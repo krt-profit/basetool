@@ -331,9 +331,40 @@ class MissionSecurityServiceTest {
 
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
     when(request.getHeader(MissionSecurityService.GUEST_EDIT_TOKEN_HEADER)).thenReturn(token);
+    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
 
-    // The creator's matching token authorises the edit without any mission-management role.
+    // The creator's matching token authorises the edit without any mission-management role - as
+    // long as the mission is still one a guest may see at all (see the sibling test below).
     assertTrue(
+        missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
+  }
+
+  /**
+   * Audit MEDIUM-5: the token proves WHICH row, never WHETHER the mission is still open to a guest.
+   *
+   * <p>Without the visibility re-check the capability outlived the surface that granted it: a guest
+   * who signed up while the mission was public kept write access after it was flipped to internal
+   * and after it reached COMPLETED / CANCELLED. Since the operation payout split is recomputed on
+   * every read, back-dating start/end on a settled operation moved money away from every other
+   * participant. {@code canSeeMission} covers both halves - internal-to-a-non-member, and (audit
+   * hardening M-2) terminal-to-an-unauthenticated-caller.
+   */
+  @Test
+  void canAccessParticipant_GuestWithValidTokenButMissionNoLongerVisible_ShouldReturnFalse() {
+    UUID participantId = UUID.randomUUID();
+    String token = guestParticipantTokenService.generateToken();
+    MissionParticipant participant = new MissionParticipant();
+    participant.setId(participantId);
+    participant.setMission(mission);
+    participant.setUser(null);
+    participant.setGuestName("Somebody");
+    participant.setGuestEditTokenHash(guestParticipantTokenService.hashToken(token));
+
+    when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
+    when(request.getHeader(MissionSecurityService.GUEST_EDIT_TOKEN_HEADER)).thenReturn(token);
+    when(ownerScopeService.canSeeMission(missionId)).thenReturn(false);
+
+    assertFalse(
         missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
   }
 

@@ -157,10 +157,21 @@ public class CustomJwtGrantedAuthoritiesConverter
   }
 
   /**
-   * Builds the {@code (sub, issuedAt)} memoisation key, or {@code null} when either claim is absent
-   * — in which case {@link #convert(Jwt)} bypasses the cache and always recomputes. Keying on the
-   * token's issued-at epoch millis guarantees a freshly-issued token (re-login, refresh) is a
-   * distinct key and therefore a miss, so authority changes take effect on re-authentication.
+   * Builds the {@code (sub, issuedAt, azp)} memoisation key, or {@code null} when {@code sub} or
+   * {@code iat} is absent — in which case {@link #convert(Jwt)} bypasses the cache and always
+   * recomputes. Keying on the token's issued-at guarantees a freshly-issued token (re-login,
+   * refresh) is a distinct key and therefore a miss, so authority changes take effect on
+   * re-authentication.
+   *
+   * <p><strong>{@code azp} belongs in the key because the assembly reads it.</strong> Since
+   * REQ-SEC-036 / ADR-0141 the authority set is no longer a pure function of {@code (sub, iat)}:
+   * {@link #assembleAuthorities} branches on the authorized party twice - the ingest-gateway
+   * short-circuit, and the partial-role-scope client list that decides whether a client's role
+   * claim may replace the stored set. {@code iat} is a NumericDate in <em>seconds</em>, so two
+   * tokens for the same person minted by different clients within one wall-clock second collided on
+   * this key and the first one to arrive decided the authorities for both - which is precisely the
+   * admin-demotion (and, mirrored, admin-elevation) that REQ-SEC-036 exists to prevent. A
+   * memoisation key must be a superset of the inputs the memoised computation reads.
    *
    * @param jwt the access token.
    * @return the cache key, or {@code null} to bypass caching for this token.
@@ -171,7 +182,7 @@ public class CustomJwtGrantedAuthoritiesConverter
     if (sub == null || issuedAt == null) {
       return null;
     }
-    return sub + '|' + issuedAt.toEpochMilli();
+    return sub + '|' + issuedAt.toEpochMilli() + '|' + jwt.getClaimAsString("azp");
   }
 
   /**

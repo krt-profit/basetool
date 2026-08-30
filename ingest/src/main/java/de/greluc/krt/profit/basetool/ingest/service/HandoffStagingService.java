@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.ingest.service;
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
 import de.greluc.krt.profit.basetool.ingest.model.dto.HandoffKind;
 import de.greluc.krt.profit.basetool.ingest.model.dto.StagedHandoff;
+import de.greluc.krt.profit.basetool.ingest.web.BadRequestException;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Optional;
@@ -50,6 +51,13 @@ public class HandoffStagingService {
   /** Redis key prefix; the full key is {@code ingest:handoff:<sub>:<handoffId>}. */
   public static final String KEY_PREFIX = "ingest:handoff:";
 
+  /**
+   * Prefix of the per-subject index list, {@code ingest:handoff-index:<sub>}. Deliberately NOT
+   * under {@link #KEY_PREFIX}, so a wildcard sweep of staged handoffs cannot mistake an index for
+   * one.
+   */
+  static final String INDEX_PREFIX = "ingest:handoff-index:";
+
   private static final SecureRandom RANDOM = new SecureRandom();
   private static final Base64.Encoder URL_ENCODER = Base64.getUrlEncoder().withoutPadding();
 
@@ -72,7 +80,24 @@ public class HandoffStagingService {
     RANDOM.nextBytes(raw);
     String handoffId = URL_ENCODER.encodeToString(raw);
     String value = objectMapper.writeValueAsString(new StagedHandoff(kind, draftJson));
+
+    // Size guard. The 2 MiB ingress cap is an ingress cap; it was never a staging policy, and using
+    // it as one let one caller park megabytes per stage in a Redis that is SHARED with the
+    // frontend's Spring Session store and runs `--maxmemory-policy noeviction` - where reaching the
+    // ceiling refuses writes rather than evicting, so the symptom is that nobody can log in.
+    long stagedBytes = value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+    if (stagedBytes > ingestProperties.getMaxHandoffBytes()) {
+      log.warn(
+          "Refused to stage an oversized {} handoff (sub=u-{}, bytes={}, max={})",
+          kind,
+          mask(sub),
+          stagedBytes,
+          ingestProperties.getMaxHandoffBytes());
+      throw new BadRequestException("The import draft is too large to hand off.");
+    }
+
     redisTemplate.opsForValue().set(key(sub, handoffId), value, ingestProperties.getHandoffTtl());
+    trimSubjectIndex(sub, handoffId);
     // Diagnostic correlator (REQ-OBS-004): log a NON-reversible hash of the subject and of the
     // handoff id — never the raw subject (pseudonymous PII), the raw id (a bearer-grade secret that
     // travels in the browser URL), or the draft. The frontend's consume logs the same two hashes,
@@ -110,6 +135,52 @@ public class HandoffStagingService {
       return Optional.empty();
     }
     return Optional.of(objectMapper.readValue(value, StagedHandoff.class));
+  }
+
+  /**
+   * Records the new handoff in the subject's index and evicts the oldest beyond the per-subject
+   * cap, deleting their payload keys with them.
+   *
+   * <p>The rate limiter bounds requests per minute; it does not bound how many entries are alive at
+   * once. At 30 requests/minute against a 30-minute TTL one subject could hold 900 - which, in a
+   * Redis shared with the session store and run under {@code noeviction}, is a login outage rather
+   * than a slow page. The index is itself given the handoff TTL so it cannot outlive what it
+   * tracks.
+   *
+   * <p>Best-effort by design: a lost race trims one entry late, never one too many, and the TTL is
+   * still the backstop. Redis being unavailable must not fail an ingest that already succeeded, so
+   * a failure here is logged and swallowed - the entry stays within its TTL.
+   *
+   * @param sub the caller's subject
+   * @param handoffId the id just staged
+   */
+  private void trimSubjectIndex(@NotNull String sub, @NotNull String handoffId) {
+    String indexKey = INDEX_PREFIX + sub;
+    try {
+      redisTemplate.opsForList().rightPush(indexKey, handoffId);
+      redisTemplate.expire(indexKey, ingestProperties.getHandoffTtl());
+      Long size = redisTemplate.opsForList().size(indexKey);
+      long excess = size == null ? 0L : size - ingestProperties.getMaxHandoffsPerSubject();
+      for (long i = 0; i < excess; i++) {
+        String evicted = redisTemplate.opsForList().leftPop(indexKey);
+        if (evicted == null) {
+          break;
+        }
+        redisTemplate.delete(key(sub, evicted));
+      }
+      if (excess > 0) {
+        log.info(
+            "Evicted {} handoff(s) over the per-subject cap (sub=u-{}, cap={})",
+            excess,
+            mask(sub),
+            ingestProperties.getMaxHandoffsPerSubject());
+      }
+    } catch (RuntimeException redisProblem) {
+      log.warn(
+          "Could not maintain the handoff index (sub=u-{}): {}",
+          mask(sub),
+          redisProblem.toString());
+    }
   }
 
   /**

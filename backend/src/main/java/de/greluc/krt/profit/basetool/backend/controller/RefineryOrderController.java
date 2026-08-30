@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderStoreDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
@@ -70,6 +71,7 @@ public class RefineryOrderController {
   private final UserService userService;
   private final RefineryOrderMapper mapper;
   private final AuthHelperService authHelperService;
+  private final OwnerScopeService ownerScopeService;
 
   /**
    * Lists the calling user's own refinery orders. Optional status filter.
@@ -167,8 +169,18 @@ public class RefineryOrderController {
   }
 
   /**
-   * Creates a refinery order. Logisticians can specify any owner via {@code orderDto.owner()};
-   * regular users always own their orders themselves (any owner override is ignored).
+   * Creates a refinery order. A caller who names another member via {@code orderDto.owner()} must
+   * pass the same per-target scope gate as the dedicated on-behalf endpoint {@link
+   * #createRefineryOrderForUser}; otherwise the override is ignored and the caller owns the order.
+   *
+   * <p><strong>Why the gate and not the role.</strong> This branch used to honour the
+   * client-supplied owner for anyone holding the flat {@code ROLE_LOGISTICIAN} - the OR-union over
+   * all of the caller's memberships, with no org-unit context - so a logistician of any Staffel
+   * could stamp an order into a member of any other Staffel's refinery ledger (REQ-SEC-005). Its
+   * sibling {@code POST /users/&#123;userId&#125;} had already been hardened with {@code
+   * canManageUserRefineryOrders} in PR #808, and only this door was left open - which matters
+   * because the hardened one is not on the API vhost allow-list at all, so from the internet this
+   * was the only reachable of the two.
    *
    * @return the persisted DTO
    */
@@ -178,8 +190,9 @@ public class RefineryOrderController {
       @AuthenticationPrincipal Jwt jwt, @RequestBody @Valid @NotNull RefineryOrderDto orderDto) {
     UUID userId = userService.getUserIdFromJwt(jwt);
     if (orderDto.owner() != null && orderDto.owner().id() != null) {
-      if (authHelperService.isLogisticianOrAbove()) {
-        userId = orderDto.owner().id();
+      UUID requestedOwnerId = orderDto.owner().id();
+      if (ownerScopeService.canManageUserRefineryOrders(requestedOwnerId)) {
+        userId = requestedOwnerId;
       }
     }
     RefineryOrder saved =

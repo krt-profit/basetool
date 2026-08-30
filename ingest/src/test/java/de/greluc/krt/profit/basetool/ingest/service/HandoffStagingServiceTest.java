@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.ingest.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
@@ -52,6 +53,7 @@ class HandoffStagingServiceTest {
       new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
 
   private HandoffStagingService service;
+  private IngestProperties properties;
 
   @BeforeEach
   void setUp() {
@@ -61,7 +63,7 @@ class HandoffStagingServiceTest {
     connectionFactory.start();
     StringRedisTemplate redisTemplate = new StringRedisTemplate(connectionFactory);
     redisTemplate.afterPropertiesSet();
-    IngestProperties properties = new IngestProperties();
+    properties = new IngestProperties();
     properties.setHandoffTtl(Duration.ofMinutes(5));
     service = new HandoffStagingService(redisTemplate, JsonMapper.builder().build(), properties);
   }
@@ -113,5 +115,51 @@ class HandoffStagingServiceTest {
   @Test
   void shouldReturnEmptyForUnknownId() {
     assertThat(service.consume("user-1", "does-not-exist")).isEmpty();
+  }
+
+  /**
+   * Audit HIGH-2: the staging store shares the Redis instance that holds the frontend's Spring
+   * Session store, and that instance runs {@code --maxmemory-policy noeviction} - reaching the
+   * ceiling refuses writes, so the symptom is that nobody can log in. Staging had no per-subject
+   * quota at all: only a rate limit of 30 requests/minute against a 30-minute TTL, i.e. up to 900
+   * live entries of up to the 2 MiB ingress cap each.
+   */
+  @Test
+  void shouldEvictTheOldestHandoffsBeyondThePerSubjectCap() {
+    properties.setMaxHandoffsPerSubject(3);
+
+    String first = service.stage("user-cap", HandoffKind.REFINERY, "{\"n\":1}");
+    String second = service.stage("user-cap", HandoffKind.REFINERY, "{\"n\":2}");
+    String third = service.stage("user-cap", HandoffKind.REFINERY, "{\"n\":3}");
+    String fourth = service.stage("user-cap", HandoffKind.REFINERY, "{\"n\":4}");
+
+    assertThat(service.consume("user-cap", first))
+        .describedAs("the oldest entry is evicted once the cap is exceeded")
+        .isEmpty();
+    assertThat(service.consume("user-cap", second)).isPresent();
+    assertThat(service.consume("user-cap", third)).isPresent();
+    assertThat(service.consume("user-cap", fourth)).isPresent();
+  }
+
+  /** A draft above the staging budget is refused rather than parked in the shared Redis. */
+  @Test
+  void shouldRefuseADraftAboveTheStagingBudget() {
+    properties.setMaxHandoffBytes(1024);
+    String oversized = "{\"pad\":\"" + "x".repeat(4096) + "\"}";
+
+    assertThatThrownBy(() -> service.stage("user-big", HandoffKind.BLUEPRINT, oversized))
+        .isInstanceOf(de.greluc.krt.profit.basetool.ingest.web.BadRequestException.class);
+  }
+
+  /** The cap is per subject, so one caller's flood cannot evict another caller's handoff. */
+  @Test
+  void shouldNotEvictAnotherSubjectsHandoff() {
+    properties.setMaxHandoffsPerSubject(2);
+    String mine = service.stage("user-a", HandoffKind.REFINERY, "{\"n\":1}");
+    for (int i = 0; i < 5; i++) {
+      service.stage("user-b", HandoffKind.REFINERY, "{\"n\":" + i + "}");
+    }
+
+    assertThat(service.consume("user-a", mine)).isPresent();
   }
 }

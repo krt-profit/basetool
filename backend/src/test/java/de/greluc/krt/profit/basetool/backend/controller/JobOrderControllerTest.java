@@ -153,44 +153,26 @@ class JobOrderControllerTest {
         false);
   }
 
-  // ── POST /api/v1/orders (permitAll) ──────────────────────────────────
+  // ── POST /api/v1/orders (authenticated since ADR-0149) ──────────────
 
   @Test
-  void createJobOrder_authenticatedCaller_passesThroughUnredacted() {
+  void createJobOrder_passesTheServiceResultThroughUnredacted() {
     CreateJobOrderDto request = new CreateJobOrderDto(null, null, "alice", null, List.of(), null);
     JobOrderDto created = jobOrderDto(UUID.randomUUID());
     when(jobOrderService.createJobOrder(request)).thenReturn(created);
 
-    JobOrderDto result =
-        controller.createJobOrder(request, jwt("00000000-0000-0000-0000-000000000099"));
+    JobOrderDto result = controller.createJobOrder(request);
 
-    // Authenticated callers see the full DTO — the guest-redaction pass kicks in only when the
-    // JWT is null. Pinning this also confirms the controller does not touch the JWT helper / role
-    // helper on the create path — they remain unused for the authenticated branch as well, so a
-    // future refactor cannot sneak in "let's just record the creator's id" without breaking this
-    // test.
+    // ADR-0149 requires a login for the create, so there is no anonymous branch left to redact for
+    // - the sibling test that drove `jwt == null` through the guest acknowledgement is gone with
+    // the code it covered. The method gate said permitAll() until 2026-08-30 while the URL matrix
+    // said authenticated(); harmless, because the matrix decides, but a "consistency" pass could
+    // have widened the matrix to match the annotation instead of the other way round.
+    //
+    // Pinning the pass-through also confirms the controller touches neither the JWT helper nor the
+    // role helper on this path, so a future refactor cannot sneak in "let's just record the
+    // creator's id" without breaking this test.
     assertThat(result).isSameAs(created);
-    verifyNoInteractions(userService, authHelperService);
-  }
-
-  @Test
-  void createJobOrder_anonymousCaller_redactsAssigneesHandoversAndVersion() {
-    CreateJobOrderDto request = new CreateJobOrderDto(null, null, "alice", null, List.of(), null);
-    JobOrderDto created = jobOrderDto(UUID.randomUUID());
-    when(jobOrderService.createJobOrder(request)).thenReturn(created);
-
-    JobOrderDto result = controller.createJobOrder(request, null);
-
-    // Audit finding C-1 family for JobOrder: an anonymous caller submitting the public request
-    // form must get a slim acknowledgement — assignees / handovers wiped (defence-in-depth: a
-    // freshly-created order has neither, but a future regression that pre-populates either would
-    // leak member PII), version stripped (anonymous cannot update so it has no purpose).
-    assertThat(result.id()).isEqualTo(created.id());
-    assertThat(result.displayId()).isEqualTo(created.displayId());
-    assertThat(result.handle()).isEqualTo(created.handle());
-    assertThat(result.assignees()).isEmpty();
-    assertThat(result.handovers()).isEmpty();
-    assertThat(result.version()).isNull();
     verifyNoInteractions(userService, authHelperService);
   }
 
@@ -317,16 +299,35 @@ class JobOrderControllerTest {
   // ── GET /api/v1/orders/{id} ──────────────────────────────────────────
 
   @Test
-  void getJobOrderById_fullViewerDtoPassesThroughUnredacted() {
+  void getJobOrderById_fullViewerKeepsEveryFieldButPeerShapesTheAssignees() {
     UUID id = UUID.randomUUID();
     // The service stamps the per-order redaction decision; a full viewer's DTO carries
-    // redacted=false, so the controller returns it verbatim without re-evaluating any gate.
+    // redacted=false, so the controller applies no tier redaction and re-evaluates no gate.
+    //
+    // It does peer-shape the nested assignee users, unconditionally (audit LOW-2): the chips render
+    // effectiveName, while the nested UserDto used to carry roles, permissions, description,
+    // joinDate and discordLinked to every viewer of the order - including a member of another
+    // Staffel reading through the SK public escape, who gets the peer shape for the very same
+    // person from GET /api/v1/users/{id}.
     JobOrderDto dto = jobOrderDto(id); // redacted=false
     when(jobOrderQueryService.getJobOrderById(id)).thenReturn(dto);
 
     JobOrderDto result = controller.getJobOrderById(id);
 
-    assertThat(result).isSameAs(dto);
+    assertThat(result.withAssignees(dto.assignees())).isEqualTo(dto);
+    if (dto.assignees() != null) {
+      for (int i = 0; i < dto.assignees().size(); i++) {
+        de.greluc.krt.profit.basetool.backend.model.dto.UserDto shaped =
+            result.assignees().get(i).user();
+        if (shaped != null) {
+          assertThat(shaped.roles()).isNull();
+          assertThat(shaped.permissions()).isNull();
+          assertThat(shaped.description()).isNull();
+          assertThat(shaped.joinDate()).isNull();
+          assertThat(shaped.discordLinked()).isNull();
+        }
+      }
+    }
     verify(ownerScopeService, never()).canSeeJobOrder(any(UUID.class));
   }
 

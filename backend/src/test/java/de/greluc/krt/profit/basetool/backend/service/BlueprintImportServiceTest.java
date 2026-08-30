@@ -583,6 +583,29 @@ class BlueprintImportServiceTest {
     assertThrows(BadRequestException.class, () -> service.previewImport(SUB, wrong));
   }
 
+  /**
+   * Audit MEDIUM-6: the byte cap is not an entry-count cap, and de-duplication keys on the NAME -
+   * so every distinct name survives it. An upload of minimal records therefore stayed under 8 MiB
+   * while yielding hundreds of thousands of entries, each of which costs one alias lookup plus a
+   * full-catalogue fuzzy scan, all inside one {@code @Transactional(readOnly = true)} that holds a
+   * Hikari connection for the whole run.
+   */
+  @Test
+  void preview_tooManyDistinctEntriesThrowsBadRequestWithoutTouchingTheCatalogue() {
+    StringBuilder json = new StringBuilder("{\"blueprints\":[");
+    for (int i = 0; i < 20_001; i++) {
+      if (i > 0) {
+        json.append(',');
+      }
+      json.append("{\"productName\":\"bp").append(i).append("\"}");
+    }
+    json.append("]}");
+
+    assertThrows(
+        BadRequestException.class, () -> service.previewImport(SUB, upload(json.toString())));
+    verify(blueprintProductService, never()).allProducts();
+  }
+
   // ------------------------------------------------------------------ apply --
 
   @Test

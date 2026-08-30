@@ -19832,7 +19832,7 @@
       "post" : {
         "tags" : [ "Orders" ],
         "summary" : "Create a new job order",
-        "description" : "Allows anyone to create a job order.",
+        "description" : "Creates a job order. Requires an authenticated member (ADR-0149).",
         "operationId" : "createJobOrder",
         "requestBody" : {
           "content" : {
@@ -59930,7 +59930,9 @@
             "enum" : [ "DISCARD", "TRANSFER", "SELL" ]
           },
           "terminal" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 120,
+            "minLength" : 0
           },
           "sellAmount" : {
             "type" : "number",

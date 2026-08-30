@@ -140,10 +140,18 @@ escape_sed_replacement() {
 declare -A expected_tag=()
 while IFS= read -r image_ref; do
   [ -n "$image_ref" ] || continue
-  # Every monitoring image is pinned as repository:tag; a digest pin or an unpinned image is a
-  # separate policy problem, so skip rather than guess.
+  # Every monitoring image is pinned as repository:tag@sha256:<digest> (ADR-0072). The digest is the
+  # immutability guarantee; the TAG is what the docs quote and therefore what this gate compares, so
+  # strip the digest first and keep checking the tag.
+  #
+  # This strip is load-bearing, not cosmetic: the previous version skipped any ref containing '@'
+  # outright, so the moment every image became digest-pinned the expected-tag map would have come
+  # out EMPTY and the gate would have failed with "would pass vacuously" - a green-to-red flip with
+  # no drift behind it.
+  image_ref="${image_ref%@*}"
+  # A ref with no tag left (a bare repository@digest pin) carries nothing to compare, and an
+  # unpinned image is a separate policy problem - skip rather than guess in both cases.
   case "$image_ref" in
-    *@*) continue ;;
     *:*) ;;
     *) continue ;;
   esac

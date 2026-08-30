@@ -83,6 +83,14 @@ public final class FleetExportParser {
    */
   private static final long MAX_IMPORT_BYTES = 8L * 1024 * 1024;
 
+  /**
+   * Cap on the number of entries one ship-list import may carry, applied after parsing.
+   *
+   * <p>Sibling of {@code BlueprintExportParser#MAX_IMPORT_ENTRIES} and there for the same reason:
+   * the byte cap bounds the JSON tree, not the per-entry database work the importer then performs.
+   */
+  private static final int MAX_IMPORT_ENTRIES = 20_000;
+
   private FleetExportParser() {}
 
   /**
@@ -105,6 +113,32 @@ public final class FleetExportParser {
    *     element matches a known format
    */
   public static @NotNull List<FleetImportEntry> parse(
+      @NotNull ObjectMapper objectMapper, @NotNull MultipartFile file) {
+    List<FleetImportEntry> entries = parseEntries(objectMapper, file);
+    // The byte cap bounds the parse; it does not bound the work AFTER it. HangarImportService walks
+    // every entry and inserts one Ship row per counted unit inside a single transaction, so an
+    // 8 MiB upload of minimal records turns into an unbounded insert loop holding one connection
+    // for its whole run - the same shape as the blueprint import's per-entry fuzzy scan. A real
+    // fleet export is in the hundreds.
+    if (entries.size() > MAX_IMPORT_ENTRIES) {
+      throw new BadRequestException(
+          "The uploaded ship list carries "
+              + entries.size()
+              + " entries; at most "
+              + MAX_IMPORT_ENTRIES
+              + " are accepted per import.");
+    }
+    return entries;
+  }
+
+  /**
+   * The format-detecting parse itself, without the entry-count cap {@link #parse} applies on top.
+   *
+   * @param objectMapper the caller's configured JSON mapper
+   * @param file the uploaded ship-list JSON
+   * @return the parsed entries, unbounded in count
+   */
+  private static @NotNull List<FleetImportEntry> parseEntries(
       @NotNull ObjectMapper objectMapper, @NotNull MultipartFile file) {
     // Reject an oversized upload BEFORE readTree builds the in-memory tree (security audit
     // gap-fill). getSize() reflects the buffered multipart length, so this never reads the body.

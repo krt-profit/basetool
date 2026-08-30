@@ -626,6 +626,29 @@ public class OwnerScopeService {
   }
 
   /**
+   * Delegates to {@link AccessGateService#canManageUserInventory(UUID)}: the coarse user-level
+   * write pre-check shared by the two "create stock for another member" entry points, Einbuchen
+   * ({@code POST /api/v1/inventory}) and the per-item receiver of the refinery store.
+   *
+   * @param targetUserId the member whose inventory would receive the row; never {@code null}.
+   * @return {@code true} iff the caller may create inventory rows in that member's name.
+   */
+  public boolean canManageUserInventory(@NotNull UUID targetUserId) {
+    return accessGateService.canManageUserInventory(targetUserId);
+  }
+
+  /**
+   * Delegates to {@link AccessGateService#canSeeOperationLedger(UUID)}: operation visibility
+   * <em>without</em> the self-issuable participant escape, for the finance and payout endpoints.
+   *
+   * @param operationId operation to inspect; never {@code null}.
+   * @return {@code true} iff the caller reaches the operation through scope alone.
+   */
+  public boolean canSeeOperationLedger(@NotNull UUID operationId) {
+    return accessGateService.canSeeOperationLedger(operationId);
+  }
+
+  /**
    * Delegates to {@link AccessGateService#canSeeOperation(UUID)}: whether the caller may read
    * operation {@code operationId} (scope / ownerless-leadership / participant escape).
    *

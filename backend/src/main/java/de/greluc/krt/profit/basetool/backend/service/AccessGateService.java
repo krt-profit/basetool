@@ -760,7 +760,7 @@ public class AccessGateService {
    * @return {@code true} iff the caller may read the target user's in-scope refinery orders.
    */
   public boolean canViewUserRefineryOrders(@NotNull UUID targetUserId) {
-    return canActOnUserRefineryOrders(targetUserId, this::canSeeSquadron);
+    return canActOnTargetUserScoped(targetUserId, this::canSeeSquadron);
   }
 
   /**
@@ -781,14 +781,43 @@ public class AccessGateService {
    * @return {@code true} iff the caller may create a refinery order on that user's behalf.
    */
   public boolean canManageUserRefineryOrders(@NotNull UUID targetUserId) {
-    return canActOnUserRefineryOrders(targetUserId, this::canEditSquadron);
+    return canActOnTargetUserScoped(targetUserId, this::canEditSquadron);
   }
 
   /**
-   * Shared resolution for the per-user refinery endpoints: admin all-access, then the self escape,
-   * then a coarse strict org-unit scope check against the target user's memberships (read straight
-   * from {@code org_unit_membership}, never a lazy association). The {@code unitScope} predicate is
-   * {@link #canSeeSquadron(UUID)} for reads / {@link #canEditSquadron(UUID)} for writes.
+   * Write pre-check for every "create stock in another member's name" entry point: {@code POST
+   * /api/v1/inventory} (Einbuchen) and the per-item receiver of {@code POST
+   * /api/v1/refinery-orders/{id}/store}. Same resolution as {@link
+   * #canManageUserRefineryOrders(UUID)} - admin, self, or at least one shared editable org unit -
+   * because it is the same question about the same kind of write.
+   *
+   * <p><strong>It replaces a flat {@code ROLE_LOGISTICIAN} boolean, and that is the whole
+   * point.</strong> Both call sites used to authorise the receiver with {@code
+   * AuthHelperService#isLogisticianOrAbove()}, which is the OR-union over <em>all</em> of the
+   * caller's memberships and carries no org-unit context whatsoever. A logistician of any Staffel
+   * could therefore fabricate stock - shared, or with {@code personal} private - in the ledger of a
+   * member of any other Staffel, which REQ-SEC-005 forbids and which the sibling endpoint {@code
+   * POST /api/v1/refinery-orders/users/&#123;userId&#125;} had already closed with {@link
+   * #canManageUserRefineryOrders(UUID)}. A role that says "may act on behalf of somebody" is not an
+   * answer to "may act on behalf of <em>this</em> somebody".
+   *
+   * <p>Like its sibling this is a coarse {@code anyMatch} pre-check, not a per-row gate; the
+   * per-row bound remains the stamp validation in {@code
+   * OrgUnitStampingService#resolveOrgUnitForPickerOutputNullable}.
+   *
+   * @param targetUserId the member whose inventory would receive the row; never {@code null}.
+   * @return {@code true} iff the caller may create inventory rows in that member's name.
+   */
+  public boolean canManageUserInventory(@NotNull UUID targetUserId) {
+    return canActOnTargetUserScoped(targetUserId, this::canEditSquadron);
+  }
+
+  /**
+   * Shared resolution for every per-user on-behalf endpoint - refinery orders and inventory
+   * creation alike: admin all-access, then the self escape, then a coarse strict org-unit scope
+   * check against the target user's memberships (read straight from {@code org_unit_membership},
+   * never a lazy association). The {@code unitScope} predicate is {@link #canSeeSquadron(UUID)} for
+   * reads / {@link #canEditSquadron(UUID)} for writes.
    *
    * <p><b>This is an {@code anyMatch} pre-check, not a per-row gate.</b> A non-admin passes as soon
    * as the caller shares <em>one</em> of the target's (up to two, REQ-ORG-017) org units, so the
@@ -802,7 +831,7 @@ public class AccessGateService {
    * @param unitScope the per-unit scope check to apply; never {@code null}.
    * @return {@code true} iff the caller shares at least one in-scope org unit with the target user.
    */
-  private boolean canActOnUserRefineryOrders(
+  private boolean canActOnTargetUserScoped(
       @NotNull UUID targetUserId, @NotNull java.util.function.Predicate<UUID> unitScope) {
     if (authHelper.isAdmin()) {
       return true;
@@ -846,6 +875,34 @@ public class AccessGateService {
                       : canSeeSquadron(o.getOwningOrgUnit().getId());
               return scopeVisible || participatedInOperation(operationId);
             })
+        .orElse(false);
+  }
+
+  /**
+   * {@link #canSeeOperation(UUID)} <em>without</em> the participant escape: the caller must reach
+   * the operation through org-unit scope (or the ownerless-leadership rule) alone.
+   *
+   * <p><strong>Why the money endpoints need a second, narrower predicate.</strong> The participant
+   * escape is <em>self-issuable</em>. {@code POST /api/v1/missions/&#123;id&#125;/join} is gated
+   * only on {@code isAuthenticated() and canSeeMission(#id)}, and {@code canSeeMission} is true for
+   * any non-internal mission of any org unit - so one request enrols a member of Staffel A in a
+   * public mission of Staffel B, and {@code participatedInOperation} then unlocks that operation.
+   * ADR-0006 granted the escape on the reasoning that "participation is the right, minimal key",
+   * which assumes participation is <em>granted</em>; here it is merely <em>claimed</em>. The escape
+   * is therefore fine for seeing that an operation exists and which missions it links, and is not a
+   * sufficient key to a foreign unit's finance ledger.
+   *
+   * @param operationId operation to inspect; never {@code null}.
+   * @return {@code true} iff the caller reaches the operation without the participant escape.
+   */
+  public boolean canSeeOperationLedger(@NotNull UUID operationId) {
+    return operationRepository
+        .findById(operationId)
+        .map(
+            o ->
+                o.getOwningOrgUnit() == null
+                    ? authHelper.isMemberOrAbove()
+                    : canSeeSquadron(o.getOwningOrgUnit().getId()))
         .orElse(false);
   }
 

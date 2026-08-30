@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -469,6 +470,7 @@ class MissionControllerSlimEndpointsTest {
     when(missionService.updateParticipantAttributes(
             any(UUID.class),
             any(UUID.class),
+            any(),
             any(),
             any(),
             any(),

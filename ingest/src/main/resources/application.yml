@@ -92,6 +92,13 @@ app:
     # guarantees. Env-overridable so the value can be tuned from .env without rebuilding the image.
     handoff-ttl: ${APP_INGEST_HANDOFF_TTL:PT30M}
     max-payload-bytes: 2097152
+    # Staging budget, deliberately NOT the ingress cap above. The handoff store shares the Redis
+    # instance that holds the frontend's Spring Session store, and that instance runs
+    # `--maxmemory-policy noeviction`: reaching the ceiling REFUSES WRITES, i.e. nobody can log in
+    # any more. A real draft is a few KB, and a member has one or two in flight, so these two bound
+    # one subject's footprint at 10 x 256 KiB instead of 900 x 2 MiB (30 req/min x 30 min TTL).
+    max-handoff-bytes: ${APP_INGEST_MAX_HANDOFF_BYTES:262144}
+    max-handoffs-per-subject: ${APP_INGEST_MAX_HANDOFFS_PER_SUBJECT:10}
     # Client-identity gate (REQ-INGEST-011): WHICH CLIENT SOFTWARE may drive the gateway. The user
     # gate is unchanged and stays isAuthenticated() for every member (REQ-INGEST-002/-008).
     #

@@ -14,7 +14,7 @@
 ADR-0090 moved Actuator off the public connector for `frontend` and `ingest` and stated plainly why
 the backend was left out:
 
-> **`backend` is unchanged** — it is off every `net-proxy-*` network and is not internet-reachable at
+> **`backend` is unchanged** — its management surface is not internet-reachable at
 > all, so it keeps its app-port scrape with fail-closed basic auth; moving it would add risk with no
 > external-exposure benefit.
 

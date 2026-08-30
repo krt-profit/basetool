@@ -166,8 +166,10 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     UUID userId = AuthenticatedSubject.idOf(auth).orElse(null);
     if (userId == null) {
-      // No subject, or a subject that is not a member id — a service account or a malformed token.
-      // Neither is a person who can accept anything; the audience and scope checks govern them.
+      // No subject the seam recognises as a member id. NOT because a service account's `sub` looks
+      // different - a Keycloak service-account subject IS a UUID - but because the seam resolves a
+      // subject to a LOCAL member and a service account has no member row. Either way it is not a
+      // person who can accept anything; the audience and scope checks govern those callers.
       return null;
     }
     return termsConsentCheck.hasAcceptedCurrentTerms(userId) ? null : userId;

@@ -39,6 +39,7 @@ import org.springframework.http.server.PathContainer;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.util.NumberUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
@@ -105,7 +106,11 @@ public class AnonymousPageSizeFilter extends OncePerRequestFilter {
     if (uri == null || !API_SCOPE.matches(PathContainer.parsePath(uri))) {
       return true;
     }
-    return request.getParameter("size") == null;
+    // An absent OR empty `size` is not this filter's business: `?size=` binds to null and is a
+    // legal way to ask for the default page. Handled here rather than inside withinLimit, so that
+    // method can stay a strict "does this parse the way Spring parses it, and is it in range".
+    String size = request.getParameter("size");
+    return size == null || size.isBlank();
   }
 
   @Override
@@ -134,15 +139,30 @@ public class AnonymousPageSizeFilter extends OncePerRequestFilter {
   /**
    * Whether a requested size is acceptable for an anonymous caller.
    *
-   * @param sizeParam the raw {@code size} query parameter; never {@code null} here.
-   * @return {@code true} when it is within the ceiling, or unparseable — a non-numeric value is not
-   *     this filter's to reject, {@code PaginationUtil} already defaults it.
+   * <p><strong>Parsed exactly the way Spring will parse it, and not more strictly.</strong> This
+   * used to be {@code Integer.parseInt(sizeParam.trim())} with an "unparseable means allowed"
+   * fallback, on the stated grounds that {@code PaginationUtil} defaults a non-numeric value
+   * anyway. {@code PaginationUtil} never sees the raw string - Spring's binder does, through {@code
+   * StringToNumberConverterFactory} - {@code NumberUtils#parseNumber}, which first strips
+   * <em>all</em> whitespace and then honours the hex spellings {@code 0x}, {@code 0X} and {@code
+   * #}. So {@code size=0x186A0} threw here, was waved through as "unparseable", and bound to 100000
+   * downstream: the REQ-SEC-032 ceiling of 1000 was bypassable with three characters, on paths that
+   * are anonymous by design and outside the per-account budget.
+   *
+   * <p>Using the binder's own parser removes the divergence by construction. A value it cannot
+   * parse either is now <em>refused</em> rather than allowed, because a size the binder rejects can
+   * never legitimately produce a page. The one legitimate non-number, an <em>empty</em> {@code
+   * size=}, never reaches here: {@link #shouldNotFilter} skips it.
+   *
+   * @param sizeParam the raw {@code size} query parameter; never {@code null} or blank here.
+   * @return {@code true} only when the value parses the way Spring will parse it AND is within the
+   *     ceiling.
    */
   private static boolean withinLimit(String sizeParam) {
     try {
-      return Integer.parseInt(sizeParam.trim()) <= MAX_ANONYMOUS_PAGE_SIZE;
-    } catch (NumberFormatException ex) {
-      return true;
+      return NumberUtils.parseNumber(sizeParam, Integer.class) <= MAX_ANONYMOUS_PAGE_SIZE;
+    } catch (IllegalArgumentException ex) {
+      return false;
     }
   }
 

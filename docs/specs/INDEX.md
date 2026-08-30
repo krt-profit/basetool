@@ -137,7 +137,8 @@ proves it, and every issue/PR that touched it.
 >
 > ORG requirements skip the contested range: epic #692 allocated `REQ-ORG-014..018`, Phase 6 used
 > `REQ-ORG-019` (the bank AREA/CARTEL→Bereich/OL linkage), and `REQ-ORG-020` is the org-chart
-> free-text holder name, so the **next free ORG id is `REQ-ORG-021`**. Phase 7 reconciliation confirms
+> free-text holder name, and `REQ-ORG-021` is the operation-ledger split of ADR-0150, so the
+> **next free ORG id is `REQ-ORG-022`**. Phase 7 reconciliation confirms
 > this two-namespace split (tenancy vs org-chart) as
 > the **accepted working resolution**; a physical renumber of the shipped, test-referenced
 > `REQ-ORG-010/011` pair remains an owner-approved cleanup and is **not** a release-gate blocker.

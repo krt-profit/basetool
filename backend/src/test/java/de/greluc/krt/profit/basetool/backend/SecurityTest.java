@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -169,6 +170,28 @@ class SecurityTest {
         .andExpect(status().isUnauthorized());
   }
 
+  /**
+   * The same two paths, asked for with {@code HEAD}.
+   *
+   * <p>The carve-out above used to be registered with {@code HttpMethod.GET}, and Spring Security
+   * compares the verb with {@code String.equals} - so a {@code HEAD} missed it and fell through to
+   * the all-verb catalogue {@code permitAll} underneath. Spring MVC then answers {@code HEAD} from
+   * the {@code @GetMapping} handler, so the query ran anonymously and the {@code Content-Length}
+   * came back. The rule is now verb-agnostic; these two pin that, because a method-scoped rewrite
+   * would look like a harmless tightening and re-open exactly this.
+   */
+  @Test
+  void materialsMatrixIsNotAnonymouslyReachableWithHead() throws Exception {
+    mockMvc.perform(head("/api/v1/materials/matrix")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void materialTerminalPricesAreNotAnonymouslyReachableWithHead() throws Exception {
+    mockMvc
+        .perform(head("/api/v1/materials/00000000-0000-4000-8000-00000000cafe/terminals"))
+        .andExpect(status().isUnauthorized());
+  }
+
   @Test
   void theRestOfTheMaterialCatalogStaysAnonymous() throws Exception {
     // The carve-out must be surgical: the anonymous order form's material picker still needs the
@@ -191,6 +214,32 @@ class SecurityTest {
         .perform(get("/api/v1/materials").param("size", "50000"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("PAGE_SIZE_TOO_LARGE"));
+  }
+
+  /**
+   * The ceiling must be bypass-proof in every spelling Spring's binder accepts, not just the
+   * decimal one.
+   *
+   * <p>The filter used to parse with {@code Integer.parseInt} and treat "unparseable" as "allowed".
+   * Spring binds through {@code NumberUtils#parseNumber}, which strips all whitespace and honours
+   * {@code 0x} / {@code 0X} / {@code #} - so each of these threw in the filter, was waved through,
+   * and bound to a number two orders of magnitude above the ceiling.
+   */
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(
+      strings = {"0x186A0", "0X186A0", "#186A0", "100 000", " 50000 "})
+  void anonymousPageSizeCeilingCannotBeBypassedByAlternativeSpellings(String size)
+      throws Exception {
+    mockMvc
+        .perform(get("/api/v1/materials").param("size", size))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("PAGE_SIZE_TOO_LARGE"));
+  }
+
+  /** An empty {@code size=} binds to null and must stay a legal way to ask for the default page. */
+  @Test
+  void anonymousEmptyPageSizeIsNotRefused() throws Exception {
+    mockMvc.perform(get("/api/v1/materials").param("size", "")).andExpect(status().isOk());
   }
 
   @Test

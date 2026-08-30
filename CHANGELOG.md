@@ -2,6 +2,52 @@
 
 ## [Unreleased]
 
+### Security
+
+- **Bestand für ein anderes Mitglied anlegen prüft jetzt die Staffel, nicht nur die Rolle.** Wer
+  Logistiker war, konnte an vier Stellen Lager- und Raffineriebestand im Namen eines Mitglieds
+  einer *fremden* Staffel erzeugen — das flache Logistiker-Recht kennt keine Staffel. Betroffen
+  waren „Einbuchen", die Raffinerie-Auftragserstellung und das Einlagern von Raffinerie-Ausbeute.
+
+- **Der Lagerbestand eines Einsatzes ist nur noch für die eigene Staffel sichtbar.** Über die
+  öffentlichen Einsätze konnte jedes Mitglied die Lagereinträge einer fremden Staffel mitlesen —
+  samt Besitzer, Lagerort, Menge und Qualität.
+
+- **Ein Gast-Bearbeitungslink verliert seine Wirkung, sobald der Einsatz intern oder abgeschlossen
+  ist.** Bisher blieb er unbegrenzt gültig: eine nachträglich geänderte Anwesenheit verschob bei
+  bereits abgerechneten Operationen die Auszahlung aller anderen Teilnehmer.
+
+- **Gäste können sich nicht mehr selbst zum Einsatzleiter machen** und ihre Anmeldung nicht mehr auf
+  den exakten Namen eines registrierten Mitglieds umbenennen. Beides ging bisher über den
+  Bearbeitungslink; die Umbenennung konnte zusätzlich eine als „Bezahlt" markierte Auszahlung
+  zurücksetzen.
+
+- **Die Auszahlungstabelle einer Operation folgt nicht mehr der bloßen Teilnahme.** Wer sich in einen
+  öffentlichen Einsatz einer fremden Staffel einträgt, sieht dort jetzt nur noch die eigene Zeile;
+  die Finanzansichten der Operation bleiben der eigenen Staffel vorbehalten (ADR-0150).
+
+- **Das Seitengrößen-Limit für nicht angemeldete Aufrufe lässt sich nicht mehr umgehen.** Eine
+  hexadezimale oder mit Leerzeichen geschriebene Größe rutschte an der Prüfung vorbei und lieferte
+  bis zum Hundertfachen der erlaubten Zeilen.
+
+- **Import-Uploads haben jetzt eine Obergrenze für die Eintragszahl.** Ein einzelner Blueprint- oder
+  Schiffslisten-Upload konnte die Datenbankverbindungen für alle Nutzer belegen.
+
+- **Ein einzelner Absender kann den geteilten Zwischenspeicher nicht mehr füllen.** Die
+  Import-Übergaben des SC-Extractors haben jetzt ein Kontingent pro Konto; ohne das konnte ein
+  volles Redis die Anmeldung für alle blockieren.
+
+### Fixed
+
+- **Bearbeiter eines Auftrags werden nur noch mit Name und Rang ausgeliefert**, nicht mehr mit
+  Rollen, Berechtigungen, Beitrittsdatum und Discord-Status.
+
+- **Der Verkaufsort einer Ausbuchung wird als Länge statt im Wortlaut protokolliert.** Der
+  Prüfprotokoll-Eintrag enthält damit wieder keinen freien Nutzertext.
+
+- **Die 13 Abbilder des Monitoring-Stacks sind digest-gepinnt** (ADR-0072), wie es die Entscheidung
+  immer vorsah.
+
 ## [v1.6.11](https://github.com/krt-profit/basetool/releases/tag/v1.6.11) - 2026-08-29
 
 ### Fixed

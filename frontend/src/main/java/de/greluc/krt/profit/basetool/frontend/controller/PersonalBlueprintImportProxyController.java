@@ -109,6 +109,12 @@ public class PersonalBlueprintImportProxyController {
   }
 
   /**
+   * Inclusive upper bound on a relayed blueprint-export upload, matching the backend parser's own
+   * cap ({@code BlueprintExportParser#MAX_IMPORT_BYTES}). A real export is well under 1 MB.
+   */
+  static final long MAX_EXPORT_BYTES = 8L * 1024 * 1024;
+
+  /**
    * Proxies a blueprint export JSON upload to the backend import-preview endpoint and returns the
    * resolution preview. The backend persists nothing at this step.
    *
@@ -120,6 +126,14 @@ public class PersonalBlueprintImportProxyController {
    */
   @PostMapping(value = "/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public BlueprintImportPreviewDto preview(@RequestParam("file") @NotNull MultipartFile file) {
+    // Refuse before file.getBytes() pulls the whole upload into frontend heap and then copies it
+    // again into the relay body. The backend parser has its own 8 MiB cap, but it only sees the
+    // upload AFTER this process has buffered it twice - so without a cap here the relay is the
+    // cheaper target of the two. Mirrors RefineryImportProxyController.MAX_EXTRACT_BYTES, sized to
+    // the backend parser's own limit for this format.
+    if (file.isEmpty() || file.getSize() > MAX_EXPORT_BYTES) {
+      throw new IllegalArgumentException("The uploaded blueprint export is empty or too large.");
+    }
     try {
       byte[] bytes = file.getBytes();
       String filename =

@@ -123,6 +123,36 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   List<InventoryItem> findByMissionId(@Param("missionId") UUID missionId);
 
   /**
+   * Org-unit-scoped variant of {@link #findByMissionId(UUID)}, and the one the mission-detail
+   * "Lagereinträge" panel uses.
+   *
+   * <p>{@link InventoryItem} is <strong>strict-staffel</strong> with no cross-staffel escape
+   * (REQ-ORG-003, {@code docs/specs/org-unit-tenancy.md}); the two documented wideners are the
+   * owner escape and the job-order link. The mission link was a third, undocumented one: the
+   * unscoped query returned every row any Staffel had earmarked for the mission, and because a
+   * mission is visible cross-staffel whenever {@code is_internal = false}, any member could read a
+   * foreign Staffel's mission stock - owner callsign, location, material, quantity, quality and the
+   * linked job-order ids - simply by enumerating public missions. That is exactly the leak the
+   * refinery twin closed as BAC-004.
+   *
+   * @param missionId the mission whose linked inventory to load; never {@code null}.
+   * @param isAdminAllScope {@code true} for an unpinned admin (no org-unit filter).
+   * @param activeOrgUnitId the pinned org unit, or {@code null} when unpinned.
+   * @param memberOrgUnitIds the caller's memberships, consulted only when unpinned.
+   * @return the mission's inventory rows within the caller's scope; never {@code null}.
+   */
+  @EntityGraph(attributePaths = {"material", "location", "user"})
+  @Query(
+      "SELECT i FROM InventoryItem i WHERE EXISTS (SELECT 1 FROM InventoryMissionAllocation ma"
+          + " WHERE ma.inventoryItem = i AND ma.mission.id = :missionId) AND "
+          + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE)
+  List<InventoryItem> findByMissionIdScoped(
+      @Param("missionId") UUID missionId,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds);
+
+  /**
    * Loads every non-personal (shared) inventory row owned by the given user as managed entities.
    * Used by {@link de.greluc.krt.profit.basetool.backend.service.InventoryOrgUnitReconciler} to
    * re-stamp and dedupe a user's shared stock when they gain their first or lose their last

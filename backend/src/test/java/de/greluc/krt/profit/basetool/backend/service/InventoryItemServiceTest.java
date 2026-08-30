@@ -139,14 +139,22 @@ class InventoryItemServiceTest {
     InventoryItem b = new InventoryItem();
     InventoryItemDto da = mock(InventoryItemDto.class);
     InventoryItemDto db = mock(InventoryItemDto.class);
-    when(inventoryItemRepository.findByMissionId(missionId)).thenReturn(List.of(a, b));
+    // The mission panel is org-unit scoped now (REQ-ORG-003): InventoryItem is strict-staffel and
+    // the mission link was an undocumented third widener, so a member of any Staffel could read a
+    // foreign Staffel's mission stock by enumerating public missions.
+    when(ownerScopeService.currentScopePredicate())
+        .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
+    when(inventoryItemRepository.findByMissionIdScoped(missionId, true, null, java.util.Set.of()))
+        .thenReturn(List.of(a, b));
     when(inventoryItemMapper.toDto(a)).thenReturn(da);
     when(inventoryItemMapper.toDto(b)).thenReturn(db);
 
     List<InventoryItemDto> result = inventoryItemService.getMissionInventory(missionId);
 
     assertEquals(List.of(da, db), result);
-    verify(inventoryItemRepository).findByMissionId(missionId);
+    verify(inventoryItemRepository)
+        .findByMissionIdScoped(missionId, true, null, java.util.Set.of());
+    verify(inventoryItemRepository, never()).findByMissionId(missionId);
   }
 
   @Test
@@ -545,7 +553,7 @@ class InventoryItemServiceTest {
             null);
     when(inventoryItemMapper.toDto(savedItem)).thenReturn(expectedDto);
 
-    InventoryItemDto result = inventoryItemService.createInventoryItem(dto, userId, false);
+    InventoryItemDto result = inventoryItemService.createInventoryItem(dto, userId);
 
     assertNotNull(result);
     verify(inventoryItemRepository).save(any(InventoryItem.class));
@@ -605,7 +613,7 @@ class InventoryItemServiceTest {
         .thenAnswer(inv -> inv.getArgument(0));
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
 
-    inventoryItemService.createInventoryItem(dto, userId, false);
+    inventoryItemService.createInventoryItem(dto, userId);
 
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
@@ -667,8 +675,7 @@ class InventoryItemServiceTest {
         .thenReturn(Set.of(materialId));
 
     assertThrows(
-        OverAllocationException.class,
-        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+        OverAllocationException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
@@ -714,8 +721,7 @@ class InventoryItemServiceTest {
         .thenReturn(Set.of(materialId));
 
     assertThrows(
-        BadRequestException.class,
-        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+        BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
@@ -753,8 +759,7 @@ class InventoryItemServiceTest {
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
 
     assertThrows(
-        BadRequestException.class,
-        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+        BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
@@ -801,8 +806,7 @@ class InventoryItemServiceTest {
     when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(UUID.randomUUID()));
 
     assertThrows(
-        BadRequestException.class,
-        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+        BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
@@ -848,7 +852,7 @@ class InventoryItemServiceTest {
     when(inventoryItemRepository.save(any(InventoryItem.class))).thenReturn(saved);
     when(inventoryItemMapper.toDto(saved)).thenReturn(null);
 
-    inventoryItemService.createInventoryItem(dto, userId, false);
+    inventoryItemService.createInventoryItem(dto, userId);
 
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
@@ -899,7 +903,7 @@ class InventoryItemServiceTest {
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
 
     // When
-    inventoryItemService.createInventoryItem(dto, userId, false);
+    inventoryItemService.createInventoryItem(dto, userId);
 
     // Then
     org.mockito.ArgumentCaptor<InventoryItem> captor =
@@ -930,7 +934,116 @@ class InventoryItemServiceTest {
 
     assertThrows(
         AccessDeniedException.class,
-        () -> inventoryItemService.createInventoryItem(dto, currentUserId, false));
+        () -> inventoryItemService.createInventoryItem(dto, currentUserId));
+  }
+
+  /**
+   * REQ-SEC-005 regression: the receiver is authorised against the TARGET, never against a role.
+   *
+   * <p>Before this gate the decision was a flat {@code isLogisticianOrAbove()} boolean handed in
+   * from the controller, so a logistician of any Staffel could fabricate stock in a member of any
+   * other Staffel's ledger. The scope predicate must be consulted with the requested id, and it
+   * must be consulted BEFORE the user lookup so a refused caller cannot tell "no such user" from
+   * "access denied" and use the endpoint as an existence oracle.
+   */
+  @Test
+  void createInventoryItem_shouldThrowAccessDenied_whenTargetIsOutsideTheCallersScope() {
+    UUID currentUserId = UUID.randomUUID();
+    UUID foreignUserId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            foreignUserId,
+            UUID.randomUUID(),
+            null,
+            UUID.randomUUID(),
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+    when(ownerScopeService.canManageUserInventory(foreignUserId)).thenReturn(false);
+
+    assertThrows(
+        AccessDeniedException.class,
+        () -> inventoryItemService.createInventoryItem(dto, currentUserId));
+
+    verify(ownerScopeService).canManageUserInventory(foreignUserId);
+    verify(userRepository, never()).findById(any());
+  }
+
+  /** A foreign member's PRIVATE pool is never an on-behalf target on this endpoint. */
+  @Test
+  void createInventoryItem_shouldThrowAccessDenied_whenBookingPersonalStockForAnotherUser() {
+    UUID currentUserId = UUID.randomUUID();
+    UUID foreignUserId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            foreignUserId,
+            UUID.randomUUID(),
+            null,
+            UUID.randomUUID(),
+            100,
+            10.0,
+            true,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+    // Scope is fine - a logistician of the target's own Staffel. The personal pool is still closed,
+    // because the write-time merge (REQ-INV-026) keys on `personal` and would fold the target's own
+    // private rows into the response.
+    when(ownerScopeService.canManageUserInventory(foreignUserId)).thenReturn(true);
+
+    assertThrows(
+        AccessDeniedException.class,
+        () -> inventoryItemService.createInventoryItem(dto, currentUserId));
+
+    verify(userRepository, never()).findById(any());
+  }
+
+  /** The ordinary on-behalf Einbuchen - a SHARED booking, in scope - still goes through. */
+  @Test
+  void createInventoryItem_shouldBookSharedStockForAnotherUser_whenScopeAllows() {
+    UUID currentUserId = UUID.randomUUID();
+    UUID targetUserId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            targetUserId,
+            materialId,
+            null,
+            locationId,
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+    User target = new User();
+    target.setId(targetUserId);
+    when(ownerScopeService.canManageUserInventory(targetUserId)).thenReturn(true);
+    when(userRepository.findById(targetUserId)).thenReturn(Optional.of(target));
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(new Material()));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(new Location()));
+    when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
+
+    inventoryItemService.createInventoryItem(dto, currentUserId);
+
+    org.mockito.ArgumentCaptor<InventoryItem> captor =
+        org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository).save(captor.capture());
+    assertSame(
+        target, captor.getValue().getUser(), "the row must be booked for the requested receiver");
   }
 
   // --- game-item stock rows (V220, REQ-INV-029/031) --------------------------
@@ -1007,7 +1120,7 @@ class InventoryItemServiceTest {
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
 
     // When
-    inventoryItemService.createInventoryItem(dto, userId, false);
+    inventoryItemService.createInventoryItem(dto, userId);
 
     // Then — the saved row is a catalog-consistent item row: gameItem set, material and quality
     // null (the XOR the DB CHECK chk_inventory_item_catalog_xor enforces), whole-unit amount.
@@ -1036,8 +1149,7 @@ class InventoryItemServiceTest {
 
     // When / Then
     assertThrows(
-        NotFoundException.class,
-        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+        NotFoundException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
@@ -1055,8 +1167,7 @@ class InventoryItemServiceTest {
 
     // When / Then
     assertThrows(
-        BadRequestException.class,
-        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+        BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
@@ -1079,8 +1190,7 @@ class InventoryItemServiceTest {
 
     // When / Then
     assertThrows(
-        BadRequestException.class,
-        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+        BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
@@ -1108,8 +1218,7 @@ class InventoryItemServiceTest {
 
     // When / Then
     assertThrows(
-        BadRequestException.class,
-        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+        BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
@@ -1138,8 +1247,7 @@ class InventoryItemServiceTest {
 
     // When / Then
     assertThrows(
-        BadRequestException.class,
-        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+        BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
@@ -1168,7 +1276,7 @@ class InventoryItemServiceTest {
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
 
     // When
-    inventoryItemService.createInventoryItem(dto, userId, false);
+    inventoryItemService.createInventoryItem(dto, userId);
 
     // Then — the slice is written via the gameItem gate; the material gate is never consulted
     // (an item row has no material to check).
@@ -1199,8 +1307,7 @@ class InventoryItemServiceTest {
 
     // When / Then — the whole-unit rule fires before the order lookup, mirroring PIECE materials
     assertThrows(
-        BadRequestException.class,
-        () -> inventoryItemService.createInventoryItem(dto, userId, false));
+        BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
@@ -1248,8 +1355,7 @@ class InventoryItemServiceTest {
     // When / Then
     BadRequestException ex =
         assertThrows(
-            BadRequestException.class,
-            () -> inventoryItemService.createInventoryItem(dto, userId, false));
+            BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     assertEquals("Exactly one of materialId and gameItemId must be set", ex.getMessage());
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
@@ -1275,8 +1381,7 @@ class InventoryItemServiceTest {
     // When / Then — neither catalog repository is consulted, the belt 400s
     BadRequestException ex =
         assertThrows(
-            BadRequestException.class,
-            () -> inventoryItemService.createInventoryItem(dto, userId, false));
+            BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     assertEquals("Exactly one of materialId and gameItemId must be set", ex.getMessage());
     verify(materialRepository, never()).findById(any());
     verify(gameItemRepository, never()).findById(any());
@@ -1319,8 +1424,7 @@ class InventoryItemServiceTest {
     // When / Then
     BadRequestException ex =
         assertThrows(
-            BadRequestException.class,
-            () -> inventoryItemService.createInventoryItem(dto, userId, false));
+            BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     assertEquals("Material stock requires a quality", ex.getMessage());
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
@@ -1352,8 +1456,7 @@ class InventoryItemServiceTest {
     // When / Then
     BadRequestException ex =
         assertThrows(
-            BadRequestException.class,
-            () -> inventoryItemService.createInventoryItem(dto, userId, false));
+            BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     assertEquals("Game-item stock carries no quality", ex.getMessage());
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
@@ -2218,7 +2321,7 @@ class InventoryItemServiceTest {
     when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
 
-    inventoryItemService.createInventoryItem(dto, userId, true);
+    inventoryItemService.createInventoryItem(dto, userId);
 
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
@@ -2258,8 +2361,7 @@ class InventoryItemServiceTest {
         .thenThrow(new BadRequestException("not a membership"));
 
     assertThrows(
-        BadRequestException.class,
-        () -> inventoryItemService.createInventoryItem(dto, userId, true));
+        BadRequestException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
@@ -2307,7 +2409,7 @@ class InventoryItemServiceTest {
     when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
     when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(null);
 
-    inventoryItemService.createInventoryItem(dto, userId, true);
+    inventoryItemService.createInventoryItem(dto, userId);
 
     // A brand-new row is saved, stamped with the resolved org unit and carrying the DTO amount.
     org.mockito.ArgumentCaptor<InventoryItem> captor =
