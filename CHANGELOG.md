@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [v1.6.12](https://github.com/krt-profit/basetool/releases/tag/v1.6.12) - 2026-08-30
+
+### Fixed
+
+- **Bearbeiter eines Auftrags werden nur noch mit Name und Rang ausgeliefert**, nicht mehr mit
+  Rollen, Berechtigungen, Beitrittsdatum und Discord-Status.
+
+- **Der Verkaufsort einer Ausbuchung wird als Länge statt im Wortlaut protokolliert.** Der
+  Prüfprotokoll-Eintrag enthält damit wieder keinen freien Nutzertext.
+
+- **Die 13 Abbilder des Monitoring-Stacks sind digest-gepinnt** (ADR-0072), wie es die Entscheidung
+  immer vorsah.
+
 ### Security
 
 - **Bestand für ein anderes Mitglied anlegen prüft jetzt die Staffel, nicht nur die Rolle.** Wer
@@ -36,17 +49,6 @@
 - **Ein einzelner Absender kann den geteilten Zwischenspeicher nicht mehr füllen.** Die
   Import-Übergaben des SC-Extractors haben jetzt ein Kontingent pro Konto; ohne das konnte ein
   volles Redis die Anmeldung für alle blockieren.
-
-### Fixed
-
-- **Bearbeiter eines Auftrags werden nur noch mit Name und Rang ausgeliefert**, nicht mehr mit
-  Rollen, Berechtigungen, Beitrittsdatum und Discord-Status.
-
-- **Der Verkaufsort einer Ausbuchung wird als Länge statt im Wortlaut protokolliert.** Der
-  Prüfprotokoll-Eintrag enthält damit wieder keinen freien Nutzertext.
-
-- **Die 13 Abbilder des Monitoring-Stacks sind digest-gepinnt** (ADR-0072), wie es die Entscheidung
-  immer vorsah.
 
 ## [v1.6.11](https://github.com/krt-profit/basetool/releases/tag/v1.6.11) - 2026-08-29
 
