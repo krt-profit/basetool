@@ -808,7 +808,7 @@ services:
   redis-exporter:
     <<: *mon-base
     container_name: redis-exporter
-    image: oliver006/redis_exporter:v1.89.0@sha256:fed773ffd2bb2eac706e0ed9cc2fff41651193ee4977e2a4f6919658ad2313f4
+    image: oliver006/redis_exporter:v1.90.0@sha256:a129504e65b87c54f79bc92f1afc403475e8ff646a3d7512de469904ceddf986
     cap_drop: [ALL]
     environment:
       # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 24MiB = 75% of the 32M limit.
