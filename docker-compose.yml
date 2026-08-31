@@ -247,7 +247,7 @@ x-db-keycloak: &db-keycloak-template
 x-keycloak: &keycloak-template
   # Same digest pin policy as the Postgres images. Refresh with
   # `docker buildx imagetools inspect quay.io/keycloak/keycloak:26.7`.
-  image: quay.io/keycloak/keycloak:26.7@sha256:9d1f1b2b7261ff53c66cb1092dfcdc34a5fb77e81f9e6a6e75b8b6a795de8067
+  image: quay.io/keycloak/keycloak:26.7@sha256:ff4257d0d64efbe99ed1ddfaf07765cc3c36dc7518bf8324d41961327f441c54
   command: start --proxy-headers xforwarded --cache=local --log=console,file --log-file=/var/log/keycloak/keycloak.log
   restart: unless-stopped
   logging: *default-logging
@@ -329,16 +329,21 @@ x-keycloak: &keycloak-template
     KC_DB_URL: jdbc:postgresql://db-keycloak:15433/${KC_POSTGRES_DB:?KC_POSTGRES_DB must be set in .env}
     KC_DB_USERNAME: ${KC_POSTGRES_USER:?KC_POSTGRES_USER must be set in .env}
     KC_DB_PASSWORD: ${KC_POSTGRES_PASSWORD:?KC_POSTGRES_PASSWORD must be set in .env}
-    # Disable Keycloak 26.7's new default-ON asynchronous-commit optimization (#1207). When enabled,
-    # its AsyncCommitIntegrator probes `SELECT aurora_version()` on a bootstrap connection at every
-    # persistence-unit SessionFactory init to detect AWS Aurora (where `synchronous_commit=off` can
-    # drop transactions from logical decoding). `aurora_version()` only exists on Aurora, so on our
-    # stock PostgreSQL every startup logs `ERROR: function aurora_version() does not exist` into the
-    # db-keycloak log (surfaced in Loki as app=postgres-keycloak). Keycloak catches the exception —
-    # the error is benign — but it clutters the DB error log and any log-error view/alert. The
-    # optimization only skips the WAL-fsync wait for ephemeral entities (auth sessions / events),
-    # trading a little crash-durability for throughput; turning it off restores the fully-synchronous
-    # behaviour we ran before the 26.7 upgrade AND removes the probe (and its error) at the source.
+    # Disable Keycloak 26.7's new default-ON asynchronous-commit optimization (#1207). The
+    # optimization skips the WAL-fsync wait for ephemeral entities (auth sessions / events), trading
+    # a little crash-durability for throughput; turning it off keeps the fully-synchronous behaviour
+    # we ran before the 26.7 upgrade. That durability preference is now the ONLY reason this is set.
+    #
+    # It originally had a second one, and 26.7.3 removed it. The AsyncCommitIntegrator used to probe
+    # `SELECT aurora_version()` on a bootstrap connection at every persistence-unit SessionFactory
+    # init to detect AWS Aurora (where `synchronous_commit=off` can drop transactions from logical
+    # decoding). The function exists only on Aurora, so on our stock PostgreSQL every startup logged
+    # `ERROR: function aurora_version() does not exist` into the db-keycloak log (surfaced in Loki as
+    # app=postgres-keycloak) — caught and benign, but it cluttered the DB error log and any
+    # log-error view/alert. Upstream keycloak#51792 / PR keycloak#51794 fixed that at the source in
+    # 26.7.3: the probe is now `SELECT to_regproc('pg_catalog.aurora_version') IS NOT NULL`, which
+    # stock PostgreSQL answers false without an ERROR. So re-enabling async commit no longer costs
+    # log hygiene — it is a plain throughput-vs-crash-durability call, and we still choose durability.
     # Runtime SPI option, applies to keycloak (prod) + keycloak-dev via this shared template.
     KC_SPI_CONNECTIONS_JPA_QUARKUS_ASYNC_COMMIT: "false"
     KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:?KC_BOOTSTRAP_ADMIN_USERNAME must be set in .env}
