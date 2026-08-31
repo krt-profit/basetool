@@ -568,9 +568,9 @@ done
 docker rm -f bb-lint
 
 # Alloy — format check + validate
-docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.18.1 \
+docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.19.2 \
   fmt --test /cfg/config.alloy
-docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.18.1 \
+docker run --rm -v "$PWD/monitoring/alloy:/cfg" grafana/alloy:v1.19.2 \
   validate /cfg/config.alloy
 
 # Compose project — syntax/interpolation check
