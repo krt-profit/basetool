@@ -144,10 +144,23 @@ jobs:
           probe GET /api/v1/materials/search 200
           probe GET /api/v1/locations/search 200
           # Phase M - the create form's write and its two mandatory pickers. All three must reach
-          # the backend and be refused there; the org-wide list and the extractor import must not.
+          # the backend; the org-wide list and the extractor import must not.
+          #
+          # Only the write is refused with a 401. Both pickers were first written down as 401 too,
+          # on the assumption that a mandatory field of a gated form must be gated like the form
+          # around it -- and the backend has never answered that on either. The vhost admits all
+          # three; what differs is the layer that judges the caller, and each of the two is what
+          # the role matrix already recorded (ROLES_AND_PERMISSIONS.md, "Read master data"):
+          #   /locations/refineries -> 403. /api/v1/locations/** is permitAll in the chain, so the
+          #     request is dispatched and the method-level isAuthenticated() refuses it at the
+          #     method seam, which GlobalExceptionHandler renders as 403. Identical in shape and in
+          #     number to /locations/home-locations, probed further down.
+          #   /refining-methods -> 200. An anonymous master-data catalogue with no method gate, the
+          #     same family as /ship-types, /materials/search and /locations/search probed above:
+          #     method names and their UEX ratings, no member, org unit or order anywhere in it.
           probe POST /api/v1/refinery-orders 401
-          probe GET /api/v1/locations/refineries 401
-          probe GET /api/v1/refining-methods 401
+          probe GET /api/v1/locations/refineries 403
+          probe GET /api/v1/refining-methods 200
           probe GET /api/v1/refinery-orders/all 404
           probe POST /api/v1/refinery-orders/import-extract 404
           probe GET "/api/v1/materials/$nil/terminals" 401

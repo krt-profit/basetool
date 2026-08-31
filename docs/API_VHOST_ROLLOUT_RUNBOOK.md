@@ -673,9 +673,13 @@ The safe order, and the reason for it:
    ```
 
    **The expected status is per path, not one number for all of them.** An allow-listed path
-   inherits whatever the backend requires of it, and that is deliberately not uniform — two are
-   anonymous by design (REQ-SEC-037). Reading "401 is the pass" off a `permitAll` path produces a
-   false alarm, which is exactly what happened the first time this step was run.
+   inherits whatever the backend requires of it, and that is deliberately not uniform — several
+   paths are anonymous by design, and several more are refused at the method seam with `403`
+   rather than `401` (REQ-SEC-037). Reading "401 is the pass" off a `permitAll` path produces a
+   false alarm, which is exactly what happened the first time this step was run — and again on
+   phase M's two pickers, written down as `401` when the backend has always answered `403` and
+   `200`. Corrected 2026-08-31, after three nights of a red probe against a correctly pasted
+   vhost.
 
    |                         Path                          |                           Without a token                           |                                                   Why                                                    |
    |-------------------------------------------------------|---------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
@@ -737,7 +741,7 @@ The safe order, and the reason for it:
    | `/api/v1/materials/search`                            | **200**                                                             | anonymous by design: `permitAll` catalogue, like `/ship-types` (REQ-SEC-037)                             |
    | `/api/v1/locations/search`                            | **200**                                                             | same catalogue family                                                                                    |
    | `/api/v1/users/search`                                | **401**                                                             | member records; `isAuthenticated()` and role-gated                                                       |
-   | `/api/v1/materials/<uuid>/terminals`                  | **200**                                                             | same catalogue family                                                                                    |
+   | `/api/v1/materials/<uuid>/terminals`                  | **401**                                                             | carved back **out** of the catalogue family with `/materials/matrix` (REQ-SEC-032) — UEX trade prices    |
    | `/api/v1/org-units/bank/accounts/<uuid>/transactions` | **401**                                                             | same                                                                                                     |
    | `/api/v1/hangar/my-ships`                             | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/hangar/squadron-overview`                    | **401**                                                             | scoped to the active org unit                                                                            |
@@ -753,6 +757,9 @@ The safe order, and the reason for it:
    | `/api/v1/users/me`                                    | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/users/me/registration-status`                | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/users/me/memberships`                        | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/refinery-orders` (POST)                      | **401**                                                             | phase M; `hasRole(KRT_MEMBER)` — the create form's write                                                 |
+   | `/api/v1/locations/refineries`                        | **403**                                                             | phase M; `permitAll` chain + method guard, refused at the method seam like `/locations/home-locations`   |
+   | `/api/v1/refining-methods`                            | **200**                                                             | phase M; anonymous master-data catalogue with no method gate, like `/ship-types` (REQ-SEC-037)           |
    | anything not on the list                              | **404**                                                             | default deny                                                                                             |
 
    **Two refusals, two numbers, and the difference is structural rather than a policy gap.** The
@@ -1159,10 +1166,13 @@ two endpoints rather than a surface with an admin half hiding in it.
 | `GET /api/v1/material-requests`                  | **401**          |
 | `GET /api/v1/material-exchange/releasable-items` | **401**          |
 
-**The `200` in that table is not a typo and not a finding.** `version-policy` is the single
-anonymous path this vhost admits (REQ-SEC-037), and a `401` there would mean the gate is broken:
-the build that most needs to be told it is too old is the one that cannot log in. Check it
-deliberately, and do not "fix" it upward.
+**The `200` in that table is not a typo and not a finding.** `version-policy` is the only path this
+vhost admits that was *decided* anonymous rather than inheriting it from something already public
+(REQ-SEC-037), and a `401` there would mean the gate is broken: the build that most needs to be told
+it is too old is the one that cannot log in. Check it deliberately, and do not "fix" it upward. It
+is not the only `200` on the vhost, though — the master-data catalogues are anonymous too
+(`/ship-types`, `/materials/search`, `/locations/search`, and phase M's `/refining-methods`), and
+so are `/terms/document` and the guest-redacted Einsatz reads.
 
 Two things worth knowing before reading a result. The stream answers `403`, not `401`, for an
 *authenticated* caller none of whose topics were accepted — the caller authenticated fine, they
@@ -1356,8 +1366,35 @@ receive it.
 
 ### What to expect afterwards
 
-The three admitted paths answer **401** anonymously; `/api/v1/refinery-orders/all` and
-`/api/v1/refinery-orders/import-extract` answer **404**.
+|                Path                | Anonymous status |
+|------------------------------------|------------------|
+| `POST /api/v1/refinery-orders`     | **401**          |
+| `GET /api/v1/locations/refineries` | **403**          |
+| `GET /api/v1/refining-methods`     | **200**          |
+
+`/api/v1/refinery-orders/all` and `/api/v1/refinery-orders/import-extract` answer **404**.
+
+> [!warning] Corrected 2026-08-31 — this section said all three answer `401`, and neither picker
+> ever did
+> The number was reasoned from the form around the field rather than read off the rule that judges
+> the caller, and the nightly probe was written from this table, so both carried the same mistake.
+> The first red run was the expected pre-paste `404` on both paths, which is precisely how this
+> hides: night one looked like the missing block it is supposed to look like, and the three nights
+> after the paste reported a drift on a vhost that was configured correctly.
+>
+> `GET /api/v1/locations/refineries` is `permitAll` in the filter chain under
+> `/api/v1/locations/**`, so the request is dispatched and the method-level `isAuthenticated()`
+> refuses it at the method seam — which `GlobalExceptionHandler` renders as **403**. Identical in
+> shape and number to `/api/v1/locations/home-locations`, which this runbook already recorded as
+> `403` a few phases up.
+>
+> `GET /api/v1/refining-methods` is an anonymous master-data catalogue with no method gate at all,
+> the same family as `/ship-types` and `/materials/search`: it answers **200**, and
+> [`ROLES_AND_PERMISSIONS.md`](../ROLES_AND_PERMISSIONS.md) has said so all along. Method names and
+> their UEX ratings — no member, org unit or order is reachable through it.
+>
+> All three are now pinned in `ApiVhostAnonymousSurfaceTest`, which is what REQ-SEC-037 asks for on
+> every admitted path and is the step this phase skipped.
 
 ---
 
