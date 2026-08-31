@@ -1963,6 +1963,7 @@ The anonymous surface, complete:
 | `GET /api/v1/ship-types`                   | phase 3's Hangar editor needs the hull catalogue before a member has picked anything, and `/api/v1/ship-types/**` is `permitAll` in the chain                                                                                                                | game data — hull names, manufacturers, SCU — already rendered without a session by the public web frontend; no member, org unit or ship of anyone's is reachable through it            |
 | `GET /api/v1/materials/search`             | phase 3's Lager form needs the material catalogue, and `/api/v1/materials/**` is `permitAll` in the chain                                                                                                                                                    | material names, their unit and their category — the same catalogue the public web frontend renders; no stock figure and no member is reachable through it                              |
 | `GET /api/v1/locations/search`             | the same form needs the place catalogue, under the same `permitAll` prefix                                                                                                                                                                                   | place names and ids; what is *stored* at a place needs a token                                                                                                                         |
+| `GET /api/v1/refining-methods`             | phase M's Methoden-Picker needs the refining catalogue before a member has picked anything, and `/api/v1/refining-methods/**` is `permitAll` in the chain with no method gate beneath it                                                                     | the refining methods by name with their UEX yield/cost ratings — game data with no member, org unit or order in it; the admin CRUD on the same stem stays `hasRole(ADMIN)`             |
 | ~~`GET /api/v1/materials/{id}/terminals`~~ | **No longer anonymous.** Carved out with `/api/v1/materials/matrix` under REQ-SEC-032 (verb-agnostic): its only consumer is the authenticated inventory page, and leaving it open published UEX trade prices per material to the internet from the API vhost | n/a — the path answers `401` without a token, which the nightly edge-deny probe had (correctly) been asserting all along                                                               |
 | `GET /api/v1/app/version-policy`           | REQ-API-010 — an app too old to authenticate must still be able to learn that it is too old; a token-gated gate is silent in the one case it exists for                                                                                                      | three integers and the public GitHub release URL. No caller identity goes in and none comes out — the rare `/api` path with nothing to redact                                          |
 
@@ -1990,6 +1991,16 @@ allow-listed path whose chain rule is a *role* rather than a session: anonymous 
 authenticated member without `LOGISTICIAN` gets `403`. `GET /api/v1/locations/home-locations`
 behaves the same way for the same reason. Both are pinned in `ApiVhostAnonymousSurfaceTest` with
 the status they actually answer, because both were first written down with the wrong one.
+
+So was `GET /api/v1/locations/refineries`, phase M's Raffinerie-Picker — the same `permitAll`
+chain, the same method-level `isAuthenticated()`, the same `403`, recorded as `401` when it was
+admitted and corrected on 2026-08-31 after the nightly probe had reported the difference for three
+nights. Phase M's other picker, `GET /api/v1/refining-methods`, was recorded as `401` in the same
+stroke and is anonymous (the row above). Neither had been pinned in
+`ApiVhostAnonymousSurfaceTest`, which is the step that would have caught both at review time and
+is why the requirement names it: **a path admitted without its pin is admitted without its status
+stated**, whatever the runbook says next to it. The rule the two misses share is that a status is
+read off the layer that refuses the caller, never off the form the field belongs to.
 
 **And one family on the list is reachable anonymously by design, without being *anonymous*.** The
 four participant writes — `…/participants/{id}/slim` and its `check-in`, `check-out` and

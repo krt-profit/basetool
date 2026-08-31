@@ -305,6 +305,28 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * Phase M's create write, refused before it can raise anything.
+   *
+   * <p>The vhost admits the bare {@code /api/v1/refinery-orders} stem for every verb it serves, so
+   * the chain rule is the only thing between an anonymous caller and a booked refinery run. That
+   * rule is the {@code authenticated()} catch-all, which refuses before the dispatch — the body is
+   * never parsed, which is why an empty one still answers {@code 401} rather than {@code 400}.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousRefineryOrderCreateWithUnauthorized() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/refinery-orders")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
    * The Materialbörse's four reads are refused without a token (REQ-SEC-037).
    *
    * <p>{@code releasable-items} is the sharpest of them: it answers with the <em>caller's own</em>
@@ -459,6 +481,26 @@ class ApiVhostAnonymousSurfaceTest {
   @WithAnonymousUser
   void shouldServeTheCataloguesAnonymously(String path) throws Exception {
     mockMvc.perform(get(path)).andExpect(status().isOk());
+  }
+
+  /**
+   * Phase M's Methoden-Picker is a catalogue of the same kind, and <strong>anonymous</strong>.
+   *
+   * <p>`/api/v1/refining-methods/**` is `permitAll` in the chain and the list read carries no
+   * method gate, so an anonymous caller gets `200`: refining-method names with their UEX yield/cost
+   * ratings, master data with no member, org unit or order in it. The admin CRUD on the same stem
+   * stays `hasRole(ADMIN)` and is unaffected.
+   *
+   * <p>Recorded separately from the phase-3 family above because it was admitted to the vhost as
+   * `401`, which it has never answered. It is the entry REQ-SEC-037's enumeration rule exists for:
+   * a path anonymous on the internet that its own rollout note described as gated.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldServeTheRefiningMethodCatalogueAnonymously() throws Exception {
+    mockMvc.perform(get("/api/v1/refining-methods")).andExpect(status().isOk());
   }
 
   /**
@@ -676,6 +718,25 @@ class ApiVhostAnonymousSurfaceTest {
   @WithAnonymousUser
   void shouldRefuseAnonymousHomeLocationsWithForbidden() throws Exception {
     mockMvc.perform(get("/api/v1/locations/home-locations")).andExpect(status().isForbidden());
+  }
+
+  /**
+   * The refinery-location list is refused with {@code 403} for the same structural reason as the
+   * home-location list above it — two subreads of one prefix, identical in shape.
+   *
+   * <p>Phase M admits it as the create form's Raffinerie-Picker and recorded it as {@code 401}. It
+   * has never answered that: `/api/v1/locations/**` is `permitAll` in the chain, so the request is
+   * dispatched, the method-level `isAuthenticated()` refuses it at the method seam, and
+   * `GlobalExceptionHandler` renders that as `403`. The number was reasoned from the gated form the
+   * picker belongs to rather than read off the rule that judges the caller, and the nightly probe
+   * inherited it — three red runs against a vhost that was configured correctly.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousRefineryLocationsWithForbidden() throws Exception {
+    mockMvc.perform(get("/api/v1/locations/refineries")).andExpect(status().isForbidden());
   }
 
   /**
