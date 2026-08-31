@@ -443,34 +443,15 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The first <em>writes</em> the vhost admits, refused the same way when nobody is signed in.
-   *
-   * <p>Worth its own case rather than folding into the read above: the allow-list opens these two
-   * paths for every verb the backend serves, so the question "what does an anonymous POST get" is
-   * now a real one. It must be the same {@code 401} — a write that answered anything softer would
-   * mean the vhost had opened a path whose method-level guard does not hold.
-   *
-   * @throws Exception if the request could not be performed
-   */
-  /**
-   * The ship-type catalogue is <strong>anonymous</strong>, and phase 3 puts it on the vhost.
-   *
-   * <p>Not an oversight and not a leak: `/api/v1/ship-types/**` is `permitAll` in the chain, the
-   * rows are game data (hull names and manufacturers) that the public web frontend already renders
-   * without a session, and the editor behind it needs the list before a member has picked anything.
-   * It is recorded here because REQ-SEC-037 requires every anonymous path on the allow-list to be
-   * stated deliberately — the failure that rule exists to prevent is a path that turns out
-   * anonymous when nobody intended it.
-   *
-   * @throws Exception if the request could not be performed
-   */
-  /**
    * The catalogues phase 3 admits, and what an anonymous caller gets from each.
    *
-   * <p>All three are {@code permitAll} game data the public web frontend already renders without a
-   * session — hull names, material names with their units, place names. Recorded per path rather
-   * than as a family, because REQ-SEC-037 asks for the anonymous surface to be enumerated and a
-   * family is not an enumeration.
+   * <p>Not an oversight and not a leak: all three are {@code permitAll} game data the public web
+   * frontend already renders without a session — hull names, material names with their units, place
+   * names — and the editors behind them need the lists before a member has picked anything.
+   *
+   * <p>Recorded per path rather than as a family, because REQ-SEC-037 asks for the anonymous
+   * surface to be enumerated and a family is not an enumeration. The failure that rule exists to
+   * prevent is a path that turns out anonymous when nobody intended it.
    *
    * @param path the allow-listed catalogue read
    * @throws Exception if the request could not be performed
@@ -771,6 +752,16 @@ class ApiVhostAnonymousSurfaceTest {
         .andExpect(status().isUnauthorized());
   }
 
+  /**
+   * The first <em>writes</em> the vhost admits, refused the same way when nobody is signed in.
+   *
+   * <p>Worth its own case rather than folding into the read above: the allow-list opens these two
+   * paths for every verb the backend serves, so the question "what does an anonymous POST get" is
+   * now a real one. It must be the same {@code 401} — a write that answered anything softer would
+   * mean the vhost had opened a path whose method-level guard does not hold.
+   *
+   * @throws Exception if the request could not be performed
+   */
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousPersonalInventoryWritesWithUnauthorized() throws Exception {
