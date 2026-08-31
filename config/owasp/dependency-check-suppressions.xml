@@ -208,14 +208,16 @@
     coordinates; CVE-2026-15076's vulnerable class actually lives in
     io.vertx:vertx-web-client, which is not on any classpath in this build at all.
 
-    Re-verified on 2026-08-19 against Keycloak 26.7.2, which moved these transitives:
-    vertx-core and the vertx-grpc* jars now resolve to 4.5.31 - ABOVE the fixed
-    4.5.30, so those coordinates have left the affected range entirely. What keeps
-    this suppression load-bearing is io.vertx:vertx-codegen, still selected at
-    4.5.26 (pulled by smallrye-mutiny-vertx-core -> quarkus-vertx), which the
-    4.5.29-and-earlier CPE range still covers. Confirmed via
+    Re-verified on 2026-08-31 against Keycloak 26.7.3, which moved NONE of these
+    transitives: the 26.7.2 -> 26.7.3 bump changes only the eight org.keycloak:*
+    coordinates, and Quarkus stays at 3.33.3.1. vertx-core and the vertx-grpc* jars
+    still resolve to 4.5.31 - ABOVE the fixed 4.5.30, so those coordinates remain
+    outside the affected range. What keeps this suppression load-bearing is
+    io.vertx:vertx-codegen, still selected at 4.5.26 (pulled by
+    smallrye-mutiny-vertx-core -> quarkus-vertx), which the 4.5.29-and-earlier CPE
+    range still covers. Confirmed via
     `./gradlew :keycloak-spi:dependencyInsight`: every one of these jars is dragged
-    in ONLY by org.keycloak:keycloak-services:26.7.2 -> keycloak-config-api ->
+    in ONLY by org.keycloak:keycloak-services:26.7.3 -> keycloak-config-api ->
     Quarkus (quarkus-vertx / quarkus-grpc-common / quarkus-opentelemetry) on the
     keycloak-spi module's compileOnly classpath, and vertx-codegen is absent from
     every basetool RUNTIME classpath (backend / frontend / ingest / keycloak-spi
@@ -226,7 +228,7 @@
     genuinely-vulnerable Vert.x ever entering a real classpath still fails the gate.
   -->
   <suppress>
-    <notes>False positive: build-time-only + CPE expansion. CVE-2026-15075 (vertx-core HttpClient cross-origin redirect header leak) and CVE-2026-15076 (vertx-web-client WebClientSession cross-domain cookie injection, whose vulnerable class is not even on the classpath) affect Eclipse Vert.x 4.5.29 and earlier. Under Keycloak 26.7.2 our vertx-core / vertx-grpc* jars resolve to 4.5.31, above the 4.5.30 fix; the only coordinate still inside the affected range is vertx-codegen 4.5.26. All of them are compileOnly transitives of keycloak-services 26.7.2 (via Quarkus) on the keycloak-spi module only, absent from every basetool runtime classpath and container-provided by Keycloak at runtime (re-verified 2026-08-19).</notes>
+    <notes>False positive: build-time-only + CPE expansion. CVE-2026-15075 (vertx-core HttpClient cross-origin redirect header leak) and CVE-2026-15076 (vertx-web-client WebClientSession cross-domain cookie injection, whose vulnerable class is not even on the classpath) affect Eclipse Vert.x 4.5.29 and earlier. Under Keycloak 26.7.3 our vertx-core / vertx-grpc* jars resolve to 4.5.31, above the 4.5.30 fix; the only coordinate still inside the affected range is vertx-codegen 4.5.26. All of them are compileOnly transitives of keycloak-services 26.7.3 (via Quarkus) on the keycloak-spi module only, absent from every basetool runtime classpath and container-provided by Keycloak at runtime (re-verified 2026-08-31).</notes>
     <packageUrl regex="true">^pkg:maven/io\.vertx/vertx-.*@4\.5\..*$</packageUrl>
     <cve>CVE-2026-15075</cve>
     <cve>CVE-2026-15076</cve>
