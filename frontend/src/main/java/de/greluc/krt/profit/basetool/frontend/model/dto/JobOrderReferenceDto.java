@@ -31,7 +31,9 @@ import java.util.UUID;
  * with the order's customer org unit (may be {@code null} on pre-rework rows). {@code
  * requiredGameItemIds} is the game-item sibling of {@code requiredMaterialIds} (REQ-INV-031): the
  * distinct game items an ITEM order's lines request, empty for MATERIAL orders — the item-view
- * order picker's gate.
+ * order picker's gate. {@code materialNeeds} carries what the order still needs per {@code
+ * (material, quality)} bucket so the allocation pickers can label an option with it (REQ-INV-039);
+ * it is <b>empty unless the page asked the lookup for it</b> ({@code withNeeds=true}).
  */
 public record JobOrderReferenceDto(
     UUID id,
@@ -41,4 +43,5 @@ public record JobOrderReferenceDto(
     SquadronReferenceDto requestingOrgUnit,
     List<JobOrderMaterialDto> materials,
     List<UUID> requiredMaterialIds,
-    List<UUID> requiredGameItemIds) {}
+    List<UUID> requiredGameItemIds,
+    List<JobOrderMaterialNeedDto> materialNeeds) {}

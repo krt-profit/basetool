@@ -136,6 +136,7 @@ class RefineryOrderStoreJobOrderDropdownTest {
             null,
             List.of(),
             List.of(outputMaterialId),
+            List.of(),
             List.of());
     JobOrderReferenceDto unrelated =
         new JobOrderReferenceDto(
@@ -146,6 +147,7 @@ class RefineryOrderStoreJobOrderDropdownTest {
             null,
             List.of(),
             List.of(UUID.randomUUID()),
+            List.of(),
             List.of());
 
     when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))

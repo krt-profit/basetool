@@ -240,6 +240,37 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
+  void inventoryInputOrderSeamMap_isASubsetOfTheOrdersQueueWhitelist() throws IOException {
+    // #1740 (REQ-INV-039): the Einbuchen form joins the global `orders` room to re-read the
+    // outstanding need its picker labels carry. It renders a SUBSET of that room — it reuses the
+    // existing `demand` key rather than introducing one — so it cannot match the whole whitelist
+    // the way the two partitioning pages do. Assert the key it names is a real section: the relay
+    // drops an unknown key silently, which would strand every viewer of this form on figures that
+    // never refresh, with no error anywhere (the REQ-FE-010 defect class).
+    Set<String> jsKeys =
+        seamMapKeys("/static/js/inventory-input.js", "INVENTORY_INPUT_ORDER_SECTIONS");
+    assertThat(jsKeys)
+        .as(
+            "INVENTORY_INPUT_ORDER_SECTIONS keys in inventory-input.js vs the ORDERS_QUEUE"
+                + " whitelist")
+        .isSubsetOf(LiveSyncTopicClass.ORDERS_QUEUE.allowedSections());
+  }
+
+  @Test
+  void inventoryPageOrderSeamMaps_areASubsetOfTheOrdersQueueWhitelist() throws IOException {
+    // #1740 (REQ-INV-039): both Lager pages already PUBLISH to `orders`/`demand`; since the
+    // allocation popover's options carry the outstanding need, they now RECEIVE on it too — an
+    // order-side write (a handover, an edited line) moves that figure without touching any
+    // inventory row, so `inventory`/`stock` alone would leave the popover stale.
+    assertThat(seamMapKeys("/static/js/inventory-admin.js", "INVENTORY_ALL_ORDER_SECTIONS"))
+        .as("INVENTORY_ALL_ORDER_SECTIONS keys in inventory-admin.js vs the ORDERS_QUEUE whitelist")
+        .isSubsetOf(LiveSyncTopicClass.ORDERS_QUEUE.allowedSections());
+    assertThat(seamMapKeys("/static/js/inventory-my.js", "INVENTORY_MY_ORDER_SECTIONS"))
+        .as("INVENTORY_MY_ORDER_SECTIONS keys in inventory-my.js vs the ORDERS_QUEUE whitelist")
+        .isSubsetOf(LiveSyncTopicClass.ORDERS_QUEUE.allowedSections());
+  }
+
+  @Test
   void inventoryAllSeamMap_matchesTheInventoryAllTopicWhitelist() throws IOException {
     // #1307: the shared Lager's INVENTORY_ALL_SECTIONS receiver map must mirror the
     // LiveSyncTopicClass.INVENTORY_ALL whitelist (the broadcast derives its keys from this map).

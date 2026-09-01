@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.support;
 
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -71,5 +72,40 @@ public final class QuantityTypeRounding {
    */
   public static double roundForQuantityType(double quantity, @Nullable Material material) {
     return roundForQuantityType(quantity, material == null ? null : material.getQuantityType());
+  }
+
+  /**
+   * Convenience overload for the projection side, where a material has already been mapped and its
+   * quantity type survives only as the DTO's text. An absent, blank or unrecognised value is
+   * treated as SCU — the {@link Material#getQuantityType()} default — rather than failing the whole
+   * read for one malformed catalog row, which is what a cross-order fold over many materials needs.
+   *
+   * @param quantity the raw, possibly noisy quantity
+   * @param material the mapped material whose textual quantity type selects the granularity, or
+   *     {@code null} (treated as SCU)
+   * @return the rounded quantity, in the material's own unit
+   */
+  public static double roundForQuantityType(double quantity, @Nullable MaterialDto material) {
+    return roundForQuantityType(
+        quantity, material == null ? null : parseQuantityType(material.quantityType()));
+  }
+
+  /**
+   * Resolves a DTO's textual quantity type back to the enum, tolerating the two shapes a projection
+   * can carry that an entity cannot: absent, and a value no longer in the enum.
+   *
+   * @param quantityType the textual quantity type, possibly {@code null}
+   * @return the parsed type, or {@code null} to mean "the SCU default"
+   */
+  @Nullable
+  private static QuantityType parseQuantityType(@Nullable String quantityType) {
+    if (quantityType == null) {
+      return null;
+    }
+    try {
+      return QuantityType.valueOf(quantityType);
+    } catch (IllegalArgumentException unknownType) {
+      return null;
+    }
   }
 }

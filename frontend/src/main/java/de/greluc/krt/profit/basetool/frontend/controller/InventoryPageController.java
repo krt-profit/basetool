@@ -32,7 +32,9 @@ import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -47,6 +49,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Spring MVC controller for the inventory read pages ({@code /inventory}, {@code /inventory/my},
@@ -186,6 +191,15 @@ public class InventoryPageController {
   private static final int DRILLDOWN_DEFAULT_PAGE_SIZE = 50;
 
   private final BackendApiClient backendApiClient;
+
+  /**
+   * Writes the check-in picker's per-order need figures into the page's {@code data-order-needs}
+   * attribute (REQ-INV-039). A {@code static} instance — writes are thread-safe and the
+   * server-rendered frontend context registers no shared {@code ObjectMapper} bean (the same
+   * rationale {@code RefineryImportProxyController} states for its own).
+   */
+  private static final ObjectMapper NEEDS_MAPPER = JsonMapper.builder().build();
+
   private final ParallelPageLoader parallelPageLoader;
 
   /** Resolves ADMIN/OFFICER onto LOGISTICIAN so the gate is asked, not enumerated. */
@@ -1201,7 +1215,13 @@ public class InventoryPageController {
         (p != null && p.content() != null) ? new ArrayList<>(p.content()) : new ArrayList<>();
     model.addAttribute("entries", entries);
     model.addAttribute("entriesPage", p);
-    model.addAttribute("jobOrders", fetchActiveJobOrders());
+    // `includeMissions` is this helper's material-mode gate (an item row carries no mission
+    // dimension, REQ-INV-031), and the allocation popover labels its order options with the
+    // outstanding need in material mode only (REQ-INV-039) — so the same flag decides both.
+    List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> stackJobOrders =
+        fetchActiveJobOrders(includeMissions);
+    model.addAttribute("jobOrders", stackJobOrders);
+    model.addAttribute("orderNeedAmounts", orderNeedAmounts(stackJobOrders));
     model.addAttribute(
         "missions",
         includeMissions
@@ -1248,7 +1268,7 @@ public class InventoryPageController {
     var materialsFuture = parallelPageLoader.loadAsync(this::fetchMaterials);
     var locationsFuture = parallelPageLoader.loadAsync(this::fetchLocations);
     var missionsFuture = parallelPageLoader.loadAsync(this::fetchMissions);
-    var jobOrdersFuture = parallelPageLoader.loadAsync(this::fetchActiveJobOrders);
+    var jobOrdersFuture = parallelPageLoader.loadAsync(() -> fetchActiveJobOrders(true));
     var ownerFuture = parallelPageLoader.loadAsync(() -> fetchOwnerPickerOptions(boundForm));
     var selectedUserFuture = parallelPageLoader.loadAsync(() -> fetchSelectedInputUser(boundForm));
     CompletableFuture.allOf(
@@ -1262,10 +1282,120 @@ public class InventoryPageController {
     model.addAttribute("materials", materialsFuture.join());
     model.addAttribute("locations", locationsFuture.join());
     model.addAttribute("missions", missionsFuture.join());
-    model.addAttribute("jobOrders", jobOrdersFuture.join());
+    List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> inputJobOrders =
+        jobOrdersFuture.join();
+    model.addAttribute("jobOrders", inputJobOrders);
+    // REQ-INV-039: the per-order need figures ride into the page as one JSON blob rather than as an
+    // attribute per <option>, because the allocation rows are CLONED from a <template> — a figure
+    // duplicated onto every clone would have to be rewritten on every clone when a peer's booking
+    // moves it. The live-sync refresh re-reads the identical shape from /inventory/order-needs, so
+    // the page script decodes one format and never has to reconcile two.
+    model.addAttribute("jobOrderNeedsJson", writeOrderNeedsJson(orderNeeds(inputJobOrders)));
     model.addAttribute("ownerOptions", ownerFuture.join());
     model.addAttribute("selectedUser", selectedUserFuture.join());
     return "inventory-input";
+  }
+
+  /**
+   * Re-reads the active-order catalog with its per-material need figures as JSON, for the Einbuchen
+   * form's live-sync refresh (REQ-INV-039, REQ-FE-010).
+   *
+   * <p>This exists as a frontend route rather than the page calling {@code /api/v1/orders/lookup}
+   * directly because a page script fetching an {@code /api/v1} path on the <em>frontend</em> origin
+   * gets a 404 — the backend API is not served here. It relays through the same authenticated
+   * client the page render uses, so the caller's order visibility is identical to the one that
+   * produced the options in the first place.
+   *
+   * <p>The receiver re-labels the picker options in place from this payload instead of swapping a
+   * fragment: the order options live in a {@code <template>} and every allocation row the member
+   * has already added holds a clone, which no fragment swap would reach — and a swap would discard
+   * a picked order and a typed amount mid-composition.
+   *
+   * @return the active orders with their needs; an empty list when the lookup fails, which leaves
+   *     the already-rendered labels standing rather than blanking them
+   */
+  @ResponseBody
+  @GetMapping(value = "/order-needs", headers = "X-Requested-With=XMLHttpRequest")
+  public Map<UUID, List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialNeedDto>>
+      orderNeedsAjax() {
+    return orderNeeds(fetchActiveJobOrders(true));
+  }
+
+  /**
+   * Flattens the order catalog's needs into the {@code "<orderId>|<materialId>"} lookup the
+   * allocation popover's option loop reads (REQ-INV-039).
+   *
+   * <p>A flat string key rather than a nested map because Thymeleaf resolves {@code
+   * map.get(order.id + '|' + entry.material.id)} in one expression, where a nested lookup would
+   * need a null-safe intermediate per option. Buckets of the same material at different quality
+   * levels are summed: what the order still needs of that material is their total, and the popover
+   * — unlike the check-in form — is not choosing a grade, so it has no floor to weigh them against.
+   *
+   * @param orders the loaded order catalog, already carrying its needs.
+   * @return outstanding amount by {@code orderId|materialId}; entries only where something is still
+   *     needed, so a fully covered bucket renders no suffix rather than a "0" one.
+   */
+  private static Map<String, Double> orderNeedAmounts(
+      List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> orders) {
+    Map<String, Double> amounts = new LinkedHashMap<>();
+    for (de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto order : orders) {
+      if (order.id() == null || order.materialNeeds() == null) {
+        continue;
+      }
+      for (de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialNeedDto need :
+          order.materialNeeds()) {
+        if (need.materialId() == null
+            || need.outstandingAmount() == null
+            || need.outstandingAmount() <= 0.0) {
+          continue;
+        }
+        amounts.merge(order.id() + "|" + need.materialId(), need.outstandingAmount(), Double::sum);
+      }
+    }
+    return amounts;
+  }
+
+  /**
+   * Reduces the order catalog to the shape the picker actually renders: order id &rarr; its
+   * outstanding per-bucket needs. Orders that require no material are dropped rather than mapped to
+   * an empty list, so the payload carries only what can produce a label.
+   *
+   * @param orders the loaded order catalog, already carrying its needs.
+   * @return the needs by order id, never {@code null}.
+   */
+  private static Map<
+          UUID, List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialNeedDto>>
+      orderNeeds(
+          List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> orders) {
+    Map<UUID, List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialNeedDto>>
+        needs = new LinkedHashMap<>();
+    for (de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto order : orders) {
+      if (order.id() != null && order.materialNeeds() != null && !order.materialNeeds().isEmpty()) {
+        needs.put(order.id(), order.materialNeeds());
+      }
+    }
+    return needs;
+  }
+
+  /**
+   * Serialises the need map for the page's {@code data-order-needs} attribute.
+   *
+   * <p>A serialisation failure yields {@code "{}"} rather than propagating: the figures are a
+   * convenience on a form whose actual job is booking stock in, so an unlabelled picker is the
+   * correct degradation and a 500 is not.
+   *
+   * @param needs the needs by order id.
+   * @return the JSON object, or {@code "{}"} when it cannot be written.
+   */
+  private String writeOrderNeedsJson(
+      Map<UUID, List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialNeedDto>>
+          needs) {
+    try {
+      return NEEDS_MAPPER.writeValueAsString(needs);
+    } catch (Exception e) {
+      log.warn("Failed to serialise job-order need figures for the check-in picker", e);
+      return "{}";
+    }
   }
 
   /**
@@ -1390,11 +1520,31 @@ public class InventoryPageController {
 
   private List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto>
       fetchActiveJobOrders() {
+    return fetchActiveJobOrders(false);
+  }
+
+  /**
+   * Loads the active-order catalog, optionally with each order's outstanding per-material need
+   * (REQ-INV-039).
+   *
+   * <p>The needs are asked for only by the two surfaces that render them — the Einbuchen form's
+   * allocation rows and the per-entry allocation popover — because folding an ITEM order's
+   * blueprint-derived requirements costs a read the filter dropdowns on the Lager pages, which use
+   * this catalog only for their order checkboxes, would otherwise pay on every page load.
+   *
+   * @param withNeeds whether to request the per-material need figures
+   * @return the active orders the caller may see; empty (never {@code null}) when the lookup fails,
+   *     so a picker degrades to unlabelled options rather than the page failing
+   */
+  private List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto>
+      fetchActiveJobOrders(boolean withNeeds) {
     List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> orders =
         new ArrayList<>();
     try {
       List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> content =
-          backendApiClient.get("/api/v1/orders/lookup", JOB_ORDER_REFERENCE_LIST);
+          backendApiClient.get(
+              withNeeds ? "/api/v1/orders/lookup?withNeeds=true" : "/api/v1/orders/lookup",
+              JOB_ORDER_REFERENCE_LIST);
       if (content != null) {
         orders.addAll(content);
       }

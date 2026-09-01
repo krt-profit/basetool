@@ -82,6 +82,14 @@ class JobOrderMaterialDemandServiceTest {
   @Mock private MaterialMapper materialMapper;
   @Mock private SquadronMapper squadronMapper;
 
+  /**
+   * Real, not mocked (#1740): the two-kind normalisation moved out of this service into the shared
+   * resolver, and these cases assert exactly that a MATERIAL line and an ITEM order's
+   * blueprint-derived requirement fold into one bucket. A mocked resolver would assert only that
+   * the service delegates.
+   */
+  @InjectMocks private JobOrderMaterialRequirementResolver materialRequirementResolver;
+
   @InjectMocks private JobOrderMaterialDemandService service;
 
   /** Stubbed batched stock lookup; each test decides what a bucket has linked to it. */
@@ -92,6 +100,10 @@ class JobOrderMaterialDemandServiceTest {
 
   @BeforeEach
   void setUp() {
+    // @InjectMocks would leave the extracted resolver as a mock returning no buckets, so every
+    // demand row would come back empty (#1740).
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        service, "materialRequirementResolver", materialRequirementResolver);
     stockIndex = mock(OrderLinkedStockIndex.class);
     titanium = material("Titanium", QuantityType.SCU);
     titaniumDto = materialDto(titanium);

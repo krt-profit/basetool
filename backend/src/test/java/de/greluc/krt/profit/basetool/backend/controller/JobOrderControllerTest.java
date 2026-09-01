@@ -288,13 +288,14 @@ class JobOrderControllerTest {
             null,
             List.of(),
             List.of(),
+            List.of(),
             List.of());
-    when(jobOrderQueryService.findAllActiveReference()).thenReturn(List.of(ref));
+    when(jobOrderQueryService.findAllActiveReference(false)).thenReturn(List.of(ref));
 
-    List<JobOrderReferenceDto> result = controller.lookupJobOrders();
+    List<JobOrderReferenceDto> result = controller.lookupJobOrders(false);
 
     assertThat(result).containsExactly(ref);
-    verify(jobOrderQueryService).findAllActiveReference();
+    verify(jobOrderQueryService).findAllActiveReference(false);
   }
 
   // ── GET /api/v1/orders/{id} ──────────────────────────────────────────

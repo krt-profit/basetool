@@ -46,6 +46,12 @@ import java.util.UUID;
  *     hides orders that do not request a row's game item. Always empty for a MATERIAL order (which
  *     accepts no item-stock link); a parallel set, not a replacement — material rows stay linkable
  *     to ITEM orders through {@code requiredMaterialIds}.
+ * @param materialNeeds what the order still needs per {@code (material, quality)} bucket, so the
+ *     Lager's allocation pickers can label an option with the outstanding amount instead of sending
+ *     the member to the order (REQ-INV-039). <b>Empty unless the lookup was asked for it</b>
+ *     ({@code withNeeds=true}): folding an ITEM order's blueprint-derived requirements costs a read
+ *     the pickers that show no figure must not pay for. Covers both order kinds, unlike {@code
+ *     materials}.
  */
 public record JobOrderReferenceDto(
     UUID id,
@@ -55,4 +61,5 @@ public record JobOrderReferenceDto(
     SquadronReferenceDto requestingOrgUnit,
     List<JobOrderMaterialDto> materials,
     List<UUID> requiredMaterialIds,
-    List<UUID> requiredGameItemIds) {}
+    List<UUID> requiredGameItemIds,
+    List<JobOrderMaterialNeedDto> materialNeeds) {}

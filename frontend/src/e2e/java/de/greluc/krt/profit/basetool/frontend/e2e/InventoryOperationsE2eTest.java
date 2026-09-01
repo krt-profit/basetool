@@ -135,6 +135,12 @@ class InventoryOperationsE2eTest {
   private static String viewStateMatId;
   private static String viewStateItemId;
 
+  // REQ-INV-039 need-label fixture: a job-order material and an order that requests 400 of
+  // it at a 650 floor, with NO stock ever linked — so the outstanding figure stays 400 no
+  // matter which other test in this class ran first.
+  private static String needMatId;
+  private static String needOrderId;
+
   /**
    * Launches the browser, performs the single shared login, and (ephemeral stack only) seeds the
    * IRIDIUM membership plus one isolated material+row per scenario: a shared source location, the
@@ -186,6 +192,13 @@ class InventoryOperationsE2eTest {
     assignOrderId =
         seeder.createJobOrder(
             USERNAME, PASSWORD, IRIDIUM_ID, "E2E Inv Assign Order", assignOrderMatId, 650, 100);
+
+    // REQ-INV-039: an order whose need the check-in picker must state. Deliberately left with
+    // no linked stock and never written to by another test, so the label is a fixed 400.
+    needMatId = seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Inv Need Mat");
+    needOrderId =
+        seeder.createJobOrder(
+            USERNAME, PASSWORD, IRIDIUM_ID, "E2E Inv Need Order", needMatId, 650, 400);
 
     assignMissionMatId =
         seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Inv Assign Mission Mat");
@@ -624,6 +637,54 @@ class InventoryOperationsE2eTest {
               amountAtLocation(stacks, refineryHubLocId),
               AMOUNT_DELTA,
               "a rejected transfer must not change the held amount");
+        });
+  }
+
+  /**
+   * <em>Restmenge an der Auftragsoption (REQ-INV-039).</em> Splitting a haul across orders used to
+   * mean opening each candidate to see what it still wanted. Picks the material of an order that
+   * requests 400 at a 650 floor and has no stock linked, adds an allocation row, and asserts the
+   * option carries the outstanding figure.
+   *
+   * <p>Then drops the entered quality below the order's floor and asserts the option additionally
+   * carries the marker: such an allocation is allowed (the gate is on the material alone) but the
+   * stock would not reduce that order's need, so a bare number there would mislead.
+   */
+  @Test
+  void checkInOrderOptionStatesTheOutstandingNeedAndTheQualityFloor() {
+    runFlow(
+        "inventory-order-need-label",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
+          page.waitForLoadState();
+
+          // A grade at or above the order's floor: the figure stands on its own.
+          page.locator("#quality").fill("700");
+          E2eSupport.selectComboboxByValue(
+              page.locator(".krt-combobox:has(#materialId) .krt-combobox__input"),
+              needMatId,
+              "E2E Inv Need Mat");
+          page.locator("[data-trigger='inv-input-add-order']").click();
+
+          Locator option =
+              page.locator(
+                  "#jobOrderAllocRows [data-alloc-target] option[value='" + needOrderId + "']");
+          assertThat(option).hasCount(1);
+          // "#<id> - <handle> (OPEN) · noch 400,000 SCU" — the separator and the decimal mark are
+          // locale-dependent, so pin the digits rather than the formatting.
+          assertThat(option)
+              .hasText(
+                  Pattern.compile(".*400.*"),
+                  new LocatorAssertions.HasTextOptions().setTimeout(10_000));
+          assertThat(option).not().hasText(Pattern.compile(".*650.*"));
+
+          // Below the floor: the option keeps its figure and gains the marker.
+          page.locator("#quality").fill("100");
+          assertThat(option)
+              .hasText(
+                  Pattern.compile(".*650.*"),
+                  new LocatorAssertions.HasTextOptions().setTimeout(10_000));
+          assertThat(option).hasText(Pattern.compile(".*400.*"));
         });
   }
 

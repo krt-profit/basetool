@@ -108,6 +108,11 @@ declare const umbuchenI18n: KrtI18nDict;
 // --- consumed by: inventory-input.js
 /** Injected by the page bootstrap (declared in inventory-input.html). */
 declare const INV_ADD_MSG: KrtI18nDict;
+/**
+ * The check-in order picker's need labels (REQ-INV-039). Injected by the page bootstrap (declared
+ * in inventory-input.html).
+ */
+declare const INV_ORDER_NEED_MSG: KrtI18nDict;
 
 // --- consumed by: inventory-input.js, orders-create.js, orders-detail.js
 /** Injected by the page bootstrap (declared in inventory-input.html). */

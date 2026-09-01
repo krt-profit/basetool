@@ -42403,8 +42403,17 @@
       "get" : {
         "tags" : [ "Orders" ],
         "summary" : "Lookup active job orders",
-        "description" : "Returns a reference list of active job orders.",
+        "description" : "Returns a reference list of active job orders. With withNeeds=true every order also carries its outstanding need per material bucket, for the Lager allocation pickers.",
         "operationId" : "lookupJobOrders",
+        "parameters" : [ {
+          "name" : "withNeeds",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        } ],
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -63509,6 +63518,31 @@
           }
         }
       },
+      "JobOrderMaterialNeedDto" : {
+        "type" : "object",
+        "properties" : {
+          "materialId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "qualityFloor" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "requiredAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "bookedAmount" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "outstandingAmount" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }
+      },
       "JobOrderReferenceDto" : {
         "type" : "object",
         "properties" : {
@@ -63548,6 +63582,12 @@
             "items" : {
               "type" : "string",
               "format" : "uuid"
+            }
+          },
+          "materialNeeds" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderMaterialNeedDto"
             }
           }
         }
