@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -79,23 +80,27 @@ class OrgUnitContextAdviceTest {
   }
 
   @Test
-  void adminSwitcher_routesSquadronAndSpecialCommandCataloguesThroughCache_notPlainGet() {
-    // REQ-DATA-007: the admin switcher's squadron AND special-command catalogues both go through
-    // getCached (URI-keyed STATIC_DATA_CACHE), never a plain GET. The SK catalogue became cacheable
-    // once every SK lifecycle mutation wired clearStaticDataCache()
-    // (AdminSpecialCommandsPageController
-    // + SpecialCommandAdminProxyController); this pins that both are cached now.
+  void switcher_asksTheServerWhichOrgUnitsMayBePinned_ratherThanBranchingItself() {
+    // Replaces the pair of tests that pinned this class's own admin/non-admin fork. The rule moved
+    // to GET /api/v1/me/org-units (ADR-0151, REQ-SEC-048): an admin gets the active catalogue,
+    // everyone else their memberships, decided once on the server. Two clients each knowing the
+    // rule is how the Android app came to offer an admin nothing to pin at all.
     when(authHelper.isAuthenticated()).thenReturn(true);
-    when(authHelper.isAdmin()).thenReturn(true);
 
     advice().availableOrgUnits();
 
-    verify(backendApiClient).getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef());
-    verify(backendApiClient, never())
-        .get(eq("/api/v1/squadrons?size=1000&sort=name,asc"), anyTypeRef());
-    verify(backendApiClient).getCached(eq(CachedCatalog.SPECIAL_COMMANDS), anyTypeRef());
-    verify(backendApiClient, never())
-        .get(eq("/api/v1/special-commands?size=1000&sort=name,asc"), anyTypeRef());
+    verify(backendApiClient).get(eq("/api/v1/me/org-units"), anyTypeRef());
+    // The catalogues this class used to page-walk for admins are no longer its business.
+    verify(backendApiClient, never()).getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef());
+    verify(backendApiClient, never()).getCached(eq(CachedCatalog.SPECIAL_COMMANDS), anyTypeRef());
+  }
+
+  @Test
+  void switcher_returnsEmptyForAnAnonymousCaller_withoutAskingTheBackend() {
+    when(authHelper.isAuthenticated()).thenReturn(false);
+
+    assertTrue(advice().availableOrgUnits().isEmpty());
+    verify(backendApiClient, never()).get(eq("/api/v1/me/org-units"), anyTypeRef());
   }
 
   @Test

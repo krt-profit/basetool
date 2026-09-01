@@ -150,6 +150,7 @@ class JobOrderControllerTest {
         List.of(),
         Instant.parse("2026-01-01T00:00:00Z"),
         1L,
+        null,
         false);
   }
 
@@ -366,6 +367,7 @@ class JobOrderControllerTest {
             java.util.Collections.singletonList(null), // itemHandovers — redacted
             Instant.parse("2026-01-01T00:00:00Z"),
             9L,
+            null,
             true); // the service already decided this is a requester-only (redacted) view
     when(jobOrderQueryService.getJobOrderById(id)).thenReturn(full);
 
@@ -418,6 +420,7 @@ class JobOrderControllerTest {
         null,
         null,
         1L,
+        null,
         null);
   }
 

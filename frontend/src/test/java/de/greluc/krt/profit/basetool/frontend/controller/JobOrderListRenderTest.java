@@ -144,6 +144,7 @@ class JobOrderListRenderTest {
             List.of(),
             Instant.now(),
             1L,
+            null,
             false);
 
     when(backendApiClient.get(
@@ -189,6 +190,7 @@ class JobOrderListRenderTest {
             List.of(),
             Instant.now(),
             1L,
+            null,
             false);
 
     when(backendApiClient.get(

@@ -19,14 +19,23 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -54,6 +63,10 @@ public class MeController {
 
   /** Answers role questions through the configured hierarchy rather than by literal match. */
   private final AuthHelperService authHelperService;
+
+  private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
+
+  private final UserService userService;
 
   /**
    * Returns the org-unit context that the backend currently applies to staffel-scoped queries for
@@ -88,6 +101,13 @@ public class MeController {
    *       for admins and any member of at least one org unit, independent of profit eligibility. It
    *       lets a non-profit ordering-squad member reach their own placed orders instead of being
    *       redirected to the create form.
+   *   <li>{@code isLogisticianOrAbove} / {@code isMissionManagerOrAbove} / {@code isAdmin} &mdash;
+   *       the caller's <em>authorisation</em> standing, resolved through the role hierarchy. They
+   *       exist because {@code UserDto}'s {@code isLogistician} / {@code isMissionManager} answer a
+   *       different question: those are Staffel-membership projections and are {@code false} for an
+   *       admin, who holds no Staffel membership by design. A client that gates on the membership
+   *       flag therefore hides Lager, Auftrag and payout actions from admins and officers that the
+   *       server would permit &mdash; which is exactly what happened (REQ-SEC-030).
    * </ul>
    *
    * @return the caller's UI capability flags; never {@code null}.
@@ -103,7 +123,52 @@ public class MeController {
         // Through the hierarchy on purpose: a Bankleitung holds BANK_MANAGEMENT and NOT
         // BANK_EMPLOYEE, so a direct check would hide the staff bank from the people who run it.
         authHelperService.hasReachableRole(Roles.authority(Roles.BANK_EMPLOYEE)),
-        authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)));
+        authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)),
+        // Same reason, and the reason these three exist at all. UserDto's isLogistician /
+        // isMissionManager are membership projections — resolveLogistician() reads the Staffel
+        // rows and nothing else — so they are false for an ADMIN, who by design holds no Staffel
+        // membership. A client gating on them hides actions from exactly the people most entitled
+        // to perform them. These are the authorisation answer instead of the membership one.
+        authHelperService.isLogisticianOrAbove(),
+        authHelperService.hasReachableRole(Roles.authority(Roles.MISSION_MANAGER)),
+        authHelperService.isAdmin());
+  }
+
+  /**
+   * Returns the org units the caller may pin as their active context.
+   *
+   * <p><strong>One endpoint instead of one branch per client.</strong> The rule has two halves: an
+   * admin may pin <em>any</em> active Staffel or Spezialkommando, while everyone else may pin only
+   * the units they belong to. Both clients had to know that, and only one of them did — the web
+   * frontend branched on {@code isAdmin()} and the Android app did not, so an admin (who by design
+   * holds no Staffel membership) was offered nothing but „Alle Org-Einheiten" and could not narrow
+   * the app to a unit at all. Encapsulating the branch here means a client asks one question and
+   * gets the right answer without reproducing the rule.
+   *
+   * <p>Staffel and SK only, matching what the switcher offers; the Bereich and Organisationsleitung
+   * tiers are a different picker ({@code GET /api/v1/org-units/active-all-kinds}) with a different
+   * consumer. Sorted by the query service, so both clients render the same order.
+   *
+   * <p>Carries no PII — org-unit names, shorthands and kinds only.
+   *
+   * @param jwt the caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
+   * @return the pinnable options; never {@code null}, possibly empty for a membership-less
+   *     non-admin.
+   */
+  @GetMapping("/org-units")
+  @PreAuthorize("isAuthenticated()")
+  @Transactional(readOnly = true)
+  @Operation(
+      summary = "List the org units the caller may pin as their active context",
+      description =
+          "Admins get every active Staffel and Spezialkommando; everyone else gets their own"
+              + " memberships. Encapsulates the branch both clients would otherwise duplicate.")
+  @ApiResponses(
+      value = {@ApiResponse(responseCode = "200", description = "Pinnable org-unit options")})
+  public List<OrgUnitMembershipOptionDto> getPinnableOrgUnits(@AuthenticationPrincipal Jwt jwt) {
+    return authHelperService.isAdmin()
+        ? orgUnitMembershipQueryService.listAllActiveOptions()
+        : orgUnitMembershipQueryService.listOptionsForUser(userService.getUserIdFromJwt(jwt));
   }
 
   /**
@@ -129,11 +194,26 @@ public class MeController {
    *     &mdash; {@code BANK_EMPLOYEE} or anything above it in the role hierarchy.
    * @param canManageBank {@code true} iff the caller additionally holds {@code BANK_MANAGEMENT},
    *     which is what gates the account lifecycle and the grants matrix.
+   * @param isLogisticianOrAbove {@code true} iff the caller reaches {@code LOGISTICIAN} through the
+   *     role hierarchy &mdash; so {@code LOGISTICIAN}, {@code OFFICER} and {@code ADMIN} alike.
+   *     This is the flag a client gates the Lager and the Auftrag write paths on. It is
+   *     deliberately <em>not</em> {@code UserDto.isLogistician()}, which is a Staffel-membership
+   *     projection and is {@code false} for an admin.
+   * @param isMissionManagerOrAbove {@code true} iff the caller reaches {@code MISSION_MANAGER}
+   *     through the hierarchy &mdash; {@code MISSION_MANAGER}, {@code OFFICER}, {@code ADMIN}. The
+   *     flag behind the Operation's payout confirmation; the same membership-versus-authorisation
+   *     distinction applies as above.
+   * @param isAdmin {@code true} iff the caller holds {@code ADMIN}. Clients use it for the surfaces
+   *     where admin is not merely "above" a role but a different scope altogether &mdash; an admin
+   *     sees every org unit rather than their own memberships.
    */
   public record CapabilitiesResponse(
       boolean canSeeBlueprintOverview,
       boolean canViewJobOrders,
       boolean canViewOwnJobOrders,
       boolean canViewBankStaff,
-      boolean canManageBank) {}
+      boolean canManageBank,
+      boolean isLogisticianOrAbove,
+      boolean isMissionManagerOrAbove,
+      boolean isAdmin) {}
 }

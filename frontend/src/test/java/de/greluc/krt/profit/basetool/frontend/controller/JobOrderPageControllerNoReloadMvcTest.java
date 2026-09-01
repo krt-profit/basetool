@@ -134,6 +134,7 @@ class JobOrderPageControllerNoReloadMvcTest {
         List.of(),
         Instant.now(),
         version,
+        null,
         false);
   }
 

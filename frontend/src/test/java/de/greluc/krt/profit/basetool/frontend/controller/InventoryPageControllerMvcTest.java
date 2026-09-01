@@ -774,6 +774,7 @@ class InventoryPageControllerMvcTest {
             null,
             null,
             1L,
+            null,
             Instant.now());
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(item), 1, 50, 120, 3, Collections.emptyList());
@@ -916,6 +917,7 @@ class InventoryPageControllerMvcTest {
             null,
             null,
             1L,
+            null,
             Instant.parse("2026-02-03T10:15:30Z"));
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
@@ -981,6 +983,7 @@ class InventoryPageControllerMvcTest {
             null,
             null,
             1L,
+            null,
             Instant.parse("2026-02-03T10:15:30Z"));
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
@@ -1046,6 +1049,7 @@ class InventoryPageControllerMvcTest {
             null,
             null,
             1L,
+            null,
             Instant.parse("2026-02-03T10:15:30Z"));
 
     // Both ITEM orders carry an empty MATERIAL-lines list; only requiredMaterialIds distinguishes
@@ -1397,6 +1401,7 @@ class InventoryPageControllerMvcTest {
             null,
             null,
             1L,
+            null,
             Instant.parse("2026-01-01T00:00:00Z"));
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
@@ -1791,6 +1796,7 @@ class InventoryPageControllerMvcTest {
             null,
             null,
             1L,
+            null,
             Instant.parse("2026-03-01T00:00:00Z"));
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(item), 0, 1000, 1, 1, Collections.emptyList());
@@ -1839,6 +1845,7 @@ class InventoryPageControllerMvcTest {
             null,
             null,
             1L,
+            null,
             Instant.parse("2026-03-01T00:00:00Z"));
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(item), 1, 50, 130, 3, Collections.emptyList());
@@ -1892,6 +1899,7 @@ class InventoryPageControllerMvcTest {
             null,
             null,
             1L,
+            null,
             Instant.parse("2026-03-01T00:00:00Z"));
     JobOrderReferenceDto matching =
         new JobOrderReferenceDto(
@@ -1991,6 +1999,7 @@ class InventoryPageControllerMvcTest {
             null,
             null,
             1L,
+            null,
             Instant.parse("2026-03-01T00:00:00Z"));
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
@@ -2055,6 +2064,7 @@ class InventoryPageControllerMvcTest {
             null,
             null,
             1L,
+            null,
             Instant.parse("2026-03-01T00:00:00Z"));
 
     when(backendApiClient.get(anyString(), anyTypeRef()))

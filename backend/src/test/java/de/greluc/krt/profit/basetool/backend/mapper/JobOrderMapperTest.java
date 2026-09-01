@@ -86,6 +86,22 @@ class JobOrderMapperTest {
     ReflectionTestUtils.setField(mapper, "materialMapper", materialMapper);
     ReflectionTestUtils.setField(mapper, "jobOrderHandoverMapper", handoverMapper);
     ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
+    // The caller-aware seam behind canEdit (REQ-SEC-047). Answering true keeps these tests about
+    // the field mapping; the role-and-scope rule itself is covered where it lives.
+    ReflectionTestUtils.setField(
+        mapper,
+        "stockAccess",
+        new de.greluc.krt.profit.basetool.backend.support.StockViewerAccess() {
+          @Override
+          public boolean canEditInventoryItem(java.util.UUID inventoryItemId) {
+            return true;
+          }
+
+          @Override
+          public boolean mayEditJobOrder(java.util.UUID jobOrderId) {
+            return true;
+          }
+        });
   }
 
   @Test
