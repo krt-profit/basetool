@@ -670,21 +670,22 @@ class InventoryOperationsE2eTest {
               page.locator(
                   "#jobOrderAllocRows [data-alloc-target] option[value='" + needOrderId + "']");
           assertThat(option).hasCount(1);
-          // "#<id> - <handle> (OPEN) · noch 400,000 SCU" — the separator and the decimal mark are
-          // locale-dependent, so pin the digits rather than the formatting.
+          // "#<id> - <handle> (OPEN) · noch 400,000 SCU". Pin the SUFFIX, not a lone number: the
+          // option's own auto-incremented displayId can contain "400", so ".*400.*" would pass with
+          // the label missing entirely. The decimal mark stays out — it is locale-dependent.
           assertThat(option)
               .hasText(
-                  Pattern.compile(".*400.*"),
+                  Pattern.compile(".*·\s*noch\s*400.*"),
                   new LocatorAssertions.HasTextOptions().setTimeout(10_000));
-          assertThat(option).not().hasText(Pattern.compile(".*650.*"));
+          assertThat(option).not().hasText(Pattern.compile(".*benötigt.*"));
 
           // Below the floor: the option keeps its figure and gains the marker.
           page.locator("#quality").fill("100");
           assertThat(option)
               .hasText(
-                  Pattern.compile(".*650.*"),
+                  Pattern.compile(".*benötigt\s*650.*"),
                   new LocatorAssertions.HasTextOptions().setTimeout(10_000));
-          assertThat(option).hasText(Pattern.compile(".*400.*"));
+          assertThat(option).hasText(Pattern.compile(".*·\s*noch\s*400.*"));
         });
   }
 

@@ -52,9 +52,13 @@ import java.util.UUID;
  * @param allocatedAmount whole units of item stock currently earmarked to this order for the game
  *     item, summed over the entries' own slices (Variante C, REQ-INV-027) — never the whole row
  * @param outstandingAmount {@code orderedAmount − deliveredAmount − allocatedAmount}, floored at 0:
- *     what still has to be procured or built. The floor is not cosmetic — a handover may outrun its
- *     earmarked stock (the best-effort shortfall {@code JobOrderItemHandoverService} tolerates for
- *     a legacy line), which can otherwise drive the difference negative
+ *     what still has to be procured or built. The floor is not cosmetic, but the mechanism is
+ *     <b>over-earmarking</b>, not a handover: {@code deliveredAmount} can never exceed {@code
+ *     orderedAmount} (the line's own invariant, and {@code JobOrderItemHandoverService} refuses
+ *     over-delivery), while nothing caps an earmark against what the order still wants — {@code
+ *     InventoryItemService.assertGameItemRequiredByJobOrder} checks only that the order requests
+ *     the game item at all. A member may therefore earmark more units to an order than it has left
+ *     to receive, and the raw difference goes negative
  */
 public record JobOrderGameItemNeedDto(
     UUID gameItemId,
