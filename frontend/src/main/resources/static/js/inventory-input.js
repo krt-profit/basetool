@@ -45,7 +45,7 @@
  * bootstrap block of inventory-input.html, which executes immediately before this classic script.
  */
 
-/* global MSG_UNIT_PIECE, MSG_UNIT_SCU, INV_ADD_MSG */
+/* global MSG_UNIT_PIECE, MSG_UNIT_SCU, INV_ADD_MSG, INV_ORDER_NEED_MSG */
 
 document.addEventListener('DOMContentLoaded', function () {
     const matSelect = document.getElementById('materialId');
@@ -68,6 +68,13 @@ document.addEventListener('DOMContentLoaded', function () {
             filterOrderSelects(this.value);
             syncGameItemNameEcho(this);
         });
+    }
+
+    // REQ-INV-039: the quality-floor marker on an order option is relative to the grade being
+    // booked, so a changed grade re-decides which options carry it.
+    const qualityInput = document.getElementById('quality');
+    if (qualityInput) {
+        qualityInput.addEventListener('input', relabelOrderOptions);
     }
 
     const personalToggle = document.getElementById('personal');
@@ -101,7 +108,60 @@ document.addEventListener('DOMContentLoaded', function () {
     // Apply the server-derived initial mode (item on a gameItemId-carrying redisplay) so the
     // inactive block starts disabled and the amount/allocation wiring matches the visible catalog.
     applyCatalogMode();
+
+    startOrderNeedsLiveSync();
 });
+
+// #1740 (REQ-FE-010, REQ-INV-039): the need figures go stale the moment a peer books stock against
+// one of these orders, records a handover, or edits a line — so the form joins the global `orders`
+// room and re-reads them.
+//
+// It reuses that room's existing `demand` section rather than introducing a key: this page renders
+// a SUBSET of what the room already invalidates (the material-collection precedent), and `demand`
+// is poked by exactly the writers that move this figure — orders-detail on any queue-visible
+// mutation, and both Lager pages after an order-linked stock write.
+//
+// The refresh replaces the map and re-labels rather than swapping a fragment. A swap cannot reach
+// the cloned rows, and it would take a picked order and a typed amount with it.
+const INVENTORY_INPUT_ORDER_SECTIONS = {
+    demand: { container: '#jobOrderAllocGroup', fragmentValue: 'demand' },
+};
+
+function startOrderNeedsLiveSync() {
+    if (
+        !window.krtLiveSync ||
+        typeof window.krtLiveSync.createReceiver !== 'function' ||
+        !document.getElementById('jobOrderAllocGroup')
+    ) {
+        return;
+    }
+    window.krtLiveSync.createReceiver({
+        topic: 'orders',
+        sections: INVENTORY_INPUT_ORDER_SECTIONS,
+        coalesceMs: 1500,
+        refresh: refreshOrderNeeds,
+    });
+}
+
+// Re-reads the figures through the frontend relay (a page script cannot reach /api/v1 on this
+// origin) and re-labels in place. A failed read leaves the standing labels alone: a figure that is
+// a few seconds old beats a picker that suddenly says nothing.
+function refreshOrderNeeds() {
+    fetch('/inventory/order-needs', {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+    })
+        .then(function (response) {
+            return response.ok ? response.json() : null;
+        })
+        .then(function (needs) {
+            if (!needs) return;
+            orderNeeds = needs;
+            relabelOrderOptions();
+        })
+        .catch(function () {
+            /* keep the standing labels */
+        });
+}
 
 // ===== Material <-> Item catalog-mode toggle (design §6.2) =====
 
@@ -339,7 +399,135 @@ function filterOrderSelects(catalogId) {
     // Clearing an incompatible selection above fires no `change`, so the Σ / over-warning and the
     // single-target hint have to be recomputed here — otherwise switching the material silently
     // leaves both reading the dropped order row.
+    relabelOrderOptions();
     updateAllocOver();
+}
+
+// ===== Outstanding need on the order options (REQ-INV-039) =====
+//
+// Splitting a haul across orders used to mean opening each candidate order in another tab to see
+// what it still needed. The figure now rides on the option itself: `#1042 - Handle (OPEN) · noch
+// 1200.000 SCU`.
+//
+// It is deliberately NOT stored per <option>: the allocation rows are cloned from the <template>,
+// so N rows hold N copies of the same option list, and a peer's booking would have to be written
+// into every one of them. The figures live in ONE module-level map keyed by order id, and every
+// label is (re)computed from it — the same map the live-sync refresh below replaces wholesale.
+
+// Order id -> its outstanding per-(material, quality) buckets, as the backend projected them.
+let orderNeeds = readEmbeddedOrderNeeds();
+
+// Seeds the map from the blob the page rendered. A malformed or absent value degrades to "no
+// figures" — unlabelled options are a lesser failure on a form whose job is booking stock in.
+function readEmbeddedOrderNeeds() {
+    const group = document.getElementById('jobOrderAllocGroup');
+    const raw = group ? group.getAttribute('data-order-needs') : '';
+    if (!raw) return {};
+    try {
+        return JSON.parse(raw) || {};
+    } catch (_malformed) {
+        return {};
+    }
+}
+
+// One order's outstanding need for one material, summed across its quality buckets, plus the
+// highest floor among them. A material required at two quality levels yields two buckets; the sum
+// is what the order still needs of that material, and the floor is what the entered grade is
+// checked against. Returns null when this order does not require the material at all.
+function orderNeedFor(orderId, materialId) {
+    const buckets = orderNeeds[orderId];
+    if (!buckets || !buckets.length || !materialId) return null;
+    let outstanding = 0;
+    let floor = null;
+    let matched = false;
+    buckets.forEach(function (bucket) {
+        if (bucket.materialId !== materialId) return;
+        matched = true;
+        if (typeof bucket.outstandingAmount === 'number') outstanding += bucket.outstandingAmount;
+        if (
+            typeof bucket.qualityFloor === 'number' &&
+            (floor === null || bucket.qualityFloor > floor)
+        ) {
+            floor = bucket.qualityFloor;
+        }
+    });
+    return matched ? { outstanding: outstanding, floor: floor } : null;
+}
+
+// The picked material's quantity type, read the same way updateAmountFieldForMaterial reads it (the
+// combobox mirrors it onto the hidden input; the raw <select> is the un-enhanced fallback).
+function pickedMaterialQuantityType() {
+    const el = document.getElementById('materialId');
+    if (!el) return '';
+    if (el.dataset && el.dataset.quantityType) return el.dataset.quantityType;
+    const opt = el.selectedOptions && el.selectedOptions[0];
+    return (opt && opt.getAttribute('data-quantity-type')) || '';
+}
+
+// Renders an amount in its material's own precision — whole for PIECE, three decimals for SCU
+// (REQ-INV-027) — mirroring inventory-admin.js's assocFormatAmount so the two surfaces print one
+// number identically.
+function formatNeedAmount(amount, isPiece) {
+    const n = typeof amount === 'number' ? amount : parseFloat(amount);
+    if (isNaN(n)) return '0';
+    return isPiece ? String(Math.round(n)) : n.toFixed(3);
+}
+
+// Rewrites every order option's label to carry the outstanding need for the picked material.
+//
+// Material mode only: an item check-in's need is a different figure (ordered − delivered against
+// built item stock, not a material bucket) and is not projected here, so an item-mode picker keeps
+// its plain labels rather than borrowing a number that does not answer its question.
+//
+// The server-rendered label is stashed on first pass and every rewrite starts from it, so repeated
+// material changes never stack suffixes.
+function relabelOrderOptions() {
+    const materialMode = currentCatalogMode() === 'material';
+    const materialId = materialMode ? activeCatalogId() : '';
+    const isPiece = pickedMaterialQuantityType() === 'PIECE';
+    const unit = isPiece ? MSG_UNIT_PIECE : MSG_UNIT_SCU;
+    const grade = parseInt((document.getElementById('quality') || {}).value, 10);
+    document.querySelectorAll('#jobOrderAllocRows [data-alloc-target]').forEach(function (select) {
+        for (let i = 1; i < select.options.length; i++) {
+            applyOrderOptionLabel(select.options[i], materialId, isPiece, unit, grade);
+        }
+    });
+    // The <template>'s own options are the master every future row is cloned from, so they carry the
+    // current labels too — otherwise the next "+ Auftrag" row would appear unlabelled until the
+    // material was touched again.
+    const template = document.getElementById('jobOrderRowTemplate');
+    if (template && template.content) {
+        template.content.querySelectorAll('[data-alloc-target] option').forEach(function (option) {
+            if (option.value) applyOrderOptionLabel(option, materialId, isPiece, unit, grade);
+        });
+    }
+}
+
+// Applies (or removes) one option's need suffix.
+function applyOrderOptionLabel(option, materialId, isPiece, unit, grade) {
+    if (!option.dataset.baseLabel) option.dataset.baseLabel = option.textContent;
+    const base = option.dataset.baseLabel;
+    const need = materialId ? orderNeedFor(option.value, materialId) : null;
+    if (!need) {
+        option.textContent = base;
+        return;
+    }
+    const parts = [];
+    parts.push(
+        need.outstanding > 0
+            ? INV_ORDER_NEED_MSG.outstanding.replace(
+                  '{0}',
+                  formatNeedAmount(need.outstanding, isPiece) + ' ' + unit,
+              )
+            : INV_ORDER_NEED_MSG.covered,
+    );
+    // An allocation is gated on the MATERIAL alone — stock below an order's quality floor may be
+    // earmarked to it and simply will not reduce the figure beside it. Saying so is the difference
+    // between a number and a misleading one.
+    if (need.floor !== null && !isNaN(grade) && grade < need.floor) {
+        parts.push(INV_ORDER_NEED_MSG.qualityFloor.replace('{0}', String(need.floor)));
+    }
+    option.textContent = base + ' · ' + parts.join(' · ');
 }
 
 // Sums a dimension's entered allocation amounts.

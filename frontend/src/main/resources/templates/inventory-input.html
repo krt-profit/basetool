@@ -189,7 +189,13 @@
                      carries; an empty section falls back to no assignment. With exactly ONE target
                      row the amount may stay blank — the write controller then earmarks the entry's
                      whole amount to it (single-target shorthand); the hint states that. -->
-                <div class="form-group" id="jobOrderAllocGroup">
+                <!-- REQ-INV-039: the per-order outstanding need rides in as one JSON blob keyed by
+                     order id, NOT as an attribute per <option>: the rows below are cloned from the
+                     <template>, so a figure copied onto every clone would have to be rewritten on
+                     every clone whenever a peer's booking moves it. inventory-input.js decodes this
+                     once and re-reads the identical shape from /inventory/order-needs on a live-sync
+                     frame, so there is one format rather than two. -->
+                <div class="form-group" id="jobOrderAllocGroup" th:attr="data-order-needs=${jobOrderNeedsJson}">
                     <label th:text="#{inventory.input.orders.label}">Aufträge zuordnen (optional)</label>
                     <div id="jobOrderAllocRows" data-alloc-rows="jobOrder"></div>
                     <p class="form-hint" id="jobOrderAllocSingleHint" th:text="#{inventory.input.alloc.single}">Bei genau einer Zuordnung kann die Menge leer bleiben - dann wird die gesamte Menge zugeordnet.</p>
@@ -266,6 +272,12 @@
     /*<![CDATA[*/
     const MSG_UNIT_PIECE = /*[[#{material.quantity.piece}]]*/ 'Stueck';
     const MSG_UNIT_SCU = /*[[#{material.quantity.scu}]]*/ 'SCU';
+    // REQ-INV-039: the picker's need labels; {0} is the formatted amount / the quality floor.
+    const INV_ORDER_NEED_MSG = {
+        outstanding: /*[[#{inventory.input.order.need}]]*/ 'noch {0}',
+        covered: /*[[#{inventory.input.order.need.covered}]]*/ 'gedeckt',
+        qualityFloor: /*[[#{inventory.input.order.need.quality}]]*/ 'benoetigt {0}+'
+    };
     const INV_ADD_MSG = {
         failed: /*[[#{error.inventory.add.failed}]]*/ 'Fehler.',
         personalAssignment: /*[[#{error.inventory.personal.assignment}]]*/ 'Ungueltig.',

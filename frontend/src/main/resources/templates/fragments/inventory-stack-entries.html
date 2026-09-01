@@ -77,10 +77,15 @@
                                                 data-trigger="inv-my-assoc-pick"
                                                 th:data-combobox-placeholder="#{inventory.assoc.add.order}">
                                             <option value=""></option>
+                                            <!-- REQ-INV-039: the option carries what this order still needs of THIS entry's
+                                                 material, so choosing a target does not mean opening the order first. The
+                                                 lookup is keyed orderId|materialId (orderNeedAmounts); an order that needs
+                                                 nothing more has no entry and keeps its plain label. -->
                                             <option th:each="order : ${jobOrders}"
                                                     th:if="${order.requiredMaterialIds != null and #lists.contains(order.requiredMaterialIds, entry.material.id) and not #lists.contains(entry.jobOrderAllocations.![jobOrderId], order.id)}"
+                                                    th:with="orderNeed=${orderNeedAmounts != null ? orderNeedAmounts.get(order.id + '|' + entry.material.id) : null}"
                                                     th:value="${order.id}"
-                                                    th:text="'#' + ${order.displayId}"></option>
+                                                    th:text="${orderNeed == null} ? ('#' + ${order.displayId}) : ('#' + ${order.displayId} + ' · ' + #{inventory.assoc.order.need(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(orderNeed, 1, 'NONE') : #numbers.formatDecimal(orderNeed, 1, 'NONE', 3, 'DEFAULT')) + ' ' + (entry.material.quantityType == 'PIECE' ? #messages.msg('material.quantity.piece') : #messages.msg('material.quantity.scu'))})})"></option>
                                         </select>
                                     </div>
                                     <div class="assoc-pop__menge krtm-hidden" data-assoc-pop-amount>
@@ -461,10 +466,13 @@
                                                     data-trigger="inv-admin-assoc-pick"
                                                     th:data-combobox-placeholder="#{inventory.assoc.add.order}">
                                                 <option value=""></option>
+                                                <!-- REQ-INV-039: see the sibling picker above — the option states what this
+                                                     order still needs of the entry's material. -->
                                                 <option th:each="order : ${jobOrders}"
                                                         th:if="${order.requiredMaterialIds != null and #lists.contains(order.requiredMaterialIds, entry.material.id) and not #lists.contains(entry.jobOrderAllocations.![jobOrderId], order.id)}"
+                                                        th:with="orderNeed=${orderNeedAmounts != null ? orderNeedAmounts.get(order.id + '|' + entry.material.id) : null}"
                                                         th:value="${order.id}"
-                                                        th:text="'#' + ${order.displayId}"></option>
+                                                        th:text="${orderNeed == null} ? ('#' + ${order.displayId}) : ('#' + ${order.displayId} + ' · ' + #{inventory.assoc.order.need(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(orderNeed, 1, 'NONE') : #numbers.formatDecimal(orderNeed, 1, 'NONE', 3, 'DEFAULT')) + ' ' + (entry.material.quantityType == 'PIECE' ? #messages.msg('material.quantity.piece') : #messages.msg('material.quantity.scu'))})})"></option>
                                             </select>
                                         </div>
                                         <div class="assoc-pop__menge krtm-hidden" data-assoc-pop-amount>

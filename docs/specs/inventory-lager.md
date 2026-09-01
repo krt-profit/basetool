@@ -920,6 +920,110 @@ them; everything else below holds verbatim on both.
 (`toggleAdminFilterPanel` / `initAdminFilterPanel` / `countActiveAdminInventoryFilters` /
 `updateAdminFilterCountBadge`) · **Issues:** — · **ADR:** — (extends REQ-UI-017 / ADR-0120)
 
+### REQ-INV-039 — The allocation pickers say what each order still needs
+
+Splitting a check-in across several orders (REQ-INV-027 R4) means deciding how much each one should
+get, and the picker used to identify a candidate only as `#<displayId> - <handle> (<status>)`. The
+member had to open every candidate order in another tab to find out what it still needed. Both
+allocation pickers therefore **state the outstanding need beside the order**.
+
+**The figure.** For the picked material and one order:
+
+> `noch benoetigt = max(0, outstanding requirement - order-linked stock)`
+
+summed over that material's quality buckets. It is the per-order narrowing of
+`MaterialDemandRowDto.outstandingAmount` (REQ-ORDERS-034) and is folded from the **same**
+normalisation and the **same** batched stock index, so a picker label, the cross-order demand
+overview and the order detail can never print three different numbers. Three properties are load
+bearing, and each has a wrong-looking alternative:
+
+- **The requirement is already the remainder.** A MATERIAL line's `amount` is decremented in place
+  by a handover (`JobOrderHandoverService`); an ITEM order's blueprint-derived requirement is
+  already scaled by its not-yet-manufactured share. Subtracting handovers again double-counts them.
+- **Claims never shrink it.** `openAmount` is `required - claims` — a promise that has moved no
+  stock (REQ-ORDERS-024). Using it would report a merely-claimed bucket as covered.
+- **Both order kinds carry a figure.** An ITEM (crafting) order is offered for every material its
+  blueprint consumes (REQ-ORDERS-018) and has no `job_order_material` rows at all, so a projection
+  reading only `materials` would leave a blank beside exactly the orders whose need is hardest to
+  look up by hand.
+
+**Opt-in on the wire.** `GET /api/v1/orders/lookup` ships `materialNeeds` only for
+`withNeeds=true`. The same lookup feeds the Lager pages' filter dropdowns, which render no figure,
+and folding an ITEM order's requirements is a read they must not pay for. Visibility is unchanged:
+the projection is built from the orders the lookup already returns.
+
+**The quality marker.** An allocation is gated on the required **material** alone — never on
+quality — while the order's linked stock is summed at the bucket's own floor (`GOOD` -> 650, `NONE`
+-> none). Grade-400 ore may therefore be earmarked to a 650-floor order and will simply not reduce
+that order's need. The check-in form, which is the one surface where a grade is being chosen, marks
+such an option (`benoetigt 650+`) whenever the entered grade falls below the floor. The figure is
+still shown: the option is legitimate, and the marker is what keeps the number from misleading.
+
+**Two surfaces, two rendering paths, and the reason they differ.**
+
+|             Surface              |                Path                 |                 Rendered                 |
+|----------------------------------|-------------------------------------|------------------------------------------|
+| Einbuchen form's allocation rows | `/inventory/input`                  | client-side, from one embedded JSON blob |
+| Per-entry `+ Zuordnen` popover   | `/inventory/{my,all}` stack entries | server-side, in the option text          |
+
+The form's rows are **cloned from a `<template>`**, so N rows hold N copies of the option list; the
+figures live in one module-level map keyed by order id and every label is computed from it, rather
+than being duplicated onto every clone and rewritten on each of them. The popover's picker is a
+**combobox**, which snapshots an option's text when it enhances the `<select>` — a label written
+after that point would never appear — so its label is server-rendered, which it can be because the
+entry's material is already fixed.
+
+**Live-sync (REQ-FE-010).** The figure moves when a peer books stock against one of these orders,
+records a handover, edits a line, or opens/closes an order. Both surfaces therefore join the global
+`orders` room and re-read, reusing its existing `demand` section as **subset consumers** (the
+`material-collection.js` precedent) rather than introducing a key: `demand` is published by exactly
+those writers, and the room's `canViewJobOrders` gate is the same gate that decides whether the
+picker has any orders at all. The Einbuchen form's refresh **re-reads JSON and re-labels in place**
+through `GET /inventory/order-needs` — it never swaps a fragment, because a swap cannot reach the
+cloned rows and would take a picked order and a typed amount with it. The Lager pages re-pull their
+grouped table, whose collapsed stacks re-fetch their entries (and so their labels) on the next
+expand. The receiver's default busy guard applies: while the member has focus inside the allocation
+group, the update is held behind the "updates available" pill instead of moving a number under a
+half-typed split.
+
+**Item mode is out of scope here.** Booking *finished items* against an ITEM order is a different
+figure (ordered minus delivered, against built item stock — `JobOrderItemStockGroupDto`), not a
+material bucket. The item-mode picker keeps its plain labels rather than borrowing a number that
+does not answer its question.
+
+**Acceptance criteria**
+
+- [ ] With a material picked, every order option in the Einbuchen form's allocation rows states what
+  that order still needs of it, in the material's own unit and rounding (whole for `PIECE`, three
+  decimals for SCU, REQ-INV-027).
+- [ ] A fully covered order reads "gedeckt" rather than "noch 0".
+- [ ] An ITEM order whose blueprint consumes the picked material carries a figure, not a blank.
+- [ ] Changing the picked material re-computes every label, including the rows already added, and
+  never stacks suffixes.
+- [ ] An option whose order requires a higher grade than the one being entered additionally carries
+  the quality marker; changing the grade re-decides it.
+- [ ] The `+ Zuordnen` popover on `/inventory/my` and `/inventory/all` labels its options with the
+  same figure for the entry's own material.
+- [ ] The figures reconcile with `/orders/material-demand` and with the order detail for the same
+  bucket.
+- [ ] `withNeeds=false` (the default) ships no figures and fires no stock query.
+- [ ] A peer's booking against a listed order moves the figure on both surfaces with no reload; a
+  failed re-read leaves the standing labels rather than blanking them.
+
+**Enforced by:** `JobOrderReferenceNeedsTest`, `InventoryPageControllerMvcTest`
+(`viewInputPage_ShouldEmbedTheOutstandingNeedFigures`,
+`orderNeedsAjax_ShouldAnswerTheNeedsKeyedByOrderId`,
+`viewAllStackEntries_ShouldLabelOrderOptionsWithTheOutstandingNeed`),
+`LiveSyncSectionMapParityTest`
+(`inventoryInputOrderSeamMap_isASubsetOfTheOrdersQueueWhitelist`,
+`inventoryPageOrderSeamMaps_areASubsetOfTheOrdersQueueWhitelist`) · **Code:**
+`JobOrderMaterialRequirementResolver`, `JobOrderQueryService#findAllActiveReference`,
+`JobOrderMaterialNeedDto`, `InventoryPageController#orderNeedsAjax`,
+`templates/inventory-input.html`, `static/js/inventory-input.js` (`relabelOrderOptions` /
+`refreshOrderNeeds`), `templates/fragments/inventory-stack-entries.html`,
+`static/js/inventory-{my,admin}.js` · **Issues:** #1740 · **ADR:** — (extends REQ-INV-027 /
+REQ-ORDERS-034)
+
 ## Out of scope
 
 - Tenancy / visibility scope of inventory (strict-staffel Lager-View) is governed by

@@ -387,7 +387,7 @@ class JobOrderServiceAssigneeAndListTest {
       when(ownerScopeService.canViewJobOrders()).thenReturn(true);
       when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of());
 
-      assertTrue(queryService.findAllActiveReference().isEmpty());
+      assertTrue(queryService.findAllActiveReference(false).isEmpty());
     }
 
     @Test
@@ -395,7 +395,7 @@ class JobOrderServiceAssigneeAndListTest {
       // M-2: the viewer-side profit gate short-circuits before the repository is even touched.
       when(ownerScopeService.canViewJobOrders()).thenReturn(false);
 
-      assertTrue(queryService.findAllActiveReference().isEmpty());
+      assertTrue(queryService.findAllActiveReference(false).isEmpty());
       verify(jobOrderRepository, never()).findAllActiveWithMaterials();
     }
 
@@ -408,7 +408,7 @@ class JobOrderServiceAssigneeAndListTest {
       when(ownerScopeService.canSeeJobOrder(any(JobOrder.class))).thenReturn(false);
       when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of(o));
 
-      assertTrue(queryService.findAllActiveReference().isEmpty());
+      assertTrue(queryService.findAllActiveReference(false).isEmpty());
     }
 
     @Test
@@ -419,7 +419,7 @@ class JobOrderServiceAssigneeAndListTest {
       when(ownerScopeService.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
       when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of(o));
 
-      List<JobOrderReferenceDto> result = queryService.findAllActiveReference();
+      List<JobOrderReferenceDto> result = queryService.findAllActiveReference(false);
 
       assertEquals(1, result.size());
       assertTrue(
@@ -442,7 +442,7 @@ class JobOrderServiceAssigneeAndListTest {
               new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto(
                   mat.getId(), null, 100, 1.0, 0.0, List.of(), null, 0L));
 
-      List<JobOrderReferenceDto> result = queryService.findAllActiveReference();
+      List<JobOrderReferenceDto> result = queryService.findAllActiveReference(false);
 
       assertEquals(1, result.size());
       assertEquals(1, result.get(0).materials().size());
