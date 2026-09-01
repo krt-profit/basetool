@@ -289,12 +289,13 @@ class JobOrderReferenceNeedsTest {
   }
 
   /**
-   * The handover is best-effort: it may deliver more than was earmarked (a legacy line manufactured
-   * before item stock existed) and is never rolled back, which can drive the raw difference
-   * negative.
+   * Over-earmarking is what can drive the raw difference negative: nothing caps a slice against
+   * what the order still has to receive ({@code assertGameItemRequiredByJobOrder} checks only that
+   * the order requests the game item), so more may be earmarked to an order than it wants. The
+   * delivered count cannot cause this — it never exceeds the ordered count.
    */
   @Test
-  @DisplayName("a delivery that outran its earmark reports 0, not a negative")
+  @DisplayName("an over-earmarked bucket reports 0, not a negative")
   void itemOrder_flooredAtZero() {
     givenOrders(itemOrder(10, 0, 10));
     givenLinkedItemStock(new JobOrderGameItemStockRow(ORDER_ID, GAME_ITEM_ID, 3.0));

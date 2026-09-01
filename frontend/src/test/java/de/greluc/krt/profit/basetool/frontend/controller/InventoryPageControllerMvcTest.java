@@ -75,6 +75,13 @@ import org.springframework.web.context.WebApplicationContext;
 @ActiveProfiles("test")
 class InventoryPageControllerMvcTest {
 
+  /**
+   * The middle dot an allocation-picker option puts between the order id and its outstanding-need
+   * suffix (REQ-INV-039). Written as an escape rather than typed inline so a source-encoding
+   * accident cannot silently weaken the assertions that pin the label.
+   */
+  private static final String NEED_SEPARATOR = "\u00b7";
+
   @Autowired private WebApplicationContext context;
 
   private MockMvc mockMvc;
@@ -1358,12 +1365,10 @@ class InventoryPageControllerMvcTest {
                 .param("locationId", locationId.toString())
                 .param("quality", "90"))
         .andExpect(status().isOk())
-        // "#1042 · noch 250,000 SCU" — the display id, then what the order still needs, in the
-        // material's own unit. The decimal separator is locale-dependent, so only the digits and
-        // the unit are pinned.
-        .andExpect(
-            content()
-                .string(stringContainsInOrder("value=\"" + orderId + "\"", "#1042", "250", "SCU")));
+        // "#1042 · noch 250,000 SCU", pinned as one contiguous run up to the whole part.
+        // The decimal separator is locale-dependent, so the fraction is left out.
+        .andExpect(content().string(containsString("#1042 " + NEED_SEPARATOR + " noch 250")))
+        .andExpect(content().string(containsString("value=\"" + orderId + "\"")));
   }
 
   /**
@@ -2210,8 +2215,11 @@ class InventoryPageControllerMvcTest {
                 .param("userId", userId.toString())
                 .param("locationId", locationId.toString()))
         .andExpect(status().isOk())
-        // "#1042 · noch 5 Stück" — the display id, then the units still wanted.
-        .andExpect(
-            content().string(stringContainsInOrder("value=\"" + orderId + "\"", "#1042", "5")));
+        // Pinned as ONE contiguous run, not "#1042" and a lone "5" in order: the leaf's
+        // action cell emits several random UUIDs after this option, so a bare digit is
+        // satisfied by unrelated markup and the assertion would survive deleting the label
+        // outright. "noch {0}" is the need message (inventory.assoc.order.need).
+        .andExpect(content().string(containsString("#1042 " + NEED_SEPARATOR + " noch 5")))
+        .andExpect(content().string(containsString("value=\"" + orderId + "\"")));
   }
 }

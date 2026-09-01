@@ -376,12 +376,17 @@ class ItemInventoryOperationsE2eTest {
               page.locator(
                   "#jobOrderAllocRows [data-alloc-target] option[value='" + needItemOrderId + "']");
           assertThat(option).hasCount(1);
-          // "#<id> - <handle> (OPEN) · noch 7 Stück" — whole units, and no quality floor beside it.
+          // "#<id> - <handle> (OPEN) · noch 7 Stück". Pin the SUFFIX, not a lone digit: the
+          // option's own auto-incremented displayId can itself contain a 7, so ".*7.*" would pass
+          // with the label missing entirely. The separator and the "noch" of the need message can
+          // only come from the suffix.
           assertThat(option)
               .hasText(
-                  Pattern.compile(".*7.*"),
+                  Pattern.compile(".*·\s*noch\s*7\b.*"),
                   new LocatorAssertions.HasTextOptions().setTimeout(10_000));
-          assertThat(option).not().hasText(Pattern.compile(".*650.*"));
+          // Item rows carry no quality (REQ-INV-029), so the material picker's floor marker
+          // ("benötigt 650+") must never appear here.
+          assertThat(option).not().hasText(Pattern.compile(".*benötigt.*"));
         });
   }
 

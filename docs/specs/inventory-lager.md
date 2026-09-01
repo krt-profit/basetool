@@ -1003,8 +1003,14 @@ where an implementation goes wrong:
   hide a real need. A producer who books the output in **without** the earmark
   (`allocateToOrder = false`) has created stock committed to nobody — which the material side does
   not count either, so the two dimensions stay consistent.
-- **The floor at 0 is not cosmetic.** A handover is best-effort and may outrun its earmarked stock
-  (a legacy line manufactured before item stock existed); the raw difference can go negative.
+- **The floor at 0 is not cosmetic, and the mechanism is over-earmarking.** `delivered` can never
+  exceed `ordered` (the line's invariant, and the handover refuses over-delivery), so that pair
+  alone cannot go negative. What can is the earmark: `assertGameItemRequiredByJobOrder` checks only
+  that the order *requests* the game item, and nothing caps a slice against what the order still has
+  to receive — so a member may earmark more units to an order than it wants, and the raw difference
+  turns negative. (An earlier revision of this requirement blamed the handover's best-effort
+  shortfall; that is wrong in the opposite direction — a shortfall leaves `allocated` *smaller*,
+  which makes the difference larger, never negative. Corrected 2026-09-01.)
 
 **No quality marker in item mode.** Item rows carry no quality dimension at all (REQ-INV-029), so
 there is no floor to compare an entry against — the asymmetry with the material picker is the data
