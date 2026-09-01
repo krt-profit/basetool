@@ -1688,6 +1688,7 @@ class InventoryItemServiceBookOutTest {
         null,
         null,
         1L,
+        null,
         null);
   }
 }

@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.frontend.controller.MeFrontendController;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
@@ -240,11 +239,13 @@ public class OrgUnitContextAdvice {
    * <p>Backend round-trips:
    *
    * <ul>
-   *   <li>Admin: still uses {@code /api/v1/squadrons} (Staffel-only today) merged with {@code
-   *       /api/v1/special-commands}. Both catalogues are page-walked complete inside {@code
-   *       getCached} (REQ-ADMIN-003), so the switcher never silently truncates.
-   *   <li>Non-admin: uses the lean {@code /api/v1/users/{id}/memberships} that R5.d.a introduced
-   *       for the picker fragment. Reuses the existing wire shape so no new endpoint is needed.
+   *   <li><strong>One call, no branch here.</strong> {@code GET /api/v1/me/org-units} answers it:
+   *       an admin gets every active Staffel and Spezialkommando, everyone else their own
+   *       memberships. The fork used to live in this class — page-walking {@code /squadrons} plus
+   *       {@code /special-commands} for admins, and two round-trips ({@code /users/me}, then {@code
+   *       /users/{id}/memberships}) for everyone else. The Android client had to know the same rule
+   *       and did not, so an admin was offered nothing to pin at all (ADR-0151, REQ-SEC-048). One
+   *       endpoint means one place to be right, and collapses up to four round-trips into one.
    * </ul>
    *
    * <p>Failures degrade silently to an empty list — the switcher then hides itself rather than
@@ -257,79 +258,12 @@ public class OrgUnitContextAdvice {
     if (!authHelper.isAuthenticated()) {
       return List.of();
     }
-    if (authHelper.isAdmin()) {
-      return loadAdminOrgUnitCatalogue();
-    }
-    return loadCallerMemberships();
-  }
-
-  /**
-   * Admin path of {@link #availableOrgUnits()} — concatenates the Squadron catalogue with the
-   * SpecialCommand catalogue. Both catalogues are assembled complete by the page walk inside {@code
-   * getCached} (REQ-ADMIN-003), so no OrgUnit can drop out of the switcher silently.
-   *
-   * @return Squadron + SK catalogue, never {@code null}.
-   */
-  private List<OrgUnitMembershipOptionDto> loadAdminOrgUnitCatalogue() {
-    java.util.List<OrgUnitMembershipOptionDto> combined = new java.util.ArrayList<>();
     try {
-      // Cached global catalogue — same URI (and therefore same STATIC_DATA_CACHE entry) as
-      // availableSquadrons() above, so the admin render no longer double-fetches the squadron list.
-      PageResponse<SquadronDto> squadrons =
-          backendApiClient.getCached(CachedCatalog.SQUADRONS, SQUADRON_PAGE);
-      if (squadrons != null && squadrons.content() != null) {
-        for (SquadronDto s : squadrons.content()) {
-          combined.add(
-              new OrgUnitMembershipOptionDto(
-                  s.id(), s.name(), s.shorthand(), "SQUADRON", s.isProfitEligible()));
-        }
-      }
+      List<OrgUnitMembershipOptionDto> options =
+          backendApiClient.get("/api/v1/me/org-units", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
+      return options != null ? options : List.of();
     } catch (Exception ex) {
-      log.debug("Failed to load Squadron catalogue for admin switcher", ex);
-    }
-    try {
-      // Cached global catalogue (REQ-DATA-007): the SK catalogue is now cacheable because every SK
-      // lifecycle mutation evicts STATIC_DATA_CACHE — AdminSpecialCommandsPageController
-      // create/update/delete/activate (+ AJAX twins) and SpecialCommandAdminProxyController's
-      // profit-eligible flip all call clearStaticDataCache(). Same URI-keyed entry the admin
-      // switcher shares, so the SK list is fetched at most once per TTL app-wide instead of on
-      // every
-      // admin render.
-      PageResponse<SquadronDto> specialCommands =
-          backendApiClient.getCached(CachedCatalog.SPECIAL_COMMANDS, SQUADRON_PAGE);
-      if (specialCommands != null && specialCommands.content() != null) {
-        for (SquadronDto sk : specialCommands.content()) {
-          combined.add(
-              new OrgUnitMembershipOptionDto(
-                  sk.id(), sk.name(), sk.shorthand(), "SPECIAL_COMMAND", sk.isProfitEligible()));
-        }
-      }
-    } catch (Exception ex) {
-      log.debug("Failed to load SpecialCommand catalogue for admin switcher", ex);
-    }
-    return combined;
-  }
-
-  /**
-   * Non-admin path of {@link #availableOrgUnits()} — reads the caller's memberships via the lean
-   * R5.d.a endpoint. One round-trip to {@code /api/v1/users/me} to resolve the principal's id, then
-   * one to {@code /api/v1/users/{id}/memberships}; the second call already returns the Staffel +
-   * every SK membership in one shot.
-   *
-   * @return the caller's memberships, never {@code null}.
-   */
-  private List<OrgUnitMembershipOptionDto> loadCallerMemberships() {
-    try {
-      UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
-      if (me == null || me.id() == null) {
-        return List.of();
-      }
-      List<OrgUnitMembershipOptionDto> memberships =
-          backendApiClient.get(
-              "/api/v1/users/" + me.id() + "/memberships", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
-      return memberships != null ? memberships : List.of();
-    } catch (Exception ex) {
-      log.debug("Failed to load memberships for non-admin switcher", ex);
+      log.debug("Failed to load pinnable org units for the switcher", ex);
       return List.of();
     }
   }

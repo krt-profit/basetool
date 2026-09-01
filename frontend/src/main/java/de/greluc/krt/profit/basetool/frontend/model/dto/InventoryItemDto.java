@@ -51,4 +51,5 @@ public record InventoryItemDto(
     String note,
     SquadronReferenceDto owningSquadron,
     Long version,
+    Boolean canEdit,
     Instant createdAt) {}

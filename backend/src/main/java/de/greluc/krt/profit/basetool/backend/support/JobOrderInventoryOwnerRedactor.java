@@ -167,6 +167,9 @@ public class JobOrderInventoryOwnerRedactor {
         item.note(),
         null,
         item.version(),
+        // The redaction hides WHOSE row it is, not whether this caller may write to it. Dropping
+        // canEdit here would lock the owner out of a row the server still lets them edit.
+        item.canEdit(),
         item.createdAt());
   }
 }

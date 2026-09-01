@@ -128,6 +128,7 @@ class InventoryCheckoutServiceAuditTest {
                 null,
                 null,
                 1L,
+                null,
                 null));
 
     service.updateDelivered(itemId, request, ownerId, false);

@@ -41,6 +41,14 @@ import java.util.UUID;
  * carries {@code gameItem} with {@code material == null} and {@code quality == null}. Exactly one
  * of the two references is set — the DTO mirrors the DB CHECK {@code
  * chk_inventory_item_catalog_xor} rather than adding a redundant kind field.
+ *
+ * <p>{@code canEdit} is the <em>caller-dependent</em> field: the server's own answer to "may this
+ * caller write to this row", carried on the row rather than left for a client to re-derive. The
+ * rule is per-row and hierarchy-aware — owner, or edit rights on the row's org unit, where an admin
+ * holds no Staffel membership yet may edit every row — so a client-side approximation gets it wrong
+ * for exactly the people most entitled to act. This mirrors what {@code MissionDto.canEdit} already
+ * does for a mission, and exists because the Android client gating on the membership projection hid
+ * the Lager's write actions from admins and officers (REQ-SEC-030).
  */
 public record InventoryItemDto(
     UUID id,
@@ -58,6 +66,7 @@ public record InventoryItemDto(
     String note,
     SquadronReferenceDto owningSquadron,
     Long version,
+    Boolean canEdit,
     Instant createdAt) {
 
   /**
@@ -89,6 +98,7 @@ public record InventoryItemDto(
         note,
         owningSquadron,
         newVersion,
+        canEdit,
         createdAt);
   }
 }

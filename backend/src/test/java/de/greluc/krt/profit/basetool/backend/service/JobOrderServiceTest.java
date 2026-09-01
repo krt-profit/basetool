@@ -223,6 +223,7 @@ class JobOrderServiceTest {
             List.of(),
             Instant.now(),
             1L,
+            null,
             false);
   }
 
@@ -1130,6 +1131,7 @@ class JobOrderServiceTest {
             null,
             null,
             1L,
+            null,
             null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
@@ -1317,6 +1319,7 @@ class JobOrderServiceTest {
             null,
             null,
             1L,
+            null,
             null);
     // Same owner "Alpha", higher quality 90 → comes before quality 80
     InventoryItemDto dto2 =
@@ -1336,6 +1339,7 @@ class JobOrderServiceTest {
             null,
             null,
             1L,
+            null,
             null);
     // Owner "Beta" → after all "Alpha" entries
     InventoryItemDto dto3 =
@@ -1355,6 +1359,7 @@ class JobOrderServiceTest {
             null,
             null,
             1L,
+            null,
             null);
     // Same owner "Alpha", same quality 80, same location ArcCorp, higher amount → comes before
     // lower amount
@@ -1375,6 +1380,7 @@ class JobOrderServiceTest {
             null,
             null,
             1L,
+            null,
             null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
@@ -1446,6 +1452,7 @@ class JobOrderServiceTest {
             null,
             null,
             1L,
+            null,
             null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
@@ -1510,6 +1517,7 @@ class JobOrderServiceTest {
             null,
             null,
             1L,
+            null,
             null);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
@@ -1995,6 +2003,7 @@ class JobOrderServiceTest {
               List.of(),
               Instant.now(),
               1L,
+              null,
               false);
       when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(itemBase);
       when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
@@ -2069,6 +2078,7 @@ class JobOrderServiceTest {
                     List.of(),
                     Instant.now(),
                     o.getVersion(),
+                    null,
                     false);
               });
     }

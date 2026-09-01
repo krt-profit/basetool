@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -141,7 +142,12 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
         new PageResponse<>(List.of(first), 0, 500, 2, 2, List.of());
     PageResponse<PersonalBlueprintDto> page1 =
         new PageResponse<>(List.of(second), 1, 500, 2, 2, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page0, page1);
+    // Scoped to the page-walk's own URI. A bare anyString() stub hands its sequenced values to
+    // whichever call arrives first, so an unrelated request in the same exchange — the org-unit
+    // switcher advice runs for every controller test — would consume page0 and leave the walk
+    // reading page1 twice.
+    when(backendApiClient.get(startsWith("/api/v1/personal-blueprints?"), anyTypeRef()))
+        .thenReturn(page0, page1);
 
     mockMvc
         .perform(get("/personal-inventory/blueprints"))

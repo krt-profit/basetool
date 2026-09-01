@@ -148,6 +148,7 @@ class JobOrderServiceAssigneeAndListTest {
                   List.of(),
                   null,
                   o.getVersion(),
+                  null,
                   false);
             });
     // The paged list path batches stock once per page via findMaterialStockRowsByJobOrderIds
@@ -738,6 +739,7 @@ class JobOrderServiceAssigneeAndListTest {
         List.of(),
         null,
         order.getVersion(),
+        null,
         false);
   }
 

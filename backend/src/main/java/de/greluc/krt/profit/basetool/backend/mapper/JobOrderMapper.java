@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderAssigneeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.backend.support.StockViewerAccess;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -41,7 +42,25 @@ import org.mapstruct.Mapping;
       JobOrderHandoverMapper.class,
       SquadronMapper.class
     })
-public interface JobOrderMapper {
+public abstract class JobOrderMapper {
+
+  // Field injection, because MapStruct's generated subclass has a no-arg constructor — the same
+  // shape as MissionMapper. Depends only on the support-package leaf interface, never on the
+  // service layer or SecurityContextHolder (ArchUnit mapperLayerShouldNotReachIntoSecurityContext).
+  @org.springframework.beans.factory.annotation.Autowired protected StockViewerAccess stockAccess;
+
+  /**
+   * Resolves the caller-dependent {@code canEdit} projection of one job order.
+   *
+   * @param jobOrder the order being mapped; {@code null} or id-less yields {@code false}.
+   * @return whether the current caller may edit it — role <em>and</em> scope, as the endpoint
+   *     gates.
+   */
+  protected boolean resolveCanEdit(JobOrder jobOrder) {
+    return jobOrder != null
+        && jobOrder.getId() != null
+        && stockAccess.mayEditJobOrder(jobOrder.getId());
+  }
 
   /**
    * Maps a {@link JobOrder} entity to its outbound DTO. The legacy free-text {@code squadron} field
@@ -68,7 +87,8 @@ public interface JobOrderMapper {
   // Per-order redaction decision is not an entity property; it is stamped by the read path
   // (JobOrderService.getJobOrderById) via JobOrderDto#withRedacted, so the mapper leaves it false.
   @Mapping(target = "redacted", ignore = true)
-  JobOrderDto toDto(JobOrder jobOrder);
+  @Mapping(target = "canEdit", expression = "java(resolveCanEdit(jobOrder))")
+  public abstract JobOrderDto toDto(JobOrder jobOrder);
 
   /**
    * Maps a {@link JobOrderMaterial} child to its DTO. {@code currentStock} (inventory queried at
@@ -78,7 +98,7 @@ public interface JobOrderMapper {
   @Mapping(target = "currentStock", ignore = true)
   @Mapping(target = "claims", ignore = true)
   @Mapping(target = "openAmount", ignore = true)
-  JobOrderMaterialDto toDto(JobOrderMaterial material);
+  public abstract JobOrderMaterialDto toDto(JobOrderMaterial material);
 
   /**
    * Maps a single {@link JobOrderAssignee} edge to its DTO: the assigned {@code user} routes
@@ -88,7 +108,7 @@ public interface JobOrderMapper {
    * @param assignee the assignee edge to project; {@code null} returns {@code null}.
    * @return the populated assignee DTO.
    */
-  JobOrderAssigneeDto toDto(JobOrderAssignee assignee);
+  public abstract JobOrderAssigneeDto toDto(JobOrderAssignee assignee);
 
   /**
    * Maps a set of {@link JobOrderAssignee} edges into a DTO list sorted by the assignee's effective
@@ -98,7 +118,7 @@ public interface JobOrderMapper {
    * @param assignees the assignee edges to project; {@code null} returns {@code null}.
    * @return the sorted assignee DTO list.
    */
-  default List<JobOrderAssigneeDto> mapAndSortAssignees(Set<JobOrderAssignee> assignees) {
+  public List<JobOrderAssigneeDto> mapAndSortAssignees(Set<JobOrderAssignee> assignees) {
     if (assignees == null) {
       return null;
     }
@@ -119,7 +139,7 @@ public interface JobOrderMapper {
    * first, then alphabetical by material name (case-insensitive). The deterministic order keeps the
    * materials table stable across reloads.
    */
-  default List<JobOrderMaterialDto> mapAndSortMaterials(Set<JobOrderMaterial> materials) {
+  public List<JobOrderMaterialDto> mapAndSortMaterials(Set<JobOrderMaterial> materials) {
     if (materials == null) {
       return null;
     }
