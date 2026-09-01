@@ -33,7 +33,9 @@ import java.util.UUID;
  * @param orderedAmount whole units requested across the order's lines naming it
  * @param deliveredAmount whole units already handed over
  * @param allocatedAmount whole units of item stock currently earmarked to this order
- * @param outstandingAmount {@code ordered − delivered − allocated}, floored at 0 — what to render
+ * @param outstandingAmount {@code ordered − delivered − allocated}, floored at 0 — what to render.
+ *     The floor guards against <b>over-earmarking</b> (nothing caps an earmark against the order's
+ *     remaining need), not against a handover, which can never over-deliver
  */
 public record JobOrderGameItemNeedDto(
     UUID gameItemId,
