@@ -1296,6 +1296,7 @@ class InventoryPageControllerMvcTest {
             null,
             null,
             1L,
+            null,
             Instant.parse("2026-01-01T00:00:00Z"));
 
     JobOrderReferenceDto order =
