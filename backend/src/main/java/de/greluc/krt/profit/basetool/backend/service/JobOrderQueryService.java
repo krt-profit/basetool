@@ -27,6 +27,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService.OrderLinkedStockIndex;
+import de.greluc.krt.profit.basetool.backend.support.QuantityTypeRounding;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -65,6 +67,7 @@ public class JobOrderQueryService {
   private final de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper squadronMapper;
   private final JobOrderItemService jobOrderItemService;
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
+  private final JobOrderMaterialRequirementResolver materialRequirementResolver;
   private final de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper
       inventoryItemMapper;
 
@@ -177,18 +180,31 @@ public class JobOrderQueryService {
    * gets an empty list, and squadron-private orders of other squadrons are filtered out so the
    * typeahead cannot enumerate a foreign squadron's order handle + materials (audit M-2).
    *
+   * @param withNeeds whether to fold each order's outstanding per-material need into the projection
+   *     (REQ-INV-039). Opt-in because an ITEM order's needs come from its blueprint-derived
+   *     aggregation, a cost the pickers that render no figure must not pay.
    * @return active job orders the caller may see, as reference DTOs
    */
   public List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto>
-      findAllActiveReference() {
+      findAllActiveReference(boolean withNeeds) {
     // M-2: mirror the list endpoint's controls. Viewer-side profit gate first (a non-profit member
     // sees nothing, not even the SK-public union), then per-row visibility scope on the loaded
     // rows.
     if (!ownerScopeService.canViewJobOrders()) {
       return List.of();
     }
-    return jobOrderRepository.findAllActiveWithMaterials().stream()
-        .filter(ownerScopeService::canSeeJobOrder)
+    List<JobOrder> visible =
+        jobOrderRepository.findAllActiveWithMaterials().stream()
+            .filter(ownerScopeService::canSeeJobOrder)
+            .toList();
+    // One batched read for the whole picker rather than a SUM per (order, material) bucket
+    // (REQ-DATA-003) — and the SAME index the cross-order demand overview sums through, so a
+    // picker figure and that page can never disagree. Skipped entirely when no figure is asked
+    // for: an empty id collection never touches the database.
+    OrderLinkedStockIndex stockIndex =
+        jobOrderStockProjectionService.loadOrderLinkedStockIndex(
+            withNeeds ? visible.stream().map(JobOrder::getId).toList() : List.of());
+    return visible.stream()
         .map(
             o ->
                 new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto(
@@ -206,7 +222,54 @@ public class JobOrderQueryService {
                     List.copyOf(jobOrderItemService.requiredMaterialIds(o)),
                     // Game-item sibling (REQ-INV-031): the Lager item-mode picker filters orders
                     // on the requested game items; empty for MATERIAL orders.
-                    List.copyOf(jobOrderItemService.requiredGameItemIds(o))))
+                    List.copyOf(jobOrderItemService.requiredGameItemIds(o)),
+                    withNeeds ? materialNeedsOf(o, stockIndex) : List.of()))
+        .toList();
+  }
+
+  /**
+   * Folds one order's outstanding per-bucket need for the allocation pickers (REQ-INV-039).
+   *
+   * <p>Every figure comes from the shared seams rather than a second derivation: the requirement
+   * from {@link JobOrderMaterialRequirementResolver} (which reduces both order kinds to the same
+   * buckets and has already excluded handed-over and manufactured shares), the linked stock from
+   * the batched {@link OrderLinkedStockIndex} at the bucket's own quality floor. The gap ignores
+   * material claims on purpose — a claim is a promise that moved no stock (REQ-ORDERS-024) and must
+   * not shrink what is still to be gathered.
+   *
+   * @param order the managed order to fold.
+   * @param stockIndex the batched order-linked stock lookup.
+   * @return the order's buckets, empty when it requires no material.
+   */
+  private List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialNeedDto>
+      materialNeedsOf(
+          @org.jetbrains.annotations.NotNull JobOrder order,
+          @org.jetbrains.annotations.NotNull OrderLinkedStockIndex stockIndex) {
+    return materialRequirementResolver.requirementsOf(order).stream()
+        .map(
+            requirement -> {
+              Integer qualityFloor =
+                  JobOrderStockProjectionService.qualityFloorFor(requirement.quality());
+              // Round both figures and derive the gap from the ROUNDED pair, exactly as
+              // MaterialDemandRowDto does — otherwise a picker label and the demand overview can
+              // print two different numbers for one bucket.
+              double required =
+                  QuantityTypeRounding.roundForQuantityType(
+                      requirement.requiredAmount(), requirement.material());
+              double booked =
+                  QuantityTypeRounding.roundForQuantityType(
+                      stockIndex.stockFor(order.getId(), requirement.material().id(), qualityFloor),
+                      requirement.material());
+              return new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialNeedDto(
+                  requirement.material().id(),
+                  qualityFloor,
+                  required,
+                  booked,
+                  Math.max(
+                      0.0,
+                      QuantityTypeRounding.roundForQuantityType(
+                          required - booked, requirement.material())));
+            })
         .toList();
   }
 

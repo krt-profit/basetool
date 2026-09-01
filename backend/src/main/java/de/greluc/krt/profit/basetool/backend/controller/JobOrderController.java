@@ -670,17 +670,27 @@ public class JobOrderController {
    * Lightweight projection (id + label) of active job orders for typeaheads. Excludes terminal
    * states.
    *
+   * <p>With {@code withNeeds=true} each order additionally carries its outstanding per-material
+   * need (REQ-INV-039), which is what lets the Lager's allocation pickers label an order option
+   * with the amount it still needs instead of sending the member to the order itself. It is opt-in
+   * rather than always-on because an ITEM order's needs are folded from its blueprint-derived
+   * requirements, and this endpoint also feeds pickers that render no such figure.
+   *
+   * @param withNeeds whether to include each order's outstanding per-material need
    * @return active job orders as reference DTOs
    */
   @GetMapping("/lookup")
   @Operation(
       summary = "Lookup active job orders",
-      description = "Returns a reference list of active job orders.")
+      description =
+          "Returns a reference list of active job orders. With withNeeds=true every order also"
+              + " carries its outstanding need per material bucket, for the Lager allocation"
+              + " pickers.")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto>
-      lookupJobOrders() {
-    return jobOrderQueryService.findAllActiveReference();
+  public List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto> lookupJobOrders(
+      @RequestParam(required = false, defaultValue = "false") boolean withNeeds) {
+    return jobOrderQueryService.findAllActiveReference(withNeeds);
   }
 
   /**

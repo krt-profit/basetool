@@ -1061,6 +1061,35 @@ if (
     });
 }
 
+// #1740 (REQ-INV-039): the allocation popover's order options carry what each order still NEEDS, and
+// that figure also moves when nothing here changed — a handover recorded on the order, an edited
+// line, an order opened or closed. Those writes poke the global `orders` room, never `inventory`,
+// so this page joins it as a second receiver.
+//
+// It reuses that room's existing `demand` key rather than adding one: this page renders a SUBSET of
+// what the room already invalidates (the material-collection precedent), and `demand` is published
+// by exactly the writers that move the figure. Re-pulling the owned table is the whole refresh — a
+// collapsed stack comes back data-stack-loaded=false, so the freshly labelled options arrive with
+// the next expand.
+const INVENTORY_MY_ORDER_SECTIONS = {
+    demand: { container: '#myInventoryTableContainer' },
+};
+
+if (
+    window.krtLiveSync &&
+    typeof window.krtLiveSync.createReceiver === 'function' &&
+    document.getElementById('myInventoryTableContainer')
+) {
+    window.krtLiveSync.createReceiver({
+        topic: 'orders',
+        sections: INVENTORY_MY_ORDER_SECTIONS,
+        coalesceMs: 1500,
+        refresh: function () {
+            filterMyInventory();
+        },
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     // Restore the persisted per-browser filter state first (REQ-UI-017): on a bare URL the
     // saved selection is applied to the widgets, and — only when it differs from the rendered

@@ -19,17 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
-import de.greluc.krt.profit.basetool.backend.model.QuantityType;
-import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandGroupDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandOrderShareDto;
@@ -38,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandRowDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.service.JobOrderMaterialRequirementResolver.MaterialRequirement;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService.OrderLinkedStockIndex;
 import de.greluc.krt.profit.basetool.backend.support.QuantityTypeRounding;
 import java.util.ArrayList;
@@ -85,17 +81,14 @@ public class JobOrderMaterialDemandService {
   /** Supplies the caller's visibility scope and the viewer-side profit gate. */
   private final OwnerScopeService ownerScopeService;
 
+  /** Normalises either order kind into its outstanding material requirement buckets. */
+  private final JobOrderMaterialRequirementResolver materialRequirementResolver;
+
   /** Supplies the batched order-linked stock index and the bucket quality floors. */
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
 
-  /** Normalises an item order's blueprint-derived requirements into material buckets. */
-  private final JobOrderItemService jobOrderItemService;
-
   /** Supplies the batched per-order claim view for public Spezialkommando orders. */
   private final MaterialClaimService materialClaimService;
-
-  /** Maps a {@code MATERIAL} line's material entity to its DTO. */
-  private final MaterialMapper materialMapper;
 
   /** Maps the responsible OrgUnit to the badge reference the grouping is rendered with. */
   private final SquadronMapper squadronMapper;
@@ -155,7 +148,7 @@ public class JobOrderMaterialDemandService {
           groups.computeIfAbsent(
               groupKey(order),
               key -> new GroupAccumulator(referenceOf(order.getResponsibleOrgUnit())));
-      for (MaterialRequirement requirement : requirementsOf(order)) {
+      for (MaterialRequirement requirement : materialRequirementResolver.requirementsOf(order)) {
         accumulate(group, order, requirement, stockIndex, claimByBucket);
       }
     }
@@ -171,51 +164,6 @@ public class JobOrderMaterialDemandService {
         orders.size(),
         groupDtos.size());
     return new MaterialDemandOverviewDto(groupDtos);
-  }
-
-  /**
-   * Normalises one order into its material buckets, hiding the two kinds' different shapes from the
-   * aggregation loop. A {@code MATERIAL} order contributes its material lines directly (their
-   * {@code amount} is already the outstanding requirement — handovers decrement it in place); an
-   * {@code ITEM} order contributes the blueprint-derived aggregation, which already scales each
-   * line by its not-yet-manufactured share. Neither is adjusted again here, so no reduction is
-   * applied twice.
-   *
-   * @param order the order to normalise.
-   * @return its buckets; empty for an order with no requirements.
-   */
-  @NotNull
-  private List<MaterialRequirement> requirementsOf(@NotNull JobOrder order) {
-    if (order.getType() == JobOrderType.ITEM) {
-      List<MaterialRequirement> requirements = new ArrayList<>();
-      for (AggregatedMaterialDto aggregated : jobOrderItemService.aggregateMaterials(order)) {
-        if (aggregated.material() == null) {
-          continue;
-        }
-        requirements.add(
-            new MaterialRequirement(
-                aggregated.material(),
-                aggregated.qualityRequirement(),
-                aggregated.totalQuantity() == null ? 0.0 : aggregated.totalQuantity()));
-      }
-      return requirements;
-    }
-    List<MaterialRequirement> requirements = new ArrayList<>();
-    for (JobOrderMaterial line : order.getMaterials()) {
-      if (line.getMaterial() == null) {
-        continue;
-      }
-      // A MATERIAL line's bucket quality mirrors aggregateMaterials(): a stored 650-floor is GOOD,
-      // "Keine" (null minQuality) is NONE — so both kinds land in the same bucket for one material.
-      QualityRequirement quality =
-          line.getMinQuality() != null ? QualityRequirement.GOOD : QualityRequirement.NONE;
-      requirements.add(
-          new MaterialRequirement(
-              materialMapper.toDto(line.getMaterial()),
-              quality,
-              line.getAmount() == null ? 0.0 : line.getAmount()));
-    }
-    return requirements;
   }
 
   /**
@@ -293,28 +241,7 @@ public class JobOrderMaterialDemandService {
    * @return the rounded amount.
    */
   private static double round(double value, @Nullable MaterialDto material) {
-    return QuantityTypeRounding.roundForQuantityType(value, quantityTypeOf(material));
-  }
-
-  /**
-   * Resolves a material DTO's textual quantity type back to the enum {@link QuantityTypeRounding}
-   * keys on, treating an unknown or absent value as SCU (the {@code Material} default) rather than
-   * failing the whole overview for one malformed catalog row.
-   *
-   * @param material the material, possibly {@code null}.
-   * @return the quantity type, or {@code null} to mean "the SCU default".
-   */
-  @Nullable
-  private static QuantityType quantityTypeOf(@Nullable MaterialDto material) {
-    if (material == null || material.quantityType() == null) {
-      return null;
-    }
-    try {
-      return QuantityType.valueOf(material.quantityType());
-    } catch (IllegalArgumentException unknownType) {
-      log.debug("Unknown quantity type '{}' - falling back to SCU", material.quantityType());
-      return null;
-    }
+    return QuantityTypeRounding.roundForQuantityType(value, material);
   }
 
   /**
@@ -392,17 +319,6 @@ public class JobOrderMaterialDemandService {
               r -> r.material() != null && r.material().name() != null ? r.material().name() : "",
               String.CASE_INSENSITIVE_ORDER)
           .thenComparing(r -> r.qualityRequirement().name());
-
-  /**
-   * One order's normalised material bucket, the shape both order kinds are reduced to before they
-   * are aggregated.
-   *
-   * @param material the bucket's material
-   * @param quality the bucket's quality requirement
-   * @param requiredAmount the order's outstanding requirement for the bucket
-   */
-  private record MaterialRequirement(
-      MaterialDto material, QualityRequirement quality, double requiredAmount) {}
 
   /**
    * The aggregation key inside one org-unit group: a material at one quality level.

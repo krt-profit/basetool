@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
@@ -41,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferen
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryStackDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderAllocationDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialNeedDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto;
@@ -1056,6 +1058,7 @@ class InventoryPageControllerMvcTest {
             null,
             List.of(),
             List.of(materialId),
+            List.of(),
             List.of());
     JobOrderReferenceDto unrelated =
         new JobOrderReferenceDto(
@@ -1066,6 +1069,7 @@ class InventoryPageControllerMvcTest {
             null,
             List.of(),
             List.of(UUID.randomUUID()),
+            List.of(),
             List.of());
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
@@ -1123,6 +1127,7 @@ class InventoryPageControllerMvcTest {
             null,
             List.of(),
             List.of(materialId),
+            List.of(),
             List.of());
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
@@ -1149,6 +1154,187 @@ class InventoryPageControllerMvcTest {
                     stringContainsInOrder(
                         "value=\"" + itemOrderId + "\"", "data-materials=\"" + materialId + "\"")))
         .andExpect(content().string(not(containsString("data-materials=\"\""))));
+  }
+
+  /**
+   * Check-in picker need figures (REQ-INV-039, #1740): the {@code /inventory/input} form embeds
+   * each order's outstanding per-material need as one JSON blob on the allocation group, which
+   * {@code inventory-input.js} decodes to label the options.
+   *
+   * <p>Also pins that the page asks the lookup for the figures at all: without {@code
+   * withNeeds=true} the backend ships an empty list and every option would render unlabelled — a
+   * failure with no error anywhere.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewInputPage_ShouldEmbedTheOutstandingNeedFigures() throws Exception {
+    UUID materialId = UUID.randomUUID();
+    UUID orderId = UUID.randomUUID();
+
+    JobOrderReferenceDto order =
+        new JobOrderReferenceDto(
+            orderId,
+            71,
+            "h1",
+            "IN_PROGRESS",
+            null,
+            List.of(),
+            List.of(materialId),
+            List.of(),
+            List.of(new JobOrderMaterialNeedDto(materialId, 650, 400.0, 150.0, 250.0)));
+
+    java.util.List<String> lookupUrls = new java.util.ArrayList<>();
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              if (url.contains("/orders/lookup")) {
+                lookupUrls.add(url);
+                return List.of(order);
+              }
+              return Collections.emptyList();
+            });
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/input"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("inventory-input"))
+        .andExpect(content().string(containsString("data-order-needs=")))
+        .andExpect(content().string(containsString(orderId.toString())))
+        // The outstanding gap, and the floor the client compares the entered grade against.
+        .andExpect(content().string(containsString("&quot;outstandingAmount&quot;:250.0")))
+        .andExpect(content().string(containsString("&quot;qualityFloor&quot;:650")));
+
+    assertThat(lookupUrls).isNotEmpty().allMatch(url -> url.contains("withNeeds=true"));
+  }
+
+  /**
+   * The live-sync re-read behind the same figures (REQ-FE-010): {@code /inventory/order-needs}
+   * answers the identical shape the page embedded, keyed by order id, so the page script decodes
+   * one format for both the first paint and every refresh.
+   *
+   * <p>It is an AJAX-only route ({@code X-Requested-With}); a page script cannot reach {@code
+   * /api/v1} on this origin, which is why the relay exists at all.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void orderNeedsAjax_ShouldAnswerTheNeedsKeyedByOrderId() throws Exception {
+    UUID materialId = UUID.randomUUID();
+    UUID orderId = UUID.randomUUID();
+    UUID needlessOrderId = UUID.randomUUID();
+
+    JobOrderReferenceDto order =
+        new JobOrderReferenceDto(
+            orderId,
+            71,
+            "h1",
+            "IN_PROGRESS",
+            null,
+            List.of(),
+            List.of(materialId),
+            List.of(),
+            List.of(new JobOrderMaterialNeedDto(materialId, null, 400.0, 150.0, 250.0)));
+    // An order that requires no material carries no entry at all rather than an empty one.
+    JobOrderReferenceDto needless =
+        new JobOrderReferenceDto(
+            needlessOrderId, 72, "h2", "OPEN", null, List.of(), List.of(), List.of(), List.of());
+
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              return url.contains("/orders/lookup")
+                  ? List.of(order, needless)
+                  : Collections.emptyList();
+            });
+
+    mockMvc
+        .perform(get("/inventory/order-needs").header("X-Requested-With", "XMLHttpRequest"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$['" + orderId + "'][0].outstandingAmount").value(250.0))
+        .andExpect(jsonPath("$['" + orderId + "'][0].materialId").value(materialId.toString()))
+        .andExpect(jsonPath("$['" + needlessOrderId + "']").doesNotExist());
+  }
+
+  /**
+   * The second surface (REQ-INV-039): the per-entry {@code + Zuordnen} popover labels each order
+   * option with what that order still needs of <em>this</em> entry's material, so choosing a target
+   * does not mean opening the order first.
+   *
+   * <p>The label is server-rendered here — unlike the check-in form, this picker is a combobox,
+   * which snapshots an option's text at enhancement time and would never see a later rewrite.
+   */
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
+  void viewAllStackEntries_ShouldLabelOrderOptionsWithTheOutstandingNeed() throws Exception {
+    UUID itemId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID orderId = UUID.randomUUID();
+
+    InventoryItemDto item =
+        new InventoryItemDto(
+            itemId,
+            new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
+            new MaterialReferenceDto(materialId, "Tungsten", "SCU"),
+            null,
+            new LocationReferenceDto(locationId, "ARC-L1"),
+            90,
+            10.0,
+            false,
+            java.util.List.of(),
+            null,
+            java.util.List.of(),
+            10.0,
+            null,
+            null,
+            1L,
+            Instant.parse("2026-01-01T00:00:00Z"));
+
+    JobOrderReferenceDto order =
+        new JobOrderReferenceDto(
+            orderId,
+            1042,
+            "h1",
+            "IN_PROGRESS",
+            null,
+            List.of(),
+            List.of(materialId),
+            List.of(),
+            List.of(new JobOrderMaterialNeedDto(materialId, null, 400.0, 150.0, 250.0)));
+
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              if (url.contains("/inventory/all/stack/entries")) {
+                return new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList());
+              }
+              if (url.contains("/orders/lookup")) {
+                return List.of(order);
+              }
+              return Collections.emptyList();
+            });
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(
+            get("/inventory/all/stack/entries")
+                .param("materialId", materialId.toString())
+                .param("userId", userId.toString())
+                .param("locationId", locationId.toString())
+                .param("quality", "90"))
+        .andExpect(status().isOk())
+        // "#1042 · noch 250,000 SCU" — the display id, then what the order still needs, in the
+        // material's own unit. The decimal separator is locale-dependent, so only the digits and
+        // the unit are pinned.
+        .andExpect(
+            content()
+                .string(stringContainsInOrder("value=\"" + orderId + "\"", "#1042", "250", "SCU")));
   }
 
   /**
@@ -1692,7 +1878,8 @@ class InventoryPageControllerMvcTest {
             null,
             List.of(),
             List.of(),
-            List.of(gameItemId));
+            List.of(gameItemId),
+            List.of());
     JobOrderReferenceDto unrelated =
         new JobOrderReferenceDto(
             unrelatedOrderId,
@@ -1702,7 +1889,8 @@ class InventoryPageControllerMvcTest {
             null,
             List.of(),
             List.of(),
-            List.of(UUID.randomUUID()));
+            List.of(UUID.randomUUID()),
+            List.of());
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenAnswer(
