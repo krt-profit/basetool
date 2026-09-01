@@ -33,7 +33,10 @@ import java.util.UUID;
  * distinct game items an ITEM order's lines request, empty for MATERIAL orders — the item-view
  * order picker's gate. {@code materialNeeds} carries what the order still needs per {@code
  * (material, quality)} bucket so the allocation pickers can label an option with it (REQ-INV-039);
- * it is <b>empty unless the page asked the lookup for it</b> ({@code withNeeds=true}).
+ * it is <b>empty unless the page asked the lookup for it</b> ({@code withNeeds=true}). {@code
+ * gameItemNeeds} is its item-mode sibling under the same opt-in — a separate projection, because an
+ * item line's remaining count is {@code ordered − delivered − earmarked} rather than a material
+ * bucket. Always empty for a MATERIAL order.
  */
 public record JobOrderReferenceDto(
     UUID id,
@@ -44,4 +47,5 @@ public record JobOrderReferenceDto(
     List<JobOrderMaterialDto> materials,
     List<UUID> requiredMaterialIds,
     List<UUID> requiredGameItemIds,
-    List<JobOrderMaterialNeedDto> materialNeeds) {}
+    List<JobOrderMaterialNeedDto> materialNeeds,
+    List<JobOrderGameItemNeedDto> gameItemNeeds) {}

@@ -108,6 +108,11 @@ class ItemInventoryOperationsE2eTest {
   private static String gateItemOrderId;
   private static String gateMaterialOrderId;
 
+  // REQ-INV-039 (#1742) need-label fixture: an ITEM order for 7 units with nothing manufactured,
+  // delivered or earmarked, and never written to by another case — so the label is a fixed 7.
+  private static String needGameItemId;
+  private static String needItemOrderId;
+
   /**
    * Launches the browser, performs the single shared login, and (ephemeral stack only) seeds the
    * IRIDIUM membership, a shared source location, one bookable game item per scenario, the item
@@ -146,6 +151,11 @@ class ItemInventoryOperationsE2eTest {
     gateItemOrderId =
         seeder.createItemJobOrder(
             USERNAME, PASSWORD, IRIDIUM_ID, "E2E Item Gate Order", gateGameItemId, 1);
+    needGameItemId = seeder.seedOrderableItem("E2E Item Need Widget", ingredientMatId);
+    needItemOrderId =
+        seeder.createItemJobOrder(
+            USERNAME, PASSWORD, IRIDIUM_ID, "E2E Item Need Order", needGameItemId, 7);
+
     String gateMatId = seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Item Gate Mat");
     gateMaterialOrderId =
         seeder.createJobOrder(
@@ -334,6 +344,44 @@ class ItemInventoryOperationsE2eTest {
           assertThat(orderSelect.locator("option[value='" + gateItemOrderId + "']")).isEnabled();
           assertThat(orderSelect.locator("option[value='" + gateMaterialOrderId + "']"))
               .isDisabled();
+        });
+  }
+
+  /**
+   * <em>Restmenge an der Auftragsoption, Item-Variante (REQ-INV-039, #1742).</em> The material
+   * picker states what an order still needs; the item picker states the same thing from a different
+   * calculation — ordered minus delivered minus already earmarked, in whole pieces. Picks the game
+   * item of an order for 7 units with nothing built, delivered or earmarked, adds an allocation row
+   * and asserts the option carries the count.
+   *
+   * <p>Also pins the deliberate asymmetry: item rows carry no quality at all (REQ-INV-029), so the
+   * material picker's quality marker must never appear here.
+   */
+  // covers REQ-INV-039 (item mode)
+  @Test
+  void checkInItemOrderOptionStatesTheOutstandingNeed() {
+    assumeTrue(STACK.managesStack(), "needs the JDBC-seeded bookable game-item catalog");
+    runFlow(
+        "item-order-need-label",
+        page -> {
+          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
+          page.waitForLoadState();
+
+          page.getByTestId("inventory-mode-item").check();
+          E2eSupport.selectComboboxByValue(
+              page.locator(".krt-combobox:has(#gameItemId) .krt-combobox__input"), needGameItemId);
+          page.locator("[data-trigger='inv-input-add-order']").click();
+
+          Locator option =
+              page.locator(
+                  "#jobOrderAllocRows [data-alloc-target] option[value='" + needItemOrderId + "']");
+          assertThat(option).hasCount(1);
+          // "#<id> - <handle> (OPEN) · noch 7 Stück" — whole units, and no quality floor beside it.
+          assertThat(option)
+              .hasText(
+                  Pattern.compile(".*7.*"),
+                  new LocatorAssertions.HasTextOptions().setTimeout(10_000));
+          assertThat(option).not().hasText(Pattern.compile(".*650.*"));
         });
   }
 

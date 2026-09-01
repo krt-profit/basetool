@@ -287,10 +287,15 @@
                                                 data-trigger="inv-my-assoc-pick"
                                                 th:data-combobox-placeholder="#{inventory.assoc.add.order}">
                                             <option value=""></option>
+                                            <!-- REQ-INV-039 (#1742): the option carries what this order still needs of THIS
+                                                 entry's game item - ordered minus delivered minus already earmarked, in whole
+                                                 pieces. Keyed orderId|gameItemId (orderGameItemNeedAmounts), a separate lookup
+                                                 from the material one because it is a different calculation. -->
                                             <option th:each="order : ${jobOrders}"
                                                     th:if="${order.requiredGameItemIds != null and #lists.contains(order.requiredGameItemIds, entry.gameItem.id) and not #lists.contains(entry.jobOrderAllocations.![jobOrderId], order.id)}"
+                                                    th:with="orderNeed=${orderGameItemNeedAmounts != null ? orderGameItemNeedAmounts.get(order.id + '|' + entry.gameItem.id) : null}"
                                                     th:value="${order.id}"
-                                                    th:text="'#' + ${order.displayId}"></option>
+                                                    th:text="${orderNeed == null} ? ('#' + ${order.displayId}) : ('#' + ${order.displayId} + ' · ' + #{inventory.assoc.order.need(${orderNeed + ' ' + #messages.msg('material.quantity.piece')})})"></option>
                                         </select>
                                     </div>
                                     <div class="assoc-pop__menge krtm-hidden" data-assoc-pop-amount>
@@ -676,10 +681,13 @@
                                                     data-trigger="inv-admin-assoc-pick"
                                                     th:data-combobox-placeholder="#{inventory.assoc.add.order}">
                                                 <option value=""></option>
+                                                <!-- REQ-INV-039 (#1742): see the sibling picker above - the option states what
+                                                     this order still needs of the entry's game item, in whole pieces. -->
                                                 <option th:each="order : ${jobOrders}"
                                                         th:if="${order.requiredGameItemIds != null and #lists.contains(order.requiredGameItemIds, entry.gameItem.id) and not #lists.contains(entry.jobOrderAllocations.![jobOrderId], order.id)}"
+                                                        th:with="orderNeed=${orderGameItemNeedAmounts != null ? orderGameItemNeedAmounts.get(order.id + '|' + entry.gameItem.id) : null}"
                                                         th:value="${order.id}"
-                                                        th:text="'#' + ${order.displayId}"></option>
+                                                        th:text="${orderNeed == null} ? ('#' + ${order.displayId}) : ('#' + ${order.displayId} + ' · ' + #{inventory.assoc.order.need(${orderNeed + ' ' + #messages.msg('material.quantity.piece')})})"></option>
                                             </select>
                                         </div>
                                         <div class="assoc-pop__menge krtm-hidden" data-assoc-pop-amount>

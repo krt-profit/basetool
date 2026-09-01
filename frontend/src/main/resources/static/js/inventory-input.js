@@ -414,7 +414,8 @@ function filterOrderSelects(catalogId) {
 // into every one of them. The figures live in ONE module-level map keyed by order id, and every
 // label is (re)computed from it — the same map the live-sync refresh below replaces wholesale.
 
-// Order id -> its outstanding per-(material, quality) buckets, as the backend projected them.
+// The whole need payload: { materials: {orderId: [...]}, gameItems: {orderId: [...]} }. Both catalog
+// modes read from this one object, so switching Material <-> Item relabels without a second fetch.
 let orderNeeds = readEmbeddedOrderNeeds();
 
 // Seeds the map from the blob the page rendered. A malformed or absent value degrades to "no
@@ -430,12 +431,19 @@ function readEmbeddedOrderNeeds() {
     }
 }
 
+// The order-keyed map for a catalog mode. A missing half answers as an empty map, never undefined,
+// so every caller can index it without a guard of its own.
+function needsMapFor(itemMode) {
+    const key = itemMode ? 'gameItems' : 'materials';
+    return (orderNeeds && orderNeeds[key]) || {};
+}
+
 // One order's outstanding need for one material, summed across its quality buckets, plus the
 // highest floor among them. A material required at two quality levels yields two buckets; the sum
 // is what the order still needs of that material, and the floor is what the entered grade is
 // checked against. Returns null when this order does not require the material at all.
 function orderNeedFor(orderId, materialId) {
-    const buckets = orderNeeds[orderId];
+    const buckets = needsMapFor(false)[orderId];
     if (!buckets || !buckets.length || !materialId) return null;
     let outstanding = 0;
     let floor = null;
@@ -452,6 +460,22 @@ function orderNeedFor(orderId, materialId) {
         }
     });
     return matched ? { outstanding: outstanding, floor: floor } : null;
+}
+
+// The item-mode sibling. Deliberately not the same function with another key: an item order's need
+// is a flat whole-unit count with no quality dimension to sum across and no floor to report
+// (REQ-INV-029), so there is exactly one entry per game item and nothing to fold.
+function orderItemNeedFor(orderId, gameItemId) {
+    const needs = needsMapFor(true)[orderId];
+    if (!needs || !needs.length || !gameItemId) return null;
+    const match = needs.find(function (need) {
+        return need.gameItemId === gameItemId;
+    });
+    if (!match) return null;
+    return {
+        outstanding: typeof match.outstandingAmount === 'number' ? match.outstandingAmount : 0,
+        floor: null,
+    };
 }
 
 // The picked material's quantity type, read the same way updateAmountFieldForMaterial reads it (the
@@ -473,23 +497,26 @@ function formatNeedAmount(amount, isPiece) {
     return isPiece ? String(Math.round(n)) : n.toFixed(3);
 }
 
-// Rewrites every order option's label to carry the outstanding need for the picked material.
+// Rewrites every order option's label to carry the outstanding need for the picked catalog entry.
 //
-// Material mode only: an item check-in's need is a different figure (ordered − delivered against
-// built item stock, not a material bucket) and is not projected here, so an item-mode picker keeps
-// its plain labels rather than borrowing a number that does not answer its question.
+// Both modes carry a figure, from two different calculations (#1742): a material bucket's
+// `required - booked` in the material's own unit, and an item line's `ordered - delivered -
+// earmarked` in whole pieces. The mode decides which map is read; nothing else about the labelling
+// differs, except that item mode has no quality marker because item rows carry no quality.
 //
 // The server-rendered label is stashed on first pass and every rewrite starts from it, so repeated
 // material changes never stack suffixes.
 function relabelOrderOptions() {
-    const materialMode = currentCatalogMode() === 'material';
-    const materialId = materialMode ? activeCatalogId() : '';
-    const isPiece = pickedMaterialQuantityType() === 'PIECE';
+    const itemMode = currentCatalogMode() === 'item';
+    const catalogId = activeCatalogId();
+    // Item stock is counted in whole pieces and carries no quality at all (REQ-INV-029), so item
+    // mode has no grade to compare against and never renders the quality marker.
+    const isPiece = itemMode || pickedMaterialQuantityType() === 'PIECE';
     const unit = isPiece ? MSG_UNIT_PIECE : MSG_UNIT_SCU;
-    const grade = parseInt((document.getElementById('quality') || {}).value, 10);
+    const grade = itemMode ? NaN : parseInt((document.getElementById('quality') || {}).value, 10);
     document.querySelectorAll('#jobOrderAllocRows [data-alloc-target]').forEach(function (select) {
         for (let i = 1; i < select.options.length; i++) {
-            applyOrderOptionLabel(select.options[i], materialId, isPiece, unit, grade);
+            applyOrderOptionLabel(select.options[i], catalogId, itemMode, isPiece, unit, grade);
         }
     });
     // The <template>'s own options are the master every future row is cloned from, so they carry the
@@ -498,16 +525,22 @@ function relabelOrderOptions() {
     const template = document.getElementById('jobOrderRowTemplate');
     if (template && template.content) {
         template.content.querySelectorAll('[data-alloc-target] option').forEach(function (option) {
-            if (option.value) applyOrderOptionLabel(option, materialId, isPiece, unit, grade);
+            if (option.value) {
+                applyOrderOptionLabel(option, catalogId, itemMode, isPiece, unit, grade);
+            }
         });
     }
 }
 
 // Applies (or removes) one option's need suffix.
-function applyOrderOptionLabel(option, materialId, isPiece, unit, grade) {
+function applyOrderOptionLabel(option, catalogId, itemMode, isPiece, unit, grade) {
     if (!option.dataset.baseLabel) option.dataset.baseLabel = option.textContent;
     const base = option.dataset.baseLabel;
-    const need = materialId ? orderNeedFor(option.value, materialId) : null;
+    const need = !catalogId
+        ? null
+        : itemMode
+          ? orderItemNeedFor(option.value, catalogId)
+          : orderNeedFor(option.value, catalogId);
     if (!need) {
         option.textContent = base;
         return;

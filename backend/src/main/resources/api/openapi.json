@@ -63518,6 +63518,31 @@
           }
         }
       },
+      "JobOrderGameItemNeedDto" : {
+        "type" : "object",
+        "properties" : {
+          "gameItemId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "orderedAmount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "deliveredAmount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "allocatedAmount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "outstandingAmount" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "JobOrderMaterialNeedDto" : {
         "type" : "object",
         "properties" : {
@@ -63588,6 +63613,12 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/JobOrderMaterialNeedDto"
+            }
+          },
+          "gameItemNeeds" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderGameItemNeedDto"
             }
           }
         }

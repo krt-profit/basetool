@@ -986,10 +986,35 @@ expand. The receiver's default busy guard applies: while the member has focus in
 group, the update is held behind the "updates available" pill instead of moving a number under a
 half-typed split.
 
-**Item mode is out of scope here.** Booking *finished items* against an ITEM order is a different
-figure (ordered minus delivered, against built item stock — `JobOrderItemStockGroupDto`), not a
-material bucket. The item-mode picker keeps its plain labels rather than borrowing a number that
-does not answer its question.
+**Item mode carries the figure too, from a second calculation** (#1742). Booking *finished items*
+against an ITEM order is not the material question in another unit, so it is not the material
+formula either:
+
+> `noch benoetigt = max(0, ordered - delivered - earmarked)`
+
+in whole units, summed over the order's lines naming that game item. Three notes, each of which is
+where an implementation goes wrong:
+
+- **It is stable across a handover.** `JobOrderItemHandoverService` consumes the order's earmarked
+  item stock as it delivers, so the units move from `earmarked` into `delivered` and the figure does
+  not twitch. That stability is the point of subtracting both rather than picking one.
+- **`manufacturedAmount` plays no part.** Production books its output into the Lager *earmarked to
+  the order*, so those units are already in `earmarked`; subtracting both would count them twice and
+  hide a real need. A producer who books the output in **without** the earmark
+  (`allocateToOrder = false`) has created stock committed to nobody — which the material side does
+  not count either, so the two dimensions stay consistent.
+- **The floor at 0 is not cosmetic.** A handover is best-effort and may outrun its earmarked stock
+  (a legacy line manufactured before item stock existed); the raw difference can go negative.
+
+**No quality marker in item mode.** Item rows carry no quality dimension at all (REQ-INV-029), so
+there is no floor to compare an entry against — the asymmetry with the material picker is the data
+model, not an omission.
+
+**On the wire** the item figures are a parallel projection (`gameItemNeeds`), not a unit variant of
+`materialNeeds`, under the same `withNeeds` opt-in and always empty for a MATERIAL order. The page
+payload is one envelope — `{"materials": {...}, "gameItems": {...}}` — so the check-in form, which
+switches catalog mode in place, relabels either without a second fetch, and the live-sync refresh
+re-reads exactly the shape the page was rendered with.
 
 **Acceptance criteria**
 
@@ -1009,6 +1034,11 @@ does not answer its question.
 - [ ] `withNeeds=false` (the default) ships no figures and fires no stock query.
 - [ ] A peer's booking against a listed order moves the figure on both surfaces with no reload; a
   failed re-read leaves the standing labels rather than blanking them.
+- [ ] In **item** mode both surfaces state the units an ITEM order still wants, in whole pieces, and
+  never render a quality marker.
+- [ ] Delivering earmarked item stock leaves that figure unchanged; booking production in moves it.
+- [ ] Two lines of one order naming the same game item are summed, matching the order detail's
+  Item-Bestand panel.
 
 **Enforced by:** `JobOrderReferenceNeedsTest`, `InventoryPageControllerMvcTest`
 (`viewInputPage_ShouldEmbedTheOutstandingNeedFigures`,
@@ -1021,8 +1051,9 @@ does not answer its question.
 `JobOrderMaterialNeedDto`, `InventoryPageController#orderNeedsAjax`,
 `templates/inventory-input.html`, `static/js/inventory-input.js` (`relabelOrderOptions` /
 `refreshOrderNeeds`), `templates/fragments/inventory-stack-entries.html`,
-`static/js/inventory-{my,admin}.js` · **Issues:** #1740 · **ADR:** — (extends REQ-INV-027 /
-REQ-ORDERS-034)
+`static/js/inventory-{my,admin}.js`, `JobOrderGameItemNeedDto`,
+`InventoryItemRepository#findGameItemStockRowsByJobOrderIds` · **Issues:** #1740, #1742 ·
+**ADR:** — (extends REQ-INV-027 / REQ-ORDERS-034)
 
 ## Out of scope
 

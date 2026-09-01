@@ -137,6 +137,7 @@ class RefineryOrderStoreJobOrderDropdownTest {
             List.of(),
             List.of(outputMaterialId),
             List.of(),
+            List.of(),
             List.of());
     JobOrderReferenceDto unrelated =
         new JobOrderReferenceDto(
@@ -147,6 +148,7 @@ class RefineryOrderStoreJobOrderDropdownTest {
             null,
             List.of(),
             List.of(UUID.randomUUID()),
+            List.of(),
             List.of(),
             List.of());
 
