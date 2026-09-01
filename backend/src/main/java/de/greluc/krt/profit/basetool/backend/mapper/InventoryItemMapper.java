@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderAllocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionAllocationDto;
+import de.greluc.krt.profit.basetool.backend.support.StockViewerAccess;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -36,7 +37,25 @@ import org.mapstruct.Mapping;
 @Mapper(
     config = CentralMapperConfig.class,
     uses = {UserMapper.class, MaterialMapper.class, SquadronMapper.class})
-public interface InventoryItemMapper {
+public abstract class InventoryItemMapper {
+
+  // MapStruct generates a concrete subclass whose constructor takes no arguments, so the seam comes
+  // in by field injection — the same shape as MissionMapper and UserMapper. The mapper depends only
+  // on the support-package leaf interface, never on the service layer or on SecurityContextHolder
+  // (ArchUnit mapperLayerShouldNotReachIntoSecurityContext).
+  @org.springframework.beans.factory.annotation.Autowired protected StockViewerAccess stockAccess;
+
+  /**
+   * Resolves the caller-dependent {@code canEdit} projection of one Lager row.
+   *
+   * @param inventoryItem the row being mapped; {@code null} or id-less yields {@code false}.
+   * @return whether the current caller may write to it.
+   */
+  protected boolean resolveCanEdit(InventoryItem inventoryItem) {
+    return inventoryItem != null
+        && inventoryItem.getId() != null
+        && stockAccess.canEditInventoryItem(inventoryItem.getId());
+  }
 
   /**
    * Maps an {@link InventoryItem} entity to its outbound DTO. The two quantity splits ({@code
@@ -65,7 +84,8 @@ public interface InventoryItemMapper {
   @Mapping(target = "jobOrderRest", expression = "java(jobOrderRest(inventoryItem))")
   @Mapping(target = "missionRest", expression = "java(missionRest(inventoryItem))")
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
-  InventoryItemDto toDto(InventoryItem inventoryItem);
+  @Mapping(target = "canEdit", expression = "java(resolveCanEdit(inventoryItem))")
+  public abstract InventoryItemDto toDto(InventoryItem inventoryItem);
 
   /**
    * Maps one job-order slice to its outbound chip DTO, flattening the earmarked order to its id and
@@ -76,7 +96,8 @@ public interface InventoryItemMapper {
    */
   @Mapping(source = "jobOrder.id", target = "jobOrderId")
   @Mapping(source = "jobOrder.displayId", target = "jobOrderDisplayId")
-  JobOrderAllocationDto jobOrderAllocationToDto(InventoryJobOrderAllocation allocation);
+  public abstract JobOrderAllocationDto jobOrderAllocationToDto(
+      InventoryJobOrderAllocation allocation);
 
   /**
    * Maps one mission slice to its outbound chip DTO, flattening the earmarked mission to its id,
@@ -88,10 +109,11 @@ public interface InventoryItemMapper {
   @Mapping(source = "mission.id", target = "missionId")
   @Mapping(source = "mission.name", target = "missionName")
   @Mapping(source = "mission.plannedStartTime", target = "missionPlannedStartTime")
-  MissionAllocationDto missionAllocationToDto(InventoryMissionAllocation allocation);
+  public abstract MissionAllocationDto missionAllocationToDto(
+      InventoryMissionAllocation allocation);
 
   /** Nested mapping for the item's {@link Location} (used as {@code uses} target). */
-  LocationDto locationToDto(Location location);
+  public abstract LocationDto locationToDto(Location location);
 
   /**
    * Projects a {@link GameItem} catalogue entity into the slim Lager reference DTO (REQ-INV-029):
@@ -105,7 +127,7 @@ public interface InventoryItemMapper {
    * @param gameItem the catalogue entity to project; {@code null} returns {@code null}.
    * @return the slim reference DTO, or {@code null} for a {@code null} input.
    */
-  default InventoryGameItemReferenceDto gameItemToReferenceDto(GameItem gameItem) {
+  public InventoryGameItemReferenceDto gameItemToReferenceDto(GameItem gameItem) {
     if (gameItem == null) {
       return null;
     }
@@ -125,7 +147,7 @@ public interface InventoryItemMapper {
    * @param item the entry whose job-order remainder to compute; never {@code null}.
    * @return the rounded remainder.
    */
-  default Double jobOrderRest(InventoryItem item) {
+  public Double jobOrderRest(InventoryItem item) {
     double allocated =
         item.getJobOrderAllocations().stream()
             .mapToDouble(a -> a.getAmount() == null ? 0.0 : a.getAmount())
@@ -140,7 +162,7 @@ public interface InventoryItemMapper {
    * @param item the entry whose mission remainder to compute; never {@code null}.
    * @return the rounded remainder.
    */
-  default Double missionRest(InventoryItem item) {
+  public Double missionRest(InventoryItem item) {
     double allocated =
         item.getMissionAllocations().stream()
             .mapToDouble(a -> a.getAmount() == null ? 0.0 : a.getAmount())

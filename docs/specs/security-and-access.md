@@ -2387,6 +2387,72 @@ user-deletion flow's job and carries its own fail-closed Keycloak probe (REQ-DAT
 **Code:** `UserAccountMergeService`, `DiscordRegistrationAdminController#merge` ·
 **Related:** REQ-SEC-045, ADR-0142 point 5, REQ-DATA-008, REQ-AUDIT-001
 
+### REQ-SEC-047 — A client is told its authorisation, never left to derive it
+
+The API answers "may this caller do this" itself. Two shapes carry it:
+
+- **`GET /api/v1/me/capabilities`** reports the caller's standing resolved **through the role
+  hierarchy** — `isLogisticianOrAbove`, `isMissionManagerOrAbove`, `isAdmin` alongside the existing
+  bank and blueprint flags.
+- **`canEdit` on the row** — `MissionDto`, `InventoryItemDto` and `JobOrderDto` each carry the
+  server's own answer for that row, computed by the same `AccessGateService` the endpoint's
+  `@PreAuthorize` reaches.
+
+**Because `UserDto.isLogistician` answers a different question and reads like this one.** It is a
+Staffel-membership projection — `UserMapper.resolveLogistician` reads the membership rows and
+nothing else — and an **admin holds no Staffel membership by design**. The same is true of
+`isMissionManager`. A client gating on them is not approximating the rule; it is applying a
+different rule that happens to agree for one role and disagree for the two above it. The Android
+client did exactly that and hid the Lager write actions, the Auftrag write actions and the
+Operation's payout confirmation from admins and officers the server would have permitted — a
+defect no server test could see, because the server was answering correctly the whole time.
+
+**A row flag carries the endpoint's whole rule, not half of it.** `JobOrderController`'s writes gate
+on `hasRole('LOGISTICIAN') and canEditJobOrder(#id)`; a flag built on the scope half alone would
+offer editing to a plain member whose own Staffel owns the order, which the endpoint refuses.
+`StockViewerAccess#mayEditJobOrder` therefore answers with both halves.
+
+**The mapper reaches the gate through a leaf interface** (`StockViewerAccess` in `support`,
+implemented in `service`), for the ADR-0047 reason `MissionViewerAccess` already exists: a
+`mapper → service` edge would close a package cycle, and mappers may touch neither
+`SecurityContextHolder` (ArchUnit `mapperLayerShouldNotReachIntoSecurityContext`) nor the service
+layer directly.
+
+**Acceptance**
+
+- [x] The three capability flags resolve through the hierarchy, so an admin reads `true` for all
+  three and an officer for the first two (`MeControllerTest`).
+- [x] The job-order row flag is false for a caller who passes the scope check but holds no
+  Logistician-or-above role.
+- [ ] Walked on a device with an admin account: outstanding.
+
+**Enforced by:** `MeControllerTest` · **Code:** `MeController`, `StockViewerAccess`,
+`StockViewerAccessService`, `AccessGateService#mayEditJobOrder`, `InventoryItemMapper`,
+`JobOrderMapper` · **Related:** REQ-SEC-046, ADR-0047, REQ-APP-SEC-001
+
+### REQ-SEC-048 — One endpoint answers which org units a caller may pin
+
+`GET /api/v1/me/org-units` returns the active Staffeln and Spezialkommandos an **admin** may pin,
+and the caller's own memberships for **everyone else**.
+
+**Because the branch was duplicated and one copy was missing.** The web frontend's
+`OrgUnitContextAdvice` had it (`isAdmin()` → the catalogue, else the memberships); the Android
+client read `/users/me/memberships` for everybody. An admin — holding no membership — was therefore
+offered nothing but „Alle Org-Einheiten" and could not narrow the app to a single unit at all. A
+rule that two clients must each know is a rule one of them will get wrong.
+
+Staffel and SK only, matching what the switcher offers; the Bereich and Organisationsleitung tiers
+belong to `GET /api/v1/org-units/active-all-kinds` and a different consumer.
+
+**Acceptance**
+
+- [x] An admin gets the active catalogue and never the membership list (`MeControllerTest`).
+- [x] A non-admin gets their memberships and never the catalogue.
+- [ ] Both clients read this endpoint rather than branching themselves: outstanding.
+
+**Enforced by:** `MeControllerTest` · **Code:** `MeController#getPinnableOrgUnits` ·
+**Related:** REQ-SEC-047, REQ-ORG-017
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the

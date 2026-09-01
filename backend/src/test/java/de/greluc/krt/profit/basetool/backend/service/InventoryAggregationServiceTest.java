@@ -544,6 +544,7 @@ class InventoryAggregationServiceTest {
               null,
               null,
               1L,
+              null,
               null);
       when(ownerScopeService.currentScopePredicate())
           .thenReturn(new ScopePredicate(false, null, Set.of(memberOrgUnitId)));
@@ -647,6 +648,7 @@ class InventoryAggregationServiceTest {
                   0.0,
                   List.of(),
                   0.0,
+                  null,
                   null,
                   null,
                   null,

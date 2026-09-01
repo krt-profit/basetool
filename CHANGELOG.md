@@ -2,7 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Ein Admin durfte in der App nichts, was er im Webtool darf.** Lagereinträge zuordnen, fremde Zeilen umbuchen, Aufträge bearbeiten, Auszahlungen bestätigen — alles war ausgegraut, obwohl der Server es erlaubt hätte; und im Org-Einheiten-Umschalter stand nur „Alle Org-Einheiten". Betraf ebenso Offiziere. Ursache: `isLogistician` und `isMissionManager` in `/users/me` sagen aus, ob eine **Staffel-Mitgliedschaft** dieses Häkchen trägt, und ein Admin hat per Design keine. Die API sagt einem Client seine Berechtigung jetzt selbst — über drei hierarchie-aufgelöste Flags in `/api/v1/me/capabilities` und ein `canEdit` pro Zeile auf Lager- und Auftragsdaten.
+
 ### Added
+
+- **`GET /api/v1/me/org-units`** beantwortet, welche Org-Einheiten ein Aufrufer als Kontext wählen darf: für Admins alle aktiven Staffeln und Spezialkommandos, sonst die eigenen Mitgliedschaften. Das Webtool hatte diese Fallunterscheidung selbst gebaut, die App nicht — jetzt steht sie einmal auf dem Server. Nebeneffekt: aus bis zu vier Abrufen pro Seitenaufbau wird einer.
 
 - **Die Auftragsauswahl beim Einbuchen und im „+ Zuordnen“-Menü zeigt, was jeder Auftrag noch braucht.** Die offene Restmenge steht direkt an der Option („#1042 · noch 250,000 SCU“), Fertigungsaufträge eingeschlossen, und aktualisiert sich live, wenn jemand anderes auf einen dieser Aufträge bucht. Liegt die eingegebene Qualität unter dem Mindestwert des Auftrags, steht das dabei — die Zuordnung ist erlaubt, senkt dessen Bedarf aber nicht.
 

@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.support.StockViewerAccess;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,20 @@ import org.mapstruct.factory.Mappers;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class InventoryItemMapperTest {
+
+  /** Says yes to every row, so these tests assert the mapping rather than the gate. */
+  private static final StockViewerAccess ALWAYS_ALLOWED =
+      new StockViewerAccess() {
+        @Override
+        public boolean canEditInventoryItem(java.util.UUID inventoryItemId) {
+          return true;
+        }
+
+        @Override
+        public boolean mayEditJobOrder(java.util.UUID jobOrderId) {
+          return true;
+        }
+      };
 
   private InventoryItemMapper mapper;
 
@@ -50,6 +65,9 @@ class InventoryItemMapperTest {
     mapper = Mappers.getMapper(InventoryItemMapper.class);
     ReflectionTestUtils.setField(mapper, "userMapper", Mappers.getMapper(UserMapper.class));
     ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
+    // The caller-aware seam behind canEdit (REQ-SEC-047). Answering true here keeps these tests
+    // about the field mapping; the authorisation rule itself is covered where it lives.
+    ReflectionTestUtils.setField(mapper, "stockAccess", ALWAYS_ALLOWED);
   }
 
   @Test

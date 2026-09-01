@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -176,8 +177,16 @@ class AdminTermsPageControllerTest {
    * @return the requested URI, query string included
    */
   private String requestedUri() {
+    // Selects the overview call rather than asserting it is the only one. The org-unit switcher
+    // advice runs for every controller test and now issues its own get(String, PTR) — a count-based
+    // verification here was pinning "nothing else in the request talks to the backend", which was
+    // never what this helper meant to assert.
     ArgumentCaptor<String> captor = ArgumentCaptor.captor();
-    verify(backendApiClient).get(captor.capture(), any(ParameterizedTypeReference.class));
-    return captor.getValue();
+    verify(backendApiClient, atLeastOnce())
+        .get(captor.capture(), any(ParameterizedTypeReference.class));
+    return captor.getAllValues().stream()
+        .filter(uri -> uri.startsWith("/api/v1/admin/terms"))
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("no overview request was made"));
   }
 }

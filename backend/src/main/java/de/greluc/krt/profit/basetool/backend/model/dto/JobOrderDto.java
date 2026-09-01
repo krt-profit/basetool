@@ -82,6 +82,7 @@ public record JobOrderDto(
     List<JobOrderItemHandoverDto> itemHandovers,
     Instant createdAt,
     Long version,
+    Boolean canEdit,
     boolean redacted) {
 
   /**
@@ -112,6 +113,7 @@ public record JobOrderDto(
         itemHandovers,
         createdAt,
         version,
+        canEdit,
         redacted);
   }
 
@@ -144,6 +146,7 @@ public record JobOrderDto(
         itemHandovers,
         createdAt,
         version,
+        canEdit,
         value);
   }
 }
