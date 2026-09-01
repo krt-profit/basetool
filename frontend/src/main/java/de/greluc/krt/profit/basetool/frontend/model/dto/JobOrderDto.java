@@ -53,4 +53,5 @@ public record JobOrderDto(
     List<JobOrderItemHandoverDto> itemHandovers,
     Instant createdAt,
     Long version,
+    Boolean canEdit,
     boolean redacted) {}

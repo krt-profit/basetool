@@ -380,6 +380,7 @@ class InventoryItemServiceAggregateTest {
                   null,
                   null,
                   null,
+                  null,
                   null);
             });
   }

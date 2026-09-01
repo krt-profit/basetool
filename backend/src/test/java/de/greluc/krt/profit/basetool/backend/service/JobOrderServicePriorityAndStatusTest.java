@@ -132,6 +132,7 @@ class JobOrderServicePriorityAndStatusTest {
                   List.of(),
                   null,
                   o.getVersion(),
+                  null,
                   false);
             });
 

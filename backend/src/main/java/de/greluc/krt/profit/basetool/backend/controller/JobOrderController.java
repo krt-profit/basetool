@@ -535,6 +535,9 @@ public class JobOrderController {
         java.util.Collections.emptyList(),
         dto.createdAt(),
         dto.version(),
+        // Redaction hides the order's contents from a requester-only viewer; it says nothing about
+        // whether they may edit it. Carry the server's answer through rather than dropping it.
+        dto.canEdit(),
         // This IS the requesting-owner redacted view — carry the flag so the client renders the
         // limited template regardless of its global capabilities (review finding 2).
         true);

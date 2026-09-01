@@ -144,7 +144,7 @@ class InventoryItemServiceAllocationTest {
   private InventoryItemDto sentinelDto() {
     return new InventoryItemDto(
         itemId, null, null, null, null, 750, 10.0, false, List.of(), 0.0, List.of(), 0.0, null,
-        null, 2L, null);
+        null, 2L, null, null);
   }
 
   // --- add ---------------------------------------------------------------------------------

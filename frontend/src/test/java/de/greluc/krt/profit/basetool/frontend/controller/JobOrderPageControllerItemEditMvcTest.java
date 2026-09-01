@@ -96,6 +96,7 @@ class JobOrderPageControllerItemEditMvcTest {
         itemHandovers,
         Instant.now(),
         1L,
+        null,
         false);
   }
 
@@ -221,6 +222,7 @@ class JobOrderPageControllerItemEditMvcTest {
             List.of(),
             Instant.now(),
             1L,
+            null,
             false);
     doReturn(order).when(backendApiClient).get(eq("/api/v1/orders/" + id), eq(JobOrderDto.class));
 

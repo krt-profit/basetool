@@ -136,6 +136,7 @@ class JobOrderInventoryOwnerRedactorTest {
             "note",
             new SquadronReferenceDto(UUID.randomUUID(), "Alpha", "A"),
             9L,
+            null,
             Instant.EPOCH);
 
     List<InventoryItemDto> result = redactor.redactInventoryItems(List.of(item));

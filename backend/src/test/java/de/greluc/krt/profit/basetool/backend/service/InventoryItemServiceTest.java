@@ -550,6 +550,7 @@ class InventoryItemServiceTest {
             null,
             null,
             null,
+            null,
             null);
     when(inventoryItemMapper.toDto(savedItem)).thenReturn(expectedDto);
 
@@ -2127,7 +2128,7 @@ class InventoryItemServiceTest {
       minimalInventoryDto(UUID id) {
     return new de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto(
         id, null, null, null, null, null, null, null, List.of(), 0.0, List.of(), 0.0, null, null,
-        1L, null);
+        1L, null, null);
   }
 
   /**

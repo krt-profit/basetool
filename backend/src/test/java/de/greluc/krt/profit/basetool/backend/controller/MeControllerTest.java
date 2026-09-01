@@ -22,13 +22,20 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -49,6 +56,10 @@ class MeControllerTest {
 
   @Mock private AuthHelperService authHelperService;
 
+  @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
+
+  @Mock private UserService userService;
+
   @InjectMocks private MeController controller;
 
   @Test
@@ -67,6 +78,76 @@ class MeControllerTest {
     when(ownerScopeService.currentOrgUnitId()).thenReturn(Optional.empty());
 
     assertNull(controller.getActiveOrgUnit().orgUnitId());
+  }
+
+  @Test
+  void getCapabilities_logisticianFlagIsTheHierarchyAnswer_notTheMembershipOne() {
+    // The whole reason this flag exists. UserDto.isLogistician is resolveLogistician(), which reads
+    // Staffel membership rows and nothing else, so it is false for an admin — who holds no Staffel
+    // membership by design and may still edit every Lager row. A client gating on the membership
+    // projection hid the write actions from exactly the people most entitled to perform them.
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+
+    assertTrue(controller.getCapabilities().isLogisticianOrAbove());
+    verify(authHelperService).isLogisticianOrAbove();
+  }
+
+  @Test
+  void getCapabilities_logisticianFlagFalseWhenTheCallerReachesNeitherRole() {
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+
+    assertFalse(controller.getCapabilities().isLogisticianOrAbove());
+  }
+
+  @Test
+  void getCapabilities_missionManagerFlagResolvesThroughTheHierarchy() {
+    // Reached by MISSION_MANAGER, OFFICER and ADMIN alike — the same hierarchy the payout
+    // endpoint's hasRole('MISSION_MANAGER') applies.
+    // getCapabilities() asks hasReachableRole three times; under strict stubbing every argument
+    // the method is called with has to be answered, not just the one under test.
+    when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_EMPLOYEE)))
+        .thenReturn(false);
+    when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
+        .thenReturn(false);
+    when(authHelperService.hasReachableRole(Roles.authority(Roles.MISSION_MANAGER)))
+        .thenReturn(true);
+
+    assertTrue(controller.getCapabilities().isMissionManagerOrAbove());
+  }
+
+  @Test
+  void getCapabilities_adminFlagIsItsOwnAnswer() {
+    // Not "above a role" but a different scope: an admin sees every org unit rather than their
+    // own memberships, which is what the pinnable-org-unit branch turns on.
+    when(authHelperService.isAdmin()).thenReturn(true);
+
+    assertTrue(controller.getCapabilities().isAdmin());
+    verify(authHelperService).isAdmin();
+  }
+
+  @Test
+  void getPinnableOrgUnits_adminGetsTheWholeActiveCatalogue() {
+    // The branch that was missing in the Android client: an admin holds no membership, so the
+    // membership list would have offered them nothing to pin at all.
+    List<OrgUnitMembershipOptionDto> catalogue = List.of();
+    when(authHelperService.isAdmin()).thenReturn(true);
+    when(orgUnitMembershipQueryService.listAllActiveOptions()).thenReturn(catalogue);
+
+    assertSame(catalogue, controller.getPinnableOrgUnits(null));
+    verify(orgUnitMembershipQueryService).listAllActiveOptions();
+    verify(orgUnitMembershipQueryService, never()).listOptionsForUser(any());
+  }
+
+  @Test
+  void getPinnableOrgUnits_everyoneElseGetsTheirOwnMemberships() {
+    UUID callerId = UUID.randomUUID();
+    List<OrgUnitMembershipOptionDto> mine = List.of();
+    when(authHelperService.isAdmin()).thenReturn(false);
+    when(userService.getUserIdFromJwt(null)).thenReturn(callerId);
+    when(orgUnitMembershipQueryService.listOptionsForUser(callerId)).thenReturn(mine);
+
+    assertSame(mine, controller.getPinnableOrgUnits(null));
+    verify(orgUnitMembershipQueryService, never()).listAllActiveOptions();
   }
 
   @Test

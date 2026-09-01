@@ -54,10 +54,25 @@ class InventoryPageControllerTest {
   private InventoryPageController controller;
   private InventoryWriteController writeController;
 
+  /** Mirrors {@code SecurityConfig#roleHierarchy}, which mirrors the backend's. */
+  private static final org.springframework.security.access.hierarchicalroles.RoleHierarchy
+      ROLE_HIERARCHY =
+          org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl.fromHierarchy(
+              """
+              ROLE_ADMIN > ROLE_LOGISTICIAN
+              ROLE_OFFICER > ROLE_LOGISTICIAN
+              ROLE_ADMIN > ROLE_MISSION_MANAGER
+              ROLE_OFFICER > ROLE_MISSION_MANAGER
+              ROLE_ADMIN > ROLE_BANK_MANAGEMENT
+              ROLE_BANK_MANAGEMENT > ROLE_BANK_EMPLOYEE
+              """);
+
   @BeforeEach
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
-    controller = new InventoryPageController(backendApiClient, PARALLEL);
+    // The real hierarchy, not a mock: the point of resolving through it is that ADMIN and
+    // OFFICER reach LOGISTICIAN without being listed, and a stub would assert nothing.
+    controller = new InventoryPageController(backendApiClient, PARALLEL, ROLE_HIERARCHY);
     writeController = new InventoryWriteController(backendApiClient, controller);
   }
 
@@ -277,6 +292,7 @@ class InventoryPageControllerTest {
             null,
             null,
             1L,
+            null,
             null);
     PageResponse<InventoryItemDto> lastPage =
         new PageResponse<>(List.of(row), 0, 50, 20, 1, Collections.emptyList());
@@ -535,6 +551,7 @@ class InventoryPageControllerTest {
             null,
             null,
             1L,
+            null,
             null);
     when(backendApiClient.post(anyString(), any(), eq(InventoryItemDto.class)))
         .thenReturn(expectedDto);
@@ -718,6 +735,7 @@ class InventoryPageControllerTest {
             "hello",
             null,
             2L,
+            null,
             null);
     when(backendApiClient.put(
             eq("/api/v1/inventory/" + id + "/note"), eq(request), eq(InventoryItemDto.class)))
@@ -846,6 +864,7 @@ class InventoryPageControllerTest {
             null,
             null,
             2L,
+            null,
             null);
     when(backendApiClient.post(
             eq("/api/v1/inventory/" + id + "/book-out"), eq(dto), eq(InventoryItemDto.class)))
@@ -927,6 +946,7 @@ class InventoryPageControllerTest {
             null,
             null,
             2L,
+            null,
             null);
     when(backendApiClient.patch(
             eq("/api/v1/inventory/" + id + "/delivered"), eq(request), eq(InventoryItemDto.class)))
@@ -998,6 +1018,7 @@ class InventoryPageControllerTest {
             null,
             null,
             1L,
+            null,
             null);
     when(backendApiClient.post(
             eq("/api/v1/inventory/" + id + "/personal-rebook"),

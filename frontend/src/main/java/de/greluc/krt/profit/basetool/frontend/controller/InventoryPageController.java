@@ -188,6 +188,9 @@ public class InventoryPageController {
   private final BackendApiClient backendApiClient;
   private final ParallelPageLoader parallelPageLoader;
 
+  /** Resolves ADMIN/OFFICER onto LOGISTICIAN so the gate is asked, not enumerated. */
+  private final org.springframework.security.access.hierarchicalroles.RoleHierarchy roleHierarchy;
+
   /**
    * Renders the squadron-wide aggregated inventory view ({@code /inventory}). The {@code view}
    * query parameter picks the catalog (REQ-INV-030): the default Material view keeps its fixed sort
@@ -1422,21 +1425,27 @@ public class InventoryPageController {
     return auth != null ? auth.getName() : null;
   }
 
-  private static boolean hasLogisticianOrAbove() {
+  /**
+   * Whether the caller reaches {@code LOGISTICIAN} — the gate on writing to another member's row.
+   *
+   * <p><strong>Resolved, not enumerated.</strong> This used to list {@code LOGISTICIAN || OFFICER
+   * || ADMIN} by hand against the raw authority set. That was correct only for as long as the list
+   * stayed complete: the hierarchy already says {@code ADMIN > LOGISTICIAN} and {@code OFFICER >
+   * LOGISTICIAN} (declared once in {@code SecurityConfig#roleHierarchy}, mirroring the backend), so
+   * a third role placed above Logistician would have been silently missed here while every {@code
+   * sec:authorize} in the templates picked it up. Asking the hierarchy makes this agree with them
+   * by construction (ADR-0151).
+   *
+   * @return {@code true} iff the caller holds Logistician or a role above it.
+   */
+  private boolean hasLogisticianOrAbove() {
     org.springframework.security.core.Authentication auth =
         org.springframework.security.core.context.SecurityContextHolder.getContext()
             .getAuthentication();
     if (auth == null || auth.getAuthorities() == null) {
       return false;
     }
-    for (org.springframework.security.core.GrantedAuthority a : auth.getAuthorities()) {
-      String r = a.getAuthority();
-      if (Roles.authority(Roles.LOGISTICIAN).equals(r)
-          || Roles.authority(Roles.OFFICER).equals(r)
-          || Roles.authority(Roles.ADMIN).equals(r)) {
-        return true;
-      }
-    }
-    return false;
+    return roleHierarchy.getReachableGrantedAuthorities(auth.getAuthorities()).stream()
+        .anyMatch(a -> Roles.authority(Roles.LOGISTICIAN).equals(a.getAuthority()));
   }
 }

@@ -441,6 +441,24 @@ public class AccessGateService {
   }
 
   /**
+   * Whether the current caller may edit this job order — the <em>complete</em> rule the write
+   * endpoints enforce.
+   *
+   * <p>{@code JobOrderController}'s write mappings read {@code hasRole('LOGISTICIAN')
+   * and @ownerScopeService.canEditJobOrder(#id)}, and both halves matter: the scope check alone
+   * would admit a plain member whose own Staffel owns the order, which is not what the endpoint
+   * permits. A client flag that carried only the scope half would offer an action the server then
+   * refuses — so this method answers with both, and a DTO built on it agrees with the endpoint by
+   * construction.
+   *
+   * @param jobOrderId the order to test.
+   * @return whether the current caller may edit it.
+   */
+  public boolean mayEditJobOrder(@NotNull UUID jobOrderId) {
+    return authHelper.isLogisticianOrAbove() && canEditJobOrder(jobOrderId);
+  }
+
+  /**
    * Per-row write check shared by {@link #canEditJobOrder(UUID)}. First applies the same
    * viewer-side profit gate as the read path ({@link RequestScopeResolver#canViewJobOrders()}): a
    * caller who is not a member of any profit-eligible org unit (and is not an admin) may edit no
