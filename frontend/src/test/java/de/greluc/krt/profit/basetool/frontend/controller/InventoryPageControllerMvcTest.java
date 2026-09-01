@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferen
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryStackDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderAllocationDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderGameItemNeedDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialNeedDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
@@ -1059,6 +1060,7 @@ class InventoryPageControllerMvcTest {
             List.of(),
             List.of(materialId),
             List.of(),
+            List.of(),
             List.of());
     JobOrderReferenceDto unrelated =
         new JobOrderReferenceDto(
@@ -1069,6 +1071,7 @@ class InventoryPageControllerMvcTest {
             null,
             List.of(),
             List.of(UUID.randomUUID()),
+            List.of(),
             List.of(),
             List.of());
 
@@ -1128,6 +1131,7 @@ class InventoryPageControllerMvcTest {
             List.of(),
             List.of(materialId),
             List.of(),
+            List.of(),
             List.of());
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
@@ -1181,7 +1185,8 @@ class InventoryPageControllerMvcTest {
             List.of(),
             List.of(materialId),
             List.of(),
-            List.of(new JobOrderMaterialNeedDto(materialId, 650, 400.0, 150.0, 250.0)));
+            List.of(new JobOrderMaterialNeedDto(materialId, 650, 400.0, 150.0, 250.0)),
+            List.of());
 
     java.util.List<String> lookupUrls = new java.util.ArrayList<>();
     when(backendApiClient.get(anyString(), anyTypeRef()))
@@ -1205,7 +1210,11 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString(orderId.toString())))
         // The outstanding gap, and the floor the client compares the entered grade against.
         .andExpect(content().string(containsString("&quot;outstandingAmount&quot;:250.0")))
-        .andExpect(content().string(containsString("&quot;qualityFloor&quot;:650")));
+        .andExpect(content().string(containsString("&quot;qualityFloor&quot;:650")))
+        // #1742: one envelope with a map per catalog dimension — the item half is present (and
+        // empty here), so switching the form to Item mode reads a map rather than undefined.
+        .andExpect(content().string(containsString("&quot;materials&quot;")))
+        .andExpect(content().string(containsString("&quot;gameItems&quot;")));
 
     assertThat(lookupUrls).isNotEmpty().allMatch(url -> url.contains("withNeeds=true"));
   }
@@ -1235,11 +1244,21 @@ class InventoryPageControllerMvcTest {
             List.of(),
             List.of(materialId),
             List.of(),
-            List.of(new JobOrderMaterialNeedDto(materialId, null, 400.0, 150.0, 250.0)));
+            List.of(new JobOrderMaterialNeedDto(materialId, null, 400.0, 150.0, 250.0)),
+            List.of());
     // An order that requires no material carries no entry at all rather than an empty one.
     JobOrderReferenceDto needless =
         new JobOrderReferenceDto(
-            needlessOrderId, 72, "h2", "OPEN", null, List.of(), List.of(), List.of(), List.of());
+            needlessOrderId,
+            72,
+            "h2",
+            "OPEN",
+            null,
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of());
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenAnswer(
@@ -1253,9 +1272,13 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get("/inventory/order-needs").header("X-Requested-With", "XMLHttpRequest"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$['" + orderId + "'][0].outstandingAmount").value(250.0))
-        .andExpect(jsonPath("$['" + orderId + "'][0].materialId").value(materialId.toString()))
-        .andExpect(jsonPath("$['" + needlessOrderId + "']").doesNotExist());
+        // #1742: the payload is one envelope with a map per catalog dimension, so the page script
+        // decodes a single shape for both modes and for every live-sync refresh.
+        .andExpect(jsonPath("$.materials['" + orderId + "'][0].outstandingAmount").value(250.0))
+        .andExpect(
+            jsonPath("$.materials['" + orderId + "'][0].materialId").value(materialId.toString()))
+        .andExpect(jsonPath("$.materials['" + needlessOrderId + "']").doesNotExist())
+        .andExpect(jsonPath("$.gameItems").exists());
   }
 
   /**
@@ -1304,7 +1327,8 @@ class InventoryPageControllerMvcTest {
             List.of(),
             List.of(materialId),
             List.of(),
-            List.of(new JobOrderMaterialNeedDto(materialId, null, 400.0, 150.0, 250.0)));
+            List.of(new JobOrderMaterialNeedDto(materialId, null, 400.0, 150.0, 250.0)),
+            List.of());
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenAnswer(
@@ -1879,6 +1903,7 @@ class InventoryPageControllerMvcTest {
             List.of(),
             List.of(),
             List.of(gameItemId),
+            List.of(),
             List.of());
     JobOrderReferenceDto unrelated =
         new JobOrderReferenceDto(
@@ -1890,6 +1915,7 @@ class InventoryPageControllerMvcTest {
             List.of(),
             List.of(),
             List.of(UUID.randomUUID()),
+            List.of(),
             List.of());
 
     when(backendApiClient.get(anyString(), anyTypeRef()))
@@ -2058,5 +2084,122 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("data-trigger=\"inv-admin-bookout\"")))
         .andExpect(content().string(containsString("data-quantity-type=\"PIECE\"")))
         .andExpect(content().string(not(containsString("data-material-id"))));
+  }
+
+  /**
+   * Item-mode check-in figures (REQ-INV-039, #1742): the embedded blob's {@code gameItems} half
+   * carries what each ITEM order still wants, so the form can label its picker after the member
+   * flips to Item mode without a second fetch.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void viewInputPage_ShouldEmbedTheGameItemNeedFigures() throws Exception {
+    UUID gameItemId = UUID.randomUUID();
+    UUID orderId = UUID.randomUUID();
+
+    JobOrderReferenceDto order =
+        new JobOrderReferenceDto(
+            orderId,
+            71,
+            "craft-1",
+            "IN_PROGRESS",
+            null,
+            List.of(),
+            List.of(),
+            List.of(gameItemId),
+            List.of(),
+            List.of(new JobOrderGameItemNeedDto(gameItemId, 10, 2, 3, 5)));
+
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              return url.contains("/orders/lookup") ? List.of(order) : Collections.emptyList();
+            });
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/input"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("&quot;gameItemId&quot;")))
+        // 10 ordered − 2 delivered − 3 earmarked. Whole units: item rows carry no fractions and no
+        // quality, so there is no floor beside this figure the way a material bucket has one.
+        .andExpect(content().string(containsString("&quot;outstandingAmount&quot;:5")))
+        .andExpect(content().string(not(containsString("&quot;qualityFloor&quot;"))));
+  }
+
+  /**
+   * The item-mode popover (REQ-INV-039, #1742): the game-item stack entries' {@code + Zuordnen}
+   * picker labels each ITEM order with the units it still wants, the whole-unit sibling of the
+   * material picker's figure.
+   */
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
+  void viewAllGameItemStackEntries_ShouldLabelOrderOptionsWithTheOutstandingNeed()
+      throws Exception {
+    UUID itemId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID orderId = UUID.randomUUID();
+
+    InventoryItemDto entry =
+        new InventoryItemDto(
+            itemId,
+            new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
+            null,
+            sampleGameItem(gameItemId),
+            new LocationReferenceDto(locationId, "ARC-L1"),
+            null,
+            2.0,
+            false,
+            java.util.List.of(),
+            2.0,
+            java.util.List.of(),
+            null,
+            null,
+            null,
+            1L,
+            Instant.parse("2026-03-01T00:00:00Z"));
+
+    JobOrderReferenceDto order =
+        new JobOrderReferenceDto(
+            orderId,
+            1042,
+            "craft-1",
+            "IN_PROGRESS",
+            null,
+            List.of(),
+            List.of(),
+            List.of(gameItemId),
+            List.of(),
+            List.of(new JobOrderGameItemNeedDto(gameItemId, 10, 2, 3, 5)));
+
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(
+            inv -> {
+              String url = inv.getArgument(0);
+              if (url.contains("/inventory/all/stack/entries") && url.contains("catalog=ITEM")) {
+                return new PageResponse<>(List.of(entry), 0, 20, 1, 1, Collections.emptyList());
+              }
+              if (url.contains("/orders/lookup")) {
+                return List.of(order);
+              }
+              return Collections.emptyList();
+            });
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(
+            get("/inventory/all/game-item-stack/entries")
+                .param("gameItemId", gameItemId.toString())
+                .param("userId", userId.toString())
+                .param("locationId", locationId.toString()))
+        .andExpect(status().isOk())
+        // "#1042 · noch 5 Stück" — the display id, then the units still wanted.
+        .andExpect(
+            content().string(stringContainsInOrder("value=\"" + orderId + "\"", "#1042", "5")));
   }
 }

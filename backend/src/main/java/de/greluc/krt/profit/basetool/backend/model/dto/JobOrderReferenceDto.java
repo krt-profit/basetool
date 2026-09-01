@@ -52,6 +52,11 @@ import java.util.UUID;
  *     ({@code withNeeds=true}): folding an ITEM order's blueprint-derived requirements costs a read
  *     the pickers that show no figure must not pay for. Covers both order kinds, unlike {@code
  *     materials}.
+ * @param gameItemNeeds what an ITEM order still wants per game item, for the item-mode allocation
+ *     pickers (REQ-INV-039). Empty under the same {@code withNeeds} opt-in as {@code
+ *     materialNeeds}, and always empty for a MATERIAL order, which accepts no item-stock link. A
+ *     parallel projection rather than a unit variant of {@code materialNeeds}: an item line's
+ *     remaining count is {@code ordered − delivered − earmarked}, not a material bucket.
  */
 public record JobOrderReferenceDto(
     UUID id,
@@ -62,4 +67,5 @@ public record JobOrderReferenceDto(
     List<JobOrderMaterialDto> materials,
     List<UUID> requiredMaterialIds,
     List<UUID> requiredGameItemIds,
-    List<JobOrderMaterialNeedDto> materialNeeds) {}
+    List<JobOrderMaterialNeedDto> materialNeeds,
+    List<JobOrderGameItemNeedDto> gameItemNeeds) {}

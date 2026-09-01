@@ -30,13 +30,17 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
+import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemNeedDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialNeedDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto;
@@ -77,6 +81,9 @@ class JobOrderReferenceNeedsTest {
 
   /** The order under test; fixed so the stubbed stock rows can name it. */
   private static final UUID ORDER_ID = UUID.randomUUID();
+
+  /** Game item every item-mode case orders. */
+  private static final UUID GAME_ITEM_ID = UUID.randomUUID();
 
   @Mock private JobOrderRepository jobOrderRepository;
 
@@ -208,6 +215,106 @@ class JobOrderReferenceNeedsTest {
   }
 
   // ---------------------------------------------------------------
+  // item-mode needs (#1742)
+  // ---------------------------------------------------------------
+
+  /** The plain item case: what is neither delivered nor already earmarked is still needed. */
+  @Test
+  @DisplayName("an item line's need is ordered minus delivered minus earmarked")
+  void itemOrder_projectsOrderedMinusDeliveredMinusEarmarked() {
+    givenOrders(itemOrder(10, 0, 0));
+    givenLinkedItemStock(new JobOrderGameItemStockRow(ORDER_ID, GAME_ITEM_ID, 4.0));
+
+    JobOrderGameItemNeedDto need = onlyItemNeed(queryService.findAllActiveReference(true));
+
+    assertEquals(10, need.orderedAmount());
+    assertEquals(0, need.deliveredAmount());
+    assertEquals(4, need.allocatedAmount());
+    assertEquals(6, need.outstandingAmount());
+  }
+
+  /**
+   * The property that makes the definition worth having: handing the earmarked units over moves
+   * them from one subtrahend to the other, so the figure a member reads does not twitch.
+   */
+  @Test
+  @DisplayName("the figure is unchanged by a handover, which consumes the earmark it delivers")
+  void itemOrder_isStableAcrossAHandover() {
+    // Before: 4 built and earmarked, nothing delivered.
+    givenOrders(itemOrder(10, 0, 0));
+    givenLinkedItemStock(new JobOrderGameItemStockRow(ORDER_ID, GAME_ITEM_ID, 4.0));
+    assertEquals(6, onlyItemNeed(queryService.findAllActiveReference(true)).outstandingAmount());
+
+    // After: JobOrderItemHandoverService consumed the earmark as it delivered those same 4.
+    givenOrders(itemOrder(10, 0, 4));
+    givenLinkedItemStock();
+
+    assertEquals(
+        6,
+        onlyItemNeed(queryService.findAllActiveReference(true)).outstandingAmount(),
+        "delivering earmarked stock must not change what is still outstanding");
+  }
+
+  /**
+   * {@code manufacturedAmount} is deliberately absent from the calculation: production books its
+   * output into the Lager earmarked to the order, so subtracting both would count those units twice
+   * and hide a real need.
+   */
+  @Test
+  @DisplayName("manufacturedAmount plays no part — its units are already the earmark")
+  void itemOrder_ignoresManufacturedAmount() {
+    givenOrders(itemOrder(10, 4, 0));
+    givenLinkedItemStock(new JobOrderGameItemStockRow(ORDER_ID, GAME_ITEM_ID, 4.0));
+
+    assertEquals(
+        6,
+        onlyItemNeed(queryService.findAllActiveReference(true)).outstandingAmount(),
+        "the 4 manufactured ARE the 4 earmarked; counting both would report 2");
+  }
+
+  /** Several lines may name one game item (an adopted sub-assembly beside its parent). */
+  @Test
+  @DisplayName("two lines for one game item are summed, matching the order-detail panel")
+  void itemOrder_sumsLinesNamingTheSameGameItem() {
+    JobOrder order = newOrder(JobOrderType.ITEM);
+    order.setItems(new HashSet<>(Set.of(itemLine(6, 0, 1), itemLine(4, 0, 2))));
+    givenOrders(order);
+    givenLinkedItemStock();
+
+    JobOrderGameItemNeedDto need = onlyItemNeed(queryService.findAllActiveReference(true));
+
+    assertEquals(10, need.orderedAmount(), "6 + 4 requested");
+    assertEquals(3, need.deliveredAmount(), "1 + 2 handed over");
+    assertEquals(7, need.outstandingAmount(), "both counts are summed, not just the first line's");
+  }
+
+  /**
+   * The handover is best-effort: it may deliver more than was earmarked (a legacy line manufactured
+   * before item stock existed) and is never rolled back, which can drive the raw difference
+   * negative.
+   */
+  @Test
+  @DisplayName("a delivery that outran its earmark reports 0, not a negative")
+  void itemOrder_flooredAtZero() {
+    givenOrders(itemOrder(10, 0, 10));
+    givenLinkedItemStock(new JobOrderGameItemStockRow(ORDER_ID, GAME_ITEM_ID, 3.0));
+
+    assertEquals(0, onlyItemNeed(queryService.findAllActiveReference(true)).outstandingAmount());
+  }
+
+  /** A material order accepts no item-stock link at all, so it carries no item figure. */
+  @Test
+  @DisplayName("a MATERIAL order ships no game-item needs")
+  void materialOrder_shipsNoGameItemNeeds() {
+    givenOrders(materialOrder(400.0, null));
+    givenLinkedStock();
+
+    assertTrue(
+        queryService.findAllActiveReference(true).get(0).gameItemNeeds().isEmpty(),
+        "a MATERIAL order has no ordered items to need");
+  }
+
+  // ---------------------------------------------------------------
   // fixtures
   // ---------------------------------------------------------------
 
@@ -239,6 +346,62 @@ class JobOrderReferenceNeedsTest {
   private void givenLinkedStock(JobOrderMaterialStockRow... rows) {
     when(inventoryItemRepository.findMaterialStockRowsByJobOrderIds(anyCollection()))
         .thenReturn(List.of(rows));
+  }
+
+  /**
+   * Stubs the batched order-linked <em>item</em> earmark read.
+   *
+   * @param rows the earmark slices to index.
+   */
+  private void givenLinkedItemStock(JobOrderGameItemStockRow... rows) {
+    when(inventoryItemRepository.findGameItemStockRowsByJobOrderIds(anyCollection()))
+        .thenReturn(List.of(rows));
+  }
+
+  /**
+   * Asserts a single projected order with a single game-item bucket and returns that bucket.
+   *
+   * @param result the lookup result.
+   * @return the single game-item need.
+   */
+  private static JobOrderGameItemNeedDto onlyItemNeed(List<JobOrderReferenceDto> result) {
+    assertEquals(1, result.size(), "one order was stubbed");
+    assertEquals(1, result.get(0).gameItemNeeds().size(), "one game item was stubbed");
+    return result.get(0).gameItemNeeds().get(0);
+  }
+
+  /**
+   * Builds an ITEM order with one line for {@link #GAME_ITEM_ID}.
+   *
+   * @param ordered whole units requested.
+   * @param manufactured whole units already produced.
+   * @param delivered whole units already handed over.
+   * @return the order.
+   */
+  private static JobOrder itemOrder(int ordered, int manufactured, int delivered) {
+    JobOrder order = newOrder(JobOrderType.ITEM);
+    order.setItems(new HashSet<>(Set.of(itemLine(ordered, manufactured, delivered))));
+    return order;
+  }
+
+  /**
+   * Builds one ordered-item line naming {@link #GAME_ITEM_ID}.
+   *
+   * @param ordered whole units requested.
+   * @param manufactured whole units already produced.
+   * @param delivered whole units already handed over.
+   * @return the line.
+   */
+  private static JobOrderItem itemLine(int ordered, int manufactured, int delivered) {
+    GameItem gameItem = new GameItem();
+    gameItem.setId(GAME_ITEM_ID);
+    JobOrderItem line = new JobOrderItem();
+    line.setId(UUID.randomUUID());
+    line.setGameItem(gameItem);
+    line.setAmount(ordered);
+    line.setManufacturedAmount(manufactured);
+    line.setDeliveredAmount(delivered);
+    return line;
   }
 
   /**

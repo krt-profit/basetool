@@ -29,8 +29,12 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionService.OrderLinkedStockIndex;
 import de.greluc.krt.profit.basetool.backend.support.QuantityTypeRounding;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -201,9 +205,14 @@ public class JobOrderQueryService {
     // (REQ-DATA-003) — and the SAME index the cross-order demand overview sums through, so a
     // picker figure and that page can never disagree. Skipped entirely when no figure is asked
     // for: an empty id collection never touches the database.
+    List<UUID> needIds = withNeeds ? visible.stream().map(JobOrder::getId).toList() : List.of();
     OrderLinkedStockIndex stockIndex =
-        jobOrderStockProjectionService.loadOrderLinkedStockIndex(
-            withNeeds ? visible.stream().map(JobOrder::getId).toList() : List.of());
+        jobOrderStockProjectionService.loadOrderLinkedStockIndex(needIds);
+    // The item sibling of that index. Kept as a plain map rather than a second index type: item
+    // earmarks have no quality floor to reproduce in memory (REQ-INV-029), so summing them is the
+    // whole job. An empty id list short-circuits without touching the database.
+    Map<UUID, Map<UUID, Double>> itemStockByOrder =
+        needIds.isEmpty() ? Map.of() : loadItemStockIndex(needIds);
     return visible.stream()
         .map(
             o ->
@@ -223,7 +232,8 @@ public class JobOrderQueryService {
                     // Game-item sibling (REQ-INV-031): the Lager item-mode picker filters orders
                     // on the requested game items; empty for MATERIAL orders.
                     List.copyOf(jobOrderItemService.requiredGameItemIds(o)),
-                    withNeeds ? materialNeedsOf(o, stockIndex) : List.of()))
+                    withNeeds ? materialNeedsOf(o, stockIndex) : List.of(),
+                    withNeeds ? gameItemNeedsOf(o, itemStockByOrder) : List.of()))
         .toList();
   }
 
@@ -271,6 +281,83 @@ public class JobOrderQueryService {
                           required - booked, requirement.material())));
             })
         .toList();
+  }
+
+  /**
+   * Loads every order's earmarked item stock in one query and folds it to order &rarr; game item
+   * &rarr; summed slice (REQ-DATA-003).
+   *
+   * @param jobOrderIds the orders to index; never empty when this is called.
+   * @return the summed earmarks, never {@code null}.
+   */
+  private Map<UUID, Map<UUID, Double>> loadItemStockIndex(List<UUID> jobOrderIds) {
+    Map<UUID, Map<UUID, Double>> index = new HashMap<>();
+    for (de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow row :
+        inventoryItemRepository.findGameItemStockRowsByJobOrderIds(jobOrderIds)) {
+      if (row.jobOrderId() == null || row.gameItemId() == null) {
+        continue;
+      }
+      index
+          .computeIfAbsent(row.jobOrderId(), unused -> new HashMap<>())
+          .merge(row.gameItemId(), row.amount() == null ? 0.0 : row.amount(), Double::sum);
+    }
+    return index;
+  }
+
+  /**
+   * Folds one ITEM order's outstanding per-game-item need for the item-mode allocation pickers
+   * (REQ-INV-039).
+   *
+   * <p>An order may carry several lines for the same game item (a sub-assembly adopted beside its
+   * parent, REQ-ORDERS-031), so the counts are summed per game item exactly as the order-detail
+   * Item-Bestand panel sums them — a per-line figure would contradict the panel a member can open
+   * next to this picker.
+   *
+   * <p>The gap is {@code ordered − delivered − earmarked}. It does not use {@code
+   * manufacturedAmount}: production books its output in earmarked to the order, so those units are
+   * already in the earmark sum, and counting both would hide a real need behind units that exist
+   * only once. See {@link de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemNeedDto}.
+   *
+   * @param order the managed order to fold; a MATERIAL order yields an empty list.
+   * @param itemStockByOrder the batched earmark sums.
+   * @return the order's per-game-item needs, empty when it orders no items.
+   */
+  private List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemNeedDto>
+      gameItemNeedsOf(
+          @org.jetbrains.annotations.NotNull JobOrder order,
+          @org.jetbrains.annotations.NotNull Map<UUID, Map<UUID, Double>> itemStockByOrder) {
+    if (order.getItems() == null || order.getItems().isEmpty()) {
+      return List.of();
+    }
+    // gameItem.getId() resolves off the FK without initialising the lazy proxy, so this walk fires
+    // no per-line catalogue query (the same read InventoryAggregationService relies on).
+    Map<UUID, int[]> lineTotals = new LinkedHashMap<>();
+    for (de.greluc.krt.profit.basetool.backend.model.JobOrderItem line : order.getItems()) {
+      if (line.getGameItem() == null) {
+        continue;
+      }
+      int[] totals = lineTotals.computeIfAbsent(line.getGameItem().getId(), key -> new int[2]);
+      totals[0] += line.getAmount() != null ? line.getAmount() : 0;
+      totals[1] += line.getDeliveredAmount() != null ? line.getDeliveredAmount() : 0;
+    }
+    Map<UUID, Double> earmarked = itemStockByOrder.getOrDefault(order.getId(), Map.of());
+    List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemNeedDto> needs =
+        new ArrayList<>();
+    lineTotals.forEach(
+        (gameItemId, totals) -> {
+          int ordered = totals[0];
+          int delivered = totals[1];
+          // Item rows hold whole units (REQ-INV-029), so the SCU-typed slice rounds loss-free.
+          int allocated = (int) Math.round(earmarked.getOrDefault(gameItemId, 0.0));
+          needs.add(
+              new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemNeedDto(
+                  gameItemId,
+                  ordered,
+                  delivered,
+                  allocated,
+                  Math.max(0, ordered - delivered - allocated)));
+        });
+    return needs;
   }
 
   /**

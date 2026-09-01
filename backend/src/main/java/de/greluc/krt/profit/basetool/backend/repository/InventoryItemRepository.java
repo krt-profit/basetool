@@ -947,6 +947,31 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       findMaterialStockRowsByJobOrderIds(@Param("jobOrderIds") Collection<UUID> jobOrderIds);
 
   /**
+   * The game-item sibling of {@link #findMaterialStockRowsByJobOrderIds}: every job-order-linked
+   * <em>item</em> earmark for all given orders in one query, so the allocation pickers can sum the
+   * per-(order, game item) buckets in memory instead of firing one read per order (REQ-DATA-003,
+   * REQ-INV-039). This is the projection the material query's Javadoc anticipated when it excluded
+   * item earmarks from its own result.
+   *
+   * <p>Mirror-image guard: {@code gameItem IS NOT NULL} keeps material earmarks out, exactly as the
+   * material query keeps item earmarks out. No quality is projected — item rows carry none
+   * (REQ-INV-029).
+   *
+   * @param jobOrderIds the orders whose earmarked item stock to project; an empty collection yields
+   *     an empty list.
+   * @return one {@link de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow}
+   *     per game-item job-order allocation, never {@code null}.
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow(a.jobOrder.id, a.inventoryItem.gameItem.id, a.amount)
+      FROM InventoryJobOrderAllocation a WHERE a.jobOrder.id IN :jobOrderIds
+      AND a.inventoryItem.gameItem IS NOT NULL
+      """)
+  List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow>
+      findGameItemStockRowsByJobOrderIds(@Param("jobOrderIds") Collection<UUID> jobOrderIds);
+
+  /**
    * Drops every job-order allocation of the given order (Variante C, REQ-INV-027) so an order
    * activity that detaches stock releases only the order's allocated slice while the owning entries
    * survive as (partially) unassigned stock (R2). A plain bulk {@code DELETE}: {@code

@@ -288,6 +288,7 @@ class JobOrderControllerTest {
             List.of(),
             List.of(),
             List.of(),
+            List.of(),
             List.of());
     when(jobOrderQueryService.findAllActiveReference(false)).thenReturn(List.of(ref));
 

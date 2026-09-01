@@ -1212,13 +1212,15 @@ public class InventoryPageController {
         (p != null && p.content() != null) ? new ArrayList<>(p.content()) : new ArrayList<>();
     model.addAttribute("entries", entries);
     model.addAttribute("entriesPage", p);
-    // `includeMissions` is this helper's material-mode gate (an item row carries no mission
-    // dimension, REQ-INV-031), and the allocation popover labels its order options with the
-    // outstanding need in material mode only (REQ-INV-039) — so the same flag decides both.
+    // Both catalog modes label their allocation popover with the outstanding need (REQ-INV-039),
+    // so the needs are always requested here. `includeMissions` stays the material-mode gate for
+    // the mission dimension alone (an item row carries none, REQ-INV-031). Only one of the two
+    // lookups can produce a label for a given row; the other is an empty map rather than a branch.
     List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> stackJobOrders =
-        fetchActiveJobOrders(includeMissions);
+        fetchActiveJobOrders(true);
     model.addAttribute("jobOrders", stackJobOrders);
     model.addAttribute("orderNeedAmounts", orderNeedAmounts(stackJobOrders));
+    model.addAttribute("orderGameItemNeedAmounts", orderGameItemNeedAmounts(stackJobOrders));
     model.addAttribute(
         "missions",
         includeMissions
@@ -1313,8 +1315,7 @@ public class InventoryPageController {
    */
   @ResponseBody
   @GetMapping(value = "/order-needs", headers = "X-Requested-With=XMLHttpRequest")
-  public Map<UUID, List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialNeedDto>>
-      orderNeedsAjax() {
+  public Map<String, Object> orderNeedsAjax() {
     return orderNeeds(fetchActiveJobOrders(true));
   }
 
@@ -1353,25 +1354,73 @@ public class InventoryPageController {
   }
 
   /**
-   * Reduces the order catalog to the shape the picker actually renders: order id &rarr; its
-   * outstanding per-bucket needs. Orders that require no material are dropped rather than mapped to
-   * an empty list, so the payload carries only what can produce a label.
+   * Reduces the order catalog to the shape the pickers actually render: two order-id-keyed maps,
+   * one per catalog dimension, under a single envelope.
+   *
+   * <p>One envelope rather than two payloads, because the check-in form switches between Material
+   * and Item mode in place (REQ-INV-029) and has to relabel either without a second fetch — and
+   * because the live-sync refresh then re-reads exactly the shape the page was rendered with.
+   * Orders that need nothing in a dimension are dropped from that map rather than mapped to an
+   * empty list, so the payload carries only what can produce a label.
    *
    * @param orders the loaded order catalog, already carrying its needs.
-   * @return the needs by order id, never {@code null}.
+   * @return {@code {"materials": {orderId: [...]}, "gameItems": {orderId: [...]}}}, never {@code
+   *     null}.
    */
-  private static Map<
-          UUID, List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialNeedDto>>
-      orderNeeds(
-          List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> orders) {
+  private static Map<String, Object> orderNeeds(
+      List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> orders) {
     Map<UUID, List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialNeedDto>>
-        needs = new LinkedHashMap<>();
+        materials = new LinkedHashMap<>();
+    Map<UUID, List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderGameItemNeedDto>>
+        gameItems = new LinkedHashMap<>();
     for (de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto order : orders) {
-      if (order.id() != null && order.materialNeeds() != null && !order.materialNeeds().isEmpty()) {
-        needs.put(order.id(), order.materialNeeds());
+      if (order.id() == null) {
+        continue;
+      }
+      if (order.materialNeeds() != null && !order.materialNeeds().isEmpty()) {
+        materials.put(order.id(), order.materialNeeds());
+      }
+      if (order.gameItemNeeds() != null && !order.gameItemNeeds().isEmpty()) {
+        gameItems.put(order.id(), order.gameItemNeeds());
       }
     }
-    return needs;
+    Map<String, Object> envelope = new LinkedHashMap<>();
+    envelope.put("materials", materials);
+    envelope.put("gameItems", gameItems);
+    return envelope;
+  }
+
+  /**
+   * The item sibling of {@link #orderNeedAmounts}: outstanding whole units by {@code
+   * "<orderId>|<gameItemId>"}, for the game-item stack entries' allocation popover (REQ-INV-039).
+   *
+   * <p>Kept separate from the material lookup although the key shape is identical. A game item and
+   * a material cannot collide on a UUID, so merging them would work — and would let a template
+   * silently read the wrong dimension's figure, which is worse than a missing one, because the two
+   * are different calculations.
+   *
+   * @param orders the loaded order catalog, already carrying its needs.
+   * @return outstanding whole units by {@code orderId|gameItemId}; entries only where something is
+   *     still needed, so a covered game item renders no suffix rather than a "0" one.
+   */
+  private static Map<String, Integer> orderGameItemNeedAmounts(
+      List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> orders) {
+    Map<String, Integer> amounts = new LinkedHashMap<>();
+    for (de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto order : orders) {
+      if (order.id() == null || order.gameItemNeeds() == null) {
+        continue;
+      }
+      for (de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderGameItemNeedDto need :
+          order.gameItemNeeds()) {
+        if (need.gameItemId() == null
+            || need.outstandingAmount() == null
+            || need.outstandingAmount() <= 0) {
+          continue;
+        }
+        amounts.merge(order.id() + "|" + need.gameItemId(), need.outstandingAmount(), Integer::sum);
+      }
+    }
+    return amounts;
   }
 
   /**
@@ -1384,9 +1433,7 @@ public class InventoryPageController {
    * @param needs the needs by order id.
    * @return the JSON object, or {@code "{}"} when it cannot be written.
    */
-  private String writeOrderNeedsJson(
-      Map<UUID, List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialNeedDto>>
-          needs) {
+  private String writeOrderNeedsJson(Map<String, Object> needs) {
     try {
       return NEEDS_MAPPER.writeValueAsString(needs);
     } catch (Exception e) {

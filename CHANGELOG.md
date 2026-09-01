@@ -6,6 +6,8 @@
 
 - **Die Auftragsauswahl beim Einbuchen und im „+ Zuordnen“-Menü zeigt, was jeder Auftrag noch braucht.** Die offene Restmenge steht direkt an der Option („#1042 · noch 250,000 SCU“), Fertigungsaufträge eingeschlossen, und aktualisiert sich live, wenn jemand anderes auf einen dieser Aufträge bucht. Liegt die eingegebene Qualität unter dem Mindestwert des Auftrags, steht das dabei — die Zuordnung ist erlaubt, senkt dessen Bedarf aber nicht.
 
+- **Auch beim Einbuchen fertiger Items steht die Restmenge am Auftrag.** Gezählt wird, was der Auftrag noch nicht erhalten hat und wofür ihm auch noch nichts zugeordnet ist — eine Übergabe bereits zugeordneter Stücke ändert die Zahl daher nicht. Eine Qualitätsangabe gibt es hier nicht, weil Item-Bestände keine Qualität tragen.
+
 ### Changed
 
 - **Keycloak auf 26.7.3 angehoben (großes Sicherheitsupdate).** Das Patch-Release schließt 20 Schwachstellen im Anmeldedienst — darunter das Umbiegen eines Anmeldecodes auf eine fremde Client-Sitzung, eine unvollständig behobene Redirect-Injection, die bisher nur den Query-Teil und nicht den Fragment-Teil der Rücksprungadresse prüfte, und ein weiterhin mögliches Ausspionieren des Dateisystems über relative Pfade. Dazu kommen Korrekturen an einer CPU-Regression seit 26.7.1. Keine Funktions- oder Konfigurationsänderung: Das gepinnte Container-Image (`quay.io/keycloak/keycloak:26.7`-Digest, weiterhin JDK 21) und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit; Anmeldung, Discord-Kontoverknüpfung und die App-Anmeldung laufen unverändert weiter. **Deploy-Hinweis:** Eine geänderte Keycloak-Image-Pinnung ist operator-gated — der Deploy wendet sie nicht selbständig an, sondern muss einmal mit `deploy.sh --force` durchgesetzt werden; der Keycloak-Container startet dabei neu.
