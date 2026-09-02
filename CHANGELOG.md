@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.6.16](https://github.com/krt-profit/basetool/releases/tag/v1.6.16) - 2026-09-02
+
 ### Fixed
 
 - **Ein fehlgeschlagener Anmeldeversuch konnte eine Sitzung dauerhaft unbrauchbar machen.** Spring Security legte die Fehlermeldung in der Sitzung ab; dieser Wert ließ sich schreiben, aber nicht mehr zurücklesen — und weil beim Lesen einer Sitzung alle Felder verarbeitet werden, riss dieses eine Feld die ganze Sitzung mit. Ergebnis: ab dem nächsten Klick überall ein Fehler, bis die Sitzung ablief. Die Meldung wird jetzt nicht mehr gespeichert; die Anmeldeseite zeigt den Fehler ohnehin über die Adresszeile an. Ursache des Ausfalls vom 02.09.
