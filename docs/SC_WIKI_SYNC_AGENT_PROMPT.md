@@ -7,6 +7,25 @@ deployment runbook references it twice and `V106MigrationTest` cites its "§5 pi
 It is kept as a record of how the work was commissioned, **not** as instructions to follow now — the
 plan it briefs has shipped, and the deviations from it are listed in that document's header.
 
+> [!important] R9 has landed — the *column* is gone, the *wire field* is not
+> Verified against `main` on 2026-09-02. §2.1 below still says "The existing `isManualEntry` field
+>
+>> stays; the new `sourceSystems` enum coexists", and §9 still pencils the destructive cleanup in as
+>> "V116". Neither holds any more. R9's cleanup landed on **2026-06-01** (#281):
+>> [`V125__drop_legacy_material_and_ship_type_columns.sql`](../backend/src/main/resources/db/migration/V125__drop_legacy_material_and_ship_type_columns.sql)
+>> dropped `material.is_manual_entry` and `ship_type.description`, and the JPA fields
+>> `Material.isManualEntry` / `ShipType.description` were removed in the same change. (§2.1's other
+>> caveat — "R9 cleanup may have landed by then" — is about the *Spezialkommando* R9 chain V100–V105
+>> and which V-number is free next, not about these two columns; §5 pitfall #6 says so explicitly.)
+>
+> What survives is a **derived DTO wire field**, not the column: `MaterialDto.isManualEntry` is
+> derived in `MaterialMapper` from `sourceSystems == MANUAL`, and `ShipTypeDto.description` is
+> derived in `ShipMapper` from `descriptionDe` falling back to `descriptionEn`. Seeing either name
+> on the API is not evidence that its column still exists — that confusion is the whole reason this
+> banner is here.
+>
+> Nothing below this banner has been rewritten. It is the 2026-05 briefing as it was handed over.
+
 This file is the **briefing for a Claude Code agent** that will implement the
 plan in [`SC_WIKI_SYNC_PLAN.md`](SC_WIKI_SYNC_PLAN.md). The agent starts with
 no memory of how the plan was authored — everything it needs to do its job is
