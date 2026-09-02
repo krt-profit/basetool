@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiItemDto;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiItemManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiResponseDto;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.model.GameItemSourceSystem;
@@ -34,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -98,6 +100,16 @@ public class ScWikiItemSyncService {
   private final BlueprintRepository blueprintRepository;
   private final ManufacturerRepository manufacturerRepository;
   private final SyncReportService syncReportService;
+
+  /**
+   * Registry the orphan-sweep stand-down counter binds to.
+   *
+   * <p>The stand-down below is the conservative, correct answer to a fetch that is not a full
+   * census, and until this counter existed it was a log line and nothing else — {@code
+   * business.yml} said so in as many words. A sweep that has not run for weeks and one running
+   * cleanly every night were indistinguishable from outside the log.
+   */
+  private final MeterRegistry meterRegistry;
 
   /**
    * Self-reference, resolved lazily so the per-item DB writes can be invoked through the Spring
@@ -319,9 +331,19 @@ public class ScWikiItemSyncService {
             "Marked {} game_item row(s) scwiki_deleted (no longer in any Wiki kind feed).", marked);
       }
     } else {
+      String reason = sweepSkipReason(ctx);
+      meterRegistry
+          .counter(
+              MetricNames.CATALOGUE_ORPHAN_SWEEP_SKIPPED,
+              MetricNames.TAG_SWEEP,
+              MetricNames.SWEEP_ITEM,
+              MetricNames.TAG_REASON,
+              reason)
+          .increment();
       log.warn(
-          "Skipping cross-kind orphan sweep (allPassesSucceeded={}, seenCount={}): a partial,"
-              + " empty, 304 or sanity-capped kind fetch must never wipe Wiki-side state.",
+          "Skipping cross-kind orphan sweep (reason={}, allPassesSucceeded={}, seenCount={}): a"
+              + " partial, empty, 304 or sanity-capped kind fetch must never wipe Wiki-side state.",
+          reason,
           allPassesSucceeded,
           ctx.seen.size());
     }
@@ -948,5 +970,30 @@ public class ScWikiItemSyncService {
     private void markConsumed(UUID uexId) {
       consumedUexIds.add(uexId);
     }
+  }
+
+  /**
+   * Names why the cross-kind orphan sweep stood down, from state the run already carries.
+   *
+   * <p>The distinction is load-bearing rather than decorative. {@code runKindPass} counts a {@code
+   * 304 Not Modified} as a failed pass, and its own Javadoc calls an all-304 run "a fully-cached
+   * healthy run" — so an untagged counter would fire on every healthy night and could carry no
+   * alert at all. Only {@link MetricNames#SWEEP_SKIP_INCOMPLETE} means something went wrong.
+   *
+   * @param ctx the finished run's context.
+   * @return one of the three bounded reason values; never {@code null}.
+   */
+  private static String sweepSkipReason(BackfillContext ctx) {
+    if (ctx.notModifiedPasses > 0 && ctx.failedPasses == ctx.notModifiedPasses) {
+      // Every pass that did not enumerate answered 304: a fully-cached, healthy run. Tested first
+      // on purpose — such a run also leaves `seen` empty, so checking emptiness first would file
+      // the healthiest possible outcome under the same reason as a total upstream outage, and the
+      // alert built on it could then never distinguish the two.
+      return MetricNames.SWEEP_SKIP_NOT_MODIFIED;
+    }
+    if (ctx.seen.isEmpty()) {
+      return MetricNames.SWEEP_SKIP_NO_ROWS;
+    }
+    return MetricNames.SWEEP_SKIP_INCOMPLETE;
   }
 }

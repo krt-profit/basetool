@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiItemDto;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiItemManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.integration.scwiki.ScWikiClient;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.model.GameItemSourceSystem;
@@ -43,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -83,6 +85,12 @@ class ScWikiItemSyncServiceBackfillTest {
   @Mock private SyncReportService syncReportService;
   @Mock private ObjectProvider<ScWikiItemSyncService> self;
 
+  /**
+   * Real registry rather than a mock: {@code @InjectMocks} cannot wire a plain {@code
+   * MeterRegistry}, and the sweep-stand-down assertions read counter values back out of it.
+   */
+  private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+
   private ScWikiProperties properties;
   private ScWikiItemSyncService service;
 
@@ -99,6 +107,7 @@ class ScWikiItemSyncServiceBackfillTest {
             blueprintRepository,
             manufacturerRepository,
             syncReportService,
+            meterRegistry,
             self);
     lenient().when(self.getObject()).thenReturn(service);
     lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
@@ -165,6 +174,13 @@ class ScWikiItemSyncServiceBackfillTest {
     verify(gameItemRepository, never()).save(any());
     // A 304 pass never enumerates the pool, so the cross-kind orphan sweep stays suppressed.
     verify(gameItemRepository, never()).markScwikiDeletedExcept(any(), any());
+    // ...and it is counted as `not_modified`, not `incomplete` and not `no_rows`: this run is
+    // healthy. Getting that split wrong would make the counter non-zero every night and therefore
+    // unalertable — which is why the reason tag exists at all rather than a bare count. It must
+    // also not collapse into `no_rows`, which is what a total upstream outage looks like.
+    assertEquals(1.0, sweepSkips(MetricNames.SWEEP_SKIP_NOT_MODIFIED));
+    assertEquals(0.0, sweepSkips(MetricNames.SWEEP_SKIP_INCOMPLETE));
+    assertEquals(0.0, sweepSkips(MetricNames.SWEEP_SKIP_NO_ROWS));
   }
 
   // ---- per-endpoint kind derivation + WIKI_ONLY creation ---------------------------------------
@@ -342,6 +358,9 @@ class ScWikiItemSyncServiceBackfillTest {
 
     // All eight passes (7 kinds + GENERIC residual) returned data → the cross-kind sweep fires.
     verify(gameItemRepository).markScwikiDeletedExcept(any(), any());
+    // A run that actually swept must not register the counter at all. Registered-and-zero and
+    // absent are different things to the alert rule: absent cannot false-fire.
+    assertNull(meterRegistry.find(MetricNames.CATALOGUE_ORPHAN_SWEEP_SKIPPED).counter());
   }
 
   @Test
@@ -359,6 +378,27 @@ class ScWikiItemSyncServiceBackfillTest {
     service.syncItems();
 
     verify(gameItemRepository, never()).markScwikiDeletedExcept(any(), any());
+    // The stand-down is right; being unable to see it was the gap. `business.yml` said in as many
+    // words that no metric existed for it, so a sweep that had not run for weeks read exactly like
+    // one running cleanly every night.
+    assertEquals(1.0, sweepSkips(MetricNames.SWEEP_SKIP_INCOMPLETE));
+  }
+
+  /**
+   * Reads the orphan-sweep stand-down counter for one reason.
+   *
+   * @param reason one of the bounded {@code MetricNames.SWEEP_SKIP_*} values.
+   * @return the count, or 0 when the counter was never registered for that reason.
+   */
+  private double sweepSkips(String reason) {
+    return meterRegistry
+        .find(MetricNames.CATALOGUE_ORPHAN_SWEEP_SKIPPED)
+        .tag(MetricNames.TAG_SWEEP, MetricNames.SWEEP_ITEM)
+        .tag(MetricNames.TAG_REASON, reason)
+        .counters()
+        .stream()
+        .mapToDouble(counter -> counter.count())
+        .sum();
   }
 
   // ---- per-item transaction isolation ----------------------------------------------------------

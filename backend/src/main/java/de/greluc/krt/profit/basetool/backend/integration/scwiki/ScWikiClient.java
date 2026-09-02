@@ -369,6 +369,7 @@ public class ScWikiClient {
       // Genuine empty-200 / network / parse failure (NOT a 304) — an empty list with the flag
       // cleared so a real outage still surfaces as zero items to SyncZeroItems. The walk never
       // enumerated the catalogue, so it is reported as INCOMPLETE and no caller may tombstone.
+      forgetFirstPageEtag(firstPageUri);
       return FetchResult.partial(Collections.emptyList());
     }
 
@@ -520,6 +521,9 @@ public class ScWikiClient {
         pagesFetched,
         lastPage,
         complete);
+    if (!complete) {
+      forgetFirstPageEtag(firstPageUri);
+    }
     return complete ? FetchResult.of(accumulated) : FetchResult.partial(accumulated);
   }
 
@@ -953,6 +957,32 @@ public class ScWikiClient {
       }
       recorded = true;
       return true;
+    }
+  }
+
+  /**
+   * Drops the cached page-1 {@code ETag} for a walk that did not produce a full census.
+   *
+   * <p>{@code fetchSinglePage} stores the {@code ETag} on <em>any</em> page-1 2xx, which is before
+   * completeness can possibly be known — it is a property of the whole walk, not of page 1. Left
+   * cached, an incomplete walk freezes that endpoint's conditional-GET state: the next run replays
+   * {@code If-None-Match}, the upstream answers 304, the result is {@code unchanged()}, and the
+   * pages this walk never fetched are never fetched again until the upstream bytes happen to
+   * change. Since a not-modified pass also stands the cross-kind orphan sweep down, one bad walk
+   * could otherwise suppress the sweep for that catalogue indefinitely — the shape seen on {@code
+   * /api/vehicle-items} in the 2026-09-02 export, whose census warned identically on two runs 96
+   * minutes apart.
+   *
+   * <p>Deliberately not called on the 304 early return: that ETag is still valid, and the whole
+   * point of the conditional GET is to keep it.
+   *
+   * @param firstPageUri the canonical page-1 request URI this walk started from; never null.
+   */
+  private void forgetFirstPageEtag(String firstPageUri) {
+    if (etagByFirstPageUri.remove(firstPageUri) != null) {
+      log.debug(
+          "Dropped the cached page-1 ETag after an incomplete walk so the next run re-fetches"
+              + " unconditionally instead of being answered 304.");
     }
   }
 }
