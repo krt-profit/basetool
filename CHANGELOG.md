@@ -2,17 +2,19 @@
 
 ## [Unreleased]
 
-### Fixed
-
-- **Ein kurz nicht erreichbares Redis konnte das Backend beim Start abstürzen lassen.** Beide Redis-Kanäle (Live-Sync und Benachrichtigungen) melden sich beim Hochfahren an; scheiterte diese erste Anmeldung — etwa weil Redis gerade neu erstellt wurde —, brach der ganze Start ab und das Backend lief in eine Neustart-Schleife, obwohl Redis ausdrücklich optional ist. Das Backend startet jetzt auch ohne Redis und meldet sich im Hintergrund an, sobald es wieder da ist. Ursache des Ausfalls vom 02.09., 07:07 Uhr.
-
-- **Ein unvollständiger SC-Wiki-Abruf blockierte die nächsten Abrufe.** Der zwischengespeicherte ETag der ersten Seite wurde auch dann behalten, wenn der Durchlauf gar keine vollständige Bestandsaufnahme ergab — der nächste Lauf bekam daraufhin „unverändert“ zurück und holte die fehlenden Seiten nie nach. Damit blieb auch die Aufräumroutine für gelöschte Einträge auf unbestimmte Zeit stehen. Nach einem unvollständigen Durchlauf wird der ETag jetzt verworfen.
+## [v1.6.17](https://github.com/krt-profit/basetool/releases/tag/v1.6.17) - 2026-09-02
 
 ### Changed
 
 - **Unlesbare Session-Werte werden jetzt benannt und gezählt.** Bisher stand pro Vorfall nur „ein Wert war unlesbar“ im Log — am 02.09. drei Stunden lang 496-mal dieselbe Zeile, ohne zu sagen, welcher Wert. Die Meldung nennt jetzt das betroffene Session-Attribut, die Ursache und den nicht auflösbaren Typ, wiederholt sich nicht mehr endlos und wird zusätzlich als Messwert erfasst. Für dich ändert sich nichts: ein unlesbarer Wert meldet dich weiterhin nur ab.
 
 - **Die Überwachung sieht drei bisher stille Fehler.** Neu sind Alarme dafür, dass Sitzungen dauerhaft unlesbar werden, dass ein Redis-Kanal dauerhaft nicht angemeldet ist, und dass die SC-Wiki-Aufräumroutine mehrere Läufe hintereinander aussetzt. Alle drei waren zuvor nur als Logzeile sichtbar.
+
+### Fixed
+
+- **Ein kurz nicht erreichbares Redis konnte das Backend beim Start abstürzen lassen.** Beide Redis-Kanäle (Live-Sync und Benachrichtigungen) melden sich beim Hochfahren an; scheiterte diese erste Anmeldung — etwa weil Redis gerade neu erstellt wurde —, brach der ganze Start ab und das Backend lief in eine Neustart-Schleife, obwohl Redis ausdrücklich optional ist. Das Backend startet jetzt auch ohne Redis und meldet sich im Hintergrund an, sobald es wieder da ist. Ursache des Ausfalls vom 02.09., 07:07 Uhr.
+
+- **Ein unvollständiger SC-Wiki-Abruf blockierte die nächsten Abrufe.** Der zwischengespeicherte ETag der ersten Seite wurde auch dann behalten, wenn der Durchlauf gar keine vollständige Bestandsaufnahme ergab — der nächste Lauf bekam daraufhin „unverändert“ zurück und holte die fehlenden Seiten nie nach. Damit blieb auch die Aufräumroutine für gelöschte Einträge auf unbestimmte Zeit stehen. Nach einem unvollständigen Durchlauf wird der ETag jetzt verworfen.
 
 ## [v1.6.16](https://github.com/krt-profit/basetool/releases/tag/v1.6.16) - 2026-09-02
 
