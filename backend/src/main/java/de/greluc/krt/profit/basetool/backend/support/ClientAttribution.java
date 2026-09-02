@@ -20,8 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.support;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import java.util.ArrayList;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -95,26 +93,5 @@ public class ClientAttribution {
       return authorizedParty;
     }
     return MetricNames.CLIENT_ID_OTHER;
-  }
-
-  /**
-   * Every value {@link #label(String)} can produce, for the audit viewer's filter dropdown.
-   *
-   * <p>Derived from the configured allowlists rather than hand-listed, so a deployment that renames
-   * its clients gets a filter that still matches what the trail records — a hardcoded list would
-   * offer options that select nothing and hide the client that is actually there. The two bounded
-   * buckets come last because they are the residual, and {@code other} is the one an investigation
-   * reaches for first.
-   *
-   * @return the known client ids in configuration order, then {@code other} and {@code none}
-   */
-  public @NotNull List<String> knownLabels() {
-    List<String> labels = new ArrayList<>(clientProperties.getKnownClientIds());
-    gatewayProperties.getClientIds().stream()
-        .filter(id -> !labels.contains(id))
-        .forEach(labels::add);
-    labels.add(MetricNames.CLIENT_ID_OTHER);
-    labels.add(MetricNames.CLIENT_ID_NONE);
-    return List.copyOf(labels);
   }
 }
