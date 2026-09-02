@@ -171,8 +171,14 @@ public class RedisSessionConfig {
    */
   @Bean
   public RedisSerializer<Object> springSessionDefaultRedisSerializer() {
-    return new GenericJacksonJsonRedisSerializer(
-        buildSessionJsonMapper(getClass().getClassLoader()));
+    // Wrapped, because the read path has no error handling of its own: a value that cannot be
+    // deserialized leaves RedisIndexedSessionRepository uncaught and becomes an HTTP 500 on every
+    // request carrying a session cookie. That is the 2026-09-02 outage. The wrapper turns an
+    // unreadable ATTRIBUTE into "not set", i.e. a signed-out member; it cannot mask a bad write,
+    // and it cannot hide the required timestamps, which are final types and never fail. See
+    // FaultTolerantSessionSerializer for why that is both safe and sufficient.
+    return new FaultTolerantSessionSerializer(
+        new GenericJacksonJsonRedisSerializer(buildSessionJsonMapper(getClass().getClassLoader())));
   }
 
   /**

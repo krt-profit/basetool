@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Eine unlesbare Session legte das gesamte angemeldete Basetool lahm.** Konnte ein Session-Wert in Redis nicht mehr gelesen werden, beantwortete **jede** Anfrage mit einem Session-Cookie einen HTTP 500 — und weil die Fehlerseite den CSRF-Token aus derselben Session liest, kam nicht einmal die Fehlerseite durch: der Browser zeigte eine weiße Fläche ohne Statuscode und ohne Korrelations-ID. Ein unlesbarer Session-Wert bedeutet jetzt „nicht gesetzt“: du wirst abgemeldet und landest auf dem Login statt vor einer leeren Seite. Schreibfehler bleiben bewusst laut.
+
 ## [v1.6.14](https://github.com/krt-profit/basetool/releases/tag/v1.6.14) - 2026-09-02
 
 ### Fixed
