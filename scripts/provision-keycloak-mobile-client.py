@@ -95,18 +95,34 @@ ACCESS_TOKEN_LIFESPAN_SECONDS = 300
 # holding Admin + Officer + KRT Member left it holding `Guest` alone.
 #
 # `Guest` itself is deliberately absent: it is what the backend assigns when the claim is empty, so
-# listing it would buy nothing. `Admin` is absent for a stronger reason — see below.
-MEMBER_REALM_ROLES = ["KRT Member", "Officer", "Bank Employee", "Bank Management"]
-
-# The role the app must NOT carry, asserted rather than merely omitted.
+# listing it would buy nothing.
 #
-# The admin area is web-only permanently (app decision, 2026-08-17), but ADMIN is not just a menu:
-# `RequestScopeResolver.currentScopePredicate()` gives an admin WITHOUT an active-org-unit header
-# `adminAllScope = true` — every org unit at once — and honours an admin's pin to any unit, not only
-# to one they belong to. The app has no screen built for either. Carrying ADMIN into it would hand
-# the app a scope rule nothing there is designed around, silently, the first time an administrator
-# installs it.
-FORBIDDEN_REALM_ROLE = "Admin"
+# `Admin` WAS absent, and was asserted absent, until 2026-09-01 (owner decision reversing the
+# original one, REQ-SEC-035). It is granted now because withholding it did not narrow the app so
+# much as break it for the one member it mattered to. An administrator holds no Staffel membership
+# by design, so with `Admin` stripped from the token their app had no org unit to pin, no way to
+# widen a list, and the „Alle Org-Einheiten" state — which IS `adminAllScope` — resolved to their
+# own (empty) reach instead of to everything. Measured on the test stack 2026-09-01: the same
+# account read 784.8 SCU of Lager through the app's scope and 1403.4 SCU with `Admin` present.
+#
+# The old comment justified the ban as containment, and it is worth being exact about what that
+# containment actually was. The same unlocked phone also holds a 720-hour web session carrying the
+# full role set against a UI genuinely built for admin work, so the ban never kept an
+# administrator's rights off the device. What it did buy — and what is being given up — is that a
+# *stolen access token* replayed from another machine within its 300-second lifetime was
+# member-scoped rather than admin-scoped. That is the entire trade; REQ-SEC-035 states it rather
+# than implying it.
+MEMBER_REALM_ROLES = ["KRT Member", "Officer", "Bank Employee", "Bank Management", "Admin"]
+
+# No realm role is asserted absent any more.
+#
+# The converge-in-both-directions behaviour below is unchanged and still load-bearing: the scope is
+# set to exactly MEMBER_REALM_ROLES, so a role added by hand in the Admin Console is still taken
+# back on the next run, and --verify-only now reports any role on the scope that this list does not
+# name. What is gone is only the extra assertion that singled one role out. Kept as an explicit
+# empty list rather than deleted, so re-banning a role stays a one-line change and reads as a
+# decision rather than as an oversight.
+FORBIDDEN_REALM_ROLES: list[str] = []
 
 
 class KcadmError(RuntimeError):
@@ -388,8 +404,8 @@ def upsert_realm_role_scope(kc: Kcadm, client_uuid: str) -> None:
     """Grant exactly [MEMBER_REALM_ROLES] to the client's scope, and take back anything else.
 
     Converges in both directions on purpose. Granting is what makes the app usable at all; taking
-    back is what keeps `FORBIDDEN_REALM_ROLE` from being added by hand in the Admin Console and
-    surviving the next provisioning run, which is precisely how a scope grows without a decision.
+    back is what keeps a role added by hand in the Admin Console from surviving the next
+    provisioning run, which is precisely how a scope grows without a decision.
     """
     assigned = kc.get(f"clients/{client_uuid}/scope-mappings/realm") or []
     assigned_names = {role.get("name") for role in assigned}
@@ -467,18 +483,37 @@ def verify(kc: Kcadm, profile: str = "prod") -> list[str]:
         problems.append(f"marker role '{MARKER_ROLE}' is missing — the policy matches nothing")
 
     scope = {role.get("name") for role in (kc.get(f"clients/{client['id']}/scope-mappings/realm") or [])}
+    # Two consequences, because they are genuinely different failures and a message that names the
+    # wrong one sends the reader hunting the wrong thing. A missing MEMBER role empties the claim
+    # and demotes the account in the database; a missing `Admin` leaves the row alone and instead
+    # strands the administrator inside the app, with nothing to pin and „Alle Org-Einheiten"
+    # resolving to their own empty reach.
     for name in MEMBER_REALM_ROLES:
-        if name not in scope:
+        if name in scope:
+            continue
+        if name == "Admin":
+            problems.append(
+                "realm role 'Admin' is not on the client scope — an administrator using the app "
+                "is then a member with no memberships: no org unit to pin, and 'all org units' "
+                "resolves to their own (empty) reach instead of to everything (REQ-SEC-035)"
+            )
+        else:
             problems.append(
                 f"realm role '{name}' is not on the client scope — with fullScopeAllowed off the "
                 f"token carries no roles, and every member who signs in through the app is "
                 f"reconciled onto the Guest fallback in the database"
             )
-    if FORBIDDEN_REALM_ROLE in scope:
+    for name in FORBIDDEN_REALM_ROLES:
+        if name in scope:
+            problems.append(
+                f"realm role '{name}' IS on the client scope, and this client is configured to "
+                f"refuse it"
+            )
+    for name in sorted(scope - set(MEMBER_REALM_ROLES)):
         problems.append(
-            f"realm role '{FORBIDDEN_REALM_ROLE}' IS on the client scope — an administrator using "
-            f"the app would get admin scoping (all org units without a pin), which no screen there "
-            f"is built for"
+            f"realm role '{name}' is on the client scope but is not in MEMBER_REALM_ROLES — the "
+            f"scope has grown outside this script, which is exactly how a client's rights widen "
+            f"without a decision; re-run without --verify-only to converge it back"
         )
 
     profiles = read_list(kc, "client-policies/profiles", "profiles")

@@ -167,10 +167,13 @@ app:
       client-ids: ${APP_SECURITY_INGEST_GATEWAY_CLIENT_IDS:}
     # Which Keycloak clients mint tokens whose realm-role claim is deliberately incomplete, and
     # whose roles must therefore never be written to app_user (REQ-SEC-036). The mobile client runs
-    # with fullScopeAllowed:false and withholds Admin on purpose (REQ-SEC-035), so persisting its
-    # claim would strip Admin from an administrator's row the moment they open the app. Matched on
-    # azp. Unlike ingest-gateway above, EMPTY IS THE UNSAFE END here -- it resumes overwriting
-    # stored roles from partial tokens -- so the default names the client known to be partial.
+    # with fullScopeAllowed:false and an explicit five-role scope; the realm holds eight, so Guest,
+    # Logistician and Mission Manager are absent from its tokens and persisting its claim would
+    # strip them from a member's row. (Until 2026-09-02 the missing role was Admin, which is the
+    # form of this that actually bit -- see the REQ-SEC-035 reversal.) Matched on azp. Unlike
+    # ingest-gateway above, EMPTY IS THE UNSAFE END here -- it resumes overwriting stored roles from
+    # partial tokens, AND it moves authorisation back onto the row, which would make the client's
+    # scope mapping stop deciding anything -- so the default names the client known to be partial.
     partial-role-scope:
       client-ids: ${APP_SECURITY_PARTIAL_ROLE_SCOPE_CLIENT_IDS:basetool-android}
   logging:

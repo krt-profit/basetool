@@ -599,11 +599,17 @@ class UserReconciliationServiceTest {
   // ---------------------------------------------------------------
 
   /**
-   * The mobile client runs with {@code fullScopeAllowed: false} and withholds {@code Admin} on
-   * purpose (REQ-SEC-035), so its tokens describe a deliberately smaller member than the real one.
-   * Since this reconciliation REPLACES the stored role set rather than merging into it, persisting
-   * that description would let whichever client a member used last decide what the database says
-   * they are.
+   * The mobile client runs with {@code fullScopeAllowed: false} and a scope naming five of the
+   * realm's eight roles (REQ-SEC-035), so its tokens describe a deliberately smaller member than
+   * the real one. Since this reconciliation REPLACES the stored role set rather than merging into
+   * it, persisting that description would let whichever client a member used last decide what the
+   * database says they are.
+   *
+   * <p>The omitted role these cases are written around was {@code Admin} until the 2026-09-02
+   * reversal, and {@code Admin} is still the sharpest illustration — which is why the fixtures keep
+   * using it. It is now a stand-in for {@code Guest} / {@code Logistician} / {@code Mission
+   * Manager} rather than the live case, and the rule under test is unchanged either way: what
+   * matters is that the claim is *partial*, not which role is missing from it.
    *
    * <p>These cases pin both halves, because either alone is a defect: the row must survive the
    * partial claim, and the request must still be authorised by it.

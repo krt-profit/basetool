@@ -138,16 +138,24 @@ public class MeController {
    * Returns the org units the caller may pin as their active context.
    *
    * <p><strong>One endpoint instead of one branch per client.</strong> The rule has two halves: an
-   * admin may pin <em>any</em> active Staffel or Spezialkommando, while everyone else may pin only
-   * the units they belong to. Both clients had to know that, and only one of them did — the web
-   * frontend branched on {@code isAdmin()} and the Android app did not, so an admin (who by design
-   * holds no Staffel membership) was offered nothing but „Alle Org-Einheiten" and could not narrow
-   * the app to a unit at all. Encapsulating the branch here means a client asks one question and
-   * gets the right answer without reproducing the rule.
+   * admin may pin <em>any</em> active org unit, while everyone else may pin the units they belong
+   * to <em>or reach through a Bereich or OL leadership seat</em>. Both clients had to know that,
+   * and only one of them did — the web frontend branched on {@code isAdmin()} and the Android app
+   * did not, so an admin (who by design holds no Staffel membership) was offered nothing but „Alle
+   * Org-Einheiten" and could not narrow the app to a unit at all. Encapsulating the branch here
+   * means a client asks one question and gets the right answer without reproducing the rule.
    *
-   * <p>Staffel and SK only, matching what the switcher offers; the Bereich and Organisationsleitung
-   * tiers are a different picker ({@code GET /api/v1/org-units/active-all-kinds}) with a different
-   * consumer. Sorted by the query service, so both clients render the same order.
+   * <p><strong>All four kinds, not just Staffel and SK.</strong> A member may hold a seat on a
+   * Bereich or on the Organisationsleitung and on nothing else, and those units own aggregates in
+   * their own right (REQ-ORG-016: the create-time stamping applies no kind filter). Listing only
+   * Staffeln and SKs left exactly those members with an empty switcher — the same shape of defect
+   * as the admin one above, one tier up. The membership branch therefore reuses the drill-down
+   * picker's reach, which resolves a leadership seat to the concrete units below it (REQ-ORG-015 —
+   * never an admin-all marker), and the admin branch lists every active unit of every kind so an
+   * admin can still reach at least as far as an OL member.
+   *
+   * <p>Both branches sort top-down (OL &rarr; Bereich &rarr; Staffel &rarr; SK, then by name), so
+   * the two clients and the two branches render one order.
    *
    * <p>Carries no PII — org-unit names, shorthands and kinds only.
    *
@@ -161,14 +169,16 @@ public class MeController {
   @Operation(
       summary = "List the org units the caller may pin as their active context",
       description =
-          "Admins get every active Staffel and Spezialkommando; everyone else gets their own"
-              + " memberships. Encapsulates the branch both clients would otherwise duplicate.")
+          "Admins get every active org unit of all four kinds; everyone else gets the units they"
+              + " belong to or reach through a Bereich/OL seat. Encapsulates the branch both"
+              + " clients would otherwise duplicate.")
   @ApiResponses(
       value = {@ApiResponse(responseCode = "200", description = "Pinnable org-unit options")})
   public List<OrgUnitMembershipOptionDto> getPinnableOrgUnits(@AuthenticationPrincipal Jwt jwt) {
     return authHelperService.isAdmin()
-        ? orgUnitMembershipQueryService.listAllActiveOptions()
-        : orgUnitMembershipQueryService.listOptionsForUser(userService.getUserIdFromJwt(jwt));
+        ? orgUnitMembershipQueryService.listAllPinnableOptions()
+        : orgUnitMembershipQueryService.listPickerOptionsWithDescendants(
+            userService.getUserIdFromJwt(jwt));
   }
 
   /**

@@ -44902,7 +44902,7 @@
       "get" : {
         "tags" : [ "me-controller" ],
         "summary" : "List the org units the caller may pin as their active context",
-        "description" : "Admins get every active Staffel and Spezialkommando; everyone else gets their own memberships. Encapsulates the branch both clients would otherwise duplicate.",
+        "description" : "Admins get every active org unit of all four kinds; everyone else gets the units they belong to or reach through a Bereich/OL seat. Encapsulates the branch both clients would otherwise duplicate.",
         "operationId" : "getPinnableOrgUnits",
         "responses" : {
           "200" : {
