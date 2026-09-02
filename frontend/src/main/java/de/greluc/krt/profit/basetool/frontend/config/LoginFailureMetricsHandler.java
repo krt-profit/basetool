@@ -32,6 +32,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.web.WebAttributes;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 
 /**
@@ -102,6 +103,12 @@ public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHa
   private final MeterRegistry meterRegistry;
 
   /**
+   * The redirect target, kept here because the superclass's own copy is private and its {@code
+   * onAuthenticationFailure} — the only thing that reads it — is what this class replaces.
+   */
+  private final String failureUrl;
+
+  /**
    * Builds the handler with the failure redirect target and the counter registry.
    *
    * @param meterRegistry the registry the {@code basetool_login_total} counter is bumped against
@@ -111,6 +118,7 @@ public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHa
       @NotNull MeterRegistry meterRegistry, @NotNull String failureUrl) {
     super(failureUrl);
     this.meterRegistry = meterRegistry;
+    this.failureUrl = failureUrl;
   }
 
   /**
@@ -139,7 +147,52 @@ public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHa
             reason)
         .increment();
     logFailure(reason, exception);
-    super.onAuthenticationFailure(request, response, exception);
+
+    // Deliberately NOT super.onAuthenticationFailure(...): that calls the superclass's `final`
+    // saveException, which parks the exception in the HTTP session. See redirectWithoutPoisoning.
+    redirectWithoutPoisoningTheSession(request, response, exception);
+  }
+
+  /**
+   * Performs the failure redirect without writing the exception into the session.
+   *
+   * <p><strong>This replaces the one line that caused the 2026-09-02 outage.</strong> {@code
+   * SimpleUrlAuthenticationFailureHandler#onAuthenticationFailure} calls {@code saveException},
+   * which stores the {@link AuthenticationException} under {@code SPRING_SECURITY_LAST_EXCEPTION}
+   * in the session. Sessions are JSON in Redis here, and that value writes cleanly — with its
+   * {@code @class} — and then <em>cannot be read back</em>: reconstruction dies on {@code
+   * IllegalArgumentException: authenticationRequest cannot be null}, a field the serialized form
+   * never carried. Reading a session deserializes every field, so this single attribute poisoned
+   * the whole session and every later request answered HTTP 500. Every new failed login armed
+   * another one, which is why clearing Redis only bought minutes.
+   *
+   * <p>The superclass's {@code saveException} is {@code protected final}, so it cannot be
+   * overridden — the redirect is reproduced here instead, minus that one call. It is the same two
+   * lines the superclass runs for the redirect case, using the same {@link
+   * org.springframework.security.web.RedirectStrategy} so a configured strategy still applies.
+   *
+   * <p><strong>Nothing is lost.</strong> This handler redirects to its failure URL and the UI reads
+   * the <em>query parameter</em> ({@code param.error} in {@code fragments/toast.html}), never the
+   * session attribute. The diagnostic value is captured before this runs: the login-failure counter
+   * carries the reason bucket and {@link #logFailure} writes the single log line. The attribute was
+   * written, never read, and able to take the site down.
+   *
+   * <p>It is still set as a <em>request</em> attribute, exactly as the superclass does on its
+   * forward path, so anything inspecting it within this request still finds it. A request attribute
+   * is never serialized.
+   *
+   * @param request the current request.
+   * @param response the response to redirect.
+   * @param exception the failure, kept for this request only.
+   * @throws IOException if writing the redirect fails.
+   */
+  private void redirectWithoutPoisoningTheSession(
+      @NotNull HttpServletRequest request,
+      @NotNull HttpServletResponse response,
+      @NotNull AuthenticationException exception)
+      throws IOException {
+    request.setAttribute(WebAttributes.AUTHENTICATION_EXCEPTION, exception);
+    getRedirectStrategy().sendRedirect(request, response, failureUrl);
   }
 
   /**
