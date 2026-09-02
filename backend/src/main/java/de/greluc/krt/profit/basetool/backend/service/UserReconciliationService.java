@@ -218,11 +218,12 @@ public class UserReconciliationService {
     //
     // The token's claim is authoritative for MOST clients and for none of them unconditionally.
     // A client provisioned with `fullScopeAllowed: false` and a narrowed scope mints a token that
-    // describes a deliberately smaller member than the real one: the mobile client withholds
-    // `Admin` on purpose (REQ-SEC-035). Because this write REPLACES the stored set rather than
-    // merging into it, persisting such a claim lets whichever client a member happened to use last
-    // decide what the database says they are -- an administrator who opens the app would have
-    // `Admin` removed from their row, and every consumer that reads roles outside a request
+    // describes a deliberately smaller member than the real one: the mobile client's scope names
+    // five of the realm's eight roles (REQ-SEC-035). Because this write REPLACES the stored set
+    // rather than merging into it, persisting such a claim lets whichever client a member happened
+    // to use last decide what the database says they are. The case that actually bit, before the
+    // scope gained `Admin` on 2026-09-02: an administrator who opened the app had `Admin` removed
+    // from their row, and every consumer that reads roles outside a request
     // (scheduled tasks, notification targeting, roster views) would see the narrower set until
     // their next web request put it back.
     //
