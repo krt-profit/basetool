@@ -60,15 +60,17 @@ JSON
   echo '[]' >"${state}/mappers.json"
   echo '[]' >"${state}/optional-scopes.json"
   # The realm's own roles, as `kcadm get roles` would serve them, and what the client's scope
-  # already holds. The pre-existing Admin mapping is the interesting part: the provisioner has to
-  # take it back, or a hand-edit in the Admin Console survives every later run.
+  # already holds. The pre-existing Guest mapping is the interesting part: it is a real realm role
+  # that MEMBER_REALM_ROLES does not name, so the provisioner has to take it back, or a hand-edit
+  # in the Admin Console survives every later run. It was `Admin` here until 2026-09-01, when Admin
+  # became a granted role (REQ-SEC-035 reversed) and could no longer serve as the probe.
   cat >"${state}/realm-roles.json" <<'JSON'
 [{"id":"r-krt","name":"KRT Member"},{"id":"r-off","name":"Officer"},
  {"id":"r-adm","name":"Admin"},{"id":"r-gue","name":"Guest"},
  {"id":"r-bem","name":"Bank Employee"},{"id":"r-bmg","name":"Bank Management"}]
 JSON
   cat >"${state}/scope-mappings.json" <<'JSON'
-[{"id":"r-adm","name":"Admin"}]
+[{"id":"r-gue","name":"Guest"}]
 JSON
 
   # The stub is Python rather than a shell script on purpose: the provisioner spawns it through
@@ -161,10 +163,21 @@ STUB
 
 # Runs the provisioner against the stub in state dir $1; extra arguments are passed through.
 # Echoes the provisioner's combined output and returns its exit code.
+# The stub's path is handed to a CHILD python through --kcadm-command, so it has to be a path that
+# child can open. On Windows the interpreter behind `python3` is a native one while this shell is
+# MSYS, and the two do not agree on `/tmp`: MSYS means C:\Users\<user>\AppData\Local\Temp, native
+# Python reads the same string as <current drive>:\tmp. The whole suite therefore died on its first
+# assertion with `can't open file 'D:\tmp\...\kcadm_stub.py'`, before this change and after it.
+# `cygpath -m` yields the mixed form (C:/Users/...) that both accept; on Linux and in CI there is no
+# cygpath and the path is passed through untouched.
+to_child_path() {
+  if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s' "$1"; fi
+}
+
 run_provisioner() {
   local state="$1"; shift
   KCADM_STUB_STATE="$state" "$PYTHON" "$PROVISIONER" \
-    --realm iri --kcadm-command "${PYTHON} ${state}/kcadm_stub.py" "$@" 2>&1
+    --realm iri --kcadm-command "${PYTHON} $(to_child_path "${state}/kcadm_stub.py")" "$@" 2>&1
 }
 
 pass() { tests_run=$((tests_run + 1)); printf '  ok   %s\n' "$1"; }
@@ -308,12 +321,17 @@ if [[ $rc -eq 0 ]]; then pass "the intended state verifies clean"; else
 rm -rf "$state"
 
 # ---------------------------------------------------------------------------
-echo "7. the client scope carries the member roles, and never Admin"
+echo "7. the client scope carries exactly the roles the list names, Admin included"
 # ---------------------------------------------------------------------------
 # The failure this pins is not "the app has fewer rights". `fullScopeAllowed` is off, so a client
 # with no scope mappings sends a token with NO realm roles at all — and the backend replaces the
 # local role set from that claim on every login, falling back to Guest. Measured on the test stack
 # before this existed: an account holding Admin + Officer + KRT Member came out holding Guest.
+#
+# `Admin` moved from asserted-absent to granted on 2026-09-01 (owner decision, REQ-SEC-035
+# reversed). What survives that reversal is the property this section really guards: the scope is
+# converged to EXACTLY the list, in both directions, so it can neither shrink by accident nor grow
+# by a hand-edit in the Admin Console.
 state="$(mktemp -d)"
 make_stub "$state"
 run_provisioner "$state" >/dev/null
@@ -322,8 +340,12 @@ assert_contains "$scope" '"KRT Member"' "KRT Member reaches the app"
 assert_contains "$scope" '"Officer"' "Officer reaches the app"
 assert_contains "$scope" '"Bank Employee"' "Bank Employee reaches the app"
 assert_contains "$scope" '"Bank Management"' "Bank Management reaches the app"
-# The pre-existing Admin mapping the stub seeded models a hand-edit in the Admin Console.
-assert_not_contains "$scope" '"Admin"' "a hand-added Admin mapping is taken back"
+# The reversal itself: without this the administrator's app has no org unit to pin and „Alle
+# Org-Einheiten" resolves to their own empty reach rather than to everything.
+assert_contains "$scope" '"Admin"' "Admin reaches the app"
+# Converging downwards still has to work, or the list stops being the authority. The stub seeded
+# Guest on the scope to model a hand-edit in the Admin Console.
+assert_not_contains "$scope" '"Guest"' "a hand-added mapping outside the list is taken back"
 
 # A second run must not re-add or re-remove anything.
 before="$scope"
@@ -344,12 +366,23 @@ assert_contains "$output" "reconciled onto the Guest fallback" "the message name
 
 echo '[{"id":"r-krt","name":"KRT Member"},{"id":"r-off","name":"Officer"},
       {"id":"r-bem","name":"Bank Employee"},{"id":"r-bmg","name":"Bank Management"},
-      {"id":"r-adm","name":"Admin"}]' >"${state}/scope-mappings.json"
+      {"id":"r-adm","name":"Admin"},{"id":"r-gue","name":"Guest"}]' >"${state}/scope-mappings.json"
 rc=0
 output="$(run_provisioner "$state" --verify-only)" || rc=$?
-if [[ $rc -ne 0 ]]; then pass "an Admin mapping is reported as a failure"; else
-  fail "an Admin mapping is reported as a failure" "exit was 0"; fi
-assert_contains "$output" "no screen there" "the message says why Admin is withheld"
+if [[ $rc -ne 0 ]]; then pass "a widened client scope is reported as a failure"; else
+  fail "a widened client scope is reported as a failure" "exit was 0"; fi
+assert_contains "$output" "without a decision" "the message names the failure mode"
+assert_contains "$output" "'Guest'" "the message names the role that was added"
+
+# The complement: the exact intended scope, Admin included, must verify clean. Without this the
+# section above could pass while the granted list itself was wrong.
+echo '[{"id":"r-krt","name":"KRT Member"},{"id":"r-off","name":"Officer"},
+      {"id":"r-bem","name":"Bank Employee"},{"id":"r-bmg","name":"Bank Management"},
+      {"id":"r-adm","name":"Admin"}]' >"${state}/scope-mappings.json"
+rc=0
+run_provisioner "$state" --verify-only >/dev/null || rc=$?
+if [[ $rc -eq 0 ]]; then pass "the intended scope, with Admin, verifies clean"; else
+  fail "the intended scope, with Admin, verifies clean" "exit was ${rc}"; fi
 rm -rf "$state"
 
 # ---------------------------------------------------------------------------

@@ -8,6 +8,20 @@
   [ADR-0129](0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md) (the `azp` handle, the database-only authority
   assembly), REQ-SEC-035 (what the mobile client's scope carries)
 
+> [!note] The motivating example changed on 2026-09-02; the decision did not
+> This ADR's Context is written around the mobile client withholding `Admin`. The owner reversed
+> that on 2026-09-02 — the mobile scope carries `Admin` now (see the reversal note in REQ-SEC-035).
+> The Context below is left as written, because it is the record of why this decision was made.
+>
+> **The decision stands, and the reversal makes its second half more load-bearing, not less.** The
+> mobile scope still names five of the realm's eight roles — `Guest`, `Logistician` and
+> `Mission Manager` are absent — so the client is still partial and both properties still apply.
+> And the half that says *authorise from the token, never from the row* is now what makes the scope
+> mapping decide anything at all: read authorities off the row instead and a client's scope would
+> stop bounding what it may do. The original text argued that half by pointing at the risk of
+> handing the app an authority its token deliberately lacked. That specific risk is gone; the rule
+> it justified is not.
+
 ## Context
 
 `UserReconciliationService#syncUser(Jwt)` mirrors a member's realm roles into `app_user` on **every**

@@ -156,6 +156,32 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
+   * Every active org unit an <strong>admin</strong> may pin in the active-context switcher, in the
+   * same top-down order {@link #listPickerOptionsWithDescendants(UUID)} uses for everybody else (OL
+   * &rarr; Bereich &rarr; Staffel &rarr; SK). Backs the admin branch of {@code GET
+   * /api/v1/me/org-units}.
+   *
+   * <p>Kept separate from {@link #listAllActiveOptions()} rather than widening it: that list is
+   * also the public Job-Order form's requesting/responsible-unit picker, which must stay
+   * Staffel/SK-only because only those process orders. It is the ordering — not the contents — that
+   * separates this from {@link #listAllActiveOrgUnitOptionsAllKinds()}, whose bank-account consumer
+   * expects Staffel first.
+   *
+   * <p><strong>Why an admin is given all four kinds.</strong> The switcher's pin narrows a read to
+   * one owning org unit, and a Bereich or the OL may own an aggregate in its own right (REQ-ORG-016
+   * — the create-time stamping applies no kind filter). An admin who could only pin a Staffel or an
+   * SK would therefore be unable to reach rows an OL member can, which inverts the hierarchy.
+   *
+   * @return every active org unit as a pinnable option; never {@code null}, possibly empty.
+   */
+  public List<OrgUnitMembershipOptionDto> listAllPinnableOptions() {
+    List<OrgUnitMembershipOptionDto> options =
+        new ArrayList<>(listAllActiveOrgUnitOptionsAllKinds());
+    options.sort(pickerOrder());
+    return options;
+  }
+
+  /**
    * Lists every org unit the given user is a member of, materialised as the picker-optimised {@link
    * OrgUnitMembershipOptionDto} wire shape. Backs the {@code GET
    * /api/v1/users/{userId}/memberships} endpoint that the R5.d owner-picker fragment consumes.
@@ -263,11 +289,7 @@ public class OrgUnitMembershipQueryService {
               orgUnit.getKind(),
               orgUnit.isProfitEligible()));
     }
-    options.sort(
-        Comparator.<OrgUnitMembershipOptionDto, Integer>comparing(o -> pickerKindOrder(o.kind()))
-            .thenComparing(
-                o -> o.orgUnitName() == null ? "" : o.orgUnitName(),
-                String.CASE_INSENSITIVE_ORDER));
+    options.sort(pickerOrder());
     return options;
   }
 
@@ -333,6 +355,20 @@ public class OrgUnitMembershipQueryService {
   /**
    * Stable top-down ordering of org-unit kinds for the owning-org-unit picker (OL → Bereich →
    * Staffel → SK), so the picker fragment renders its {@code optgroup}s in hierarchy order.
+   *
+   * @param kind the option's org-unit kind; never {@code null}.
+   * @return the sort rank (0 = top of the hierarchy).
+   */
+  private static Comparator<OrgUnitMembershipOptionDto> pickerOrder() {
+    return Comparator.<OrgUnitMembershipOptionDto, Integer>comparing(o -> pickerKindOrder(o.kind()))
+        .thenComparing(
+            o -> o.orgUnitName() == null ? "" : o.orgUnitName(), String.CASE_INSENSITIVE_ORDER);
+  }
+
+  /**
+   * Stable top-down ordering of org-unit kinds for the owning-org-unit picker (OL &rarr; Bereich
+   * &rarr; Staffel &rarr; SK), so the picker fragment renders its {@code optgroup}s in hierarchy
+   * order.
    *
    * @param kind the option's org-unit kind; never {@code null}.
    * @return the sort rank (0 = top of the hierarchy).

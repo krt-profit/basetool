@@ -128,26 +128,31 @@ class MeControllerTest {
   @Test
   void getPinnableOrgUnits_adminGetsTheWholeActiveCatalogue() {
     // The branch that was missing in the Android client: an admin holds no membership, so the
-    // membership list would have offered them nothing to pin at all.
+    // membership list would have offered them nothing to pin at all. All four kinds, so an admin
+    // reaches at least as far as an OL member does through the cascade.
     List<OrgUnitMembershipOptionDto> catalogue = List.of();
     when(authHelperService.isAdmin()).thenReturn(true);
-    when(orgUnitMembershipQueryService.listAllActiveOptions()).thenReturn(catalogue);
+    when(orgUnitMembershipQueryService.listAllPinnableOptions()).thenReturn(catalogue);
 
     assertSame(catalogue, controller.getPinnableOrgUnits(null));
-    verify(orgUnitMembershipQueryService).listAllActiveOptions();
-    verify(orgUnitMembershipQueryService, never()).listOptionsForUser(any());
+    verify(orgUnitMembershipQueryService).listAllPinnableOptions();
+    verify(orgUnitMembershipQueryService, never()).listPickerOptionsWithDescendants(any());
   }
 
   @Test
-  void getPinnableOrgUnits_everyoneElseGetsTheirOwnMemberships() {
+  void getPinnableOrgUnits_everyoneElseGetsTheirReachNotOnlyTheirBelonging() {
+    // Deliberately the drill-down reach rather than listOptionsForUser: that list is a member's
+    // DIRECT Staffel/SK rows, which is empty for somebody whose only seat is on a Bereich or the
+    // OL — and those units own aggregates, so an empty switcher was hiding reachable data.
     UUID callerId = UUID.randomUUID();
     List<OrgUnitMembershipOptionDto> mine = List.of();
     when(authHelperService.isAdmin()).thenReturn(false);
     when(userService.getUserIdFromJwt(null)).thenReturn(callerId);
-    when(orgUnitMembershipQueryService.listOptionsForUser(callerId)).thenReturn(mine);
+    when(orgUnitMembershipQueryService.listPickerOptionsWithDescendants(callerId)).thenReturn(mine);
 
     assertSame(mine, controller.getPinnableOrgUnits(null));
-    verify(orgUnitMembershipQueryService, never()).listAllActiveOptions();
+    verify(orgUnitMembershipQueryService, never()).listAllPinnableOptions();
+    verify(orgUnitMembershipQueryService, never()).listOptionsForUser(any());
   }
 
   @Test

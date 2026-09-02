@@ -207,9 +207,20 @@
                 <label for="squadron-switcher-select" class="squadron-switcher-label"
                        th:text="#{orgUnit.switcher.label}">Active OrgUnit</label>
                 <select id="squadron-switcher-select" name="orgUnitId" class="squadron-switcher-select">
+                    <!--/* Two wordings for one control, because it means two different things.
+                           Sending no active-org-unit header gives an ADMIN adminAllScope — literally
+                           every unit — but gives everyone else the union of their OWN reach
+                           (RequestScopeResolver#currentScopePredicate). One label promised a member
+                           more than it delivered; measured on the test stack 2026-09-01, a member of
+                           two Staffeln read 884.8 SCU under it while an admin read 1403.4. */-->
                     <option value=""
+                            sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
                             th:selected="${activeSquadronId == null}"
-                            th:text="#{orgUnit.switcher.all}">All OrgUnits</option>
+                            th:text="#{orgUnit.switcher.all}">All org units</option>
+                    <option value=""
+                            sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                            th:selected="${activeSquadronId == null}"
+                            th:text="#{orgUnit.switcher.allMine}">All my org units</option>
                     <option th:each="ou : ${availableOrgUnits}"
                             th:value="${ou.orgUnitId()}"
                             th:selected="${activeSquadronId != null and activeSquadronId == ou.orgUnitId()}"

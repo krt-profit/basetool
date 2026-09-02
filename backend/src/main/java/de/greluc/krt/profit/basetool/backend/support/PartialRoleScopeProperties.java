@@ -33,9 +33,12 @@ import org.springframework.validation.annotation.Validated;
  * <p>Ordinarily a token's {@code realm_access.roles} is the whole truth about a member and {@code
  * UserReconciliationService#syncUser(Jwt)} may replace the stored role set from it. That stops
  * being true for a client provisioned with {@code fullScopeAllowed: false} and a narrowed scope:
- * the mobile client withholds {@code Admin} on purpose (REQ-SEC-035), so its tokens describe a
- * member who is deliberately smaller than the real one. Persisting that description would let the
- * client a member happened to use last decide what the database says they are.
+ * the mobile client's scope names five of the realm's eight roles (REQ-SEC-035), so its tokens
+ * describe a member who is deliberately smaller than the real one. Until the 2026-09-02 reversal
+ * the omitted role was {@code Admin}, which is the form of this that actually cost an administrator
+ * their row; {@code Guest}, {@code Logistician} and {@code Mission Manager} are omitted still, so
+ * the rule is unchanged and so is this class. Persisting that description would let the client a
+ * member happened to use last decide what the database says they are.
  *
  * <p>Matched on the token's {@code azp} — a claim inside a Keycloak-signed token, not something a
  * client can set — the same handle {@link IngestGatewayProperties} already uses for the far more
