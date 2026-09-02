@@ -30,9 +30,13 @@ package de.greluc.krt.profit.basetool.backend.model;
  *       existing UEX row.
  *   <li>{@link #WIKI_ONLY} → {@link #BOTH} when a subsequent UEX commodity sync picks up a row Wiki
  *       imported first.
- *   <li>{@link #MANUAL} is sticky: an admin-created row keeps the badge even after a sync run
- *       writes UEX or Wiki columns on top of it (see {@code UexCommodityService}'s manual-entry
- *       handover).
+ *   <li>{@link #MANUAL} → {@link #UEX_ONLY} when a later UEX commodity sync adopts an admin-created
+ *       row by name-match and backfills {@code id_commodity} — {@code UexCommodityService}'s
+ *       manual-entry handover, pinned by {@code UexCommodityServiceTest}. {@link #MANUAL} is
+ *       therefore <b>not</b> sticky, and the derived {@code MaterialDto.isManualEntry} badge
+ *       disappears with it. The SC Wiki commodity sync is the exception: {@code
+ *       ScWikiCommoditySyncService} promotes only {@link #UEX_ONLY} → {@link #BOTH}, so a
+ *       Wiki-linked manual row keeps {@link #MANUAL} while Wiki columns are written on top of it.
  * </ul>
  *
  * <p>R1 only writes {@link #UEX_ONLY} (every existing row at migration time). The other values
