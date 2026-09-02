@@ -32,6 +32,10 @@ import org.slf4j.Logger;
  * run actually saw at least one Wiki row AND the fetch that produced those rows enumerated the
  * whole feed.
  *
+ * <p><b>The plan describes only the first of those two gates.</b> §8.7 predates the census gate,
+ * which arrived with ADR-0147 on 2026-08-28 — so read that ADR alongside the section, and treat the
+ * second gate below as the authority rather than the plan.
+ *
  * <p><b>Why the gate is load-bearing:</b> {@code markScwikiDeletedExcept(seen, now)} tombstones
  * <em>every</em> catalogue row whose external UUID is not in {@code seen}. If a run reached the
  * sweep with an empty {@code seen} set — every fetched row had a null UUID, or every row threw — an
