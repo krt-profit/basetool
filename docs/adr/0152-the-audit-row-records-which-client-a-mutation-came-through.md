@@ -89,10 +89,12 @@ the question was asked. Evidence is written once, at the moment of the act.
   Management` sit on the mobile client's scope, so bank mutations are two-client-ambiguous by the
   same argument. Closing it is a sibling change against a second table, deliberately not folded into
   this one.
-- The viewer's filter list is **derived from configuration** on the backend and mirrored in the
-  frontend controller, the way the event-type lists already are. A deployment that renames its
-  Keycloak clients must update the mirror, or the trail will record a client the viewer cannot
-  filter for.
+- The viewer's filter list is a **hand-maintained mirror** of the backend's allowlist, held in the
+  frontend controller the way the event-type lists already are — the frontend module holds no
+  backend beans. A deployment that renames its Keycloak clients through
+  `app.monitoring.api-clients.known-client-ids` must update the mirror and the three message
+  bundles, or the trail will record a client the viewer cannot filter for. Nothing fails when it
+  drifts: the column falls back to the raw id, and the stale option simply selects nothing.
 - The label mapping now has a **single owner**, so the metric and the trail cannot drift into
   disagreeing about what `other` means — an operator moving from a Grafana panel to the audit filter
   is following one rule, not two that look alike.
