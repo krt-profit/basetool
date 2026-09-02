@@ -1769,6 +1769,16 @@ it back — the same mechanism as the `Guest` demotion above, just smaller. That
 the app's claim no longer writes to the database at all, and the request is authorised from the
 token instead of from the row.
 
+**What the scope list does not decide.** Which realm roles ride on a client's scope decides what the
+app *may* do; it does not decide whether the record of what was done can name the client. Those are
+separate, and only the second one is a property of the trail: `Bank Employee` and `Bank Management`
+are already on this scope, so mutations reachable from two clients are not hypothetical, and a
+stolen access token replayed inside its 300-second lifetime acts with its member's authority
+whatever the list says. `audit_event` therefore records the originating client on every row —
+the same bounded `azp` mapping this file's `azp`-matched rules already rely on
+([REQ-AUDIT-005](audit.md), ADR-0152). Changing the scope list is then a decision about authority,
+not one that also silently changes what a post-incident review can reconstruct.
+
 **Acceptance**
 
 - [x] The provisioning script grants the four member roles and takes back anything else on the

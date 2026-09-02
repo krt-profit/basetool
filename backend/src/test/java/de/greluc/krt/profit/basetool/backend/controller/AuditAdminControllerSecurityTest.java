@@ -84,7 +84,8 @@ class AuditAdminControllerSecurityTest {
 
   @Test
   void auditLog_admin_isAllowed() throws Exception {
-    when(auditService.getEvents(any(), any(), any(), any(), any(), any())).thenReturn(Page.empty());
+    when(auditService.getEvents(any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(Page.empty());
     mockMvc
         .perform(
             get("/api/v1/audit/REFINERY")
@@ -106,7 +107,8 @@ class AuditAdminControllerSecurityTest {
 
   @Test
   void auditLog_promotion_admin_isAllowed() throws Exception {
-    when(auditService.getEvents(any(), any(), any(), any(), any(), any())).thenReturn(Page.empty());
+    when(auditService.getEvents(any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(Page.empty());
     mockMvc
         .perform(
             get("/api/v1/audit/PROMOTION")

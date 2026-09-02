@@ -53,6 +53,7 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
    * @param to period end (inclusive), or {@code null}
    * @param actorUserId filter on the acting user, or {@code null}
    * @param eventType filter on the event type, or {@code null}
+   * @param clientId filter on the originating client (REQ-AUDIT-005), or {@code null}
    * @param pageable page, size and whitelisted sort (default {@code occurredAt} descending)
    * @return one page of audit events
    */
@@ -63,6 +64,7 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
       AND (CAST(:to AS timestamp) IS NULL OR e.occurredAt <= :to)
       AND (CAST(:actorUserId AS uuid) IS NULL OR e.actorUserId = :actorUserId)
       AND (CAST(:eventType AS string) IS NULL OR e.eventType = :eventType)
+      AND (CAST(:clientId AS string) IS NULL OR e.clientId = :clientId)
       """)
   Page<AuditEvent> findFiltered(
       @Param("domain") AuditDomain domain,
@@ -70,6 +72,7 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
       @Param("to") Instant to,
       @Param("actorUserId") UUID actorUserId,
       @Param("eventType") AuditEventType eventType,
+      @Param("clientId") String clientId,
       Pageable pageable);
 
   /**

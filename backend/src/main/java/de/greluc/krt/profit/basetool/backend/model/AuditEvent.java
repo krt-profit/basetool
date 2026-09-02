@@ -122,4 +122,23 @@ public class AuditEvent {
   @Nullable
   @Column(columnDefinition = "TEXT")
   private String details;
+
+  /**
+   * Which client software the mutation came through — the token's {@code azp} mapped onto the
+   * bounded known-client vocabulary (REQ-AUDIT-005, GHSA-2vq5-8p8w-5r64): a known client id
+   * verbatim, {@code other} for an unrecognised one, {@code none} for a caller with no token or a
+   * token carrying no {@code azp}.
+   *
+   * <p>Bounded rather than verbatim for the same reason {@link #details} carries no free text: this
+   * table is evidence, and a client-chosen string is the one kind of value that must not be able to
+   * write itself into it. {@code azp} is signed by Keycloak and unsettable by the client, so
+   * recording it adds no trust that {@code IngestGatewayProperties} does not already place in it.
+   *
+   * <p>{@code null} <em>only</em> on rows written before V237 added the column, where the client
+   * was unambiguous anyway — never on a new row, where {@code none} is a recorded answer rather
+   * than an absence.
+   */
+  @Nullable
+  @Column(name = "client_id", length = 60)
+  private String clientId;
 }

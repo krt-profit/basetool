@@ -143,12 +143,33 @@ class AuditLogE2eTest {
             page.evaluate("() => window.__krtNoReload === true"),
             "Filtering the audit log must update in place — no page reload.");
 
+        // The bank keeps its own audit table and records no originating client, so the client
+        // filter is absent here rather than present and inert (REQ-AUDIT-005).
+        assertEquals(
+            0,
+            page.locator("[data-testid='audit-filter-client']").count(),
+            "the Bank tab must not offer a client filter its trail cannot answer");
+
         // Switch to the Lager (INVENTORY) tab — a tab is a plain link (full navigation).
         page.locator("[data-testid='audit-tab-INVENTORY']").click();
         page.waitForLoadState();
         assertThat(page).hasURL(Pattern.compile(".*[?&]domain=INVENTORY.*"));
         assertThat(page.locator("[data-testid='audit-panel']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+
+        // ... and it IS offered on a generic tab, where the column exists. Filtering to the app
+        // narrows to rows the app wrote; the seeded stack was written by the web frontend, so the
+        // assertion is on the round trip carrying the filter, not on a row count.
+        assertThat(page.locator("[data-testid='audit-filter-client']"))
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+        page.evaluate("() => { window.__krtNoReload = true; }");
+        page.locator("[data-testid='audit-filter-client']").selectOption("basetool-frontend");
+        page.locator("[data-testid='audit-filter-apply']").click();
+        assertThat(page).hasURL(Pattern.compile(".*[?&]clientId=basetool-frontend.*"));
+        assertEquals(
+            Boolean.TRUE,
+            page.evaluate("() => window.__krtNoReload === true"),
+            "Filtering by client must update in place — no page reload.");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "audit-log-viewer");
         throw failure;

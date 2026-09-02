@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -64,7 +65,7 @@ class AuditQueryIntegrationTest {
 
     // When — every optional filter absent, exactly the admin viewer's default call.
     Page<AuditEventDto> page =
-        auditService.getEvents(AuditDomain.INVENTORY, null, null, null, null, pageable);
+        auditService.getEvents(AuditDomain.INVENTORY, null, null, null, null, null, pageable);
 
     // Then it does not throw (the CAST null-guards hold on PostgreSQL) and yields the seeded event.
     assertNotNull(page);
@@ -85,6 +86,7 @@ class AuditQueryIntegrationTest {
             Instant.now().plus(1, ChronoUnit.DAYS),
             UUID.randomUUID(),
             AuditEventType.INVENTORY_ITEM_CREATED,
+            "basetool-android",
             pageable);
 
     // Then the query executes (the random actor id simply matches nothing).
@@ -104,7 +106,52 @@ class AuditQueryIntegrationTest {
                 AuditEventType.INVENTORY_ITEM_CREATED, null, "no-tx", null, "should not persist"));
   }
 
+  @Test
+  void getEvents_clientFilter_selectsOnlyThatClientsRows() {
+    // REQ-AUDIT-005 / GHSA-2vq5-8p8w-5r64: the whole point of the column is that a reviewer can
+    // separate two clients' rows. Two rows differing ONLY in their client -- same domain, same
+    // event type, same actor -- so a filter that silently did nothing would still look right on a
+    // one-row fixture and fails here.
+    seedInventoryAuditRowFrom("basetool-frontend");
+    seedInventoryAuditRowFrom("basetool-android");
+    PageRequest pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "occurredAt"));
+
+    // When
+    Page<AuditEventDto> fromApp =
+        auditService.getEvents(
+            AuditDomain.INVENTORY, null, null, null, null, "basetool-android", pageable);
+
+    // Then only the app's row comes back, and it carries the label the filter selected on.
+    assertEquals(1, fromApp.getTotalElements());
+    assertEquals("basetool-android", fromApp.getContent().getFirst().clientId());
+  }
+
+  @Test
+  void getEvents_blankClientFilter_meansNoFilterRatherThanNoMatches() {
+    // The viewer's "all clients" option submits the select's empty value rather than omitting the
+    // parameter. Passed through it would match rows whose client_id is literally '' -- none -- and
+    // read to the admin as "this area has no events" instead of as "no filter".
+    seedInventoryAuditRowFrom("basetool-frontend");
+    PageRequest pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "occurredAt"));
+
+    // When
+    Page<AuditEventDto> unfiltered =
+        auditService.getEvents(AuditDomain.INVENTORY, null, null, null, null, "  ", pageable);
+
+    // Then
+    assertTrue(unfiltered.getTotalElements() >= 1, "a blank client filter must not exclude rows");
+  }
+
   private void seedInventoryAuditRow() {
+    seedInventoryAuditRowFrom(null);
+  }
+
+  /**
+   * Persists one inventory audit row attributed to the given client.
+   *
+   * @param clientId the bounded client label, or {@code null} for a pre-V237-shaped row
+   */
+  private void seedInventoryAuditRowFrom(String clientId) {
     auditEventRepository.save(
         AuditEvent.builder()
             .occurredAt(Instant.now())
@@ -113,6 +160,7 @@ class AuditQueryIntegrationTest {
             .actorHandle("integration-test")
             .subjectLabel("Quantanium @ Port Olisar")
             .details("qty=5.0")
+            .clientId(clientId)
             .build());
   }
 }

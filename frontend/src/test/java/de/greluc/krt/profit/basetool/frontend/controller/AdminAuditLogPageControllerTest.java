@@ -21,11 +21,14 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.AuditEventDto;
@@ -45,6 +48,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import tools.jackson.databind.JsonNode;
@@ -102,7 +106,7 @@ class AdminAuditLogPageControllerTest {
         .thenReturn(new PageResponse<>(List.of(bankRow), 0, 50, 1, 1, List.of()));
 
     // When
-    String view = controller.auditLog("BANK", null, null, null, null, 0, null, model);
+    String view = controller.auditLog("BANK", null, null, null, null, null, 0, null, model);
 
     // Then
     assertEquals("admin/audit-log", view);
@@ -132,12 +136,13 @@ class AdminAuditLogPageControllerTest {
             UUID.randomUUID(),
             "Quantanium @ Port Olisar",
             null,
-            "qty=5.0");
+            "qty=5.0",
+            "basetool-android");
     when(backendApiClient.get(contains("/api/v1/audit/INVENTORY"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(genericRow), 0, 50, 1, 1, List.of()));
 
     // When
-    String view = controller.auditLog("INVENTORY", null, null, null, null, 0, null, model);
+    String view = controller.auditLog("INVENTORY", null, null, null, null, null, 0, null, model);
 
     // Then
     assertEquals("admin/audit-log", view);
@@ -164,12 +169,13 @@ class AdminAuditLogPageControllerTest {
             UUID.randomUUID(),
             "Grundlagen",
             null,
-            null);
+            null,
+            "basetool-frontend");
     when(backendApiClient.get(contains("/api/v1/audit/PROMOTION"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(genericRow), 0, 50, 1, 1, List.of()));
 
     // When
-    String view = controller.auditLog("PROMOTION", null, null, null, null, 0, null, model);
+    String view = controller.auditLog("PROMOTION", null, null, null, null, null, 0, null, model);
 
     // Then
     assertEquals("admin/audit-log", view);
@@ -194,7 +200,7 @@ class AdminAuditLogPageControllerTest {
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     // When
-    controller.auditLog("ROLE", null, null, null, null, 0, null, model);
+    controller.auditLog("ROLE", null, null, null, null, null, 0, null, model);
 
     // Then
     List<String> eventTypes = (List<String>) model.getAttribute("eventTypes");
@@ -217,7 +223,7 @@ class AdminAuditLogPageControllerTest {
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     // When
-    controller.auditLog("NONSENSE", null, null, null, null, 0, null, model);
+    controller.auditLog("NONSENSE", null, null, null, null, null, 0, null, model);
 
     // Then
     assertEquals("BANK", model.getAttribute("activeDomain"));
@@ -231,7 +237,8 @@ class AdminAuditLogPageControllerTest {
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     // When
-    String view = controller.auditLog("REFINERY", null, null, null, null, 0, "results", model);
+    String view =
+        controller.auditLog("REFINERY", null, null, null, null, null, 0, "results", model);
 
     // Then
     assertEquals("admin/audit-log :: auditResults", view);
@@ -251,7 +258,7 @@ class AdminAuditLogPageControllerTest {
     Model model = new ConcurrentModel();
     when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
-    controller.auditLog("BANK", null, null, null, null, 0, null, model);
+    controller.auditLog("BANK", null, null, null, null, null, 0, null, model);
     List<String> filterTypes = (List<String>) model.getAttribute("eventTypes");
     assertNotNull(filterTypes);
     Properties labels = loadDefaultBundle();
@@ -284,7 +291,7 @@ class AdminAuditLogPageControllerTest {
     Set<String> filterable = new HashSet<>();
     for (String domain : GENERIC_DOMAINS) {
       Model model = new ConcurrentModel();
-      controller.auditLog(domain, null, null, null, null, 0, null, model);
+      controller.auditLog(domain, null, null, null, null, null, 0, null, model);
       List<String> types = (List<String>) model.getAttribute("eventTypes");
       assertNotNull(types, "no event-type list for domain " + domain);
       filterable.addAll(types);
@@ -383,6 +390,112 @@ class AdminAuditLogPageControllerTest {
     return bundle;
   }
 
+  // ---------------------------------------------------------------------------------------------
+  // Originating-client filter (REQ-AUDIT-005, GHSA-2vq5-8p8w-5r64)
+  // ---------------------------------------------------------------------------------------------
+
+  @Test
+  void genericTab_forwardsTheClientFilterAndRendersTheRowsClient() {
+    // Given
+    Model model = new ConcurrentModel();
+    AuditEventDto row =
+        new AuditEventDto(
+            UUID.randomUUID(),
+            Instant.now(),
+            "ROLE",
+            "ROLE_GRANTED",
+            "admin_jo",
+            UUID.randomUUID(),
+            "IRIDIUM",
+            UUID.randomUUID(),
+            "rank=OL",
+            "basetool-android");
+    when(backendApiClient.get(contains("/api/v1/audit/ROLE"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(row), 0, 50, 1, 1, List.of()));
+
+    // When
+    controller.auditLog("ROLE", null, null, null, null, "basetool-android", 0, null, model);
+
+    // Then the filter reaches the backend as a query parameter ...
+    ArgumentCaptor<String> uri = ArgumentCaptor.forClass(String.class);
+    verify(backendApiClient).get(uri.capture(), anyTypeRef());
+    assertTrue(
+        uri.getValue().contains("clientId=basetool-android"),
+        "the client filter must reach the backend, not just the page: " + uri.getValue());
+
+    // ... the tab offers it, and the row carries the client through to the template.
+    assertEquals(Boolean.TRUE, model.getAttribute("clientFilterSupported"));
+    assertEquals("basetool-android", model.getAttribute("filterClientId"));
+    PageResponse<AuditRowView> events = (PageResponse<AuditRowView>) model.getAttribute("events");
+    assertNotNull(events);
+    assertEquals("basetool-android", events.content().getFirst().clientId());
+  }
+
+  @Test
+  void genericTab_keepsTheClientFilterAcrossPaging() {
+    // Paging rebuilds the page URL from the filters; a filter dropped there silently widens the
+    // result set on page 2, which reads as the trail contradicting itself between pages.
+    Model model = new ConcurrentModel();
+    when(backendApiClient.get(any(String.class), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+
+    controller.auditLog("MISSION", null, null, null, null, "other", 0, null, model);
+
+    String paginationBaseUrl = (String) model.getAttribute("paginationBaseUrl");
+    assertNotNull(paginationBaseUrl);
+    assertTrue(
+        paginationBaseUrl.contains("clientId=other"),
+        "pagination must preserve the client filter: " + paginationBaseUrl);
+  }
+
+  @Test
+  void bankTab_neitherOffersNorForwardsTheClientFilter() {
+    // The bank keeps its own audit table, which records no client. Offering the filter there would
+    // be a control that appears to apply and does not — worse than its absence, because an empty
+    // result would read as "no such rows" rather than as "this tab cannot answer that".
+    Model model = new ConcurrentModel();
+    when(backendApiClient.get(any(String.class), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+
+    // When — even with a client filter explicitly in the URL.
+    controller.auditLog("BANK", null, null, null, null, "basetool-android", 0, null, model);
+
+    // Then
+    assertEquals(Boolean.FALSE, model.getAttribute("clientFilterSupported"));
+    assertNull(model.getAttribute("filterClientId"));
+    assertTrue(((List<String>) model.getAttribute("clientIds")).isEmpty());
+    ArgumentCaptor<String> uri = ArgumentCaptor.forClass(String.class);
+    verify(backendApiClient).get(uri.capture(), anyTypeRef());
+    assertFalse(
+        uri.getValue().contains("clientId"),
+        "the bank endpoint has no clientId parameter: " + uri.getValue());
+    String paginationBaseUrl = (String) model.getAttribute("paginationBaseUrl");
+    assertFalse(paginationBaseUrl.contains("clientId"), paginationBaseUrl);
+  }
+
+  @Test
+  void everyOfferedClientFilterValue_carriesALabel() throws Exception {
+    // Mirrors the event-type parity check above: a filter option with no bundle entry renders as a
+    // raw key. The template falls back to the id itself, which is legible but not translated —
+    // this keeps the shipped list actually labelled.
+    Model model = new ConcurrentModel();
+    when(backendApiClient.get(any(String.class), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    controller.auditLog("INVENTORY", null, null, null, null, null, 0, null, model);
+
+    List<String> clientIds = (List<String>) model.getAttribute("clientIds");
+    assertNotNull(clientIds);
+    assertTrue(clientIds.contains("basetool-android"), "the app must be filterable");
+    assertTrue(clientIds.contains("other"), "an unrecognised client must be filterable");
+    assertTrue(clientIds.contains("none"), "a system write must be filterable");
+    Properties labels = loadDefaultBundle();
+    for (String clientId : clientIds) {
+      assertNotNull(
+          labels.getProperty("admin.audit.client." + clientId),
+          "missing admin.audit.client." + clientId + " label for an offered filter value");
+    }
+  }
+
   @Test
   void backendFailure_setsErrorAttribute() {
     // Given
@@ -391,7 +504,7 @@ class AdminAuditLogPageControllerTest {
         .thenThrow(new RuntimeException("down"));
 
     // When
-    controller.auditLog("JOB_ORDER", null, null, null, null, 0, null, model);
+    controller.auditLog("JOB_ORDER", null, null, null, null, null, 0, null, model);
 
     // Then
     assertEquals("admin.audit.error.load", model.getAttribute("error"));

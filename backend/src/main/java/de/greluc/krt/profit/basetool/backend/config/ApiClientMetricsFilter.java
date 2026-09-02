@@ -20,9 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.support.ApiClientMetricsProperties;
 import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
-import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
+import de.greluc.krt.profit.basetool.backend.support.ClientAttribution;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -31,7 +30,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.http.server.PathContainer;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -71,8 +69,7 @@ public class ApiClientMetricsFilter extends OncePerRequestFilter {
   /** The surface this filter attributes; nothing outside it is an API call. */
   private static final PathPattern API_SCOPE = PathPatternParser.defaultInstance.parse("/api/**");
 
-  private final ApiClientMetricsProperties properties;
-  private final IngestGatewayProperties gatewayProperties;
+  private final ClientAttribution clientAttribution;
   private final MeterRegistry meterRegistry;
 
   /**
@@ -107,31 +104,9 @@ public class ApiClientMetricsFilter extends OncePerRequestFilter {
           .counter(
               MetricNames.API_CLIENT_REQUESTS,
               MetricNames.TAG_CLIENT_ID,
-              boundedClientLabel(AuthenticatedSubject.authorizedParty(authentication).orElse(null)))
+              clientAttribution.labelOf(authentication))
           .increment();
     }
     chain.doFilter(request, response);
-  }
-
-  /**
-   * Maps an {@code azp} claim onto a label value that cannot grow without bound.
-   *
-   * <p>A configured ingest gateway counts as known without being listed twice: that list already
-   * names the machine clients this deployment trusts, and duplicating it here would let the two
-   * drift until a gateway silently started reading as {@code other}.
-   *
-   * @param authorizedParty the token's {@code azp}, may be {@code null} or blank.
-   * @return the claim itself for a known client, else {@link MetricNames#CLIENT_ID_NONE} for an
-   *     absent claim or {@link MetricNames#CLIENT_ID_OTHER}.
-   */
-  private @NotNull String boundedClientLabel(@Nullable String authorizedParty) {
-    if (authorizedParty == null || authorizedParty.isBlank()) {
-      return MetricNames.CLIENT_ID_NONE;
-    }
-    if (properties.isKnownClient(authorizedParty)
-        || gatewayProperties.isGatewayClient(authorizedParty)) {
-      return authorizedParty;
-    }
-    return MetricNames.CLIENT_ID_OTHER;
   }
 }

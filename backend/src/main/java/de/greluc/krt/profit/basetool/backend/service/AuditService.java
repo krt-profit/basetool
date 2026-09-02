@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.AuditEventDto;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.ClientAttribution;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.Optional;
@@ -55,6 +56,13 @@ import org.springframework.transaction.annotation.Transactional;
  * the user id (FK {@code ON DELETE SET NULL}) and the effective-name handle so the trail survives
  * user deletion. The {@link AuditDomain} is derived from the event type itself, so the persisted
  * domain column and the event type can never disagree.
+ *
+ * <p>The row also records <em>which client</em> the mutation came through (REQ-AUDIT-005), because
+ * the actor alone stops identifying the origin as soon as two clients can reach the same mutation:
+ * a replayed access token acts with its member's authority, and without this the resulting rows are
+ * indistinguishable from the same person working in the browser. The value is the token's {@code
+ * azp} mapped through {@link ClientAttribution} — the same bounded vocabulary the request counter
+ * labels with (REQ-OBS-018), so the metric and the trail can be read against each other.
  */
 @Service
 @RequiredArgsConstructor
@@ -65,6 +73,7 @@ public class AuditService {
   private final AuthHelperService authHelperService;
   private final UserRepository userRepository;
   private final AuditEventMapper auditEventMapper;
+  private final ClientAttribution clientAttribution;
   private final MeterRegistry meterRegistry;
 
   /**
@@ -107,6 +116,12 @@ public class AuditService {
             // Persist the rendered payload; a null stays null (no details), any other CharSequence
             // (an AuditDetails composer or a raw String) is stringified byte-identically.
             .details(details == null ? null : details.toString())
+            // Read at write time from the SAME authentication the actor came from, so the two
+            // halves of "who, through what" can never describe different requests. Always a
+            // value, never null: a caller with no token records `none`, which the row's `system`
+            // actor handle then distinguishes from the token-with-no-azp case (REQ-AUDIT-005).
+            .clientId(
+                clientAttribution.labelOf(authHelperService.currentAuthentication().orElse(null)))
             .build();
     AuditEvent saved = auditEventRepository.save(event);
     // Per-domain audited-mutation counter (REQ-OBS-011). The domain is the bounded AuditDomain
@@ -128,6 +143,7 @@ public class AuditService {
    * @param to period end (inclusive), or {@code null}
    * @param actorUserId filter on the acting user, or {@code null}
    * @param eventType filter on the event type, or {@code null}
+   * @param clientId filter on the originating client (REQ-AUDIT-005), or {@code null}
    * @param pageable page, size and whitelisted sort
    * @return one page of audit events for that area
    */
@@ -138,10 +154,27 @@ public class AuditService {
       @Nullable Instant to,
       @Nullable UUID actorUserId,
       @Nullable AuditEventType eventType,
+      @Nullable String clientId,
       @NotNull Pageable pageable) {
     return auditEventRepository
-        .findFiltered(domain, from, to, actorUserId, eventType, pageable)
+        .findFiltered(domain, from, to, actorUserId, eventType, blankToNull(clientId), pageable)
         .map(auditEventMapper::toDto);
+  }
+
+  /**
+   * Normalises an absent client filter to {@code null} so the query's {@code IS NULL} branch
+   * disables it.
+   *
+   * <p>An empty string arrives from the viewer's "all clients" option, which submits the select's
+   * blank value rather than omitting the parameter. Passed through unchanged it would match only
+   * rows whose {@code client_id} is literally empty — that is, nothing — and read to the admin as
+   * "this area has no events" rather than as "no filter".
+   *
+   * @param clientId the raw filter value, or {@code null}
+   * @return the value, or {@code null} when it is absent or blank
+   */
+  private static @Nullable String blankToNull(@Nullable String clientId) {
+    return clientId == null || clientId.isBlank() ? null : clientId;
   }
 
   /**

@@ -6,6 +6,10 @@
 
 - **Ein Admin durfte in der App nichts, was er im Webtool darf.** Lagereinträge zuordnen, fremde Zeilen umbuchen, Aufträge bearbeiten, Auszahlungen bestätigen — alles war ausgegraut, obwohl der Server es erlaubt hätte; und im Org-Einheiten-Umschalter stand nur „Alle Org-Einheiten". Betraf ebenso Offiziere. Ursache: `isLogistician` und `isMissionManager` in `/users/me` sagen aus, ob eine **Staffel-Mitgliedschaft** dieses Häkchen trägt, und ein Admin hat per Design keine. Die API sagt einem Client seine Berechtigung jetzt selbst — über drei hierarchie-aufgelöste Flags in `/api/v1/me/capabilities` und ein `canEdit` pro Zeile auf Lager- und Auftragsdaten.
 
+### Security
+
+- **Das Prüfprotokoll hält jetzt fest, über welchen Client eine Änderung kam** — Webtool oder Android-App —, im Audit-Viewer als Spalte und als Filter. Der Wert stammt aus dem von Keycloak signierten Token und wird auf eine feste Werteliste abgebildet, nie als freier Text gespeichert. Ältere Einträge bleiben leer (der Wert wurde nie gespeichert und war damals eindeutig); der Bank-Tab hat eine eigene Tabelle ohne Client-Spalte und blendet den Filter aus (ADR-0152).
+
 ### Added
 
 - **`GET /api/v1/me/org-units`** beantwortet, welche Org-Einheiten ein Aufrufer als Kontext wählen darf: für Admins alle aktiven Staffeln und Spezialkommandos, sonst die eigenen Mitgliedschaften. Das Webtool hatte diese Fallunterscheidung selbst gebaut, die App nicht — jetzt steht sie einmal auf dem Server. Nebeneffekt: aus bis zu vier Abrufen pro Seitenaufbau wird einer.

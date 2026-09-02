@@ -81,6 +81,20 @@ public class AdminAuditLogPageController {
   /** Message-bundle key prefix for the generic-area event-type labels. */
   private static final String GENERIC_EVENT_PREFIX = "admin.audit.event.";
 
+  /**
+   * The originating-client values the generic trail can hold (REQ-AUDIT-005), in filter order.
+   *
+   * <p>Mirrors the backend's bounded vocabulary — the two first-party clients of {@code
+   * app.monitoring.api-clients.known-client-ids} plus the {@code other} / {@code none} buckets that
+   * {@code ClientAttribution} collapses everything else into. Hardcoded here for the same reason
+   * {@link #EVENT_TYPES_BY_DOMAIN} is: the frontend holds no backend beans, and a filter list is
+   * only useful if it is fixed enough to render as a {@code <select>}. A deployment that renames
+   * its Keycloak clients through that property must extend this list, or the trail will record a
+   * client the viewer cannot filter for.
+   */
+  private static final List<String> CLIENT_IDS =
+      List.of("basetool-frontend", "basetool-android", "other", "none");
+
   /** The event types offered in the per-tab filter dropdown, by domain (in a sensible order). */
   private static final Map<String, List<String>> EVENT_TYPES_BY_DOMAIN =
       Map.of(
@@ -319,6 +333,8 @@ public class AdminAuditLogPageController {
    * @param to period end filter (ISO instant), or absent
    * @param actorUserId actor filter (user id), or absent
    * @param eventType event-type filter, or absent
+   * @param clientId originating-client filter (REQ-AUDIT-005), or absent; ignored on the BANK tab,
+   *     whose separate trail records no client
    * @param page zero-based page index
    * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
    *     in-place AJAX swap; otherwise the full page
@@ -332,6 +348,7 @@ public class AdminAuditLogPageController {
       @RequestParam(required = false) String to,
       @RequestParam(required = false) String actorUserId,
       @RequestParam(required = false) String eventType,
+      @RequestParam(required = false) String clientId,
       @RequestParam(required = false, defaultValue = "0") int page,
       @RequestParam(required = false) String fragment,
       Model model) {
@@ -348,6 +365,12 @@ public class AdminAuditLogPageController {
     appendIfPresent(uri, "to", to);
     appendIfPresent(uri, "actorUserId", actorUserId);
     appendIfPresent(uri, "eventType", eventType);
+    // Not forwarded on the BANK tab: /api/v1/bank/admin/audit has no such parameter, and Spring
+    // would ignore it silently -- which would render as a filter that appears to apply and does
+    // not. The tab hides the control instead (see clientFilterSupported below).
+    if (!isBank) {
+      appendIfPresent(uri, "clientId", clientId);
+    }
 
     PageResponse<AuditRowView> events = null;
     try {
@@ -373,8 +396,12 @@ public class AdminAuditLogPageController {
     model.addAttribute("filterTo", to);
     model.addAttribute("filterActorUserId", actorUserId);
     model.addAttribute("filterEventType", eventType);
+    model.addAttribute("clientFilterSupported", !isBank);
+    model.addAttribute("clientIds", isBank ? List.<String>of() : CLIENT_IDS);
+    model.addAttribute("filterClientId", isBank ? null : clientId);
     model.addAttribute(
-        "paginationBaseUrl", buildBaseUrl(activeDomain, from, to, actorUserId, eventType));
+        "paginationBaseUrl",
+        buildBaseUrl(activeDomain, from, to, actorUserId, eventType, isBank ? null : clientId));
     model.addAttribute("exportEndpoint", "/api/proxy/audit/" + activeDomain + "/export");
     model.addAttribute("purgeEndpoint", "/api/proxy/audit/" + activeDomain);
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
@@ -404,7 +431,12 @@ public class AdminAuditLogPageController {
                         e.actorHandle(),
                         prefix + e.eventType(),
                         e.accountNo() != null ? e.accountNo() : "—",
-                        e.details()))
+                        e.details(),
+                        // The bank keeps its own table, which carries no client column
+                        // (REQ-AUDIT-005 covers audit_event only); null renders as a dash and the
+                        // tab hides the filter, rather than implying every bank row came from
+                        // nowhere.
+                        null))
             .toList();
     return new PageResponse<>(
         rows, page.page(), page.size(), page.totalElements(), page.totalPages(), page.sort());
@@ -431,7 +463,8 @@ public class AdminAuditLogPageController {
                         e.actorHandle(),
                         prefix + e.eventType(),
                         e.subjectLabel() != null ? e.subjectLabel() : "—",
-                        e.details()))
+                        e.details(),
+                        e.clientId()))
             .toList();
     return new PageResponse<>(
         rows, page.page(), page.size(), page.totalElements(), page.totalPages(), page.sort());
@@ -458,16 +491,23 @@ public class AdminAuditLogPageController {
    * @param to period end filter, or {@code null}
    * @param actorUserId actor filter, or {@code null}
    * @param eventType event-type filter, or {@code null}
+   * @param clientId originating-client filter, or {@code null}
    * @return the base URL with the domain + filter query parameters (no page/size)
    */
   private static String buildBaseUrl(
-      String domain, String from, String to, String actorUserId, String eventType) {
+      String domain,
+      String from,
+      String to,
+      String actorUserId,
+      String eventType,
+      String clientId) {
     UriComponentsBuilder base =
         UriComponentsBuilder.fromPath("/admin/audit-log").queryParam("domain", domain);
     appendIfPresent(base, "from", from);
     appendIfPresent(base, "to", to);
     appendIfPresent(base, "actorUserId", actorUserId);
     appendIfPresent(base, "eventType", eventType);
+    appendIfPresent(base, "clientId", clientId);
     return base.toUriString();
   }
 }

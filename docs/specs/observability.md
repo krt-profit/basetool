@@ -2144,6 +2144,14 @@ things: `other` is a client nobody registered here, `none` is a Keycloak mapper 
 blinds the attribution for every client at once. `ApiUnknownClient` (warning) fires on a sustained
 `other`; the `none` rule ships staged (below).
 
+That mapping is **not private to this counter**. It lives in `support.ClientAttribution` and is
+shared with the audit trail's `client_id` column (REQ-AUDIT-005), which records the same bounded
+value on every audited mutation. The sharing is the requirement, not an implementation detail: an
+operator who sees a burst on this counter and then filters the audit log for the same client is
+joining two answers, and they only mean the same thing while one rule produces both. The two remain
+complements — this counter finds the window, the audit column attributes the individual act, which
+a counter can never do.
+
 The counter **observes and never refuses**. The ingest gateway enforces a client allow-list because
 it fronts a single approved tool (REQ-INGEST-011); this surface serves whichever first-party clients
 the realm carries, and turning an unrecognised `azp` into a 403 would lock out a client on the day

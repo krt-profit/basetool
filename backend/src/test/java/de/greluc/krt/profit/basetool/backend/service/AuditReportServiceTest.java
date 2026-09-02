@@ -142,7 +142,8 @@ class AuditReportServiceTest {
             null,
             "#7 'X'",
             null,
-            "d");
+            "d",
+            "basetool-frontend");
     when(auditEventRepository.findForExport(AuditDomain.JOB_ORDER, from, to))
         .thenReturn(List.of(event));
     when(auditEventMapper.toDto(event)).thenReturn(dto);
