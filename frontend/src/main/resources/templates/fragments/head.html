@@ -3,8 +3,15 @@
 <head th:fragment="head(titleContent, additionalLinks)">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta th:if="${_csrf != null}" name="_csrf" th:content="${_csrf.token}"/>
-    <meta th:if="${_csrf != null}" name="_csrf_header" th:content="${_csrf.headerName}"/>
+    <!--/* Read through SafeCsrfAdvice, never from ${_csrf} directly. `_csrf` is a DEFERRED token
+           since Spring Security 6: it is never null, so `th:if="${_csrf != null}"` looks like it
+           covers the failure case and does not — the getter loads from the session and throws when
+           the session cannot be read. On 2026-09-02 that threw inside error/500 as well, so the
+           error page produced an empty body and every symptom was a blank white page. The advice
+           resolves the token before Thymeleaf sees it and yields null on failure, so the worst case
+           here is a page without CSRF metadata instead of no page at all. */-->
+    <meta th:if="${csrfTokenValue != null}" name="_csrf" th:content="${csrfTokenValue}"/>
+    <meta th:if="${csrfHeaderName != null}" name="_csrf_header" th:content="${csrfHeaderName}"/>
     <!--
       App favicon + touch icon (REQ-UI-019). The Basetool mark replaces the DAS KARTELL org
       mark here: at tab size the org logo was indistinguishable from every other KRT surface,
