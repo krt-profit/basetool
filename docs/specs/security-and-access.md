@@ -2217,10 +2217,48 @@ matchers.
   allow-listed path gives an anonymous caller, so the table cannot drift from the code even between
   nightly runs.
 
+#### What the probe leaves in the backend log
+
+The probe's own refusals surface to an operator as backend WARN lines, and they are the *expected
+output of a passing assertion*. Recognising them matters: on 2026-09-02 they cost a log triage
+twenty minutes, because four anonymous `403`s against real endpoints read exactly like a broken
+relay.
+
+The signature is **the path set, not the clock**. A run leaves two to four lines of the shape
+`Access denied for GET … [status=403, code=ACCESS_DENIED, …]` with `userId=anonymous` and
+`orgUnitId=anonymous` (`CorrelationIdFilter`), on exactly these paths and in this order:
+
+1. `/api/v1/locations/refineries`
+2. `/api/v1/locations/home-locations`
+3. `/api/v1/missions/{id}/finance-entries`
+4. `/api/v1/missions/{id}/finance-entries/summary`
+
+— the only four `403` assertions in the workflow. The two Finanzen rows carry a **live** mission
+UUID, because the probe discovers the id from the anonymous search rather than hardcoding one, and
+they are skipped altogether when that search returns no row (hence "two to four").
+
+The negatives are what close the triage:
+
+- The run's ~100 `401` assertions log at **DEBUG** and its one app-level `404` likewise, so
+  "four WARN lines and nothing else" *is* the signature. A burst of anonymous `403`s on *other*
+  paths is not this probe.
+- The schedule is `17 5 * * *` UTC, but a burst at another hour proves nothing — it is equally a
+  `workflow_dispatch`, a delayed schedule, the manual runbook check, or an unrelated anonymous
+  caller. Match on the paths.
+- These count toward `basetool_http_error_total{code="ACCESS_DENIED"}` but sit roughly two orders
+  below `AccessDeniedSpike`'s `0.2/s for 10m`, so a firing `AccessDeniedSpike` is never this.
+
+The WARN level is deliberate and must not be lowered for these, nor folded into the REQ-OBS-001
+`401`→DEBUG carve-out. That line is the only human-readable signal that a deliberately-anonymous
+catalogue (`/ship-types`, `/materials/search`, `/locations/search`, `/refining-methods`) has
+accidentally grown a method gate and is now `403`ing the public pickers — drift this probe has
+already caught once. `AccessDeniedSpike` is a spike detector, not a drift detector.
+
 **Enforced by:** review at the moment a path is added — deliberately a documented obligation rather
 than a test, for the reason in the open item above · **Code:** `SecurityConfig` (filter chain),
 `MissionController#searchMissions` (outsider redaction), `HomeController#home` (the anonymous
-consumer) · **Decision:** [ADR-0135](../adr/0135-public-api-vhost-not-a-gateway.md),
+consumer) · **Tests:** `ApiVhostAnonymousSurfaceTest` (the four statuses above) ·
+**Decision:** [ADR-0135](../adr/0135-public-api-vhost-not-a-gateway.md),
 [ADR-0138](../adr/0138-terms-wording-is-a-backend-resource.md)
 
 ### REQ-SEC-039 — A per-item receiver id is an authorization input, not a routing hint

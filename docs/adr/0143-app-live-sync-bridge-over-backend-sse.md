@@ -161,3 +161,36 @@ between the two stops.
 - **New metrics** (`basetool_livesync_*`, REQ-OBS-011): stream gauge, accepted/refused subscribes by
   topic class, published/consumed/dropped frames, and the two bucket rejection counters.
 
+## Addendum — 2026-09-02: "Redis stays optional" now holds at startup too
+
+This ADR's posture is that a Redis outage degrades cross-instance sync to single-instance behaviour
+and **never worse**, which is ADR-0084's rule applied to the fan-out. That held for a Redis lost
+while running, and silently did not hold while *starting*.
+
+Both fan-out containers subscribe during context refresh. A plain `RedisMessageListenerContainer`
+rethrows that first connection failure out of `SmartLifecycle#start()` — its `lazyListen()`
+`InitialBackoffExecution` branch does not back off, it propagates — and Spring turns any exception
+out of a lifecycle start into a cancelled refresh. On **2026-09-02 07:07:09Z** that crash-looped the
+production backend (`ApplicationContextException: Failed to start bean
+'liveSyncRedisMessageListenerContainer'`) at roughly one boot per minute, with no API for the
+frontend at all, because Redis had been recreated during a deploy.
+
+No decision here is reversed; the decision is restored. `ResilientRedisMessageListenerContainer`
+swallows that first failure, resets the container's `started` flag (upstream sets it *before* the
+throw, so a bare retry would be a permanent no-op) and retries every five seconds in the background.
+Both containers use it — hardening only the live-sync one would have renamed the outage rather than
+ended it, since both sit at lifecycle phase `Integer.MAX_VALUE` and whichever the lifecycle
+processor reaches first is the one that aborts the refresh.
+
+The trade this makes is loud-to-quiet: an unreachable Redis used to announce itself by taking the
+backend down. `basetool_redis_fanout_subscribed{fanout}` and the `RedisFanoutUnsubscribed` alert
+(0 for 10m, warning) are what replace that announcement, bound to `isListening()` rather than
+`isRunning()` for the reason above.
+
+Deliberately **not** extended to the frontend: Redis is genuinely mandatory there
+(`@EnableRedisIndexedHttpSession` — no session store, no login), and its context dies one bean
+earlier in the keyspace-notification initializer, before any `SmartLifecycle` runs. And deliberately
+not solved with a compose `depends_on` gate: `depends_on` is not re-evaluated on a restart-policy
+restart, on `docker restart backend`, on `up -d --no-deps backend` (which `scripts/deploy.sh` itself
+runs on health recovery), or when redis is recreated under a running backend — which are exactly the
+paths this happened on.

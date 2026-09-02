@@ -169,6 +169,25 @@ public final class MetricNames {
   public static final String SESSION_EVICTED = "basetool.session.evicted";
 
   /**
+   * Counter {@code basetool_session_value_dropped_total} — tag {@code cause}; bumped every time a
+   * session value in Redis cannot be deserialized and is dropped by {@code
+   * FaultTolerantSessionSerializer}.
+   *
+   * <p>Exists because the fix for the 2026-09-02 outage made the fault survivable and therefore
+   * invisible. A dropped value is not written back, so a poisoned session keeps its poison for up
+   * to the 720-hour authenticated window and re-drops on every single request: the export from that
+   * day carries 496 identical WARN lines over three hours and no number anywhere. This counter is
+   * what shows the volume, and — after a deploy that stops a poison being written — whether the
+   * residue is actually draining as the affected sessions expire.
+   *
+   * <p>{@code cause} is the caught failure's root-cause <em>simple</em> class name mapped through a
+   * fixed allow-list, with everything else folded into {@code other}. Never the unresolved type id:
+   * that is parsed out of the corrupted payload and is unbounded — and, measured, can be the
+   * member's own data rather than a class name at all (REQ-OBS-006, REQ-OBS-004).
+   */
+  public static final String SESSION_VALUE_DROPPED = "basetool.session.value.dropped";
+
+  /**
    * Counter {@code basetool_client_error_total} — tag {@code kind} ({@link
    * #CLIENT_ERROR_SCRIPT_ERROR} / {@link #CLIENT_ERROR_UNHANDLED_REJECTION} / {@link
    * #CLIENT_ERROR_RESOURCE_ERROR}); browser-side failures reported by the client error beacon. A JS
@@ -264,6 +283,13 @@ public final class MetricNames {
 
   /** Tag key: the presence-relay frame type on {@link #PRESENCE_RELAY_FRAMES}. */
   public static final String TAG_TYPE = "type";
+
+  /**
+   * Tag key: the bounded root-cause bucket of a dropped session value on {@link
+   * #SESSION_VALUE_DROPPED}. Allow-listed exception simple names plus {@code other} — never a raw
+   * class name, which would be an unbounded label.
+   */
+  public static final String TAG_CAUSE = "cause";
 
   /**
    * Tag key: the bounded live-sync {@code topic_class} on the relay counters and {@link

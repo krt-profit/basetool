@@ -152,9 +152,12 @@ logging:
     org.springframework.web: INFO
     org.springframework.security: INFO
     io.github.resilience4j: INFO
-    # REQ-OBS-013: a telemetry-sink outage is not an application fault. The OTLP span exporter logs a
-    # failed export batch at ERROR by default; demote it to WARN so an unreachable Alloy/Tempo does
-    # not inflate logback_events_total{level="error"} and falsely trip the LogbackErrorSpike alert.
+    # REQ-OBS-013: this is a THRESHOLD, not a demotion (corrected 2026-09-02 — the note here used to
+    # claim it demoted ERROR to WARN; it never did). The OTLP exporter logs a transport failure at
+    # JUL SEVERE, which arrives as ERROR and clears a WARN threshold untouched. Accepted, because the
+    # SDK's ThrottlingLogger caps that source at <= 1/min — two orders below LogbackErrorSpike's
+    # > 0.2/s — and an unreachable Alloy pages via TargetDown regardless. The pin's real effect is
+    # dropping the exporter's INFO chatter; not OFF, which would also drop the only local breadcrumb.
     io.opentelemetry.exporter: WARN
 app:
   security:

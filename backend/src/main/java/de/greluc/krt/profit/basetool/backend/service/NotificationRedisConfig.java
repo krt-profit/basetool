@@ -19,7 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.NotificationFanoutProperties;
+import de.greluc.krt.profit.basetool.backend.support.ResilientRedisMessageListenerContainer;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -130,17 +133,27 @@ public class NotificationRedisConfig {
    *     uex/scWiki/import/notification/mail executors) and the parameter name alone cannot
    *     disambiguate them, so an un-qualified inject fails to start the context once the fan-out is
    *     enabled (the crash the disabled-by-default unit test never exercised)
+   * @param meterRegistry registry the subscription gauge binds to
    * @return the message-listener container
    */
   @Bean
   public RedisMessageListenerContainer notificationRedisMessageListenerContainer(
       RedisConnectionFactory connectionFactory,
       RedisNotificationFanout fanout,
-      @Qualifier("notificationRedisListenerExecutor") ThreadPoolTaskExecutor listenerExecutor) {
-    RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+      @Qualifier("notificationRedisListenerExecutor") ThreadPoolTaskExecutor listenerExecutor,
+      MeterRegistry meterRegistry) {
+    // Resilient for the same reason the live-sync one is, and just as necessarily: both containers
+    // sit at SmartLifecycle phase Integer.MAX_VALUE, so whichever the lifecycle processor reaches
+    // first is the one that aborts the refresh. Hardening only the other would have renamed the
+    // 2026-09-02 crash loop rather than ended it.
+    ResilientRedisMessageListenerContainer container = new ResilientRedisMessageListenerContainer();
     container.setConnectionFactory(connectionFactory);
     container.setTaskExecutor(listenerExecutor);
     container.addMessageListener(fanout, new ChannelTopic(fanout.channel()));
+    Gauge.builder(MetricNames.REDIS_FANOUT_SUBSCRIBED, container, c -> c.isListening() ? 1d : 0d)
+        .tag(MetricNames.TAG_FANOUT, MetricNames.FANOUT_NOTIFICATIONS)
+        .description("1 while this instance is subscribed to the notification fan-out channel")
+        .register(meterRegistry);
     return container;
   }
 }

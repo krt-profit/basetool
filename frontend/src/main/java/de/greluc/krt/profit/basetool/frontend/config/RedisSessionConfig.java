@@ -20,9 +20,11 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.util.Locale;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -167,10 +169,16 @@ public class RedisSessionConfig {
    * SecurityJacksonModules#getModules(ClassLoader, BasicPolymorphicTypeValidator.Builder)} which
    * extends it with all required Spring Security type allowances.
    *
+   * @param meterRegistry provider for the registry {@code basetool_session_value_dropped_total}
+   *     binds to. An {@link ObjectProvider} rather than the registry itself: this bean is consumed
+   *     by the configuration {@code @EnableRedisIndexedHttpSession} imports onto this very class,
+   *     and a hard dependency would drag Micrometer's auto-configuration into session-repository
+   *     creation.
    * @return the configured {@link RedisSerializer} for session data
    */
   @Bean
-  public RedisSerializer<Object> springSessionDefaultRedisSerializer() {
+  public RedisSerializer<Object> springSessionDefaultRedisSerializer(
+      ObjectProvider<MeterRegistry> meterRegistry) {
     // Wrapped, because the read path has no error handling of its own: a value that cannot be
     // deserialized leaves RedisIndexedSessionRepository uncaught and becomes an HTTP 500 on every
     // request carrying a session cookie. That is the 2026-09-02 outage. The wrapper turns an
@@ -178,7 +186,8 @@ public class RedisSessionConfig {
     // and it cannot hide the required timestamps, which are final types and never fail. See
     // FaultTolerantSessionSerializer for why that is both safe and sufficient.
     return new FaultTolerantSessionSerializer(
-        new GenericJacksonJsonRedisSerializer(buildSessionJsonMapper(getClass().getClassLoader())));
+        new GenericJacksonJsonRedisSerializer(buildSessionJsonMapper(getClass().getClassLoader())),
+        meterRegistry);
   }
 
   /**
@@ -281,7 +290,15 @@ public class RedisSessionConfig {
    * {@link #flushModeValue} by {@link #resolveFlushMode()} (configurable, defaulting to {@code
    * IMMEDIATE}).
    *
-   * @return a customizer that sets timeout, namespace, and flush mode on the repository
+   * <p>It also installs {@link SessionAttributeDiagnosticMapper} in place of the default {@code
+   * RedisSessionMapper}. That mapper is the only layer that sees both the failure's shape and the
+   * hash field it came from, so it is where an unreadable value is named — see its Javadoc for why
+   * the 2026-09-02 storm could not be acted on without that name. Note the repository also invokes
+   * the mapper from {@code onMessage} with a session-<em>created</em> payload rather than a stored
+   * hash; that map is deserialized in a single serializer call, so it can never contain an {@link
+   * UnreadableSessionValue}, and a brand-new session has nothing stale in it to be poisoned by.
+   *
+   * @return a customizer that sets timeout, namespace, flush mode and the diagnostic session mapper
    */
   @Bean
   public SessionRepositoryCustomizer<RedisIndexedSessionRepository> sessionRepositoryCustomizer() {
@@ -289,6 +306,7 @@ public class RedisSessionConfig {
       repository.setDefaultMaxInactiveInterval(anonymousSessionTimeout);
       repository.setRedisKeyNamespace(redisNamespace);
       repository.setFlushMode(resolveFlushMode());
+      repository.setRedisSessionMapper(new SessionAttributeDiagnosticMapper());
     };
   }
 

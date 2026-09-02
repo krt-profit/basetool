@@ -20,7 +20,12 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
@@ -93,5 +98,44 @@ class SessionSerializerRoundTripTest {
   @Test
   void aBooleanAttribute_isReadableAgain() {
     assertEquals(Boolean.TRUE, roundTrip(Boolean.TRUE));
+  }
+
+  /** A record, i.e. an implicitly final type whose JSON form is an object. */
+  private record ProbeRecord(String name, int amount) {}
+
+  @Test
+  void aRecordAsAnAttributeValue_cannotBeReadBack() {
+    // The trap, measured rather than argued. A record is implicitly FINAL, so the NON_FINAL default
+    // typing writes it with no `@class` — while still writing a JSON OBJECT, which the reader then
+    // demands a type id for. It writes without complaint and is unreadable on the very next
+    // request, taking the whole session with it before FaultTolerantSessionSerializer existed.
+    //
+    // This is a CONTRACT, not a wish: nothing about a record makes it unusable in a session, only
+    // this serializer configuration does. If a future change makes the round trip succeed, this
+    // test is the one to delete — deliberately, not by accident.
+    assertThrows(Exception.class, () -> roundTrip(new ProbeRecord("probe", 3)));
+  }
+
+  @Test
+  void anImmutableJdkCollectionAsAnAttributeValue_cannotBeReadBack() {
+    // The same trap wearing different clothes, and the easier one to walk into: List.of(...) and
+    // Map.of(...) are final JDK classes, so they too are written without a type id. BackendRoleSync
+    // Filter's `new ArrayList<>(backend.asserted())` is not a stylistic wrapper — it is what makes
+    // that attribute readable.
+    assertThrows(Exception.class, () -> roundTrip(List.of("a", "b")));
+    assertThrows(Exception.class, () -> roundTrip(Map.of("a", "b")));
+  }
+
+  @Test
+  void aMutableCollectionCarryingTheSameRecord_isReadableAgain() {
+    // And the workaround, pinned so the rule is not over-read into "records may never touch a
+    // session". A non-final container gets its `@class`, and its contents are then written through
+    // Object-typed slots, which type-id everything inside — including a record. This is why flash
+    // attributes (a java.util.ArrayList of FlashMap) survive while a bare record does not.
+    List<Object> wrapped = new ArrayList<>(List.of(new ProbeRecord("probe", 3)));
+
+    assertEquals(wrapped, roundTrip(wrapped));
+    assertEquals(
+        new LinkedHashMap<>(Map.of("k", "v")), roundTrip(new LinkedHashMap<>(Map.of("k", "v"))));
   }
 }

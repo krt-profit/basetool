@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +67,12 @@ class ScWikiItemSyncServiceClosureTest {
   @Mock private SyncReportService syncReportService;
   @Mock private ObjectProvider<ScWikiItemSyncService> self;
 
+  /**
+   * Real registry rather than a mock: {@code @InjectMocks} cannot wire a plain {@code
+   * MeterRegistry}, and the sweep-stand-down assertions read counter values back out of it.
+   */
+  private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+
   private ScWikiProperties properties;
   private ScWikiItemSyncService service;
 
@@ -81,6 +88,7 @@ class ScWikiItemSyncServiceClosureTest {
             blueprintRepository,
             manufacturerRepository,
             syncReportService,
+            meterRegistry,
             self);
     lenient().when(self.getObject()).thenReturn(service);
     lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());

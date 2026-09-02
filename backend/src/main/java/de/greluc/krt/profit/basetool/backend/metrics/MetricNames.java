@@ -60,6 +60,48 @@ public final class MetricNames {
    */
   public static final String SCHEDULED_JOB_STEP_FAILURES = "basetool.scheduled.job.step.failures";
 
+  /**
+   * Counter {@code basetool_catalogue_orphan_sweep_skipped_total} — tags {@code sweep}, {@code
+   * reason}. Bumped when a catalogue sync completes but stands its cross-kind orphan sweep down
+   * because the fetch was not a full census. The stand-down is the correct, conservative answer (a
+   * partial fetch must never tombstone rows the feed simply did not hand over), but until this
+   * counter existed it was a log line and nothing else — {@code business.yml} said so in as many
+   * words — so a sweep that had not run for weeks looked exactly like one running cleanly.
+   *
+   * <p>{@code reason} is the bounded triple {@link #SWEEP_SKIP_INCOMPLETE} / {@link
+   * #SWEEP_SKIP_NOT_MODIFIED} / {@link #SWEEP_SKIP_NO_ROWS}, and the split is load-bearing rather
+   * than decorative: an all-304 run is a <em>healthy</em> fully-cached run that also stands the
+   * sweep down, so an untagged counter would be non-zero on every healthy day and could carry no
+   * alert.
+   *
+   * <p>{@code sweep} carries exactly one value today, {@link #SWEEP_ITEM} — the cross-kind
+   * game-item sweep, the one the 2026-09-02 export showed standing down. The four other catalogue
+   * sweeps (vehicle, commodity, blueprint, manufacturer) stand down through the same gates and are
+   * <strong>not</strong> instrumented yet; three of them go through the static {@code
+   * ScWikiOrphanSweep} helper, which would need a skip callback threaded in from each caller. Said
+   * plainly here rather than left to be inferred from an alert that quietly watches one catalogue:
+   * {@code ScWikiOrphanSweepStandingDown} is blind to the other four, and {@code
+   * ScWikiCensusIncompleteStreak}'s fetch-error proxy is what still covers them. Bounded literal
+   * set either way (REQ-OBS-011).
+   */
+  public static final String CATALOGUE_ORPHAN_SWEEP_SKIPPED =
+      "basetool.catalogue.orphan.sweep.skipped";
+
+  /**
+   * Gauge {@code basetool_redis_fanout_subscribed} — tag {@code fanout} ({@code livesync} / {@code
+   * notifications}); 1 while the cross-instance pub/sub container is listening, 0 while it is not.
+   *
+   * <p>Exists because the failure it watches used to be loud and is now quiet. Until 2026-09-02 a
+   * Redis that was unreachable during context refresh aborted the refresh outright — the backend
+   * crash-looped, which no metric was needed to notice. {@code
+   * ResilientRedisMessageListenerContainer} makes that survivable, and a fan-out that retries
+   * forever without ever subscribing is otherwise indistinguishable from a healthy one: peers'
+   * changes simply never arrive. Bound to {@code isListening()}, not {@code isRunning()} — the
+   * latter reports the {@code started} flag, which upstream sets <em>before</em> the subscription
+   * can fail and which therefore reads 1 for a container that is subscribed to nothing.
+   */
+  public static final String REDIS_FANOUT_SUBSCRIBED = "basetool.redis.fanout.subscribed";
+
   // --- External-sync events (SyncReportService) ------------------------------------------
 
   /** Counter {@code basetool_sync_events_total} — tags {@code source}, {@code event_type}. */
@@ -423,7 +465,43 @@ public final class MetricNames {
   /** Tag key: the notification Redis fan-out operation on {@link #SSE_REDIS_ERRORS}. */
   public static final String TAG_OP = "op";
 
+  /**
+   * Tag key: the catalogue whose orphan sweep stood down, on {@link
+   * #CATALOGUE_ORPHAN_SWEEP_SKIPPED} ({@code item} / {@code vehicle} / {@code commodity} / {@code
+   * blueprint} / {@code manufacturer}). Bounded literal set, mirroring {@link #TAG_STEP}.
+   */
+  public static final String TAG_SWEEP = "sweep";
+
+  /**
+   * Tag key: which cross-instance pub/sub container a {@link #REDIS_FANOUT_SUBSCRIBED} sample
+   * belongs to — {@link #FANOUT_LIVESYNC} or {@link #FANOUT_NOTIFICATIONS}. Two series, fixed at
+   * compile time.
+   */
+  public static final String TAG_FANOUT = "fanout";
+
   // --- Bounded tag values (not an application enum) --------------------------------------
+
+  /** Catalogue identity of the cross-kind game-item sweep, on {@link #TAG_SWEEP}. */
+  public static final String SWEEP_ITEM = "item";
+
+  /** Orphan-sweep stand-down: at least one kind pass came back an incomplete census. */
+  public static final String SWEEP_SKIP_INCOMPLETE = "incomplete";
+
+  /**
+   * Orphan-sweep stand-down: every kind pass answered 304, so the run held no census to sweep
+   * against. The healthy, expected case — a fully-cached run — and the reason this counter is
+   * tagged at all.
+   */
+  public static final String SWEEP_SKIP_NOT_MODIFIED = "not_modified";
+
+  /** Orphan-sweep stand-down: the run ended up with no rows at all, so a sweep would wipe. */
+  public static final String SWEEP_SKIP_NO_ROWS = "no_rows";
+
+  /** Fan-out identity: the app live-sync bridge's Redis pub/sub container (ADR-0143). */
+  public static final String FANOUT_LIVESYNC = "livesync";
+
+  /** Fan-out identity: the notification push's Redis pub/sub container (ADR-0094). */
+  public static final String FANOUT_NOTIFICATIONS = "notifications";
 
   /** Notification Redis fan-out operation: publishing a signal to peer replicas. */
   public static final String OP_PUBLISH = "publish";
