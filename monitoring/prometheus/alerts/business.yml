@@ -235,8 +235,14 @@ groups:
       # than in the feed (REQ-DATA-014, ADR-0147). A surplus over meta.total is no longer a census
       # failure; a repeated row now is.
       #
-      # There is NO metric for "the sweep stood down" — the skip is a log line and nothing else. The
-      # closest faithful proxy is basetool_external_fetch_errors_total{source="scwiki"}: every branch
+      # There IS now a direct metric for "the sweep stood down" —
+      # basetool_catalogue_orphan_sweep_skipped_total{sweep,reason}, added 2026-09-02 — and
+      # ScWikiOrphanSweepStandingDown below reads it. This rule is kept as written because the proxy
+      # it uses covers a wider set of walks (every kind pass, including the ones that feed no sweep)
+      # and has three days of history behind its tuning. The paragraph below described the gap that
+      # metric closed; it is left in place because the proxy's reasoning still stands.
+      #
+      # The closest faithful proxy is basetool_external_fetch_errors_total{source="scwiki"}: every branch
       # that makes a walk incomplete increments it — once per fetch, since the FetchErrorLatch
       # collapses the several symptoms one broken walk can show at the same time into a single
       # increment — so a run whose census was incomplete always contributes at least one. (The
@@ -264,6 +270,29 @@ groups:
         annotations:
           summary: "SC-Wiki page walk incomplete on three consecutive days (orphan sweep standing down)"
           description: "Every one of the last three daily SC-Wiki syncs recorded a fetch/census error, so the page walk was flagged INCOMPLETE and the scwiki_deleted orphan sweep refused to run on all of them — rows the Wiki has actually dropped are no longer being tombstoned, while the sync keeps reporting success. Grep the backend log for 'INCOMPLETE' / 'Skipping the … scwiki_deleted sweep' to see which check fails: a genuinely broken upstream also trips ExternalFetchErrors, whereas this alert alone points at a pagination-contract drift (rows repeating across pages, the distinct rows falling short of meta.total, meta.last_page renamed, or the announced page count growing mid-walk). Note which side the numbers fall on: a SURPLUS over meta.total is deliberately not a census failure (ADR-0147), so it is not what is firing this."
+
+      # (2026-09-02 log triage) The direct reading of the same failure. Where
+      # ScWikiCensusIncompleteStreak infers a standing-down sweep from fetch errors, this counts the
+      # stand-down itself, at the branch that performs it.
+      #
+      # The reason filter is the whole rule. A stand-down is NOT by itself a fault: an all-304 run is
+      # a fully-cached healthy night and stands the sweep down too, which is why the counter carries
+      # `reason` and why an untagged version of it would be non-zero on every healthy deployment and
+      # could not carry an alert at all. Only reason="incomplete" means a walk could not vouch for its
+      # census; reason="no_rows" is the total-outage shape, already covered by SyncZeroItems and
+      # ExternalSyncStale. The counter is registered lazily per reason, so on a healthy deployment
+      # this series is ABSENT rather than zero and the rule cannot false-fire.
+      #
+      # baseline-tune: three incomplete runs inside 72h. The sync runs daily, so that is "three runs
+      # in a row" without depending on the scrape landing inside any particular window.
+      - alert: ScWikiOrphanSweepStandingDown
+        expr: sum(increase(basetool_catalogue_orphan_sweep_skipped_total{reason="incomplete"}[72h])) >= 3
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "SC-Wiki orphan sweep has stood down on three incomplete runs in 72h"
+          description: "The cross-kind scwiki_deleted sweep refused to run on at least three syncs in 72h because a kind pass came back an incomplete census. The refusal is correct — sweeping a half-walked feed would soft-delete every row that was merely never fetched — but rows the Wiki has actually dropped are not being tombstoned while the sync keeps reporting success. Grep the backend log for 'Skipping cross-kind orphan sweep (reason=incomplete' and for the census WARNs above it to see which kind endpoint failed to enumerate. reason=not_modified is a healthy fully-cached run and is deliberately not matched here."
 
       # (#1041 item 3) All-jobs staleness. UserSyncStale/ExternalSyncStale covered only user_sync and
       # the two catalogue syncs; the daily notification-retention purge and the hourly default-
@@ -373,8 +402,17 @@ groups:
           description: "{{ $labels.application }} is re-mapping unreachable-Keycloak-JWKS failures to 503 at an elevated rate — the root cause of the past Http5xxRateHigh incident. Check Keycloak reachability / DNS before 5xx surfaces to users."
 
       # (#1041 item 6) Authorization-probing signal: 401 (UNAUTHENTICATED) is charted, 403 was not.
-      # baseline-tune: 0.2/s is an initial guess; 403s occur normally (guest field redaction), so tune
-      # against the baseline week.
+      # baseline-tune: 0.2/s is an initial guess; 403s occur normally, so tune against the baseline
+      # week. Two known-benign sources, neither of which may be absorbed by raising the threshold:
+      #   - Mission-surface refusals for a caller outside the owning scope (the canSeeMission /
+      #     canAccessParticipant checks, REQ-SEC-018). NOTE this is NOT "guest field redaction", which
+      #     the earlier version of this comment claimed: redaction answers 200 with fields stripped
+      #     and never produces a 403 at all (corrected 2026-09-02).
+      #   - The nightly edge-deny probe (.github/workflows/edge-deny-probe.yml, 17 5 * * * UTC), which
+      #     asserts 403 on exactly four paths — /api/v1/locations/refineries, /locations/home-locations
+      #     and the two /api/v1/missions/{id}/finance-entries reads. Up to four per run, ~0.013/s: it
+      #     cannot satisfy `for: 10m` and is therefore never what is firing this. Its backend log
+      #     signature is written up under REQ-SEC-037.
       - alert: AccessDeniedSpike
         expr: sum by (application) (rate(basetool_http_error_total{code="ACCESS_DENIED"}[5m])) > 0.2
         for: 10m
@@ -612,6 +650,52 @@ groups:
         annotations:
           summary: "Frontend session store growing unbounded (>2000 active sessions)"
           description: "basetool_active_sessions has held above 2000 for 1h. Expected steady state is a few hundred; a sustained climb means anonymous/orphan sessions are accreting again (REQ-SEC-025 two-tier TTL regressed) and Redis is heading for its maxmemory noeviction ceiling. Check the session store size (redis SCAN 'basetool:session:sessions:*') and the created-vs-login ratio."
+
+      # (2026-09-02 log triage) Unreadable session values. On 2026-09-02 one session value in Redis
+      # that could not be deserialized answered HTTP 500 on EVERY request carrying a session cookie —
+      # everything behind the login, for everyone. FaultTolerantSessionSerializer made that
+      # survivable (the value reads as absent, the member is merely signed out), and in doing so made
+      # it INVISIBLE: the three hours after the fix deployed carry 496 identical WARN lines and no
+      # number anywhere. A dropped value is not written back, so a poisoned session keeps re-dropping
+      # on every request for up to its 720h window.
+      #
+      # Two things this watches. First, residue draining: after a deploy that stops a poison being
+      # written, the rate must fall as affected sessions expire — a flat rate means something is
+      # still WRITING an unreadable value. Second, a new poison: a release that renames a class held
+      # in a session, or puts a final-typed value (a record, a List.of(...)) into one, turns this from
+      # a decaying tail into a step change on deploy day.
+      #
+      # baseline-tune: >20 in 15m held for 30m. A handful of long-lived poisoned sessions being
+      # polled produces a few per minute; the storm that prompted this was ~2.75/min sustained, which
+      # this matches, while a single stale session ticking over does not.
+      - alert: SessionValueDropsSustained
+        expr: sum(increase(basetool_session_value_dropped_total[15m])) > 20
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Frontend is dropping unreadable session values ({{ $value | printf \"%.0f\" }} per 15m)"
+          description: "Session values in Redis cannot be deserialized and are being dropped, signing those members out. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names the attribute, the cause and the unresolved type id. typeId=absent means a FINAL-typed value (a record, a List.of/Map.of) was written into a session and can never be read back; a class name means that class was renamed or removed since the session was written; cause=IllegalArgumentException means a top-level @class no longer resolves. A decaying rate after a deploy is old sessions expiring and is expected; a flat or rising one means something is still writing it."
+
+      # (2026-09-02 log triage) Cross-instance Redis fan-out not subscribed. Until this release, a
+      # Redis unreachable during context refresh threw out of SmartLifecycle#start() and aborted the
+      # refresh — the backend crash-looped, which needed no metric to notice. That is now survivable
+      # (ResilientRedisMessageListenerContainer retries in the background), and the failure it leaves
+      # behind is silent: peers' changes simply never arrive, on a backend that is up, healthy and
+      # serving. This gauge is the only thing that can tell the two apart.
+      #
+      # Bound to isListening(), not isRunning(): the latter reports the `started` flag, which upstream
+      # sets BEFORE the subscription can fail. Absent on a deployment with the fan-out switched off,
+      # so `== 0` cannot fire there. Ten minutes is well past the 5s retry cadence plus any ordinary
+      # container recreate.
+      - alert: RedisFanoutUnsubscribed
+        expr: basetool_redis_fanout_subscribed == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis {{ $labels.fanout }} fan-out has not been subscribed for 10m"
+          description: "The {{ $labels.fanout }} pub/sub container on the backend is not listening, so cross-instance delivery for that channel is dead: a peer replica's change never reaches this instance. The container retries every 5s, so 10 minutes means Redis is genuinely unreachable from the backend rather than merely restarting — check the redis container and the net-redis-backend network. The backend deliberately stays up and serving while this is true (ADR-0084, ADR-0143), so nothing else will page."
 
       # (PR #1472) Concurrent-session evictions. Spring Security expires a principal's OLDEST session
       # once maximumSessions (10, SecurityConfig.MAX_CONCURRENT_SESSIONS) is exceeded, and until

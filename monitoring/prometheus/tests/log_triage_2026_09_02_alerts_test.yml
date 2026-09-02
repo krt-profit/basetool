@@ -1,0 +1,109 @@
+# promtool unit tests for the three rules added by the 2026-09-02 production log triage:
+# SessionValueDropsSustained, RedisFanoutUnsubscribed and ScWikiOrphanSweepStandingDown.
+#
+# Each of the three watches a failure that USED to be loud and is now quiet, so the thing worth
+# pinning in every case is the negative: the healthy shape must not fire.
+#   - SessionValueDropsSustained: a single stale poisoned session ticking over is not the storm.
+#   - RedisFanoutUnsubscribed: a fan-out that is subscribed, and one switched off entirely (series
+#     absent), must both stay silent.
+#   - ScWikiOrphanSweepStandingDown: reason="not_modified" is a fully-cached HEALTHY night that also
+#     stands the sweep down. If the rule matched it, it would fire on every healthy deployment —
+#     which is the whole reason the counter carries a reason tag instead of being a bare count.
+#
+# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
+#   docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.14.0 -c 'promtool test rules tests/log_triage_2026_09_02_alerts_test.yml'
+
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  # The 2026-09-02 storm: 496 drops over ~three hours, i.e. ~2.75/min, sustained. Well past the
+  # >20-per-15m threshold and held far longer than the 30m `for`.
+  - name: fires - sustained session-value drops at the storm's observed rate
+    interval: 1m
+    input_series:
+      - series: 'basetool_session_value_dropped_total{cause="InvalidTypeIdException",app="basetool-frontend"}'
+        values: "0+3x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: SessionValueDropsSustained
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Frontend is dropping unreadable session values (45 per 15m)"
+              description: "Session values in Redis cannot be deserialized and are being dropped, signing those members out. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names the attribute, the cause and the unresolved type id. typeId=absent means a FINAL-typed value (a record, a List.of/Map.of) was written into a session and can never be read back; a class name means that class was renamed or removed since the session was written; cause=IllegalArgumentException means a top-level @class no longer resolves. A decaying rate after a deploy is old sessions expiring and is expected; a flat or rising one means something is still writing it."
+
+  # One poisoned session being re-read occasionally. Real, worth a log line, not worth waking anyone.
+  - name: silent - a single stale poisoned session ticking over
+    interval: 1m
+    input_series:
+      - series: 'basetool_session_value_dropped_total{cause="InvalidTypeIdException",app="basetool-frontend"}'
+        values: "0+1x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: SessionValueDropsSustained
+        exp_alerts: []
+
+  # The fan-out retrying forever without ever subscribing: up, healthy, serving, and silently not
+  # receiving anything a peer publishes.
+  - name: fires - livesync fan-out never subscribes
+    interval: 1m
+    input_series:
+      - series: 'basetool_redis_fanout_subscribed{fanout="livesync"}'
+        values: "0x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: RedisFanoutUnsubscribed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              fanout: livesync
+            exp_annotations:
+              summary: "Redis livesync fan-out has not been subscribed for 10m"
+              description: "The livesync pub/sub container on the backend is not listening, so cross-instance delivery for that channel is dead: a peer replica's change never reaches this instance. The container retries every 5s, so 10 minutes means Redis is genuinely unreachable from the backend rather than merely restarting — check the redis container and the net-redis-backend network. The backend deliberately stays up and serving while this is true (ADR-0084, ADR-0143), so nothing else will page."
+
+  # A container recreate: unsubscribed for a couple of minutes, then the 5s retry wins. The `for: 10m`
+  # is what keeps an ordinary redeploy off the pager.
+  - name: silent - a brief unsubscribed window during a container recreate
+    interval: 1m
+    input_series:
+      - series: 'basetool_redis_fanout_subscribed{fanout="notifications"}'
+        values: "1 1 0 0 0 1 1 1 1 1 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: RedisFanoutUnsubscribed
+        exp_alerts: []
+
+  # Three incomplete census runs in 72h — the sweep has not tombstoned anything for three days while
+  # the sync kept reporting success.
+  - name: fires - three incomplete SC-Wiki runs stand the orphan sweep down
+    interval: 1h
+    input_series:
+      - series: 'basetool_catalogue_orphan_sweep_skipped_total{sweep="item",reason="incomplete"}'
+        values: "0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 3x40"
+    alert_rule_test:
+      - eval_time: 50h
+        alertname: ScWikiOrphanSweepStandingDown
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "SC-Wiki orphan sweep has stood down on three incomplete runs in 72h"
+              description: "The cross-kind scwiki_deleted sweep refused to run on at least three syncs in 72h because a kind pass came back an incomplete census. The refusal is correct — sweeping a half-walked feed would soft-delete every row that was merely never fetched — but rows the Wiki has actually dropped are not being tombstoned while the sync keeps reporting success. Grep the backend log for 'Skipping cross-kind orphan sweep (reason=incomplete' and for the census WARNs above it to see which kind endpoint failed to enumerate. reason=not_modified is a healthy fully-cached run and is deliberately not matched here."
+
+  # The case that decides whether the reason tag was worth having. A fully-cached run stands the sweep
+  # down every single night; an untagged counter would be indistinguishable from the failure above and
+  # this rule would page daily on a perfectly healthy deployment.
+  - name: silent - nightly all-304 runs stand the sweep down healthily
+    interval: 1h
+    input_series:
+      - series: 'basetool_catalogue_orphan_sweep_skipped_total{sweep="item",reason="not_modified"}'
+        values: "0+1x80"
+    alert_rule_test:
+      - eval_time: 50h
+        alertname: ScWikiOrphanSweepStandingDown
+        exp_alerts: []

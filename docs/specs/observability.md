@@ -754,8 +754,8 @@ Tracing on the OTel SDK) behind a hard master gate:
   `TempoSpansRefused` (`tempo_receiver_refused_spans`), `TempoReceiverSilent`
   (`tempo_receiver_accepted_spans` rate 0 for 1h while the counter is non-zero, so it stays quiet
   when tracing is disabled) and `TempoWritePathFailing` (live-store completion/flush failures) —
-  metric names verified against a live Tempo 3.0.2 scrape, since REQ-OBS-013 keeps sink failures out
-  of the app logs. An ungraceful container stop is a distinct trigger of this write-path failure
+  metric names verified against a live Tempo 3.0.2 scrape, since the app's own throttled
+  export-failure log (<= 1/min, see REQ-OBS-013) is not a usable outage detector. An ungraceful container stop is a distinct trigger of this write-path failure
   mode: the two dskit stores (`loki`, `tempo`) both set `stop_grace_period: 45s` so a routine
   `deploy.sh --force-recreate` cannot `SIGKILL` them mid-drain (dskit
   `server.graceful_shutdown_timeout` 30s) and truncate the write-ahead log (ADR-0072 amendment
@@ -1001,9 +1001,40 @@ transaction per pass) rather than per-scrape.
   the two firing together read as an ordinary multi-day upstream outage. The proxy is a **superset** —
   a failed fetch on a pass that feeds no sweep also counts, which is the safe direction for a warning —
   and both the alert comment and the `monitoring/README.md` runbook row say so. Panel 44 on dashboard
-  `07` plots the counter per `source`; it had no panel anywhere before. **Still open:** a dedicated
-  "sweep stood down" meter would let the alert drop the proxy, and belongs with the `reason`-tag work
-  above.
+  `07` plots the counter per `source`; it had no panel anywhere before. ~~**Still open:** a dedicated
+  "sweep stood down" meter would let the alert drop the proxy~~ — **closed 2026-09-02** by the meter
+  below.
+- `basetool_catalogue_orphan_sweep_skipped_total{sweep,reason}` counter
+  (`ScWikiItemSyncService`), bumped where the cross-kind `scwiki_deleted` sweep stands itself down.
+  The stand-down is the correct answer to a fetch that is not a full census — sweeping a half-walked
+  feed soft-deletes every row that was merely never fetched — but until this meter existed it was a
+  log line and nothing else, so a sweep that had not run for weeks and one running cleanly every
+  night were indistinguishable from outside the log. `sweep` is the bounded catalogue literal
+  (`item` today); `reason` is the bounded triple `incomplete` / `not_modified` / `no_rows`.
+  **The `reason` split is load-bearing rather than decorative**: an all-304 run is a fully-cached
+  *healthy* night that also stands the sweep down, so an untagged counter would be non-zero on every
+  healthy deployment and could carry no alert at all. Only `incomplete` means a walk could not vouch
+  for its census; `no_rows` is the total-outage shape already covered by `SyncZeroItems` /
+  `ExternalSyncStale`. Registered lazily per reason, so the series is *absent* rather than zero on a
+  healthy deployment and `ScWikiOrphanSweepStandingDown` (>= 3 in 72h, warning) cannot false-fire.
+  **Known gap, stated rather than left to be inferred:** `sweep` carries exactly one value today,
+  `item` — the cross-kind game-item sweep, the one the 2026-09-02 export showed standing down. The
+  vehicle, commodity, blueprint and manufacturer sweeps stand down through the same gates and are
+  **not** instrumented; three of them go through the static `ScWikiOrphanSweep` helper, which would
+  need a skip callback threaded in from each caller. So the new alert covers one catalogue, and
+  `ScWikiCensusIncompleteStreak`'s fetch-error proxy is still what covers the other four.
+- `basetool_redis_fanout_subscribed{fanout}` gauge (`LiveSyncRedisConfig`,
+  `NotificationRedisConfig`), 1 while the cross-instance pub/sub container is listening and 0 while
+  it is not; `fanout` is the two-valued literal `livesync` / `notifications`. Exists because the
+  failure it watches used to be loud and is now quiet: until 2026-09-02 a Redis unreachable during
+  context refresh threw out of `SmartLifecycle#start()` and aborted the refresh, so the backend
+  crash-looped and needed no metric to be noticed. `ResilientRedisMessageListenerContainer` makes
+  that survivable, and a fan-out that retries forever without ever subscribing is otherwise
+  indistinguishable from a healthy one — the backend is up, healthy and serving while a peer
+  replica's changes never arrive. Bound to `isListening()`, **not** `isRunning()`: the latter reports
+  the `started` flag, which upstream sets *before* the subscription can fail and which therefore
+  reads 1 for a container subscribed to nothing. Backs `RedisFanoutUnsubscribed` (== 0 for 10m,
+  warning).
 - `basetool_keycloak_sync_fetch_failures_total` counter (untagged, `KeycloakService.fetchUsers`) and
   `basetool_scheduled_job_step_failures_total{task,step}` counter (`ScWikiScheduler.runStep`; `step`
   = the bounded `commodity`/`vehicle`/`item`/`blueprint`/`manufacturer` literal) both cover a
@@ -1399,6 +1430,24 @@ anonymous traffic cannot accrete, and only a successful login promotes the sessi
 session store is heading for its `maxmemory noeviction` ceiling where login/token-refresh writes
 fail.
 
+A third frontend meter was added by the 2026-09-02 production log triage:
+
+- `basetool_session_value_dropped_total{cause}` — counter bumped by
+  `FaultTolerantSessionSerializer` every time a session value in Redis cannot be deserialized and is
+  dropped. It exists because the fix for the 2026-09-02 outage made the fault *survivable* and
+  therefore *invisible*: the three hours after that fix deployed carry 496 identical WARN lines and
+  no number anywhere. A dropped value is not written back, so a poisoned session keeps re-dropping on
+  every single request for up to its 720-hour window — the counter is what shows both the volume and,
+  after a deploy that stops a poison being written, whether the residue is actually draining as those
+  sessions expire. A *flat* rate means something is still writing one. `cause` is the caught
+  failure's root-cause simple class name mapped through a fixed allow-list with everything else
+  folded into `other`; it is never the unresolved type id, which is parsed out of the corrupted
+  payload, is unbounded, and — measured — can be the member's own data rather than a class name at
+  all (REQ-OBS-004, REQ-OBS-006). Backs `SessionValueDropsSustained` (> 20 per 15m held 30m,
+  warning). The actionable detail lives in the paired WARN from `SessionAttributeDiagnosticMapper`,
+  which names the **attribute**, the cause, the unresolved type id and the base type — class names
+  and fixed tokens only, never the value, never a session id, never the exception message.
+
 Two frontend meters were added by the 2026-08 logging audit:
 
 - `basetool_session_evicted_total` — unlabelled counter, bumped by `SessionEvictionLoggingStrategy`
@@ -1669,25 +1718,51 @@ off the probe jobs removes only the false page, not any real signal. (2026-07-12
 
 ### REQ-OBS-013 — Telemetry-sink failures are not application errors
 
-A failure to reach the observability plane must never look like an application fault. In
-particular, the OpenTelemetry OTLP span exporter logs a failed export batch (Alloy/Tempo unreachable
-or slow) at ERROR by default; that noise flows into `logback_events_total{level="error"}` and can
-trip the `LogbackErrorSpike` alert on a monitoring-plane outage that has nothing to do with the
-application. All three modules therefore pin the `io.opentelemetry.exporter` logger to WARN, so a
-telemetry-sink outage stays visible (a WARN breadcrumb) without inflating the app error-rate signal.
-Detection of a genuine tracing outage is owned by the `up{job=~"alloy|tempo"}` targets and the
-dead-man's switch, not by the app's own error log.
+A failure to reach the observability plane must never look like an application fault. Detection of
+a genuine tracing outage is owned by the `up` targets for the `alloy` and `tempo` scrape jobs and by
+the dead-man's switch, **not** by the application's own error log.
+
+> [!warning] Corrected 2026-09-02 — the WARN pin never demoted anything
+> Until this date this requirement asserted that pinning `io.opentelemetry.exporter` to WARN made
+> the exporter "keep logging OTLP export failures at WARN (not ERROR)", and its acceptance box was
+> written as if that were verifiable. **It is not, and never was.** A logback level is a
+> *threshold*, not a rewrite: the exporter logs a transport failure at JUL `SEVERE`
+> (`HttpExporter.onError`), `jul-to-slf4j` delivers it as ERROR, and ERROR clears a WARN threshold
+> untouched. The proof is a production line — `2026-09-02T07:24:04Z ERROR
+> io.opentelemetry.exporter.internal.http.HttpExporter: Failed to export spans` — which is an ERROR
+> from the very logger the pin covers. The requirement was corrected against reality rather than the
+> code being changed to match it, because the behaviour turns out to be acceptable on its own terms
+> (below).
+
+**Why the ERROR is tolerable.** The OTel SDK wraps this logger in a `ThrottlingLogger` that caps the
+source at five messages per minute and then permanently at one per minute. An OTLP outage of *any*
+duration therefore contributes at most ~0.083 errors/second, against `LogbackErrorSpike`'s
+`> 0.2 for 10m` — it cannot trip that alert on its own, whatever else is true. And an unreachable
+Alloy pages through `TargetDown` (critical, 3m) plus `AlloyConfigReloadFailed` /
+`AlloyComponentUnhealthy`, entirely independently of any application log line.
+
+**The pin stays**, and is not dead configuration: its real, residual effect is suppressing the
+exporter's INFO chatter. It is deliberately not `OFF`, which *would* satisfy the original wording
+literally — Micrometer's `MetricsTurboFilter` gates on the effective level, so `OFF` stops both the
+line and the counter — at the cost of the only local breadcrumb for "why is this window's trace
+missing".
 
 **Acceptance**
 
-- [ ] With Alloy/Tempo unreachable, backend/frontend/ingest keep logging OTLP export failures at
-  WARN (not ERROR), so `logback_events_total{level="error"}` does not rise and `LogbackErrorSpike`
-  does not fire on the export failures alone.
+- [ ] `io.opentelemetry.exporter` resolves to an effective level of WARN in all three modules:
+  INFO is suppressed, ERROR is **not** (this is the corrected, checkable form of the old claim).
 - [ ] A real application error still logs at ERROR and still counts toward `LogbackErrorSpike`.
+- [ ] An OTLP sink outage alone cannot trip `LogbackErrorSpike`: the SDK's `ThrottlingLogger` bounds
+  the source at <= 1/min, two orders below the rule's `> 0.2/s`.
+- [ ] An unreachable Alloy/Tempo is detected by `TargetDown` on those scrape jobs, not by the app's
+  log level.
 
 **Enforced by:** `{backend,frontend,ingest}/src/main/resources/application.yml`
-(`logging.level."io.opentelemetry.exporter": WARN`) · `monitoring/prometheus/alerts/apps.yml`
-(`LogbackErrorSpike`)
+(`logging.level."io.opentelemetry.exporter": WARN`) ·
+`backend/src/test/java/.../logging/OtelExporterLogLevelTest.java` ·
+`monitoring/prometheus/alerts/apps.yml` (`LogbackErrorSpike`) ·
+`monitoring/prometheus/alerts/infrastructure.yml` (`TargetDown`) ·
+`monitoring/prometheus/alerts/meta.yml`
 
 ### REQ-OBS-014 — Monitoring-plane self-observation & pipeline liveness
 
