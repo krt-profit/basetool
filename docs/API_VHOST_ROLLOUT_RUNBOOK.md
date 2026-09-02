@@ -430,6 +430,12 @@ if ($uri = "/api/v1/refinery-orders/my-orders") { set $krt_api_allowed 1; }
 # below are mandatory fields of that form: without them the member has nothing to choose from.
 if ($uri = "/api/v1/refinery-orders") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/locations/refineries") { set $krt_api_allowed 1; }
+# Read-only since 2026-09-02, and this one is load-bearing. `POST /api/v1/refining-methods` carries
+# a bare `hasRole('ADMIN')` and was the ONLY allow-listed path that did. That cost nothing while the
+# mobile client's token could not be ADMIN; the REQ-SEC-035 reversal made it an internet-reachable
+# admin write, so `refining-methods` joined the read-only family above. The app only ever GETs it
+# (the refinery form's method picker), and the web admin does not come through this vhost at all -
+# the frontend calls the backend over the docker network - so nothing loses a capability.
 if ($uri = "/api/v1/refining-methods") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/refinery-orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/refinery-orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/store$") { set $krt_api_allowed 1; }
@@ -556,7 +562,7 @@ if ($krt_api_allowed = 0) { return 404; }
 # the harder half: this guard is verb-blind by design, so opening one write means naming it
 # explicitly rather than widening the family.
 set $krt_readonly_family "";
-if ($uri ~ "^/api/v1/(missions|operations|notifications|announcement|hangar|inventory|orders|org-units|uex|blueprints|ship-types|locations|materials|users)") { set $krt_readonly_family "R"; }
+if ($uri ~ "^/api/v1/(missions|operations|notifications|announcement|hangar|inventory|orders|org-units|uex|blueprints|ship-types|locations|materials|users|refining-methods)") { set $krt_readonly_family "R"; }
 if ($request_method !~ "^(GET|HEAD)$") { set $krt_readonly_family "${krt_readonly_family}W"; }
 # Named exceptions: the writes phase 3 opens INSIDE a read-only family. Each one clears the verdict
 # before it is judged, which is the only shape nginx allows - it cannot nest `if`, so an exception

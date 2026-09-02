@@ -4,7 +4,19 @@
 
 ### Fixed
 
-- **Ein Admin durfte in der App nichts, was er im Webtool darf.** Lagereinträge zuordnen, fremde Zeilen umbuchen, Aufträge bearbeiten, Auszahlungen bestätigen — alles war ausgegraut, obwohl der Server es erlaubt hätte; und im Org-Einheiten-Umschalter stand nur „Alle Org-Einheiten". Betraf ebenso Offiziere. Ursache: `isLogistician` und `isMissionManager` in `/users/me` sagen aus, ob eine **Staffel-Mitgliedschaft** dieses Häkchen trägt, und ein Admin hat per Design keine. Die API sagt einem Client seine Berechtigung jetzt selbst — über drei hierarchie-aufgelöste Flags in `/api/v1/me/capabilities` und ein `canEdit` pro Zeile auf Lager- und Auftragsdaten.
+- **Als Admin sahst du in der App nur deine eigenen Einheiten statt aller.** Der mobile Keycloak-Client trug die Rolle `Admin` bewusst nicht — damit warst du in der App faktisch ein Mitglied ohne Mitgliedschaften: keine Einheit zum Umschalten, und „Alle Org-Einheiten“ lieferte deine eigene (leere) Reichweite statt wirklich allem. Der Client trägt `Admin` jetzt. Dazu drei Folgefehler behoben: die App pinnte beim Kaltstart selbst die erste Einheit des Katalogs (und schloss dich damit von herrenlosen Zeilen aus), der Umschalter konnte nicht scrollen, sodass „Alle Org-Einheiten“ ab acht Einheiten unerreichbar war, und der Eintrag stand ganz unten statt oben. Die Admin-Seiten bleiben weiterhin nur im Webtool.
+
+- **„Alle Org-Einheiten“ versprach Mitgliedern mehr, als es lieferte.** Ohne Pin sieht ein Admin wirklich alles, jeder andere die Vereinigung seiner eigenen Einheiten — beschriftet war beides gleich. Heißt für Nicht-Admins jetzt „Alle meine Org-Einheiten“, in App und Webtool. Der Web-Umschalter hieß außerdem „Aktiver Bereich“, was mit der Einheiten-Art „Bereich“ kollidierte; er heißt jetzt „Aktive Org-Einheit“.
+
+- **Wer nur einem Bereich oder der Organisationsleitung angehörte, hatte einen leeren Org-Einheiten-Umschalter.** Die Auswahl bot nur Staffeln und Spezialkommandos an, obwohl ein Bereich und die OL selbst Daten besitzen können und der Server einen entsprechenden Kontext akzeptiert hätte. Umschalter und `GET /api/v1/me/org-units` bieten jetzt alle vier Arten an — für Mitglieder die eigenen Einheiten samt der über einen Leitungssitz erreichbaren, für Admins alle aktiven.
+
+- **Ein Admin durfte in der App nichts, was er im Webtool darf.** Lagereinträge zuordnen, fremde Zeilen umbuchen, Aufträge bearbeiten, Auszahlungen bestätigen — alles war ausgegraut, obwohl der Server es erlaubt hätte. Betraf ebenso Offiziere. Ursache: `isLogistician` und `isMissionManager` in `/users/me` sagen aus, ob eine **Staffel-Mitgliedschaft** dieses Häkchen trägt, und ein Admin hat per Design keine. Die API sagt einem Client seine Berechtigung jetzt selbst — über drei hierarchie-aufgelöste Flags in `/api/v1/me/capabilities` und ein `canEdit` pro Zeile auf Lager- und Auftragsdaten.
+
+### Security
+
+- **Eingebettetes Tomcat auf 11.0.25 angehoben.** Das Update schließt zehn Schwachstellen der bisher ausgelieferten 11.0.24, vier davon kritisch: eine Sicherheitsbeschränkung ließ sich umgehen, wenn eine Regel für einen längeren Pfad vor der strengeren Regel eines Unterpfads steht; eine DIGEST-Anmeldung war einmalig wiederholbar; eine FORM-Anmeldung hebelte eine auf POST beschränkte Regel aus; und eine Eingabeprüfung war zuvor nur unvollständig korrigiert worden. Betrifft Backend, Webtool und Ingest gleichermaßen — keine Funktions- oder Konfigurationsänderung.
+
+## [v1.6.13](https://github.com/krt-profit/basetool/releases/tag/v1.6.13) - 2026-09-02
 
 ### Security
 
@@ -12,7 +24,7 @@
 
 ### Added
 
-- **`GET /api/v1/me/org-units`** beantwortet, welche Org-Einheiten ein Aufrufer als Kontext wählen darf: für Admins alle aktiven Staffeln und Spezialkommandos, sonst die eigenen Mitgliedschaften. Das Webtool hatte diese Fallunterscheidung selbst gebaut, die App nicht — jetzt steht sie einmal auf dem Server. Nebeneffekt: aus bis zu vier Abrufen pro Seitenaufbau wird einer.
+- **`GET /api/v1/me/org-units`** beantwortet, welche Org-Einheiten ein Aufrufer als Kontext wählen darf: für Admins alle aktiven Einheiten, sonst die eigenen Mitgliedschaften plus die über einen Bereichs- oder OL-Sitz erreichbaren. Das Webtool hatte diese Fallunterscheidung selbst gebaut, die App nicht — jetzt steht sie einmal auf dem Server. Nebeneffekt: aus bis zu vier Abrufen pro Seitenaufbau wird einer.
 
 - **Die Auftragsauswahl beim Einbuchen und im „+ Zuordnen“-Menü zeigt, was jeder Auftrag noch braucht.** Die offene Restmenge steht direkt an der Option („#1042 · noch 250,000 SCU“), Fertigungsaufträge eingeschlossen, und aktualisiert sich live, wenn jemand anderes auf einen dieser Aufträge bucht. Liegt die eingegebene Qualität unter dem Mindestwert des Auftrags, steht das dabei — die Zuordnung ist erlaubt, senkt dessen Bedarf aber nicht.
 
@@ -21,6 +33,10 @@
 ### Changed
 
 - **Keycloak auf 26.7.3 angehoben (großes Sicherheitsupdate).** Das Patch-Release schließt 20 Schwachstellen im Anmeldedienst — darunter das Umbiegen eines Anmeldecodes auf eine fremde Client-Sitzung, eine unvollständig behobene Redirect-Injection, die bisher nur den Query-Teil und nicht den Fragment-Teil der Rücksprungadresse prüfte, und ein weiterhin mögliches Ausspionieren des Dateisystems über relative Pfade. Dazu kommen Korrekturen an einer CPU-Regression seit 26.7.1. Keine Funktions- oder Konfigurationsänderung: Das gepinnte Container-Image (`quay.io/keycloak/keycloak:26.7`-Digest, weiterhin JDK 21) und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit; Anmeldung, Discord-Kontoverknüpfung und die App-Anmeldung laufen unverändert weiter. **Deploy-Hinweis:** Eine geänderte Keycloak-Image-Pinnung ist operator-gated — der Deploy wendet sie nicht selbständig an, sondern muss einmal mit `deploy.sh --force` durchgesetzt werden; der Keycloak-Container startet dabei neu.
+
+### Fixed
+
+- **Ein Admin durfte in der App nichts, was er im Webtool darf.** Lagereinträge zuordnen, fremde Zeilen umbuchen, Aufträge bearbeiten, Auszahlungen bestätigen — alles war ausgegraut, obwohl der Server es erlaubt hätte; und im Org-Einheiten-Umschalter stand nur „Alle Org-Einheiten". Betraf ebenso Offiziere. Ursache: `isLogistician` und `isMissionManager` in `/users/me` sagen aus, ob eine **Staffel-Mitgliedschaft** dieses Häkchen trägt, und ein Admin hat per Design keine. Die API sagt einem Client seine Berechtigung jetzt selbst — über drei hierarchie-aufgelöste Flags in `/api/v1/me/capabilities` und ein `canEdit` pro Zeile auf Lager- und Auftragsdaten.
 
 ## [v1.6.12](https://github.com/krt-profit/basetool/releases/tag/v1.6.12) - 2026-08-30
 

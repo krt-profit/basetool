@@ -1738,13 +1738,43 @@ from the original registration.
 `ApprovalDecision#REOPENED`, `AdminDiscordRegistrationsPageController`, `discord-registrations.js`,
 `V233__allow_reopened_user_approval_decision.sql` · **Decision:** ADR-0140
 
-### REQ-SEC-035 — The mobile client's scope MUST carry the member realm roles, and MUST NOT carry `Admin`
+### REQ-SEC-035 — The mobile client's scope MUST carry the member realm roles, `Admin` included
 
 The Keycloak client `basetool-android` runs with `fullScopeAllowed: false`, so the realm roles its
 tokens carry are exactly the ones mapped onto its client scope. That list MUST be
-`KRT Member`, `Officer`, `Bank Employee`, `Bank Management`, and it MUST NOT contain `Admin`.
+`KRT Member`, `Officer`, `Bank Employee`, `Bank Management`, `Admin` — and the provisioning script
+MUST converge the scope to exactly that list, taking back anything else.
 
-Neither half is a matter of taste.
+> [!warning] Reversed 2026-09-02 — this requirement used to forbid `Admin`, and the ban was wrong
+> The original text read *"and it MUST NOT contain `Admin`"*. The repository owner reversed it after
+> using the app as an administrator. The reversal is written here beside the original reasoning
+> rather than replacing it: the ban was a deliberate decision, and a reader deserves to see both why
+> it was made and why it did not survive contact with the person it applied to.
+>
+> **What the ban actually did.** An administrator holds no Staffel membership by design. With
+> `Admin` stripped from the token the app offered them no org unit to pin, no way to widen a list,
+> and — the part that matters — „Alle Org-Einheiten" resolved to *their own empty reach* rather than
+> to everything, because `RequestScopeResolver#currentScopePredicate` grants `adminAllScope` only to
+> a caller the token says is an admin. Measured on the test stack 2026-09-01: the same account read
+> **784.8 SCU** of Lager through the app's scope and **1403.4 SCU** with `Admin` present.
+>
+> **What the ban bought, stated exactly.** Not containment of an administrator's rights on the
+> device: the same unlocked phone holds a 720-hour web session (`app.session.authenticated-timeout`)
+> carrying the full role set, against a UI genuinely built for admin work. What it bought is that a
+> **stolen access token, replayed from another machine inside its 300-second lifetime**, was
+> member-scoped rather than admin-scoped. That is the whole of what is given up, and it is real —
+> the access token is a plain Bearer with no `cnf`, because ADR-0131 binds the *refresh* token only.
+>
+> **Where the original reasoning was wrong.** It said the app "has no screen designed around" admin
+> scope. Two of the three surfaces it meant already existed: the switcher's „Alle Org-Einheiten" row
+> *is* the unpinned all-scope state, and the bank staff surface is gated on `bankEmployee`, which
+> the mobile scope already carried — so an admin holding a bank role already reached it, and the app
+> reads `bankManagement` on no screen at all. What was genuinely missing was smaller, and is fixed
+> in the same unit of work: the app auto-pinned the first unit of the catalogue on a cold start
+> (`OrgUnitViewModel`), and the switcher sheet could not scroll, which put „Alle Org-Einheiten" out
+> of reach once the list held every unit.
+
+Both halves of the list are load-bearing, and neither is a matter of taste.
 
 **Why the member roles must be there.** The backend does not read the token's roles for
 authorization directly: `UserReconciliationService#syncUser` **replaces** the account's local role
@@ -1755,19 +1785,45 @@ do — it rewrites the member's row in the database, for the web app too. Measur
 before this requirement existed: an account holding `Admin` + `Officer` + `KRT Member` was left
 holding `Guest` alone after one app login.
 
-**Why `Admin` must not be.** The admin area is permanently web-only, but `ADMIN` is not just a menu.
+**Why `Admin` must be there.** For the same reason as the rest, one tier up. `ADMIN` is not a menu —
+the admin area stays permanently web-only and no app screen renders it — it is a **scope rule**.
 `RequestScopeResolver#currentScopePredicate` grants an admin without an active-org-unit header
-`adminAllScope` — every org unit at once — and honours an admin's pin to a unit they do not belong
-to. The app has no screen designed around either. Withholding the role keeps that scope rule out of
-a client that cannot express it.
+`adminAllScope`, every org unit at once, and honours an admin's pin to a unit they do not belong to.
+Withholding the role did not keep that rule out of a client that could not express it. It took the
+rule away from the one member whose work needs it, on the one client they carry: an administrator
+using the app was, in effect, a member with no memberships.
 
-**The residual this left, and where it went.** Withholding a role only narrows the app if the
-narrowing is not written down. Because `syncUser` replaced the stored set wholesale, an
-administrator who opened the app had `Admin` removed from their row until their next web request put
-it back — the same mechanism as the `Guest` demotion above, just smaller. That is closed by
-[REQ-SEC-036](#req-sec-036--a-clients-role-claim-is-authoritative-only-if-its-scope-is-complete):
-the app's claim no longer writes to the database at all, and the request is authorised from the
-token instead of from the row.
+> [!note] The admin area staying web-only is unaffected
+> That is a product decision about which screens exist (app owner, 2026-08-17), and nothing here
+> builds one. The role changes what the *existing* screens are scoped to, not which screens there
+> are.
+
+**What this now depends on, and it is not in this repository.** With `Admin` in the token, the 105
+`@PreAuthorize(HAS_ROLE_ADMIN)` sites and the eight admin URL matchers in `SecurityConfig` are
+satisfied by an app-issued token. The app calls none of those paths, but a token is not a client —
+the remaining boundary is the **default-deny vhost allow-list** of
+[REQ-SEC-037](#req-sec-037--the-api-vhost-denies-by-default), which lives in the edge proxy's
+database and therefore cannot be gated by any test in any repository here. Two consequences, both
+load-bearing:
+
+- `POST /api/v1/refining-methods` was the one allow-listed path carrying a bare `hasRole('ADMIN')`
+  write. `refining-methods` is therefore added to the read-only family in
+  [`API_VHOST_ROLLOUT_RUNBOOK.md`](../API_VHOST_ROLLOUT_RUNBOOK.md). Nothing loses a capability: the
+  app only reads it (the refinery form's method picker) and the web admin does not traverse this
+  vhost at all. **The runbook is the version-controlled copy of host state — this change is not live
+  until the vhost config is applied on the host.**
+- The allow-list is now load-bearing for what this requirement itself used to guarantee. Anyone
+  widening it is widening what a stolen mobile token can reach.
+
+**The scope stays partial, and the client stays on the partial-role-scope list.** Adding `Admin`
+covers every realm role that is actually assigned to people, but the realm also holds `Guest`,
+`Logistician` and `Mission Manager` — so `basetool-android` remains a partial-scope client and
+remains named in `app.security.partial-role-scope.client-ids`. That keeps
+[REQ-SEC-036](#req-sec-036--a-clients-role-claim-is-authoritative-only-if-its-scope-is-complete)'s
+two properties in force, and the second of them is what makes this requirement work at all: the
+app's claim never rewrites the stored role set, and the request is **authorised from the token**.
+Were the client taken off that list, authorisation would move back to the database row and the
+whole scope mapping would stop deciding anything.
 
 **What the scope list does not decide.** Which realm roles ride on a client's scope decides what the
 app *may* do; it does not decide whether the record of what was done can name the client. Those are
@@ -1781,22 +1837,30 @@ not one that also silently changes what a post-incident review can reconstruct.
 
 **Acceptance**
 
-- [x] The provisioning script grants the four member roles and takes back anything else on the
-  client scope, converging in both directions, so a role added by hand in the Admin Console does not
-  survive the next run.
-- [x] `--verify-only` fails when a member role is missing and when `Admin` is present, and each
-  message names the consequence rather than the symptom.
+- [x] The provisioning script grants exactly `MEMBER_REALM_ROLES` and takes back anything else on
+  the client scope, converging in both directions, so a role added by hand in the Admin Console does
+  not survive the next run.
+- [x] `--verify-only` fails when a listed role is missing **and** when a role the list does not name
+  is present, and each message names the consequence rather than the symptom.
 - [x] Keycloak's own scope evaluation for the client returns `['KRT Member']` for a plain member and
-  `['KRT Member', 'Officer']` for an account that also holds `Admin` (measured against the test
-  stack's `iri` realm, Keycloak 26.7, 2026-08-21).
+  `['Admin', 'Bank Employee', 'KRT Member', 'Officer']` for an administrator (measured against the
+  test stack's `iri` realm 2026-09-02, after applying the provisioning script). The pre-reversal
+  measurement (`['KRT Member', 'Officer']` for the same admin account, Keycloak 26.7, 2026-08-21) is
+  exactly the behaviour that changed and is kept as the before-picture. **The member's token did not
+  widen** — that is the non-regression this pair is measured for.
 - [x] The realm is checked for the role names before granting: a rename upstream fails the run
   loudly instead of silently leaving the scope empty.
+- [x] Walked on a device with an administrator's account (2026-09-02, `Pixel_10a` against the test
+  stack): the switcher offers all eight org units of all four kinds, ordered OL → Bereich → Staffel
+  → SK with „Alle Org-Einheiten" as the first row; a cold start lands on it rather than on a pinned
+  unit; and the Lager under it reads **1403.4 SCU** (102.93 + 700 + 180 + 420.5), the org-wide
+  total, against the 784.8 the same screen shows a member of one Staffel.
 
 **Enforced by:** `provision-keycloak-mobile-client.test.sh` section 7 · **Code:**
-`scripts/provision-keycloak-mobile-client.py` (`MEMBER_REALM_ROLES`, `FORBIDDEN_REALM_ROLE`,
+`scripts/provision-keycloak-mobile-client.py` (`MEMBER_REALM_ROLES`, `FORBIDDEN_REALM_ROLES`,
 `upsert_realm_role_scope`), `UserReconciliationService#syncUser`,
-`CustomJwtGrantedAuthoritiesConverter` · **Decision:**
-[ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md)
+`CustomJwtGrantedAuthoritiesConverter`, `OrgUnitViewModel` (app) · **Decision:**
+[ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md), and the 2026-09-02 reversal above
 
 ### REQ-SEC-036 — A client's role claim is authoritative only if its scope is complete
 
@@ -1806,8 +1870,8 @@ That is correct only while every client's token carries the member's whole role 
 being correct the moment one client was deliberately given less.
 
 A client whose Keycloak scope is narrowed — `fullScopeAllowed: false` plus a partial scope mapping,
-which is exactly the mobile client under REQ-SEC-035 — mints a token describing a **smaller member
-than the real one**. Persisting that description lets whichever client a member happened to use last
+which the mobile client of REQ-SEC-035 still is (its scope names five of the realm's eight roles) —
+mints a token describing a **smaller member than the real one**. Persisting that description lets whichever client a member happened to use last
 decide what the database says they are.
 
 **The rule.** A token from a configured *partial-scope client* MUST NOT write the account's role set.
@@ -1817,9 +1881,13 @@ rather than from the row.
 Both halves are load-bearing and each is a defect without the other:
 
 - Persisting the partial claim is the data loss this requirement exists to stop.
-- Authorising from the row instead of the token would be **worse than the original defect**: the row
-  keeps `Admin` precisely because the app path no longer overwrites it, so reading roles back off it
-  would hand the app the authority REQ-SEC-035 withholds — silently, and only for administrators.
+- Authorising from the row instead of the token would be **worse than the original defect**, and
+  the 2026-09-02 reversal of REQ-SEC-035 did not soften that — it inverted which way the damage
+  runs. While `Admin` was withheld, reading roles off the row would have handed the app an authority
+  its token deliberately lacked. Now that the scope carries `Admin`, reading off the row is what
+  would make the scope mapping stop deciding anything at all: `Logistician`, `Mission Manager` and
+  `Guest` are still absent from it, so the row and the token still describe different members, and
+  the token is the one the client was actually issued.
 
 **Matched on `azp`**, a claim inside a Keycloak-signed token that a client cannot set — the same
 handle `IngestGatewayProperties` already uses for the far more dangerous on-behalf-of decision, so
@@ -2442,26 +2510,71 @@ layer directly.
 
 ### REQ-SEC-048 — One endpoint answers which org units a caller may pin
 
-`GET /api/v1/me/org-units` returns the active Staffeln and Spezialkommandos an **admin** may pin,
-and the caller's own memberships for **everyone else**.
+`GET /api/v1/me/org-units` returns every active org unit an **admin** may pin, and for **everyone
+else** the units they belong to plus the ones a Bereich or OL seat reaches (`OrgUnitCascadeService`,
+REQ-ORG-015 — a materialised id set, never an admin-all marker). All four kinds in both branches,
+ordered top-down: OL → Bereich → Staffel → SK, then by name.
 
-**Because the branch was duplicated and one copy was missing.** The web frontend's
-`OrgUnitContextAdvice` had it (`isAdmin()` → the catalogue, else the memberships); the Android
-client read `/users/me/memberships` for everybody. An admin — holding no membership — was therefore
-offered nothing but „Alle Org-Einheiten" and could not narrow the app to a single unit at all. A
-rule that two clients must each know is a rule one of them will get wrong.
+**Because the branch was duplicated.** The web frontend's `OrgUnitContextAdvice` had it
+(`isAdmin()` → the catalogue, else the memberships); the Android client read
+`/users/me/memberships` for everybody. A rule that two clients must each know is a rule one of them
+will get wrong, and the endpoint removes the duplication — for the web it also collapses up to four
+round-trips into one.
 
-Staffel and SK only, matching what the switcher offers; the Bereich and Organisationsleitung tiers
-belong to `GET /api/v1/org-units/active-all-kinds` and a different consumer.
+> **Correction, 2026-09-01, itself superseded 2026-09-02.** An earlier revision claimed the missing
+> branch was *why* an admin using the Android app saw nothing but „Alle Org-Einheiten". That was
+> wrong, and the 2026-09-01 correction said so: REQ-SEC-035 withheld `Admin` from the mobile
+> client's scope on purpose, so an app caller was never an admin to this endpoint and the admin
+> branch could not fire there. Measured on a device: an account holding `Admin` reached the backend
+> as `KRT Member` alone, exactly as REQ-SEC-036 prescribes for a partial-scope client.
+>
+> **That reading was accurate and the design behind it did not survive.** The owner reversed
+> REQ-SEC-035 on 2026-09-02 and the mobile scope now carries `Admin`, so the admin branch fires for
+> an app caller too and this endpoint's two branches finally mean the same thing on both clients —
+> which is what it was written for. The 2026-09-01 text is kept because it is the reason the
+> reversal was needed: the symptom was never this endpoint's defect, and fixing it here would have
+> been fixing the wrong thing.
+>
+> **Correction, 2026-09-01.** This requirement first said "Staffel and SK only, matching what the
+>
+>> switcher offers". **That was wrong**, and it hid a second empty switcher behind the first. A
+>> member may hold a seat on a Bereich or on the Organisationsleitung *and on nothing else*
+>> (`V165` forbids an OL member a Staffel row at all), and those units own aggregates in their own
+>> right — `OrgUnitStampingService` applies no kind filter, REQ-ORG-016. Listing only Staffeln and
+>> SKs therefore left exactly those members with a switcher that had nothing in it but „Alle
+>> Org-Einheiten", while the scope predicate would have honoured a pin to any of them
+>> (`RequestScopeResolver#currentScopePredicate` accepts a pin inside the caller's expanded reach).
+>> The web's own `orgunit-select.html` had grouped all four kinds since epic #692 Phase 5; the
+>> restriction lived only in the backend.
+
+The membership branch is the epic #692 Phase 5 drill-down reach
+(`OrgUnitMembershipQueryService#listPickerOptionsWithDescendants`) rather than the direct-membership
+list (`#listOptionsForUser`), which is what makes a leadership seat resolve to the units below it.
+The admin branch is `#listAllPinnableOptions`, kept separate from `#listAllActiveOptions` because
+that one is also the public Job-Order form's requesting/responsible-unit picker and must stay
+Staffel/SK-only — only those process orders.
+
+**An admin must reach at least as far as an OL member.** The OL cascade names every org unit, so an
+admin branch restricted to two kinds would have been the narrower of the two — an inversion of the
+hierarchy that no gate would have caught, because both answers are individually plausible.
 
 **Acceptance**
 
-- [x] An admin gets the active catalogue and never the membership list (`MeControllerTest`).
-- [x] A non-admin gets their memberships and never the catalogue.
+- [x] An admin gets every active org unit of all four kinds and never the membership list
+  (`MeControllerTest`, `OrgUnitMembershipQueryServiceTest#listAllPinnableOptions_…`).
+- [x] A non-admin gets their reach and never the catalogue — and specifically the drill-down reach,
+  not the direct-membership list (`MeControllerTest`).
+- [x] A member whose only seat is a plain `MEMBER` row on a Bereich is offered that Bereich
+  (`OrgUnitMembershipQueryServiceTest#listPickerOptionsWithDescendants_plainBereichMember_…`);
+  verified against the test stack 2026-09-01.
+- [x] An OL seat is offered every unit the cascade names, top-down
+  (`…_olSeat_reachesEveryUnitTheCascadeNames`).
 - [ ] Both clients read this endpoint rather than branching themselves: outstanding.
 
-**Enforced by:** `MeControllerTest` · **Code:** `MeController#getPinnableOrgUnits` ·
-**Related:** REQ-SEC-047, REQ-ORG-017
+**Enforced by:** `MeControllerTest`, `OrgUnitMembershipQueryServiceTest` · **Code:**
+`MeController#getPinnableOrgUnits`, `OrgUnitMembershipQueryService#listAllPinnableOptions` /
+`#listPickerOptionsWithDescendants` · **Related:** REQ-SEC-047, REQ-ORG-015, REQ-ORG-016,
+REQ-ORG-017
 
 ## Out of scope
 

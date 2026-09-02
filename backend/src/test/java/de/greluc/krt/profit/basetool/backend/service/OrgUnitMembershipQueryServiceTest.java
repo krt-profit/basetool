@@ -402,11 +402,109 @@ class OrgUnitMembershipQueryServiceTest {
   }
 
   @Test
+  void listPickerOptionsWithDescendants_plainBereichMember_stillGetsTheirBereich() {
+    // The owner's case: a member may belong to a Bereich and to nothing else. A plain MEMBER seat
+    // is not an area rank, so nothing cascades and the reach is the Bereich alone — which is a
+    // real option, because a Bereich owns aggregates in its own right (REQ-ORG-016). While the
+    // switcher listed Staffeln and SKs only, this member was offered nothing at all.
+    UUID bereichId = UUID.randomUUID();
+    OrgUnitMembership seat = new OrgUnitMembership();
+    seat.setId(new OrgUnitMembershipId(userId, bereichId));
+    seat.setKind(OrgUnitKind.BEREICH);
+    seat.setRole(MembershipRole.MEMBER);
+    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(seat));
+    when(orgUnitCascadeService.expandWithDescendants(any()))
+        .thenReturn(new java.util.LinkedHashSet<>(List.of(bereichId)));
+    Bereich bereich = new Bereich();
+    bereich.setId(bereichId);
+    bereich.setName("Profit");
+    bereich.setShorthand("PRF");
+    when(orgUnitRepository.findAllById(any())).thenReturn(List.of(bereich));
+
+    List<OrgUnitMembershipOptionDto> options =
+        queryService.listPickerOptionsWithDescendants(userId);
+
+    assertEquals(1, options.size());
+    assertEquals(bereichId, options.getFirst().orgUnitId());
+    assertEquals(OrgUnitKind.BEREICH, options.getFirst().kind());
+  }
+
+  @Test
+  void listPickerOptionsWithDescendants_olSeat_reachesEveryUnitTheCascadeNames() {
+    // An OL member holds one row, on the Organisationsleitung, and V165 forbids them a Staffel row
+    // — so the belonging-based list is not merely short for them, it is empty, and the switcher
+    // disappeared entirely. The reach itself is the cascade's answer (a materialised id set, never
+    // an admin-all marker — REQ-ORG-015); this pins that the picker renders all of it.
+    UUID olId = UUID.randomUUID();
+    UUID staffelId = UUID.randomUUID();
+    UUID skId = UUID.randomUUID();
+    OrgUnitMembership seat = new OrgUnitMembership();
+    seat.setId(new OrgUnitMembershipId(userId, olId));
+    seat.setKind(OrgUnitKind.ORGANISATIONSLEITUNG);
+    seat.setRole(MembershipRole.OL_MEMBER);
+    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(seat));
+    when(orgUnitCascadeService.expandWithDescendants(any()))
+        .thenReturn(new java.util.LinkedHashSet<>(List.of(olId, staffelId, skId)));
+    Organisationsleitung ol = new Organisationsleitung();
+    ol.setId(olId);
+    ol.setName("Organisationsleitung");
+    ol.setShorthand("OL");
+    Squadron staffel = new Squadron();
+    staffel.setId(staffelId);
+    staffel.setName("IRIDIUM");
+    staffel.setShorthand("IRI");
+    SpecialCommand sk = new SpecialCommand();
+    sk.setId(skId);
+    sk.setName("SK ROTFUCHS");
+    sk.setShorthand("SKR");
+    when(orgUnitRepository.findAllById(any())).thenReturn(List.of(sk, staffel, ol));
+
+    List<OrgUnitMembershipOptionDto> options =
+        queryService.listPickerOptionsWithDescendants(userId);
+
+    assertEquals(3, options.size());
+    assertEquals(OrgUnitKind.ORGANISATIONSLEITUNG, options.get(0).kind());
+    assertEquals(OrgUnitKind.SQUADRON, options.get(1).kind());
+    assertEquals(OrgUnitKind.SPECIAL_COMMAND, options.get(2).kind());
+  }
+
+  @Test
   void listPickerOptionsWithDescendants_noMemberships_returnsEmptyWithoutCascade() {
     when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of());
 
     assertTrue(queryService.listPickerOptionsWithDescendants(userId).isEmpty());
     verify(orgUnitCascadeService, never()).expandWithDescendants(any());
+  }
+
+  @Test
+  void listAllPinnableOptions_coversAllFourKindsTopDown() {
+    // An admin must reach at least as far as an OL member, whose cascade names every unit. The
+    // Job-Order form's own list stays Staffel/SK-only, which is why this is a separate method
+    // rather than a widening of listAllActiveOptions().
+    Squadron staffel = new Squadron();
+    staffel.setId(UUID.randomUUID());
+    staffel.setName("IRIDIUM");
+    SpecialCommand sk = new SpecialCommand();
+    sk.setId(UUID.randomUUID());
+    sk.setName("SK ROTFUCHS");
+    Bereich bereich = new Bereich();
+    bereich.setId(UUID.randomUUID());
+    bereich.setName("Profit");
+    Organisationsleitung ol = new Organisationsleitung();
+    ol.setId(UUID.randomUUID());
+    ol.setName("Organisationsleitung");
+    when(squadronRepository.findAllByActiveTrue()).thenReturn(List.of(staffel));
+    when(specialCommandRepository.findAllByActiveTrue()).thenReturn(List.of(sk));
+    when(orgUnitRepository.findActiveBereiche()).thenReturn(List.of(bereich));
+    when(orgUnitRepository.findActiveOrganisationsleitung()).thenReturn(List.of(ol));
+
+    List<OrgUnitMembershipOptionDto> options = queryService.listAllPinnableOptions();
+
+    assertEquals(4, options.size());
+    assertEquals(OrgUnitKind.ORGANISATIONSLEITUNG, options.get(0).kind());
+    assertEquals(OrgUnitKind.BEREICH, options.get(1).kind());
+    assertEquals(OrgUnitKind.SQUADRON, options.get(2).kind());
+    assertEquals(OrgUnitKind.SPECIAL_COMMAND, options.get(3).kind());
   }
 
   // --- listAllActiveOptions (R5.d.c Job Order picker) -----------------------

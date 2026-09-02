@@ -231,21 +231,23 @@ public class OrgUnitContextAdvice {
 
   /**
    * R5.e — list of {@link OrgUnitMembershipOptionDto} that the caller can switch their active scope
-   * to. Replaces {@link #availableSquadrons()} for the post-R5.e sidebar switcher: admins see the
-   * full Squadron + SpecialCommand catalogue; non-admins see only the OrgUnits they are a member of
-   * (Staffel + every SK membership). The switcher template hides itself when this list has fewer
-   * than two entries — no choice to offer means no UI noise (plan §7.2).
+   * to. Replaces {@link #availableSquadrons()} for the post-R5.e sidebar switcher: admins see every
+   * active org unit; everyone else sees the units they belong to plus the ones a Bereich or OL seat
+   * reaches. All four kinds — a Bereich and the Organisationsleitung own aggregates in their own
+   * right, so a member seated on one and on nothing else had an empty switcher. The template hides
+   * itself when this list has fewer than two entries — no choice to offer means no UI noise (plan
+   * §7.2).
    *
    * <p>Backend round-trips:
    *
    * <ul>
    *   <li><strong>One call, no branch here.</strong> {@code GET /api/v1/me/org-units} answers it:
-   *       an admin gets every active Staffel and Spezialkommando, everyone else their own
-   *       memberships. The fork used to live in this class — page-walking {@code /squadrons} plus
-   *       {@code /special-commands} for admins, and two round-trips ({@code /users/me}, then {@code
-   *       /users/{id}/memberships}) for everyone else. The Android client had to know the same rule
-   *       and did not, so an admin was offered nothing to pin at all (ADR-0151, REQ-SEC-048). One
-   *       endpoint means one place to be right, and collapses up to four round-trips into one.
+   *       an admin gets every active org unit, everyone else their own reach. The fork used to live
+   *       in this class — page-walking {@code /squadrons} plus {@code /special-commands} for
+   *       admins, and two round-trips ({@code /users/me}, then {@code /users/{id}/memberships}) for
+   *       everyone else. The Android client had to know the same rule and did not, so an admin was
+   *       offered nothing to pin at all (ADR-0151, REQ-SEC-048). One endpoint means one place to be
+   *       right, and collapses up to four round-trips into one.
    * </ul>
    *
    * <p>Failures degrade silently to an empty list — the switcher then hides itself rather than
