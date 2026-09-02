@@ -19,7 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.LiveSyncFanoutProperties;
+import de.greluc.krt.profit.basetool.backend.support.ResilientRedisMessageListenerContainer;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -120,9 +123,16 @@ public class LiveSyncRedisConfig {
   /**
    * Subscribes the bridge to its channel.
    *
+   * <p>A {@link ResilientRedisMessageListenerContainer}, not a plain one, because a plain container
+   * whose first subscription fails throws out of {@code SmartLifecycle#start()} and cancels the
+   * whole context refresh — the 2026-09-02 07:07:09Z backend crash loop, in which an
+   * <em>optional</em> fan-out (ADR-0084, ADR-0143) decided whether the API existed. The container's
+   * own recovery back-off never covered that first attempt.
+   *
    * @param connectionFactory the Redis connection factory
    * @param fanout the bridge, acting as the message listener
    * @param listenerExecutor the bounded pool messages are dispatched on
+   * @param meterRegistry registry the subscription gauge binds to
    * @return the listener container
    */
   @Bean
@@ -133,11 +143,16 @@ public class LiveSyncRedisConfig {
   public RedisMessageListenerContainer liveSyncRedisMessageListenerContainer(
       RedisConnectionFactory connectionFactory,
       RedisLiveSyncFanout fanout,
-      @Qualifier("liveSyncRedisListenerExecutor") ThreadPoolTaskExecutor listenerExecutor) {
-    RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+      @Qualifier("liveSyncRedisListenerExecutor") ThreadPoolTaskExecutor listenerExecutor,
+      MeterRegistry meterRegistry) {
+    ResilientRedisMessageListenerContainer container = new ResilientRedisMessageListenerContainer();
     container.setConnectionFactory(connectionFactory);
     container.setTaskExecutor(listenerExecutor);
     container.addMessageListener(fanout, new ChannelTopic(fanout.channel()));
+    Gauge.builder(MetricNames.REDIS_FANOUT_SUBSCRIBED, container, c -> c.isListening() ? 1d : 0d)
+        .tag(MetricNames.TAG_FANOUT, MetricNames.FANOUT_LIVESYNC)
+        .description("1 while this instance is subscribed to the live-sync fan-out channel")
+        .register(meterRegistry);
     return container;
   }
 }

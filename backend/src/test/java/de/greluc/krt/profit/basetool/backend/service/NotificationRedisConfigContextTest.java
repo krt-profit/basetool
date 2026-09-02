@@ -21,12 +21,14 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.support.NotificationFanoutProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
@@ -98,5 +100,42 @@ class NotificationRedisConfigContextTest {
         return bean;
       }
     };
+  }
+
+  /**
+   * Loads the same enabled configuration against a Redis that refuses every connection, with
+   * auto-start left ON, and asserts the context still comes up with the fan-out bean present.
+   *
+   * <p>This is the 2026-09-02 07:07:09Z outage as a test. The container subscribes during context
+   * refresh; upstream rethrows the connection failure out of {@code SmartLifecycle#start()}, and
+   * Spring turns that into {@code ApplicationContextException: Failed to start bean …} — the whole
+   * backend crash-looping because an <em>optional</em> fan-out could not reach an optional
+   * dependency. The {@code noAutoStart} post-processor of the test above deliberately hides exactly
+   * this, which is why the outage shipped with that test green.
+   *
+   * <p>The second assertion is what stops the cheap fix: disabling the container would satisfy
+   * "context starts" while silently ending cross-instance notification delivery for good.
+   */
+  @Test
+  void contextStarts_whenRedisRefusesTheSubscription() {
+    RedisConnectionFactory refusing = mock(RedisConnectionFactory.class);
+    when(refusing.getConnection())
+        .thenThrow(new RedisConnectionFailureException("Connection refused"));
+
+    new ApplicationContextRunner()
+        .withPropertyValues("app.notifications.redis-fanout.enabled=true")
+        .withBean(NotificationStreamService.class, () -> mock(NotificationStreamService.class))
+        .withBean(StringRedisTemplate.class, () -> mock(StringRedisTemplate.class))
+        .withBean(SimpleMeterRegistry.class, SimpleMeterRegistry::new)
+        .withBean(
+            NotificationFanoutProperties.class,
+            () -> new NotificationFanoutProperties(true, "basetool:notify:published"))
+        .withBean(RedisConnectionFactory.class, () -> refusing)
+        .withUserConfiguration(NotificationRedisConfig.class)
+        .run(
+            context ->
+                assertThat(context)
+                    .hasNotFailed()
+                    .hasSingleBean(RedisMessageListenerContainer.class));
   }
 }

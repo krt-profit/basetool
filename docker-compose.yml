@@ -1259,8 +1259,18 @@ services:
       # The x-backend anchor enables the notification Redis fan-out (ADR-0094) for every backend
       # service, so the dev stack's backend opens the RedisMessageListenerContainer at boot — wait for
       # redis-dev to be healthy first so the full `docker compose --profile dev up` starts cleanly
-      # instead of racing the fan-out connection (#1246). Prod's fan-out degrades gracefully on a Redis
-      # outage (REQ-NOTIF-006), so the prod `backend` service intentionally keeps no hard redis gate.
+      # instead of racing the fan-out connection (#1246).
+      #
+      # Corrected 2026-09-02: this note used to add that "prod's fan-out degrades gracefully on a
+      # Redis outage (REQ-NOTIF-006), so the prod `backend` service intentionally keeps no hard redis
+      # gate". That was true of the RUNNING fan-out and false of STARTUP — both fan-out containers
+      # subscribe during context refresh, and upstream rethrows that first failure out of
+      # SmartLifecycle#start(), which cancels the refresh. On 2026-09-02 07:07:09Z that crash-looped
+      # the prod backend for want of an optional dependency. Startup resilience now lives in
+      # ResilientRedisMessageListenerContainer rather than in a compose gate, deliberately: depends_on
+      # is not re-evaluated on a restart-policy restart, on `docker restart backend`, on
+      # `up -d --no-deps backend` (which scripts/deploy.sh itself runs on health recovery), or when
+      # redis is recreated under a running backend — and those are exactly the paths this happened on.
       redis-dev:
         condition: service_healthy
     networks:

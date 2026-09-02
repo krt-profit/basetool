@@ -1647,10 +1647,32 @@ registry: the admin area is web-only permanently, so a room there would have no 
   (`LiveSyncSubscriptionAuthorizerTest`).
 - [x] The backend registry is a subset of the frontend's, staff rooms excluded
   (`LiveSyncTopicRegistryParityTest`).
+- [x] **A Redis that is unreachable at startup does not stop the backend from starting**; the
+  subscription is established in the background once Redis returns, and
+  `basetool_redis_fanout_subscribed{fanout}` reads 0 until it is
+  (`LiveSyncRedisConfigContextTest`, `NotificationRedisConfigContextTest`,
+  `ResilientRedisMessageListenerContainerTest`).
 
+> [!warning] Added 2026-09-02 — the acceptance above was true of the running fan-out, not of startup
+> "Local delivery precedes the fan-out, so a Redis outage costs peers only" held for a Redis lost
+> *while running*, and `LiveSyncRedisConfig`'s own Javadoc promised the ADR-0084 posture outright
+> ("an optional external must never keep the container from starting"). Neither covered the *first*
+> subscription: a plain `RedisMessageListenerContainer` rethrows that failure out of
+> `SmartLifecycle#start()`, and Spring turns it into a cancelled context refresh. On 2026-09-02
+> 07:07:09Z that crash-looped the production backend — `ApplicationContextException: Failed to start
+> bean 'liveSyncRedisMessageListenerContainer'` — with no API for the frontend at all, for want of a
+> dependency the design calls optional. Both fan-out containers now extend
+> `ResilientRedisMessageListenerContainer`; hardening only one would have renamed the outage, since
+> both sit at lifecycle phase `Integer.MAX_VALUE` and either can abort the refresh first.
+>
+> The frontend's own live-sync container is deliberately **not** changed: Redis is mandatory there
+> (`@EnableRedisIndexedHttpSession` — no session store, no login), and it fails one bean earlier
+> anyway, in the keyspace-notification initializer, before any `SmartLifecycle` runs.
+>
 > **Code:** `backend/…/controller/LiveSyncController`, `backend/…/service/LiveSyncStreamService`,
 > `LiveSyncRelayService`, `LiveSyncSubscriptionAuthorizer`, `RedisLiveSyncFanout`,
-> `LocalLiveSyncFanout`, `LiveSyncRedisConfig`, `backend/…/support/LiveSyncTopic`,
+> `LocalLiveSyncFanout`, `LiveSyncRedisConfig`, `NotificationRedisConfig`,
+> `backend/…/support/ResilientRedisMessageListenerContainer`, `backend/…/support/LiveSyncTopic`,
 > `LiveSyncTopicClass`, `LiveSyncAuthorization` · **ADR:** ADR-0143 (ADR-0094 unchanged) ·
 > **App side:** `basetool-android` `REQ-APP-SYNC-*`
 
