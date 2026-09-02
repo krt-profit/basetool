@@ -112,11 +112,9 @@ public class UexCommodityService {
                                     m -> {
                                       m.setIdCommodity(dto.id());
                                       // A manual entry has just been adopted by UEX. Flip its
-                                      // provenance
-                                      // off MANUAL so the admin badge disappears and the
-                                      // "manual" filter only lists materials that UEX has not yet
-                                      // picked up; the link to UEX is recorded via the INFO log
-                                      // and the now-populated idCommodity column.
+                                      // provenance off MANUAL so the admin badge disappears; the
+                                      // link to UEX is recorded via the INFO log and the
+                                      // now-populated idCommodity column.
                                       if (m.getSourceSystems() == MaterialSourceSystem.MANUAL) {
                                         log.info(
                                             "Manual material '{}' is now linked to UEX commodity"
@@ -322,7 +320,9 @@ public class UexCommodityService {
    * honours the {@link MaterialSourceSystem} contract (§6.1) that the UEX item and vehicle syncs
    * already follow; the commodity sync previously left an adopted Wiki row stuck at {@code
    * WIKI_ONLY} (and hidden). Idempotent: only a {@code WIKI_ONLY} row is touched, so a normal
-   * re-sync of a {@code UEX_ONLY} / {@code BOTH} / {@code MANUAL} row is unaffected.
+   * re-sync of a {@code UEX_ONLY} / {@code BOTH} / {@code MANUAL} row is unaffected <em>by this
+   * method</em> — note that the caller has already flipped an adopted {@code MANUAL} row to {@code
+   * UEX_ONLY} two statements earlier, so no {@code MANUAL} row ever reaches here on adoption.
    *
    * @param material the locally-resolved material UEX just linked by name
    */

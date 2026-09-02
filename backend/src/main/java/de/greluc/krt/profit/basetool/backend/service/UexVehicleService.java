@@ -43,8 +43,9 @@ import org.springframework.util.StringUtils;
 
 /**
  * R2 UEX vehicle sync. Replaces the pre-R2 name-only matcher with the §8.5 UUID-first chain and
- * populates the 36 capability flags / dimensions / fuel / urls / English description that the V111
- * migration added to {@code ship_type}.
+ * populates the 36 capability flags / dimensions / fuel / urls that the V111 migration added to
+ * {@code ship_type}. The two description columns V111 added alongside them are <em>not</em> written
+ * here — see the R9 paragraph below.
  *
  * <p>Resolution chain per SC_WIKI_SYNC_PLAN.md §8.5:
  *
@@ -61,8 +62,9 @@ import org.springframework.util.StringUtils;
  *
  * <p>R9 Step 2: the legacy synthesized {@code description} column is no longer written — readers
  * source the ship-type description from {@code descriptionEn} / {@code descriptionDe} instead (the
- * column is dropped in R9 Step 4). Neither of those two is written <em>here</em>: UEX serves no
- * description at all, so both come from the SC-Wiki vehicle sync (REQ-DATA-015).
+ * column was dropped by V125 on 2026-06-01, R9 Step 4). Neither of those two is written
+ * <em>here</em>: UEX serves no description at all, so both come from the SC-Wiki vehicle sync
+ * (REQ-DATA-015) and, as a fill-if-null enrichment, from the P4K import.
  *
  * <p>Empty UEX response short-circuits without wiping local data. Orphan handling via {@link
  * ShipTypeRepository#markUexDeletedExcept(java.util.Collection, Instant)} gated on a non-empty

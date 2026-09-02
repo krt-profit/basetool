@@ -40,17 +40,17 @@ in this file as part of the same commit that ships the code.**
 Updated as each phase deploys. The "PR" column points to the merged Pull
 Request; "Date" is the production deploy timestamp.
 
-|                 Phase                 | Dev | Staging | Prod | Date | PR  |                                                 Notes                                                  |
-|---------------------------------------|-----|---------|------|------|-----|--------------------------------------------------------------------------------------------------------|
-| R1 - Foundation                       | TBD | TBD     | TBD  | TBD  | TBD | additive only; scheduler default off                                                                   |
-| R2 - UEX items + vehicle hardening    | TBD | TBD     | TBD  | TBD  | TBD | game_item table + 47 ship_type flags; no Wiki traffic                                                  |
-| R3 - Wiki commodity merge             | TBD | TBD     | TBD  | TBD  | TBD | ships dark; commodity-sync-enabled flag turns Wiki traffic on                                          |
-| R4 - Wiki items + Blueprints          | TBD | TBD     | TBD  | TBD  | TBD | blueprint graph + closure item fill + vehicle fill; 3 dark flags                                       |
-| R5 - Full Wiki item backfill          | TBD | TBD     | TBD  | TBD  | TBD | needs item-sync-enabled + sync-all-items both on; ~12 700 rows; NO migration                           |
-| R6 - Manufacturer Wiki reconciliation | TBD | TBD     | TBD  | TBD  | TBD | needs manufacturer-sync-enabled; enriches scwiki_uuid/code on UEX rows; NO migration                   |
-| R7 - UEX item prices                  | TBD | TBD     | TBD  | TBD  | TBD | needs item-price-sync-enabled; V115 game_item_price (~24k rows); display-only                          |
-| R8 - Soak + V116 cleanup              | TBD | TBD     | TBD  | TBD  | TBD | flips is_manual_entry -> source_systems=MANUAL (was V115, shifted by R7)                               |
-| R9 - V125 destructive cleanup         | TBD | TBD     | TBD  | TBD  | TBD | drops is_manual_entry + ship_type.description (was V116/V117, shifted by R7 + features merged to main) |
+|                 Phase                 | Dev | Staging | Prod | Date | PR  |                                                Notes                                                 |
+|---------------------------------------|-----|---------|------|------|-----|------------------------------------------------------------------------------------------------------|
+| R1 - Foundation                       | TBD | TBD     | TBD  | TBD  | TBD | additive only; scheduler default off                                                                 |
+| R2 - UEX items + vehicle hardening    | TBD | TBD     | TBD  | TBD  | TBD | game_item table + 47 ship_type flags; no Wiki traffic                                                |
+| R3 - Wiki commodity merge             | TBD | TBD     | TBD  | TBD  | TBD | ships dark; commodity-sync-enabled flag turns Wiki traffic on                                        |
+| R4 - Wiki items + Blueprints          | TBD | TBD     | TBD  | TBD  | TBD | blueprint graph + closure item fill + vehicle fill; 3 dark flags                                     |
+| R5 - Full Wiki item backfill          | TBD | TBD     | TBD  | TBD  | TBD | needs item-sync-enabled + sync-all-items both on; ~12 700 rows; NO migration                         |
+| R6 - Manufacturer Wiki reconciliation | TBD | TBD     | TBD  | TBD  | TBD | needs manufacturer-sync-enabled; enriches scwiki_uuid/code on UEX rows; NO migration                 |
+| R7 - UEX item prices                  | TBD | TBD     | TBD  | TBD  | TBD | needs item-price-sync-enabled; V115 game_item_price (~24k rows); display-only                        |
+| R8 - Soak + V116 cleanup              | TBD | TBD     | TBD  | TBD  | TBD | flips is_manual_entry -> source_systems=MANUAL (was V115, shifted by R7)                             |
+| R9 - V125 destructive cleanup         | TBD | TBD     | TBD  | TBD  | TBD | dropped is_manual_entry + ship_type.description as V125 on 2026-06-01 (was V116/V117, shifted by R7) |
 
 ---
 
@@ -103,7 +103,7 @@ afterwards.
 - **R5** - large data backfill (~12 700 Wiki item rows); take a logical
   backup of `game_item` + `manufacturer` immediately before the deploy so
   the rollback is a simple table re-load.
-- **R8** - data-only migration (V115 backfills `source_systems = 'MANUAL'`
+- **R8** - data-only migration (V116 backfills `source_systems = 'MANUAL'`
   from `is_manual_entry`); logical backup of `material` only.
 - **R9** - destructive (drops `material.is_manual_entry` and
   `ship_type.description`); requires **both** a logical dump AND a
@@ -321,8 +321,8 @@ the Wiki scheduler stays at the R1 default (`krt.scwiki.scheduler-enabled
   - **V111** - extends `ship_type` with `external_uuid` UNIQUE,
     `uex_vehicle_id` UNIQUE, 36 capability `is_*` flags, dimensions,
     fuel, urls, English description, R2 `source_systems` column. The
-    legacy synthesized `description` column stays for back-compat
-    (dropped in R9).
+    legacy synthesized `description` column stayed for back-compat and
+    was dropped in R9 (V125, 2026-06-01).
   - **V112** - tiny fix-up that adds `created_at` / `updated_at`
     columns missed by R1's V109 on `uex_category` (Hibernate
     `ddl-auto: validate` requires them since `UexCategory` extends
@@ -1245,16 +1245,20 @@ The point of R8 is to prove the whole sync is healthy before the irreversible R9
 
 ### 9.1 Scope summary
 
-R9 is the only **irreversible** phase: it drops `material.is_manual_entry` and the synthesized
-`ship_type.description` column. It is tracked as a separate, staged roadmap —
-[`SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md`](SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md) — which is the
-authoritative source; this section is the deploy-time summary.
+R9 was the only **irreversible** phase: it dropped `material.is_manual_entry` and the synthesized
+`ship_type.description` column. It shipped on **2026-06-01** as
+`V125__drop_legacy_material_and_ship_type_columns.sql`. It was tracked as a separate, staged
+roadmap — [`SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md`](SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md) — which is
+the authoritative source; this section is the deploy-time summary.
 
-- **Both columns are still UI-consumed** (§13 #9): `is_manual_entry` backs the admin materials
-  "manual" badge / filter; `ship_type.description` is rendered by `ship-data.html` +
-  `admin/mission-data.html` via `ShipTypeDto`. So R9 is staged: migrate the readers to the
-  replacements (`source_systems = 'MANUAL'` and `description_en` / `description_de`) first, soak,
-  then drop.
+- **Both columns were still UI-consumed when R9 was planned** (§13 #9): `is_manual_entry` backed the
+  admin materials "manual" badge; `ship_type.description` was rendered by `ship-data.html` via
+  `ShipTypeDto`. So R9 was staged: the readers were re-sourced onto the replacements
+  (`source_systems = 'MANUAL'` and `description_de` / `description_en`) first, soaked, and only then
+  were the columns dropped. Note what the drop did **not** remove: the DTO wire fields survive it —
+  `MaterialDto.isManualEntry` is now derived in `MaterialMapper` from `source_systems == MANUAL`, and
+  `ShipTypeDto.description` in `ShipMapper` from `description_de` falling back to `description_en`.
+  The *columns* are gone; the *wire fields* are not.
 - **V-NUMBER:** V115 went to R7 (`game_item_price`), V116 to R8 (`is_manual_entry` backfill); V117–V124
   were then claimed by features merged to `main` while this PR was open (job-order comment, min-quality
   nullable, mission party-lead, blueprint requirement-groups/modifier-segments, FK-index round2, item
@@ -1262,25 +1266,32 @@ authoritative source; this section is the deploy-time summary.
 
 ### 9.2 Pre-deployment checks (R9)
 
-- [ ] R8 (PR [#271](https://github.com/krt-iri/basetool/pull/271)) soaked clean for ~two weeks
-  (§8.6 exit criterion met).
-- [ ] Roadmap Steps 1–2 (reader migrations) shipped and soaked; `git grep -i
-  "isManualEntry\|ship_type.*description"` is clean in the `main` source set.
-- [ ] `./gradlew spotlessApply check` green from a clean clone of the R9 (V125) branch.
-- [ ] Full DB backup taken immediately before merge — the drop is irreversible.
+- [x] R8 (PR [#271](https://github.com/krt-iri/basetool/pull/271)) merged **2026-05-29**. The §8.6
+  exit criterion asked for a ~two-week soak; the drop followed on **2026-06-01**, so the soak that
+  actually happened was ~2.5 days. The box records that R8 shipped first, not that the two-week
+  criterion was met as written.
+- [x] Roadmap Steps 1–2 (reader migrations) shipped **2026-05-29** in PR
+  [#275](https://github.com/krt-iri/basetool/pull/275) — every reader now reads
+  `source_systems` / `description_de` / `description_en`. They were in production ~2.5 days before
+  the drop, not the "~one release window" V125's own header comment names. A bare `git grep -i
+  "isManualEntry\|ship_type.*description"` is **not** empty and never will be: it still hits the
+  surviving DTO wire fields `MaterialDto.isManualEntry` and `ShipTypeDto.description`, which are
+  derived from the new columns rather than mapped to the dropped ones.
+- [x] `./gradlew spotlessApply check` green from a clean clone of the R9 (V125) branch.
+- [x] Full DB backup taken immediately before merge — the drop is irreversible.
 
 ### 9.3 Deployment steps (production, R9)
 
-Follow `SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md` Step 4. In brief:
+This followed `SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md` Step 4. In brief, as executed on 2026-06-01:
 
-1. **Backup** (`pg_dump … basetool-pre-r9-…dump`).
-2. **Merge the R9 (V125) PR** — it removes `Material.isManualEntry` + `ShipType.description` and
-   runs `ALTER TABLE … DROP COLUMN`. Watch for V125:
+1. **Backup** taken (`pg_dump … basetool-pre-r9-…dump`).
+2. **The R9 (V125) PR was merged** — it removed the `Material.isManualEntry` and
+   `ShipType.description` JPA fields and ran `ALTER TABLE … DROP COLUMN`. The deploy log carried:
 
    ```
-   Migrating schema "public" to version "122 - drop legacy material and ship_type columns"
+   Migrating schema "public" to version "125 - drop legacy material and ship type columns"
    ```
-3. **Confirm `ddl-auto=validate` boots green** (the entity fields were removed in the same PR).
+3. **`ddl-auto=validate` booted green** (the entity fields were removed in the same PR).
 
 ### 9.4 Smoke tests (R9, post-deploy)
 
@@ -1289,10 +1300,12 @@ Follow `SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md` Step 4. In brief:
 psql -d basetool -c "SELECT column_name FROM information_schema.columns \
   WHERE (table_name='material' AND column_name='is_manual_entry') \
      OR (table_name='ship_type' AND column_name='description')"
-#   Expect zero rows.
+#   Expected zero rows.
 
-# 2. Admin materials "manual" badge/filter still works (now from source_systems='MANUAL').
-# 3. ship-data + admin/mission-data pages still render a description (from description_en/de).
+# 2. The admin materials "manual" badge still resolved (MaterialDto.isManualEntry is now derived
+#    from source_systems = 'MANUAL').
+# 3. ship-data still rendered a description (ShipTypeDto.description is now derived from
+#    description_de, falling back to description_en).
 ```
 
 ### 9.5 Rollback (R9)

@@ -60,6 +60,15 @@ recorded, so it is stated once here rather than 48 times in the code.
 >   `false` in `ScWikiProperties`, and the Javadoc still says "ships dark", but
 >   `application-prod.yml` (and `application-dev.yml`) enable all five plus `sync-all-items`.
 >   Reading only the defaults gives the opposite of the truth.
+> - **§7 / §11 R9 — the destructive cleanup shipped, as V125, and the two DTO fields stayed on
+>   purpose.** `V125__drop_legacy_material_and_ship_type_columns.sql` (#281, 2026-06-01) dropped
+>   `material.is_manual_entry` and `ship_type.description`; the §7 table's reserved "V116" row and
+>   R9's future tense have been corrected in place. What survives is **not** those columns but two
+>   derived DTO *wire fields*: `MaterialDto.isManualEntry` (from `sourceSystems == MANUAL`) and
+>   `ShipTypeDto.description` (from `descriptionDe`, falling back to `descriptionEn`). Their "kept
+>
+>   > for API stability for one release" grace note is **superseded, not expired** — each is now the
+>   > only wire channel for data no other DTO exposes, so both are permanent API surface.
 
 Companion document to the existing UEX integration (see `backend/.../integration/UexClient.java` and `UexProperties.java`). The goal is twofold:
 
@@ -1230,7 +1239,7 @@ Same `clearStalePrices` orphan handling as `material_price`. Build off the exist
 | V113 | `create_blueprint_tables.sql`                            | Create `blueprint`, `blueprint_ingredient`, `blueprint_dismantle_return` with CHECK constraints.                                                                                                                                                                                                                                                                                                                                                                                                         | Safe additive.                    |
 | V114 | `create_game_item_price.sql`                             | Create `game_item_price` (feature-flagged sync writes to it).                                                                                                                                                                                                                                                                                                                                                                                                                                            | Safe additive.                    |
 | V115 | `update_material_source_systems_for_isManualEntry.sql`   | One-shot: `UPDATE material SET source_systems = 'MANUAL' WHERE is_manual_entry = TRUE;`.                                                                                                                                                                                                                                                                                                                                                                                                                 | Idempotent.                       |
-| V116 | *(reserved)*                                             | future cleanup — drop `material.is_manual_entry` and `ship_type.description` after one release soak. **Not in this plan's scope.**                                                                                                                                                                                                                                                                                                                                                                       | Destructive.                      |
+| V125 | `drop_legacy_material_and_ship_type_columns.sql`         | **Shipped 2026-06-01** (#281) as `V125__drop_legacy_material_and_ship_type_columns.sql`, not V116 — V116–V124 were already taken (V116 by the R8 backfill, V117–V124 by unrelated features). Runs `ALTER TABLE material DROP COLUMN IF EXISTS is_manual_entry;` and `ALTER TABLE ship_type DROP COLUMN IF EXISTS description;`. The two **DTO wire fields** `MaterialDto.isManualEntry` and `ShipTypeDto.description` outlive the columns as mapper-derived values — see §11 R9.                         | Destructive — executed.           |
 
 All migrations follow `backend/src/main/resources/db/migration/README.md` conventions: two-phase for any destructive change; performance-aware (CREATE INDEX CONCURRENTLY is not Flyway-friendly, so we accept short locks during table creation).
 
@@ -1696,8 +1705,9 @@ The same release pattern as the SK rollout (small slices, each independently mer
 
 ### R9 — V125 destructive cleanup *(separate track — see [`SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md`](SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md))*
 
-- Drop `material.is_manual_entry` and `ship_type.description`.
-- Out of scope of this plan; tracked in `SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md`, which stages the reader migrations (`is_manual_entry` → `source_systems = 'MANUAL'`; `ship_type.description` → `description_en` / `description_de`, resolving §13 #9 — both are still UI-consumed) ahead of the irreversible drop, with a soak between, gated on a clean R8 soak.
+- **Shipped 2026-06-01** (#281, commit `a0efd7ca1`): `V125__drop_legacy_material_and_ship_type_columns.sql` dropped `material.is_manual_entry` and `ship_type.description`. The JPA fields `Material.isManualEntry` and `ShipType.description` went with them, and `V125MigrationTest` pins the applied migration. The synthesiser itself was already gone: `UexVehicleService.buildLegacyDescription` was deleted one step earlier, by the Steps 1-2 reader migration (#275), which is what let Step 4 be a pure drop.
+- Ran on the separate track in `SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md`, which staged the reader migrations (`is_manual_entry` → `source_systems = 'MANUAL'`; `ship_type.description` → `description_en` / `description_de`, resolving §13 #9) ahead of the irreversible drop, with a soak between, gated on a clean R8 soak.
+- **What survived the drop is two derived DTO *wire fields*, not the columns.** `MaterialDto.isManualEntry` is derived in `MaterialMapper` from `sourceSystems == MANUAL`; `ShipTypeDto.description` is derived in `ShipMapper` from `descriptionDe`, falling back to `descriptionEn`. Steps 1-2 re-sourced both fields from the new columns, so each is now the **only** wire channel for data that has no other representation on the API — no DTO exposes `source_systems`, and none exposes `descriptionEn` / `descriptionDe`. The "kept for API stability for one release" grace note is therefore **superseded, not expired**: both fields are permanent API surface, and reshaping them is a separate decision rather than an R9 leftover.
 - V-number drift: V115 / V116 went to R7 (`game_item_price`) / R8 (`is_manual_entry` backfill), and V117–V124 were claimed by features merged to `main` while this PR was open, so the destructive drop is **V125** (the draft §7 table called it V116).
 
 ---
@@ -1741,6 +1751,7 @@ These need user input before R3 / R4 work begins. R1 + R2 can ship without resol
 7. **Should `GameItem` participate in OrgUnit-scoped queries?** It's a static catalog (like `ShipType`, `Material`); no, it should not. Confirm.
 8. **`UexItemPriceSyncService` cost.** UEX `/items_prices_all` is large (estimated > 1 MB, possibly several MB once the catalog grows). The existing 16 MB WebClient buffer is sized for it but we should re-check after first probe. Also: is there a use case for surfacing item retail prices to users today? If not, R7 stays gated.
 9. **`ship_type.description` deprecation timeline.** The current `description` is a synthesized multi-line text built from `nameFull / scu / crew / urlWiki|urlStore`. After R2 ships rich columns, downstream UI must migrate to `descriptionEn`/`descriptionDe`/explicit fields. Is there a hangar / fleet UI page that depends on the synthesized format today? If yes, we keep it longer than one release; if no, we can ship V116 in the soak window after R8.
+   - **RESOLVED (R9 Step 4), shipped 2026-06-01 as `V125__drop_legacy_material_and_ship_type_columns.sql` (#281):** no UI page turned out to depend on the synthesized format — the suspected admin surface does not consume it (`admin/mission-data.html` has never rendered a ship-type description), and the roadmap migrated the remaining readers to `description_en` / `description_de` before the drop. The column went in **V125**, not V116, after the soak. `ShipTypeDto.description` still exists as an API **wire field**, but it is now derived in `ShipMapper` from `descriptionDe` with a `descriptionEn` fallback — the synthesized column behind it is gone.
 10. **Vehicle `external_uuid` backfill on existing rows** (V112). The current `ship_type` table has rows like "Aegis Avenger Titan" matched by name to UEX vehicle id 5. We need to map them to the UUID UEX returns now. Best done by re-running `UexVehicleService` once with the new code (it will UUID-stamp every row it can match by name). If a row's name doesn't match any UEX vehicle (e.g., an admin-created entry), it stays UUID-less and `source_systems = MANUAL`. Confirm there are no such admin-only rows that would lose their tracking.
 11. **UEX item ↔ vehicle linkage**. UEX items carry `id_vehicle` for paints/components specific to a vehicle (e.g., "100i Auspicious Red Dog Livery" has `id_vehicle = 1`). We've planned a `linked_ship_type_id` FK on `game_item`. Resolution chain: `shipTypeRepo.findByUexVehicleId(dto.id_vehicle)`. What's the expected use case? The data is there but no UI currently consumes it. Defer the FK if not needed — but the migration is cheap and we'd rather not need a V117 for it.
 
@@ -1771,7 +1782,7 @@ These need user input before R3 / R4 work begins. R1 + R2 can ship without resol
 ## 15. References
 
 - `SPEZIALKOMMANDO_PLAN.md` — pattern reference for phased rollout + migration numbering.
-- `R8_DESTRUCTIVE_ROADMAP.md` — pattern for two-phase destructive migration (relevant for the V116 future drop of `is_manual_entry` + `ship_type.description`).
+- `SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md` — pattern for two-phase destructive migration; it staged the **V125** drop of `material.is_manual_entry` + `ship_type.description`, which shipped 2026-06-01 (#281).
 - `backend/src/main/resources/db/migration/README.md` — migration conventions.
 - `backend/src/main/java/de/greluc/krt/iri/basetool/backend/integration/UexClient.java` — pattern source.
 - `backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/UexVehicleService.java:65-95` — the name-match upsert that R2 hardens to UUID-match.
