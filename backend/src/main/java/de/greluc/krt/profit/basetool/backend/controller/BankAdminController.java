@@ -93,6 +93,8 @@ public class BankAdminController {
    * @param actorUserId filter on the acting user, or absent
    * @param accountId filter on the affected account, or absent
    * @param eventType filter on the event type, or absent
+   * @param clientId filter on the originating client (REQ-AUDIT-005) — a bounded label such as
+   *     {@code basetool-android}, {@code other} or {@code none}, or absent
    * @param page zero-based page index
    * @param size page size
    * @param sort whitelisted sort spec
@@ -109,6 +111,7 @@ public class BankAdminController {
       @RequestParam(required = false) UUID actorUserId,
       @RequestParam(required = false) UUID accountId,
       @RequestParam(required = false) BankAuditEventType eventType,
+      @RequestParam(required = false) String clientId,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
@@ -117,7 +120,7 @@ public class BankAdminController {
         PaginationUtil.createPageRequest(
             page, size, effectiveSort, AUDIT_SORT_FIELDS, "occurredAt");
     Page<BankAuditEventDto> result =
-        bankAuditService.getEvents(from, to, actorUserId, accountId, eventType, pageable);
+        bankAuditService.getEvents(from, to, actorUserId, accountId, eventType, clientId, pageable);
     return PageResponse.of(result);
   }
 

@@ -157,24 +157,15 @@ public class AuditService {
       @Nullable String clientId,
       @NotNull Pageable pageable) {
     return auditEventRepository
-        .findFiltered(domain, from, to, actorUserId, eventType, blankToNull(clientId), pageable)
+        .findFiltered(
+            domain,
+            from,
+            to,
+            actorUserId,
+            eventType,
+            clientAttribution.filterValue(clientId),
+            pageable)
         .map(auditEventMapper::toDto);
-  }
-
-  /**
-   * Normalises an absent client filter to {@code null} so the query's {@code IS NULL} branch
-   * disables it.
-   *
-   * <p>An empty string arrives from the viewer's "all clients" option, which submits the select's
-   * blank value rather than omitting the parameter. Passed through unchanged it would match only
-   * rows whose {@code client_id} is literally empty — that is, nothing — and read to the admin as
-   * "this area has no events" rather than as "no filter".
-   *
-   * @param clientId the raw filter value, or {@code null}
-   * @return the value, or {@code null} when it is absent or blank
-   */
-  private static @Nullable String blankToNull(@Nullable String clientId) {
-    return clientId == null || clientId.isBlank() ? null : clientId;
   }
 
   /**

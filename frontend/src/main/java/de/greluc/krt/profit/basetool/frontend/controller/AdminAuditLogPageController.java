@@ -91,6 +91,10 @@ public class AdminAuditLogPageController {
    * only useful if it is fixed enough to render as a {@code <select>}. A deployment that renames
    * its Keycloak clients through that property must extend this list, or the trail will record a
    * client the viewer cannot filter for.
+   *
+   * <p>The list is the same on <em>every</em> tab, the bank included: both trails record the value
+   * through one {@code ClientAttribution} seam, so a filter that meant something different per tab
+   * would be a bug rather than a feature.
    */
   private static final List<String> CLIENT_IDS =
       List.of("basetool-frontend", "basetool-android", "other", "none");
@@ -333,8 +337,7 @@ public class AdminAuditLogPageController {
    * @param to period end filter (ISO instant), or absent
    * @param actorUserId actor filter (user id), or absent
    * @param eventType event-type filter, or absent
-   * @param clientId originating-client filter (REQ-AUDIT-005), or absent; ignored on the BANK tab,
-   *     whose separate trail records no client
+   * @param clientId originating-client filter (REQ-AUDIT-005), or absent
    * @param page zero-based page index
    * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
    *     in-place AJAX swap; otherwise the full page
@@ -365,12 +368,7 @@ public class AdminAuditLogPageController {
     appendIfPresent(uri, "to", to);
     appendIfPresent(uri, "actorUserId", actorUserId);
     appendIfPresent(uri, "eventType", eventType);
-    // Not forwarded on the BANK tab: /api/v1/bank/admin/audit has no such parameter, and Spring
-    // would ignore it silently -- which would render as a filter that appears to apply and does
-    // not. The tab hides the control instead (see clientFilterSupported below).
-    if (!isBank) {
-      appendIfPresent(uri, "clientId", clientId);
-    }
+    appendIfPresent(uri, "clientId", clientId);
 
     PageResponse<AuditRowView> events = null;
     try {
@@ -396,12 +394,11 @@ public class AdminAuditLogPageController {
     model.addAttribute("filterTo", to);
     model.addAttribute("filterActorUserId", actorUserId);
     model.addAttribute("filterEventType", eventType);
-    model.addAttribute("clientFilterSupported", !isBank);
-    model.addAttribute("clientIds", isBank ? List.<String>of() : CLIENT_IDS);
-    model.addAttribute("filterClientId", isBank ? null : clientId);
+    model.addAttribute("clientIds", CLIENT_IDS);
+    model.addAttribute("filterClientId", clientId);
     model.addAttribute(
         "paginationBaseUrl",
-        buildBaseUrl(activeDomain, from, to, actorUserId, eventType, isBank ? null : clientId));
+        buildBaseUrl(activeDomain, from, to, actorUserId, eventType, clientId));
     model.addAttribute("exportEndpoint", "/api/proxy/audit/" + activeDomain + "/export");
     model.addAttribute("purgeEndpoint", "/api/proxy/audit/" + activeDomain);
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
@@ -432,11 +429,7 @@ public class AdminAuditLogPageController {
                         prefix + e.eventType(),
                         e.accountNo() != null ? e.accountNo() : "—",
                         e.details(),
-                        // The bank keeps its own table, which carries no client column
-                        // (REQ-AUDIT-005 covers audit_event only); null renders as a dash and the
-                        // tab hides the filter, rather than implying every bank row came from
-                        // nowhere.
-                        null))
+                        e.clientId()))
             .toList();
     return new PageResponse<>(
         rows, page.page(), page.size(), page.totalElements(), page.totalPages(), page.sort());

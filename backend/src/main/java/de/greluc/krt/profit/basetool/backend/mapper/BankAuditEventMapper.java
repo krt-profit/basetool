@@ -44,5 +44,6 @@ public interface BankAuditEventMapper {
   @Mapping(target = "id", source = "event.id")
   @Mapping(target = "accountId", source = "event.accountId")
   @Mapping(target = "accountNo", source = "accountNo")
+  @Mapping(target = "clientId", source = "event.clientId")
   BankAuditEventDto toDto(BankAuditEvent event, @Nullable String accountNo);
 }

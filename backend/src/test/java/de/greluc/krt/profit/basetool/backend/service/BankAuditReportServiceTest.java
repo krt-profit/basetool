@@ -116,7 +116,8 @@ class BankAuditReportServiceTest {
             null,
             null,
             null,
-            "+100 aUEC");
+            "+100 aUEC",
+            "basetool-frontend");
     when(bankAuditEventRepository.findForExport(from, to)).thenReturn(List.of(event));
     when(bankAuditEventMapper.toDto(event, null)).thenReturn(dto);
 

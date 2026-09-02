@@ -36,6 +36,8 @@ import org.jetbrains.annotations.Nullable;
  * @param transactionId the created ledger transaction for booking events
  * @param targetUserId the affected user for grant/holder events
  * @param details compact human-readable details payload
+ * @param clientId which client the mutation came through (REQ-AUDIT-005) — a bounded label, {@code
+ *     null} on rows written before the column existed, where it means "not recorded"
  */
 public record BankAuditEventDto(
     UUID id,
@@ -46,4 +48,5 @@ public record BankAuditEventDto(
     @Nullable String accountNo,
     @Nullable UUID transactionId,
     @Nullable UUID targetUserId,
-    @Nullable String details) {}
+    @Nullable String details,
+    @Nullable String clientId) {}

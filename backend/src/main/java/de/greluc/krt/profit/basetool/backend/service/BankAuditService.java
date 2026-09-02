@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.ClientAttribution;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.List;
@@ -57,6 +58,13 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>The actor is resolved from the current security context and snapshotted: the row stores both
  * the user id (FK {@code ON DELETE SET NULL}) and the effective-name handle so the trail survives
  * user deletion.
+ *
+ * <p>The row also records <em>which client</em> the mutation came through (REQ-AUDIT-005), through
+ * the same {@link ClientAttribution} seam and the same bounded vocabulary as the shared trail and
+ * the {@code client_id} request metric (REQ-OBS-018). Not optional here for the reason it is not
+ * optional there, only sooner: {@code Bank Employee} and {@code Bank Management} have sat on the
+ * mobile client's Keycloak scope since it was provisioned, so a bank row has been reachable from
+ * two clients for as long as that client has existed.
  */
 @Service
 @RequiredArgsConstructor
@@ -68,6 +76,7 @@ public class BankAuditService {
   private final UserRepository userRepository;
   private final BankAccountRepository accountRepository;
   private final BankAuditEventMapper bankAuditEventMapper;
+  private final ClientAttribution clientAttribution;
   private final MeterRegistry meterRegistry;
 
   /**
@@ -112,6 +121,12 @@ public class BankAuditService {
             // Persist the rendered payload; a null stays null (no details), any other CharSequence
             // (an AuditDetails composer or a raw String) is stringified byte-identically.
             .details(details == null ? null : details.toString())
+            // Read at write time from the SAME authentication the actor came from, so the two
+            // halves of "who, through what" can never describe different requests. Always a
+            // value, never null: a caller with no token records `none`, which the row's `system`
+            // actor handle then distinguishes from the token-with-no-azp case (REQ-AUDIT-005).
+            .clientId(
+                clientAttribution.labelOf(authHelperService.currentAuthentication().orElse(null)))
             .build();
     BankAuditEvent saved = auditEventRepository.save(event);
     // Bank-trail volume signal (#1041 item 10): counts only, tagged by the bounded
@@ -132,6 +147,7 @@ public class BankAuditService {
    * @param actorUserId filter on the acting user, or {@code null}
    * @param accountId filter on the affected account, or {@code null}
    * @param eventType filter on the event type, or {@code null}
+   * @param clientId filter on the originating client (REQ-AUDIT-005), or {@code null}
    * @param pageable page, size and whitelisted sort
    * @return one page of audit events with resolved account numbers
    */
@@ -142,9 +158,17 @@ public class BankAuditService {
       @Nullable UUID actorUserId,
       @Nullable UUID accountId,
       @Nullable BankAuditEventType eventType,
+      @Nullable String clientId,
       @NotNull Pageable pageable) {
     Page<BankAuditEvent> page =
-        auditEventRepository.findFiltered(from, to, actorUserId, accountId, eventType, pageable);
+        auditEventRepository.findFiltered(
+            from,
+            to,
+            actorUserId,
+            accountId,
+            eventType,
+            clientAttribution.filterValue(clientId),
+            pageable);
     List<UUID> accountIds =
         page.getContent().stream()
             .map(BankAuditEvent::getAccountId)

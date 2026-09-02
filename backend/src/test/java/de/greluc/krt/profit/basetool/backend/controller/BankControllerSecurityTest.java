@@ -383,7 +383,7 @@ class BankControllerSecurityTest {
             get("/api/v1/bank/admin/audit")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_MANAGEMENT"))))
         .andExpect(status().isForbidden());
-    when(bankAuditService.getEvents(any(), any(), any(), any(), any(), any()))
+    when(bankAuditService.getEvents(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(org.springframework.data.domain.Page.empty());
     mockMvc
         .perform(

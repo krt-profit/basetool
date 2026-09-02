@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -148,20 +149,23 @@ class AdminAuditLogModalRenderMvcTest {
 
   @Test
   @WithMockUser(roles = "ADMIN")
-  void bankTab_rendersNeitherTheClientFilterNorTheColumn() throws Exception {
-    // The bank's own trail records no client, so the control must be absent rather than inert.
+  void bankTab_rendersTheClientFilterAndColumnToo() {
+    // The bank trail records the client since V238 (REQ-AUDIT-005), so the tab is no longer the
+    // exception it was when the column shipped for audit_event alone.
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     String html =
-        mockMvc
-            .perform(get("/admin/audit-log").param("domain", "BANK"))
-            .andExpect(status().isOk())
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
+        assertDoesNotThrow(
+            () ->
+                mockMvc
+                    .perform(get("/admin/audit-log").param("domain", "BANK"))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString());
 
-    assertThat(html).doesNotContain("data-testid=\"audit-filter-client\"");
-    assertThat(html).doesNotContain("data-testid=\"audit-row-client\"");
+    assertThat(html).contains("data-testid=\"audit-filter-client\"");
+    assertThat(html).doesNotContain("??admin.audit.client.");
   }
 }
