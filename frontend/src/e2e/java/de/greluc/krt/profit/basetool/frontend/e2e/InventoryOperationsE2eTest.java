@@ -675,7 +675,7 @@ class InventoryOperationsE2eTest {
           // the label missing entirely. The decimal mark stays out — it is locale-dependent.
           assertThat(option)
               .hasText(
-                  Pattern.compile(".*·\s*noch\s*400.*"),
+                  Pattern.compile(".*·\\s*noch\\s*400.*"),
                   new LocatorAssertions.HasTextOptions().setTimeout(10_000));
           assertThat(option).not().hasText(Pattern.compile(".*benötigt.*"));
 
@@ -685,7 +685,7 @@ class InventoryOperationsE2eTest {
               .hasText(
                   Pattern.compile(".*benötigt\s*650.*"),
                   new LocatorAssertions.HasTextOptions().setTimeout(10_000));
-          assertThat(option).hasText(Pattern.compile(".*·\s*noch\s*400.*"));
+          assertThat(option).hasText(Pattern.compile(".*·\\s*noch\\s*400.*"));
         });
   }
 
