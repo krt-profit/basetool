@@ -17,7 +17,10 @@ something broke once.
   the NOT NULL constraint in V89; dropped the legacy `job_order.squadron`
   VARCHAR in V90.
 - **V94–V96** — Main-line additions unrelated to the Spezialkommando work:
-  - **V94** — `add_is_manual_entry_to_material` (admin-created manual materials).
+  - **V94** — `add_is_manual_entry_to_material` (admin-created manual materials). The
+    column no longer exists: V116 moved the provenance into `material.source_systems`
+    (`MaterialSourceSystem.MANUAL`) and V125 dropped `is_manual_entry` on 2026-06-01.
+    Provenance is read from `source_systems` now.
   - **V95** — `backfill_material_quantity_type`.
   - **V96** — `add_mission_participant_user_unique_index` (DB-backstop against
     duplicate Einsatz-Anmeldungen).
@@ -61,6 +64,50 @@ something broke once.
     `squadron(id)` (`promotion_topic`, `mission_participant`,
     `job_order_handover`) to `org_unit(id)`, drop the V100 sync trigger and
     drop the legacy `squadron` table (R9 step 6).
+- **V106–V116** — SC Wiki + UEX-Items sync (see `SC_WIKI_SYNC_PLAN.md`). Adds the
+  Star Citizen Wiki API as a second catalogue source alongside UEX, joined on the
+  shared in-game asset UUID. Additive throughout, one release phase at a time:
+  - **V106–V109** (R1, foundation) — Wiki/UEX cross-ref columns plus
+    `source_systems` and `is_visible` on `material`; cross-ref columns on
+    `manufacturer`; the curated `material_external_alias` table (6 seeded rows);
+    the `uex_category` reference table.
+  - **V110–V112** (R2, UEX items) — `game_item`, the joint UEX + Wiki item entity
+    keyed on `external_uuid`; the rich UEX/Wiki field set on `ship_type`; and the
+    `created_at` / `updated_at` columns V109 had omitted. V112 exists as its own
+    file precisely because V109 had already shipped — see hard rule 1.
+  - **V113** (R3) — `external_sync_report`, the append-only per-run audit log both
+    syncs write their findings to.
+  - **V114** (R4) — the blueprint recipe graph: `blueprint`, `blueprint_ingredient`,
+    `blueprint_dismantle_return`.
+  - **V115** (R7) — `game_item_price`, the per-(item, terminal) UEX price matrix.
+  - **V116** (R8) — data-only backfill, no schema change: `source_systems = 'MANUAL'`
+    for every row that carried `is_manual_entry = TRUE`, so the provenance outlives
+    the column drop in V125.
+- **V117–V124** — main-line additions interleaved with the sync work:
+  - **V117** — `add_comment_to_job_order` (optional free-text comment at creation).
+  - **V118** — `make_job_order_material_min_quality_nullable`; NULL means "no
+    quality floor".
+  - **V119** — `add_mission_party_lead`, with its own `party_lead_version`
+    section-scoped counter in the V77 family.
+  - **V120–V121** — blueprint requirement groups and their stat modifiers, plus the
+    value-segment table describing the non-linear curve a modifier interpolates over.
+  - **V122** — `add_missing_fk_indexes_round2`, the second backfill of indexes on FK /
+    filter columns after the V34 blanket sweep and the V92 first backfill.
+  - **V123** — item job orders: the `job_order.type` discriminator (backfilled to
+    `'MATERIAL'`, CHECK-constrained to `MATERIAL`/`ITEM`) plus the item, requirement
+    and item-handover child tables.
+  - **V124** — `mission_participant_org_unit`, replacing the single
+    `mission_participant.squadron_id` FK with a join table over `org_unit`. Phase 1
+    of a two-phase drop: the entity stops writing the column, the column stays.
+- **V125 (destructive)** — SC Wiki sync R9 step 4 (see
+  `SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md`), shipped 2026-06-01. Drops
+  `material.is_manual_entry` and `ship_type.description`, whose readers had moved to
+  `source_systems` and `description_en` / `description_de` one release earlier. It is
+  the worked example for the two-phase DROP rule below.
+
+This timeline is curated, not exhaustive, and it stops at V125 — later releases have
+shipped many more migrations. `ls | sort -V | tail -1` in this directory is the only
+reliable answer to "what is the current tip?".
 
 ## Hard rules
 
@@ -104,6 +151,15 @@ Rules:
   - Phase 2 (`V<n+k>__drop_old_column.sql`): the actual `ALTER TABLE ... DROP
     COLUMN`. Land this in a *separate* release, after at least one production
     deploy with phase 1.
+  - **Worked example: V125** (`drop_legacy_material_and_ship_type_columns`).
+    Phase 1 was code-only (#275): every reader of `material.is_manual_entry` moved
+    to `source_systems` (which V116 had backfilled) and every reader of
+    `ship_type.description` moved to `description_en` / `description_de`, while both
+    columns stayed in place through a soak. Phase 2 (#281, 2026-06-01) ran the two
+    `DROP COLUMN`s **and** deleted the JPA fields `Material.isManualEntry` /
+    `ShipType.description` in the same change — which is what keeps
+    `ddl-auto=validate` green: during the soak both the field and the column existed,
+    after V125 neither did, and at no point was there a field without its column.
 * **Drop-then-add in one file is allowed only on tables that did not yet ship
   to production**, i.e. for migrations younger than the most recently
   deployed version. Use sparingly and only during the very first iteration of
