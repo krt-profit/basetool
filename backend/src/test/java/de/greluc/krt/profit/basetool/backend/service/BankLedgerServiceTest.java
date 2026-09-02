@@ -1101,7 +1101,7 @@ class BankLedgerServiceTest {
    */
   private BankAuditEvent auditForTransaction(UUID accountId, UUID transactionId) {
     return auditEventRepository
-        .findFiltered(null, null, null, accountId, null, PageRequest.of(0, 50))
+        .findFiltered(null, null, null, accountId, null, null, PageRequest.of(0, 50))
         .getContent()
         .stream()
         .filter(event -> transactionId.equals(event.getTransactionId()))

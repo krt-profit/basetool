@@ -401,9 +401,15 @@ a player identity).
 Each event stores: timestamp, actor user id (FK
 `ON DELETE SET NULL`) **plus** a denormalized actor handle snapshot (the trail must
 survive user deletion), event type, affected account/transaction/target-user references,
-and a compact details payload. The audit log is readable **only by admins**
+a compact details payload, and — since V238 — the bounded **originating client**
+([REQ-AUDIT-005](audit.md), [ADR-0153](../adr/0153-the-bank-trail-records-the-client-through-the-same-seam.md)):
+which client software the mutation came through, recorded through the same `ClientAttribution`
+seam and vocabulary as the shared trail, because the bank realm roles have sat on the mobile
+client's Keycloak scope since it was provisioned and the actor alone therefore never identified
+the origin here. Rows predating V238 carry `NULL`, which means **not recorded** and must not be
+read as "the web frontend". The audit log is readable **only by admins**
 (`hasRole('ADMIN')` on URL **and** method gate), paginated and filterable (period, actor,
-account, event type). Audit rows are never exposed through any non-admin endpoint.
+account, event type, client). Audit rows are never exposed through any non-admin endpoint.
 
 The audit table is business data, not logging — the `docs/specs/observability.md` rule
 (never log names/emails/tokens to the **log stream**) still applies to bank code.

@@ -94,4 +94,22 @@ public class ClientAttribution {
     }
     return MetricNames.CLIENT_ID_OTHER;
   }
+
+  /**
+   * Normalises a client filter value, treating blank as "no filter".
+   *
+   * <p>Lives beside the mapping rather than in either audit service, because both trails filter on
+   * the same vocabulary and the trap is the same in both: the viewer's "all clients" option submits
+   * the select's <em>empty</em> value rather than omitting the parameter. Passed through unchanged
+   * it would match only rows whose {@code client_id} is literally empty — that is, nothing — and
+   * read to the admin as "this log has no events" rather than as "no filter". A silent empty-result
+   * is the worst failure an audit viewer has, so the guard is shared and not reimplemented per
+   * trail.
+   *
+   * @param clientId the raw filter value, or {@code null}
+   * @return the value, or {@code null} when it is absent or blank
+   */
+  public @Nullable String filterValue(@Nullable String clientId) {
+    return clientId == null || clientId.isBlank() ? null : clientId;
+  }
 }

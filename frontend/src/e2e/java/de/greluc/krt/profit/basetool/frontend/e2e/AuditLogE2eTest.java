@@ -143,12 +143,11 @@ class AuditLogE2eTest {
             page.evaluate("() => window.__krtNoReload === true"),
             "Filtering the audit log must update in place — no page reload.");
 
-        // The bank keeps its own audit table and records no originating client, so the client
-        // filter is absent here rather than present and inert (REQ-AUDIT-005).
-        assertEquals(
-            0,
-            page.locator("[data-testid='audit-filter-client']").count(),
-            "the Bank tab must not offer a client filter its trail cannot answer");
+        // Since V238 the bank trail records the originating client too, so the filter is offered
+        // on this tab as well -- it was the one exception when the column shipped for audit_event
+        // alone (REQ-AUDIT-005).
+        assertThat(page.locator("[data-testid='audit-filter-client']"))
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
 
         // Switch to the Lager (INVENTORY) tab — a tab is a plain link (full navigation).
         page.locator("[data-testid='audit-tab-INVENTORY']").click();
@@ -157,9 +156,9 @@ class AuditLogE2eTest {
         assertThat(page.locator("[data-testid='audit-panel']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
 
-        // ... and it IS offered on a generic tab, where the column exists. Filtering to the app
-        // narrows to rows the app wrote; the seeded stack was written by the web frontend, so the
-        // assertion is on the round trip carrying the filter, not on a row count.
+        // ... and on a generic tab as well. Filtering to the app narrows to rows the app wrote;
+        // the seeded stack was written by the web frontend, so the assertion is on the round trip
+        // carrying the filter, not on a row count.
         assertThat(page.locator("[data-testid='audit-filter-client']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         page.evaluate("() => { window.__krtNoReload = true; }");

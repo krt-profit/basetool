@@ -23,7 +23,6 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
@@ -101,7 +100,8 @@ class AdminAuditLogPageControllerTest {
             "KB-0001",
             null,
             null,
-            "+100 aUEC");
+            "+100 aUEC",
+            "basetool-frontend");
     when(backendApiClient.get(contains("/api/v1/bank/admin/audit"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(bankRow), 0, 50, 1, 1, List.of()));
 
@@ -424,7 +424,6 @@ class AdminAuditLogPageControllerTest {
         "the client filter must reach the backend, not just the page: " + uri.getValue());
 
     // ... the tab offers it, and the row carries the client through to the template.
-    assertEquals(Boolean.TRUE, model.getAttribute("clientFilterSupported"));
     assertEquals("basetool-android", model.getAttribute("filterClientId"));
     PageResponse<AuditRowView> events = (PageResponse<AuditRowView>) model.getAttribute("events");
     assertNotNull(events);
@@ -449,28 +448,52 @@ class AdminAuditLogPageControllerTest {
   }
 
   @Test
-  void bankTab_neitherOffersNorForwardsTheClientFilter() {
-    // The bank keeps its own audit table, which records no client. Offering the filter there would
-    // be a control that appears to apply and does not — worse than its absence, because an empty
-    // result would read as "no such rows" rather than as "this tab cannot answer that".
+  void bankTab_offersAndForwardsTheClientFilterToo() {
+    // The bank trail records the client since V238, through the same ClientAttribution seam, so
+    // this tab is no longer the exception it was when the column shipped for audit_event alone.
     Model model = new ConcurrentModel();
     when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
-    // When — even with a client filter explicitly in the URL.
+    // When
     controller.auditLog("BANK", null, null, null, null, "basetool-android", 0, null, model);
 
     // Then
-    assertEquals(Boolean.FALSE, model.getAttribute("clientFilterSupported"));
-    assertNull(model.getAttribute("filterClientId"));
-    assertTrue(((List<String>) model.getAttribute("clientIds")).isEmpty());
+    assertEquals("basetool-android", model.getAttribute("filterClientId"));
+    assertFalse(((List<String>) model.getAttribute("clientIds")).isEmpty());
     ArgumentCaptor<String> uri = ArgumentCaptor.forClass(String.class);
     verify(backendApiClient).get(uri.capture(), anyTypeRef());
-    assertFalse(
-        uri.getValue().contains("clientId"),
-        "the bank endpoint has no clientId parameter: " + uri.getValue());
-    String paginationBaseUrl = (String) model.getAttribute("paginationBaseUrl");
-    assertFalse(paginationBaseUrl.contains("clientId"), paginationBaseUrl);
+    assertTrue(
+        uri.getValue().contains("clientId=basetool-android"),
+        "the bank endpoint takes a clientId parameter now: " + uri.getValue());
+    assertTrue(((String) model.getAttribute("paginationBaseUrl")).contains("clientId="));
+  }
+
+  @Test
+  void bankTab_carriesTheRowsClientThroughTheAdapter() {
+    // The uniform row view is shared by both trails; the bank adapter used to hardcode null here,
+    // which would now silently blank a value the backend does send.
+    Model model = new ConcurrentModel();
+    BankAuditEventDto bankRow =
+        new BankAuditEventDto(
+            UUID.randomUUID(),
+            Instant.now(),
+            "banker_jo",
+            "DEPOSIT_BOOKED",
+            UUID.randomUUID(),
+            "KB-0001",
+            null,
+            null,
+            "+100 aUEC",
+            "basetool-android");
+    when(backendApiClient.get(contains("/api/v1/bank/admin/audit"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(bankRow), 0, 50, 1, 1, List.of()));
+
+    controller.auditLog("BANK", null, null, null, null, null, 0, null, model);
+
+    PageResponse<AuditRowView> events = (PageResponse<AuditRowView>) model.getAttribute("events");
+    assertNotNull(events);
+    assertEquals("basetool-android", events.content().getFirst().clientId());
   }
 
   @Test

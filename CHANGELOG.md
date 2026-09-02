@@ -20,7 +20,7 @@
 
 ### Security
 
-- **Das Prüfprotokoll hält jetzt fest, über welchen Client eine Änderung kam** — Webtool oder Android-App —, im Audit-Viewer als Spalte und als Filter. Der Wert stammt aus dem von Keycloak signierten Token und wird auf eine feste Werteliste abgebildet, nie als freier Text gespeichert. Ältere Einträge bleiben leer (der Wert wurde nie gespeichert und war damals eindeutig); der Bank-Tab hat eine eigene Tabelle ohne Client-Spalte und blendet den Filter aus (ADR-0152).
+- **Das Prüfprotokoll hält jetzt fest, über welchen Client eine Änderung kam** — Webtool oder Android-App —, in allen zehn Bereichen des Audit-Viewers samt Bank, als Spalte und als Filter. Der Wert stammt aus dem von Keycloak signierten Token und wird auf eine feste Werteliste abgebildet, nie als freier Text gespeichert. Ältere Einträge bleiben leer und werden nicht nachgetragen — im Bank-Protokoll heißt leer ausdrücklich „nicht erfasst“ und nicht „aus dem Webtool“, denn die Bank-Rollen liegen seit jeher auch beim App-Client (ADR-0152, ADR-0153).
 
 ### Added
 

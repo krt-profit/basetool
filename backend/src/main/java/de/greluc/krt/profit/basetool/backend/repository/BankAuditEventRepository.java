@@ -52,6 +52,7 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
    * @param actorUserId filter on the acting user, or {@code null}
    * @param accountId filter on the affected account, or {@code null}
    * @param eventType filter on the event type, or {@code null}
+   * @param clientId filter on the originating client (REQ-AUDIT-005), or {@code null}
    * @param pageable page, size and whitelisted sort (default {@code occurredAt} descending)
    * @return one page of audit events
    */
@@ -63,6 +64,7 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
       AND (CAST(:actorUserId AS uuid) IS NULL OR e.actorUserId = :actorUserId)
       AND (CAST(:accountId AS uuid) IS NULL OR e.accountId = :accountId)
       AND (CAST(:eventType AS string) IS NULL OR e.eventType = :eventType)
+      AND (CAST(:clientId AS string) IS NULL OR e.clientId = :clientId)
       """)
   Page<BankAuditEvent> findFiltered(
       @Param("from") Instant from,
@@ -70,6 +72,7 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
       @Param("actorUserId") UUID actorUserId,
       @Param("accountId") UUID accountId,
       @Param("eventType") BankAuditEventType eventType,
+      @Param("clientId") String clientId,
       Pageable pageable);
 
   /**

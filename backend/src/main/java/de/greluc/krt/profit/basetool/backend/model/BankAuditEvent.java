@@ -109,4 +109,24 @@ public class BankAuditEvent {
   @Nullable
   @Column(columnDefinition = "TEXT")
   private String details;
+
+  /**
+   * Which client software the mutation came through — the token's {@code azp} mapped onto the
+   * bounded known-client vocabulary (REQ-AUDIT-005, GHSA-2vq5-8p8w-5r64): a known client id
+   * verbatim, {@code other} for an unrecognised one, {@code none} for a caller with no token or a
+   * token carrying no {@code azp}.
+   *
+   * <p>Bounded rather than verbatim because this table is evidence: a client-chosen string is the
+   * one kind of value that must not be able to write itself into it. {@code azp} is signed by
+   * Keycloak and unsettable by the client, so recording it adds no trust that {@code
+   * IngestGatewayProperties} does not already place in it.
+   *
+   * <p>{@code null} on rows written before V238 means <strong>not recorded</strong> — and, unlike
+   * {@link AuditEvent#getClientId()}, <em>not</em> "unambiguous anyway": the bank realm roles have
+   * been on the mobile client's scope since it was provisioned, so a bank row was reachable from
+   * two clients before this column existed. A null here must never be read as "the web frontend".
+   */
+  @Nullable
+  @Column(name = "client_id", length = 60)
+  private String clientId;
 }

@@ -82,10 +82,9 @@
                         th:text="#{${eventKeyPrefix + et}}">Ereignis</option>
             </select>
         </div>
-        <!-- Originating-client filter (REQ-AUDIT-005): only on the generic tabs. The bank keeps
-             its own table, which records no client, so the control is absent there rather than
-             present and inert. -->
-        <div class="bank-form-row" th:if="${clientFilterSupported}">
+        <!-- Originating-client filter (REQ-AUDIT-005): on every tab, the bank included -- both
+             trails record the value through the one ClientAttribution seam. -->
+        <div class="bank-form-row">
             <label for="audit-client" th:text="#{admin.audit.filter.client}">Client</label>
             <select id="audit-client" name="clientId" data-testid="audit-filter-client">
                 <option value="" th:text="#{admin.audit.filter.allClients}">Alle Clients</option>
@@ -124,7 +123,7 @@
                         <th th:text="#{admin.audit.col.actor}">Akteur</th>
                         <th th:text="#{admin.audit.col.event}">Ereignis</th>
                         <th th:text="#{admin.audit.col.subject}">Betroffen</th>
-                        <th th:if="${clientFilterSupported}" th:text="#{admin.audit.col.client}">Client</th>
+                        <th th:text="#{admin.audit.col.client}">Client</th>
                         <th th:text="#{admin.audit.col.details}">Details</th>
                     </tr>
                     </thead>
@@ -140,7 +139,7 @@
                         <!-- Falls back to the raw client id rather than a missing-key marker: an
                              unlabelled value means the deployment renamed a client, and the id
                              itself is the useful answer. -->
-                        <td th:if="${clientFilterSupported}" data-testid="audit-row-client"
+                        <td data-testid="audit-row-client"
                             th:text="${e.clientId() != null ? (#messages.msgOrNull('admin.audit.client.' + e.clientId()) ?: e.clientId()) : '—'}">&mdash;</td>
                         <td class="bank-note-cell" th:text="${e.details()}" th:title="${e.details()}">Details</td>
                     </tr>

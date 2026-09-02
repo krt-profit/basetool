@@ -219,11 +219,9 @@ the existing `/api/v1/bank/admin/audit` endpoint; the nine area tabs read `/api/
 both DTO
 shapes are adapted into one uniform row view so a single
 template renders every tab. Each tab is paginated and filterable by **period** (the
-`datetime-split-group` picker), **actor**, **event type** (the per-area type list) and — on the nine
-generic tabs — **originating client** (REQ-AUDIT-005), which also renders as its own column. The
-client control is **absent on the Bank tab**, not merely empty: `bank_audit_event` records no
-client, and a filter that appears to apply and does not is worse than its absence, because an empty
-result reads as "no such rows" rather than as "this tab cannot answer that". Filtering and
+`datetime-split-group` picker), **actor**, **event type** (the per-area type list) and
+**originating client** (REQ-AUDIT-005, on every tab — both trails record it), which also renders as
+its own column. Filtering and
 paging swap **in place** (`krtFetch`, the epic #571 pattern); the legacy `/admin/bank-audit` URL
 redirects here with the bank tab preselected.
 
@@ -231,8 +229,8 @@ redirects here with the bank tab preselected.
 
 - [ ] An admin sees ten tabs; switching a tab loads that area's log; filtering/paging stays in place.
 - [ ] `/admin/bank-audit` redirects to `/admin/audit-log?domain=BANK`.
-- [x] The client filter is offered on a generic tab and absent on the Bank tab; selecting it reaches
-  the backend as a query parameter and survives paging.
+- [x] The client filter is offered on **every** tab, the bank included; selecting it reaches the
+  backend as a query parameter and survives paging.
 
 **Enforced by:** `AdminAuditLogPageControllerTest`, `AuditLogE2eTest` · **Code:**
 `controller/AdminAuditLogPageController`, `templates/admin/audit-log.html`, `static/js/audit-log.js`
@@ -303,9 +301,9 @@ retention sweep**; purging is always an explicit admin action.
 
 ### REQ-AUDIT-005 — The trail records which client a mutation came through
 
-Every row `AuditService.record(...)` writes carries the **originating client**: which client
-software the request that caused the mutation was made from, stored in `audit_event.client_id` in
-the same transaction as the row itself.
+Every row **either** audit trail writes carries the **originating client**: which client software
+the request that caused the mutation was made from, stored in `audit_event.client_id` and
+`bank_audit_event.client_id` in the same transaction as the row itself.
 
 **Why the actor is not enough.** "Who did this" and "from where" are two questions, and the second
 one only became askable when a second first-party client appeared. While one client could reach a
@@ -322,12 +320,12 @@ signs and a client cannot set — the same handle `IngestGatewayProperties` uses
 dangerous on-behalf-of decision (ADR-0129) — so recording it introduces no new trust. It is
 **never written verbatim**:
 
-|                                        Recorded value                                         |                                                                             Means                                                                             |
-|-----------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| a configured client id (`basetool-frontend`, `basetool-android`, a configured ingest gateway) | that client                                                                                                                                                   |
-| `other`                                                                                       | an authenticated caller whose `azp` names no client this deployment knows                                                                                     |
-| `none`                                                                                        | a caller with **no token at all** (a scheduled job — the row's actor handle then reads `system`), or a token carrying no `azp` (a Keycloak mapper regression) |
-| `NULL`                                                                                        | **only** a row written before V237 added the column — see below                                                                                               |
+|                                        Recorded value                                         |                                                                                     Means                                                                                     |
+|-----------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| a configured client id (`basetool-frontend`, `basetool-android`, a configured ingest gateway) | that client                                                                                                                                                                   |
+| `other`                                                                                       | an authenticated caller whose `azp` names no client this deployment knows                                                                                                     |
+| `none`                                                                                        | a caller with **no token at all** (a scheduled job — the row's actor handle then reads `system`), or a token carrying no `azp` (a Keycloak mapper regression)                 |
+| `NULL`                                                                                        | **only** a row written before the column existed (V237 for `audit_event`, V238 for `bank_audit_event`) — see below, and note the two tables' nulls do not mean the same thing |
 
 The bound is not decoration. The claim's *content* is trustworthy; its *range* is not, because a
 client id exists in the realm the moment somebody registers one. Writing it unbounded would put an
@@ -343,33 +341,47 @@ mapping is exactly how that stops being true. The two are complements, not dupli
 finds the window, the column attributes the act; a counter can never say that *this* role grant came
 from the app.
 
-**`NULL` is not a gap in the trail.** Rows written before the column existed carry `NULL` and are
-**not** backfilled: the claim was never stored, and those rows predate the ambiguity, because while
-they were written the authority they record could come from one client only. V237 says so in a
-`COMMENT ON COLUMN` so a later reader does not read the nulls as data loss. New rows always carry a
-value; `none` is an answer, not an absence.
+**`NULL` means different things on the two tables, and the difference matters.** Neither is
+backfilled — the claim was never stored, so there is nothing to backfill *from*, and an audit trail
+that guesses is no longer evidence. But a reader must not treat the two alike:
 
-**Not covered: the bank trail.** `bank_audit_event` is a separate table (ADR-0037) and has no such
-column, so the unified viewer hides both the filter and the column on the Bank tab. The gap is
-real — `Bank Employee` and `Bank Management` sit on the mobile client's scope, so bank mutations are
-two-client-ambiguous by the same argument — and closing it is a sibling change against that second
-table, not part of this one.
+- **`audit_event`** (pre-V237): the nulls are **unambiguous anyway**. While those rows were written,
+  the authority they record could come from one client only, so the row's own domain implies the
+  answer.
+- **`bank_audit_event`** (pre-V238): the nulls mean **not recorded**, and nothing more. `Bank
+  Employee` and `Bank Management` have been on the mobile client's Keycloak scope since it was
+  provisioned — REQ-SEC-035's role list named them from its first revision — so a bank row has been
+  reachable from two clients for as long as that client has existed, independent of whether a
+  shipped app screen ever exercised it, because the authority rides on the token and a replayed
+  token carries it. **A null client on a pre-V238 bank row must never be read as "the web
+  frontend".**
+
+Each migration states its own case in a `COMMENT ON COLUMN`, so the distinction survives without
+this document. New rows on both tables always carry a value; `none` is an answer, not an absence.
+
+**Both trails, one seam.** The bank keeps a physically separate table (ADR-0037), but not a separate
+rule: `BankAuditService.record(...)` stamps the column through the same `ClientAttribution` and the
+same bounded vocabulary. A filter that meant something different per tab would be a defect rather
+than a feature, so the viewer offers the identical list everywhere.
 
 **Acceptance**
 
-- [x] A mutation made with a known client's token records that client id verbatim; an unregistered
-  client records `other`; a caller with no token, and a token-less authentication, record `none` —
-  never `null`, and never by throwing (the write is inside the business transaction).
-- [x] Two rows differing only in their client are separable by the viewer's filter, and a blank
-  filter value means "no filter" rather than "matches nothing".
+- [x] On **both** trails: a mutation made with a known client's token records that client id
+  verbatim; an unregistered client records `other`; a caller with no token, and a token-less
+  authentication, record `none` — never `null`, and never by throwing (the write is inside the
+  business transaction).
+- [x] On **both** trails: two rows differing only in their client are separable by the viewer's
+  filter, and a blank filter value means "no filter" rather than "matches nothing".
 - [x] The bounded vocabulary is the same object the `client_id` metric label uses.
-- [x] The filter is offered on the nine generic tabs and absent on the Bank tab, and every offered
-  value carries a DE/EN label.
+- [x] The filter is offered on all ten tabs and every offered value carries a DE/EN label.
 
-**Enforced by:** `AuditServiceTest`, `ClientAttributionTest`, `AuditQueryIntegrationTest`,
-`AdminAuditLogPageControllerTest`, `ApiClientMetricsFilterTest`, `AuditLogE2eTest` · **Code:**
-`support/ClientAttribution`, `service/AuditService#record`, `model/AuditEvent#clientId`,
-`controller/AuditAdminController`, `controller/AdminAuditLogPageController`,
-`db/migration/V237` · **Decision:**
-[ADR-0152](../adr/0152-the-audit-row-records-which-client-a-mutation-came-through.md) ·
+**Enforced by:** `AuditServiceTest`, `BankAuditServiceTest`, `ClientAttributionTest`,
+`AuditQueryIntegrationTest`, `BankAuditQueryIntegrationTest`, `AdminAuditLogPageControllerTest`,
+`AdminAuditLogModalRenderMvcTest`, `ApiClientMetricsFilterTest`, `AuditLogE2eTest` · **Code:**
+`support/ClientAttribution`, `service/AuditService#record`, `service/BankAuditService#record`,
+`model/AuditEvent#clientId`, `model/BankAuditEvent#clientId`, `controller/AuditAdminController`,
+`controller/BankAdminController`, `controller/AdminAuditLogPageController`,
+`db/migration/V237`, `db/migration/V238` · **Decision:**
+[ADR-0152](../adr/0152-the-audit-row-records-which-client-a-mutation-came-through.md),
+[ADR-0153](../adr/0153-the-bank-trail-records-the-client-through-the-same-seam.md) ·
 **Source:** private security advisory GHSA-2vq5-8p8w-5r64
