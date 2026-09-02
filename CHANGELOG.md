@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.6.14](https://github.com/krt-profit/basetool/releases/tag/v1.6.14) - 2026-09-02
+
 ### Fixed
 
 - **Als Admin sahst du in der App nur deine eigenen Einheiten statt aller.** Der mobile Keycloak-Client trug die Rolle `Admin` bewusst nicht — damit warst du in der App faktisch ein Mitglied ohne Mitgliedschaften: keine Einheit zum Umschalten, und „Alle Org-Einheiten“ lieferte deine eigene (leere) Reichweite statt wirklich allem. Der Client trägt `Admin` jetzt. Dazu drei Folgefehler behoben: die App pinnte beim Kaltstart selbst die erste Einheit des Katalogs (und schloss dich damit von herrenlosen Zeilen aus), der Umschalter konnte nicht scrollen, sodass „Alle Org-Einheiten“ ab acht Einheiten unerreichbar war, und der Eintrag stand ganz unten statt oben. Die Admin-Seiten bleiben weiterhin nur im Webtool.
