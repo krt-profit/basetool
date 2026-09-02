@@ -379,10 +379,16 @@ class ItemInventoryOperationsE2eTest {
           // "#<id> - <handle> (OPEN) · noch 7 Stück". Pin the SUFFIX, not a lone digit: the
           // option's own auto-incremented displayId can itself contain a 7, so ".*7.*" would pass
           // with the label missing entirely. The separator and the "noch" of the need message can
-          // only come from the suffix.
+          // only come from the suffix, and the word boundary keeps "noch 70" from passing.
+          //
+          // ESCAPE THEM TWICE. In a Java string literal \s is a SPACE (a Java 15 escape,
+          // not a regex one) and \b is a BACKSPACE, U+0008 — so the single-backslash form
+          // compiles to `·<SP>*noch<SP>*7<BS>` and can never match rendered text, whatever the
+          // page does. That is why this sat red in every browser. The material sibling gets
+          // away with the same mistake only because it carries no \b.
           assertThat(option)
               .hasText(
-                  Pattern.compile(".*·\s*noch\s*7\b.*"),
+                  Pattern.compile(".*·\\s*noch\\s*7\\b.*"),
                   new LocatorAssertions.HasTextOptions().setTimeout(10_000));
           // Item rows carry no quality (REQ-INV-029), so the material picker's floor marker
           // ("benötigt 650+") must never appear here.
