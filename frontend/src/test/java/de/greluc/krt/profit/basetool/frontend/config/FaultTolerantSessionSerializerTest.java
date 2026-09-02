@@ -122,4 +122,29 @@ class FaultTolerantSessionSerializerTest {
     assertThrows(SerializationException.class, () -> raw.deserialize(withoutTypeId));
     assertNull(new FaultTolerantSessionSerializer(raw).deserialize(withoutTypeId));
   }
+
+  @Test
+  void theAttributeThatCausedTheOutageIsSurvivable() {
+    // The culprit, found by surveying the live session hashes: SPRING_SECURITY_LAST_EXCEPTION.
+    // Spring Security parks the last failed authentication in the session, and this value writes
+    // cleanly WITH its @class and then cannot be read back — reconstruction dies on
+    // `IllegalArgumentException: authenticationRequest cannot be null`, a field the serialized form
+    // never carried. Reading a session deserializes every field, so this one poisons the whole
+    // session: from the next request on, that member gets a 500 on everything.
+    //
+    // It is not a regression. The same probe fails identically on v1.6.12, so the trap has been
+    // latent for as long as sessions have been JSON — a release only has to make an authentication
+    // FAIL to arm it.
+    RedisSerializer<Object> raw =
+        new GenericJacksonJsonRedisSerializer(
+            RedisSessionConfig.buildSessionJsonMapper(
+                FaultTolerantSessionSerializerTest.class.getClassLoader()));
+    byte[] stored =
+        raw.serialize(
+            new org.springframework.security.authentication.InsufficientAuthenticationException(
+                "authentication failed"));
+
+    assertThrows(SerializationException.class, () -> raw.deserialize(stored));
+    assertNull(new FaultTolerantSessionSerializer(raw).deserialize(stored));
+  }
 }
