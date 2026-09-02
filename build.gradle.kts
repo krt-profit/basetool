@@ -186,17 +186,38 @@ subprojects {
       systemProperty("spring.profiles.active", "dev")
     }
 
-    // No Boot-BOM version override is needed on 4.1.1. This block used to carry three security
-    // overrides — PostgreSQL 42.7.13 (CVE-2026-54291 SCRAM channel-binding downgrade), Tomcat
-    // 11.0.24 (CVE-2026-59083 RewriteValve `+` decoding, CVE-2026-59084 EncryptInterceptor) and
-    // Netty 4.2.17.Final (CVE-2026-56820 OCSP CertificateID, CVE-2026-56819 HTTP/2 leak,
-    // CVE-2026-55833 SPDY decode DoS) — and the Boot 4.1.1 BOM now manages exactly those three
-    // versions itself, so all three `extra[...]` lines were dropped with the 4.1.0 -> 4.1.1 bump.
-    // When a future CVE needs pinning again, override the Boot BOM property right here (NOT in
-    // gradle.properties, whose value is loaded first and would be silently overridden, and not as
-    // a plain Gradle constraint): io.spring.dependency-management emits every managed version as a
-    // `{strictly ...}` constraint, so a competing constraint collides instead of winning. The
-    // OWASP `dependencyCheckAggregate` gate keeps the absence of an override honest either way.
+    // Security override for a Spring-Boot-BOM-managed transitive. The Boot 4.1.1 BOM pins the
+    // embedded Tomcat to 11.0.24, and the Tomcat 11.0.25 advisory (2026-08-25) puts TEN CVEs on
+    // that version, nine of them at or above the `failBuildOnCVSS = 7.0` gate below: CVE-2026-65637
+    // (9.8, input validation — the incomplete-fix follow-up to CVE-2026-32990), CVE-2026-65905
+    // (9.8, DIGEST authenticator capture-replay), CVE-2026-65182 (9.1, security-constraint bypass
+    // when a longer path is declared before a more restrictive sub-path), CVE-2026-68525 (9.1, FORM
+    // auth bypassing a method-specific constraint), CVE-2026-65183 (8.1, unix-domain-socket
+    // TOCTOU),
+    // CVE-2026-66422 (8.1, `security-role-ref` used as a Realm role alias), CVE-2026-68569 (8.1,
+    // DataSourceRealm principal lookup failing open under CLIENT-CERT/SPNEGO), CVE-2026-65927 (7.5,
+    // rewrite `[N]` off-by-one) and CVE-2026-68763 (7.5, HTTP/2 reset-stream allocation leak); plus
+    // the sub-gate CVE-2026-73180 (6.8) and CVE-2026-66299 (WebSocket chat example). All ten are
+    // fixed in 11.0.25, which is the latest 11.0.x on Maven Central and stays on the line the Boot
+    // 4.1 BOM expects, so no 11.1.x jump. Boot has no 4.1.2 to bump to — 4.1.1 is the current
+    // stable and 4.2.0-M1 is a milestone — so the override is the only path. Tomcat is on the
+    // backend, frontend AND ingest runtime classpaths (embedded servlet container), so this is a
+    // shipped-code exposure, not a build-time one, and it is fixed by upgrading rather than
+    // suppressed. Discovered by the weekly scheduled scan, run 33392506709.
+    //
+    // Overriding the Boot BOM property is the conflict-free mechanism: it belongs right HERE (NOT
+    // in gradle.properties, whose value is loaded first and would be silently overridden, and not
+    // as a plain Gradle constraint), because io.spring.dependency-management emits every managed
+    // version as a `{strictly ...}` constraint, so a competing constraint collides instead of
+    // winning. Remove once the Boot BOM ships >= 11.0.25; the OWASP `dependencyCheckAggregate` gate
+    // keeps the presence and the absence of the override honest either way.
+    //
+    // This block previously carried two further overrides — PostgreSQL 42.7.13 (CVE-2026-54291
+    // SCRAM channel-binding downgrade) and Netty 4.2.17.Final (CVE-2026-56820 OCSP CertificateID,
+    // CVE-2026-56819 HTTP/2 leak, CVE-2026-55833 SPDY decode DoS) — dropped with the 4.1.0 ->
+    // 4.1.1 bump because the 4.1.1 BOM manages exactly those versions itself. It still does, so
+    // they stay gone; only Tomcat needs pinning again.
+    extra["tomcat.version"] = "11.0.25"
   }
 
   // JaCoCo coverage. Both modules want the same setup: emit XML + CSV + HTML
