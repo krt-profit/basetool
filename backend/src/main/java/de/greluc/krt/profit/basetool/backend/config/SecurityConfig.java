@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.ActingMemberAuthorities;
-import de.greluc.krt.profit.basetool.backend.support.ApiClientMetricsProperties;
+import de.greluc.krt.profit.basetool.backend.support.ClientAttribution;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.Permissions;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
@@ -345,8 +345,9 @@ public class SecurityConfig {
    * @param objectMapper serializes those filters' {@code ProblemDetail}s to JSON
    * @param meterRegistry counts the identity-provider-unavailable 503 on {@code
    *     basetool_http_error_total} (REQ-OBS-011)
-   * @param apiClientMetricsProperties bounds the {@code client_id} label of {@code
-   *     basetool_api_client_requests_total} (A8, REQ-OBS-018)
+   * @param clientAttribution bounds the {@code client_id} label of {@code
+   *     basetool_api_client_requests_total} (A8, REQ-OBS-018) — the same mapping the audit trail's
+   *     client column records (REQ-AUDIT-005)
    * @return the configured security filter chain
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
@@ -365,7 +366,7 @@ public class SecurityConfig {
       IngestGatewayProperties ingestGatewayProperties,
       ActingMemberAuthorities actingMemberAuthorities,
       RateLimitProperties rateLimitProperties,
-      ApiClientMetricsProperties apiClientMetricsProperties)
+      ClientAttribution clientAttribution)
       throws Exception {
 
     boolean isTest = java.util.Arrays.asList(env.getActiveProfiles()).contains("test");
@@ -814,8 +815,7 @@ public class SecurityConfig {
         // which is exactly how the counter shipped dead. ApiClientMetricsChainTest pins both edges
         // now; each wrong variant above fails it.
         .addFilterAfter(
-            new ApiClientMetricsFilter(
-                apiClientMetricsProperties, ingestGatewayProperties, meterRegistry),
+            new ApiClientMetricsFilter(clientAttribution, meterRegistry),
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
         .addFilterAfter(

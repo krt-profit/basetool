@@ -18,6 +18,10 @@
 
 ## [v1.6.13](https://github.com/krt-profit/basetool/releases/tag/v1.6.13) - 2026-09-02
 
+### Security
+
+- **Das Prüfprotokoll hält jetzt fest, über welchen Client eine Änderung kam** — Webtool oder Android-App —, im Audit-Viewer als Spalte und als Filter. Der Wert stammt aus dem von Keycloak signierten Token und wird auf eine feste Werteliste abgebildet, nie als freier Text gespeichert. Ältere Einträge bleiben leer (der Wert wurde nie gespeichert und war damals eindeutig); der Bank-Tab hat eine eigene Tabelle ohne Client-Spalte und blendet den Filter aus (ADR-0152).
+
 ### Added
 
 - **`GET /api/v1/me/org-units`** beantwortet, welche Org-Einheiten ein Aufrufer als Kontext wählen darf: für Admins alle aktiven Einheiten, sonst die eigenen Mitgliedschaften plus die über einen Bereichs- oder OL-Sitz erreichbaren. Das Webtool hatte diese Fallunterscheidung selbst gebaut, die App nicht — jetzt steht sie einmal auf dem Server. Nebeneffekt: aus bis zu vier Abrufen pro Seitenaufbau wird einer.

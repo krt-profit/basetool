@@ -35,10 +35,14 @@ import org.jetbrains.annotations.Nullable;
  * @param subject the affected subject label (account number / inventory label / order title), or a
  *     dash when the event has no subject
  * @param details the compact details payload
+ * @param clientId which client the mutation came through (REQ-AUDIT-005) — a bounded label such as
+ *     {@code basetool-android}, or {@code null} on the bank trail, which does not record one, and
+ *     on generic rows written before the column existed
  */
 public record AuditRowView(
     Instant occurredAt,
     String actorHandle,
     String eventLabelKey,
     String subject,
-    @Nullable String details) {}
+    @Nullable String details,
+    @Nullable String clientId) {}

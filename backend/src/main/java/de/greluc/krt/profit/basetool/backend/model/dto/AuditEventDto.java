@@ -38,6 +38,8 @@ import org.jetbrains.annotations.Nullable;
  * @param subjectLabel the affected aggregate's human-readable label snapshot
  * @param targetUserId the affected user for user-centric events
  * @param details compact human-readable details payload
+ * @param clientId which client the mutation came through (REQ-AUDIT-005) — a bounded label, {@code
+ *     null} only on rows written before the column existed
  */
 public record AuditEventDto(
     UUID id,
@@ -48,4 +50,5 @@ public record AuditEventDto(
     @Nullable UUID subjectId,
     @Nullable String subjectLabel,
     @Nullable UUID targetUserId,
-    @Nullable String details) {}
+    @Nullable String details,
+    @Nullable String clientId) {}

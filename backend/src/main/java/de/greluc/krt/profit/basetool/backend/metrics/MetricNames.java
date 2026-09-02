@@ -164,8 +164,8 @@ public final class MetricNames {
    *
    * <p>The label is bounded exactly as the ingest gateway bounds its own ({@code
    * basetool_ingest_client_total}): the {@code azp} is used verbatim only while it names a client
-   * the deployment already knows — one of {@code ApiClientMetricsProperties#getKnownClientIds()} or
-   * a configured ingest gateway — and collapses to {@link #CLIENT_ID_OTHER} otherwise, to {@link
+   * the deployment already knows — one of the client ids {@code ClientAttribution} knows or a
+   * configured ingest gateway — and collapses to {@link #CLIENT_ID_OTHER} otherwise, to {@link
    * #CLIENT_ID_NONE} when the token carries no {@code azp} at all. Keycloak only ever stamps a
    * registered client id, but deriving a Prometheus label from a token claim without a bound is the
    * kind of thing that stays correct until the day it is not (REQ-OBS-006).

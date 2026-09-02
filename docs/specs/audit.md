@@ -33,7 +33,8 @@ as the business write**. An audit-insert failure rolls the mutation back, so the
 silent gaps**. Each event stores: timestamp (UTC), the acting user's id (FK `ON
 DELETE SET NULL`) **plus** a denormalized actor-handle snapshot (the trail must survive user
 deletion), the `domain`, the event type, the affected subject's id + a denormalized subject-label
-snapshot, an optional target-user reference, and a compact details payload.
+snapshot, an optional target-user reference, a compact details payload, and the bounded
+originating-client label of [REQ-AUDIT-005](#req-audit-005--the-trail-records-which-client-a-mutation-came-through).
 
 Coverage is **complete**, including the cross-area writers and the system/automatic mutations:
 
@@ -218,7 +219,11 @@ the existing `/api/v1/bank/admin/audit` endpoint; the nine area tabs read `/api/
 both DTO
 shapes are adapted into one uniform row view so a single
 template renders every tab. Each tab is paginated and filterable by **period** (the
-`datetime-split-group` picker), **actor** and **event type** (the per-area type list). Filtering and
+`datetime-split-group` picker), **actor**, **event type** (the per-area type list) and — on the nine
+generic tabs — **originating client** (REQ-AUDIT-005), which also renders as its own column. The
+client control is **absent on the Bank tab**, not merely empty: `bank_audit_event` records no
+client, and a filter that appears to apply and does not is worse than its absence, because an empty
+result reads as "no such rows" rather than as "this tab cannot answer that". Filtering and
 paging swap **in place** (`krtFetch`, the epic #571 pattern); the legacy `/admin/bank-audit` URL
 redirects here with the bank tab preselected.
 
@@ -226,6 +231,8 @@ redirects here with the bank tab preselected.
 
 - [ ] An admin sees ten tabs; switching a tab loads that area's log; filtering/paging stays in place.
 - [ ] `/admin/bank-audit` redirects to `/admin/audit-log?domain=BANK`.
+- [x] The client filter is offered on a generic tab and absent on the Bank tab; selecting it reaches
+  the backend as a query parameter and survives paging.
 
 **Enforced by:** `AdminAuditLogPageControllerTest`, `AuditLogE2eTest` · **Code:**
 `controller/AdminAuditLogPageController`, `templates/admin/audit-log.html`, `static/js/audit-log.js`
@@ -293,3 +300,76 @@ retention sweep**; purging is always an explicit admin action.
 `controller/AuditAdminController`, `controller/BankAdminController`, `model/dto/AuditPurgeResultDto`,
 `templates/admin/audit-log.html`, `static/js/audit-log.js` · **Decision:**
 [ADR-0038](../adr/0038-admin-retention-purge-of-audit-logs.md)
+
+### REQ-AUDIT-005 — The trail records which client a mutation came through
+
+Every row `AuditService.record(...)` writes carries the **originating client**: which client
+software the request that caused the mutation was made from, stored in `audit_event.client_id` in
+the same transaction as the row itself.
+
+**Why the actor is not enough.** "Who did this" and "from where" are two questions, and the second
+one only became askable when a second first-party client appeared. While one client could reach a
+given mutation, its answer was implied by the row's own domain. It is not implied any more: the
+realm roles on a client's Keycloak scope decide which mutations it can reach, and wherever two
+clients' scopes overlap the same mutation can arrive from either. The case this exists for is
+narrower than "an app row looks like a browser row": an **access token replayed inside its
+lifetime** acts with its member's full authority, so its rows would be indistinguishable from the
+same person working in the browser — and "which client did this" is the first question of the review
+that follows.
+
+**The value is the token's `azp`, mapped through a bounded allowlist.** `azp` is a claim Keycloak
+signs and a client cannot set — the same handle `IngestGatewayProperties` uses for the far more
+dangerous on-behalf-of decision (ADR-0129) — so recording it introduces no new trust. It is
+**never written verbatim**:
+
+|                                        Recorded value                                         |                                                                             Means                                                                             |
+|-----------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| a configured client id (`basetool-frontend`, `basetool-android`, a configured ingest gateway) | that client                                                                                                                                                   |
+| `other`                                                                                       | an authenticated caller whose `azp` names no client this deployment knows                                                                                     |
+| `none`                                                                                        | a caller with **no token at all** (a scheduled job — the row's actor handle then reads `system`), or a token carrying no `azp` (a Keycloak mapper regression) |
+| `NULL`                                                                                        | **only** a row written before V237 added the column — see below                                                                                               |
+
+The bound is not decoration. The claim's *content* is trustworthy; its *range* is not, because a
+client id exists in the realm the moment somebody registers one. Writing it unbounded would put an
+unreviewed, externally-chosen string into the one table whose value rests on carrying none — the
+same instinct as the "no user free text, no PII in the details payload" rule above — and would grow
+an unbounded metric label on the other consumer (REQ-OBS-006).
+
+**One mapping, two consumers.** The bounded vocabulary is `support.ClientAttribution`, shared with
+the `client_id` label of `basetool_api_client_requests_total` (REQ-OBS-018). They must agree: an
+operator who sees a burst on that counter and then filters the audit log for the same client is
+joining two answers that only mean the same thing if one rule produced both. Two copies of the
+mapping is exactly how that stops being true. The two are complements, not duplicates — the counter
+finds the window, the column attributes the act; a counter can never say that *this* role grant came
+from the app.
+
+**`NULL` is not a gap in the trail.** Rows written before the column existed carry `NULL` and are
+**not** backfilled: the claim was never stored, and those rows predate the ambiguity, because while
+they were written the authority they record could come from one client only. V237 says so in a
+`COMMENT ON COLUMN` so a later reader does not read the nulls as data loss. New rows always carry a
+value; `none` is an answer, not an absence.
+
+**Not covered: the bank trail.** `bank_audit_event` is a separate table (ADR-0037) and has no such
+column, so the unified viewer hides both the filter and the column on the Bank tab. The gap is
+real — `Bank Employee` and `Bank Management` sit on the mobile client's scope, so bank mutations are
+two-client-ambiguous by the same argument — and closing it is a sibling change against that second
+table, not part of this one.
+
+**Acceptance**
+
+- [x] A mutation made with a known client's token records that client id verbatim; an unregistered
+  client records `other`; a caller with no token, and a token-less authentication, record `none` —
+  never `null`, and never by throwing (the write is inside the business transaction).
+- [x] Two rows differing only in their client are separable by the viewer's filter, and a blank
+  filter value means "no filter" rather than "matches nothing".
+- [x] The bounded vocabulary is the same object the `client_id` metric label uses.
+- [x] The filter is offered on the nine generic tabs and absent on the Bank tab, and every offered
+  value carries a DE/EN label.
+
+**Enforced by:** `AuditServiceTest`, `ClientAttributionTest`, `AuditQueryIntegrationTest`,
+`AdminAuditLogPageControllerTest`, `ApiClientMetricsFilterTest`, `AuditLogE2eTest` · **Code:**
+`support/ClientAttribution`, `service/AuditService#record`, `model/AuditEvent#clientId`,
+`controller/AuditAdminController`, `controller/AdminAuditLogPageController`,
+`db/migration/V237` · **Decision:**
+[ADR-0152](../adr/0152-the-audit-row-records-which-client-a-mutation-came-through.md) ·
+**Source:** private security advisory GHSA-2vq5-8p8w-5r64

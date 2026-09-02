@@ -117,8 +117,8 @@ public final class AuthenticatedSubject {
    * answer that the caller decides how to treat.
    *
    * <p>Bounding the value is deliberately NOT this method's job. It returns whatever the token
-   * says; a consumer that turns it into a metric label must map it onto a bounded set first
-   * (REQ-OBS-006), which is what {@code ApiClientMetricsProperties} is for.
+   * says; a consumer that turns it into a metric label or writes it to a row must map it onto a
+   * bounded set first (REQ-OBS-006), which is what {@link ClientAttribution} is for.
    *
    * @param authentication the current authentication, may be {@code null}
    * @return the {@code azp} claim, or empty when there is no token or the claim is absent/blank

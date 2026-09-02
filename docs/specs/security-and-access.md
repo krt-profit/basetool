@@ -1825,6 +1825,16 @@ app's claim never rewrites the stored role set, and the request is **authorised 
 Were the client taken off that list, authorisation would move back to the database row and the
 whole scope mapping would stop deciding anything.
 
+**What the scope list does not decide.** Which realm roles ride on a client's scope decides what the
+app *may* do; it does not decide whether the record of what was done can name the client. Those are
+separate, and only the second one is a property of the trail: `Bank Employee` and `Bank Management`
+are already on this scope, so mutations reachable from two clients are not hypothetical, and a
+stolen access token replayed inside its 300-second lifetime acts with its member's authority
+whatever the list says. `audit_event` therefore records the originating client on every row —
+the same bounded `azp` mapping this file's `azp`-matched rules already rely on
+([REQ-AUDIT-005](audit.md), ADR-0152). Changing the scope list is then a decision about authority,
+not one that also silently changes what a post-incident review can reconstruct.
+
 **Acceptance**
 
 - [x] The provisioning script grants exactly `MEMBER_REALM_ROLES` and takes back anything else on

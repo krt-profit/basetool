@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.ApiClientMetricsProperties;
+import de.greluc.krt.profit.basetool.backend.support.ClientAttribution;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -60,7 +61,9 @@ class ApiClientMetricsFilterTest {
     properties.setKnownClientIds(List.of("basetool-frontend", "basetool-android"));
     gatewayProperties = new IngestGatewayProperties();
     meterRegistry = new SimpleMeterRegistry();
-    filter = new ApiClientMetricsFilter(properties, gatewayProperties, meterRegistry);
+    filter =
+        new ApiClientMetricsFilter(
+            new ClientAttribution(properties, gatewayProperties), meterRegistry);
   }
 
   @AfterEach

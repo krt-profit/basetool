@@ -79,6 +79,8 @@ public class AuditAdminController {
    * @param to period end (inclusive, ISO instant), or absent
    * @param actorUserId filter on the acting user, or absent
    * @param eventType filter on the event type, or absent
+   * @param clientId filter on the originating client (REQ-AUDIT-005) — a bounded label such as
+   *     {@code basetool-android}, {@code other} or {@code none}, or absent
    * @param page zero-based page index
    * @param size page size
    * @param sort whitelisted sort spec
@@ -95,6 +97,7 @@ public class AuditAdminController {
           Instant to,
       @RequestParam(required = false) UUID actorUserId,
       @RequestParam(required = false) AuditEventType eventType,
+      @RequestParam(required = false) String clientId,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
@@ -103,7 +106,7 @@ public class AuditAdminController {
         PaginationUtil.createPageRequest(
             page, size, effectiveSort, AUDIT_SORT_FIELDS, "occurredAt");
     Page<AuditEventDto> result =
-        auditService.getEvents(domain, from, to, actorUserId, eventType, pageable);
+        auditService.getEvents(domain, from, to, actorUserId, eventType, clientId, pageable);
     return PageResponse.of(result);
   }
 
