@@ -292,4 +292,55 @@ class LoginMetricsHandlersTest {
   private static OAuth2AuthenticationException oauth2(String errorCode) {
     return new OAuth2AuthenticationException(new OAuth2Error(errorCode));
   }
+
+  @Test
+  void aFailedLoginDoesNotParkTheExceptionInTheSession() throws Exception {
+    // The write that caused the 2026-09-02 outage. SimpleUrlAuthenticationFailureHandler stores the
+    // AuthenticationException under SPRING_SECURITY_LAST_EXCEPTION in the session; sessions are
+    // JSON
+    // in Redis here, and that value writes cleanly and cannot be read back — reconstruction dies on
+    // `authenticationRequest cannot be null`. Reading a session deserializes every field, so one
+    // failed login left that member with an HTTP 500 on everything until the session expired.
+    //
+    // Nothing is lost by not storing it: the UI reads the `error` QUERY PARAMETER, never this
+    // attribute, and the failure is already counted and logged before the redirect.
+    org.springframework.mock.web.MockHttpServletRequest request =
+        new org.springframework.mock.web.MockHttpServletRequest();
+    org.springframework.mock.web.MockHttpServletResponse response =
+        new org.springframework.mock.web.MockHttpServletResponse();
+    // A session must already exist, or the superclass would skip the write for a different reason
+    // and the test would pass without proving anything.
+    request.getSession(true);
+
+    new LoginFailureMetricsHandler(new SimpleMeterRegistry(), "/?error")
+        .onAuthenticationFailure(request, response, new BadCredentialsException("nope"));
+
+    assertThat(request.getSession(false)).isNotNull();
+    assertThat(
+            request
+                .getSession(false)
+                .getAttribute(
+                    org.springframework.security.web.WebAttributes.AUTHENTICATION_EXCEPTION))
+        .isNull();
+  }
+
+  @Test
+  void aFailedLoginStillRedirectsAndStillExposesTheFailureForThisRequest() throws Exception {
+    // Replacing the superclass call must not change what a member sees, so both halves are pinned:
+    // the redirect still goes to the configured failure URL, and the exception is still reachable
+    // within this request (a request attribute is never serialized).
+    org.springframework.mock.web.MockHttpServletRequest request =
+        new org.springframework.mock.web.MockHttpServletRequest();
+    org.springframework.mock.web.MockHttpServletResponse response =
+        new org.springframework.mock.web.MockHttpServletResponse();
+
+    new LoginFailureMetricsHandler(new SimpleMeterRegistry(), "/?error")
+        .onAuthenticationFailure(request, response, new BadCredentialsException("nope"));
+
+    assertThat(response.getRedirectedUrl()).isEqualTo("/?error");
+    assertThat(
+            request.getAttribute(
+                org.springframework.security.web.WebAttributes.AUTHENTICATION_EXCEPTION))
+        .isNotNull();
+  }
 }
