@@ -12,6 +12,8 @@
 
 - **Ein Admin durfte in der App nichts, was er im Webtool darf.** Lagereinträge zuordnen, fremde Zeilen umbuchen, Aufträge bearbeiten, Auszahlungen bestätigen — alles war ausgegraut, obwohl der Server es erlaubt hätte. Betraf ebenso Offiziere. Ursache: `isLogistician` und `isMissionManager` in `/users/me` sagen aus, ob eine **Staffel-Mitgliedschaft** dieses Häkchen trägt, und ein Admin hat per Design keine. Die API sagt einem Client seine Berechtigung jetzt selbst — über drei hierarchie-aufgelöste Flags in `/api/v1/me/capabilities` und ein `canEdit` pro Zeile auf Lager- und Auftragsdaten.
 
+## [v1.6.13](https://github.com/krt-profit/basetool/releases/tag/v1.6.13) - 2026-09-02
+
 ### Added
 
 - **`GET /api/v1/me/org-units`** beantwortet, welche Org-Einheiten ein Aufrufer als Kontext wählen darf: für Admins alle aktiven Einheiten, sonst die eigenen Mitgliedschaften plus die über einen Bereichs- oder OL-Sitz erreichbaren. Das Webtool hatte diese Fallunterscheidung selbst gebaut, die App nicht — jetzt steht sie einmal auf dem Server. Nebeneffekt: aus bis zu vier Abrufen pro Seitenaufbau wird einer.
@@ -23,6 +25,10 @@
 ### Changed
 
 - **Keycloak auf 26.7.3 angehoben (großes Sicherheitsupdate).** Das Patch-Release schließt 20 Schwachstellen im Anmeldedienst — darunter das Umbiegen eines Anmeldecodes auf eine fremde Client-Sitzung, eine unvollständig behobene Redirect-Injection, die bisher nur den Query-Teil und nicht den Fragment-Teil der Rücksprungadresse prüfte, und ein weiterhin mögliches Ausspionieren des Dateisystems über relative Pfade. Dazu kommen Korrekturen an einer CPU-Regression seit 26.7.1. Keine Funktions- oder Konfigurationsänderung: Das gepinnte Container-Image (`quay.io/keycloak/keycloak:26.7`-Digest, weiterhin JDK 21) und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit; Anmeldung, Discord-Kontoverknüpfung und die App-Anmeldung laufen unverändert weiter. **Deploy-Hinweis:** Eine geänderte Keycloak-Image-Pinnung ist operator-gated — der Deploy wendet sie nicht selbständig an, sondern muss einmal mit `deploy.sh --force` durchgesetzt werden; der Keycloak-Container startet dabei neu.
+
+### Fixed
+
+- **Ein Admin durfte in der App nichts, was er im Webtool darf.** Lagereinträge zuordnen, fremde Zeilen umbuchen, Aufträge bearbeiten, Auszahlungen bestätigen — alles war ausgegraut, obwohl der Server es erlaubt hätte; und im Org-Einheiten-Umschalter stand nur „Alle Org-Einheiten". Betraf ebenso Offiziere. Ursache: `isLogistician` und `isMissionManager` in `/users/me` sagen aus, ob eine **Staffel-Mitgliedschaft** dieses Häkchen trägt, und ein Admin hat per Design keine. Die API sagt einem Client seine Berechtigung jetzt selbst — über drei hierarchie-aufgelöste Flags in `/api/v1/me/capabilities` und ein `canEdit` pro Zeile auf Lager- und Auftragsdaten.
 
 ## [v1.6.12](https://github.com/krt-profit/basetool/releases/tag/v1.6.12) - 2026-08-30
 
