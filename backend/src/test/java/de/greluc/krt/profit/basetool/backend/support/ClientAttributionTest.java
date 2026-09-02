@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.support;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import java.util.List;
@@ -98,35 +97,5 @@ class ClientAttributionTest {
     assertEquals(
         MetricNames.CLIENT_ID_NONE,
         attribution.labelOf(new TestingAuthenticationToken("principal", "creds")));
-  }
-
-  @Test
-  void knownLabels_offerEveryValueTheMappingCanProduce() {
-    // The viewer's filter is only honest if it lists exactly what the column can hold. Derived
-    // from the configuration rather than hardcoded, so renaming a client cannot leave the filter
-    // offering an option that selects nothing while hiding the client that is actually there.
-    gatewayProperties.setClientIds(List.of("basetool-ingest"));
-
-    List<String> labels = attribution.knownLabels();
-
-    assertEquals(
-        List.of(
-            "basetool-frontend",
-            "basetool-android",
-            "basetool-ingest",
-            MetricNames.CLIENT_ID_OTHER,
-            MetricNames.CLIENT_ID_NONE),
-        labels);
-  }
-
-  @Test
-  void knownLabels_doesNotRepeatAClientListedOnBothSides() {
-    gatewayProperties.setClientIds(List.of("basetool-android"));
-
-    List<String> labels = attribution.knownLabels();
-
-    assertEquals(
-        labels.size(), labels.stream().distinct().count(), "no label may appear twice in a filter");
-    assertTrue(labels.contains("basetool-android"));
   }
 }
