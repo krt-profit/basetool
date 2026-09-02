@@ -132,6 +132,34 @@
   </suppress>
 
   <!--
+    CVE-2026-62380 is a REAL netty CVE, not a CPE mismatch: the SOCKS4/SOCKS5 client encoders
+    (Socks4ClientEncoder / Socks5ClientEncoder) do not validate the domain address and the
+    username/password fields, so an attacker controlling them can inject NUL or CRLF and smuggle
+    a second SOCKS request. Affected: 4.2.0.Final - 4.2.16.Final and the whole 4.1.x line up to
+    and including 4.1.136.Final; fixed in 4.2.17.Final and 4.1.137.Final.
+
+    It is suppressed because it reaches nothing we deploy, on the same build-time-only ground as
+    the protobuf-java and vert.x entries below - NOT because we chose to live with it.
+    Re-verified 2026-09-02 with `dependencyInsight` over the keycloak-spi compileClasspath:
+    every netty 4.1.136.Final jar arrives as a compileOnly transitive of keycloak-services 26.7.3
+    -> quarkus-vertx/quarkus-netty 3.33.3.1, on the keycloak-spi compile classpath alone. The SPI
+    ships a plain provider JAR with no bundled dependencies and runs inside the Keycloak container,
+    which supplies its own netty. Meanwhile `:backend:`, `:frontend:` and `:ingest:` runtimeClasspath
+    all resolve netty 4.2.17.Final from the Boot 4.1.1 BOM - already at the fixed version - so no
+    shipped artifact carries a vulnerable encoder, and no basetool code opens a SOCKS proxy anyway.
+
+    Deliberately matched on the whole 4.1.x line rather than pinned to 4.1.136.Final: a Keycloak
+    bump that moves Quarkus onto 4.1.137.Final or later leaves the CVE outside its affected range,
+    so the finding disappears on its own and the entry lapses without silently masking anything.
+    Any netty on a REAL runtime classpath is a 4.2.x coordinate and is untouched by this pattern.
+  -->
+  <suppress>
+    <notes>Build-time-only: CVE-2026-62380 (SOCKS4/SOCKS5 client-encoder NUL/CRLF/credential injection, fixed in 4.1.137.Final / 4.2.17.Final) is real, but our netty 4.1.136.Final jars exist only as compileOnly transitives of keycloak-services 26.7.3 (via Quarkus) on the keycloak-spi module. They are container-provided by Keycloak at runtime and absent from every basetool runtime classpath, all of which resolve netty 4.2.17.Final - above the fix (verified 2026-09-02).</notes>
+    <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@4\.1\..*$</packageUrl>
+    <cve>CVE-2026-62380</cve>
+  </suppress>
+
+  <!--
     CVE-2024-7254 (unbounded recursion -> StackOverflowError when parsing
     untrusted nested groups, fixed in protobuf-java 3.25.5) is a REAL
     protobuf-java CVE - but protobuf-java 3.25.1 exists exclusively on the
@@ -232,34 +260,6 @@
     <packageUrl regex="true">^pkg:maven/io\.vertx/vertx-.*@4\.5\..*$</packageUrl>
     <cve>CVE-2026-15075</cve>
     <cve>CVE-2026-15076</cve>
-  </suppress>
-
-  <!--
-    CVE-2026-66299 is an uncontrolled-resource-consumption DoS in the WebSocket **chat example**
-    of Apache Tomcat (affected: 11.0.0-M20 through 11.0.24; fixed in 11.0.25, unreleased at the
-    time of writing). The advisory's own mitigation is "remove the examples web application" -
-    and an embedded Tomcat never had it in the first place.
-
-    The examples webapp ships in the standalone Tomcat *binary distribution* under
-    `webapps/examples`. It is not part of the `tomcat-embed-*` artifacts, and Spring Boot deploys
-    only this application's own servlet context. Verified on 2026-08-09 rather than reasoned
-    about: `tomcat-embed-core-11.0.24.jar` contains 1611 entries under exactly three top-level
-    package roots (`jakarta/servlet/`, `jakarta/security/`, `org/apache/`) and zero entries
-    matching `websocket/chat`, `ChatAnnotation` or `examples`. The vulnerable code is absent from
-    the artifact, so no configuration of ours can reach it.
-
-    Same class as the netty HTTP/3 suppression higher up: the broad
-    `cpe:2.3:a:apache:tomcat` match attributes a distribution-only vulnerability to the embedded
-    library. This is NOT a "real CVE we chose to live with" - CLAUDE.md forbids that, and rightly.
-
-    Pinned to 11.0.24 so the entry lapses on its own: bumping to 11.0.25 (which fixes this
-    upstream) stops the match, and the suppression should be deleted in that same change. Any
-    other Tomcat CVE, and any other embedded-Tomcat version, still fails the gate.
-  -->
-  <suppress>
-    <notes>False positive: CPE scope confusion. CVE-2026-66299 affects the WebSocket chat example in Tomcat's `webapps/examples`, which ships only with the standalone binary distribution. Verified 2026-08-09 that tomcat-embed-core-11.0.24.jar contains no examples/websocket-chat classes at all (1611 entries, only jakarta/servlet, jakarta/security and org/apache roots), so the vulnerable code is not on any classpath here. Remove this entry when the Boot BOM or our override moves to Tomcat 11.0.25, which fixes it upstream.</notes>
-    <packageUrl regex="true">^pkg:maven/org\.apache\.tomcat\.embed/tomcat\-embed\-.*@11\.0\.24$</packageUrl>
-    <cve>CVE-2026-66299</cve>
   </suppress>
 
 </suppressions>

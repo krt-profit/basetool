@@ -12,6 +12,10 @@
 
 - **Ein Admin durfte in der App nichts, was er im Webtool darf.** Lagereinträge zuordnen, fremde Zeilen umbuchen, Aufträge bearbeiten, Auszahlungen bestätigen — alles war ausgegraut, obwohl der Server es erlaubt hätte. Betraf ebenso Offiziere. Ursache: `isLogistician` und `isMissionManager` in `/users/me` sagen aus, ob eine **Staffel-Mitgliedschaft** dieses Häkchen trägt, und ein Admin hat per Design keine. Die API sagt einem Client seine Berechtigung jetzt selbst — über drei hierarchie-aufgelöste Flags in `/api/v1/me/capabilities` und ein `canEdit` pro Zeile auf Lager- und Auftragsdaten.
 
+### Security
+
+- **Eingebettetes Tomcat auf 11.0.25 angehoben.** Das Update schließt zehn Schwachstellen der bisher ausgelieferten 11.0.24, vier davon kritisch: eine Sicherheitsbeschränkung ließ sich umgehen, wenn eine Regel für einen längeren Pfad vor der strengeren Regel eines Unterpfads steht; eine DIGEST-Anmeldung war einmalig wiederholbar; eine FORM-Anmeldung hebelte eine auf POST beschränkte Regel aus; und eine Eingabeprüfung war zuvor nur unvollständig korrigiert worden. Betrifft Backend, Webtool und Ingest gleichermaßen — keine Funktions- oder Konfigurationsänderung.
+
 ## [v1.6.13](https://github.com/krt-profit/basetool/releases/tag/v1.6.13) - 2026-09-02
 
 ### Added
