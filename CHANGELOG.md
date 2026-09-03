@@ -6,6 +6,10 @@
 
 - **Eine Produktions-Promotion bricht jetzt ab, wenn das Image eine behebbare HIGH/CRITICAL-Schwachstelle trägt.** Der Trivy-Scan lief bisher zwar bei jedem Build, blockierte aber an keiner Stelle — eine verwundbare Java-Bibliothek verhinderte den Merge, ein verwundbares OS-Paket dagegen gar nichts. `promote.yml` scannt den zu promotenden Digest jetzt vor der Freigabe; der Build-Scan bleibt bewusst nur hinweisend. Für den Notfall gibt es die Eingabe `allow_vulnerable`, die den Fund sichtbar lässt und die Umgehung in der Freigabe protokolliert (REQ-OPS-024, ADR-0155).
 
+### Fixed
+
+- **Zwei App-Ansichten liefen ins Leere, weil der API-Zugang ihre Pfade nicht freigab.** Die Materialsammelübersicht eines Auftrags (Lieferstatus, Verknüpfung lösen, Material entfernen) und das Entfernen einer Person aus einer Einsatz-Einheit meldeten in der App nur „Konnte nicht gespeichert werden.". Die fünf Pfade sind jetzt freigegeben, in `ExternalContractTest` eingefroren und in `ApiVhostAnonymousSurfaceTest` festgenagelt; die Freischaltung wird mit dem Runbook (Phase N) eingespielt. Wer nur das Webtool nutzt, merkt nichts.
+
 ## [v1.6.18](https://github.com/krt-profit/basetool/releases/tag/v1.6.18) - 2026-09-03
 
 ### Fixed

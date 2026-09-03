@@ -469,6 +469,7 @@ class ExternalContractTest {
                   "version",
                   "handovers",
                   "redacted",
+                  "canEdit",
                   "requestingOrgUnit",
                   "responsibleOrgUnit")),
           // Phase 3, the two writes any member may make on an order they can see: putting their
@@ -1789,7 +1790,62 @@ class ExternalContractTest {
           // required and sent; the DTO's other fourteen properties are optional on the way in and
           // unread on the way out.
           new ContractOperation(
-              "/api/v1/refinery-orders", "post", Set.of("id"), Set.of("goods", "location")));
+              "/api/v1/refinery-orders", "post", Set.of("id"), Set.of("goods", "location")),
+          // ---- Phase N: the Materialsammelübersicht and one crew removal ----------------------
+          //
+          // The screen is one gate, so its four operations are frozen together. `canEdit` above is
+          // the gate: the app draws all three controls from it because it is
+          // `isLogisticianOrAbove() && canEditJobOrder(id)`, the same expression the two unlinks
+          // carry in their own `@PreAuthorize`. Renaming or dropping it does not disable the
+          // screen, it opens it -- an absent flag reads as "no" client-side, and every member would
+          // silently lose the three writes with nothing in a log to say why.
+          //
+          // The row's frozen set is the mapper's, not the DTO's: `inventoryEntryId` keys every
+          // write and a row without one is dropped, `version` is the row's own optimistic lock, and
+          // the remaining seven are what the card draws. `ownerName`/`location` are redacted to
+          // null for a caller who may not see them, which the app already handles -- absent is not
+          // the same as renamed.
+          new ContractOperation(
+              "/api/v1/orders/{jobOrderId}/material-collection",
+              "get",
+              Set.of(
+                  "inventoryEntryId",
+                  "version",
+                  "ownerName",
+                  "ownerId",
+                  "location",
+                  "locationId",
+                  "materialName",
+                  "quality",
+                  "quantity",
+                  "allocatedQuantity",
+                  "delivered")),
+          // Both unlinks answer 204 and the app reads nothing back -- it re-reads the collection,
+          // because every write here moves a figure the server computes. Nothing to freeze but the
+          // path and the verb, which is the promise that matters: a rename is a 404 the member
+          // sees as "could not be saved".
+          new ContractOperation(
+              "/api/v1/orders/{jobOrderId}/inventory/{inventoryItemId}/unlink", "delete", Set.of()),
+          new ContractOperation(
+              "/api/v1/orders/{jobOrderId}/materials/{materialId}", "delete", Set.of()),
+          // The delivered flag. The response is discarded, so only the request is frozen -- and all
+          // three of its fields are required: `jobOrderId` says which order's link is being marked
+          // (a row can be earmarked to exactly one, but the endpoint is on /inventory and will not
+          // infer it), and `version` is the row's own lock, so dropping it would turn a concurrent
+          // edit from a 409 into a silent overwrite.
+          new ContractOperation(
+              "/api/v1/inventory/{id}/delivered",
+              "patch",
+              Set.of(),
+              Set.of("delivered", "jobOrderId", "version")),
+          // The `/slim` crew removal, and deliberately not the deprecated full-DTO sibling beside
+          // it: that one is `@ApiDeprecation`-marked with a sunset, and freezing a path the backend
+          // has announced it will withdraw is a promise made to be broken. Answers 204, so the app
+          // re-reads the Einsatz -- the same shape as the participant leave frozen further up.
+          new ContractOperation(
+              "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim",
+              "delete",
+              Set.of()));
 
   /**
    * Contract operations the app addresses by <strong>no</strong> query parameter, although the

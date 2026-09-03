@@ -23,6 +23,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -681,6 +682,50 @@ class ApiVhostAnonymousSurfaceTest {
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"status\":\"IN_PROGRESS\",\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The Materialsammelübersicht and the crew removal, refused without a token.
+   *
+   * <p>Five paths phase N admits: the collection read, its two unlinks, the delivered PATCH that
+   * belongs to the same screen but lives on {@code /inventory}, and the {@code /slim} crew removal.
+   * REQ-SEC-037 wants every admitted path pinned here, and phase M is the reason it is not optional
+   * — that phase wrote its expected-status table by reasoning about the form around the field
+   * instead of the rule that judges the caller, the nightly probe was generated from the table, and
+   * both carried the same wrong number for three nights.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousMaterialCollectionAndCrewRemovalWithUnauthorized() throws Exception {
+    String order = "/api/v1/orders/" + ABSENT_OPERATION;
+    mockMvc.perform(get(order + "/material-collection")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(delete(order + "/inventory/" + ABSENT_OPERATION + "/unlink").with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(delete(order + "/materials/" + ABSENT_OPERATION).with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            patch("/api/v1/inventory/" + ABSENT_OPERATION + "/delivered")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"delivered\":true,\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            delete(
+                    "/api/v1/missions/"
+                        + ABSENT_OPERATION
+                        + "/units/"
+                        + ABSENT_OPERATION
+                        + "/crew/"
+                        + ABSENT_OPERATION
+                        + "/slim")
+                .with(csrf()))
         .andExpect(status().isUnauthorized());
   }
 
