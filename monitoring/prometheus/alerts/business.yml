@@ -651,23 +651,31 @@ groups:
           summary: "Frontend session store growing unbounded (>2000 active sessions)"
           description: "basetool_active_sessions has held above 2000 for 1h. Expected steady state is a few hundred; a sustained climb means anonymous/orphan sessions are accreting again (REQ-SEC-025 two-tier TTL regressed) and Redis is heading for its maxmemory noeviction ceiling. Check the session store size (redis SCAN 'basetool:session:sessions:*') and the created-vs-login ratio."
 
-      # (2026-09-02 log triage) Unreadable session values. On 2026-09-02 one session value in Redis
-      # that could not be deserialized answered HTTP 500 on EVERY request carrying a session cookie —
-      # everything behind the login, for everyone. FaultTolerantSessionSerializer made that
-      # survivable (the value reads as absent, the member is merely signed out), and in doing so made
-      # it INVISIBLE: the three hours after the fix deployed carry 496 identical WARN lines and no
-      # number anywhere. A dropped value is not written back, so a poisoned session keeps re-dropping
-      # on every request for up to its 720h window.
+      # (2026-09-02 log triage; re-tuned 2026-09-03 for REQ-SEC-050) Unreadable session values.
+      # On 2026-09-02 one session value in Redis that could not be deserialized answered HTTP 500 on
+      # EVERY request carrying a session cookie — everything behind the login, for everyone.
+      # FaultTolerantSessionSerializer made that survivable (the value reads as absent) and in doing
+      # so made it INVISIBLE: the three hours after the fix deployed carry 496 identical WARN lines
+      # and no number anywhere.
       #
-      # Two things this watches. First, residue draining: after a deploy that stops a poison being
-      # written, the rate must fall as affected sessions expire — a flat rate means something is
-      # still WRITING an unreadable value. Second, a new poison: a release that renames a class held
-      # in a session, or puts a final-typed value (a record, a List.of(...)) into one, turns this from
-      # a decaying tail into a step change on deploy day.
+      # WHAT THIS MEANS SINCE ADR-0157: a dropped value is now REMOVED from the session on the
+      # request that found it (SessionAttributeRepairFilter), so each poisoned session contributes
+      # exactly ONE drop and then stops. The counter is therefore a step, not a plateau, and the
+      # reading is simple:
+      #   - a burst that decays inside the 15m window = a poisoning that has been repaired. Expected
+      #     on the deploy that first repairs a backlog, and absorbed by the 30m `for` below.
+      #   - a rate that STAYS up = something is still WRITING an unreadable value every request. That
+      #     is the only case worth waking someone for, and it is what actually happened twice on
+      #     2026-09-03: first a Tomcat record with no @class (ADR-0154), then the same values never
+      #     being cleared because nothing rewrote them (ADR-0157).
       #
-      # baseline-tune: >20 in 15m held for 30m. A handful of long-lived poisoned sessions being
-      # polled produces a few per minute; the storm that prompted this was ~2.75/min sustained, which
-      # this matches, while a single stale session ticking over does not.
+      # Before ADR-0157 a handful of long-lived poisoned sessions being polled produced a permanent
+      # few per minute, which is exactly how the second 2026-09-03 firing looked — that case no
+      # longer exists, so a sustained rate no longer has a benign explanation.
+      #
+      # baseline-tune: >20 in 15m held for 30m, unchanged. The storm that prompted this was
+      # ~2.75/min sustained, which this matches; a single repaired session cannot reach it, and a
+      # backlog drain cannot hold it for 30 minutes.
       - alert: SessionValueDropsSustained
         expr: sum(increase(basetool_session_value_dropped_total[15m])) > 20
         for: 30m
@@ -675,7 +683,7 @@ groups:
           severity: warning
         annotations:
           summary: "Frontend is dropping unreadable session values ({{ $value | printf \"%.0f\" }} per 15m)"
-          description: "Session values in Redis cannot be deserialized and are being dropped, signing those members out. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names the attribute, the cause and the unresolved type id. typeId=absent means a FINAL-typed value (a record, a List.of/Map.of) was written into a session and can never be read back; a class name means that class was renamed or removed since the session was written; cause=IllegalArgumentException means a top-level @class no longer resolves. A decaying rate after a deploy is old sessions expiring and is expected; a flat or rising one means something is still writing it."
+          description: "Session values in Redis cannot be deserialized and are being dropped, so those attributes read as not set. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names the attribute, the cause and the unresolved type id. typeId=absent means a FINAL-typed value (a record, a List.of/Map.of) was written into a session and can never be read back; a class name means that class was renamed or removed since the session was written; cause=IllegalArgumentException means a top-level @class no longer resolves. Since ADR-0157 the value is REMOVED from the session on the request that dropped it, so each poisoned session drops exactly once: a burst that decays is a backlog being repaired and is expected on a deploy, while a rate that stays up for 30m means something is still WRITING an unreadable value every request — check that the frontend startup line \"Session serializer forces an @class type id for: [...]\" lists what you expect, and that no code path puts a final type into a session (REQ-SEC-049, REQ-SEC-050)."
 
       # (2026-09-02 log triage) Cross-instance Redis fan-out not subscribed. Until this release, a
       # Redis unreachable during context refresh threw out of SmartLifecycle#start() and aborted the

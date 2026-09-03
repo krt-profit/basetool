@@ -63,8 +63,21 @@ forced `@class` type id through a Jackson mix-in. Our own code never appears on 
 - The names are resolved with `Class.forName(…, false, loader)` and skipped when absent. An
   internal is exactly the class that appears in one patch release and moves in the next; a
   compile-time reference would make an emergency Tomcat downgrade fail to build.
-- **Existing poisoned sessions heal themselves.** The drop leaves the attribute unset, so the next
-  handshake writes a readable value over it. No Redis write, no purge, nothing handed to the owner.
+- ~~**Existing poisoned sessions heal themselves.** The drop leaves the attribute unset, so the next
+  handshake writes a readable value over it. No Redis write, no purge, nothing handed to the
+  owner.~~
+
+  > [!warning] **Wrong, corrected 2026-09-03** — see
+  > [ADR-0157](0157-a-dropped-session-value-is-repaired-on-the-request-that-found-it.md).
+  > They do not heal themselves. The claim rests on the handshake happening on every logged-in page,
+  > and it does not: `krt-live-sync.js` opens `/ws/sync` **lazily** — `ensureSocket()` is reached
+  > only from `subscribe()`, `sendChanged()` and `sendPresence()` — so a page that subscribes to no
+  > live-sync room never handshakes and nothing rewrites the attribute, while the notification poll
+  > keeps reading the session from every page. Production kept dropping at 2–6 per minute for hours
+  > after this fix was live, and `SessionValueDropsSustained` fired a second time at 13:33Z. The
+  > decision below (the forced type id) is unaffected and correct; only this argument about
+  > already-poisoned sessions was wrong. ADR-0157 repairs them instead of waiting for a handshake.
+
 - A value *we* write is never fixed here. It is fixed by not writing a final type — wrap it, as
   `BackendRoleSyncFilter`'s `new ArrayList<>(…)` already does.
 
@@ -90,9 +103,17 @@ A threshold tuned above a known-permanent rate cannot see the fault it was built
 
 ## Consequences
 
-- `basetool_session_value_dropped_total` returns to zero once the deployed sessions have re-written
+- ~~`basetool_session_value_dropped_total` returns to zero once the deployed sessions have re-written
   the attribute, so a non-zero rate means what it says again. A residual decaying tail is expected
-  for sessions that never open `/ws/sync`.
+  for sessions that never open `/ws/sync`.~~
+
+  > [!warning] **Wrong, corrected 2026-09-03.** It did not return to zero and the tail did not decay,
+  > for the reason recorded against the Decision above. "Sessions that never open `/ws/sync`" turned
+  > out to be most of them, and for those the tail is flat rather than decaying — it ends only when
+  > the session does, up to 720 h later. Made true by
+  > [ADR-0157](0157-a-dropped-session-value-is-repaired-on-the-request-that-found-it.md), which
+  > removes the value on the request that dropped it.
+
 - The allow-list is a standing obligation: an entry that no longer resolves is dead weight and the
   round-trip test is the alarm for it, which is why the test references the Tomcat class **by type**
   while production resolves it **by name**.
