@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.6.18](https://github.com/krt-profit/basetool/releases/tag/v1.6.18) - 2026-09-03
+
 ### Fixed
 
 - **Jeder angemeldete Seitenaufruf hinterließ einen unlesbaren Wert in deiner Sitzung.** Tomcat 11.0.25 legt bei jedem WebSocket-Handshake — also bei jedem Seitenaufruf mit Live-Sync — einen Wert ab, den die Sitzungsablage nicht zurücklesen konnte: er wurde bei jeder folgenden Anfrage verworfen und beim nächsten Handshake neu geschrieben. Für dich war das unsichtbar, verdeckte in der Überwachung aber echte Sitzungsfehler. Bestehende Sitzungen reparieren sich beim nächsten Seitenaufruf von selbst.
