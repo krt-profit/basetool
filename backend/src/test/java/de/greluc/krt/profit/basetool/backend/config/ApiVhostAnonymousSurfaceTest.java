@@ -686,6 +686,38 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * The Freigabe-Limits, refused without a token.
+   *
+   * <p>Four leaves under one allow-list rule (phase P), and the gap they close is the quietest one
+   * this vhost has had: the account's {@code /settings} GET that carries their current values was
+   * admitted in phase 3, so the section drew correctly and only the writes answered 404. Nothing in
+   * the runbook named {@code approval-limit} at all — neither admitting it nor excluding it.
+   *
+   * <p>Both verbs on each leaf, because the carve-out opens both and a test that checked only the
+   * PUT would say nothing about the DELETE that clears a ceiling.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousApprovalLimitWritesWithUnauthorized() throws Exception {
+    String stem = "/api/v1/org-units/bank/accounts/" + ABSENT_OPERATION + "/approval-limit/";
+    for (String leaf :
+        new String[] {
+          "all-members", "area-members", "role/KOMMANDOLEITER", "user/" + ABSENT_OPERATION
+        }) {
+      mockMvc
+          .perform(
+              put(stem + leaf)
+                  .with(csrf())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"limit\":1000}"))
+          .andExpect(status().isUnauthorized());
+      mockMvc.perform(delete(stem + leaf).with(csrf())).andExpect(status().isUnauthorized());
+    }
+  }
+
+  /**
    * The Verwaltung's direct booking, refused without a token.
    *
    * <p>Four paths phase O admits, and the phase is a correction rather than an addition: they were

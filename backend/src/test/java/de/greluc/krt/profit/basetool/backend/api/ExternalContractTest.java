@@ -179,7 +179,48 @@ class ExternalContractTest {
    * quietly substitutes the wrong shape and reports a gap that is not there.
    */
   private static final java.util.Map<String, String> PLACEHOLDERS =
-      java.util.Map.of("{enabled}", "true");
+      java.util.Map.of("{enabled}", "true", "{roleCode}", "KOMMANDOLEITER");
+
+  /**
+   * What an org-unit bank account's settings response promises, for <b>all seven</b> operations
+   * that answer with one.
+   *
+   * <p>Named once because they share a mapper. {@code settings}, {@code balance-target}, both
+   * {@code visibility} pairs and the four {@code approval-limit} leaves all funnel their answer
+   * through the app's single {@code mapped(...)} → {@code toModel()}, so a field the read needs is
+   * a field every write's response needs too. Six of the seven had a narrower set of their own
+   * until 2026-09-03 — {@code approvalLimits} and {@code canConfigureApprovalLimits} were on none
+   * of them, and the whole Freigabe-Limits section is drawn from the first.
+   *
+   * <p>The nested names are the ones {@code BankApprovalLimitsDto.toModel} reads. They are here for
+   * the same reason the top-level ones are: the guard walks nested properties, and a rename inside
+   * that object empties a control rather than failing anything.
+   */
+  private static final Set<String> BANK_ACCOUNT_SETTINGS =
+      Set.of(
+          "accountId",
+          "accountName",
+          "balanceTarget",
+          "version",
+          "canSetTarget",
+          "canConfigureVisibility",
+          "visibilityConfigurable",
+          "allMembersSupported",
+          "availableRoleCodes",
+          "grantedRoleCodes",
+          "allMembersGranted",
+          "approvalLimits",
+          "canConfigureApprovalLimits",
+          // BankApprovalLimitsDto, read field by field by the section's own mapper.
+          "configurable",
+          "areaMembersSupported",
+          "allMembersLimit",
+          "areaMembersLimit",
+          "roleLimits",
+          "userLimits",
+          "userId",
+          "displayName",
+          "limitAmount");
 
   private static final List<ContractOperation> CONTRACT =
       List.of(
@@ -556,41 +597,28 @@ class ExternalContractTest {
           // and guesses at no role. Losing either would leave the app either hiding a control a
           // holder is entitled to, or offering one that answers 403.
           new ContractOperation(
-              "/api/v1/org-units/bank/accounts/{id}/settings",
-              "get",
-              Set.of(
-                  "accountId",
-                  "accountName",
-                  "balanceTarget",
-                  "version",
-                  "canSetTarget",
-                  "canConfigureVisibility",
-                  "visibilityConfigurable",
-                  "allMembersSupported",
-                  "availableRoleCodes",
-                  "grantedRoleCodes",
-                  "allMembersGranted")),
+              "/api/v1/org-units/bank/accounts/{id}/settings", "get", BANK_ACCOUNT_SETTINGS),
           // The target is version-echoed and the target itself is optional: clearing it is sending
           // no target at all, which is why only `version` is required.
           new ContractOperation(
               "/api/v1/org-units/bank/accounts/{id}/balance-target",
               "put",
-              Set.of("accountId", "balanceTarget", "version", "canSetTarget"),
+              BANK_ACCOUNT_SETTINGS,
               Set.of("version")),
           // Visibility is addressed entirely by its path — a role bucket by code, the all-members
           // switch by a boolean path segment — so neither carries a body to freeze.
           new ContractOperation(
               "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}",
               "post",
-              Set.of("accountId", "grantedRoleCodes", "version")),
+              BANK_ACCOUNT_SETTINGS),
           new ContractOperation(
               "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}",
               "delete",
-              Set.of("accountId", "grantedRoleCodes", "version")),
+              BANK_ACCOUNT_SETTINGS),
           new ContractOperation(
               "/api/v1/org-units/bank/accounts/{id}/visibility/all-members/{enabled}",
               "put",
-              Set.of("accountId", "allMembersGranted", "version")),
+              BANK_ACCOUNT_SETTINGS),
           new ContractOperation(
                   "/api/v1/org-units/bank/accounts/{id}/transactions",
                   "get",
@@ -1889,7 +1917,57 @@ class ExternalContractTest {
           // The fee rate the sheet quotes before anything is booked. `rate` is the only field, and
           // an absent one is read as zero -- so a rename would not fail, it would quietly quote
           // "no fee" on a transfer that charges one.
-          new ContractOperation("/api/v1/bank/transfer-fee-rate", "get", Set.of("rate")));
+          new ContractOperation("/api/v1/bank/transfer-fee-rate", "get", Set.of("rate")),
+          // ---- Phase P: the Freigabe-Limits -----------------------------------------------------
+          //
+          // REQ-APP-BANK-017, design ch. 12 artboard 10, shipped 2026-08-30 -- and refused by the
+          // edge ever since, on a stem whose `/settings` GET is admitted. So the section drew its
+          // current values correctly and every write answered 404. `approval-limit` appeared
+          // NOWHERE in the runbook: not admitted, and not among the deliberate exclusions either.
+          //
+          // All four leaves answer the account's whole settings object, which is why their frozen
+          // response set is the same one `/settings` carries above -- the section redraws from the
+          // answer rather than re-reading, so a field lost here is a control that silently stops
+          // reflecting what was just saved.
+          //
+          // `limit` is the only required request field, and the DELETEs have none: clearing a
+          // ceiling is addressed entirely by its path.
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/approval-limit/all-members",
+              "put",
+              BANK_ACCOUNT_SETTINGS,
+              Set.of("limit")),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/approval-limit/all-members",
+              "delete",
+              BANK_ACCOUNT_SETTINGS),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/approval-limit/area-members",
+              "put",
+              BANK_ACCOUNT_SETTINGS,
+              Set.of("limit")),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/approval-limit/area-members",
+              "delete",
+              BANK_ACCOUNT_SETTINGS),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/approval-limit/role/{roleCode}",
+              "put",
+              BANK_ACCOUNT_SETTINGS,
+              Set.of("limit")),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/approval-limit/role/{roleCode}",
+              "delete",
+              BANK_ACCOUNT_SETTINGS),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId}",
+              "put",
+              BANK_ACCOUNT_SETTINGS,
+              Set.of("limit")),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId}",
+              "delete",
+              BANK_ACCOUNT_SETTINGS));
 
   /**
    * Contract operations the app addresses by <strong>no</strong> query parameter, although the

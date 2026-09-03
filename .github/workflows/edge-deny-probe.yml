@@ -178,6 +178,18 @@ jobs:
           probe PUT "/api/v1/operations/$nil/payouts/paid-out" 401
           probe PUT "/api/v1/org-units/bank/accounts/$nil/balance-target" 401
 
+          # Phase P - the Freigabe-Limits. Four leaves under one allow-list rule, and BOTH verbs on
+          # each: the carve-out opens the PUT that sets a ceiling and the DELETE that clears one, so
+          # probing only the PUT would say nothing about half of what was opened. A 405 here would
+          # mean the carve-out never matched, a 404 that the rule did not.
+          for leaf in all-members area-members role/LOGISTICIAN "user/$nil"; do
+            probe PUT "/api/v1/org-units/bank/accounts/$nil/approval-limit/$leaf" 401
+            probe DELETE "/api/v1/org-units/bank/accounts/$nil/approval-limit/$leaf" 401
+          done
+          # The ladder editor beside them is a DIFFERENT endpoint the app does not call and is
+          # asserted 404 further down, in the group that keeps the bank's shut paths together.
+          # Phase P's rule is $-anchored so that assertion keeps meaning something.
+
           # Phase 5 - the member's bank booking requests and the one membership read the Lager's
           # Umbuchen picker needs. Same rule again: these join with the paste that opens them
           # (runbook § Phase K), so the run is red between merging this and pasting the block.

@@ -576,6 +576,21 @@ if ($uri = "/api/v1/bank/deposits") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/bank/withdrawals") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/bank/transfers") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/bank/transfer-fee-rate") { set $krt_api_allowed 1; }
+# Phase P - the Freigabe-Limits (app REQ-APP-BANK-017, design ch. 12 artboard 10). ONE rule for
+# all four leaves, because they are one screen and one endpoint family: the ceiling that
+# decides which member may approve a booking on this account, set for everybody, for the
+# Bereich, for a role bucket, or for one member.
+#
+# The account's `/settings` GET that carries the current values was admitted in phase 3, so
+# the section has been DRAWING correctly all along and every 'Setzen' and 'Entfernen' answered
+# 404 - the reason this was invisible. Whether these eight are among the 75 the audit counted is
+# not recorded: no per-family breakdown of that number was committed, so this phase does not move
+# it either way.
+#
+# `role/` reuses the same character class as the visibility rule above, and `user/` a uuid;
+# both are $-anchored, so `approval-tiers` beside them - the KRT ladder editor, a DIFFERENT
+# endpoint the app does not call - stays unnamed and keeps answering 404.
+if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/approval-limit/(all-members|area-members|role/[A-Za-z0-9_-]{1,64}|user/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$") { set $krt_api_allowed 1; }
 # Phase N - taking somebody off an Einheit, and the `/slim` half of the pair only. The
 # full-DTO `DELETE .../crew/{crewId}` beside it is @ApiDeprecation-marked with a sunset and
 # stays unnamed on purpose: naming both would let a build fall back onto the path that is
@@ -675,6 +690,11 @@ if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a
 if ($uri = "/api/v1/org-units/bank/requests") { set $krt_readonly_family ""; }
 if ($uri ~ "^/api/v1/org-units/bank/requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_readonly_family ""; }
 if ($uri ~ "^/api/v1/org-units/bank/requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(cancel|owner-approval)$") { set $krt_readonly_family ""; }
+# Phase P - the Freigabe-Limits' two writes. The same one rule as above, and it opens exactly
+# what the backend serves on those paths: PUT to set a ceiling, DELETE to clear it. Both answer
+# with the account's whole settings object, which is what lets the section redraw from the
+# answer instead of re-reading.
+if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/approval-limit/(all-members|area-members|role/[A-Za-z0-9_-]{1,64}|user/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$") { set $krt_readonly_family ""; }
 if ($krt_readonly_family = "RW") { return 405; }
 
 # --- Which family gets which shape ---------------------------------------------------------------
@@ -741,95 +761,99 @@ The safe order, and the reason for it:
    `200`. Corrected 2026-08-31, after three nights of a red probe against a correctly pasted
    vhost.
 
-   |                          Path                           |                           Without a token                           |                                                   Why                                                    |
-   |---------------------------------------------------------|---------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
-   | `/api/v1/terms/document`                                | **200**                                                             | anonymous by design (ADR-0138): wording that must be read *before* agreeing cannot require having agreed |
-   | `/api/v1/missions/search`                               | **200**                                                             | anonymous by design: the public home page already renders its guest-redacted rows                        |
-   | `/api/v1/missions/<uuid>`                               | **200** for a non-internal, non-terminal Einsatz, **403** otherwise | anonymous by design, redacted per ADR-0034                                                               |
-   | `/api/v1/missions/<uuid>` with `PUT`/`DELETE`           | **405**                                                             | the family is read-only on this vhost                                                                    |
-   | `/api/v1/missions/<uuid>/finance-entries`               | **403**                                                             | member-or-above **and** `canSeeMission`, refused at the method seam — see below                          |
-   | `/api/v1/missions/<uuid>/finance-entries/summary`       | **403**                                                             | member-or-above **and** `canSeeMission`, refused at the method seam — see below                          |
-   | `/api/v1/operations/search`                             | **401**                                                             | `isAuthenticated()`, and no chain matcher makes it public                                                |
-   | `/api/v1/operations/<uuid>`                             | **401**                                                             | `isAuthenticated()` + `canSeeOperation`                                                                  |
-   | `/api/v1/operations/<uuid>/finance-summary`             | **401**                                                             | `isAuthenticated()` + `canSeeOperation`                                                                  |
-   | `/api/v1/operations/<uuid>/payouts`                     | **401**                                                             | `isAuthenticated()` + `canSeeOperation`                                                                  |
-   | `/api/v1/operations/<uuid>` with `PUT`/`DELETE`         | **405**                                                             | the family is read-only on this vhost                                                                    |
-   | `/api/v1/terms/status`                                  | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/terms/acceptance` (POST)                       | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/me/active-org-unit`                            | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/me/capabilities`                               | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/inventory/aggregated`                          | **401**                                                             | chain requires a member role                                                                             |
-   | `/api/v1/inventory/all/grouped`                         | **401**                                                             | same                                                                                                     |
-   | `/api/v1/orders`                                        | **401**                                                             | `isAuthenticated()`; the `POST` on the same path is refused by the read-only guard                       |
-   | `/api/v1/orders/item-catalog`                           | **401**                                                             | `isAuthenticated()` since ADR-0149; the orderable finished items                                         |
-   | `/api/v1/orders/item-catalog/<uuid>/blueprints`         | **401**                                                             | same; the blueprints one item may be built from                                                          |
-   | `/api/v1/orders/items` (POST)                           | **401**                                                             | `isAuthenticated()`; raises an item order                                                                |
-   | `/api/v1/orders/<uuid>`                                 | **401**                                                             | `isAuthenticated()` + scope                                                                              |
-   | `/api/v1/orders/<uuid>/assignees/<uuid>`                | **401**                                                             | `isAuthenticated()` + scope; self-assignment is open to every member, anyone else needs LOGISTICIAN      |
-   | `/api/v1/orders/<uuid>/assignees/<uuid>/note`           | **401**                                                             | same, and locked on the assignee edge's own version                                                      |
-   | `/api/v1/orders/<uuid>/status`                          | **401**                                                             | `hasRole(LOGISTICIAN)` + per-order scope; a member without the role gets **403** once authenticated      |
-   | `/api/v1/missions/<uuid>/join`                          | **401**                                                             | `isAuthenticated()` + `canSeeMission`                                                                    |
-   | `/api/v1/missions/<uuid>/participants/<uuid>/slim`      | **401**                                                             | `canAccessParticipant` — the caller's own row, or a mission manager's                                    |
-   | `…/participants/<uuid>/check-in/slim`                   | **401**                                                             | same                                                                                                     |
-   | `…/participants/<uuid>/payout-preference/slim`          | **401**                                                             | same                                                                                                     |
-   | `/api/v1/finance-entries`                               | **401**                                                             | `isAuthenticated()` + member-or-above + `canSeeMission` on the body's mission                            |
-   | `/api/v1/finance-entries/<uuid>`                        | **401**                                                             | `isAuthenticated()`; owner-vs-admin is decided at the service seam                                       |
-   | `/api/v1/operations/<uuid>/payouts/paid-out`            | **401**                                                             | `hasRole(MISSION_MANAGER)` + scope; taking a confirmation back additionally needs OFFICER or ADMIN       |
-   | `…/org-units/bank/accounts/<uuid>/settings`             | **401**                                                             | `isAuthenticated()`; what the caller may change is stated in the answer, not in the chain                |
-   | `…/bank/accounts/<uuid>/balance-target`                 | **401**                                                             | `isAuthenticated()` + the responsible-holder seam                                                        |
-   | `…/bank/accounts/<uuid>/visibility/…`                   | **401**                                                             | same                                                                                                     |
-   | `/api/v1/org-units/bank/balances`                       | **401**                                                             | me-scoped to the accounts the caller may see                                                             |
-   | `/api/v1/org-units/bank/accounts/<uuid>`                | **401**                                                             | same                                                                                                     |
-   | `/api/v1/personal-inventory`                            | **401**                                                             | me-scoped; the same path answers POST, which is 401 anonymously too                                      |
-   | `/api/v1/personal-inventory/<uuid>`                     | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
-   | `/api/v1/uex/locations/search`                          | **401**                                                             | `isAuthenticated()`                                                                                      |
-   | `/api/v1/personal-blueprints`                           | **401**                                                             | me-scoped; POST likewise                                                                                 |
-   | `/api/v1/personal-blueprints/<uuid>`                    | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
-   | `/api/v1/personal-blueprints/craftability`              | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/personal-blueprints/<uuid>/recipe`             | **401**                                                             | me-scoped; GET only, phase 5                                                                             |
-   | `/api/v1/blueprints/products/search`                    | **401**                                                             | `isAuthenticated()`                                                                                      |
-   | `/api/v1/hangar/ships`                                  | **401**                                                             | me-scoped; POST likewise                                                                                 |
-   | `/api/v1/hangar/ships/<uuid>`                           | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
-   | `/api/v1/ship-types`                                    | **200**                                                             | anonymous by design: `permitAll` game data the public web frontend already renders (REQ-SEC-037)         |
-   | `/api/v1/locations/home-locations`                      | **403**                                                             | `permitAll` chain + method guard — refused at the method seam, like the Finanzen paths                   |
-   | `/api/v1/inventory` (POST)                              | **401**                                                             | chain requires a member role                                                                             |
-   | `/api/v1/inventory/all/stack/entries`                   | **401**                                                             | chain requires a member role                                                                             |
-   | `/api/v1/inventory/material/<uuid>`                     | **401**                                                             | same; one material's entries, for the app's tablet pane                                                  |
-   | `/api/v1/inventory/<uuid>/book-out`                     | **401**                                                             | same, plus `canEditInventoryItem`                                                                        |
-   | `/api/v1/inventory/<uuid>/personal-rebook`              | **401**                                                             | same                                                                                                     |
-   | `/api/v1/inventory/<uuid>/note`                         | **401**                                                             | same                                                                                                     |
-   | `/api/v1/materials/search`                              | **200**                                                             | anonymous by design: `permitAll` catalogue, like `/ship-types` (REQ-SEC-037)                             |
-   | `/api/v1/locations/search`                              | **200**                                                             | same catalogue family                                                                                    |
-   | `/api/v1/users/search`                                  | **401**                                                             | member records; `isAuthenticated()` and role-gated                                                       |
-   | `/api/v1/materials/<uuid>/terminals`                    | **401**                                                             | carved back **out** of the catalogue family with `/materials/matrix` (REQ-SEC-032) — UEX trade prices    |
-   | `/api/v1/org-units/bank/accounts/<uuid>/transactions`   | **401**                                                             | same                                                                                                     |
-   | `/api/v1/hangar/my-ships`                               | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/hangar/squadron-overview`                      | **401**                                                             | scoped to the active org unit                                                                            |
-   | `/api/v1/announcement`                                  | **401**                                                             | no chain matcher makes it public                                                                         |
-   | `/api/v1/notifications`                                 | **401**                                                             | me-scoped inbox                                                                                          |
-   | `/api/v1/notifications/unread-count`                    | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/notifications/stream`                          | **401**                                                             | me-scoped SSE                                                                                            |
-   | `/api/v1/notifications/read-all`                        | **401**                                                             | me-scoped write; POST only, phase 5                                                                      |
-   | `/api/v1/notifications/read`                            | **401**                                                             | me-scoped write; DELETE only, phase 5                                                                    |
-   | `/api/v1/notifications/<uuid>`                          | **401**                                                             | me-scoped; GET + DELETE, phase 5                                                                         |
-   | `/api/v1/notifications/<uuid>/read`                     | **401**                                                             | me-scoped write; POST only, phase 5                                                                      |
-   | `/api/v1/notification-rules`                            | **404**                                                             | admin surface, NOT admitted — the four rows above must not have widened the prefix                       |
-   | `/api/v1/users/me`                                      | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/users/me/registration-status`                  | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/users/me/memberships`                          | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/refinery-orders` (POST)                        | **401**                                                             | phase M; `hasRole(KRT_MEMBER)` — the create form's write                                                 |
-   | `/api/v1/locations/refineries`                          | **403**                                                             | phase M; `permitAll` chain + method guard, refused at the method seam like `/locations/home-locations`   |
-   | `/api/v1/refining-methods`                              | **200**                                                             | phase M; anonymous master-data catalogue with no method gate, like `/ship-types` (REQ-SEC-037)           |
-   | `/api/v1/orders/<uuid>/material-collection`             | **401**                                                             | phase N; `isAuthenticated()` + `canSeeJobOrder`                                                          |
-   | `/api/v1/orders/<uuid>/inventory/<uuid>/unlink`         | **401**                                                             | phase N; LOGISTICIAN / OFFICER / ADMIN + `canEditJobOrder`                                               |
-   | `/api/v1/orders/<uuid>/materials/<uuid>`                | **401**                                                             | phase N; same gate                                                                                       |
-   | `/api/v1/inventory/<uuid>/delivered`                    | **401**                                                             | phase N; `isAuthenticated()` + `canEditInventoryItem` — the ROW's gate, not the order's                  |
-   | `/api/v1/missions/<uuid>/units/<uuid>/crew/<uuid>/slim` | **401**                                                             | phase N; `canManageMission`. The deprecated sibling without `/slim` stays **404**                        |
-   | `/api/v1/bank/deposits` (POST)                          | **401**                                                             | phase O; `hasRole(BANK_EMPLOYEE)` + per-account `canDeposit`                                             |
-   | `/api/v1/bank/withdrawals` (POST)                       | **401**                                                             | phase O; same, `canWithdraw`                                                                             |
-   | `/api/v1/bank/transfers` (POST)                         | **401**                                                             | phase O; same, `canTransfer` on the SOURCE account                                                       |
-   | `/api/v1/bank/transfer-fee-rate`                        | **401**                                                             | phase O; `hasRole(BANK_EMPLOYEE)` only — an org-wide rate, no account in it                              |
-   | anything not on the list                                | **404**                                                             | default deny                                                                                             |
+   |                             Path                              |                           Without a token                           |                                                   Why                                                    |
+   |---------------------------------------------------------------|---------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
+   | `/api/v1/terms/document`                                      | **200**                                                             | anonymous by design (ADR-0138): wording that must be read *before* agreeing cannot require having agreed |
+   | `/api/v1/missions/search`                                     | **200**                                                             | anonymous by design: the public home page already renders its guest-redacted rows                        |
+   | `/api/v1/missions/<uuid>`                                     | **200** for a non-internal, non-terminal Einsatz, **403** otherwise | anonymous by design, redacted per ADR-0034                                                               |
+   | `/api/v1/missions/<uuid>` with `PUT`/`DELETE`                 | **405**                                                             | the family is read-only on this vhost                                                                    |
+   | `/api/v1/missions/<uuid>/finance-entries`                     | **403**                                                             | member-or-above **and** `canSeeMission`, refused at the method seam — see below                          |
+   | `/api/v1/missions/<uuid>/finance-entries/summary`             | **403**                                                             | member-or-above **and** `canSeeMission`, refused at the method seam — see below                          |
+   | `/api/v1/operations/search`                                   | **401**                                                             | `isAuthenticated()`, and no chain matcher makes it public                                                |
+   | `/api/v1/operations/<uuid>`                                   | **401**                                                             | `isAuthenticated()` + `canSeeOperation`                                                                  |
+   | `/api/v1/operations/<uuid>/finance-summary`                   | **401**                                                             | `isAuthenticated()` + `canSeeOperation`                                                                  |
+   | `/api/v1/operations/<uuid>/payouts`                           | **401**                                                             | `isAuthenticated()` + `canSeeOperation`                                                                  |
+   | `/api/v1/operations/<uuid>` with `PUT`/`DELETE`               | **405**                                                             | the family is read-only on this vhost                                                                    |
+   | `/api/v1/terms/status`                                        | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/terms/acceptance` (POST)                             | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/me/active-org-unit`                                  | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/me/capabilities`                                     | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/inventory/aggregated`                                | **401**                                                             | chain requires a member role                                                                             |
+   | `/api/v1/inventory/all/grouped`                               | **401**                                                             | same                                                                                                     |
+   | `/api/v1/orders`                                              | **401**                                                             | `isAuthenticated()`; the `POST` on the same path is refused by the read-only guard                       |
+   | `/api/v1/orders/item-catalog`                                 | **401**                                                             | `isAuthenticated()` since ADR-0149; the orderable finished items                                         |
+   | `/api/v1/orders/item-catalog/<uuid>/blueprints`               | **401**                                                             | same; the blueprints one item may be built from                                                          |
+   | `/api/v1/orders/items` (POST)                                 | **401**                                                             | `isAuthenticated()`; raises an item order                                                                |
+   | `/api/v1/orders/<uuid>`                                       | **401**                                                             | `isAuthenticated()` + scope                                                                              |
+   | `/api/v1/orders/<uuid>/assignees/<uuid>`                      | **401**                                                             | `isAuthenticated()` + scope; self-assignment is open to every member, anyone else needs LOGISTICIAN      |
+   | `/api/v1/orders/<uuid>/assignees/<uuid>/note`                 | **401**                                                             | same, and locked on the assignee edge's own version                                                      |
+   | `/api/v1/orders/<uuid>/status`                                | **401**                                                             | `hasRole(LOGISTICIAN)` + per-order scope; a member without the role gets **403** once authenticated      |
+   | `/api/v1/missions/<uuid>/join`                                | **401**                                                             | `isAuthenticated()` + `canSeeMission`                                                                    |
+   | `/api/v1/missions/<uuid>/participants/<uuid>/slim`            | **401**                                                             | `canAccessParticipant` — the caller's own row, or a mission manager's                                    |
+   | `…/participants/<uuid>/check-in/slim`                         | **401**                                                             | same                                                                                                     |
+   | `…/participants/<uuid>/payout-preference/slim`                | **401**                                                             | same                                                                                                     |
+   | `/api/v1/finance-entries`                                     | **401**                                                             | `isAuthenticated()` + member-or-above + `canSeeMission` on the body's mission                            |
+   | `/api/v1/finance-entries/<uuid>`                              | **401**                                                             | `isAuthenticated()`; owner-vs-admin is decided at the service seam                                       |
+   | `/api/v1/operations/<uuid>/payouts/paid-out`                  | **401**                                                             | `hasRole(MISSION_MANAGER)` + scope; taking a confirmation back additionally needs OFFICER or ADMIN       |
+   | `…/org-units/bank/accounts/<uuid>/settings`                   | **401**                                                             | `isAuthenticated()`; what the caller may change is stated in the answer, not in the chain                |
+   | `…/bank/accounts/<uuid>/balance-target`                       | **401**                                                             | `isAuthenticated()` + the responsible-holder seam                                                        |
+   | `…/bank/accounts/<uuid>/visibility/…`                         | **401**                                                             | same                                                                                                     |
+   | `/api/v1/org-units/bank/balances`                             | **401**                                                             | me-scoped to the accounts the caller may see                                                             |
+   | `/api/v1/org-units/bank/accounts/<uuid>`                      | **401**                                                             | same                                                                                                     |
+   | `/api/v1/personal-inventory`                                  | **401**                                                             | me-scoped; the same path answers POST, which is 401 anonymously too                                      |
+   | `/api/v1/personal-inventory/<uuid>`                           | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
+   | `/api/v1/uex/locations/search`                                | **401**                                                             | `isAuthenticated()`                                                                                      |
+   | `/api/v1/personal-blueprints`                                 | **401**                                                             | me-scoped; POST likewise                                                                                 |
+   | `/api/v1/personal-blueprints/<uuid>`                          | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
+   | `/api/v1/personal-blueprints/craftability`                    | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/personal-blueprints/<uuid>/recipe`                   | **401**                                                             | me-scoped; GET only, phase 5                                                                             |
+   | `/api/v1/blueprints/products/search`                          | **401**                                                             | `isAuthenticated()`                                                                                      |
+   | `/api/v1/hangar/ships`                                        | **401**                                                             | me-scoped; POST likewise                                                                                 |
+   | `/api/v1/hangar/ships/<uuid>`                                 | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
+   | `/api/v1/ship-types`                                          | **200**                                                             | anonymous by design: `permitAll` game data the public web frontend already renders (REQ-SEC-037)         |
+   | `/api/v1/locations/home-locations`                            | **403**                                                             | `permitAll` chain + method guard — refused at the method seam, like the Finanzen paths                   |
+   | `/api/v1/inventory` (POST)                                    | **401**                                                             | chain requires a member role                                                                             |
+   | `/api/v1/inventory/all/stack/entries`                         | **401**                                                             | chain requires a member role                                                                             |
+   | `/api/v1/inventory/material/<uuid>`                           | **401**                                                             | same; one material's entries, for the app's tablet pane                                                  |
+   | `/api/v1/inventory/<uuid>/book-out`                           | **401**                                                             | same, plus `canEditInventoryItem`                                                                        |
+   | `/api/v1/inventory/<uuid>/personal-rebook`                    | **401**                                                             | same                                                                                                     |
+   | `/api/v1/inventory/<uuid>/note`                               | **401**                                                             | same                                                                                                     |
+   | `/api/v1/materials/search`                                    | **200**                                                             | anonymous by design: `permitAll` catalogue, like `/ship-types` (REQ-SEC-037)                             |
+   | `/api/v1/locations/search`                                    | **200**                                                             | same catalogue family                                                                                    |
+   | `/api/v1/users/search`                                        | **401**                                                             | member records; `isAuthenticated()` and role-gated                                                       |
+   | `/api/v1/materials/<uuid>/terminals`                          | **401**                                                             | carved back **out** of the catalogue family with `/materials/matrix` (REQ-SEC-032) — UEX trade prices    |
+   | `/api/v1/org-units/bank/accounts/<uuid>/transactions`         | **401**                                                             | same                                                                                                     |
+   | `/api/v1/hangar/my-ships`                                     | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/hangar/squadron-overview`                            | **401**                                                             | scoped to the active org unit                                                                            |
+   | `/api/v1/announcement`                                        | **401**                                                             | no chain matcher makes it public                                                                         |
+   | `/api/v1/notifications`                                       | **401**                                                             | me-scoped inbox                                                                                          |
+   | `/api/v1/notifications/unread-count`                          | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/notifications/stream`                                | **401**                                                             | me-scoped SSE                                                                                            |
+   | `/api/v1/notifications/read-all`                              | **401**                                                             | me-scoped write; POST only, phase 5                                                                      |
+   | `/api/v1/notifications/read`                                  | **401**                                                             | me-scoped write; DELETE only, phase 5                                                                    |
+   | `/api/v1/notifications/<uuid>`                                | **401**                                                             | me-scoped; GET + DELETE, phase 5                                                                         |
+   | `/api/v1/notifications/<uuid>/read`                           | **401**                                                             | me-scoped write; POST only, phase 5                                                                      |
+   | `/api/v1/notification-rules`                                  | **404**                                                             | admin surface, NOT admitted — the four rows above must not have widened the prefix                       |
+   | `/api/v1/users/me`                                            | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/users/me/registration-status`                        | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/users/me/memberships`                                | **401**                                                             | me-scoped                                                                                                |
+   | `/api/v1/refinery-orders` (POST)                              | **401**                                                             | phase M; `hasRole(KRT_MEMBER)` — the create form's write                                                 |
+   | `/api/v1/locations/refineries`                                | **403**                                                             | phase M; `permitAll` chain + method guard, refused at the method seam like `/locations/home-locations`   |
+   | `/api/v1/refining-methods`                                    | **200**                                                             | phase M; anonymous master-data catalogue with no method gate, like `/ship-types` (REQ-SEC-037)           |
+   | `/api/v1/orders/<uuid>/material-collection`                   | **401**                                                             | phase N; `isAuthenticated()` + `canSeeJobOrder`                                                          |
+   | `/api/v1/orders/<uuid>/inventory/<uuid>/unlink`               | **401**                                                             | phase N; LOGISTICIAN / OFFICER / ADMIN + `canEditJobOrder`                                               |
+   | `/api/v1/orders/<uuid>/materials/<uuid>`                      | **401**                                                             | phase N; same gate                                                                                       |
+   | `/api/v1/inventory/<uuid>/delivered`                          | **401**                                                             | phase N; `isAuthenticated()` + `canEditInventoryItem` — the ROW's gate, not the order's                  |
+   | `/api/v1/missions/<uuid>/units/<uuid>/crew/<uuid>/slim`       | **401**                                                             | phase N; `canManageMission`. The deprecated sibling without `/slim` stays **404**                        |
+   | `/api/v1/bank/deposits` (POST)                                | **401**                                                             | phase O; `hasRole(BANK_EMPLOYEE)` + per-account `canDeposit`                                             |
+   | `/api/v1/bank/withdrawals` (POST)                             | **401**                                                             | phase O; same, `canWithdraw`                                                                             |
+   | `/api/v1/bank/transfers` (POST)                               | **401**                                                             | phase O; same, `canTransfer` on the SOURCE account                                                       |
+   | `/api/v1/bank/transfer-fee-rate`                              | **401**                                                             | phase O; `hasRole(BANK_EMPLOYEE)` only — an org-wide rate, no account in it                              |
+   | `…/org-units/bank/accounts/<uuid>/approval-limit/all-members` | **401**                                                             | phase P; `isAuthenticated()` + `canConfigureApprovalLimits` on the account                               |
+   | `…/approval-limit/area-members`                               | **401**                                                             | phase P; same                                                                                            |
+   | `…/approval-limit/role/<code>`                                | **401**                                                             | phase P; same                                                                                            |
+   | `…/approval-limit/user/<uuid>`                                | **401**                                                             | phase P; same                                                                                            |
+   | anything not on the list                                      | **404**                                                             | default deny                                                                                             |
 
    **Two refusals, two numbers, and the difference is structural rather than a policy gap.** The
    me-scoped paths are `authenticated()` in the filter chain, so Spring Security turns them away
@@ -1609,6 +1633,67 @@ reachability guard now asserts these very rules admit them. `/api/v1/bank/admin/
 `/api/v1/bank/admin/audit` and `/api/v1/bank/accounts/<uuid>/approval-tiers` must still answer
 **404** — `edge-deny-probe.yml` moved the four booking paths onto the 401 side and kept those three
 where they are.
+
+---
+
+## Phase P — the Freigabe-Limits
+
+**A gap of the same class as phase O, found while writing it.** The Freigabe-Limits shipped in the
+app on 2026-08-30 (`REQ-APP-BANK-017`, design ch. 12 artboard 10): the ceiling that decides which
+member may approve a booking on an account, set for everybody, for the Bereich, for a role bucket,
+or for one named member. The section draws correctly, because the `/settings` GET that carries the
+current values was admitted in phase 3 — and **every „Setzen" and „Entfernen" has answered 404**.
+
+It is worse hidden than phase O's four paths, because it was never even *stated*. `approval-limit`
+appears nowhere in this runbook: not on the allow-list, and not among the deliberate exclusions.
+
+> [!note] Whether these eight are among the 75 is not recorded, so this phase does not move that
+> number
+> The audit's own summary says it checked „all 113 paths the app can send", which would include
+> them — but no per-family breakdown of the 75 was ever committed, so nobody can say which side of
+> the line these fell on without re-running it. Asserting either way would put a number in this
+> runbook that nothing can check. **72** stands where phase N left it.
+> The exclusion that *is* written down names `/bank/accounts/<uuid>/approval-tiers` — the KRT ladder
+> editor, a **different** endpoint the app does not call and which artboard 10 explicitly replaced.
+> A reader checking whether the limits were deliberately kept out would have found that line and
+> stopped.
+
+|     Screen      |                             Paths                             |    Verbs    |
+|-----------------|---------------------------------------------------------------|-------------|
+| Freigabe-Limits | `…/org-units/bank/accounts/<uuid>/approval-limit/all-members` | PUT, DELETE |
+| Freigabe-Limits | `…/approval-limit/area-members`                               | PUT, DELETE |
+| Freigabe-Limits | `…/approval-limit/role/<code>`                                | PUT, DELETE |
+| Freigabe-Limits | `…/approval-limit/user/<uuid>`                                | PUT, DELETE |
+
+**One rule, not four.** They are one screen and one endpoint family, they share a request body
+(`{"limit": …}`) and they all answer with the account's whole settings object. Four lines that can
+only ever be edited together are four chances to edit three of them. The alternation is
+`$`-anchored and reuses the visibility rule's role-code class, so `approval-tiers` beside it stays
+unnamed and still answers 404.
+
+**`/org-units` is a read-only family**, so the writes need the carve-out as well as the rule — and
+the carve-out opens exactly what the backend serves on those paths, which is the PUT and the
+DELETE.
+
+> [!note] Why the response is worth having, not just the write
+> Both verbs answer with `OrgUnitBankAccountSettingsDto`, so the section redraws from the answer
+> instead of re-reading. That also means the response is now part of the frozen contract:
+> `approvalLimits` and `canConfigureApprovalLimits` were **missing** from the already-frozen
+> `/settings` operation — the app has always read both — and freezing the writes without them would
+> have left the read they depend on unguarded.
+
+### What to expect afterwards
+
+|                  Path                  | Anonymous status |
+|----------------------------------------|------------------|
+| `PUT …/approval-limit/all-members`     | **401**          |
+| `DELETE …/approval-limit/area-members` | **401**          |
+| `PUT …/approval-limit/role/<code>`     | **401**          |
+| `DELETE …/approval-limit/user/<uuid>`  | **401**          |
+
+Pinned in `ApiVhostAnonymousSurfaceTest` before this table was written, and frozen in
+`ExternalContractTest`, whose reachability guard cross-checks the rule above.
+`PATCH /api/v1/bank/accounts/<uuid>/approval-tiers` must still answer **404**.
 
 ---
 
