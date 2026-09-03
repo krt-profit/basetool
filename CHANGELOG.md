@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Jeder angemeldete Seitenaufruf hinterließ einen unlesbaren Wert in deiner Sitzung.** Tomcat 11.0.25 legt bei jedem WebSocket-Handshake — also bei jedem Seitenaufruf mit Live-Sync — einen Wert ab, den die Sitzungsablage nicht zurücklesen konnte: er wurde bei jeder folgenden Anfrage verworfen und beim nächsten Handshake neu geschrieben. Für dich war das unsichtbar, verdeckte in der Überwachung aber echte Sitzungsfehler. Bestehende Sitzungen reparieren sich beim nächsten Seitenaufruf von selbst.
+
+- **Die Anmeldung zu einem Einsatz schlug in der App immer fehl** — mit „Konnte nicht gespeichert werden.", während Abmelden und das Webtool funktionierten. Die App schickte die Anmeldung an einen Pfad, den der API-Zugang nach außen gar nicht freigibt; sie wurde abgewiesen, bevor sie das Backend erreichte. Die Selbstanmeldung `POST /missions/{id}/join` nimmt jetzt die beiden Antworten des Anmeldebogens entgegen — gewünschte Funktion und Auszahlungsart —, beide freiwillig; ohne Angabe gilt unverändert die Voreinstellung aus dem Profil. Die App-Seite folgt in der App (ADR-0154).
+
 ## [v1.6.17](https://github.com/krt-profit/basetool/releases/tag/v1.6.17) - 2026-09-02
 
 ### Changed

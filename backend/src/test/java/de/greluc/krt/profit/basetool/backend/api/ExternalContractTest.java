@@ -23,11 +23,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -151,6 +156,31 @@ class ExternalContractTest {
    * <p>Recorded from the generated document rather than hand-written, so the baseline is what the
    * server actually serves and not what someone believed it served.
    */
+  /** The operator procedure whose nginx block decides what the internet can reach. */
+  private static final String RUNBOOK = "docs/API_VHOST_ROLLOUT_RUNBOOK.md";
+
+  /** {@code if ($uri = "/api/v1/…") { set $krt_api_allowed 1; }} */
+  private static final Pattern EXACT_RULE = Pattern.compile("\\$uri\\s*=\\s*\"([^\"]+)\"");
+
+  /** {@code if ($uri ~ "^/api/v1/…$") { set $krt_api_allowed 1; }} */
+  private static final Pattern REGEX_RULE = Pattern.compile("\\$uri\\s*~\\s*\"([^\"]+)\"");
+
+  /** A {@code {name}} segment in a contract path. */
+  private static final Pattern PLACEHOLDER = Pattern.compile("\\{[a-zA-Z]+}");
+
+  /** Any uuid; the rules match the shape, not the value. */
+  private static final String SAMPLE_UUID = "00000000-0000-4000-8000-000000000000";
+
+  /**
+   * Placeholders that are not uuids, and what they stand for.
+   *
+   * <p>Only one exists today: the bank account's all-members visibility toggle, whose rule matches
+   * {@code (true|false)} rather than a uuid class. A new entry here is cheaper than a test that
+   * quietly substitutes the wrong shape and reports a gap that is not there.
+   */
+  private static final java.util.Map<String, String> PLACEHOLDERS =
+      java.util.Map.of("{enabled}", "true");
+
   private static final List<ContractOperation> CONTRACT =
       List.of(
           new ContractOperation(
@@ -1833,6 +1863,124 @@ class ExternalContractTest {
         collectNested(document, properties, depth - 1, into);
       }
     }
+  }
+
+  /**
+   * Every frozen operation is actually reachable from the internet.
+   *
+   * <p>Freezing an operation's shape and admitting its path are the same decision seen from two
+   * sides — the vhost runbook says so itself — and they are kept in two files that nothing compared
+   * until now. The asymmetry is not hypothetical: an audit on 2026-09-03 found <b>75 paths the
+   * Android app calls that no allow-list rule admits</b>, every one of them refused at the edge
+   * with a 404 the app renders as „Konnte nicht gespeichert werden.". None of those 75 was in this
+   * contract set, which is exactly why this test cannot see them.
+   *
+   * <p>What it <em>can</em> see is the other direction, and that is the half this repository owns:
+   * a promise made here that the edge does not let through. That was true for 0 of 90 operations
+   * when this test was written, and this pins it — the next `ContractOperation` added without its
+   * allow-list line fails the build instead of shipping a promise nobody can call.
+   *
+   * <p>The allow-list is parsed out of the runbook rather than mirrored into a fixture on purpose:
+   * a copy is a third thing to keep in sync, and the runbook is the artefact an operator applies.
+   *
+   * @throws IOException if the runbook cannot be read
+   */
+  @Test
+  @DisplayName("every frozen operation is admitted by the API vhost allow-list")
+  void theFrozenSetIsReachableThroughTheEdge() throws IOException {
+    List<Predicate<String>> rules = allowListRules();
+    assertThat(rules)
+        .as("no allow-list rules were parsed from %s — has its format changed?", RUNBOOK)
+        .hasSizeGreaterThan(50);
+
+    List<String> unreachable =
+        CONTRACT.stream()
+            .map(ContractOperation::path)
+            .distinct()
+            .filter(path -> rules.stream().noneMatch(rule -> rule.test(probePath(path))))
+            .sorted()
+            .toList();
+
+    assertThat(unreachable)
+        .as(
+            "these operations are frozen as a promise to a shipped client but no rule in %s admits "
+                + "them, so the edge answers 404 and the promise cannot be called. Add the rule in "
+                + "the same change that freezes the operation — and if one of these merely uses a "
+                + "path placeholder this test does not know how to fill, extend PLACEHOLDERS",
+            RUNBOOK)
+        .isEmpty();
+  }
+
+  /**
+   * The allow-list, as predicates over a concrete URI.
+   *
+   * <p>Two rule shapes appear in the runbook and both are honoured: {@code $uri = "…"} is an exact
+   * comparison, {@code $uri ~ "…"} a regular expression. Anything else on a {@code krt_api_allowed
+   * 1} line is ignored rather than guessed at.
+   *
+   * @return one predicate per parsed rule
+   * @throws IOException if the runbook cannot be read
+   */
+  private static List<Predicate<String>> allowListRules() throws IOException {
+    Path runbook = findRepoRoot().resolve(RUNBOOK);
+    assertThat(Files.exists(runbook)).as("%s must exist", runbook).isTrue();
+
+    List<Predicate<String>> rules = new java.util.ArrayList<>();
+    for (String line : Files.readAllLines(runbook)) {
+      if (!line.contains("krt_api_allowed 1")) {
+        continue;
+      }
+      Matcher exact = EXACT_RULE.matcher(line);
+      if (exact.find()) {
+        String literal = exact.group(1);
+        rules.add(literal::equals);
+        continue;
+      }
+      Matcher regex = REGEX_RULE.matcher(line);
+      if (regex.find()) {
+        Pattern compiled = Pattern.compile(regex.group(1));
+        rules.add(uri -> compiled.matcher(uri).find());
+      }
+    }
+    return rules;
+  }
+
+  /**
+   * Turns a contract path into a concrete URI the allow-list can be asked about.
+   *
+   * <p>A placeholder stands for a real segment, and the rules match on its <em>shape</em> — a UUID
+   * character class, or a literal alternation such as {@code (true|false)}. Substituting a UUID for
+   * everything would silently fail against the latter, so the few non-UUID placeholders are named
+   * in {@link #PLACEHOLDERS} instead of guessed.
+   *
+   * @param path the contract path, possibly containing {@code {name}} segments
+   * @return the path with every placeholder replaced by a representative value
+   */
+  private static String probePath(String path) {
+    String probe = path;
+    for (var entry : PLACEHOLDERS.entrySet()) {
+      probe = probe.replace(entry.getKey(), entry.getValue());
+    }
+    return PLACEHOLDER.matcher(probe).replaceAll(SAMPLE_UUID);
+  }
+
+  /**
+   * Walks up from the working directory to the repository root.
+   *
+   * <p>Located by {@code settings.gradle.kts} so the runbook resolves whichever module directory
+   * the test task runs in.
+   *
+   * @return the repository root
+   */
+  private static Path findRepoRoot() {
+    Path dir = Path.of(System.getProperty("user.dir")).toAbsolutePath();
+    while (dir != null && !Files.exists(dir.resolve("settings.gradle.kts"))) {
+      dir = dir.getParent();
+    }
+    assertThat(dir)
+        .as("could not locate the repository root from %s", System.getProperty("user.dir"))
+        .isNotNull();
+    return dir;
   }
 
   /**

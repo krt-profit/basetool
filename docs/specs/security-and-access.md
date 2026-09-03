@@ -2614,6 +2614,71 @@ hierarchy that no gate would have caught, because both answers are individually 
 `#listPickerOptionsWithDescendants` · **Related:** REQ-SEC-047, REQ-ORG-015, REQ-ORG-016,
 REQ-ORG-017
 
+### REQ-SEC-049 — Every session value must survive a round trip through the session serializer
+
+A value stored in the HTTP session must be readable again on the next request. The frontend's
+session store is Redis + Jackson, and the default typing `SecurityJacksonModules` activates is
+`NON_FINAL`: a **non-final** runtime type is written with an `@class` type id and reads back, a
+**final** one is written without and the reader then demands the id it was never given. A `record`,
+a `List.of(...)`, a `Map.of(...)` or any other final class therefore writes without complaint and is
+unreadable on the very next request.
+
+`FaultTolerantSessionSerializer` makes that survivable — the value reads as absent rather than
+throwing, which is what stops it being the total outage of 2026-09-02 — but survivable is not
+correct. A dropped value is never written back, so a poisoned session re-drops on **every** request
+for up to its 720-hour window (REQ-SEC-025), and every drop bumps
+`basetool_session_value_dropped_total`. The meter's whole purpose is to detect a genuine poisoning,
+so a permanently non-zero rate does not merely annoy: it hides the next one.
+
+Two rules, and which applies depends on who writes the value:
+
+- **Code in this repository never stores a final type in a session.** Wrap it in a non-final
+  container instead — `BackendRoleSyncFilter`'s `new ArrayList<>(backend.asserted())` is not a
+  stylistic flourish, it is what makes that attribute readable. Two silent variants belong to the
+  same rule: a `UUID` comes back a `String` and an `Instant` a `Double`, with no exception and no
+  log line.
+- **A final type written by a dependency is named in `RedisSessionConfig`'s
+  `CONTAINER_WRITTEN_FINAL_SESSION_TYPES` allow-list**, which gives it a forced `@class` through
+  `ForcedTypeIdMixin`. There is no seam to wrap a value the servlet container writes itself. The
+  list is resolved by name and skipped when absent, so it cannot break the build on a container that
+  does not carry the class. It must stay short, and it must never carry one of our own classes —
+  putting one there converts a two-character fix into a permanent exception.
+
+Tomcat 11.0.25 added `org.apache.tomcat.websocket.server.WsHttpSessionBindingListener`, a `record`
+that `WsServerContainer#registerAuthenticatedSession` writes on every authenticated WebSocket
+handshake — for this application, every logged-in page, because live sync opens `/ws/sync`. It fired
+`SessionValueDropsSustained` at ~70 drops per 15 min on 2026-09-03 against an otherwise healthy
+application, and the rate could not decay: a dropped value leaves the attribute unset, which is
+exactly the condition under which Tomcat writes it again. It is the first and so far only entry on
+the allow-list.
+
+Widening the default typing to cover final types is **not** the fix and must not be proposed as a
+simplification: `creationTime`, `lastAccessedTime` and `maxInactiveInterval` are `Long`/`Integer`
+read as bare scalars, and changing their wire format breaks every live session at once with
+`IllegalStateException: creationTime key must not be null` (ADR-0154).
+
+**Acceptance**
+
+- [ ] Every value this repository's code puts in a session round-trips through the configured
+  session serializer.
+- [ ] A final type written by a dependency either round-trips or is on the allow-list; nothing else
+  is on the allow-list.
+- [ ] An allow-list entry that is not on the classpath is skipped rather than failing startup or the
+  build.
+- [ ] A bare `record` / `List.of(...)` / `Map.of(...)` still does **not** round-trip — the allow-list
+  is an exception per named class, never a policy change.
+- [ ] `basetool_session_value_dropped_total` is zero in steady state, so a non-zero rate is a real
+  poisoning.
+
+**Enforced by:** `SessionSerializerRoundTripTest` (the required keys and scalars still read back;
+the Tomcat listener round-trips and carries `@class`; a plain record and `List.of`/`Map.of` still do
+not) · `FaultTolerantSessionSerializerTest`, `SessionAttributeDiagnosticMapperTest` (the survivable
+path and the attribute-naming WARN) · **Code:** `RedisSessionConfig#buildSessionJsonMapper`,
+`CONTAINER_WRITTEN_FINAL_SESSION_TYPES`, `ForcedTypeIdMixin`, `FaultTolerantSessionSerializer`,
+`SessionAttributeDiagnosticMapper` · **Monitoring:** `SessionValueDropsSustained`,
+`basetool_session_value_dropped_total` ([`observability.md`](observability.md)) · **ADR:**
+[ADR-0154](../adr/0154-a-container-written-final-session-value-gets-a-forced-type-id.md)
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the

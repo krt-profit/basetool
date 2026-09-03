@@ -33,7 +33,9 @@ import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.JoinMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionListDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
@@ -655,22 +657,79 @@ class MissionControllerLifecycleTest {
   // ── POST /api/v1/missions/{id}/join ──────────────────────────────────
 
   @Test
-  void joinMission_resolvesCallerFromJwt_andDelegatesToService() {
+  void joinMission_withoutBody_resolvesCallerFromJwt_andKeepsTheDefaultChain() {
     Jwt jwt = jwt("alice-sub");
     UUID callerId = UUID.randomUUID();
     UUID missionId = UUID.randomUUID();
     Mission persisted = new Mission();
     MissionDto dto = fullMissionDto(missionId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
-    when(missionService.addParticipant(missionId, callerId)).thenReturn(persisted);
+    when(missionService.addParticipant(missionId, callerId, null, null, null, null, null))
+        .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
 
-    MissionDto result = controller.joinMission(jwt, missionId);
+    MissionDto result = controller.joinMission(jwt, missionId, null);
 
     // The self-enroll shortcut MUST resolve the caller from the JWT — never accept a userId
     // from the URL/body. Pin the captured argument to the JWT-derived id.
+    //
+    // The null body is the shipped-client case and the reason the parameter is optional:
+    // REQ-API-009 freezes this operation, so a build that sends nothing must keep working, and
+    // every downstream argument stays null so REQ-MISSION-002's profile-default payout chain
+    // still decides.
     assertThat(result).isSameAs(dto);
-    verify(missionService).addParticipant(missionId, callerId);
+    verify(missionService).addParticipant(missionId, callerId, null, null, null, null, null);
+  }
+
+  @Test
+  void joinMission_withBody_carriesTheSheetsTwoAnswersAndNothingElse() {
+    Jwt jwt = jwt("alice-sub");
+    UUID callerId = UUID.randomUUID();
+    UUID missionId = UUID.randomUUID();
+    UUID desiredJobTypeId = UUID.randomUUID();
+    Mission persisted = new Mission();
+    MissionDto dto = fullMissionDto(missionId);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
+    when(missionService.addParticipant(
+            missionId, callerId, null, desiredJobTypeId, null, null, PayoutPreference.DONATE))
+        .thenReturn(persisted);
+    when(missionMapper.toDto(persisted)).thenReturn(dto);
+
+    MissionDto result =
+        controller.joinMission(
+            jwt, missionId, new JoinMissionRequest(desiredJobTypeId, PayoutPreference.DONATE));
+
+    // guestName, comment and orgUnitIds stay null on purpose: this body cannot name anybody but
+    // the caller, which is what lets the endpoint skip the self-vs-manager check that
+    // /participants/add needs (ADR-0154).
+    assertThat(result).isSameAs(dto);
+    verify(missionService)
+        .addParticipant(
+            missionId, callerId, null, desiredJobTypeId, null, null, PayoutPreference.DONATE);
+  }
+
+  @Test
+  void joinMission_withHalfAnAnswer_leavesTheOtherFieldNull() {
+    Jwt jwt = jwt("alice-sub");
+    UUID callerId = UUID.randomUUID();
+    UUID missionId = UUID.randomUUID();
+    Mission persisted = new Mission();
+    MissionDto dto = fullMissionDto(missionId);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
+    when(missionService.addParticipant(
+            missionId, callerId, null, null, null, null, PayoutPreference.PAYOUT))
+        .thenReturn(persisted);
+    when(missionMapper.toDto(persisted)).thenReturn(dto);
+
+    // A member who picks a payout but no Funktion: the unanswered field means "no preference",
+    // never "clear it".
+    MissionDto result =
+        controller.joinMission(
+            jwt, missionId, new JoinMissionRequest(null, PayoutPreference.PAYOUT));
+
+    assertThat(result).isSameAs(dto);
+    verify(missionService)
+        .addParticipant(missionId, callerId, null, null, null, null, PayoutPreference.PAYOUT);
   }
 
   // ── PATCH /api/v1/missions/{id}/core ─────────────────────────────────
