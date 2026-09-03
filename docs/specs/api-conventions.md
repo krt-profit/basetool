@@ -500,10 +500,29 @@ a default-deny allow-list, and a path able to name *another* user should never n
 adding it later is one more deliberate edit.
 
 **Frozen means**, for an operation in the set: it keeps its path and verb; its response keeps every
-field it had; its request accepts everything it accepted before (a new **required** field is a
+**recorded** field; its request accepts everything it accepted before (a new **required** field is a
 break); and retirement goes through `/api/v2` + `@ApiDeprecation` with a sunset rather than a
 deletion. Additive change stays free — new optional response fields, new optional request fields,
 new endpoints.
+
+> [!warning] Amended 2026-09-02 (owner-approved) — this sentence used to say every field it had
+> The wording was stricter than the rest of its own requirement and stricter than the gate that
+> enforces it, and the three disagreed silently. Three places already meant the recorded set:
+>
+> - **The gate.** `ExternalContractTest` asserts `containsAll` over the recorded field set, so a
+>   response field the table never listed can be removed with the build green.
+> - **This requirement's own acceptance criterion**, below, has always read: no *recorded* response
+>   field has disappeared.
+> - **The freeze table's heading** — the fields a client *may rely on* — and the reasoning above it,
+>   that freezing what the client does not read would buy the backend a constraint for nothing.
+>   `isProfitEligible`, and a member's email, roles and permissions, are named above as deliberately
+>   unfrozen; that only holds under the narrower reading.
+>
+> The gap was not academic. `GET /api/v1/ship-types` records seven names, while `ShipTypeDto` also
+> serialises `description`, `scu` and `hidden`. Under the old sentence those three were frozen by
+> accident and could never be removed; under the amended one they are what the table always meant
+> them to be. Whether a field is frozen is now decided in one place — the table — rather than by
+> whichever sentence a reader reaches first.
 
 **The spec and the test are the source of truth, not the allow-list.** The API vhost's allow-list
 decides what is *reachable* and lives in the NPM admin database, which no PR can review. It must be
