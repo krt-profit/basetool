@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import lombok.extern.slf4j.Slf4j;
@@ -259,11 +260,29 @@ public class RedisSessionConfig {
             .addModules(SecurityJacksonModules.getModules(loader, typeValidatorBuilder))
             .addMixIn(Errors.class, BindingResultMixin.class)
             .addMixIn(AbstractBindingResult.class, BindingResultMixin.class);
+    List<String> forced = new ArrayList<>();
+    List<String> absent = new ArrayList<>();
     for (String className : CONTAINER_WRITTEN_FINAL_SESSION_TYPES) {
       Class<?> type = resolveIfPresent(className, loader);
-      if (type != null) {
+      if (type == null) {
+        absent.add(className);
+      } else {
         builder.addMixIn(type, ForcedTypeIdMixin.class);
+        forced.add(className);
       }
+    }
+    // Logged at INFO, and the absent case at WARN, because the whole mechanism degrades SILENTLY:
+    // an unresolved name simply means no mix-in, the values go back to being written without an
+    // @class, and the only symptom is SessionValueDropsSustained firing against an application
+    // whose code looks correct. On 2026-09-03 that cost a full investigation to rule out, with
+    // nothing in the production log either way. One line at startup answers it by grep.
+    log.info("Session serializer forces an @class type id for: {}", forced);
+    if (!absent.isEmpty()) {
+      log.warn(
+          "Session types {} are not on the classpath, so no forced @class type id is registered for"
+              + " them. If the servlet container still writes such a value it will be unreadable on"
+              + " the next request and counted in basetool_session_value_dropped_total.",
+          absent);
     }
     return builder.build();
   }
@@ -278,6 +297,12 @@ public class RedisSessionConfig {
    * emergency Tomcat downgrade into a build failure at the worst possible moment. Resolving by name
    * costs one lookup at startup and degrades to "no mix-in", which is exactly the behaviour on a
    * container that never writes the attribute.
+   *
+   * <p>The degradation is silent by construction, which is why {@link
+   * #buildSessionJsonMapper(ClassLoader)} reports the outcome at {@code INFO} and the absent case
+   * at {@code WARN} rather than leaving it at the {@code DEBUG} line below: a production log that
+   * says nothing cannot distinguish "the mix-in is registered" from "the class moved and every
+   * value is being written unreadably again".
    *
    * @param className the fully-qualified class name to look up.
    * @param loader the class loader to resolve against; {@code null} means the bootstrap loader.

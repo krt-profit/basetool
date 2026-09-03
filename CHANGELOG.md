@@ -6,6 +6,10 @@
 
 - **Eine Produktions-Promotion bricht jetzt ab, wenn das Image eine behebbare HIGH/CRITICAL-Schwachstelle trägt.** Der Trivy-Scan lief bisher zwar bei jedem Build, blockierte aber an keiner Stelle — eine verwundbare Java-Bibliothek verhinderte den Merge, ein verwundbares OS-Paket dagegen gar nichts. `promote.yml` scannt den zu promotenden Digest jetzt vor der Freigabe; der Build-Scan bleibt bewusst nur hinweisend. Für den Notfall gibt es die Eingabe `allow_vulnerable`, die den Fund sichtbar lässt und die Umgehung in der Freigabe protokolliert (REQ-OPS-024, ADR-0155).
 
+### Fixed
+
+- **Unlesbare Sitzungswerte blieben liegen und wurden bei jeder weiteren Anfrage erneut verworfen.** Die Korrektur in v1.6.18 verhinderte nur, dass neue unlesbare Werte entstehen — bestehende reparierten sich entgegen der dortigen Angabe **nicht** von selbst, weil der dafür nötige Live-Sync-Handshake nur auf Seiten mit Live-Bereich zustande kommt. Ein unlesbarer Wert wird jetzt am Ende derselben Anfrage aus der Sitzung entfernt und damit genau einmal verworfen statt bis zu 30 Tage lang (REQ-SEC-050, ADR-0157).
+
 ## [v1.6.18](https://github.com/krt-profit/basetool/releases/tag/v1.6.18) - 2026-09-03
 
 ### Fixed

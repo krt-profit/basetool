@@ -3,7 +3,8 @@
 #
 # Each of the three watches a failure that USED to be loud and is now quiet, so the thing worth
 # pinning in every case is the negative: the healthy shape must not fire.
-#   - SessionValueDropsSustained: a single stale poisoned session ticking over is not the storm.
+#   - SessionValueDropsSustained: a low trickle is not the storm, and neither is the one-off burst
+#     a backlog repair produces since ADR-0157 (each poisoned session now drops exactly once).
 #   - RedisFanoutUnsubscribed: a fan-out that is subscribed, and one switched off entirely (series
 #     absent), must both stay silent.
 #   - ScWikiOrphanSweepStandingDown: reason="not_modified" is a fully-cached HEALTHY night that also
@@ -35,14 +36,31 @@ tests:
               severity: warning
             exp_annotations:
               summary: "Frontend is dropping unreadable session values (45 per 15m)"
-              description: "Session values in Redis cannot be deserialized and are being dropped, signing those members out. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names the attribute, the cause and the unresolved type id. typeId=absent means a FINAL-typed value (a record, a List.of/Map.of) was written into a session and can never be read back; a class name means that class was renamed or removed since the session was written; cause=IllegalArgumentException means a top-level @class no longer resolves. A decaying rate after a deploy is old sessions expiring and is expected; a flat or rising one means something is still writing it."
+              description: "Session values in Redis cannot be deserialized and are being dropped, so those attributes read as not set. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names the attribute, the cause and the unresolved type id. typeId=absent means a FINAL-typed value (a record, a List.of/Map.of) was written into a session and can never be read back; a class name means that class was renamed or removed since the session was written; cause=IllegalArgumentException means a top-level @class no longer resolves. Since ADR-0157 the value is REMOVED from the session on the request that dropped it, so each poisoned session drops exactly once: a burst that decays is a backlog being repaired and is expected on a deploy, while a rate that stays up for 30m means something is still WRITING an unreadable value every request — check that the frontend startup line \"Session serializer forces an @class type id for: [...]\" lists what you expect, and that no code path puts a final type into a session (REQ-SEC-049, REQ-SEC-050)."
 
-  # One poisoned session being re-read occasionally. Real, worth a log line, not worth waking anyone.
-  - name: silent - a single stale poisoned session ticking over
+  # A low trickle of drops. Real, worth a log line, not worth waking anyone. Before ADR-0157 this
+  # was a stale poisoned session being re-read forever; since the repair it can only be a slow
+  # arrival of newly-poisoned sessions, and either way it is below the storm.
+  - name: silent - a low trickle of session-value drops
     interval: 1m
     input_series:
       - series: 'basetool_session_value_dropped_total{cause="InvalidTypeIdException",app="basetool-frontend"}'
         values: "0+1x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: SessionValueDropsSustained
+        exp_alerts: []
+
+  # The shape a REQ-SEC-050 repair produces on the deploy that first drains a backlog: every
+  # poisoned session contributes ONE drop as its next request comes in, then stops. increase[15m]
+  # spikes far above the threshold and falls back to zero once the burst leaves the window, so it
+  # cannot hold the 30m `for`. If this ever starts firing, the repair is not sticking and the
+  # values are being re-poisoned.
+  - name: silent - a backlog of poisoned sessions repairing itself
+    interval: 1m
+    input_series:
+      - series: 'basetool_session_value_dropped_total{cause="InvalidTypeIdException",app="basetool-frontend"}'
+        values: "0+30x10 300x110"
     alert_rule_test:
       - eval_time: 90m
         alertname: SessionValueDropsSustained
