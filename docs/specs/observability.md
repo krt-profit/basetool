@@ -1436,10 +1436,13 @@ A third frontend meter was added by the 2026-09-02 production log triage:
   `FaultTolerantSessionSerializer` every time a session value in Redis cannot be deserialized and is
   dropped. It exists because the fix for the 2026-09-02 outage made the fault *survivable* and
   therefore *invisible*: the three hours after that fix deployed carry 496 identical WARN lines and
-  no number anywhere. A dropped value is not written back, so a poisoned session keeps re-dropping on
-  every single request for up to its 720-hour window — the counter is what shows both the volume and,
-  after a deploy that stops a poison being written, whether the residue is actually draining as those
-  sessions expire. A *flat* rate means something is still writing one. `cause` is the caught
+  no number anywhere. Since REQ-SEC-050 / ADR-0157 the dropped value is **removed from the session on
+  the request that found it**, so each poisoned session contributes exactly one increment and the
+  counter is a step rather than a plateau: a burst that decays is a backlog repairing itself, and a
+  rate that holds means something is still *writing* an unreadable value on every request. (Before
+  that repair a dropped value was never written back, so a poisoned session re-dropped on every
+  single request for up to its 720-hour window and the rate was flat by construction — which is what
+  fired the alert a second time on 2026-09-03.) `cause` is the caught
   failure's root-cause simple class name mapped through a fixed allow-list with everything else
   folded into `other`; it is never the unresolved type id, which is parsed out of the corrupted
   payload, is unbounded, and — measured — can be the member's own data rather than a class name at
@@ -1453,14 +1456,25 @@ A third frontend meter was added by the 2026-09-02 production log triage:
   the first read: `attribute='org.apache.tomcat.websocket.server.WsHttpSessionBindingListener'
   cause=InvalidTypeIdException typeId=absent`. Tomcat 11.0.25 had added that class — a `record`,
   hence implicitly final — and writes it into the session on every authenticated WebSocket
-  handshake, which for this application is every logged-in page. The residue-drains-after-a-deploy
-  reading of this meter did **not** apply and could not: a dropped value leaves the attribute unset,
-  and an unset attribute is exactly the condition under which Tomcat writes it again, so the rate
-  was flat by construction. Closed by REQ-SEC-049 / ADR-0154 (a forced `@class` for
-  container-written final types), after which poisoned sessions heal themselves on their next
-  handshake. Two lessons the metric is kept for: a *flat* rate means something is still writing one
-  — believe that literally rather than waiting for a drain — and a permanently non-zero rate is not
-  cosmetic, because it hides the next genuine poisoning inside its own noise.
+  handshake whenever the attribute is unset. The residue-drains-after-a-deploy reading of this meter
+  did **not** apply and could not: a dropped value leaves the attribute unset, and an unset attribute
+  is exactly the condition under which Tomcat writes it again, so the rate was flat by construction.
+  The *source* was closed by REQ-SEC-049 / ADR-0154 (a forced `@class` for container-written final
+  types).
+
+  **And it earned its keep a second time the same day.** At 13:33Z, 3 h 24 min after that fix was
+  live, the alert fired again at a flat 2-6 per minute — same attribute, same `typeId=absent`. The
+  write path was already correct; what was not is that **nothing ever cleared the values written
+  before it**. ADR-0154 had claimed poisoned sessions "heal themselves on their next handshake", on
+  the premise that live sync opens `/ws/sync` on every logged-in page. It does not:
+  `krt-live-sync.js` connects lazily, only from `subscribe()` / `sendChanged()` / `sendPresence()`,
+  so a page that subscribes to no room never handshakes while `notifications.js` polls the session
+  from every page. Closed by REQ-SEC-050 / ADR-0157 (the value is removed on the request that
+  dropped it). Three lessons the metric is kept for: a rate that does not fall is a *writer* still
+  running — believe that literally rather than waiting for a drain; a permanently non-zero rate is
+  not cosmetic, because it hides the next genuine poisoning inside its own noise; and "the container
+  will rewrite it" is an assumption about *other* code that has to be checked in that code, not
+  asserted from the one being fixed.
 
 Two frontend meters were added by the 2026-08 logging audit:
 

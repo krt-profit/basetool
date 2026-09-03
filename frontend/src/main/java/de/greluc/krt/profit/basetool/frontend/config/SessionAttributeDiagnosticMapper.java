@@ -47,11 +47,20 @@ import org.springframework.session.data.redis.RedisSessionMapper;
  * krt.terms.accepted} — not member data, not a session id, not a value. The value itself never
  * reaches a log line; only the class names {@link UnreadableSessionValue} carries do.
  *
- * <p><strong>Read-only.</strong> The poisoned field is left in Redis. Repairing it means a write on
- * the session <em>read</em> path — the subsystem that took the whole application down twice inside
- * two releases — and the right cure depends on what these lines turn out to name: an attribute
- * re-written unreadably on every request would be deleted and re-poisoned forever at an unchanged
- * rate. That decision waits for this evidence, and will carry its own ADR.
+ * <p><strong>Read-only itself, but no longer the end of the story (2026-09-03).</strong> This class
+ * still writes nothing: repairing from here would mean a Redis write on the session <em>read</em>
+ * path, the subsystem that took the whole application down twice inside two releases. What it now
+ * does is hand the attribute name to {@link SessionAttributeRepairQueue}, so {@link
+ * SessionAttributeRepairFilter} can remove it through the ordinary {@code
+ * HttpSession#removeAttribute} API before the request ends (REQ-SEC-050, ADR-0157).
+ *
+ * <p>The earlier version of this note deferred that decision until the WARN named something, on the
+ * grounds that "an attribute re-written unreadably on every request would be deleted and
+ * re-poisoned forever at an unchanged rate". The evidence arrived and settled it: the name was
+ * Tomcat's {@code WsHttpSessionBindingListener}, its writer was fixed by ADR-0154's forced type id,
+ * and what kept the alert firing was purely that nothing ever cleared the values written before
+ * that fix. Repairing costs one write per drop even in the re-poisoning case, and ends the drop
+ * entirely in every other.
  *
  * <p>The repetition guard is the reason this can log at WARN at all. A poisoned session re-reads
  * its whole hash on every request for as long as it lives — up to the 720-hour authenticated window
@@ -122,7 +131,11 @@ public class SessionAttributeDiagnosticMapper
           cleaned = new LinkedHashMap<>(entries);
         }
         cleaned.put(entry.getKey(), null);
-        report(entry.getKey(), marker);
+        String attribute = attributeName(entry.getKey());
+        // Queued rather than removed here: see the class Javadoc for why the write belongs to
+        // SessionAttributeRepairFilter and not to the read path.
+        SessionAttributeRepairQueue.record(attribute);
+        report(attribute, marker);
       }
     }
     // The delegate sees exactly what it sees today whenever nothing failed, and a map whose bad
@@ -131,23 +144,34 @@ public class SessionAttributeDiagnosticMapper
   }
 
   /**
+   * Strips Spring Session's hash-field prefix, leaving the session attribute name.
+   *
+   * @param hashField the session-hash field, e.g. {@code sessionAttr:SPRING_SECURITY_CONTEXT}.
+   * @return the attribute name, or the field itself when it carries no attribute prefix (the three
+   *     required timestamp keys, which are final scalars and cannot fail in the first place).
+   */
+  @NotNull
+  private static String attributeName(@NotNull String hashField) {
+    return hashField.startsWith(ATTRIBUTE_PREFIX)
+        ? hashField.substring(ATTRIBUTE_PREFIX.length())
+        : hashField;
+  }
+
+  /**
    * Writes one WARN per distinct failure, and DEBUG for every repeat.
    *
-   * @param hashField the session-hash field the marker sat in, e.g. {@code
-   *     sessionAttr:SPRING_SECURITY_CONTEXT}.
+   * @param attribute the session attribute the marker sat in, e.g. {@code SPRING_SECURITY_CONTEXT}.
    * @param marker the failure's shape, carrying class names and fixed tokens only.
    */
-  private void report(@NotNull String hashField, @NotNull UnreadableSessionValue marker) {
-    String attribute =
-        hashField.startsWith(ATTRIBUTE_PREFIX)
-            ? hashField.substring(ATTRIBUTE_PREFIX.length())
-            : hashField;
+  private void report(@NotNull String attribute, @NotNull UnreadableSessionValue marker) {
     String key = attribute + '|' + marker.cause() + '|' + marker.typeId();
     if (reported.size() < MAX_REPORTED_FAILURES && reported.add(key)) {
       log.warn(
           "Dropped an unreadable session value: attribute='{}' cause={} typeId={} baseType={}."
-              + " The affected session degrades to signed out; further occurrences of this exact"
-              + " failure log at DEBUG and are counted in basetool_session_value_dropped_total.",
+              + " The attribute reads as not set and is removed from the session before this"
+              + " request ends, so it cannot drop again; a rate that does NOT fall to zero means"
+              + " something is still writing it. Further occurrences of this exact failure log at"
+              + " DEBUG and are counted in basetool_session_value_dropped_total.",
           attribute,
           marker.cause(),
           marker.typeId(),

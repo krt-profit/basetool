@@ -2645,12 +2645,21 @@ Two rules, and which applies depends on who writes the value:
   putting one there converts a two-character fix into a permanent exception.
 
 Tomcat 11.0.25 added `org.apache.tomcat.websocket.server.WsHttpSessionBindingListener`, a `record`
-that `WsServerContainer#registerAuthenticatedSession` writes on every authenticated WebSocket
-handshake — for this application, every logged-in page, because live sync opens `/ws/sync`. It fired
-`SessionValueDropsSustained` at ~70 drops per 15 min on 2026-09-03 against an otherwise healthy
-application, and the rate could not decay: a dropped value leaves the attribute unset, which is
-exactly the condition under which Tomcat writes it again. It is the first and so far only entry on
-the allow-list.
+that `WsServerContainer#registerAuthenticatedSession` writes whenever an authenticated WebSocket
+handshake finds the attribute unset. It fired `SessionValueDropsSustained` at ~70 drops per 15 min on
+2026-09-03 against an otherwise healthy application, and the rate could not decay: a dropped value
+leaves the attribute unset, which is exactly the condition under which Tomcat writes it again. It is
+the first and so far only entry on the allow-list.
+
+> [!warning] Corrected 2026-09-03 — the handshake is **not** on every logged-in page
+> This paragraph previously read "for this application, every logged-in page, because live sync opens
+>
+>> `/ws/sync`", and ADR-0154 built its self-healing argument on that. It is false:
+>> `krt-live-sync.js` connects **lazily** — `ensureSocket()` is reached only from `subscribe()`,
+>> `sendChanged()` and `sendPresence()` — so a page that subscribes to no live-sync room never
+>> handshakes. Getting the type id right therefore stops new poisoning but repairs nothing that is
+>> already stored, which is what REQ-SEC-050 exists for
+>> ([ADR-0157](../adr/0157-a-dropped-session-value-is-repaired-on-the-request-that-found-it.md)).
 
 Widening the default typing to cover final types is **not** the fix and must not be proposed as a
 simplification: `creationTime`, `lastAccessedTime` and `maxInactiveInterval` are `Long`/`Integer`
@@ -2677,6 +2686,68 @@ path and the attribute-naming WARN) · **Code:** `RedisSessionConfig#buildSessio
 `CONTAINER_WRITTEN_FINAL_SESSION_TYPES`, `ForcedTypeIdMixin`, `FaultTolerantSessionSerializer`,
 `SessionAttributeDiagnosticMapper` · **Monitoring:** `SessionValueDropsSustained`,
 `basetool_session_value_dropped_total` ([`observability.md`](observability.md)) · **ADR:**
+[ADR-0154](../adr/0154-a-container-written-final-session-value-gets-a-forced-type-id.md)
+
+### REQ-SEC-050 — A dropped session value must be repaired, not re-read
+
+REQ-SEC-049 keeps unreadable values from being *written*. This requirement is about the ones already
+in Redis, and it exists because getting the first half right did not clear the alert.
+
+An unreadable value is dropped by `FaultTolerantSessionSerializer` and named by
+`SessionAttributeDiagnosticMapper`, and **neither writes anything back**. The bytes therefore stay in
+the session hash and are re-read, re-dropped and re-counted on *every* subsequent request that
+session makes — for up to the 720-hour authenticated window (REQ-SEC-025). One poisoning is
+permanent for the life of the session, and `basetool_session_value_dropped_total` cannot reach zero
+while any poisoned session is still being used, so the meter cannot see the next real poisoning
+(REQ-OBS-011).
+
+**Nothing else clears it.** For the Tomcat listener of REQ-SEC-049 the only writer is
+`WsServerContainer#registerAuthenticatedSession`, which runs on a WebSocket handshake — and
+`krt-live-sync.js` opens `/ws/sync` **lazily**, only from `subscribe()` / `sendChanged()` /
+`sendPresence()`, so a page that subscribes to no live-sync room never handshakes. Meanwhile
+`notifications.js` polls from every page (60 s, or 300 s while SSE is healthy) and each poll reads
+the session again. That combination held production at 2-6 drops per minute for hours after the
+REQ-SEC-049 fix was live, and fired `SessionValueDropsSustained` a second time on 2026-09-03 at
+13:33Z.
+
+**The rule:** a session value that cannot be read is removed from the session before the request that
+discovered it ends.
+
+- The mapper hands the attribute name to `SessionAttributeRepairQueue`, a **bounded** thread-local,
+  and still writes nothing itself.
+- `SessionAttributeRepairFilter` — ordered `SessionRepositoryFilter.DEFAULT_ORDER + 10`, i.e.
+  immediately inside Spring Session's own filter — drains the queue in a `finally` and calls
+  `HttpSession#removeAttribute`. That is the same public API `BackendRoleSyncFilter` and
+  `TermsAcceptanceGateFilter` already use, so **no Redis write is added to the session read path**;
+  repairing from inside the serializer or the mapper is forbidden for that reason (ADR-0154,
+  ADR-0157).
+- The queue is cleared on the way **into** the chain as well as drained on the way out. Tomcat pools
+  request threads, and a name left behind by an earlier request would remove an attribute from a
+  different member's session.
+- The filter runs on async dispatches too, so the notification SSE stream cannot strand a queued
+  name on a pooled thread.
+
+**Acceptance**
+
+- [ ] A value that cannot be read is dropped **once** per session, not once per request.
+- [ ] The repair uses `HttpSession#removeAttribute`; neither the serializer nor the session mapper
+  writes to Redis.
+- [ ] A repair name never crosses from one request to the next on the same thread.
+- [ ] A session invalidated during the request (a logout) does not turn the repair into an error.
+- [ ] The repaired hash field reads back as absent rather than becoming a second kind of unreadable
+  value.
+- [ ] `basetool_session_value_dropped_total` falls to zero after a poisoning stops, so a rate that
+  stays up means a value is still being written unreadably.
+
+**Enforced by:** `SessionAttributeRepairIntegrationTest` (against a real Redis and the real
+`RedisIndexedSessionRepository`: the container record is written with its `@class`; a pre-fix value is
+dropped once and queued; the repair ends the drop; the repaired field reads back absent) ·
+`SessionAttributeRepairFilterTest` (drain, clear-on-entry, no session, invalidation race, repair on a
+throwing chain, filter order) · `SessionAttributeDiagnosticMapperTest` · **Code:**
+`SessionAttributeRepairFilter`, `SessionAttributeRepairQueue`, `SessionAttributeDiagnosticMapper`,
+`FaultTolerantSessionSerializer` · **Monitoring:** `SessionValueDropsSustained`,
+`basetool_session_value_dropped_total` ([`observability.md`](observability.md)) · **ADR:**
+[ADR-0157](../adr/0157-a-dropped-session-value-is-repaired-on-the-request-that-found-it.md),
 [ADR-0154](../adr/0154-a-container-written-final-session-value-gets-a-forced-type-id.md)
 
 ## Out of scope
