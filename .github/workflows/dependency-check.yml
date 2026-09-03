@@ -111,13 +111,21 @@ jobs:
       # (gradle.properties) that cross-project resolution runs without the
       # exclusive lock and Gradle aborts the scan ("Resolution of the
       # configuration ':backend:annotationProcessor' was attempted without an
-      # exclusive lock") before any analyser stage runs — verified by a
-      # parallel workflow_dispatch run on 2026-06-11 (run 27354476376, see
-      # #415). The AsciidoctorJ plugin previously blamed for this (runs
-      # 26516932803+) was merely the first configuration the race tripped
-      # over; its removal in #414 did not fix it. The flag scopes the
-      # workaround to this CI step only, so day-to-day developer builds keep
-      # their parallel speedup.
+      # exclusive lock") before any analyser stage runs. The AsciidoctorJ
+      # plugin previously blamed for this (runs 26516932803+) was merely the
+      # first configuration the race tripped over; its removal in #414 did not
+      # fix it. Upstream tracks the bug as
+      # dependency-check/dependency-check-gradle#462 (open); #415 tracks
+      # dropping this flag once a release fixes it. Last verified 2026-09-03
+      # against plugin 13.0.0 on Gradle 9.7.1 — still red; earlier evidence
+      # was a parallel workflow_dispatch run on 2026-06-11 (run 27354476376,
+      # plugin 12.2.2).
+      #
+      # Re-checking costs seconds and needs no CI run: the abort happens while
+      # the task scans the subprojects, BEFORE the engine touches NVD, so
+      # `./gradlew dependencyCheckAggregate --parallel` reproduces it locally
+      # with no dataset download. The flag scopes the workaround to this CI
+      # step only, so day-to-day developer builds keep their parallel speedup.
       - name: Run dependencyCheckAggregate
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
