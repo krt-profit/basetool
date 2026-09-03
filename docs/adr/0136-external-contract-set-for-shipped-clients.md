@@ -2,6 +2,9 @@
 
 - **Status:** Proposed
 - **Date:** 2026-08-18
+- **Amended:** 2026-09-02 (owner-approved) — "keeps every field it had" narrowed to "keeps every
+  **recorded** field", matching `ExternalContractTest` and REQ-API-009's acceptance criteria (see
+  the Amendment note in the Decision section)
 - **Related:** [ADR-0135](0135-public-api-vhost-not-a-gateway.md) ·
   [ADR-0003](0003-inventory-append-only-group-on-read.md) (the carve-out this narrows) ·
   specs `REQ-API-001`, `REQ-API-007`, `REQ-API-009`, `REQ-SEC-027` ·
@@ -41,13 +44,25 @@ terms status and acceptance, the two `/me` reads, and the registration-status re
 **Frozen means, for an operation in the set:**
 
 - it keeps its path and its verb;
-- its response keeps every field it had — additive change is explicitly fine, removal and rename are
-  not;
+- its response keeps every **recorded** field — additive change is explicitly fine, removal and
+  rename of a recorded field are not;
 - its request accepts everything it accepted before — a new required field is a break;
 - retiring it goes through `/api/v2` plus `@ApiDeprecation` with a sunset, not a deletion.
 
 Everything outside the set keeps REQ-API-001's carve-out unchanged. The web app's endpoints stay as
 evolvable as they are today; this narrows the carve-out rather than replacing it.
+
+> **Amended (2026-09-02, owner-approved):** the response bullet above used to promise every field
+> an operation had, rather than every *recorded* field.
+>
+> That was never what shipped. `ExternalContractTest` checks `containsAll` over the recorded field
+> set, and REQ-API-009's acceptance criterion has always spoken of a *recorded* response field
+> disappearing. The looser wording froze, by accident, every field an operation happened to
+> serialise — including three on `GET /api/v1/ship-types` that the table never listed. That
+> contradicts this ADR's own reasoning: the set grows deliberately, one app phase at a time, and
+> only as an operation is actually consumed.
+>
+> The decision is unchanged; the sentence now states it.
 
 **The spec plus the test are the source of truth — not the vhost allow-list.** The allow-list
 decides what is *reachable* and lives in the NPM admin database, which is not version-controlled and
