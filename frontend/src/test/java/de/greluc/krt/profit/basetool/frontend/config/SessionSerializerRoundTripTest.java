@@ -20,12 +20,16 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.tomcat.websocket.server.WsHttpSessionBindingListener;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
@@ -113,6 +117,12 @@ class SessionSerializerRoundTripTest {
     // This is a CONTRACT, not a wish: nothing about a record makes it unusable in a session, only
     // this serializer configuration does. If a future change makes the round trip succeed, this
     // test is the one to delete — deliberately, not by accident.
+    //
+    // RedisSessionConfig's forced-type-id mix-in does NOT make it succeed, and that is the point of
+    // keeping this case beside `tomcatsWebSocketSessionBindingListener_isReadableAgain`: the mix-in
+    // is an allow-list of individually named container classes, not a change of policy for final
+    // types. If this ever starts passing, the allow-list has grown into a blanket rule and the
+    // required Long/Integer session keys are the next thing to check.
     assertThrows(Exception.class, () -> roundTrip(new ProbeRecord("probe", 3)));
   }
 
@@ -137,5 +147,40 @@ class SessionSerializerRoundTripTest {
     assertEquals(wrapped, roundTrip(wrapped));
     assertEquals(
         new LinkedHashMap<>(Map.of("k", "v")), roundTrip(new LinkedHashMap<>(Map.of("k", "v"))));
+  }
+
+  @Test
+  void tomcatsWebSocketSessionBindingListener_isReadableAgain() {
+    // The 2026-09-03 alert, pinned against the real class rather than a stand-in. Tomcat 11.0.25
+    // added this record and `WsServerContainer#registerAuthenticatedSession` writes it into the
+    // HttpSession on every authenticated WebSocket handshake — which for this application is every
+    // logged-in page, because live sync opens /ws/sync. Being a record it is implicitly final, so
+    // before RedisSessionConfig's forced-type-id mix-in it was written with no `@class` and dropped
+    // on the very next request. The rate never decayed, because a dropped value leaves the
+    // attribute unset and the next handshake writes it again: SessionValueDropsSustained fired at
+    // ~70 drops per 15 min against a healthy application.
+    //
+    // Referenced by type here, deliberately, although the production registration resolves it by
+    // name: this test is the alarm that should ring if the class is ever gone, because that is
+    // exactly when the entry in CONTAINER_WRITTEN_FINAL_SESSION_TYPES stops earning its place.
+    WsHttpSessionBindingListener listener = new WsHttpSessionBindingListener("a-session-id");
+
+    assertEquals(listener, roundTrip(listener));
+  }
+
+  @Test
+  void theForcedTypeIdUsesTheSameAtClassPropertyAsEverythingElseInTheHash() {
+    // The mix-in must not invent a second dialect. `@class` is what the NON_FINAL default typing
+    // writes for every non-final value in the same session hash, so writing the forced id under any
+    // other property name would read back only by accident — and would diverge silently the moment
+    // Spring Session's own typing configuration moved.
+    byte[] written = serializer.serialize(new WsHttpSessionBindingListener("a-session-id"));
+
+    assertNotNull(written);
+    assertTrue(
+        new String(written, StandardCharsets.UTF_8)
+            .contains(
+                "\"@class\":\"org.apache.tomcat.websocket.server.WsHttpSessionBindingListener\""),
+        "the forced type id must be written as the @class property");
   }
 }

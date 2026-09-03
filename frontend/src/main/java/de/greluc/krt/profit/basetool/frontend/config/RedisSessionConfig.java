@@ -20,10 +20,14 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -84,6 +88,26 @@ import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 @Profile("!test")
 @Slf4j
 public class RedisSessionConfig {
+
+  /**
+   * Fully-qualified names of <strong>final</strong> classes that the servlet container itself
+   * writes into the HTTP session, and which therefore need a forced {@code @class} type id to
+   * survive a round trip through Redis.
+   *
+   * <p>Held as names rather than as types on purpose — see {@link #resolveIfPresent} — and
+   * deliberately short. This is not a place to work around this application's own code: a value
+   * <em>we</em> write is fixed by not writing a final type in the first place (wrap it, exactly as
+   * {@code BackendRoleSyncFilter}'s {@code new ArrayList<>(…)} does). Only a value written by a
+   * dependency, where there is no such seam, belongs here.
+   *
+   * <ul>
+   *   <li>{@code org.apache.tomcat.websocket.server.WsHttpSessionBindingListener} — a {@code
+   *       record} added in Tomcat 11.0.25, written on every authenticated WebSocket handshake. See
+   *       {@link ForcedTypeIdMixin} for the whole failure and why this is the fix.
+   * </ul>
+   */
+  private static final List<String> CONTAINER_WRITTEN_FINAL_SESSION_TYPES =
+      List.of("org.apache.tomcat.websocket.server.WsHttpSessionBindingListener");
 
   /**
    * <em>Anonymous</em> session idle timeout read from {@code app.session.anonymous-timeout}
@@ -230,12 +254,84 @@ public class RedisSessionConfig {
   static JsonMapper buildSessionJsonMapper(ClassLoader loader) {
     BasicPolymorphicTypeValidator.Builder typeValidatorBuilder =
         BasicPolymorphicTypeValidator.builder().allowIfBaseType(Object.class);
-    return JsonMapper.builder()
-        .addModules(SecurityJacksonModules.getModules(loader, typeValidatorBuilder))
-        .addMixIn(Errors.class, BindingResultMixin.class)
-        .addMixIn(AbstractBindingResult.class, BindingResultMixin.class)
-        .build();
+    JsonMapper.Builder builder =
+        JsonMapper.builder()
+            .addModules(SecurityJacksonModules.getModules(loader, typeValidatorBuilder))
+            .addMixIn(Errors.class, BindingResultMixin.class)
+            .addMixIn(AbstractBindingResult.class, BindingResultMixin.class);
+    for (String className : CONTAINER_WRITTEN_FINAL_SESSION_TYPES) {
+      Class<?> type = resolveIfPresent(className, loader);
+      if (type != null) {
+        builder.addMixIn(type, ForcedTypeIdMixin.class);
+      }
+    }
+    return builder.build();
   }
+
+  /**
+   * Resolves a class by name without initialising it, answering {@code null} when it is absent.
+   *
+   * <p>{@link #CONTAINER_WRITTEN_FINAL_SESSION_TYPES} names servlet-container internals, and an
+   * internal is exactly the kind of class that appears in one patch release and moves in the next —
+   * {@code WsHttpSessionBindingListener} did not exist before Tomcat 11.0.25. Referencing it by
+   * type would tie compilation of the frontend to one container at one version, and would turn an
+   * emergency Tomcat downgrade into a build failure at the worst possible moment. Resolving by name
+   * costs one lookup at startup and degrades to "no mix-in", which is exactly the behaviour on a
+   * container that never writes the attribute.
+   *
+   * @param className the fully-qualified class name to look up.
+   * @param loader the class loader to resolve against; {@code null} means the bootstrap loader.
+   * @return the class, or {@code null} when it is not on the classpath.
+   */
+  @Nullable
+  private static Class<?> resolveIfPresent(@NotNull String className, ClassLoader loader) {
+    try {
+      // Not initialised: a mix-in registration needs the Class object, never the class's state.
+      return Class.forName(className, false, loader);
+    } catch (ClassNotFoundException | LinkageError ex) {
+      log.debug(
+          "Session type {} is not on the classpath; its forced type-id mix-in is not registered.",
+          className);
+      return null;
+    }
+  }
+
+  /**
+   * Jackson mix-in that forces an {@code @class} type id onto a class the default typing would
+   * write without one.
+   *
+   * <p><strong>The production defect this closes (2026-09-03).</strong> Tomcat 11.0.25 added {@code
+   * org.apache.tomcat.websocket.server.WsHttpSessionBindingListener} and {@code
+   * WsServerContainer#registerAuthenticatedSession} puts it into the {@code HttpSession} on every
+   * authenticated WebSocket handshake — which for this application is every logged-in page, because
+   * live sync opens {@code /ws/sync}. It is a {@code record}, hence implicitly
+   * <strong>final</strong>, and the {@code NON_FINAL} default typing {@code SecurityJacksonModules}
+   * activates writes a final type as a JSON object with no {@code @class}. The reader then demands
+   * the type id it was never given, so the value was unreadable on the very next request: {@code
+   * InvalidTypeIdException}, {@code typeId=absent}. Tomcat re-wrote it on the next handshake, so
+   * the rate never decayed — {@code SessionValueDropsSustained} fired at ~70 drops per 15 min.
+   *
+   * <p><strong>Why forcing the id, rather than suppressing the attribute.</strong> An explicit
+   * {@code @JsonTypeInfo} beats the default typing at {@code createTypeSerializer} time, so the
+   * value is written as {@code {"@class": "…", "key": "…"}} — byte-identical in shape to every
+   * non-final session value — and reads back. Nothing has to be intercepted on the session write
+   * path, which is the subsystem that took the whole application down twice inside two releases,
+   * and a poisoned session heals itself: the drop leaves the attribute unset, so Tomcat's very next
+   * handshake writes a readable one over it.
+   *
+   * <p><strong>This is a targeted allow-list, not a policy change.</strong> Only the classes named
+   * in {@link #CONTAINER_WRITTEN_FINAL_SESSION_TYPES} get it. Widening the default typing to cover
+   * every final type would put a type id on {@code creationTime}, {@code lastAccessedTime} and
+   * {@code maxInactiveInterval} as well — the three keys Spring Session requires and the ones whose
+   * loss throws {@code IllegalStateException: creationTime key must not be null} — and would do it
+   * to every live session at once. {@code SessionSerializerRoundTripTest} pins both halves: this
+   * class round-trips, and a plain record still does not.
+   */
+  @JsonTypeInfo(
+      use = JsonTypeInfo.Id.CLASS,
+      include = JsonTypeInfo.As.PROPERTY,
+      property = "@class")
+  abstract static class ForcedTypeIdMixin {}
 
   /**
    * Jackson mix-in that hides internal {@link BeanPropertyBindingResult} properties from the
