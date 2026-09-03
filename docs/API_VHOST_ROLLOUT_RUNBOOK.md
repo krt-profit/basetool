@@ -426,7 +426,9 @@ if ($uri = "/api/v1/app/version-policy") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/refinery-orders/my-orders") { set $krt_api_allowed 1; }
 # Phase M - the app can now record a run itself (app REQ-APP-REF-009). The bare stem is the create
 # POST; `refinery-orders` is NOT in the read-only family, so naming it opens the verbs the backend
-# serves there - which for the stem is exactly POST plus the caller-scoped GET. The two picker reads
+# serves there - which for the stem is exactly the create POST. Every GET this controller offers
+# sits on a sub-path (/my-orders, /{id}, /mission/{id}, /locations/{id}/yields), so the stem itself
+# answers no read at all; the two picker reads
 # below are mandatory fields of that form: without them the member has nothing to choose from.
 if ($uri = "/api/v1/refinery-orders") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/locations/refineries") { set $krt_api_allowed 1; }
