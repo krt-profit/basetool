@@ -686,6 +686,67 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * The Verwaltung's direct booking, refused without a token.
+   *
+   * <p>Four paths phase O admits, and the phase is a correction rather than an addition: they were
+   * excluded because the runbook said no artboard drew them, and design chapter 12 artboard 9 draws
+   * exactly the sheet the app shipped. So the interesting thing to pin is not that they are refused
+   * — it is that they are refused with <b>401</b> and not 404, which is what says the allow-list
+   * actually admits them now.
+   *
+   * <p>All four gate on {@code hasRole('BANK_EMPLOYEE')}; the three bookings add a per-account
+   * grant that anonymous never reaches. The bank-admin paths beside them stay 404 and are asserted
+   * elsewhere — that exclusion is a real owner decision and this phase does not touch it.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousDirectBookingWithUnauthorized() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/bank/deposits")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"accountId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"holderId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"amount\":1}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/bank/withdrawals")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"accountId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"holderId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"amount\":1}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/bank/transfers")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"sourceAccountId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"sourceHolderId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"destinationAccountId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"destinationHolderId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"amount\":1}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/bank/transfer-fee-rate")).andExpect(status().isUnauthorized());
+  }
+
+  /**
    * The Materialsammelübersicht and the crew removal, refused without a token.
    *
    * <p>Five paths phase N admits: the collection read, its two unlinks, the delivered PATCH that

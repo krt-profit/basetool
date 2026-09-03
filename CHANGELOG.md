@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- **Die Direktbuchung der Bank war in der App gebaut und in Produktion nicht erreichbar.** Ein-, Aus- und Umbuchen ohne Antrag — der API-Zugang gab die vier Pfade nicht frei, mit der Begründung, kein Entwurf zeichne sie. Artboard 9 zeichnet sie, die App hat sie seit dem 30.08. Die Pfade sind jetzt freigegeben, eingefroren und werden auf `401` statt `404` geprobt; die Freischaltung wird mit dem Runbook (Phase O) eingespielt. Gleichzeitig zwei Fehler behoben, die erst dadurch sichtbar geworden wären: die App verlangte für den Einstieg Bank-Management, obwohl der Server nur Bankmitarbeiter plus Freigabe je Konto verlangt — und eine Buchung über dem Limit wurde als erledigt gemeldet, obwohl sie nur zur Freigabe eingereicht wurde (ADR-0156).
+
 - **Zwei App-Ansichten liefen ins Leere, weil der API-Zugang ihre Pfade nicht freigab.** Die Materialsammelübersicht eines Auftrags (Lieferstatus, Verknüpfung lösen, Material entfernen) und das Entfernen einer Person aus einer Einsatz-Einheit meldeten in der App nur „Konnte nicht gespeichert werden.". Die fünf Pfade sind jetzt freigegeben, in `ExternalContractTest` eingefroren und in `ApiVhostAnonymousSurfaceTest` festgenagelt; die Freischaltung wird mit dem Runbook (Phase N) eingespielt. Wer nur das Webtool nutzt, merkt nichts.
 
 ## [v1.6.18](https://github.com/krt-profit/basetool/releases/tag/v1.6.18) - 2026-09-03

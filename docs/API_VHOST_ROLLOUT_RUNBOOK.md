@@ -326,8 +326,8 @@ if ($uri ~ "^/api/v1/finance-entries/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4
 # Operation edit surface, and only this one path is named.
 if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/payouts/paid-out$") { set $krt_api_allowed 1; }
 # Phase 3 - the only bank writes a MEMBER has: the settings of an account they are responsible
-# for. The staff surface is admitted separately in phase L, and the direct booking forms
-# (deposits, withdrawals, transfers) are not admitted there either - no artboard draws them.
+# for. The staff surface is admitted separately in phase L; the direct booking forms
+# (deposits, withdrawals, transfers) follow in phase O, on the staff surface only.
 if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/settings$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/balance-target$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/visibility/role/[A-Za-z0-9_-]{1,64}$") { set $krt_api_allowed 1; }
@@ -528,13 +528,18 @@ if ($uri ~ "^/api/v1/users/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA
 # That is deliberate and it is safe only because this list defaults to 404: nothing under /bank is
 # reachable that is not named here.
 #
-# THREE THINGS STAY OUT, and each for its own reason:
+# TWO THINGS STAY OUT, and each for its own reason:
 #   * /api/v1/bank/admin/** - wipe-reset and the bank audit log. The admin area is web-only by
 #     owner decision and is never named below, so it keeps answering 404.
-#   * /bank/deposits, /bank/withdrawals, /bank/transfers, /bank/transfer-fee-rate - the direct
-#     booking forms. No artboard draws them; a booking that had no request stays a browser act.
 #   * /bank/accounts/<uuid>/approval-tiers and /balance-target - the KRT ladder editor is not one
 #     of the app's four tabs, and the balance target is already reachable on the member surface.
+#
+# THE THIRD ONE WAS WRONG AND IS ADMITTED IN PHASE O (2026-09-03). This block used to exclude
+# /bank/deposits, /bank/withdrawals, /bank/transfers and /bank/transfer-fee-rate on the ground
+# that "no artboard draws them; a booking that had no request stays a browser act". Chapter 12
+# artboard 9 draws exactly that sheet, round 8 decided it STAYS, REQ-APP-BANK-016 specifies it and
+# the app shipped it -- so the sentence was false when it was written and the four paths were the
+# only reason a built feature answered 404 in production. See phase O.
 if ($uri = "/api/v1/bank/dashboard") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/bank/accounts") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
@@ -555,6 +560,22 @@ if ($uri = "/api/v1/bank/export/three-month-report") { set $krt_api_allowed 1; }
 # BANK_EMPLOYEE (so BANK_MANAGEMENT via the hierarchy). A bank manager who holds no org role gets
 # 403 on /users/search and would have no picker at all. Read-only.
 if ($uri = "/api/v1/users/search-bank") { set $krt_api_allowed 1; }
+# Phase O - the Verwaltung's direct booking (app REQ-APP-BANK-016, design ch. 12 artboard 9).
+# Four exact paths, no regex: the backend serves exactly one verb on each - POST on the three
+# bookings, GET on the fee rate - and `bank` is not in the read-only family, so an exact line
+# opens precisely that verb and nothing beneath it.
+#
+# The gate is `hasRole('BANK_EMPLOYEE')` plus a PER-ACCOUNT grant (`canDeposit` /
+# `canWithdraw` / `canTransfer`, or management/admin unrestricted) - NOT Bank-Management, which
+# is what both this runbook and the app had assumed. A plain Bankmitarbeiter with a grant on
+# one account may book on that account and is refused on the others, by the backend, per call.
+#
+# /bank/holders/transfer is a DIFFERENT endpoint (moving custody between holders) and was
+# already admitted in phase L. It is not part of this.
+if ($uri = "/api/v1/bank/deposits") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/bank/withdrawals") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/bank/transfers") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/bank/transfer-fee-rate") { set $krt_api_allowed 1; }
 # Phase N - taking somebody off an Einheit, and the `/slim` half of the pair only. The
 # full-DTO `DELETE .../crew/{crewId}` beside it is @ApiDeprecation-marked with a sunset and
 # stays unnamed on purpose: naming both would let a build fall back onto the path that is
@@ -804,6 +825,10 @@ The safe order, and the reason for it:
    | `/api/v1/orders/<uuid>/materials/<uuid>`                | **401**                                                             | phase N; same gate                                                                                       |
    | `/api/v1/inventory/<uuid>/delivered`                    | **401**                                                             | phase N; `isAuthenticated()` + `canEditInventoryItem` — the ROW's gate, not the order's                  |
    | `/api/v1/missions/<uuid>/units/<uuid>/crew/<uuid>/slim` | **401**                                                             | phase N; `canManageMission`. The deprecated sibling without `/slim` stays **404**                        |
+   | `/api/v1/bank/deposits` (POST)                          | **401**                                                             | phase O; `hasRole(BANK_EMPLOYEE)` + per-account `canDeposit`                                             |
+   | `/api/v1/bank/withdrawals` (POST)                       | **401**                                                             | phase O; same, `canWithdraw`                                                                             |
+   | `/api/v1/bank/transfers` (POST)                         | **401**                                                             | phase O; same, `canTransfer` on the SOURCE account                                                       |
+   | `/api/v1/bank/transfer-fee-rate`                        | **401**                                                             | phase O; `hasRole(BANK_EMPLOYEE)` only — an org-wide rate, no account in it                              |
    | anything not on the list                                | **404**                                                             | default deny                                                                                             |
 
    **Two refusals, two numbers, and the difference is structural rather than a policy gap.** The
@@ -1091,7 +1116,7 @@ Anonymously, from outside the host — the same shape as Phase H's check:
 | `/api/v1/operations/<uuid>/payouts/paid-out` | **401**                                                                           |
 | `…/bank/accounts/<uuid>/settings`            | **401**                                                                           |
 | `…/bank/accounts/<uuid>/balance-target`      | **401**                                                                           |
-| `POST /api/v1/bank/deposits`                 | **404** — a direct booking form; not drawn, so not admitted even in phase L       |
+| `POST /api/v1/bank/deposits`                 | **404** at the time of phase I; **401** since phase O admitted it                 |
 | `POST /api/v1/orders`                        | **405** — the public request form stays refused on this vhost                     |
 | `POST /api/v1/hangar/import/fleetview`       | **404** — phase 4, on no allow-list line; refused before the verb is judged       |
 
@@ -1104,9 +1129,14 @@ queue — and only the verb is refused.
 
 A **404** where a **401** is listed means the path did not match the allow-list — a typo in the
 regex, most likely a `<uuid>` group that lost a brace. Anything other than **404** on
-`/inventory/all`, `/bank/deposits` or `/hangar/import/fleetview` means the opposite: something was
-admitted that should not have been — a **405** included, because reaching the read-only guard at all
-means the path got past the deny. That one is worth stopping for.
+`/inventory/all`, `/bank/admin/wipe-reset` or `/hangar/import/fleetview` means the opposite:
+something was admitted that should not have been — a **405** included, because reaching the
+read-only guard at all means the path got past the deny. That one is worth stopping for.
+
+> [!note] `/bank/deposits` used to be the canary named here, and is one no longer
+> Phase O admitted it (2026-09-03). The exclusion it stood for was reasoned from a claim that no
+> artboard drew the direct booking, and artboard 9 does. A canary has to guard a decision that is
+> still a decision, so the admin wipe-reset — web-only by owner decision — took its place.
 
 ### Doing it — step by step
 
@@ -1136,7 +1166,7 @@ nothing in this repo reaches that host.
 5. **Check that what should still be refused, is:**
 
    ```powershell
-   foreach ($p in '/api/v1/bank/deposits','/api/v1/inventory/all','/api/v1/hangar/import/fleetview') { '{0,-46} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' -X POST "https://api.profit-base.online$p") }
+   foreach ($p in '/api/v1/bank/admin/wipe-reset','/api/v1/inventory/all','/api/v1/hangar/import/fleetview') { '{0,-46} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' -X POST "https://api.profit-base.online$p") }
    ```
 
    Expected: `404` for all three — none of them is on the allow-list, and the deny answers before
@@ -1370,9 +1400,16 @@ peer-redacted projection), which is why the backend keeps it as a separate path 
 the first one. Admitting it widens the mobile surface by no rows: both answer the same set.
 
 **What stays 404, and is probed for it:** `/api/v1/bank/admin/wipe-reset`,
-`/api/v1/bank/admin/audit`, `/api/v1/bank/deposits`, `/api/v1/bank/withdrawals`,
-`/api/v1/bank/transfers`, `/api/v1/bank/transfer-fee-rate`, and
-`/api/v1/bank/accounts/<uuid>/approval-tiers`.
+`/api/v1/bank/admin/audit`, and `/api/v1/bank/accounts/<uuid>/approval-tiers`.
+
+> [!warning] Corrected 2026-09-03 — this list also named the four direct-booking paths, and they
+> were excluded on a premise that was never true
+> `/bank/deposits`, `/bank/withdrawals`, `/bank/transfers` and `/bank/transfer-fee-rate` are
+> admitted by **phase O**. The reason given for keeping them out — „no artboard draws them" — was
+> wrong on the day it was written: design chapter 12 artboard 9 draws the sheet, round 8 decided it
+> stays, `REQ-APP-BANK-016` specifies it, and the app shipped it with tests. The four rules were
+> the only thing standing between a built feature and production, and the probe that asserted their
+> 404 turned that mistake into a nightly green light.
 
 ### What to expect afterwards
 
@@ -1503,6 +1540,75 @@ that silently hides a control the server would have allowed.
 All five are pinned in `ApiVhostAnonymousSurfaceTest` **before** this table was written, which is
 the step phase M skipped and spent three red probe nights on. `DELETE …/crew/<uuid>` without
 `/slim`, and `POST …/units/<uuid>/crew`, must still answer **404**.
+
+---
+
+## Phase O — the direct booking, and an exclusion that was never true
+
+**This phase is a correction, not an addition.** Four paths — `POST /bank/deposits`,
+`/bank/withdrawals`, `/bank/transfers` and `GET /bank/transfer-fee-rate` — were kept off this
+allow-list from phase L onwards with the reason written into the block itself:
+
+> `/bank/deposits`, `/bank/withdrawals`, `/bank/transfers`, `/bank/transfer-fee-rate` — the direct
+> booking forms. No artboard draws them; a booking that had no request stays a browser act.
+
+**The first half of that sentence is false, and the second follows from it.** Design chapter 12
+**artboard 9** draws the sheet („Direktbuchung — Verwaltung (Ein/Aus/Um)"), design round 8 settled
+it explicitly — *„die Direktbuchung BLEIBT, weil sie den Fall deckt, für den niemand einen Antrag
+stellt (Bargeld-Übergabe im Spiel, Korrektur einer Fremdbuchung)"* — `REQ-APP-BANK-016` specifies
+it, and the app shipped it with tests and all acceptance criteria met. These four rules were the
+only thing between a finished feature and the members using it.
+
+|      Screen       |              Paths               | Verbs |
+|-------------------|----------------------------------|-------|
+| Direktbuchung     | `/api/v1/bank/deposits`          | POST  |
+| Direktbuchung     | `/api/v1/bank/withdrawals`       | POST  |
+| Direktbuchung     | `/api/v1/bank/transfers`         | POST  |
+| Gebühren-Vorschau | `/api/v1/bank/transfer-fee-rate` | GET   |
+
+**Four exact lines, no regex.** The backend serves exactly one verb on each — POST on the three
+bookings, GET on the rate — and `bank` is not in the read-only family, so an exact line opens
+precisely that verb and nothing beneath it. No carve-out is needed or wanted.
+
+**The gate is not Bank-Management, and both this runbook and the app had it wrong.** All four ask
+for `hasRole('BANK_EMPLOYEE')`; the three bookings add a **per-account** grant on top —
+`canDeposit` / `canWithdraw` / `canTransfer`, with management and admin unrestricted
+(`BankSecurityService.hasCapability`). The web has never gated its own entry on anything more: its
+CTA appears whenever at least one active account is visible. The app, following artboard 9's state
+list („403 (Rolle Bank-Management fehlt)"), locked the entry on Bank-Management and so refused
+exactly the caller the Grants tab exists to create. That lock is gone; the per-account half is
+decided per call by the backend and surfaces as a 403 the sheet shows.
+
+> [!warning] The 202 had to be fixed BEFORE these rules could be pasted
+> `POST /bank/withdrawals` and `/bank/transfers` do not always book. Over the KRT employee ceiling
+> the server files the attempt as a band-routed approval request and answers **202** with a
+> `pendingRequest` where a booking carries a `transaction` (REQ-BANK-047, ADR-0109). The app sent
+> both through a helper that treats **any** 2xx as success and discards the body — so on a 202 the
+> sheet closed, the balance had not moved, and nothing said why. Invisible while the edge answered
+> 404; a live money-path defect the moment it did not. The app now reads the answer and says
+> „Zur Freigabe eingereicht". **Do not paste this phase onto a build that predates that fix.**
+
+**What still stays out, and why it is a different kind of exclusion.** `/api/v1/bank/admin/**`
+(wipe-reset, bank audit) is web-only by **owner decision**, and
+`/bank/accounts/<uuid>/approval-tiers` is not one of the app's four tabs. Both remain unnamed and
+both are still probed at 404. The lesson of this phase is worth keeping beside them: an exclusion
+that cites a *fact* („no artboard draws them") has to be re-checked when the fact can change, and
+an exclusion that cites a *decision* does not.
+
+### What to expect afterwards
+
+|                 Path                 | Anonymous status |
+|--------------------------------------|------------------|
+| `POST /api/v1/bank/deposits`         | **401**          |
+| `POST /api/v1/bank/withdrawals`      | **401**          |
+| `POST /api/v1/bank/transfers`        | **401**          |
+| `GET /api/v1/bank/transfer-fee-rate` | **401**          |
+
+All four are pinned in `ApiVhostAnonymousSurfaceTest` and frozen in `ExternalContractTest`, whose
+reachability guard now asserts these very rules admit them. `/api/v1/bank/admin/wipe-reset`,
+`/api/v1/bank/admin/audit` and `/api/v1/bank/accounts/<uuid>/approval-tiers` must still answer
+**404** — `edge-deny-probe.yml` moved the four booking paths onto the 401 side and kept those three
+where they are.
 
 ---
 

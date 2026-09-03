@@ -546,9 +546,10 @@ class ExternalContractTest {
               Set.of(
                   "detail", "account", "delta30d", "bookingCount", "name", "accountNo", "balance")),
           // Phase 3, the only bank writes a member has: the settings of an account they are
-          // responsible for. Deliberately NOT `/api/v1/bank/**` — deposits, withdrawals and
-          // transfers are all `hasRole(BANK_EMPLOYEE)` and belong to the bank-employee surface the
-          // app does not carry (REQ-APP-BANK-001).
+          // responsible for. Still not `/api/v1/bank/**` wholesale — that prefix carries the admin
+          // area — but the three bookings under it ARE frozen further down: the app has carried the
+          // bank-employee surface since REQ-APP-BANK-007 and its direct booking since -016, and
+          // this comment claimed the opposite until 2026-09-03.
           //
           // `canSetTarget` and `canConfigureVisibility` are the two fields that make this slice
           // work at all: the server states what the caller may do, so the app offers exactly that
@@ -1843,9 +1844,52 @@ class ExternalContractTest {
           // has announced it will withdraw is a promise made to be broken. Answers 204, so the app
           // re-reads the Einsatz -- the same shape as the participant leave frozen further up.
           new ContractOperation(
-              "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim",
-              "delete",
-              Set.of()));
+              "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim", "delete", Set.of()),
+          // ---- Phase O: the Verwaltung's direct booking ----------------------------------------
+          //
+          // Design ch. 12 artboard 9, REQ-APP-BANK-016, shipped with tests -- and answering 404 in
+          // production the whole time, because the vhost excluded the four paths on the ground that
+          // "no artboard draws them". Freezing them here is the other half of admitting them; the
+          // reachability guard below now holds both halves together.
+          //
+          // The gate on all four is `hasRole('BANK_EMPLOYEE')`, and on the three bookings a
+          // PER-ACCOUNT grant on top (`canDeposit` / `canWithdraw` / `canTransfer`, with
+          // management and admin unrestricted). Not Bank-Management: the app had gated its own
+          // entry on that and locked out exactly the caller the Grants tab exists to create.
+          //
+          // `holderId` is required on all three and is the one worth saying out loud: custody is
+          // kept per org unit, so a balance without a holder is money nobody is accountable for.
+          // A server that stopped requiring it would not break the app -- it would let the app
+          // write an unaccountable balance.
+          new ContractOperation(
+              "/api/v1/bank/deposits", "post", Set.of(), Set.of("accountId", "amount", "holderId")),
+          // The two with a ceiling, and the reason their RESPONSE is frozen where the deposit's is
+          // not. Over the KRT employee ceiling the server does not refuse: it files the attempt as
+          // a band-routed approval request and answers 202 with `pendingRequest` where a booking
+          // carries `transaction` (REQ-BANK-047, ADR-0109). Both are 2xx. The app branches on
+          // `pendingRequest` to tell the member the balance has NOT moved -- so renaming that field
+          // does not break a screen, it makes a shipped build report a filed withdrawal as a
+          // completed one. It did exactly that until 2026-09-03, when the app read no answer at
+          // all.
+          new ContractOperation(
+              "/api/v1/bank/withdrawals",
+              "post",
+              Set.of("pendingRequest"),
+              Set.of("accountId", "amount", "holderId")),
+          new ContractOperation(
+              "/api/v1/bank/transfers",
+              "post",
+              Set.of("pendingRequest"),
+              Set.of(
+                  "amount",
+                  "destinationAccountId",
+                  "destinationHolderId",
+                  "sourceAccountId",
+                  "sourceHolderId")),
+          // The fee rate the sheet quotes before anything is booked. `rate` is the only field, and
+          // an absent one is read as zero -- so a rename would not fail, it would quietly quote
+          // "no fee" on a transfer that charges one.
+          new ContractOperation("/api/v1/bank/transfer-fee-rate", "get", Set.of("rate")));
 
   /**
    * Contract operations the app addresses by <strong>no</strong> query parameter, although the
