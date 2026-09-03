@@ -1095,6 +1095,38 @@ class ExternalContractTest {
               "/api/v1/bank/holders/{id}",
               "get",
               Set.of("id", "handle", "active", "totalHeld", "version")),
+          // ── The three pickers behind the two create forms (2026-09-03) ───────────────────
+          // The item order's catalogue and the grant editor's grantee search. Reads, all three,
+          // and each one is the only way its form can be filled: a picker that answers nothing is
+          // a form that cannot be submitted, which is the shape a member reads as "there are none"
+          // rather than as a fault.
+          new ContractOperation(
+                  "/api/v1/orders/item-catalog", "get", Set.of("content", "id", "name"))
+              .addressedBy(Set.of("search:string", "page:integer", "size:integer")),
+          // `outputName` with `scwikiKey` behind it and the id behind that: a blueprint whose
+          // product the catalogue has not named still has to render as something a member can
+          // pick. All three are frozen because the fallback chain IS the contract here — freezing
+          // only `outputName` would let the two behind it disappear unnoticed.
+          new ContractOperation(
+              "/api/v1/orders/item-catalog/{gameItemId}/blueprints",
+              "get",
+              Set.of("id", "outputName", "scwikiKey")),
+          // The grantee picker of the grant editor. Deliberately the bank twin of /users/search:
+          // the two run the same query over the same scope with the same peer-redacted
+          // projection and differ only in the role gate, which here is widened to BANK_EMPLOYEE.
+          // A bank manager holding no org role gets 403 on /users/search and would have no picker
+          // at all.
+          //
+          // The handle is a fallback chain — effectiveName, then displayName, then username — and
+          // all three are frozen for the same reason as the blueprint reference above.
+          // `totalElements` is frozen and the rest of the paging envelope is not: the picker shows
+          // the first page and says how many there are, and never asks for a second.
+          new ContractOperation(
+                  "/api/v1/users/search-bank",
+                  "get",
+                  Set.of(
+                      "content", "totalElements", "id", "effectiveName", "displayName", "username"))
+              .addressedBy(Set.of("query:string", "page:integer", "size:integer")),
           new ContractOperation("/api/v1/locations/refineries", "get", Set.of("id", "name")),
           // The method picker of the refinery form. A PAGE, not a bare array — the sibling above
           // answers an array and the two are easy to assume alike; parsed as a list this yields
