@@ -23403,6 +23403,7 @@
       "post" : {
         "tags" : [ "Missions" ],
         "summary" : "Join a mission",
+        "description" : "Self-enrolment: adds the caller as participant. The body is optional and carries the desired job type and the payout preference; omitting it (or either field) keeps the pre-2026-09-02 behaviour, including the profile-default payout chain of REQ-MISSION-002.",
         "operationId" : "joinMission",
         "parameters" : [ {
           "name" : "id",
@@ -23413,6 +23414,15 @@
             "format" : "uuid"
           }
         } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/JoinMissionRequest"
+              }
+            }
+          }
+        },
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -59742,6 +59752,19 @@
           }
         },
         "required" : [ "kind", "objectivesVersion", "title" ]
+      },
+      "JoinMissionRequest" : {
+        "type" : "object",
+        "properties" : {
+          "desiredJobTypeId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "payoutPreference" : {
+            "type" : "string",
+            "enum" : [ "PAYOUT", "DONATE" ]
+          }
+        }
       },
       "AddFrequencyRequest" : {
         "type" : "object",

@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.AddCrewRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddParticipantPublicRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddUnitRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.JoinMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionCrewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionFrequencyDto;
@@ -483,21 +484,49 @@ public class MissionController {
    * Self-enrolment shortcut — the caller adds themselves as participant. For adding others, use
    * {@link #addParticipantPublic} or the slim {@code addParticipantSlim}.
    *
+   * <p><b>The body is optional</b> ({@link JoinMissionRequest}) and carries the two answers a
+   * sign-up sheet collects — the desired Funktion and the payout preference. It was added on
+   * 2026-09-02 so a client with a sign-up sheet no longer has to reach for {@code
+   * /participants/add} to carry them: that endpoint can name anybody and is deliberately not on the
+   * API vhost's allow-list, so the Android app's sign-up was refused at the edge and never reached
+   * this service at all (ADR-0154). Adding an <em>optional</em> body is the additive half of
+   * REQ-API-009, which freezes this operation — a bodyless {@code POST} keeps behaving exactly as
+   * it did, which is what every shipped build sends.
+   *
    * @param jwt caller's JWT
    * @param id mission id
+   * @param request the optional sign-up answers; {@code null} when no body was sent
    * @return the persisted DTO
    */
   @PostMapping("/{id}/join")
-  @Operation(summary = "Join a mission")
+  @Operation(
+      summary = "Join a mission",
+      description =
+          "Self-enrolment: adds the caller as participant. The body is optional and carries the"
+              + " desired job type and the payout preference; omitting it (or either field) keeps"
+              + " the pre-2026-09-02 behaviour, including the profile-default payout chain of"
+              + " REQ-MISSION-002.")
   // SecurityConfig falls through to `anyRequest().authenticated()` for this path, but the
   // explicit `isAuthenticated()` keeps the controller honest if the URL filter is later loosened
   // — anonymous reaches the handler with a null JWT and would NPE in `getUserIdFromJwt`.
   // `canSeeMission` enforces MULTI_SQUADRON_PLAN.md §1: members of another squadron may join
   // only non-internal missions, own-squadron members + admins may join anything.
   @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeMission(#id)")
-  public MissionDto joinMission(@AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
+  public MissionDto joinMission(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable @NotNull UUID id,
+      @RequestBody(required = false) @jakarta.validation.Valid JoinMissionRequest request) {
+    // Self-enrolment only: the user comes from the token, never from the body. Everything the
+    // body can say is about the caller's own row, which is why it needs no self-vs-manager check.
     return missionMapper.toDto(
-        missionService.addParticipant(id, userService.getUserIdFromJwt(jwt)));
+        missionService.addParticipant(
+            id,
+            userService.getUserIdFromJwt(jwt),
+            null,
+            request == null ? null : request.desiredJobTypeId(),
+            null,
+            null,
+            request == null ? null : request.payoutPreference()));
   }
 
   /**
