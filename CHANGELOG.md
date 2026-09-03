@@ -10,6 +10,12 @@
 
 - **Unlesbare Sitzungswerte blieben liegen und wurden bei jeder weiteren Anfrage erneut verworfen.** Die Korrektur in v1.6.18 verhinderte nur, dass neue unlesbare Werte entstehen — bestehende reparierten sich entgegen der dortigen Angabe **nicht** von selbst, weil der dafür nötige Live-Sync-Handshake nur auf Seiten mit Live-Bereich zustande kommt. Ein unlesbarer Wert wird jetzt am Ende derselben Anfrage aus der Sitzung entfernt und damit genau einmal verworfen statt bis zu 30 Tage lang (REQ-SEC-050, ADR-0157).
 
+- **Die Freigabe-Limits der Bank waren in der App nicht speicherbar.** „Setzen" und „Entfernen" liefen ins Leere, weil der API-Zugang die vier Pfade nicht freigab — die aktuellen Werte wurden dagegen korrekt angezeigt, weil deren Leseweg längst frei war. Genau deshalb fiel es nicht auf. Die Pfade waren im Runbook überhaupt nicht erwähnt, weder freigegeben noch als bewusst ausgeschlossen. Jetzt freigegeben, eingefroren und auf beiden Verben geprobt (Runbook-Phase P). Nebenbei zwei Felder der Kontoeinstellungen nachgefroren, die die App immer schon liest.
+
+- **Die Direktbuchung der Bank war in der App gebaut und in Produktion nicht erreichbar.** Ein-, Aus- und Umbuchen ohne Antrag — der API-Zugang gab die vier Pfade nicht frei, mit der Begründung, kein Entwurf zeichne sie. Artboard 9 zeichnet sie, die App hat sie seit dem 30.08. Die Pfade sind jetzt freigegeben, eingefroren und werden auf `401` statt `404` geprobt; die Freischaltung wird mit dem Runbook (Phase O) eingespielt. Gleichzeitig zwei Fehler behoben, die erst dadurch sichtbar geworden wären: die App verlangte für den Einstieg Bank-Management, obwohl der Server nur Bankmitarbeiter plus Freigabe je Konto verlangt — und eine Buchung über dem Limit wurde als erledigt gemeldet, obwohl sie nur zur Freigabe eingereicht wurde (ADR-0156).
+
+- **Zwei App-Ansichten liefen ins Leere, weil der API-Zugang ihre Pfade nicht freigab.** Die Materialsammelübersicht eines Auftrags (Lieferstatus, Verknüpfung lösen, Material entfernen) und das Entfernen einer Person aus einer Einsatz-Einheit meldeten in der App nur „Konnte nicht gespeichert werden.". Die fünf Pfade sind jetzt freigegeben, in `ExternalContractTest` eingefroren und in `ApiVhostAnonymousSurfaceTest` festgenagelt; die Freischaltung wird mit dem Runbook (Phase N) eingespielt. Wer nur das Webtool nutzt, merkt nichts.
+
 ## [v1.6.18](https://github.com/krt-profit/basetool/releases/tag/v1.6.18) - 2026-09-03
 
 ### Fixed

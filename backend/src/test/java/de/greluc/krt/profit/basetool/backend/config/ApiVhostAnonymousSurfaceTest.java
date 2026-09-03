@@ -23,6 +23,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -681,6 +682,143 @@ class ApiVhostAnonymousSurfaceTest {
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"status\":\"IN_PROGRESS\",\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The Freigabe-Limits, refused without a token.
+   *
+   * <p>Four leaves under one allow-list rule (phase P), and the gap they close is the quietest one
+   * this vhost has had: the account's {@code /settings} GET that carries their current values was
+   * admitted in phase 3, so the section drew correctly and only the writes answered 404. Nothing in
+   * the runbook named {@code approval-limit} at all — neither admitting it nor excluding it.
+   *
+   * <p>Both verbs on each leaf, because the carve-out opens both and a test that checked only the
+   * PUT would say nothing about the DELETE that clears a ceiling.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousApprovalLimitWritesWithUnauthorized() throws Exception {
+    String stem = "/api/v1/org-units/bank/accounts/" + ABSENT_OPERATION + "/approval-limit/";
+    for (String leaf :
+        new String[] {
+          "all-members", "area-members", "role/KOMMANDOLEITER", "user/" + ABSENT_OPERATION
+        }) {
+      mockMvc
+          .perform(
+              put(stem + leaf)
+                  .with(csrf())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"limit\":1000}"))
+          .andExpect(status().isUnauthorized());
+      mockMvc.perform(delete(stem + leaf).with(csrf())).andExpect(status().isUnauthorized());
+    }
+  }
+
+  /**
+   * The Verwaltung's direct booking, refused without a token.
+   *
+   * <p>Four paths phase O admits, and the phase is a correction rather than an addition: they were
+   * excluded because the runbook said no artboard drew them, and design chapter 12 artboard 9 draws
+   * exactly the sheet the app shipped. So the interesting thing to pin is not that they are refused
+   * — it is that they are refused with <b>401</b> and not 404, which is what says the allow-list
+   * actually admits them now.
+   *
+   * <p>All four gate on {@code hasRole('BANK_EMPLOYEE')}; the three bookings add a per-account
+   * grant that anonymous never reaches. The bank-admin paths beside them stay 404 and are asserted
+   * elsewhere — that exclusion is a real owner decision and this phase does not touch it.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousDirectBookingWithUnauthorized() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/bank/deposits")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"accountId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"holderId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"amount\":1}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/bank/withdrawals")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"accountId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"holderId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"amount\":1}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/bank/transfers")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"sourceAccountId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"sourceHolderId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"destinationAccountId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"destinationHolderId\":\""
+                        + ABSENT_OPERATION
+                        + "\",\"amount\":1}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/bank/transfer-fee-rate")).andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The Materialsammelübersicht and the crew removal, refused without a token.
+   *
+   * <p>Five paths phase N admits: the collection read, its two unlinks, the delivered PATCH that
+   * belongs to the same screen but lives on {@code /inventory}, and the {@code /slim} crew removal.
+   * REQ-SEC-037 wants every admitted path pinned here, and phase M is the reason it is not optional
+   * — that phase wrote its expected-status table by reasoning about the form around the field
+   * instead of the rule that judges the caller, the nightly probe was generated from the table, and
+   * both carried the same wrong number for three nights.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousMaterialCollectionAndCrewRemovalWithUnauthorized() throws Exception {
+    String order = "/api/v1/orders/" + ABSENT_OPERATION;
+    mockMvc.perform(get(order + "/material-collection")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(delete(order + "/inventory/" + ABSENT_OPERATION + "/unlink").with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(delete(order + "/materials/" + ABSENT_OPERATION).with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            patch("/api/v1/inventory/" + ABSENT_OPERATION + "/delivered")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"delivered\":true,\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            delete(
+                    "/api/v1/missions/"
+                        + ABSENT_OPERATION
+                        + "/units/"
+                        + ABSENT_OPERATION
+                        + "/crew/"
+                        + ABSENT_OPERATION
+                        + "/slim")
+                .with(csrf()))
         .andExpect(status().isUnauthorized());
   }
 

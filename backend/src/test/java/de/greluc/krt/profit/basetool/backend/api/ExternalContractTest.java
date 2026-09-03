@@ -179,7 +179,48 @@ class ExternalContractTest {
    * quietly substitutes the wrong shape and reports a gap that is not there.
    */
   private static final java.util.Map<String, String> PLACEHOLDERS =
-      java.util.Map.of("{enabled}", "true");
+      java.util.Map.of("{enabled}", "true", "{roleCode}", "KOMMANDOLEITER");
+
+  /**
+   * What an org-unit bank account's settings response promises, for <b>all seven</b> operations
+   * that answer with one.
+   *
+   * <p>Named once because they share a mapper. {@code settings}, {@code balance-target}, both
+   * {@code visibility} pairs and the four {@code approval-limit} leaves all funnel their answer
+   * through the app's single {@code mapped(...)} → {@code toModel()}, so a field the read needs is
+   * a field every write's response needs too. Six of the seven had a narrower set of their own
+   * until 2026-09-03 — {@code approvalLimits} and {@code canConfigureApprovalLimits} were on none
+   * of them, and the whole Freigabe-Limits section is drawn from the first.
+   *
+   * <p>The nested names are the ones {@code BankApprovalLimitsDto.toModel} reads. They are here for
+   * the same reason the top-level ones are: the guard walks nested properties, and a rename inside
+   * that object empties a control rather than failing anything.
+   */
+  private static final Set<String> BANK_ACCOUNT_SETTINGS =
+      Set.of(
+          "accountId",
+          "accountName",
+          "balanceTarget",
+          "version",
+          "canSetTarget",
+          "canConfigureVisibility",
+          "visibilityConfigurable",
+          "allMembersSupported",
+          "availableRoleCodes",
+          "grantedRoleCodes",
+          "allMembersGranted",
+          "approvalLimits",
+          "canConfigureApprovalLimits",
+          // BankApprovalLimitsDto, read field by field by the section's own mapper.
+          "configurable",
+          "areaMembersSupported",
+          "allMembersLimit",
+          "areaMembersLimit",
+          "roleLimits",
+          "userLimits",
+          "userId",
+          "displayName",
+          "limitAmount");
 
   private static final List<ContractOperation> CONTRACT =
       List.of(
@@ -469,6 +510,7 @@ class ExternalContractTest {
                   "version",
                   "handovers",
                   "redacted",
+                  "canEdit",
                   "requestingOrgUnit",
                   "responsibleOrgUnit")),
           // Phase 3, the two writes any member may make on an order they can see: putting their
@@ -545,50 +587,38 @@ class ExternalContractTest {
               Set.of(
                   "detail", "account", "delta30d", "bookingCount", "name", "accountNo", "balance")),
           // Phase 3, the only bank writes a member has: the settings of an account they are
-          // responsible for. Deliberately NOT `/api/v1/bank/**` — deposits, withdrawals and
-          // transfers are all `hasRole(BANK_EMPLOYEE)` and belong to the bank-employee surface the
-          // app does not carry (REQ-APP-BANK-001).
+          // responsible for. Still not `/api/v1/bank/**` wholesale — that prefix carries the admin
+          // area — but the three bookings under it ARE frozen further down: the app has carried the
+          // bank-employee surface since REQ-APP-BANK-007 and its direct booking since -016, and
+          // this comment claimed the opposite until 2026-09-03.
           //
           // `canSetTarget` and `canConfigureVisibility` are the two fields that make this slice
           // work at all: the server states what the caller may do, so the app offers exactly that
           // and guesses at no role. Losing either would leave the app either hiding a control a
           // holder is entitled to, or offering one that answers 403.
           new ContractOperation(
-              "/api/v1/org-units/bank/accounts/{id}/settings",
-              "get",
-              Set.of(
-                  "accountId",
-                  "accountName",
-                  "balanceTarget",
-                  "version",
-                  "canSetTarget",
-                  "canConfigureVisibility",
-                  "visibilityConfigurable",
-                  "allMembersSupported",
-                  "availableRoleCodes",
-                  "grantedRoleCodes",
-                  "allMembersGranted")),
+              "/api/v1/org-units/bank/accounts/{id}/settings", "get", BANK_ACCOUNT_SETTINGS),
           // The target is version-echoed and the target itself is optional: clearing it is sending
           // no target at all, which is why only `version` is required.
           new ContractOperation(
               "/api/v1/org-units/bank/accounts/{id}/balance-target",
               "put",
-              Set.of("accountId", "balanceTarget", "version", "canSetTarget"),
+              BANK_ACCOUNT_SETTINGS,
               Set.of("version")),
           // Visibility is addressed entirely by its path — a role bucket by code, the all-members
           // switch by a boolean path segment — so neither carries a body to freeze.
           new ContractOperation(
               "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}",
               "post",
-              Set.of("accountId", "grantedRoleCodes", "version")),
+              BANK_ACCOUNT_SETTINGS),
           new ContractOperation(
               "/api/v1/org-units/bank/accounts/{id}/visibility/role/{roleCode}",
               "delete",
-              Set.of("accountId", "grantedRoleCodes", "version")),
+              BANK_ACCOUNT_SETTINGS),
           new ContractOperation(
               "/api/v1/org-units/bank/accounts/{id}/visibility/all-members/{enabled}",
               "put",
-              Set.of("accountId", "allMembersGranted", "version")),
+              BANK_ACCOUNT_SETTINGS),
           new ContractOperation(
                   "/api/v1/org-units/bank/accounts/{id}/transactions",
                   "get",
@@ -1789,7 +1819,155 @@ class ExternalContractTest {
           // required and sent; the DTO's other fourteen properties are optional on the way in and
           // unread on the way out.
           new ContractOperation(
-              "/api/v1/refinery-orders", "post", Set.of("id"), Set.of("goods", "location")));
+              "/api/v1/refinery-orders", "post", Set.of("id"), Set.of("goods", "location")),
+          // ---- Phase N: the Materialsammelübersicht and one crew removal ----------------------
+          //
+          // The screen is one gate, so its four operations are frozen together. `canEdit` above is
+          // the gate: the app draws all three controls from it because it is
+          // `isLogisticianOrAbove() && canEditJobOrder(id)`, the same expression the two unlinks
+          // carry in their own `@PreAuthorize`. Renaming or dropping it does not disable the
+          // screen, it opens it -- an absent flag reads as "no" client-side, and every member would
+          // silently lose the three writes with nothing in a log to say why.
+          //
+          // The row's frozen set is the mapper's, not the DTO's: `inventoryEntryId` keys every
+          // write and a row without one is dropped, `version` is the row's own optimistic lock, and
+          // the remaining seven are what the card draws. `ownerName`/`location` are redacted to
+          // null for a caller who may not see them, which the app already handles -- absent is not
+          // the same as renamed.
+          new ContractOperation(
+              "/api/v1/orders/{jobOrderId}/material-collection",
+              "get",
+              Set.of(
+                  "inventoryEntryId",
+                  "version",
+                  "ownerName",
+                  "ownerId",
+                  "location",
+                  "locationId",
+                  "materialName",
+                  "quality",
+                  "quantity",
+                  "allocatedQuantity",
+                  "delivered")),
+          // Both unlinks answer 204 and the app reads nothing back -- it re-reads the collection,
+          // because every write here moves a figure the server computes. Nothing to freeze but the
+          // path and the verb, which is the promise that matters: a rename is a 404 the member
+          // sees as "could not be saved".
+          new ContractOperation(
+              "/api/v1/orders/{jobOrderId}/inventory/{inventoryItemId}/unlink", "delete", Set.of()),
+          new ContractOperation(
+              "/api/v1/orders/{jobOrderId}/materials/{materialId}", "delete", Set.of()),
+          // The delivered flag. The response is discarded, so only the request is frozen -- and all
+          // three of its fields are required: `jobOrderId` says which order's link is being marked
+          // (a row can be earmarked to exactly one, but the endpoint is on /inventory and will not
+          // infer it), and `version` is the row's own lock, so dropping it would turn a concurrent
+          // edit from a 409 into a silent overwrite.
+          new ContractOperation(
+              "/api/v1/inventory/{id}/delivered",
+              "patch",
+              Set.of(),
+              Set.of("delivered", "jobOrderId", "version")),
+          // The `/slim` crew removal, and deliberately not the deprecated full-DTO sibling beside
+          // it: that one is `@ApiDeprecation`-marked with a sunset, and freezing a path the backend
+          // has announced it will withdraw is a promise made to be broken. Answers 204, so the app
+          // re-reads the Einsatz -- the same shape as the participant leave frozen further up.
+          new ContractOperation(
+              "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim", "delete", Set.of()),
+          // ---- Phase O: the Verwaltung's direct booking ----------------------------------------
+          //
+          // Design ch. 12 artboard 9, REQ-APP-BANK-016, shipped with tests -- and answering 404 in
+          // production the whole time, because the vhost excluded the four paths on the ground that
+          // "no artboard draws them". Freezing them here is the other half of admitting them; the
+          // reachability guard below now holds both halves together.
+          //
+          // The gate on all four is `hasRole('BANK_EMPLOYEE')`, and on the three bookings a
+          // PER-ACCOUNT grant on top (`canDeposit` / `canWithdraw` / `canTransfer`, with
+          // management and admin unrestricted). Not Bank-Management: the app had gated its own
+          // entry on that and locked out exactly the caller the Grants tab exists to create.
+          //
+          // `holderId` is required on all three and is the one worth saying out loud: custody is
+          // kept per org unit, so a balance without a holder is money nobody is accountable for.
+          // A server that stopped requiring it would not break the app -- it would let the app
+          // write an unaccountable balance.
+          new ContractOperation(
+              "/api/v1/bank/deposits", "post", Set.of(), Set.of("accountId", "amount", "holderId")),
+          // The two with a ceiling, and the reason their RESPONSE is frozen where the deposit's is
+          // not. Over the KRT employee ceiling the server does not refuse: it files the attempt as
+          // a band-routed approval request and answers 202 with `pendingRequest` where a booking
+          // carries `transaction` (REQ-BANK-047, ADR-0109). Both are 2xx. The app branches on
+          // `pendingRequest` to tell the member the balance has NOT moved -- so renaming that field
+          // does not break a screen, it makes a shipped build report a filed withdrawal as a
+          // completed one. It did exactly that until 2026-09-03, when the app read no answer at
+          // all.
+          new ContractOperation(
+              "/api/v1/bank/withdrawals",
+              "post",
+              Set.of("pendingRequest"),
+              Set.of("accountId", "amount", "holderId")),
+          new ContractOperation(
+              "/api/v1/bank/transfers",
+              "post",
+              Set.of("pendingRequest"),
+              Set.of(
+                  "amount",
+                  "destinationAccountId",
+                  "destinationHolderId",
+                  "sourceAccountId",
+                  "sourceHolderId")),
+          // The fee rate the sheet quotes before anything is booked. `rate` is the only field, and
+          // an absent one is read as zero -- so a rename would not fail, it would quietly quote
+          // "no fee" on a transfer that charges one.
+          new ContractOperation("/api/v1/bank/transfer-fee-rate", "get", Set.of("rate")),
+          // ---- Phase P: the Freigabe-Limits -----------------------------------------------------
+          //
+          // REQ-APP-BANK-017, design ch. 12 artboard 10, shipped 2026-08-30 -- and refused by the
+          // edge ever since, on a stem whose `/settings` GET is admitted. So the section drew its
+          // current values correctly and every write answered 404. `approval-limit` appeared
+          // NOWHERE in the runbook: not admitted, and not among the deliberate exclusions either.
+          //
+          // All four leaves answer the account's whole settings object, which is why their frozen
+          // response set is the same one `/settings` carries above -- the section redraws from the
+          // answer rather than re-reading, so a field lost here is a control that silently stops
+          // reflecting what was just saved.
+          //
+          // `limit` is the only required request field, and the DELETEs have none: clearing a
+          // ceiling is addressed entirely by its path.
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/approval-limit/all-members",
+              "put",
+              BANK_ACCOUNT_SETTINGS,
+              Set.of("limit")),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/approval-limit/all-members",
+              "delete",
+              BANK_ACCOUNT_SETTINGS),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/approval-limit/area-members",
+              "put",
+              BANK_ACCOUNT_SETTINGS,
+              Set.of("limit")),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/approval-limit/area-members",
+              "delete",
+              BANK_ACCOUNT_SETTINGS),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/approval-limit/role/{roleCode}",
+              "put",
+              BANK_ACCOUNT_SETTINGS,
+              Set.of("limit")),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/approval-limit/role/{roleCode}",
+              "delete",
+              BANK_ACCOUNT_SETTINGS),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId}",
+              "put",
+              BANK_ACCOUNT_SETTINGS,
+              Set.of("limit")),
+          new ContractOperation(
+              "/api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId}",
+              "delete",
+              BANK_ACCOUNT_SETTINGS));
 
   /**
    * Contract operations the app addresses by <strong>no</strong> query parameter, although the

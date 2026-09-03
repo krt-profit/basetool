@@ -178,6 +178,18 @@ jobs:
           probe PUT "/api/v1/operations/$nil/payouts/paid-out" 401
           probe PUT "/api/v1/org-units/bank/accounts/$nil/balance-target" 401
 
+          # Phase P - the Freigabe-Limits. Four leaves under one allow-list rule, and BOTH verbs on
+          # each: the carve-out opens the PUT that sets a ceiling and the DELETE that clears one, so
+          # probing only the PUT would say nothing about half of what was opened. A 405 here would
+          # mean the carve-out never matched, a 404 that the rule did not.
+          for leaf in all-members area-members role/LOGISTICIAN "user/$nil"; do
+            probe PUT "/api/v1/org-units/bank/accounts/$nil/approval-limit/$leaf" 401
+            probe DELETE "/api/v1/org-units/bank/accounts/$nil/approval-limit/$leaf" 401
+          done
+          # The ladder editor beside them is a DIFFERENT endpoint the app does not call and is
+          # asserted 404 further down, in the group that keeps the bank's shut paths together.
+          # Phase P's rule is $-anchored so that assertion keeps meaning something.
+
           # Phase 5 - the member's bank booking requests and the one membership read the Lager's
           # Umbuchen picker needs. Same rule again: these join with the paste that opens them
           # (runbook § Phase K), so the run is red between merging this and pasting the block.
@@ -225,15 +237,20 @@ jobs:
           probe POST /api/v1/bank/holders/transfer 401
           probe POST "/api/v1/bank/transactions/$nil/reversal" 401
 
+          # Phase O - the Verwaltung's direct booking. These four were on the STAY-SHUT list below
+          # until 2026-09-03, asserted at 404 on the ground that no artboard drew them. Chapter 12
+          # artboard 9 draws exactly that sheet and the app shipped it, so the assertion was
+          # pinning a mistake and reporting it green every night. They belong here.
+          probe POST /api/v1/bank/deposits 401
+          probe POST /api/v1/bank/withdrawals 401
+          probe POST /api/v1/bank/transfers 401
+          probe GET /api/v1/bank/transfer-fee-rate 401
+
           # And the parts of the same stem that must STAY shut. The admin half is web-only by owner
-          # decision; the direct booking forms and the KRT ladder editor are drawn by no artboard.
-          # A 401 on any of these would mean the allow-list opened something by accident.
-          for p in /api/v1/bank/admin/audit /api/v1/bank/transfer-fee-rate; do
-            probe GET "$p" 404
-          done
+          # decision; the KRT ladder editor is not one of the app's four tabs.
+          # A 401 on either of these would mean the allow-list opened something by accident.
+          probe GET /api/v1/bank/admin/audit 404
           probe POST /api/v1/bank/admin/wipe-reset 404
-          probe POST /api/v1/bank/withdrawals 404
-          probe POST /api/v1/bank/transfers 404
           probe PATCH "/api/v1/bank/accounts/$nil/approval-tiers" 404
 
           # The four participant writes are the exception on this whole list: canAccessParticipant
@@ -242,16 +259,20 @@ jobs:
           # therefore 404 to everybody, and a 401 here would mean that rule changed.
           probe POST "/api/v1/missions/$nil/participants/$nil/check-in/slim" 404
 
-          # Still refused, and that is the point: the bank-employee surface, the every-member
-          # inventory list and the two Hangar imports (phase 4) are on no allow-list line at all.
+          # Still refused, and that is the point: the every-member inventory list and the two
+          # Hangar imports (phase 4) are on no allow-list line at all.
           #
-          # All three answer 404 rather than 405, and the ORDER of the two guards is why: the
+          # Both answer 404 rather than 405, and the ORDER of the two guards is why: the
           # allow-list's `if ($krt_api_allowed = 0) { return 404; }` fires before the read-only
           # family guard, so a path that was never admitted is refused without its verb ever being
           # judged. /hangar being a read-only family therefore says nothing about the imports yet --
           # that only becomes visible on the day phase 4 admits them, at which point 405 is what
           # this line must expect and the guard is what keeps the writes shut.
-          probe POST /api/v1/bank/deposits 404
+          #
+          # `POST /api/v1/bank/deposits` used to head this group as its third member. It is
+          # admitted since phase O and now sits with the other bank writes above; the bank canary
+          # this group lost is `POST /api/v1/bank/admin/wipe-reset`, which guards a decision that
+          # is still a decision.
           probe POST /api/v1/inventory/all 404
           probe POST /api/v1/hangar/import/fleetview 404
 
