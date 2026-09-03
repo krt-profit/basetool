@@ -1448,6 +1448,20 @@ A third frontend meter was added by the 2026-09-02 production log triage:
   which names the **attribute**, the cause, the unresolved type id and the base type — class names
   and fixed tokens only, never the value, never a session id, never the exception message.
 
+  **It earned its keep on 2026-09-03, one day after it shipped.** `SessionValueDropsSustained` fired
+  at ~70 per 15 min against an otherwise healthy application, and the paired WARN named the value on
+  the first read: `attribute='org.apache.tomcat.websocket.server.WsHttpSessionBindingListener'
+  cause=InvalidTypeIdException typeId=absent`. Tomcat 11.0.25 had added that class — a `record`,
+  hence implicitly final — and writes it into the session on every authenticated WebSocket
+  handshake, which for this application is every logged-in page. The residue-drains-after-a-deploy
+  reading of this meter did **not** apply and could not: a dropped value leaves the attribute unset,
+  and an unset attribute is exactly the condition under which Tomcat writes it again, so the rate
+  was flat by construction. Closed by REQ-SEC-049 / ADR-0154 (a forced `@class` for
+  container-written final types), after which poisoned sessions heal themselves on their next
+  handshake. Two lessons the metric is kept for: a *flat* rate means something is still writing one
+  — believe that literally rather than waiting for a drain — and a permanently non-zero rate is not
+  cosmetic, because it hides the next genuine poisoning inside its own noise.
+
 Two frontend meters were added by the 2026-08 logging audit:
 
 - `basetool_session_evicted_total` — unlabelled counter, bumped by `SessionEvictionLoggingStrategy`
