@@ -1023,6 +1023,73 @@ class ExternalContractTest {
                       "manufacturer"))
               .addressedBy(Set.of("page:integer", "size:integer", "sort:string")),
           new ContractOperation("/api/v1/locations/home-locations", "get", Set.of("id", "name")),
+          // ── Reachable since before this entry, and unfrozen until 2026-09-03 ──────────────
+          // REQ-API-009 says the allow-list "must be a subset of this set". It was not: an audit
+          // found 30 operations the vhost admits whose shape nothing froze, so the backend could
+          // rename a field on any of them and break a shipped app with no gate firing. These six
+          // are the reads whose consumed fields could be established from the app's own mapping;
+          // the rest — the bank-staff surface and the operations with request bodies — follow.
+          //
+          // Each field set is what the APP READS, not what the DTO carries. `LocationDto` also
+          // serialises description, hidden, homeLocation and version; the refinery picker maps
+          // `id to name` and nothing else, so freezing more would promise what nobody relies on.
+          new ContractOperation("/api/v1/locations/refineries", "get", Set.of("id", "name")),
+          // The method picker of the refinery form. A PAGE, not a bare array — the sibling above
+          // answers an array and the two are easy to assume alike; parsed as a list this yields
+          // nothing and the form is silently unsendable. `content` is frozen for that reason; the
+          // paging envelope is not, because the picker reads the first page whole and never asks
+          // for a second.
+          new ContractOperation(
+              "/api/v1/refining-methods",
+              "get",
+              Set.of("content", "id", "name", "ratingYield", "ratingCost", "ratingSpeed")),
+          // The three org-unit option reads. One DTO, one field set, three callers: the switcher
+          // asks what may be PINNED, the order form asks what exists, and the Lager's Umbuchen
+          // picker asks for the DESTINATION member's units rather than the caller's — which is why
+          // /users/{id}/memberships cannot be served by the me-scoped one.
+          //
+          // `kind` is frozen as a field, not constant-by-constant: it is nullable on the wire, and
+          // a strict client coerces an unknown value to null, so a new OrgUnit kind costs the row
+          // its badge rather than its screen.
+          new ContractOperation(
+              "/api/v1/me/org-units",
+              "get",
+              Set.of("orgUnitId", "orgUnitName", "orgUnitShorthand", "isProfitEligible", "kind")),
+          new ContractOperation(
+              "/api/v1/org-units/active-all-kinds",
+              "get",
+              Set.of("orgUnitId", "orgUnitName", "orgUnitShorthand", "isProfitEligible", "kind")),
+          // `allKinds=true` is not decoration: without it the answer is the member's Staffeln
+          // alone, and the Umbuchen picker would silently omit every Bereich, Spezialkommando and
+          // the Organisationsleitung — a destination the member can see in the web but not here.
+          new ContractOperation(
+                  "/api/v1/users/{id}/memberships",
+                  "get",
+                  Set.of(
+                      "orgUnitId", "orgUnitName", "orgUnitShorthand", "isProfitEligible", "kind"))
+              .addressedBy(Set.of("allKinds:boolean")),
+          // One material's entries, flat and paged — the tablet detail pane. The same rows as
+          // /inventory/all/stack/entries above and therefore the same frozen set: the pane shows
+          // what the caller may already see in the tree, laid out differently.
+          // `sort` is offered and deliberately not sent: the pane takes the server's order, and
+          // freezing a parameter the app does not send would promise a shape nobody relies on.
+          new ContractOperation(
+                  "/api/v1/inventory/material/{materialId}",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "id",
+                      "material",
+                      "location",
+                      "amount",
+                      "quality",
+                      "personal",
+                      "note",
+                      "user"))
+              .addressedBy(Set.of("page:integer", "size:integer")),
           // Phase 3, the Lager's three bookings. Every one of them carries `version`, and the two
           // that move stock carry `amount` — the pair that decides what actually happens to a
           // member's material, which is why they are the required fields the contract freezes.
@@ -1353,7 +1420,14 @@ class ExternalContractTest {
    * absent from the paged lists whose server-side default order the app takes as it comes.
    */
   private static final Set<String> ADDRESSED_BY_NO_QUERY_PARAMETER =
-      Set.of("get /api/v1/users/me/memberships");
+      Set.of(
+          "get /api/v1/users/me/memberships",
+          // The refinery form's method picker asks for the path and reads `content` whole. The
+          // endpoint offers page/size/sort and the app sends none of them: there are a couple of
+          // dozen methods, they change on a game patch rather than on a member's action, and a
+          // picker that paged would be a picker somebody has to operate. Recorded rather than left
+          // blank, because a blank slot cannot be told apart from a forgotten one.
+          "get /api/v1/refining-methods");
 
   @Test
   @DisplayName("the query parameters a shipped client asks with still exist, with their types")
