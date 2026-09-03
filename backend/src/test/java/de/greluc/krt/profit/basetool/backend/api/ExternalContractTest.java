@@ -602,7 +602,16 @@ class ExternalContractTest {
                       "amount",
                       "note",
                       "createdAt",
-                      "holderHandle"))
+                      "holderHandle",
+                      // Under-frozen until 2026-09-03: this operation runs the SAME
+                      // BankBookingDto.toModel() as the staff ledger, and that mapper reads four
+                      // more names than were recorded here. A rename of any of them would have
+                      // emptied a column on a shipped build with this guard green — a guard can
+                      // only defend the names it was told about.
+                      "transactionId",
+                      "reversedTransactionId",
+                      "transferFee",
+                      "counterpartyHandle"))
               .addressedBy(Set.of("page:integer", "size:integer")),
           // Phase 5, the member's booking requests (app REQ-APP-BANK-008). Still
           // `/org-units/bank/**`: confirming and rejecting live on `/api/v1/bank/requests/**`,
@@ -623,6 +632,10 @@ class ExternalContractTest {
                   "type",
                   "amount",
                   "note",
+                  // Both request lists run one mapper, and it falls back to `justification` when
+                  // `note` is blank. A request raised with a reason and no note would otherwise
+                  // render as an unexplained row. Under-frozen until 2026-09-03, on both.
+                  "justification",
                   "status",
                   "requesterHandle",
                   "rejectReason",
@@ -643,6 +656,10 @@ class ExternalContractTest {
                   "type",
                   "amount",
                   "note",
+                  // Both request lists run one mapper, and it falls back to `justification` when
+                  // `note` is blank. A request raised with a reason and no note would otherwise
+                  // render as an unexplained row. Under-frozen until 2026-09-03, on both.
+                  "justification",
                   "status",
                   "requesterHandle",
                   "requiresOwnerApproval",
@@ -1496,7 +1513,283 @@ class ExternalContractTest {
               // walk,
               // so the type is all this half can hold and the constants stay pinned by that
               // response.
-              .addressedBy(Set.of("q:string", "kind:string")));
+              .addressedBy(Set.of("q:string", "kind:string")),
+          // ── The bank-staff writes, and the lists they answer with (2026-09-03) ───────────
+          // The other half of the 30-operation gap the same audit opened. These are the paths
+          // whose shape could only be established from what the app SENDS as well as from what it
+          // reads, which is why they trail the four bank-staff reads above rather than sitting
+          // beside them. `bank` is deliberately not in the read-only family, so naming a path here
+          // opens every verb the backend serves on it — the request half is frozen too, because a
+          // newly required field is a 400 on every build already in the field.
+          //
+          // The account DTO's five unread fields are named above and hold here unchanged.
+
+          // The account detail behind artboard 6. `account` is frozen as a field with the four
+          // names the pane renders out of it, and `delta30d` and `bookingCount` beside it as the
+          // two roll-ups the header shows. `approvalLimits` and `capabilities` are on the wire and
+          // read by nothing: the app takes its capability answer from /me/capabilities, and the
+          // KRT ladder editor is not one of its four tabs.
+          new ContractOperation(
+              "/api/v1/bank/accounts/{id}",
+              "get",
+              Set.of("account", "id", "accountNo", "name", "balance", "delta30d", "bookingCount")),
+          // The rename. It answers the account DTO through the SAME mapping function as the list
+          // above, so the same eight fields — freezing fewer here would let this response drift
+          // into a row the list's own mapper can no longer read. Both request fields are required:
+          // the new name, and the lock echo without which the rename is last-writer-wins.
+          new ContractOperation(
+              "/api/v1/bank/accounts/{id}",
+              "patch",
+              Set.of("id", "accountNo", "name", "type", "status", "balance", "orgUnit", "version"),
+              Set.of("name", "version")),
+          // Close and reopen: one request shape, one response shape, two operations. The body is
+          // the version echo and nothing else — the state being set is in the path, which is why
+          // `version` alone is the required set and why dropping it would make the two buttons
+          // silently clobber a concurrent edit instead of answering 409.
+          new ContractOperation(
+              "/api/v1/bank/accounts/{id}/close",
+              "post",
+              Set.of("id", "accountNo", "name", "type", "status", "balance", "orgUnit", "version"),
+              Set.of("version")),
+          new ContractOperation(
+              "/api/v1/bank/accounts/{id}/reopen",
+              "post",
+              Set.of("id", "accountNo", "name", "type", "status", "balance", "orgUnit", "version"),
+              Set.of("version")),
+          // The staff ledger. Same envelope and same row DTO as the member's
+          // /org-units/bank/accounts/{id}/transactions, mapped by the same function — so this set
+          // is what that mapper consumes, not what this screen happens to draw. `justification`,
+          // `staffNote`, `counterAccountNo`, `counterAccountName`, `counterHolderHandle`,
+          // `intraAccount` and `counterpartyOrgUnitName` are on the wire and it reads none of
+          // them. `size` and `sort` sit on the envelope unread: paging is decided from
+          // `page` + `totalPages`.
+          new ContractOperation(
+                  "/api/v1/bank/accounts/{id}/transactions",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "postingId",
+                      "transactionId",
+                      "type",
+                      "amount",
+                      "note",
+                      "holderHandle",
+                      "createdAt",
+                      "reversedTransactionId",
+                      "transferFee",
+                      "counterpartyHandle"))
+              .addressedBy(Set.of("page:integer", "size:integer")),
+          // The account statement, a PDF: the 200 body is a byte string with no `$ref`, so the
+          // field guard resolves nothing and the two parameters ARE the contract here. Both are
+          // required server-side and both are sent. Frozen as the bare OpenAPI type, because the
+          // resolver builds its key from `schema.type` and never reads the format — a recorded
+          // `string(date-time)` would match nothing it ever emits.
+          new ContractOperation("/api/v1/bank/accounts/{id}/statement", "get", Set.of())
+              .addressedBy(Set.of("from:string", "to:string")),
+          // The three-month export, bytes and fieldless for the same reason, earning its entry
+          // through the path/verb and edge-reachability guards. It declares `X-User-Time-Zone` as
+          // a HEADER parameter, which the query-parameter guard filters out by `in` — and nothing
+          // in this file freezes a header, so making that one required would fire no gate at all.
+          new ContractOperation("/api/v1/bank/export/three-month-report", "get", Set.of()),
+          // Artboard 7's grant list, addressed by ONE parameter although the endpoint offers two:
+          // a grant screen is per account, and `userId` is never sent. The answer is a bare array,
+          // so there is no envelope to freeze. `accountName`, `accountNo` and `granteeHasBankRole`
+          // are on the DTO and the app maps none of them.
+          new ContractOperation(
+                  "/api/v1/bank/grants",
+                  "get",
+                  Set.of(
+                      "userId",
+                      "userHandle",
+                      "accountId",
+                      "canDeposit",
+                      "canWithdraw",
+                      "canTransfer",
+                      "version"))
+              .addressedBy(Set.of("accountId:string")),
+          // The create. Its 201 runs through the list's own mapper, which is why the whole row is
+          // frozen although the caller discards the model and re-reads: two of these names are
+          // load-bearing before it gets that far — without `userId` or `accountId` the mapper
+          // returns null and the repository reports a write that SUCCEEDED as a server failure.
+          // Only those two are required on the wire; the three capability flags default
+          // server-side, so an old build stays correct whether it sends them or not.
+          new ContractOperation(
+              "/api/v1/bank/grants",
+              "post",
+              Set.of(
+                  "userId",
+                  "userHandle",
+                  "accountId",
+                  "canDeposit",
+                  "canWithdraw",
+                  "canTransfer",
+                  "version"),
+              Set.of("userId", "accountId")),
+          // The capability toggles. All four request fields are required and all four are sent:
+          // the flags go as a complete set rather than as a delta, so a fourth capability added as
+          // required would leave a shipped build unable to change any of the three it knows.
+          new ContractOperation(
+              "/api/v1/bank/grants/{userId}/{accountId}",
+              "patch",
+              Set.of(
+                  "userId",
+                  "userHandle",
+                  "accountId",
+                  "canDeposit",
+                  "canWithdraw",
+                  "canTransfer",
+                  "version"),
+              Set.of("canDeposit", "canWithdraw", "canTransfer", "version")),
+          // The revoke answers 204 with no body, so there is nothing to freeze but the path and
+          // the verb. Both ids are path segments, which is why no query parameter is recorded.
+          new ContractOperation("/api/v1/bank/grants/{userId}/{accountId}", "delete", Set.of()),
+          // The holder-to-holder transfer, frozen for its request rather than its response: it
+          // answers the transaction DTO and the repository collapses it to Unit, so no field is
+          // read and an empty set is the fact rather than an omission. The three required fields
+          // are the two ends and the amount — the whole of what the write means; `note` is
+          // optional and stays out, so it can never become the field an old build fails to send.
+          new ContractOperation(
+              "/api/v1/bank/holders/transfer",
+              "post",
+              Set.of(),
+              Set.of("sourceHolderId", "destinationHolderId", "amount")),
+          // The holder ledger. A different row DTO from the account ledger and a different read:
+          // this one names the COUNTER ACCOUNT — `counterAccountName` with `counterAccountNo`
+          // behind it — where the staff ledger names the counterparty handle. Both halves of that
+          // fallback are frozen, because the fallback IS the contract: losing the name alone
+          // leaves a number, losing both leaves a booking with no other side. `transferFee` is on
+          // this DTO as well and read by nothing here; `sort` is offered and not sent.
+          new ContractOperation(
+                  "/api/v1/bank/holders/{id}/transactions",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "postingId",
+                      "transactionId",
+                      "type",
+                      "amount",
+                      "note",
+                      "createdAt",
+                      "counterAccountNo",
+                      "counterAccountName",
+                      "counterHolderHandle",
+                      "reversedTransactionId"))
+              .addressedBy(Set.of("page:integer", "size:integer")),
+          // The staff request queue. `status` is offered as a filter and no shipped call site
+          // sends one: the repository can emit it, but every screen takes the default, and
+          // freezing a parameter the app does not send would promise a shape nobody relies on.
+          //
+          // `justification` is frozen because it is what `note` falls back to when the member left
+          // the note empty — a row whose reason vanished reads as a request submitted without one.
+          // The member-side /org-units/bank/requests entry above runs the SAME mapper and omits
+          // it; that entry is under-frozen, this one is not. `BankBookingRequestDto` carries
+          // seventeen further fields the mapper never touches, among them staffNote, holderId,
+          // resultingTransactionId, deciderHandle, splitEnabled and the four counterparty names.
+          new ContractOperation(
+                  "/api/v1/bank/requests",
+                  "get",
+                  Set.of(
+                      "content",
+                      "page",
+                      "totalElements",
+                      "totalPages",
+                      "id",
+                      "accountId",
+                      "accountName",
+                      "targetAccountId",
+                      "type",
+                      "amount",
+                      "note",
+                      "justification",
+                      "status",
+                      "requesterHandle",
+                      "rejectReason",
+                      "applicableLimit",
+                      "requiresOwnerApproval",
+                      "ownerApprovalGranted",
+                      "ownerApprovalGrantedByHandle",
+                      "requiredApprover",
+                      "createdAt",
+                      "version"))
+              .addressedBy(Set.of("page:integer", "size:integer")),
+          // Confirm and reject, the two decisions. Both answer the request DTO and both send it
+          // through the queue's own mapper, so the frozen set is what that mapper consumes rather
+          // than the single field the caller keeps — the mapper is the thing that breaks, not the
+          // screen. `id` is the load-bearing one: without it the mapper returns null and a 200 is
+          // reported to the staff member as a server error, on a booking that already happened.
+          //
+          // `holderId` is required on the confirm because the money needs a holder to land on, and
+          // `reason` on the reject because a rejection without one is not a rejection. Neither
+          // takes a query parameter; `id` is a path segment on both.
+          new ContractOperation(
+              "/api/v1/bank/requests/{id}/confirm",
+              "post",
+              Set.of(
+                  "id",
+                  "accountId",
+                  "accountName",
+                  "targetAccountId",
+                  "type",
+                  "amount",
+                  "note",
+                  "justification",
+                  "status",
+                  "requesterHandle",
+                  "rejectReason",
+                  "applicableLimit",
+                  "requiresOwnerApproval",
+                  "requiredApprover",
+                  "ownerApprovalGranted",
+                  "ownerApprovalGrantedByHandle",
+                  "createdAt",
+                  "version"),
+              Set.of("holderId", "version")),
+          new ContractOperation(
+              "/api/v1/bank/requests/{id}/reject",
+              "post",
+              Set.of(
+                  "id",
+                  "accountId",
+                  "accountName",
+                  "targetAccountId",
+                  "type",
+                  "amount",
+                  "note",
+                  "justification",
+                  "status",
+                  "requesterHandle",
+                  "rejectReason",
+                  "applicableLimit",
+                  "requiresOwnerApproval",
+                  "requiredApprover",
+                  "ownerApprovalGranted",
+                  "ownerApprovalGrantedByHandle",
+                  "createdAt",
+                  "version"),
+              Set.of("reason", "version")),
+          // The Storno. Unlike confirm and reject it does NOT go through that mapper — the success
+          // branch discards the parsed body — so the empty response set is a fact about the app,
+          // not an omission. The request half is what this entry really pins: the schema requires
+          // nothing today, the app sends only the optional `note`, and a `reason` made mandatory
+          // here would 400 every installed build in the middle of reversing a booking.
+          new ContractOperation("/api/v1/bank/transactions/{id}/reversal", "post", Set.of()),
+          // The two creates that closed the audit. `items` is the whole of the item order: a list
+          // that arrived renamed makes an order the requester sees accepted and nobody can fulfil.
+          // `id` is all either response is read for — both forms navigate to what they just
+          // created, and a create that answers without one strands the member on the form.
+          new ContractOperation("/api/v1/orders/items", "post", Set.of("id"), Set.of("items")),
+          // `RefineryOrderDto` is the request AND the response schema here, so the required set is
+          // asserted against the same object the response guard walks. `goods` and `location` are
+          // required and sent; the DTO's other fourteen properties are optional on the way in and
+          // unread on the way out.
+          new ContractOperation(
+              "/api/v1/refinery-orders", "post", Set.of("id"), Set.of("goods", "location")));
 
   /**
    * Contract operations the app addresses by <strong>no</strong> query parameter, although the
@@ -1662,7 +1955,16 @@ class ExternalContractTest {
           // turn every booking request an installed build raises into a 400 while the sheet still
           // opens and still looks fine.
           "CreateBankBookingRequest.type",
-          Set.of("DEPOSIT", "WITHDRAWAL", "TRANSFER"));
+          Set.of("DEPOSIT", "WITHDRAWAL", "TRANSFER"),
+          // Reachable since POST /orders/items joined the set. A material line on an item order is
+          // raw or refined, and the app sends the constant as a literal: renaming one turns every
+          // item order an installed build raises into a 400 while the form still opens.
+          //
+          // Unlike the response enums above, a NEW constant here is harmless to an old build - it
+          // simply never sends it. The direction that hurts is removal, which this guard catches
+          // the same way.
+          "CreateJobOrderItemMaterialDto.quality",
+          Set.of("GOOD", "NONE"));
 
   @Test
   @DisplayName("no enum a shipped client must parse has gained or lost a constant")
@@ -2149,6 +2451,69 @@ class ExternalContractTest {
         .as("could not locate the repository root from %s", System.getProperty("user.dir"))
         .isNotNull();
     return dir;
+  }
+
+  /**
+   * No frozen operation demands a header a shipped build does not send.
+   *
+   * <p>The request guard beside this one freezes required <em>body</em> fields, and the parameter
+   * guard freezes query parameters. A header was caught by neither, and it is the same break in a
+   * different envelope: a build already on a member's phone sends the headers it was written
+   * against, so a newly <b>required</b> one is a 400 on every call it makes — while the screen
+   * still opens and still looks fine.
+   *
+   * <p>Two frozen operations declare a header today ({@code X-User-Time-Zone}, on the bank
+   * statement and the three-month export) and both are optional, which is why this asserts a
+   * property rather than keeping a list: there is nothing to record while nothing is required, and
+   * the day something is, the build says so.
+   *
+   * <p>A header the app genuinely sends on <em>every</em> call could be made required safely —
+   * {@code Authorization}, the active org unit, the correlation id. None is declared as a parameter
+   * in the document, so none reaches this assertion; if one ever is, the right answer is a named
+   * exemption with the reason, not a wider rule.
+   *
+   * @throws IOException if the document cannot be read
+   */
+  @Test
+  @DisplayName("no frozen operation requires a header an installed build may not send")
+  void theContractRequiresNoHeader() throws IOException {
+    JsonNode document = openapi();
+
+    List<String> demanded = new java.util.ArrayList<>();
+    for (ContractOperation operation : CONTRACT) {
+      // By field name, not a JSON Pointer: a path is itself full of slashes, and building a
+      // pointer out of it escapes them into one token that resolves to nothing — which is a test
+      // that passes because it looked nowhere.
+      JsonNode paths = document.get("paths");
+      JsonNode path = paths == null ? null : paths.get(operation.path());
+      JsonNode verb = path == null ? null : path.get(operation.method());
+      if (verb == null) {
+        continue;
+      }
+      JsonNode parameters = verb.get("parameters");
+      if (parameters == null) {
+        continue;
+      }
+      for (JsonNode parameter : parameters) {
+        boolean isHeader = "header".equals(parameter.path("in").asString(""));
+        if (isHeader && parameter.path("required").asBoolean(false)) {
+          demanded.add(
+              operation.method().toUpperCase(java.util.Locale.ROOT)
+                  + " "
+                  + operation.path()
+                  + " requires "
+                  + parameter.path("name").asString(""));
+        }
+      }
+    }
+
+    assertThat(demanded)
+        .as(
+            "a frozen operation now requires a header. Every build already installed sends the "
+                + "headers it was written against, so this is a 400 on every call it makes. Ship a "
+                + "build that sends it first — or, if the app has always sent it unconditionally, "
+                + "say so here rather than widening the rule")
+        .isEmpty();
   }
 
   /**

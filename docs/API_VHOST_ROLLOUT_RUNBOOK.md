@@ -426,7 +426,9 @@ if ($uri = "/api/v1/app/version-policy") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/refinery-orders/my-orders") { set $krt_api_allowed 1; }
 # Phase M - the app can now record a run itself (app REQ-APP-REF-009). The bare stem is the create
 # POST; `refinery-orders` is NOT in the read-only family, so naming it opens the verbs the backend
-# serves there - which for the stem is exactly POST plus the caller-scoped GET. The two picker reads
+# serves there - which for the stem is exactly the create POST. Every GET this controller offers
+# sits on a sub-path (/my-orders, /{id}, /mission/{id}, /locations/{id}/yields), so the stem itself
+# answers no read at all; the two picker reads
 # below are mandatory fields of that form: without them the member has nothing to choose from.
 if ($uri = "/api/v1/refinery-orders") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/locations/refineries") { set $krt_api_allowed 1; }
@@ -531,7 +533,7 @@ if ($uri ~ "^/api/v1/users/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA
 if ($uri = "/api/v1/bank/dashboard") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/bank/accounts") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
-if ($uri ~ "^/api/v1/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(close|reopen|transactions|balance-series|statement)$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(close|reopen|transactions|statement)$") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/bank/requests") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/bank/requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(confirm|reject)$") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/bank/grants") { set $krt_api_allowed 1; }
@@ -1300,22 +1302,22 @@ This is the first time `/api/v1/bank/**` is admitted at all. Until now the runbo
 said "never `/bank/accounts/**`"; that was true while the app had no staff surface and stopped
 being true when `REQ-APP-BANK-007` was amended.
 
-|   Tab / screen    |                               Paths                               |      Verbs       |
-|-------------------|-------------------------------------------------------------------|------------------|
-| Übersicht (ab. 4) | `/api/v1/bank/dashboard`                                          | GET              |
-| Anträge (ab. 5)   | `/api/v1/bank/requests`                                           | GET              |
-| Anträge           | `…/requests/<uuid>/confirm`, `…/reject`                           | POST             |
-| Konten (ab. 6)    | `/api/v1/bank/accounts`                                           | GET, POST        |
-| Konten            | `…/accounts/<uuid>`                                               | GET, PATCH       |
-| Konten            | `…/accounts/<uuid>/close`, `/reopen`                              | POST             |
-| Konto-Detail      | `…/accounts/<uuid>/transactions`, `/balance-series`, `/statement` | GET              |
-| Konto-Detail      | `/api/v1/bank/transactions/<uuid>/reversal`                       | POST             |
-| Konto-Detail      | `/api/v1/bank/export/three-month-report`                          | GET              |
-| Grants (ab. 7)    | `/api/v1/bank/grants`                                             | GET, POST        |
-| Grants            | `/api/v1/users/search-bank`                                       | GET              |
-| Grants            | `…/grants/<uuid>/<uuid>`                                          | PATCH, DELETE    |
-| Halter (ab. 6/8)  | `/api/v1/bank/holders`, `…/<uuid>`, `…/<uuid>/transactions`       | GET, POST, PATCH |
-| Halter-Umbuchung  | `/api/v1/bank/holders/transfer`                                   | POST             |
+|   Tab / screen    |                            Paths                            |      Verbs       |
+|-------------------|-------------------------------------------------------------|------------------|
+| Übersicht (ab. 4) | `/api/v1/bank/dashboard`                                    | GET              |
+| Anträge (ab. 5)   | `/api/v1/bank/requests`                                     | GET              |
+| Anträge           | `…/requests/<uuid>/confirm`, `…/reject`                     | POST             |
+| Konten (ab. 6)    | `/api/v1/bank/accounts`                                     | GET, POST        |
+| Konten            | `…/accounts/<uuid>`                                         | GET, PATCH       |
+| Konten            | `…/accounts/<uuid>/close`, `/reopen`                        | POST             |
+| Konto-Detail      | `…/accounts/<uuid>/transactions`, `/statement`              | GET              |
+| Konto-Detail      | `/api/v1/bank/transactions/<uuid>/reversal`                 | POST             |
+| Konto-Detail      | `/api/v1/bank/export/three-month-report`                    | GET              |
+| Grants (ab. 7)    | `/api/v1/bank/grants`                                       | GET, POST        |
+| Grants            | `/api/v1/users/search-bank`                                 | GET              |
+| Grants            | `…/grants/<uuid>/<uuid>`                                    | PATCH, DELETE    |
+| Halter (ab. 6/8)  | `/api/v1/bank/holders`, `…/<uuid>`, `…/<uuid>/transactions` | GET, POST, PATCH |
+| Halter-Umbuchung  | `/api/v1/bank/holders/transfer`                             | POST             |
 
 **The write family, and why that is the right shape here.** `bank` is not in the read-only family
 list, so a named path answers every verb the backend serves on it. Each of the pairs above wants
