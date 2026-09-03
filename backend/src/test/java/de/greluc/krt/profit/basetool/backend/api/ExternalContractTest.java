@@ -2454,6 +2454,69 @@ class ExternalContractTest {
   }
 
   /**
+   * No frozen operation demands a header a shipped build does not send.
+   *
+   * <p>The request guard beside this one freezes required <em>body</em> fields, and the parameter
+   * guard freezes query parameters. A header was caught by neither, and it is the same break in a
+   * different envelope: a build already on a member's phone sends the headers it was written
+   * against, so a newly <b>required</b> one is a 400 on every call it makes — while the screen
+   * still opens and still looks fine.
+   *
+   * <p>Two frozen operations declare a header today ({@code X-User-Time-Zone}, on the bank
+   * statement and the three-month export) and both are optional, which is why this asserts a
+   * property rather than keeping a list: there is nothing to record while nothing is required, and
+   * the day something is, the build says so.
+   *
+   * <p>A header the app genuinely sends on <em>every</em> call could be made required safely —
+   * {@code Authorization}, the active org unit, the correlation id. None is declared as a parameter
+   * in the document, so none reaches this assertion; if one ever is, the right answer is a named
+   * exemption with the reason, not a wider rule.
+   *
+   * @throws IOException if the document cannot be read
+   */
+  @Test
+  @DisplayName("no frozen operation requires a header an installed build may not send")
+  void theContractRequiresNoHeader() throws IOException {
+    JsonNode document = openapi();
+
+    List<String> demanded = new java.util.ArrayList<>();
+    for (ContractOperation operation : CONTRACT) {
+      // By field name, not a JSON Pointer: a path is itself full of slashes, and building a
+      // pointer out of it escapes them into one token that resolves to nothing — which is a test
+      // that passes because it looked nowhere.
+      JsonNode paths = document.get("paths");
+      JsonNode path = paths == null ? null : paths.get(operation.path());
+      JsonNode verb = path == null ? null : path.get(operation.method());
+      if (verb == null) {
+        continue;
+      }
+      JsonNode parameters = verb.get("parameters");
+      if (parameters == null) {
+        continue;
+      }
+      for (JsonNode parameter : parameters) {
+        boolean isHeader = "header".equals(parameter.path("in").asString(""));
+        if (isHeader && parameter.path("required").asBoolean(false)) {
+          demanded.add(
+              operation.method().toUpperCase(java.util.Locale.ROOT)
+                  + " "
+                  + operation.path()
+                  + " requires "
+                  + parameter.path("name").asString(""));
+        }
+      }
+    }
+
+    assertThat(demanded)
+        .as(
+            "a frozen operation now requires a header. Every build already installed sends the "
+                + "headers it was written against, so this is a 400 on every call it makes. Ship a "
+                + "build that sends it first — or, if the app has always sent it unconditionally, "
+                + "say so here rather than widening the rule")
+        .isEmpty();
+  }
+
+  /**
    * Reads the committed API document from the classpath.
    *
    * @return the parsed document
