@@ -17,15 +17,24 @@ name: Promote to stable
 # anyone with Actions-write reach prod (REQ-OPS-002). The gate is a single job (not
 # the promote matrix) so the run mints exactly one GitHub deployment record.
 #
-# Two gates guard a promotion, in order:
-#   1. cosign-verify the source digest's keyless signature against this repo's
+# Three gates guard a promotion, in order:
+#   1. Trivy-scan the source digest of the three app images and FAIL on a fixed
+#      HIGH/CRITICAL finding (REQ-OPS-024, ADR-0155). The identical finding is
+#      advisory in release-images.yml: at build time a missing image is worse
+#      than a vulnerable one, while at promotion time the digest is being chosen
+#      to run in production. Break-glass: the `allow_vulnerable` input.
+#   2. cosign-verify the source digest's keyless signature against this repo's
 #      release-images workflow identity (pinned to @refs/heads/main | tags/v.+).
 #      A tag not produced by our own CI cannot be promoted even if the registry
 #      contains one (e.g. someone pushed manually with a leaked PAT). This is the
 #      CI half of the supply-chain seam; scripts/deploy.sh re-verifies the same
 #      identity on the host before it applies (REQ-OPS-015), so the seam holds
 #      even if :stable is later moved out-of-band.
-#   2. Re-tag the (verified) digest as :stable.
+#   3. Re-tag the (verified) digest as :stable.
+#
+# The human-approval gate sits between (1) and (2): a reviewer is only asked
+# about an image whose scan already passed, or about one whose bypass is stated
+# in the approval message.
 
 on:
   workflow_dispatch:
@@ -34,6 +43,14 @@ on:
         description: 'Image tag to promote (e.g. "1.4.3", "sha-abc1234"). NOT "stable" itself.'
         required: true
         type: string
+      allow_vulnerable:
+        description: >-
+          Break-glass: promote even though the image carries a fixed HIGH/CRITICAL
+          vulnerability. The scan still runs and still reports; it just stops
+          blocking. Say why in the deployment notes.
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   # Serialise promotions globally so two simultaneous flips cannot leave the
@@ -68,6 +85,155 @@ jobs:
           echo "::error::version input is empty."
           exit 1
 
+  # Gate (2) of three — the vulnerability gate (REQ-OPS-024, ADR-0155).
+  #
+  # `release-images.yml` scans every build with Trivy and uploads SARIF, but that
+  # scan is advisory by design: a CVE-bearing image is preferable to a MISSING
+  # image when a hotfix is urgent, and a hard failure of the scan action must
+  # never cost a release its tags and its signature. That reasoning is about the
+  # BUILD. It does not transfer to the promotion, which is the moment a digest is
+  # chosen to run in production — the one point in the chain where "this image has
+  # a fixed HIGH/CRITICAL vulnerability" is a decision rather than a notification.
+  #
+  # So the same finding is advisory at build time and blocking here, on purpose.
+  # Until this job existed the answer to "what does a Trivy finding stop?" was
+  # "nothing, at any stage", which made the Security tab a queue nobody owned.
+  #
+  # Placed BEFORE `approve` deliberately: a reviewer is asked to approve only an
+  # image that passed, and a failing scan costs a human nothing. The break-glass
+  # is the `allow_vulnerable` input — the scan still runs and still prints every
+  # finding, it just stops failing, and both this job's summary and the approval
+  # job's message say so in full, so nobody approves a bypass without seeing it.
+  #
+  # Only the three APP images are scanned. `config` and `keycloak-spi` are
+  # `FROM scratch` artifacts with no base image and no OS package database (see
+  # docker/config/Dockerfile, docker/keycloak-spi/Dockerfile); the provider JAR's
+  # Java dependencies are gated separately and more strictly by OWASP
+  # Dependency-Check at `failBuildOnCVSS = 7.0`.
+  #
+  # Settings are deliberately IDENTICAL to the release scan (`severity:
+  # HIGH,CRITICAL`, `ignore-unfixed: true`). Two different thresholds would mean
+  # the Security tab and this gate disagree about what counts, and the first
+  # disagreement would be discovered during an urgent promotion.
+  scan:
+    name: Scan (${{ matrix.module }} / ${{ matrix.platform }})
+    needs: validate-inputs
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 15
+
+    strategy:
+      # NOT fail-fast: an operator facing a blocked promotion needs the full
+      # picture — every module and both architectures — in one run, not the first
+      # finding and five cancelled jobs.
+      fail-fast: false
+      matrix:
+        module: [backend, frontend, ingest]
+        platform: [linux/amd64, linux/arm64]
+        include:
+          - platform: linux/amd64
+            runs-on: ubuntu-latest
+          - platform: linux/arm64
+            runs-on: ubuntu-24.04-arm
+
+    steps:
+      # Required twice over: the basetool-* packages are private, and being
+      # authenticated to ghcr.io also lifts the anonymous rate limit on the Trivy
+      # vulnerability database, which is itself pulled from GHCR. An unauthenticated
+      # DB pull that gets throttled would now block a promotion rather than lose an
+      # advisory scan, so this step is load-bearing.
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Resolved here as well as in `promote`, because job outputs do not survive
+      # matrix expansion and there is no way to hand one matrix leg's value to
+      # another. The two resolutions could in principle disagree if the tag moved
+      # between them; that window is closed on the other side, where `promote`
+      # cosign-verifies whatever IT resolved against the release-images identity —
+      # a tag repointed at an unsigned or foreign digest fails gate (3) regardless
+      # of what this job scanned.
+      - name: Resolve source digest
+        id: resolve
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${VERSION}" --format '{{.Manifest.Digest}}')
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "ref=${IMAGE}@${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "Scanning ${IMAGE}:${VERSION} -> ${DIGEST}"
+
+      # `TRIVY_PLATFORM` is required, not cosmetic: `provenance: mode=max` plus
+      # `sbom: true` make buildkit push an OCI INDEX (image + provenance + SBOM
+      # manifests), and Trivy's default child selection inside an index is
+      # hardcoded to linux/amd64 — which fails outright on the arm64 runner with
+      # `no child with platform linux/amd64 in index ...`. Pinning it to the matrix
+      # platform selects the matching child explicitly on both legs.
+      #
+      # `exit-code` is the gate. It is '1' normally and '0' when the operator
+      # dispatched the run with `allow_vulnerable: true`; in the bypass case the
+      # findings are still scanned, still printed in full and still summarised
+      # below — only the failure is withheld.
+      #
+      # The condition is written fail-CLOSED and deliberately tests both
+      # representations. `inputs.<boolean>` is a real boolean, but GitHub casts any
+      # NON-EMPTY string to true — so the shorter `inputs.allow_vulnerable && '0' || '1'`
+      # would silently disable this gate the moment the value reached the expression
+      # as the STRING "false", which is exactly how `github.event.inputs` delivers
+      # it. Requiring an explicit true leaves every other value, expected or not, on
+      # the blocking branch.
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: ${{ matrix.platform }}
+        with:
+          image-ref: ${{ steps.resolve.outputs.ref }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: ${{ (inputs.allow_vulnerable == true || inputs.allow_vulnerable == 'true') && '0' || '1' }}
+
+      # `always()` so the summary is written on the failing leg too — the operator
+      # reading a blocked promotion needs the digest and the bypass instructions
+      # from the run page, not from this file.
+      - name: Summarise
+        if: always()
+        env:
+          MODULE: ${{ matrix.module }}
+          PLATFORM: ${{ matrix.platform }}
+          VERSION: ${{ inputs.version }}
+          DIGEST: ${{ steps.resolve.outputs.digest }}
+          BYPASS: ${{ inputs.allow_vulnerable }}
+          OUTCOME: ${{ job.status }}
+        run: |
+          {
+            echo "### Scanned basetool-${MODULE} (${PLATFORM}) — ${OUTCOME}"
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Source tag | \`${VERSION}\` |"
+            echo "| Digest | \`${DIGEST}\` |"
+            echo "| Threshold | HIGH,CRITICAL, fixed only |"
+            if [ "${BYPASS}" = "true" ]; then
+              echo "| Gate | **BYPASSED** (\`allow_vulnerable: true\`) |"
+            else
+              echo "| Gate | blocking |"
+            fi
+            if [ "${BYPASS}" = "true" ]; then
+              echo ""
+              echo "> **Vulnerability gate bypassed** via \`allow_vulnerable\`. Findings above were"
+              echo "> NOT enforced. Record why in the deployment notes."
+            elif [ "${OUTCOME}" != "success" ]; then
+              echo ""
+              echo "> Promotion blocked. Either ship a rebuilt image with the fix, or re-dispatch"
+              echo "> this workflow with \`allow_vulnerable: true\` and state the reason."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # Single human-approval gate for the whole run. Promotion is the ONLY path to
   # prod (REQ-OPS-002), and workflow_dispatch alone lets anyone with Actions-write
   # flip :stable. Binding THIS job — and only this job — to the `production` GitHub
@@ -87,7 +253,10 @@ jobs:
   # back onto the matrix.
   approve:
     name: Approve production promotion
-    needs: validate-inputs
+    # Waits on `scan` so the required reviewer is only ever asked about an image
+    # that passed the vulnerability gate — or, when `allow_vulnerable` was set,
+    # about one whose bypass the step below states in the approval record.
+    needs: [validate-inputs, scan]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: production
@@ -95,7 +264,12 @@ jobs:
       - name: Record approval
         env:
           VERSION: ${{ inputs.version }}
-        run: echo "Production promotion of '${VERSION}' approved — proceeding to re-tag :stable."
+          BYPASS: ${{ inputs.allow_vulnerable }}
+        run: |
+          if [ "${BYPASS}" = "true" ]; then
+            echo "::warning::Vulnerability gate BYPASSED for '${VERSION}' (allow_vulnerable=true) — this image may carry fixed HIGH/CRITICAL findings."
+          fi
+          echo "Production promotion of '${VERSION}' approved — proceeding to re-tag :stable."
 
   promote:
     name: Promote ${{ matrix.module }}

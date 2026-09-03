@@ -44,17 +44,21 @@ existing, already-validated digest to `:stable`. The app images, the `basetool-c
 and the `basetool-keycloak-spi` provider-JAR bundle are promoted **in lock-step**, so the compose
 file, the Keycloak provider JAR and the image versions the host applies always match each other.
 
-A promotion passes two gates before it flips `:stable`: (1) a **human-approval** gate — a dedicated
+A promotion passes three gates before it flips `:stable`. Gate (1) is the **vulnerability** gate —
+Trivy scans the three app images at the digest the requested tag resolves to, on both architectures,
+and a fixed HIGH/CRITICAL finding fails the run before a reviewer is ever asked
+([REQ-OPS-024](#req-ops-024--a-promotion-is-gated-on-the-promoted-digests-vulnerability-scan)).
+Gate (2) is the **human-approval** gate — a dedicated
 `approve` job is bound to the `production` GitHub Environment, so a repo-configured required reviewer
 must approve the run before the promote matrix starts (workflow_dispatch alone lets anyone with
 Actions-write reach prod). The gate lives on its **own single job**, not on the promote matrix, so the
 run mints exactly one GitHub deployment record — a matrix-bound environment minted one deployment per
 leg, four of which `auto_inactive` then flipped to `inactive`, leaving the repo home page showing a
-misleading permanent "Inactive" badge for `production`. Gate (2) is the
+misleading permanent "Inactive" badge for `production`. Gate (3) is the
 **signature** gate — cosign-verify the source digest against the release-images identity, so only an
-image built and signed by our own release pipeline can be promoted. `release-images.yml` scans every
-build with Trivy (SARIF uploaded to the Security tab for visibility) but the scan blocks neither the
-build nor the promotion — a Trivy finding is surfaced, not enforced, at any stage.
+image built and signed by our own release pipeline can be promoted. `release-images.yml` also scans
+every build with Trivy and uploads SARIF to the Security tab, but *that* scan stays advisory — the
+same finding is advisory at build time and blocking at promotion, and REQ-OPS-024 says why.
 
 **Acceptance**
 
@@ -67,6 +71,8 @@ build nor the promotion — a Trivy finding is surfaced, not enforced, at any st
   run creates exactly one deployment record (no phantom "Inactive" badge on the repo home page).
 - [ ] The `promote` job cosign-verifies the resolved digest against the release-images identity
   before re-tagging; an image not signed by our own release pipeline cannot be promoted.
+- [ ] A `scan` job runs ahead of `approve` and fails the run on a fixed HIGH/CRITICAL finding in any
+  of the three app images, on either architecture, unless `allow_vulnerable` was set (REQ-OPS-024).
 
 **Enforced by:** `.github/workflows/release-images.yml` · `.github/workflows/promote.yml` (`environment`, cosign gate) · **Runbook:** `docs/deployment.md` → *Promoting to production*
 
@@ -823,6 +829,56 @@ fail-closed, exactly as REQ-OPS-015 specifies.
 **Enforced by:** `.github/workflows/release-images.yml` (`merge`, `build-config`,
 `build-keycloak-spi`) · `.github/workflows/release-publish.yml` · **Runbook:**
 `.github/SECURITY.md` → *Verifying Releases* · **Decision:** ADR-0145
+
+### REQ-OPS-024 — A promotion is gated on the promoted digest's vulnerability scan
+
+`promote.yml` scans the digest it is about to promote and **fails on a fixed HIGH/CRITICAL
+finding** in any of the three app images, on either architecture, before the human-approval gate is
+reached. The scan uses settings **identical** to the advisory scan in `release-images.yml`
+(`severity: HIGH,CRITICAL`, `ignore-unfixed: true`), so the Security tab and the gate can never
+disagree about what counts.
+
+The same finding is therefore advisory at build time and blocking at promotion, and the split is
+deliberate. A build is speculative: most images produced are never promoted, and the cost of
+refusing one is that a fix cannot be shipped at all — which is why `exit-code: 0` and the move of
+Trivy out of the `build` job stand unchanged (REQ-OPS-021, ADR-0137). A promotion is the single
+moment a specific digest is chosen to run in production, it already requires a human, and refusing
+it costs only the promotion. Until this requirement existed the answer to "what does a Trivy finding
+stop?" was "nothing, at any stage", while a vulnerable Java *library* blocked a merge outright at
+`failBuildOnCVSS = 7.0` — an ordering no threat model produces on purpose.
+
+**Break-glass.** The `allow_vulnerable` workflow input flips the scan back to non-blocking. The scan
+still runs and still prints every finding; only the failure is withheld. The bypass is written into
+the scan job's step summary and raised as a `::warning::` in the approval record, so it cannot be
+exercised invisibly, and the reason belongs in the deployment notes.
+
+**Not scanned:** `basetool-config` and `basetool-keycloak-spi`. Both are `FROM scratch` artifacts
+with no base image and no OS package database; the provider JAR's Java dependencies are gated more
+strictly by OWASP Dependency-Check.
+
+**Not gated:** `promote-testing.yml`. A vulnerable build must stay exercisable in an environment
+that is not production — gating it would make the bypass routine and wear it out.
+
+**Acceptance**
+
+- [ ] The `scan` job runs on `needs: validate-inputs` and `approve` runs on `needs: [validate-inputs, scan]`,
+  so a reviewer is only asked about an image that passed — or about one whose bypass the approval
+  step states.
+- [ ] Severity and `ignore-unfixed` match `release-images.yml` exactly; a change to one is a change
+  to both.
+- [ ] `TRIVY_PLATFORM` is pinned to the matrix platform on both legs — the pushed artifact is an OCI
+  index (image + provenance + SBOM manifests) and Trivy's default child selection is hardcoded to
+  `linux/amd64`, which fails outright on the arm64 leg.
+- [ ] The scan job authenticates to GHCR before scanning: the packages are private, and the Trivy
+  vulnerability database is itself pulled from GHCR, where an anonymous rate limit would now block a
+  promotion rather than lose an advisory scan.
+- [ ] `allow_vulnerable` defaults to `false`, and setting it produces a visible warning in the
+  approval record and a bypass note in the step summary.
+- [ ] `promote-testing.yml` is unchanged and remains ungated.
+
+**Enforced by:** `.github/workflows/promote.yml` (`scan`) · `.github/workflows/release-images.yml`
+(the advisory twin, whose settings this gate mirrors) · **Runbook:** `docs/deployment.md` →
+*Promoting to production* · **Decision:** ADR-0155
 
 ## Out of scope
 

@@ -17,6 +17,27 @@ updates:
     commit-message:
       prefix: "chore(actions)"
 
+  # The three app modules share ONE base image (eclipse-temurin:25-jre-alpine,
+  # digest-pinned), so this cadence is the dominant term in how long an OS-level
+  # CVE survives in production. Measured 2026-09-03: the pin has moved exactly
+  # once since the images went to Alpine, and the whole path is
+  #   Dependabot notices -> PR -> merge -> release build -> promotion.
+  # Only the build is fast (~4 min after ADR-0137), so weekly detection puts up to
+  # seven days in front of everything else. That measurement is why a "rebase the
+  # runtime layer without rebuilding" pipeline was considered and dropped: it would
+  # have optimised the four-minute term while the seven-day term dominated.
+  #
+  # Weekly is nevertheless retained, by the repository owner's decision
+  # (2026-09-03), with the seven-day detection window known and accepted. Written
+  # down so the number is not rediscovered as if it were a defect: the cadence is a
+  # choice, and the lever anyone reaching for a faster patch should pull first is
+  # this interval, not a rebase pipeline.
+  #
+  # Not consolidated into one `directories:` entry with a `groups:` block, which
+  # would turn a base bump into a single PR instead of three: a wrong key there
+  # makes Dependabot silently stop updating these paths, and silently LENGTHENING
+  # this exact loop is the failure this entry exists to prevent. Worth doing
+  # deliberately, verified against a real run - not blind.
   - package-ecosystem: docker
     directory: /backend
     schedule:

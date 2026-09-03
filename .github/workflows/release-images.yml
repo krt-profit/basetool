@@ -585,8 +585,12 @@ jobs:
       # runner), so no QEMU emulation is needed inside Trivy either.
       # `exit-code: 0` is deliberate: we do NOT block the push on findings (a
       # CVE-bearing image is preferable to a missing image when a hotfix is
-      # urgent). The findings show up in the Security tab and the `promote.yml`
-      # workflow re-runs this check as a gate before flipping :stable.
+      # urgent). The findings show up in the Security tab, and the SAME scan runs
+      # as a BLOCKING gate in `promote.yml` before :stable is flipped
+      # (REQ-OPS-024, ADR-0155) — identical severity and `ignore-unfixed`
+      # settings, so the two never disagree about what counts. Advisory here,
+      # enforced there: at build time a missing image is worse than a vulnerable
+      # one; at promotion time the digest is being chosen to run in production.
       #
       # `TRIVY_PLATFORM` is required because `provenance: mode=max` + `sbom: true`
       # cause buildkit to push an OCI index (image manifest + provenance manifest
