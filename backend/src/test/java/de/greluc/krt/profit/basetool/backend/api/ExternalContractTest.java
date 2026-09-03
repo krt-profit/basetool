@@ -1033,6 +1033,68 @@ class ExternalContractTest {
           // Each field set is what the APP READS, not what the DTO carries. `LocationDto` also
           // serialises description, hidden, homeLocation and version; the refinery picker maps
           // `id to name` and nothing else, so freezing more would promise what nobody relies on.
+          // ── The bank-staff reads (2026-09-03) ────────────────────────────────────────────
+          // Nineteen bank-staff paths are admitted by the vhost and frozen by nothing, which is
+          // the largest half of the 30-operation gap. These four are the reads whose consumed
+          // fields could be established from the app's own mapping; the rest — the writes and the
+          // transaction lists — follow, established the same way rather than guessed.
+          //
+          // The stakes are higher here than anywhere else on this vhost. `bank` is deliberately
+          // NOT in the read-only family, so naming a path opens every verb the backend serves on
+          // it, and the backend's role gate is the only thing between a shipped client and moving
+          // money. A field rename on any of these breaks that client silently.
+          //
+          // `BankAccountDto` also serialises areaLeadApprovalCeiling, areaName, balanceTarget,
+          // createdAt and employeeApprovalCeiling; the app's mapping reads none of them.
+          new ContractOperation(
+                  "/api/v1/bank/accounts",
+                  "get",
+                  Set.of(
+                      "content",
+                      "id",
+                      "accountNo",
+                      "name",
+                      "type",
+                      "status",
+                      "balance",
+                      "orgUnit",
+                      "version"))
+              .addressedBy(Set.of("page:integer", "size:integer")),
+          // The management overview. Three top-level parts, and the guard descends one level into
+          // each: `totals` is null for a non-management caller and stays null rather than being
+          // folded into zeroes, which is why the three totals fields are frozen beside it.
+          //
+          // `BankDashboardAccountDto` also carries bereichDepartment, bereichId and bereichName —
+          // the web's grouping, which this client does not render.
+          new ContractOperation(
+              "/api/v1/bank/dashboard",
+              "get",
+              Set.of(
+                  "management",
+                  "accounts",
+                  "totals",
+                  "totalBalance",
+                  "activeAccounts",
+                  "closedAccounts",
+                  "id",
+                  "accountNo",
+                  "name",
+                  "type",
+                  "status",
+                  "balance",
+                  "delta30d",
+                  "sparkline")),
+          // The holder list and one holder: the same DTO, so the same five fields. `userId` and
+          // `roleManaged` are on the wire and deliberately not frozen — the app maps neither, and
+          // freezing a field nobody reads is a promise that costs without buying anything.
+          new ContractOperation(
+              "/api/v1/bank/holders",
+              "get",
+              Set.of("id", "handle", "active", "totalHeld", "version")),
+          new ContractOperation(
+              "/api/v1/bank/holders/{id}",
+              "get",
+              Set.of("id", "handle", "active", "totalHeld", "version")),
           new ContractOperation("/api/v1/locations/refineries", "get", Set.of("id", "name")),
           // The method picker of the refinery form. A PAGE, not a bare array — the sibling above
           // answers an array and the two are easy to assume alike; parsed as a list this yields
