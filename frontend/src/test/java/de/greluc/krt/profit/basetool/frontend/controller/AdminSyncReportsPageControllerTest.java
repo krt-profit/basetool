@@ -92,6 +92,55 @@ class AdminSyncReportsPageControllerTest {
   }
 
   @Test
+  void deleteOld_canonicalisesTheSourceTabBeforeRelayingIt() {
+    // The redirect always upper-cased and trimmed the tab while the relayed backend query took the
+    // raw string, so "  scwiki  " landed on the SC Wiki tab but sent an unrecognised source — which
+    // the backend reads as "no filter" and purges BOTH catalogues. One canonical value now feeds
+    // both.
+    BackendApiClient client = mock(BackendApiClient.class);
+    when(client.delete(any(String.class), eq(SyncReportPurgeResultDto.class)))
+        .thenReturn(new SyncReportPurgeResultDto(3));
+    AdminSyncReportsPageController controller = new AdminSyncReportsPageController(client);
+    RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
+
+    String view = controller.deleteOld("  scwiki  ", 30, attrs);
+
+    assertEquals("redirect:/admin/sync-reports/scwiki", view);
+    verify(client)
+        .delete(
+            "/api/v1/sync-reports?olderThanDays=30&source=SCWIKI", SyncReportPurgeResultDto.class);
+  }
+
+  @Test
+  void deleteOld_unknownSourceNeverReachesTheRelayedUri() {
+    // A crafted tab must not be able to append a second query parameter to the purge request. It is
+    // not in the allowlist, so it collapses to the combined purge and the URI carries no `source`.
+    BackendApiClient client = mock(BackendApiClient.class);
+    when(client.delete(any(String.class), eq(SyncReportPurgeResultDto.class)))
+        .thenReturn(new SyncReportPurgeResultDto(0));
+    AdminSyncReportsPageController controller = new AdminSyncReportsPageController(client);
+    RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
+
+    String view = controller.deleteOld("UEX&olderThanDays=99999", 30, attrs);
+
+    assertEquals("redirect:/admin/sync-reports", view);
+    verify(client).delete("/api/v1/sync-reports?olderThanDays=30", SyncReportPurgeResultDto.class);
+  }
+
+  @Test
+  void deleteOldAjax_canonicalisesTheSourceTabBeforeRelayingIt() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    when(client.delete(any(String.class), eq(SyncReportPurgeResultDto.class)))
+        .thenReturn(new SyncReportPurgeResultDto(5));
+    AdminSyncReportsPageController controller = new AdminSyncReportsPageController(client);
+
+    controller.deleteOldAjax("uex", 7);
+
+    verify(client)
+        .delete("/api/v1/sync-reports?olderThanDays=7&source=UEX", SyncReportPurgeResultDto.class);
+  }
+
+  @Test
   void deleteOld_backendFailureSurfacesErrorFlash() {
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.delete(any(String.class), eq(SyncReportPurgeResultDto.class)))

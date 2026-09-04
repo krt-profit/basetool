@@ -116,6 +116,31 @@
   </suppress>
 
   <!--
+    CVE-2026-54285 is an OpenTelemetry-JAVASCRIPT vulnerability: W3CBaggagePropagator.extract()
+    in @opentelemetry/core enforced the W3C Baggage size limits on the outbound inject() path
+    only, so an oversized inbound baggage header allocated without a cap. It affects
+    opentelemetry-js before 2.8.0 and has no Java counterpart - the Java SDK's
+    W3CBaggagePropagator has enforced MAX_HEADER_LENGTH / MAX_ENTRIES on extract since it was
+    written.
+
+    It lands on our io.opentelemetry Java jars (1.57.0 from the Boot 4 OpenTelemetry starter,
+    1.62.0 from the Keycloak SPI compile classpath) through the same umbrella
+    cpe:2.3:a:opentelemetry:opentelemetry the semconv entries above document: the CPE aggregates
+    the whole OpenTelemetry product family across languages, and 2.8.0 sorts below both of our
+    version numbers, so every artifact in the family matches. 28 alerts in week 2026-W36, one per
+    jar, all of them the same false positive.
+
+    Suppressed by CVE id rather than by CPE so a genuine future Java-SDK CVE on these coordinates
+    still fails the build - the semconv entries can suppress the CPE wholesale because those jars
+    are constants-only, which the SDK and exporter jars here are not.
+  -->
+  <suppress>
+    <notes>False positive: CPE confusion. CVE-2026-54285 is an inbound-baggage size-limit gap in opentelemetry-JS (@opentelemetry/core before 2.8.0); the umbrella cpe:/a:opentelemetry:opentelemetry attributes it to every io.opentelemetry Java jar by version-number overlap. The Java W3CBaggagePropagator caps header length and entry count on extract.</notes>
+    <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-.*@.*$</packageUrl>
+    <cve>CVE-2026-54285</cve>
+  </suppress>
+
+  <!--
     CVE-2026-42582 is an allocation-DoS in the QPACK decoder of
     netty-codec-http3 4.2.0.Alpha1 - 4.2.12 (fixed 4.2.13.Final). The
     netty 4.1.x line does not contain the HTTP/3 codec at all - it lives

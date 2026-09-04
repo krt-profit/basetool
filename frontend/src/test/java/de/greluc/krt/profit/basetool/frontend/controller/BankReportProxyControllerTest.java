@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 
+import java.time.Instant;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
@@ -72,7 +73,10 @@ class BankReportProxyControllerTest {
     // When
     ResponseEntity<byte[]> response =
         controller.downloadStatement(
-            id, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z", "Europe/Berlin");
+            id,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            Instant.parse("2026-02-01T00:00:00Z"),
+            "Europe/Berlin");
 
     // Then
     assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -107,7 +111,10 @@ class BankReportProxyControllerTest {
             ResponseStatusException.class,
             () ->
                 controller.downloadStatement(
-                    id, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z", null));
+                    id,
+                    Instant.parse("2026-01-01T00:00:00Z"),
+                    Instant.parse("2026-02-01T00:00:00Z"),
+                    null));
     assertEquals(403, ex.getStatusCode().value());
   }
 

@@ -27,10 +27,9 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.PersonalInventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.Valid;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -79,11 +78,16 @@ public class AdminPersonalInventoryPageController {
    * {@code adminMode=true} drives the "ADMIN MODE" banner in the template so admins are visually
    * reminded they are looking at someone else's data.
    *
+   * <p>{@code userSub} is parsed to a {@link UUID} before anything is relayed: Keycloak issues the
+   * {@code sub} as one and the backend declares it as one, so a value that is not a UUID selects no
+   * member — the same empty page the picker starts on — instead of travelling into the relayed URI
+   * as a raw string (REQ-SEC-051).
+   *
    * @param userSub Keycloak {@code sub} of the user whose inventory to show, or {@code null}
    * @param q optional free-text filter
    * @param page zero-based page index
    * @param size page size, defaults to 50
-   * @param sort optional sort spec
+   * @param sort optional sort spec; ignored unless it is a well-formed sort specification
    * @param fragment when {@code "results"} only the item-list fragment is rendered (AJAX member-
    *     select / filter swap, REQ-FE-002); the member dropdown sits outside the swap target, so the
    *     user list is then not fetched. Otherwise the full page is returned
@@ -104,13 +108,14 @@ public class AdminPersonalInventoryPageController {
       model.addAttribute("personalInventoryForm", new PersonalInventoryForm());
     }
     final boolean isFragment = "results".equals(fragment);
+    UUID selectedSub = RelayParams.uuidOrNull(userSub);
 
-    model.addAttribute("selectedUserSub", userSub);
+    model.addAttribute("selectedUserSub", selectedSub);
     model.addAttribute("filterQuery", q == null ? "" : q);
     model.addAttribute("adminMode", Boolean.TRUE);
 
-    if (userSub != null && !userSub.isBlank()) {
-      PageResponse<PersonalInventoryItemDto> items = fetchItems(userSub, q, page, size, sort);
+    if (selectedSub != null) {
+      PageResponse<PersonalInventoryItemDto> items = fetchItems(selectedSub, q, page, size, sort);
       model.addAttribute("items", items != null ? items.content() : Collections.emptyList());
       model.addAttribute("page", items);
       // The member picker is now a server-side searchable combobox (remote-users, #1193): instead
@@ -118,7 +123,7 @@ public class AdminPersonalInventoryPageController {
       // preloading the whole roster, seed only the selected member's option (edit-mode label) via a
       // single lookup. Lives OUTSIDE the AJAX swap target, so a results-fragment swap skips it.
       if (!isFragment) {
-        model.addAttribute("selectedUser", fetchUser(userSub));
+        model.addAttribute("selectedUser", fetchUser(selectedSub));
       }
     } else {
       model.addAttribute("items", Collections.emptyList());
@@ -141,7 +146,7 @@ public class AdminPersonalInventoryPageController {
    */
   @PostMapping("/{userSub}/add")
   public String add(
-      @PathVariable @NotNull String userSub,
+      @PathVariable @NotNull UUID userSub,
       @Valid @ModelAttribute("personalInventoryForm") PersonalInventoryForm form,
       BindingResult bindingResult,
       RedirectAttributes redirectAttributes) {
@@ -187,7 +192,7 @@ public class AdminPersonalInventoryPageController {
    */
   @PostMapping("/{userSub}/{id}/update")
   public String update(
-      @PathVariable @NotNull String userSub,
+      @PathVariable @NotNull UUID userSub,
       @PathVariable @NotNull UUID id,
       @Valid @ModelAttribute("personalInventoryForm") PersonalInventoryForm form,
       BindingResult bindingResult,
@@ -232,7 +237,7 @@ public class AdminPersonalInventoryPageController {
    */
   @PostMapping("/{userSub}/{id}/delete")
   public String delete(
-      @PathVariable @NotNull String userSub,
+      @PathVariable @NotNull UUID userSub,
       @PathVariable @NotNull UUID id,
       RedirectAttributes redirectAttributes) {
     try {
@@ -246,9 +251,8 @@ public class AdminPersonalInventoryPageController {
     return redirectToList(userSub);
   }
 
-  private String redirectToList(String userSub) {
-    return "redirect:/admin/personal-inventory?userSub="
-        + URLEncoder.encode(userSub, StandardCharsets.UTF_8);
+  private String redirectToList(UUID userSub) {
+    return "redirect:/admin/personal-inventory?userSub=" + userSub;
   }
 
   /**
@@ -257,13 +261,12 @@ public class AdminPersonalInventoryPageController {
    * is rendered and needs its display name. Returns {@code null} on any failure (a malformed sub is
    * rejected by the backend {@code UUID} binding), leaving the picker with just its placeholder.
    *
-   * @param userSub the selected member's Keycloak {@code sub}; never {@code null}/blank here.
+   * @param userSub the selected member's Keycloak {@code sub}; never {@code null} here.
    * @return the member DTO for the seed option, or {@code null} when the lookup fails.
    */
-  private UserDto fetchUser(String userSub) {
+  private UserDto fetchUser(UUID userSub) {
     try {
-      return backendApiClient.get(
-          "/api/v1/users/" + URLEncoder.encode(userSub, StandardCharsets.UTF_8), UserDto.class);
+      return backendApiClient.get("/api/v1/users/" + userSub, UserDto.class);
     } catch (Exception e) {
       // REQ-OBS-004: log the id only, never the resolved name.
       log.warn(
@@ -273,18 +276,17 @@ public class AdminPersonalInventoryPageController {
   }
 
   private PageResponse<PersonalInventoryItemDto> fetchItems(
-      String userSub, String q, Integer page, Integer size, String sort) {
+      UUID userSub, String q, Integer page, Integer size, String sort) {
     try {
       StringBuilder uri =
-          new StringBuilder("/api/v1/admin/personal-inventory/")
-              .append(URLEncoder.encode(userSub, StandardCharsets.UTF_8))
-              .append('?');
+          new StringBuilder("/api/v1/admin/personal-inventory/").append(userSub).append('?');
       if (page != null) {
         uri.append("page=").append(page).append('&');
       }
       uri.append("size=").append(size == null ? 50 : size);
-      if (sort != null && !sort.isBlank()) {
-        uri.append("&sort=").append(URLEncoder.encode(sort, StandardCharsets.UTF_8));
+      String safeSort = RelayParams.sortSpecOrNull(sort);
+      if (safeSort != null) {
+        uri.append("&sort=").append(safeSort);
       }
       if (q != null && !q.isBlank()) {
         // Free-text term as a WebClient URI-template variable so it is percent-encoded exactly

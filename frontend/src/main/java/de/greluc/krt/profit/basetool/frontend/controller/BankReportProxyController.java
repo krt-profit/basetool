@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -58,8 +60,8 @@ public class BankReportProxyController {
    * Proxies the account statement download for a caller-chosen period.
    *
    * @param id the account id
-   * @param from period start (ISO-8601 instant, forwarded verbatim)
-   * @param to period end (ISO-8601 instant, forwarded verbatim)
+   * @param from period start; bound as an instant so the relayed value cannot carry URI syntax
+   * @param to period end; bound as an instant so the relayed value cannot carry URI syntax
    * @param userTimeZone the caller's IANA time zone; optional
    * @return the PDF with attachment headers
    */
@@ -67,8 +69,8 @@ public class BankReportProxyController {
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<byte[]> downloadStatement(
       @PathVariable @NotNull UUID id,
-      @RequestParam @NotNull String from,
-      @RequestParam @NotNull String to,
+      @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+      @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
       @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
     String uri =
         UriComponentsBuilder.fromPath("/api/v1/bank/accounts/" + id + "/statement")

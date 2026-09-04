@@ -26,9 +26,11 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -40,6 +42,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Spring MVC controller backing the {@code /admin/sync-reports} pages (SC_WIKI_SYNC_PLAN.md §8.8):
@@ -128,15 +131,13 @@ public class AdminSyncReportsPageController {
       @RequestParam(required = false) String source,
       @RequestParam int days,
       RedirectAttributes redirectAttributes) {
-    String redirect = redirectPathFor(source);
+    String canonicalSource = canonicalSource(source);
+    String redirect = redirectPathFor(canonicalSource);
     if (days < 1) {
       redirectAttributes.addFlashAttribute("error", "error.admin.syncReports.delete");
       return "redirect:" + redirect;
     }
-    String uri = "/api/v1/sync-reports?olderThanDays=" + days;
-    if (source != null && !source.isBlank()) {
-      uri += "&source=" + source;
-    }
+    String uri = purgeUri(canonicalSource, days);
     try {
       SyncReportPurgeResultDto result =
           backendApiClient.delete(uri, SyncReportPurgeResultDto.class);
@@ -169,10 +170,7 @@ public class AdminSyncReportsPageController {
     if (days < 1) {
       return ResponseEntity.badRequest().build();
     }
-    String uri = "/api/v1/sync-reports?olderThanDays=" + days;
-    if (source != null && !source.isBlank()) {
-      uri += "&source=" + source;
-    }
+    String uri = purgeUri(canonicalSource(source), days);
     try {
       SyncReportPurgeResultDto result =
           backendApiClient.delete(uri, SyncReportPurgeResultDto.class);
@@ -186,21 +184,63 @@ public class AdminSyncReportsPageController {
   }
 
   /**
+   * Canonicalizes the caller-supplied source tab to one of the two catalogue names, or {@code null}
+   * for the combined view.
+   *
+   * <p>Both callers of this used to differ on what "the source" was: the redirect trimmed and
+   * upper-cased it while the relayed backend query took the raw value, so {@code ?source=scwiki}
+   * landed the user on the SC Wiki tab but sent {@code scwiki} to the backend — which does not
+   * recognise it and therefore purges *both* catalogues. Canonicalizing once fixes that, and it is
+   * also what keeps the value out of the relayed URI: what is forwarded is one of two literals from
+   * this switch, never the caller's string.
+   *
+   * @param source active source tab, in any case and with surrounding whitespace, or {@code null}
+   * @return {@code "SCWIKI"}, {@code "UEX"}, or {@code null} for the combined view
+   */
+  private static @Nullable String canonicalSource(@Nullable String source) {
+    if (source == null || source.isBlank()) {
+      return null;
+    }
+    return switch (source.trim().toUpperCase(Locale.ROOT)) {
+      case "SCWIKI" -> "SCWIKI";
+      case "UEX" -> "UEX";
+      default -> null;
+    };
+  }
+
+  /**
    * Maps the active source tab to the page path the delete action should redirect back to, so the
    * user lands on the same tab they triggered the purge from.
    *
-   * @param source active source tab ({@code "SCWIKI"} / {@code "UEX"}), or blank / {@code null}
+   * @param source the canonical source ({@code "SCWIKI"} / {@code "UEX"}), or {@code null}
    * @return the matching sync-reports page path
    */
-  private static String redirectPathFor(String source) {
-    if (source == null || source.isBlank()) {
+  private static String redirectPathFor(@Nullable String source) {
+    if (source == null) {
       return "/admin/sync-reports";
     }
-    return switch (source.trim().toUpperCase(java.util.Locale.ROOT)) {
+    return switch (source) {
       case "SCWIKI" -> "/admin/sync-reports/scwiki";
       case "UEX" -> "/admin/sync-reports/uex";
       default -> "/admin/sync-reports";
     };
+  }
+
+  /**
+   * Builds the backend purge URI for a canonical source, or for both catalogues when it is {@code
+   * null}.
+   *
+   * @param source the canonical source ({@code "SCWIKI"} / {@code "UEX"}), or {@code null} for both
+   * @param days minimum age in days a report must exceed to be deleted
+   * @return the relative backend URI
+   */
+  private static String purgeUri(@Nullable String source, int days) {
+    UriComponentsBuilder uri =
+        UriComponentsBuilder.fromPath("/api/v1/sync-reports").queryParam("olderThanDays", days);
+    if (source != null) {
+      uri.queryParam("source", source);
+    }
+    return uri.toUriString();
   }
 
   /**
@@ -223,10 +263,14 @@ public class AdminSyncReportsPageController {
   private String render(
       String source, String activeTab, String basePath, int page, String fragment, Model model) {
     int safePage = Math.max(page, 0);
-    String uri = "/api/v1/sync-reports?page=" + safePage + "&size=" + PAGE_SIZE;
+    UriComponentsBuilder uriBuilder =
+        UriComponentsBuilder.fromPath("/api/v1/sync-reports")
+            .queryParam("page", safePage)
+            .queryParam("size", PAGE_SIZE);
     if (source != null) {
-      uri += "&source=" + source;
+      uriBuilder.queryParam("source", source);
     }
+    String uri = uriBuilder.toUriString();
     try {
       PageResponse<SyncReportDto> events = backendApiClient.get(uri, SYNC_REPORT_PAGE_TYPE);
       if (events != null) {

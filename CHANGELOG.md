@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der Reiter „Materialbörse" im Prüfprotokoll konnte weder exportiert noch aufgeräumt werden.** PDF, JSON und die Aufbewahrungs-Bereinigung antworteten dort mit einem Fehler, während jeder andere Reiter funktionierte: der Weiterleitungs-Endpunkt führte eine eigene, veraltete Liste der Reiter. Beide Stellen lesen jetzt dieselbe Liste.
+
+- **Beim Löschen alter Synchronisationsberichte konnte die Auswahl des Katalogs verloren gehen.** Wurde der Reiter in Kleinschreibung übergeben, landete man zwar auf dem richtigen Reiter, gelöscht wurde aber in **beiden** Katalogen. Der Wert wird jetzt einmal vereinheitlicht und für Weiterleitung und Löschung gleich verwendet.
+
+### Security
+
+- **Die vom Webtool an das Backend weitergereichten Parameter sind jetzt an den Typ gebunden, den das Backend selbst verlangt.** Zeiträume als Zeitpunkt, Mitglieds-IDs als UUID, Filter nur aus der Liste, die die Seite selbst anbietet. Ein Wert mit URL-Sonderzeichen wird damit an der Weiterleitung abgewiesen statt eine Anfrage ans Backend umzuformen. Behebt acht kritische CodeQL-Meldungen, darunter zwei echte Fehler: eine Bewertungs-Weiterleitung kodierte entgegen ihres eigenen Kommentars gar nicht, und die Berichts-Bereinigung setzte ihren Katalog-Parameter ungeprüft in eine löschende Anfrage (REQ-SEC-051, ADR-0158).
+
 ## [v1.6.19](https://github.com/krt-profit/basetool/releases/tag/v1.6.19) - 2026-09-04
 
 ### Changed

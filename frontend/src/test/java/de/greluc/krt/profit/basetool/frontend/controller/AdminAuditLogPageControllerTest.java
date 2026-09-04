@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
@@ -428,6 +429,64 @@ class AdminAuditLogPageControllerTest {
     PageResponse<AuditRowView> events = (PageResponse<AuditRowView>) model.getAttribute("events");
     assertNotNull(events);
     assertEquals("basetool-android", events.content().getFirst().clientId());
+  }
+
+  @Test
+  void unknownClientFilter_isDroppedRatherThanRelayed() {
+    // The client filter is relayed straight into the backend query, so it is narrowed to the very
+    // list the page renders as <select> options (REQ-SEC-051). Anything else is not a filter the UI
+    // can produce, and a crafted one must not be able to append a second query parameter.
+    Model model = new ConcurrentModel();
+    when(backendApiClient.get(any(String.class), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+
+    controller.auditLog("MISSION", null, null, null, null, "other&size=9999", 0, null, model);
+
+    ArgumentCaptor<String> uri = ArgumentCaptor.forClass(String.class);
+    verify(backendApiClient).get(uri.capture(), anyTypeRef());
+    assertFalse(
+        uri.getValue().contains("clientId"),
+        "an unknown client filter must not reach the backend: " + uri.getValue());
+    assertNull(model.getAttribute("filterClientId"));
+  }
+
+  @Test
+  void eventTypeFilter_isNarrowedToTheActiveTabsOwnTypes() {
+    // Same narrowing for the event type, and it is per-tab: a type that belongs to another tab is
+    // not a filter this tab can produce either.
+    Model model = new ConcurrentModel();
+    when(backendApiClient.get(any(String.class), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+
+    controller.auditLog("MISSION", null, null, null, "ACCOUNT_CREATED", null, 0, null, model);
+
+    ArgumentCaptor<String> uri = ArgumentCaptor.forClass(String.class);
+    verify(backendApiClient).get(uri.capture(), anyTypeRef());
+    assertFalse(
+        uri.getValue().contains("eventType"),
+        "a bank event type must not be relayed on the mission tab: " + uri.getValue());
+    assertNull(model.getAttribute("filterEventType"));
+  }
+
+  @Test
+  void periodAndActorFilters_areRelayedInTheirCanonicalForm() {
+    // from/to and actorUserId are bound as Instant / UUID — the same types the backend's own
+    // AuditAdminController declares — so what is relayed is a canonical rendering of a parsed
+    // value, never the caller's string.
+    Model model = new ConcurrentModel();
+    Instant from = Instant.parse("2026-01-01T00:00:00Z");
+    Instant to = Instant.parse("2026-02-01T00:00:00Z");
+    UUID actor = UUID.fromString("11111111-2222-3333-4444-555555555555");
+    when(backendApiClient.get(any(String.class), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+
+    controller.auditLog("MISSION", from, to, actor, null, null, 0, null, model);
+
+    ArgumentCaptor<String> uri = ArgumentCaptor.forClass(String.class);
+    verify(backendApiClient).get(uri.capture(), anyTypeRef());
+    assertTrue(uri.getValue().contains("from=2026-01-01T00:00:00Z"), uri.getValue());
+    assertTrue(uri.getValue().contains("to=2026-02-01T00:00:00Z"), uri.getValue());
+    assertTrue(uri.getValue().contains("actorUserId=" + actor), uri.getValue());
   }
 
   @Test

@@ -34,10 +34,9 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintUpdateR
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -99,6 +98,11 @@ public class AdminPersonalBlueprintsPageController {
    * Renders the admin Blueprints page: a user picker plus, once a user is selected, that user's
    * owned-blueprint list with the add bar and import controls.
    *
+   * <p>{@code userSub} is parsed to a {@link UUID} before anything is relayed: Keycloak issues the
+   * {@code sub} as one and the backend declares it as one, so a value that is not a UUID selects no
+   * member — the same empty page the picker starts on — instead of travelling into the relayed URI
+   * as a raw string (REQ-SEC-051).
+   *
    * @param userSub target user's Keycloak {@code sub}, or {@code null} for the bare picker
    * @param q optional case-insensitive product-name filter
    * @param fragment when {@code "results"} only the owned-blueprint table fragment is rendered
@@ -115,19 +119,20 @@ public class AdminPersonalBlueprintsPageController {
       @RequestParam(required = false) String fragment,
       Model model) {
     boolean isFragment = "results".equals(fragment);
+    UUID selectedSub = RelayParams.uuidOrNull(userSub);
     // The member picker is now a server-side searchable combobox (remote-users, #1193): instead of
     // preloading the whole roster, seed only the selected member's option (edit-mode label) via a
     // single lookup. It lives OUTSIDE the swap target, so a same-user filter swap does not touch
     // it.
-    if (!isFragment && userSub != null && !userSub.isBlank()) {
-      model.addAttribute("selectedUser", fetchUser(userSub));
+    if (!isFragment && selectedSub != null) {
+      model.addAttribute("selectedUser", fetchUser(selectedSub));
     }
-    model.addAttribute("selectedUserSub", userSub);
+    model.addAttribute("selectedUserSub", selectedSub);
     model.addAttribute("filterQuery", q == null ? "" : q);
     model.addAttribute("adminMode", Boolean.TRUE);
 
-    if (userSub != null && !userSub.isBlank()) {
-      PageResponse<PersonalBlueprintDto> blueprints = fetchOwned(userSub, q);
+    if (selectedSub != null) {
+      PageResponse<PersonalBlueprintDto> blueprints = fetchOwned(selectedSub, q);
       model.addAttribute(
           "blueprints", blueprints != null ? blueprints.content() : Collections.emptyList());
     } else {
@@ -147,7 +152,7 @@ public class AdminPersonalBlueprintsPageController {
   @PostMapping("/{userSub}/add-selected")
   @ResponseBody
   public PersonalBlueprintBatchResultDto addSelected(
-      @PathVariable String userSub, @RequestBody List<String> productKeys) {
+      @PathVariable UUID userSub, @RequestBody List<String> productKeys) {
     List<String> keys = productKeys == null ? List.of() : productKeys;
     if (keys.isEmpty()) {
       return new PersonalBlueprintBatchResultDto(0, 0, 0);
@@ -155,7 +160,7 @@ public class AdminPersonalBlueprintsPageController {
     try {
       PersonalBlueprintBatchResultDto result =
           backendApiClient.post(
-              "/api/v1/admin/personal-blueprints/" + enc(userSub) + "/batch",
+              "/api/v1/admin/personal-blueprints/" + userSub + "/batch",
               new PersonalBlueprintBatchCreateRequest(keys),
               PersonalBlueprintBatchResultDto.class);
       return result == null ? new PersonalBlueprintBatchResultDto(0, 0, 0) : result;
@@ -178,7 +183,7 @@ public class AdminPersonalBlueprintsPageController {
    */
   @PostMapping("/{userSub}/items/{id}/update-note")
   public String updateNote(
-      @PathVariable String userSub,
+      @PathVariable UUID userSub,
       @PathVariable @NotNull UUID id,
       @RequestParam(required = false) String note,
       @RequestParam(required = false) String acquiredAt,
@@ -210,7 +215,7 @@ public class AdminPersonalBlueprintsPageController {
    */
   @PostMapping("/{userSub}/items/{id}/delete")
   public String delete(
-      @PathVariable String userSub,
+      @PathVariable UUID userSub,
       @PathVariable @NotNull UUID id,
       RedirectAttributes redirectAttributes) {
     try {
@@ -237,7 +242,7 @@ public class AdminPersonalBlueprintsPageController {
   @PostMapping(value = "/{userSub}/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @ResponseBody
   public BlueprintImportPreviewDto previewImport(
-      @PathVariable String userSub, @RequestParam("file") @NotNull MultipartFile file) {
+      @PathVariable UUID userSub, @RequestParam("file") @NotNull MultipartFile file) {
     try {
       byte[] bytes = file.getBytes();
       String filename =
@@ -256,7 +261,7 @@ public class AdminPersonalBlueprintsPageController {
 
       return webClient
           .post()
-          .uri("/api/v1/admin/personal-blueprints/" + enc(userSub) + "/import/preview")
+          .uri("/api/v1/admin/personal-blueprints/" + userSub + "/import/preview")
           .contentType(MediaType.MULTIPART_FORM_DATA)
           .body(BodyInserters.fromMultipartData(builder.build()))
           .retrieve()
@@ -284,12 +289,12 @@ public class AdminPersonalBlueprintsPageController {
   @PostMapping("/{userSub}/import/apply")
   @ResponseBody
   public BlueprintImportResultDto applyImport(
-      @PathVariable String userSub, @RequestBody List<BlueprintImportResolutionDto> resolutions) {
+      @PathVariable UUID userSub, @RequestBody List<BlueprintImportResolutionDto> resolutions) {
     List<BlueprintImportResolutionDto> list = resolutions == null ? List.of() : resolutions;
     try {
       BlueprintImportResultDto result =
           backendApiClient.post(
-              "/api/v1/admin/personal-blueprints/" + enc(userSub) + "/import/apply",
+              "/api/v1/admin/personal-blueprints/" + userSub + "/import/apply",
               new BlueprintImportApplyRequest(list),
               BlueprintImportResultDto.class);
       return result == null ? new BlueprintImportResultDto(0, 0, 0, 0, 0) : result;
@@ -358,12 +363,12 @@ public class AdminPersonalBlueprintsPageController {
    * is rendered and needs its display name. Returns {@code null} on any failure (a malformed sub is
    * rejected by the backend {@code UUID} binding), leaving the picker with just its placeholder.
    *
-   * @param userSub the selected member's Keycloak {@code sub}; never {@code null}/blank here.
+   * @param userSub the selected member's Keycloak {@code sub}; never {@code null} here.
    * @return the member DTO for the seed option, or {@code null} when the lookup fails.
    */
-  private UserDto fetchUser(String userSub) {
+  private UserDto fetchUser(UUID userSub) {
     try {
-      return backendApiClient.get("/api/v1/users/" + enc(userSub), UserDto.class);
+      return backendApiClient.get("/api/v1/users/" + userSub, UserDto.class);
     } catch (Exception e) {
       // REQ-OBS-004: log the id only, never the resolved name.
       log.warn(
@@ -379,20 +384,20 @@ public class AdminPersonalBlueprintsPageController {
    * @param q optional case-insensitive product-name filter
    * @return the owned-blueprint page, or an empty page on failure
    */
-  private PageResponse<PersonalBlueprintDto> fetchOwned(String userSub, String q) {
+  private PageResponse<PersonalBlueprintDto> fetchOwned(UUID userSub, String q) {
     try {
       StringBuilder uri =
           new StringBuilder("/api/v1/admin/personal-blueprints/")
-              .append(enc(userSub))
+              .append(userSub)
               .append("?size=")
               .append(PAGE_SIZE)
               .append("&sort=productName,asc");
       if (q != null && !q.isBlank()) {
         // Free-text term as a WebClient URI-template variable so it is percent-encoded exactly once
-        // across the frontend->backend hop (REQ-FE-016); enc(...) form-encoding (space -> '+')
+        // across the frontend->backend hop (REQ-FE-016); URLEncoder form-encoding (space -> '+')
         // double-encodes umlauts / reserved chars when WebClient's TEMPLATE_AND_VALUES mode
-        // re-encodes the '%', yielding zero matches. The enc(...) wrapper is why this site was
-        // missed by the URLEncoder.encode( sweep in PR #1347.
+        // re-encodes the '%', yielding zero matches. The user id above needs no encoding at all
+        // now that it is bound as a UUID.
         uri.append("&q={q}");
         return backendApiClient.get(uri.toString(), PERSONAL_BLUEPRINT_PAGE_TYPE, q);
       }
@@ -409,18 +414,8 @@ public class AdminPersonalBlueprintsPageController {
    * @param userSub target user's Keycloak {@code sub}
    * @return the redirect view string
    */
-  private String redirectToUser(String userSub) {
-    return "redirect:/admin/personal-blueprints?userSub=" + enc(userSub);
-  }
-
-  /**
-   * URL-encodes a path/query segment.
-   *
-   * @param value the raw value
-   * @return the UTF-8 URL-encoded value
-   */
-  private static String enc(String value) {
-    return URLEncoder.encode(value, StandardCharsets.UTF_8);
+  private String redirectToUser(UUID userSub) {
+    return "redirect:/admin/personal-blueprints?userSub=" + userSub;
   }
 
   /**

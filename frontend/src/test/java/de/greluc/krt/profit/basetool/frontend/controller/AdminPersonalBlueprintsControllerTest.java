@@ -59,7 +59,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
  */
 class AdminPersonalBlueprintsControllerTest {
 
-  private static final String TARGET = "target-sub";
+  /**
+   * The target member, a Keycloak {@code sub} — which Keycloak issues, and the backend binds, as a
+   * UUID.
+   */
+  private static final UUID TARGET = UUID.fromString("11111111-2222-3333-4444-555555555555");
 
   private MockWebServer server;
   private BackendApiClient backendApiClient;

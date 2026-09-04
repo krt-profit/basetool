@@ -209,11 +209,11 @@ class PromotionProxyControllerTest {
 
   @Test
   void updateEvaluation_buildsUserCategoryPath_andForwardsBody() {
-    // The evaluations endpoint uniquely takes two path variables (userId is a
-    // string, not a UUID, because JWT-sub strings can be either UUID-shaped
-    // or opaque depending on the IdP). The proxy must concatenate both into
-    // the backend URI in the right order.
-    String userId = "auth0|abc123-not-a-uuid";
+    // The evaluations endpoint uniquely takes two path variables, and the proxy must expand both
+    // into the backend URI in the right order. Both are UUIDs: Keycloak issues the JWT sub as one
+    // and the backend's MemberEvaluationController declares `@PathVariable UUID userId`, so a
+    // non-UUID sub never had a route through this proxy in the first place.
+    UUID userId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     Map<String, Object> body = Map.of("version", 0, "assignedLevel", "LEVEL_B");
     String expectedUri = "/api/v1/promotion/evaluations/user/" + userId + "/category/" + categoryId;
@@ -230,7 +230,7 @@ class PromotionProxyControllerTest {
     // Setting a level back to "Keine" sends assignedLevel: null. The proxy
     // is body-agnostic; we verify the body is passed through unchanged so
     // the backend's optimistic-lock + null-handling logic stays in charge.
-    String userId = "user-1";
+    UUID userId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     java.util.Map<String, Object> body = new java.util.HashMap<>();
     body.put("version", 0);

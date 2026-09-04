@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -93,6 +94,16 @@ public class MaterialboersePageController {
   /** The board request size — large enough to show the whole board in one scrollable list. */
   private static final int BOARD_SIZE = 200;
 
+  /** The sort key the board falls back to, and the one its {@code <select>} pre-selects. */
+  private static final String DEFAULT_SORT = "qual";
+
+  /**
+   * The sort keys the board's {@code <select>} offers, and therefore the only ones relayed to the
+   * backend. Mirrors the option list in {@code materialboerse.html} and {@code
+   * fragments/materialgesuch-board.html}.
+   */
+  private static final Set<String> SORT_KEYS = Set.of(DEFAULT_SORT, "menge", "mat", "neu");
+
   /** Cap on the number of blueprint-products the item-offer type-ahead requests. */
   private static final int PRODUCT_PICKER_LIMIT = 25;
 
@@ -112,7 +123,8 @@ public class MaterialboersePageController {
    * @param q the search fragment (material/item or player), or {@code null}.
    * @param minQuality the minimum quality filter 0–1000, or {@code null}.
    * @param minAmount the minimum quantity filter, or {@code null}.
-   * @param sort the sort key ({@code qual} / {@code menge} / {@code mat} / {@code neu}).
+   * @param sort the sort key ({@code qual} / {@code menge} / {@code mat} / {@code neu}); anything
+   *     else falls back to {@code qual}.
    * @param selected the offer/request id to show in the detail pane, or {@code null} for the first.
    * @param fragment {@code "board"} / {@code "list"} / {@code "detail"} for an AJAX swap, else the
    *     full page.
@@ -143,6 +155,10 @@ public class MaterialboersePageController {
     }
 
     String activeTab = "mein".equals(tab) ? "mein" : "alle";
+    // The sort key is relayed straight into the backend query, so it is narrowed to the four keys
+    // the <select> actually offers rather than forwarded raw (REQ-SEC-051). An unknown key already
+    // collapsed to the default in the backend's own normalizeSort; it now never leaves this page.
+    String activeSort = sort != null && SORT_KEYS.contains(sort) ? sort : DEFAULT_SORT;
 
     // Both count pairs feed the shared four-tab bar, whichever mode is active.
     MaterialExchangeCountsDto offerCounts = loadCounts();
@@ -156,10 +172,10 @@ public class MaterialboersePageController {
     model.addAttribute("filterQ", q);
     model.addAttribute("filterMinQuality", minQuality);
     model.addAttribute("filterMinAmount", minAmount);
-    model.addAttribute("filterSort", sort == null ? "qual" : sort);
+    model.addAttribute("filterSort", activeSort);
 
     if (requests) {
-      List<MaterialRequestDto> reqs = loadRequests(activeTab, q, minQuality, minAmount, sort);
+      List<MaterialRequestDto> reqs = loadRequests(activeTab, q, minQuality, minAmount, activeSort);
       model.addAttribute("requests", reqs);
       model.addAttribute(
           "selectedRequest", loadRequestDetail(pickSelectedRequestId(reqs, selected)));
@@ -172,7 +188,8 @@ public class MaterialboersePageController {
       return "materialboerse";
     }
 
-    List<MaterialExchangeOfferDto> offers = loadOffers(activeTab, q, minQuality, minAmount, sort);
+    List<MaterialExchangeOfferDto> offers =
+        loadOffers(activeTab, q, minQuality, minAmount, activeSort);
     model.addAttribute("offers", offers);
     model.addAttribute("selectedOffer", loadDetail(pickSelectedId(offers, selected)));
     if ("board".equals(fragment)) {

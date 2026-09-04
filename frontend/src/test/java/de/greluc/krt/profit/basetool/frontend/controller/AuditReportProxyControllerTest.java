@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -37,8 +38,8 @@ import org.springframework.web.server.ResponseStatusException;
  */
 class AuditReportProxyControllerTest {
 
-  private static final String FROM = "2026-01-01T00:00:00Z";
-  private static final String TO = "2026-02-01T00:00:00Z";
+  private static final Instant FROM = Instant.parse("2026-01-01T00:00:00Z");
+  private static final Instant TO = Instant.parse("2026-02-01T00:00:00Z");
 
   private final WebClient webClient = mock(WebClient.class);
   private final AuditReportProxyController controller = new AuditReportProxyController(webClient);
@@ -67,6 +68,25 @@ class AuditReportProxyControllerTest {
         assertThrows(
             ResponseStatusException.class, () -> controller.purgeAuditLog("nonsense", FROM));
     assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+  }
+
+  @Test
+  void marketDomain_passesTheAllowlistGate() {
+    // Regression: the proxy kept its own copy of the tab list and never gained MARKET, so the
+    // Materialbörse tab rendered but its export / JSON / purge buttons answered 400. Both classes
+    // now read AuditDomains.ALL.
+    ResponseStatusException ex =
+        assertThrows(
+            ResponseStatusException.class,
+            () -> controller.downloadAuditLog("MARKET", FROM, TO, null));
+    assertNotEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+  }
+
+  @Test
+  void marketDomain_passesTheAllowlistGateOnThePurgePath() {
+    ResponseStatusException ex =
+        assertThrows(ResponseStatusException.class, () -> controller.purgeAuditLog("MARKET", FROM));
+    assertNotEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
   }
 
   @Test

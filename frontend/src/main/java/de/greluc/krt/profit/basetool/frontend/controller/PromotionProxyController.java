@@ -230,16 +230,17 @@ public class PromotionProxyController {
   @PutMapping("/evaluations/user/{userId}/category/{categoryId}")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public Map<?, ?> updateEvaluation(
-      @PathVariable @NotNull String userId,
+      @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID categoryId,
       @RequestBody @NotNull Map<String, Object> body) {
-    // Security audit L7: userId is the only untyped String path variable in this controller (it is
-    // a Keycloak sub, not a UUID), so it must be RFC-3986 path-encoded rather than concatenated
-    // into
-    // the non-encoding .put(String) overload — otherwise reserved characters could reshape the
-    // forwarded backend path/query. Mirrors the UriComponentsBuilder remediation in
-    // MaterialProxyController (M-2) and UserProxyController (L-1). Do NOT URLEncoder-form-encode
-    // (space->'+' re-mangling across the frontend->backend hop) and do NOT retype userId to UUID.
+    // userId is a Keycloak sub, which Keycloak issues as a UUID — and the backend's
+    // MemberEvaluationController already declares it `@PathVariable UUID userId`, so a non-UUID
+    // could never have reached the evaluation anyway. Binding it as a UUID here rather than as a
+    // String is what makes the relayed path safe: `buildAndExpand(...)` does NOT encode (it returns
+    // RAW UriComponents, so `toUriString()` emits the expanded value verbatim), which the earlier
+    // comment on this call site claimed it did. A UUID cannot express `?`, `#`, `&` or `/`, so the
+    // expansion has nothing left to reshape, and the caller now gets a 400 at this seam instead of
+    // one hop later.
     String uri =
         org.springframework.web.util.UriComponentsBuilder.fromPath(
                 "/api/v1/promotion/evaluations/user/{userId}/category/{categoryId}")
