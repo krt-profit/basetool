@@ -101,76 +101,116 @@ class MaterialProxyControllerTest {
   void getProfitCalculation_withoutStarSystemNames_buildsBaseUri() {
     // Given
     UUID shipId = UUID.randomUUID();
-    when(backendApiClient.<List<Map<String, Object>>>get(any(String.class), anyTypeRef()))
+    when(backendApiClient.<List<Map<String, Object>>>get(
+            anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
     // When
     controller.getProfitCalculation(shipId, null);
 
-    // Then — no query parameters appended beyond the mandatory shipId
-    ArgumentCaptor<String> uriCap = ArgumentCaptor.forClass(String.class);
-    verify(backendApiClient).get(uriCap.capture(), anyTypeRef());
+    // Then - no query parameters and no URI-variable placeholders beyond the mandatory shipId
+    ArgumentCaptor<String> uriCap = ArgumentCaptor.captor();
+    verify(backendApiClient).get(uriCap.capture(), anyTypeRef(), any(Object[].class));
     assertEquals("/api/v1/materials/profit-calculation?shipId=" + shipId, uriCap.getValue());
   }
 
   @Test
   void getProfitCalculation_withEmptyStarSystemList_buildsBaseUri() {
-    // Given — explicit empty list should behave like null
+    // Given - explicit empty list should behave like null
     UUID shipId = UUID.randomUUID();
-    when(backendApiClient.<List<Map<String, Object>>>get(any(String.class), anyTypeRef()))
+    when(backendApiClient.<List<Map<String, Object>>>get(
+            anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
     // When
     controller.getProfitCalculation(shipId, List.of());
 
     // Then
-    ArgumentCaptor<String> uriCap = ArgumentCaptor.forClass(String.class);
-    verify(backendApiClient).get(uriCap.capture(), anyTypeRef());
+    ArgumentCaptor<String> uriCap = ArgumentCaptor.captor();
+    verify(backendApiClient).get(uriCap.capture(), anyTypeRef(), any(Object[].class));
     assertEquals("/api/v1/materials/profit-calculation?shipId=" + shipId, uriCap.getValue());
   }
 
   @Test
-  void getProfitCalculation_withMultipleStarSystems_appendsEachAsRepeatedParam() {
+  void getProfitCalculation_withMultipleStarSystems_appendsEachAsRepeatedPlaceholder() {
     // Given
     UUID shipId = UUID.randomUUID();
-    when(backendApiClient.<List<Map<String, Object>>>get(any(String.class), anyTypeRef()))
+    when(backendApiClient.<List<Map<String, Object>>>get(
+            anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
     // When
     controller.getProfitCalculation(shipId, List.of("Stanton", "Pyro"));
 
-    // Then — each star system is appended as its own query parameter,
-    // matching backend's Pageable/multi-value binding (NOT CSV-encoded)
-    ArgumentCaptor<String> uriCap = ArgumentCaptor.forClass(String.class);
-    verify(backendApiClient).get(uriCap.capture(), anyTypeRef());
-    String uri = uriCap.getValue();
-    assertTrue(uri.startsWith("/api/v1/materials/profit-calculation?shipId=" + shipId));
-    assertTrue(uri.contains("&starSystemNames=Stanton"));
-    assertTrue(uri.contains("&starSystemNames=Pyro"));
-    // Order preserved (insertion order in StringBuilder)
-    assertTrue(uri.indexOf("Stanton") < uri.indexOf("Pyro"));
+    // Then - each star system is its own repeated query parameter (NOT CSV-encoded), carried as a
+    // {fN} URI-template variable so the WebClient encodes it (REQ-SEC-051). Mockito matches varargs
+    // element-wise, so two selected systems mean two capture() slots.
+    ArgumentCaptor<String> uriCap = ArgumentCaptor.captor();
+    ArgumentCaptor<Object> varCap = ArgumentCaptor.captor();
+    verify(backendApiClient)
+        .get(uriCap.capture(), anyTypeRef(), varCap.capture(), varCap.capture());
+    String template = uriCap.getValue();
+    assertEquals(
+        "/api/v1/materials/profit-calculation?shipId="
+            + shipId
+            + "&starSystemNames={f0}&starSystemNames={f1}",
+        template);
+    // Values are relayed as URI variables in selection order, never inlined into the template.
+    assertEquals(List.of("Stanton", "Pyro"), varCap.getAllValues());
   }
 
   @Test
-  void getProfitCalculation_withSingleStarSystem_appendsOneParam() {
+  void getProfitCalculation_withSingleStarSystem_appendsOnePlaceholder() {
     UUID shipId = UUID.randomUUID();
-    when(backendApiClient.<List<Map<String, Object>>>get(any(String.class), anyTypeRef()))
+    when(backendApiClient.<List<Map<String, Object>>>get(
+            anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
     controller.getProfitCalculation(shipId, List.of("Stanton"));
 
-    ArgumentCaptor<String> uriCap = ArgumentCaptor.forClass(String.class);
-    verify(backendApiClient).get(uriCap.capture(), anyTypeRef());
+    ArgumentCaptor<String> uriCap = ArgumentCaptor.captor();
+    ArgumentCaptor<Object> varCap = ArgumentCaptor.captor();
+    verify(backendApiClient).get(uriCap.capture(), anyTypeRef(), varCap.capture());
     assertEquals(
-        "/api/v1/materials/profit-calculation?shipId=" + shipId + "&starSystemNames=Stanton",
+        "/api/v1/materials/profit-calculation?shipId=" + shipId + "&starSystemNames={f0}",
         uriCap.getValue());
+    assertEquals("Stanton", varCap.getValue());
+  }
+
+  @Test
+  void getProfitCalculation_withUriSyntaxInStarSystemName_relaysItAsAVariableNotAsQuerySyntax() {
+    // Regression for CodeQL alert 877 (java/ssrf). The previous implementation built the URI with
+    // `UriComponentsBuilder` and called `builder.build().toUriString()`, which returns RAW
+    // UriComponents and encodes nothing - so a star-system name carrying `&` or `=` opened
+    // additional query parameters on the backend request. The hostile value must now leave the
+    // controller as a URI VARIABLE, with the template still holding exactly one placeholder.
+    UUID shipId = UUID.randomUUID();
+    String hostile = "Stanton&shipId=00000000-0000-0000-0000-000000000000&page=99";
+    when(backendApiClient.<List<Map<String, Object>>>get(
+            anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(List.of());
+
+    controller.getProfitCalculation(shipId, List.of(hostile));
+
+    ArgumentCaptor<String> uriCap = ArgumentCaptor.captor();
+    ArgumentCaptor<Object> varCap = ArgumentCaptor.captor();
+    verify(backendApiClient).get(uriCap.capture(), anyTypeRef(), varCap.capture());
+    String template = uriCap.getValue();
+    assertEquals(
+        "/api/v1/materials/profit-calculation?shipId=" + shipId + "&starSystemNames={f0}",
+        template);
+    // The injected parameters never reach the template - they stay one opaque value.
+    assertFalse(template.contains("page=99"), template);
+    assertEquals(1, template.split("shipId=", -1).length - 1, template);
+    assertEquals(hostile, varCap.getValue());
   }
 
   @Test
   void getProfitCalculation_withNullBackendResponse_returnsEmptyList() {
     // Given
     UUID shipId = UUID.randomUUID();
-    when(backendApiClient.<List<Map<String, Object>>>get(any(String.class), anyTypeRef()))
+    when(backendApiClient.<List<Map<String, Object>>>get(
+            anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(null);
 
     // When

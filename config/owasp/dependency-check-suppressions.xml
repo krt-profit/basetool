@@ -287,4 +287,35 @@
     <cve>CVE-2026-15076</cve>
   </suppress>
 
+  <!--
+    CVE-2025-48924 is a REAL commons-lang3 bug: ClassUtils.getClass(...) recurses without a depth
+    bound, so a sufficiently long class name raises StackOverflowError. Affected: commons-lang3
+    3.0 up to (excluding) 3.18.0; fixed in 3.18.0.
+
+    It is suppressed because the only vulnerable jar in this build sits on a build-time-only
+    classpath, the same ground as the plexus-utils entry above - NOT because we chose to live with
+    it. Verified 2026-09-04 with `dependencyInsight` across every module and configuration: the
+    ONLY place commons-lang3 resolves to a pre-3.18.0 version is the `:keycloak-spi:checkstyle`
+    configuration, where 3.8.1 arrives via checkstyle 13.9.0 -> doxia-core 1.12.0 (Checkstyle's
+    Javadoc/site-rendering helper, the same path that drags in plexus-utils). Every REAL classpath
+    is already above the fix: `:backend:`, `:frontend:` and `:ingest:` compile/runtime/test all
+    resolve 3.20.0 (via springdoc -> swagger-core-jakarta, with commons-compress 1.28.0's 3.18.0
+    request upgraded into it), and `:keycloak-spi:` carries no commons-lang3 on any compile, runtime
+    or test classpath at all. The other modules' `checkstyle` configurations also land on 3.20.0 -
+    only keycloak-spi's stays at 3.8.1, because that module has no Spring Boot dependency
+    management to align it.
+
+    Nothing calls ClassUtils.getClass(...) in this repository, and Checkstyle reaches it only while
+    rendering doxia site reports, which the `checkstyleMain` source scan never does. A
+    StackOverflowError in a build-time linter is a failed build, not a shipped defect.
+
+    Version-pinned to 3.8.1 rather than the whole pre-3.18.0 range so a vulnerable commons-lang3
+    appearing on a REAL classpath later still fails the gate.
+  -->
+  <suppress>
+    <notes>Build-time-only: commons-lang3 3.8.1 is a transitive of Checkstyle 13.9.0 (doxia-core 1.12.0) on the :keycloak-spi:checkstyle configuration only. Every basetool compile/runtime/test classpath resolves 3.20.0, above the 3.18.0 fix, and keycloak-spi carries no commons-lang3 outside checkstyle. The ClassUtils.getClass recursion is unreachable from Checkstyle's source-scanning path and the jar never ships (verified 2026-09-04).</notes>
+    <packageUrl regex="true">^pkg:maven/org\.apache\.commons/commons-lang3@3\.8\.1$</packageUrl>
+    <cve>CVE-2025-48924</cve>
+  </suppress>
+
 </suppressions>

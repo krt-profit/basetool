@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -31,7 +32,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Thin REST proxy that forwards material-related read requests from the browser to the backend.
@@ -78,12 +78,23 @@ public class MaterialProxyController {
    * repeated {@code starSystemNames} query parameter (Spring's default list-binding form). The
    * star-system filter is optional — omitting it returns the calculation across all systems.
    *
-   * <p>Audit finding M-2 (2026-05-20): the URL is built via {@link UriComponentsBuilder} so each
-   * query value gets URL-encoded. The previous string-concat path let a star-system name containing
-   * {@code &} or {@code =} inject additional query parameters into the backend call (e.g. {@code
-   * ?starSystemNames=foo&shipId=…}) — harmless on this specific endpoint (read-only, authenticated,
-   * typed {@code shipId}) but a tempting pattern to copy into a riskier proxy. Mirrors the encoding
-   * {@code UserProxyController#searchUsers} already does.
+   * <p>Each selected system is relayed as its own {@code {fN}} URI-template variable, so the {@code
+   * WebClient} encodes it per RFC 3986 (REQ-SEC-051). A star-system name is free text out of the
+   * UEX catalogue rather than a closed vocabulary the backend declares a type for, so it is escaped
+   * exactly once across the hop instead of narrowed — the same treatment {@code
+   * MaterialsPageController#filteredMatrixTemplate} gives the identical values on the materials
+   * matrix. {@code shipId} binds as a {@link UUID}, which cannot express URI syntax, so it is safe
+   * to concatenate.
+   *
+   * <p><b>Corrected 2026-09-04</b> (CodeQL {@code java/ssrf}, alert 877). This method previously
+   * built the URI with {@link org.springframework.web.util.UriComponentsBuilder} and called {@code
+   * builder.build().toUriString()} under a comment asserting that each query value "gets
+   * URL-encoded". It did not: {@code UriComponentsBuilder#toUriString()} is {@code
+   * build().encode().toUriString()} and does encode, but {@code build()} alone returns {@code
+   * UriComponents} in the RAW encode state and {@code UriComponents#toUriString()} emits it
+   * verbatim. A star-system name carrying {@code &} or {@code =} therefore injected additional
+   * query parameters into the backend call — the same one-call-apart defect REQ-SEC-051's warning
+   * callout was written for, in its third spelling.
    *
    * @param shipId chosen ship's id (defines capacity)
    * @param starSystemNames optional list of star-system names to constrain the source terminals
@@ -94,15 +105,18 @@ public class MaterialProxyController {
   public List<Map<String, Object>> getProfitCalculation(
       @RequestParam UUID shipId, @RequestParam(required = false) List<String> starSystemNames) {
 
-    UriComponentsBuilder builder =
-        UriComponentsBuilder.fromPath("/api/v1/materials/profit-calculation")
-            .queryParam("shipId", shipId);
-    if (starSystemNames != null && !starSystemNames.isEmpty()) {
-      builder.queryParam("starSystemNames", starSystemNames.toArray());
+    StringBuilder uriTemplate =
+        new StringBuilder("/api/v1/materials/profit-calculation?shipId=").append(shipId);
+    List<Object> uriVariables = new ArrayList<>();
+    if (starSystemNames != null) {
+      for (String starSystemName : starSystemNames) {
+        uriTemplate.append("&starSystemNames={f").append(uriVariables.size()).append('}');
+        uriVariables.add(starSystemName);
+      }
     }
 
     List<Map<String, Object>> response =
-        backendApiClient.get(builder.build().toUriString(), MAP_LIST_TYPE);
+        backendApiClient.get(uriTemplate.toString(), MAP_LIST_TYPE, uriVariables.toArray());
     return response != null ? response : List.of();
   }
 }
