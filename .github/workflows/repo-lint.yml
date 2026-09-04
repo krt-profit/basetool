@@ -7,7 +7,7 @@ name: Repo Lint
 #   - actionlint -> the GitHub Actions workflows themselves, incl. shellcheck
 #                   over every embedded `run:` script (catches workflow-syntax
 #                   and shell bugs before they burn a CI run to discover them).
-#   - hadolint   -> the two multi-stage production Dockerfiles.
+#   - hadolint   -> the three multi-stage production Dockerfiles.
 #
 # Each linter runs from its pinned release binary (shellcheck ships
 # preinstalled on the runner), so no third-party action enters the supply
@@ -94,8 +94,14 @@ jobs:
           hadolint --version
 
       # Threshold lives in .hadolint.yaml (warning) so local + CI agree.
+      #
+      # All THREE production Dockerfiles. `ingest` was missing until 2026-09-04 and
+      # nobody noticed, because it is the one image with no HEALTHCHECK and the
+      # shortest runtime stage -- so it never produced a finding to be missed. It is
+      # promoted and vulnerability-scanned exactly like the other two (REQ-OPS-024),
+      # which is the list this should have matched all along.
       - name: Run hadolint
-        run: hadolint backend/Dockerfile frontend/Dockerfile
+        run: hadolint backend/Dockerfile frontend/Dockerfile ingest/Dockerfile
 
   pid1-reaping:
     name: pid1-reaping
