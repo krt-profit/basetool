@@ -12,6 +12,12 @@
 
 - **Die vom Webtool an das Backend weitergereichten Parameter sind jetzt an den Typ gebunden, den das Backend selbst verlangt.** Zeiträume als Zeitpunkt, Mitglieds-IDs als UUID, Filter nur aus der Liste, die die Seite selbst anbietet. Ein Wert mit URL-Sonderzeichen wird damit an der Weiterleitung abgewiesen statt eine Anfrage ans Backend umzuformen. Behebt acht kritische CodeQL-Meldungen, darunter zwei echte Fehler: eine Bewertungs-Weiterleitung kodierte entgegen ihres eigenen Kommentars gar nicht, und die Berichts-Bereinigung setzte ihren Katalog-Parameter ungeprüft in eine löschende Anfrage (REQ-SEC-051, ADR-0158).
 
+## [v1.6.20](https://github.com/krt-profit/basetool/releases/tag/v1.6.20) - 2026-09-04
+
+### Security
+
+- **Die drei Container-Images tragen keine bekannten behebbaren HIGH-Schwachstellen mehr.** Das Basis-Image war fünf Wochen alt und brachte acht — in OpenSSL, expat und p11-kit, alle aus dem Betriebssystem des Images, keine davon aus dem Basetool selbst. Das Basis-Image ist jetzt aktuell **und** die Images ziehen beim Bauen die Sicherheitsupdates ihrer Alpine-Version nach; das Aktualisieren allein hätte nur fünf der acht behoben, weil das Upstream-Image den Alpine-Updates hinterherläuft. Für dich ändert sich nichts — außer dass die Produktions-Freigabe wieder durchläuft.
+
 ## [v1.6.19](https://github.com/krt-profit/basetool/releases/tag/v1.6.19) - 2026-09-04
 
 ### Changed

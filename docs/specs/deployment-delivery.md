@@ -847,6 +847,24 @@ it costs only the promotion. Until this requirement existed the answer to "what 
 stop?" was "nothing, at any stage", while a vulnerable Java *library* blocked a merge outright at
 `failBuildOnCVSS = 7.0` — an ordering no threat model produces on purpose.
 
+**The first run of this gate refused a promotion, and the fix was not a digest bump.** On
+2026-09-04 all six scan legs failed on **8 fixed HIGH** findings, every one of them an Alpine
+package in the base image — `libcrypto3`/`libssl3`, `libexpat`, `p11-kit` — and none an application
+dependency. The pinned base was five weeks stale, so the obvious answer was to bump the digest that
+`FROM` names. Measured, that answer is **wrong**: the newest upstream `eclipse-temurin:25-jre-alpine`
+still carried 5 of the 8. Eclipse Temurin rebuilds on its own cadence, so between two of its
+rebuilds the image lags Alpine's security updates, and **a faster Dependabot cannot close that
+window — the newest tag is the thing that lags.**
+
+So the three runtime stages now run `apk upgrade --no-cache`, folded into the `RUN` that creates the
+non-root user rather than added as a layer of its own. Measured against this gate's own threshold:
+the pinned digest **8**, the newest upstream digest **5**, the newest digest with the upgrade **0**.
+
+It does not reintroduce drift. The base pins its own `/etc/apk/repositories` to `v3.24`, so the
+upgrade stays **within** that Alpine release and never walks onto the next one; the digest still
+fixes the starting point and the upgrade patches it. This is also why the `apk` note in those
+Dockerfiles still holds: nothing is *installed*, and the HEALTHCHECK still uses BusyBox `wget`.
+
 **Break-glass.** The `allow_vulnerable` workflow input flips the scan back to non-blocking. The scan
 still runs and still prints every finding; only the failure is withheld. The bypass is written into
 the scan job's step summary and raised as a `::warning::` in the approval record, so it cannot be
@@ -861,6 +879,8 @@ that is not production — gating it would make the bypass routine and wear it o
 
 **Acceptance**
 
+- [ ] The three app images' runtime stages carry `apk upgrade --no-cache`, because pinning a
+  current base digest is measurably not enough to pass this gate.
 - [ ] The `scan` job runs on `needs: validate-inputs` and `approve` runs on `needs: [validate-inputs, scan]`,
   so a reviewer is only asked about an image that passed — or about one whose bypass the approval
   step states.
