@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.6.20](https://github.com/krt-profit/basetool/releases/tag/v1.6.20) - 2026-09-04
+
 ### Security
 
 - **Die drei Container-Images tragen keine bekannten behebbaren HIGH-Schwachstellen mehr.** Das Basis-Image war fünf Wochen alt und brachte acht — in OpenSSL, expat und p11-kit, alle aus dem Betriebssystem des Images, keine davon aus dem Basetool selbst. Das Basis-Image ist jetzt aktuell **und** die Images ziehen beim Bauen die Sicherheitsupdates ihrer Alpine-Version nach; das Aktualisieren allein hätte nur fünf der acht behoben, weil das Upstream-Image den Alpine-Updates hinterherläuft. Für dich ändert sich nichts — außer dass die Produktions-Freigabe wieder durchläuft.
