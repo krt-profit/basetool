@@ -25,12 +25,17 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.BankAuditEventDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.AuditDomains;
+import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -61,19 +66,11 @@ public class AdminAuditLogPageController {
   /** The bank tab is the default landing tab (the old {@code /admin/bank-audit} redirects here). */
   private static final String DEFAULT_DOMAIN = "BANK";
 
-  /** The tabs, in display order. */
-  private static final List<String> DOMAINS =
-      List.of(
-          "BANK",
-          "INVENTORY",
-          "JOB_ORDER",
-          "REFINERY",
-          "PERSONAL_INVENTORY",
-          "MISSION",
-          "OPERATION",
-          "ROLE",
-          "PROMOTION",
-          "MARKET");
+  /**
+   * The tabs, in display order — shared with {@code AuditReportProxyController} through {@link
+   * AuditDomains} so the page and its export/purge proxy cannot disagree about which tabs exist.
+   */
+  private static final List<String> DOMAINS = AuditDomains.ALL;
 
   /** Message-bundle key prefix for the bank event-type labels (their own namespace). */
   private static final String BANK_EVENT_PREFIX = "admin.bank.audit.event.";
@@ -331,13 +328,21 @@ public class AdminAuditLogPageController {
   /**
    * Renders the paged, filterable unified audit-log viewer for one selected area tab.
    *
+   * <p>Every filter that ends up in the relayed backend URI is bound or narrowed to something that
+   * cannot express URI syntax (REQ-SEC-051): the period as instants and the actor as a {@link UUID}
+   * — both matching the backend's own {@code AuditAdminController} signature — and the two
+   * vocabulary filters against the very lists this page renders as {@code <select>} options. An
+   * unknown event type or client id degrades to "no filter", the same way an unknown {@code domain}
+   * already falls back to the default tab.
+   *
    * @param domain the selected tab (one of {@link #DOMAINS}); defaults to and falls back to {@code
    *     BANK}
-   * @param from period start filter (ISO instant), or absent
-   * @param to period end filter (ISO instant), or absent
-   * @param actorUserId actor filter (user id), or absent
-   * @param eventType event-type filter, or absent
-   * @param clientId originating-client filter (REQ-AUDIT-005), or absent
+   * @param from period start filter, or absent
+   * @param to period end filter, or absent
+   * @param actorUserId actor filter (the actor's Keycloak {@code sub}), or absent
+   * @param eventType event-type filter; ignored unless it is one of the active tab's own types
+   * @param clientId originating-client filter (REQ-AUDIT-005); ignored unless it is one of {@link
+   *     #CLIENT_IDS}
    * @param page zero-based page index
    * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
    *     in-place AJAX swap; otherwise the full page
@@ -347,9 +352,11 @@ public class AdminAuditLogPageController {
   @GetMapping("/admin/audit-log")
   public String auditLog(
       @RequestParam(required = false) String domain,
-      @RequestParam(required = false) String from,
-      @RequestParam(required = false) String to,
-      @RequestParam(required = false) String actorUserId,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant from,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant to,
+      @RequestParam(required = false) UUID actorUserId,
       @RequestParam(required = false) String eventType,
       @RequestParam(required = false) String clientId,
       @RequestParam(required = false, defaultValue = "0") int page,
@@ -358,6 +365,10 @@ public class AdminAuditLogPageController {
     String activeDomain = domain != null && DOMAINS.contains(domain) ? domain : DEFAULT_DOMAIN;
     boolean isBank = "BANK".equals(activeDomain);
     final String eventKeyPrefix = isBank ? BANK_EVENT_PREFIX : GENERIC_EVENT_PREFIX;
+    final String activeEventType =
+        RelayParams.oneOfOrNull(
+            eventType, EVENT_TYPES_BY_DOMAIN.getOrDefault(activeDomain, List.of()));
+    final String activeClientId = RelayParams.oneOfOrNull(clientId, CLIENT_IDS);
 
     String backendPath = isBank ? "/api/v1/bank/admin/audit" : "/api/v1/audit/" + activeDomain;
     UriComponentsBuilder uri =
@@ -367,8 +378,8 @@ public class AdminAuditLogPageController {
     appendIfPresent(uri, "from", from);
     appendIfPresent(uri, "to", to);
     appendIfPresent(uri, "actorUserId", actorUserId);
-    appendIfPresent(uri, "eventType", eventType);
-    appendIfPresent(uri, "clientId", clientId);
+    appendIfPresent(uri, "eventType", activeEventType);
+    appendIfPresent(uri, "clientId", activeClientId);
 
     PageResponse<AuditRowView> events = null;
     try {
@@ -393,12 +404,12 @@ public class AdminAuditLogPageController {
     model.addAttribute("filterFrom", from);
     model.addAttribute("filterTo", to);
     model.addAttribute("filterActorUserId", actorUserId);
-    model.addAttribute("filterEventType", eventType);
+    model.addAttribute("filterEventType", activeEventType);
     model.addAttribute("clientIds", CLIENT_IDS);
-    model.addAttribute("filterClientId", clientId);
+    model.addAttribute("filterClientId", activeClientId);
     model.addAttribute(
         "paginationBaseUrl",
-        buildBaseUrl(activeDomain, from, to, actorUserId, eventType, clientId));
+        buildBaseUrl(activeDomain, from, to, actorUserId, activeEventType, activeClientId));
     model.addAttribute("exportEndpoint", "/api/proxy/audit/" + activeDomain + "/export");
     model.addAttribute("purgeEndpoint", "/api/proxy/audit/" + activeDomain);
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
@@ -468,12 +479,14 @@ public class AdminAuditLogPageController {
    *
    * @param uri the builder
    * @param name the parameter name
-   * @param value the value, or {@code null}/blank to skip
+   * @param value the value, or {@code null}/blank to skip; a non-{@code String} (an {@link
+   *     Instant}, a {@link UUID}) is rendered by the builder through {@code toString()}
    */
-  private static void appendIfPresent(UriComponentsBuilder uri, String name, String value) {
-    if (value != null && !value.isBlank()) {
-      uri.queryParam(name, value);
+  private static void appendIfPresent(UriComponentsBuilder uri, String name, Object value) {
+    if (value == null || (value instanceof String s && s.isBlank())) {
+      return;
     }
+    uri.queryParam(name, value);
   }
 
   /**
@@ -489,9 +502,9 @@ public class AdminAuditLogPageController {
    */
   private static String buildBaseUrl(
       String domain,
-      String from,
-      String to,
-      String actorUserId,
+      Instant from,
+      Instant to,
+      UUID actorUserId,
       String eventType,
       String clientId) {
     UriComponentsBuilder base =

@@ -34,6 +34,11 @@ on:
       - 'versions.properties'
       - 'gradle/libs.versions.toml'
       - 'gradle/wrapper/gradle-wrapper.properties'
+      # The suppression file decides what the scan reports and whether it fails, so editing it has
+      # to re-run the scan. Without this the gate was blind to its own configuration: adding or
+      # removing a suppression changed the verdict and triggered nothing, so the change was first
+      # exercised by the next weekly cron — on `main`, after the merge.
+      - 'config/owasp/dependency-check-suppressions.xml'
   pull_request:
     branches: [main]
     paths:
@@ -42,6 +47,11 @@ on:
       - 'versions.properties'
       - 'gradle/libs.versions.toml'
       - 'gradle/wrapper/gradle-wrapper.properties'
+      # The suppression file decides what the scan reports and whether it fails, so editing it has
+      # to re-run the scan. Without this the gate was blind to its own configuration: adding or
+      # removing a suppression changed the verdict and triggered nothing, so the change was first
+      # exercised by the next weekly cron — on `main`, after the merge.
+      - 'config/owasp/dependency-check-suppressions.xml'
 
 concurrency:
   group: dep-check-${{ github.ref }}

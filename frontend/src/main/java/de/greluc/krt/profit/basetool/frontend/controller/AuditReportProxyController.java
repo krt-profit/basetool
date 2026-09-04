@@ -19,11 +19,14 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.support.AuditDomains;
+import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -56,23 +59,16 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class AuditReportProxyController {
 
   /**
-   * The known audit tabs — the bank plus the generic areas (mirrors {@code
-   * AdminAuditLogPageController.DOMAINS}). The raw {@code domain} path segment is validated against
-   * this allowlist before it is concatenated into the backend URI, so an unknown or crafted value
-   * (e.g. one containing {@code ..}) never reaches the URI builder. Defense-in-depth: the backend
-   * also re-authorizes every path and rejects unknown {@code AuditDomain} enums with 400.
+   * The known audit tabs. The raw {@code domain} path segment is validated against this allowlist
+   * before it is concatenated into the backend URI, so an unknown or crafted value (e.g. one
+   * containing {@code ..}) never reaches the URI builder. Defense-in-depth: the backend also
+   * re-authorizes every path and rejects unknown {@code AuditDomain} enums with 400.
+   *
+   * <p>Shared with the page controller through {@link AuditDomains} rather than duplicated. The
+   * duplicate had drifted: it never gained {@code MARKET}, so the Materialbörse tab rendered but
+   * its export and purge buttons answered {@code 400}.
    */
-  private static final Set<String> ALLOWED_DOMAINS =
-      Set.of(
-          "BANK",
-          "INVENTORY",
-          "JOB_ORDER",
-          "REFINERY",
-          "PERSONAL_INVENTORY",
-          "MISSION",
-          "OPERATION",
-          "ROLE",
-          "PROMOTION");
+  private static final List<String> ALLOWED_DOMAINS = AuditDomains.ALL;
 
   private final WebClient webClient;
 
@@ -93,8 +89,8 @@ public class AuditReportProxyController {
    * Proxies one area's audit-log PDF export for a caller-chosen period.
    *
    * @param domain the area tab ({@code BANK} or a generic {@code AuditDomain} name)
-   * @param from period start (ISO-8601 instant, forwarded verbatim)
-   * @param to period end (ISO-8601 instant, forwarded verbatim)
+   * @param from period start; bound as an instant so the relayed value cannot carry URI syntax
+   * @param to period end; bound as an instant so the relayed value cannot carry URI syntax
    * @param userTimeZone the caller's IANA time zone; optional
    * @return the PDF with attachment headers
    */
@@ -102,8 +98,8 @@ public class AuditReportProxyController {
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<byte[]> downloadAuditLog(
       @PathVariable @NotNull String domain,
-      @RequestParam @NotNull String from,
-      @RequestParam @NotNull String to,
+      @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+      @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
       @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
     requireKnownDomain(domain);
     String backendBase =
@@ -124,16 +120,16 @@ public class AuditReportProxyController {
    * carries UTC instants verbatim, so no time-zone header is forwarded.
    *
    * @param domain the area tab ({@code BANK} or a generic {@code AuditDomain} name)
-   * @param from period start (ISO-8601 instant, forwarded verbatim)
-   * @param to period end (ISO-8601 instant, forwarded verbatim)
+   * @param from period start; bound as an instant so the relayed value cannot carry URI syntax
+   * @param to period end; bound as an instant so the relayed value cannot carry URI syntax
    * @return the JSON with attachment headers
    */
   @GetMapping("/{domain}/export.json")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<byte[]> downloadAuditLogJson(
       @PathVariable @NotNull String domain,
-      @RequestParam @NotNull String from,
-      @RequestParam @NotNull String to) {
+      @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+      @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
     requireKnownDomain(domain);
     String backendBase =
         "BANK".equals(domain)
@@ -154,13 +150,15 @@ public class AuditReportProxyController {
    * it can report how many entries were removed. {@code BANK} routes to the bank admin purge.
    *
    * @param domain the area tab ({@code BANK} or a generic {@code AuditDomain} name)
-   * @param before the exclusive cutoff (ISO-8601 instant, forwarded verbatim)
+   * @param before the exclusive cutoff; bound as an instant so the relayed value cannot carry URI
+   *     syntax
    * @return the backend's JSON purge result
    */
   @DeleteMapping("/{domain}")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<byte[]> purgeAuditLog(
-      @PathVariable @NotNull String domain, @RequestParam @NotNull String before) {
+      @PathVariable @NotNull String domain,
+      @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before) {
     requireKnownDomain(domain);
     String backendBase =
         "BANK".equals(domain) ? "/api/v1/bank/admin/audit" : "/api/v1/audit/" + domain;

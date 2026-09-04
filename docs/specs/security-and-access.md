@@ -2750,6 +2750,67 @@ throwing chain, filter order) · `SessionAttributeDiagnosticMapperTest` · **Cod
 [ADR-0157](../adr/0157-a-dropped-session-value-is-repaired-on-the-request-that-found-it.md),
 [ADR-0154](../adr/0154-a-container-written-final-session-value-gets-a-forced-type-id.md)
 
+### REQ-SEC-051 — A relayed request parameter is bound to the backend's own type
+
+The frontend is a proxy: a page or proxy controller binds a request parameter, drops it into a
+`UriComponentsBuilder` or a URI template, and hands the result to `WebClient`. A relayed value that
+carries URI syntax — `&`, `=`, `#`, `?`, `/` — can reshape the backend request even where it cannot
+redirect it to another host, because the path prefix is always a literal `/api/v1/…`.
+
+**The rule:** a request parameter the frontend relays into a backend URI is bound to the type the
+backend's own controller declares for it. Where no type expresses the constraint, the value is
+narrowed against the allowlist the page itself renders, before it is relayed.
+
+|                      Relayed value                      |                    Bound as                    |                                                        Mirrors                                                         |
+|---------------------------------------------------------|------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
+| `from`, `to`, `before`                                  | `Instant` + `@DateTimeFormat(iso = DATE_TIME)` | `AuditAdminController`, `BankAccountController`, `OrgUnitBankController`                                               |
+| `userSub`, `actorUserId`, `userId`                      | `UUID`                                         | `AdminPersonalInventoryController`, `AdminPersonalBlueprintController`, `MemberEvaluationController`, `UserController` |
+| `eventType`, `clientId`, `source`, the board `sort` key | narrowed to the rendered option list           | the page's own `<select>`                                                                                              |
+| a Spring sort specification                             | `RelayParams.sortSpecOrNull`                   | REQ-API-005's backend field whitelist                                                                                  |
+| free text (`q`)                                         | a `WebClient` URI-template variable            | REQ-FE-016                                                                                                             |
+
+Free text is the one relayed value that may legitimately contain arbitrary characters, so it is
+escaped exactly once across the hop rather than narrowed. Everything else has a shape, and the
+backend signature is where that shape is already written down.
+
+Where the value selects something on a page, an unparseable one degrades — no member selected, no
+filter applied — the way an unknown tab already falls back to the default tab. Where it addresses a
+proxy seam, it is a `400` from Spring's type conversion, handled by `GlobalExceptionHandler`.
+
+> [!warning] `buildAndExpand(...).toUriString()` does not encode
+> `UriComponentsBuilder#toUriString()` is `build().encode().toUriString()` and **does** encode its
+> query values. `UriComponentsBuilder#buildAndExpand(...)` returns `UriComponents` in the RAW
+> encode state, and `UriComponents#toUriString()` emits raw components verbatim. The two spellings
+> differ by one call and by whether the value is encoded at all; `PromotionProxyController` used the
+> second under a comment asserting the first. Do not read an encoding claim in a comment as
+> evidence that encoding happens.
+
+**Acceptance**
+
+- [ ] Every request parameter the frontend relays into a backend URI is bound to the backend's
+  declared type, or narrowed against a rendered allowlist, or is the free-text term.
+- [ ] A period or member id carrying URI syntax is rejected at the frontend seam, with no backend
+  call made.
+- [ ] An unknown vocabulary filter is dropped rather than relayed, and the page reports it as no
+  filter rather than echoing the crafted value.
+- [ ] A source tab is canonicalized once, so the redirect and the relayed query cannot disagree
+  about which catalogue was meant.
+- [ ] No relayed identifier is `URLEncoder`-form-encoded into a path segment.
+- [ ] The audit tab list has exactly one definition in the frontend, so the page and its
+  export/purge proxy cannot disagree about which tabs exist.
+
+**Enforced by:** `RelayParamsTest` (the checks, hostile inputs included) · `RelayParamBindingMvcTest`
+(the four proxy seams answer 400 on a period carrying URI syntax; the admin page degrades without
+calling the backend) · `AdminSyncReportsPageControllerTest` (canonicalization, and a crafted tab
+appending no second query parameter) · `AdminAuditLogPageControllerTest` (per-tab event-type and
+client-id narrowing; the canonical period/actor relay) · `AuditReportProxyControllerTest` (the tab
+allowlist, `MARKET` included) · **Code:** `RelayParams`, `AuditDomains`, `AuditReportProxyController`,
+`BankReportProxyController`, `OrgUnitBankProxyController`, `PromotionProxyController`,
+`AdminAuditLogPageController`, `AdminPersonalInventoryPageController`,
+`AdminPersonalBlueprintsPageController`, `AdminSyncReportsPageController`,
+`MaterialboersePageController` · **ADR:**
+[ADR-0158](../adr/0158-a-relayed-request-parameter-is-bound-to-the-backends-own-type.md)
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the
