@@ -2768,22 +2768,35 @@ narrowed against the allowlist the page itself renders, before it is relayed.
 | `eventType`, `clientId`, `source`, the board `sort` key | narrowed to the rendered option list           | the page's own `<select>`                                                                                              |
 | a Spring sort specification                             | `RelayParams.sortSpecOrNull`                   | REQ-API-005's backend field whitelist                                                                                  |
 | free text (`q`)                                         | a `WebClient` URI-template variable            | REQ-FE-016                                                                                                             |
+| a star-system name (`starSystemNames`)                  | a `WebClient` URI-template variable            | REQ-UI-014's materials-matrix relay                                                                                    |
 
 Free text is the one relayed value that may legitimately contain arbitrary characters, so it is
 escaped exactly once across the hop rather than narrowed. Everything else has a shape, and the
 backend signature is where that shape is already written down.
 
+A value drawn from an *external* catalogue is treated the same way: a star-system name comes from
+UEX, not from a vocabulary either controller declares, and it may legitimately carry spaces. The
+frontend relays it as a URI-template variable exactly as `MaterialsPageController` already does on
+the materials matrix (REQ-UI-014) rather than narrowing it against a catalogue snapshot the page
+would have to re-fetch to validate against.
+
 Where the value selects something on a page, an unparseable one degrades — no member selected, no
 filter applied — the way an unknown tab already falls back to the default tab. Where it addresses a
 proxy seam, it is a `400` from Spring's type conversion, handled by `GlobalExceptionHandler`.
 
-> [!warning] `buildAndExpand(...).toUriString()` does not encode
+> [!warning] Only `UriComponentsBuilder#toUriString()` encodes — `build()` and
+> `buildAndExpand(...)` do not
 > `UriComponentsBuilder#toUriString()` is `build().encode().toUriString()` and **does** encode its
-> query values. `UriComponentsBuilder#buildAndExpand(...)` returns `UriComponents` in the RAW
-> encode state, and `UriComponents#toUriString()` emits raw components verbatim. The two spellings
-> differ by one call and by whether the value is encoded at all; `PromotionProxyController` used the
-> second under a comment asserting the first. Do not read an encoding claim in a comment as
-> evidence that encoding happens.
+> query values. Every other route to a string goes through raw `UriComponents`:
+> `UriComponentsBuilder#build()` and `#buildAndExpand(...)` both return `UriComponents` in the RAW
+> encode state, and `UriComponents#toUriString()` emits raw components verbatim. All three
+> spellings differ by one call and by whether the value is encoded at all.
+>
+> Both non-encoding spellings have shipped here under a comment asserting the encoding one:
+> `PromotionProxyController` used `buildAndExpand(...).toUriString()` (fixed 2026-09-04, ADR-0158)
+> and `MaterialProxyController#getProfitCalculation` used `build().toUriString()` (fixed
+> 2026-09-04, CodeQL alert 877). Do not read an encoding claim in a comment as evidence that
+> encoding happens — read the call.
 
 **Acceptance**
 
@@ -2796,6 +2809,8 @@ proxy seam, it is a `400` from Spring's type conversion, handled by `GlobalExcep
 - [ ] A source tab is canonicalized once, so the redirect and the relayed query cannot disagree
   about which catalogue was meant.
 - [ ] No relayed identifier is `URLEncoder`-form-encoded into a path segment.
+- [ ] No relayed value reaches `WebClient` through `UriComponents#toUriString()` in the raw encode
+  state; a catalogue name carrying `&` or `=` opens no second query parameter on the backend call.
 - [ ] The audit tab list has exactly one definition in the frontend, so the page and its
   export/purge proxy cannot disagree about which tabs exist.
 
@@ -2804,7 +2819,9 @@ proxy seam, it is a `400` from Spring's type conversion, handled by `GlobalExcep
 calling the backend) · `AdminSyncReportsPageControllerTest` (canonicalization, and a crafted tab
 appending no second query parameter) · `AdminAuditLogPageControllerTest` (per-tab event-type and
 client-id narrowing; the canonical period/actor relay) · `AuditReportProxyControllerTest` (the tab
-allowlist, `MARKET` included) · **Code:** `RelayParams`, `AuditDomains`, `AuditReportProxyController`,
+allowlist, `MARKET` included) · `MaterialProxyControllerTest` (a star-system name carrying
+`&`/`=` leaves the controller as a URI variable, opening no second query parameter) ·
+**Code:** `RelayParams`, `AuditDomains`, `AuditReportProxyController`,
 `BankReportProxyController`, `OrgUnitBankProxyController`, `PromotionProxyController`,
 `AdminAuditLogPageController`, `AdminPersonalInventoryPageController`,
 `AdminPersonalBlueprintsPageController`, `AdminSyncReportsPageController`,

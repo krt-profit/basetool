@@ -10,7 +10,9 @@
 
 ### Security
 
-- **Die vom Webtool an das Backend weitergereichten Parameter sind jetzt an den Typ gebunden, den das Backend selbst verlangt.** Zeiträume als Zeitpunkt, Mitglieds-IDs als UUID, Filter nur aus der Liste, die die Seite selbst anbietet. Ein Wert mit URL-Sonderzeichen wird damit an der Weiterleitung abgewiesen statt eine Anfrage ans Backend umzuformen. Behebt acht kritische CodeQL-Meldungen, darunter zwei echte Fehler: eine Bewertungs-Weiterleitung kodierte entgegen ihres eigenen Kommentars gar nicht, und die Berichts-Bereinigung setzte ihren Katalog-Parameter ungeprüft in eine löschende Anfrage (REQ-SEC-051, ADR-0158).
+- **Die vom Webtool an das Backend weitergereichten Parameter sind jetzt an den Typ gebunden, den das Backend selbst verlangt.** Zeiträume als Zeitpunkt, Mitglieds-IDs als UUID, Filter nur aus der Liste, die die Seite selbst anbietet. Ein Wert mit URL-Sonderzeichen wird damit an der Weiterleitung abgewiesen statt eine Anfrage ans Backend umzuformen. Behebt sieben von acht kritischen CodeQL-Meldungen, darunter zwei echte Fehler: eine Bewertungs-Weiterleitung kodierte entgegen ihres eigenen Kommentars gar nicht, und die Berichts-Bereinigung setzte ihren Katalog-Parameter ungeprüft in eine löschende Anfrage (REQ-SEC-051, ADR-0158).
+
+- **Die Sternsystem-Filter der Gewinnberechnung können keine zusätzlichen Parameter mehr in die Backend-Anfrage einschleusen.** Der Weiterleitungs-Endpunkt setzte die gewählten Sternsysteme unkodiert in die Anfrage-URL — entgegen seines eigenen Kommentars, der das Gegenteil behauptete. Sie werden jetzt wie auf der Materialmatrix als URI-Variablen übergeben und dabei kodiert; behebt die achte und letzte kritische CodeQL-Meldung dieser Familie (REQ-SEC-051).
 
 ## [v1.6.20](https://github.com/krt-profit/basetool/releases/tag/v1.6.20) - 2026-09-04
 
