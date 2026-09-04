@@ -1,6 +1,6 @@
 # L-8: pin the base image to its multi-arch index digest (not just the floating tag) so builds are
 # bit-reproducible and the SLSA provenance stays sound. Dependabot bumps the tag + digest together.
-FROM eclipse-temurin:25-jdk-alpine@sha256:5ecfde8e5ecde5954ea3721155b345ef56c1d579b940c761318ad4c05959a151 AS build
+FROM eclipse-temurin:25-jdk-alpine@sha256:09349d79941fd53bb3d487b393ca118d8853c08c09193f416fe6a8718df9e732 AS build
 WORKDIR /app
 
 # Application version string forwarded to Gradle's `bootBuildInfo` via
@@ -114,18 +114,34 @@ WORKDIR /app/extracted
 # pure-Java. If we ever add a native library that depends on glibc, revisit
 # and switch back to `25-jre-jammy`.
 # L-8: digest-pinned (see the build stage above).
-FROM eclipse-temurin:25-jre-alpine@sha256:28db6fdf60e38945e43d840c0333aeaec66c15943070104f7586fd3c9d1665b0
+FROM eclipse-temurin:25-jre-alpine@sha256:3137541deb3cac6626b5d9a4a2187bc0d6a34312f858bd2c67dd01e732e6b682
 WORKDIR /app
 
 # Non-root runtime user. Fixed UID/GID so host bind mounts (e.g. the log
 # directory mounted in docker-compose) can be pre-chowned consistently:
 #   chown -R 10001:10001 /var/iri/frontend/log
-# No `apk add` for curl: BusyBox's built-in `wget` (already in the Alpine
-# base) is enough for the HEALTHCHECK, and dropping the apk layer keeps the
-# image surface a few MB smaller plus removes one network round-trip on
-# rebuild. BusyBox addgroup/adduser (-S = system account, no password, no
-# UID/GID range check) replace the Debian groupadd/useradd.
-RUN addgroup -S -g 10001 app \
+# Still no `apk add` for curl: BusyBox's built-in `wget` (already in the Alpine
+# base) is enough for the HEALTHCHECK, so nothing is INSTALLED here -- the
+# upgrade below patches what the base already ships. BusyBox addgroup/adduser
+# (-S = system account, no password, no UID/GID range check) replace the Debian
+# groupadd/useradd.
+# `apk upgrade` is the one apt/apk call these images make, and it is here because
+# bumping the base digest is NOT enough. Measured 2026-09-04 against the promotion
+# gate's own threshold (HIGH/CRITICAL, fixed only): the digest this file pinned
+# carried 8 findings, the NEWEST upstream `25-jre-alpine` still carried 5, and the
+# same image with this line carries 0. Eclipse Temurin rebuilds on its own cadence,
+# so between two of its rebuilds the image lags Alpine's security updates -- and a
+# faster Dependabot cannot close that window, because the newest tag is the thing
+# that lags.
+#
+# It does not drift: the base pins its repositories to `v3.24`, so this upgrades
+# WITHIN that Alpine release and never onto the next one. The digest above still
+# fixes the starting point; this line patches it.
+#
+# Folded into the RUN below rather than added as its own layer, which is what the
+# note about `apk add` just above is really about.
+RUN apk upgrade --no-cache \
+    && addgroup -S -g 10001 app \
     && adduser  -S -u 10001 -G app -H -h /nonexistent -s /sbin/nologin app \
     && mkdir -p /app/logs \
     && chown -R 10001:10001 /app
