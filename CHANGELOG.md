@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.6.19](https://github.com/krt-profit/basetool/releases/tag/v1.6.19) - 2026-09-04
+
 ### Changed
 
 - **Eine Produktions-Promotion bricht jetzt ab, wenn das Image eine behebbare HIGH/CRITICAL-Schwachstelle trägt.** Der Trivy-Scan lief bisher zwar bei jedem Build, blockierte aber an keiner Stelle — eine verwundbare Java-Bibliothek verhinderte den Merge, ein verwundbares OS-Paket dagegen gar nichts. `promote.yml` scannt den zu promotenden Digest jetzt vor der Freigabe; der Build-Scan bleibt bewusst nur hinweisend. Für den Notfall gibt es die Eingabe `allow_vulnerable`, die den Fund sichtbar lässt und die Umgehung in der Freigabe protokolliert (REQ-OPS-024, ADR-0155).
