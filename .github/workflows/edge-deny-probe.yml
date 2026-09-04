@@ -217,7 +217,6 @@ jobs:
                    /api/v1/bank/grants /api/v1/bank/holders \
                    /api/v1/users/search-bank \
                    "/api/v1/bank/accounts/$nil" "/api/v1/bank/accounts/$nil/transactions" \
-                   "/api/v1/bank/accounts/$nil/balance-series" \
                    "/api/v1/bank/accounts/$nil/statement" \
                    "/api/v1/bank/holders/$nil" "/api/v1/bank/holders/$nil/transactions" \
                    /api/v1/bank/export/three-month-report; do
@@ -230,6 +229,16 @@ jobs:
           probe POST "/api/v1/bank/requests/$nil/confirm" 401
           probe POST "/api/v1/bank/requests/$nil/reject" 401
           probe POST /api/v1/bank/grants 401
+
+          # `balance-series` was REMOVED from the allow-list on 2026-09-03 and must now stay shut.
+          # It was admitted in phase L and frozen by nothing, and closing that gap the other way
+          # round was the cheaper answer: no Kotlin under core/ or app/ builds that path, so the
+          # rule went instead of the contract growing to promise a shape nobody reads.
+          #
+          # This line moved with it a day late. It still asserted 401 and turned the first nightly
+          # run after the paste red -- the probe doing exactly its job on a fact the repository
+          # knew and this file had not been told.
+          probe GET "/api/v1/bank/accounts/$nil/balance-series" 404
           probe PATCH "/api/v1/bank/grants/$nil/$nil" 401
           probe DELETE "/api/v1/bank/grants/$nil/$nil" 401
           probe POST /api/v1/bank/holders 401
