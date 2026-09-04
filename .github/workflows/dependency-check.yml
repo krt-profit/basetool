@@ -65,7 +65,33 @@ jobs:
   owasp:
     name: OWASP Dependency-Check
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # 120, not 60, because a COLD run has to rebuild the whole NVD dataset and
+    # that does not fit in an hour. Observed on 2026-09-04 (run 33850884642 on
+    # `main`): the task printed "Checking for updates and analyzing dependencies
+    # for vulnerabilities" and then emitted nothing for 59.5 minutes before the
+    # job timeout cancelled it.
+    #
+    # A cold run on `main` is not the rare case it looks like, because GitHub
+    # scopes Actions caches BY REF: a cache written on a PR ref
+    # (`refs/pull/N/merge`) is readable from that PR but NOT from
+    # `refs/heads/main`, while a cache written on the default branch is readable
+    # everywhere. On that day the repository held exactly one NVD cache and it
+    # sat on `refs/pull/1780/merge`, so every `main` run reported "Cache not
+    # found for input keys" and started from zero.
+    #
+    # That closed a loop: `main` missed the cache -> rebuilt NVD -> hit the
+    # 60-minute timeout -> the job was cancelled -> `Post Cache NVD feed` was
+    # skipped -> `main` still had no cache. `main` could never warm its own
+    # cache, and the dependency alerts on the Security tab stayed stale from
+    # 2026-08-31 onwards because no scan ever reached the SARIF upload.
+    #
+    # The headroom breaks the loop: one cold `main` run finishes, its post-step
+    # saves the dataset under the default branch's ref, and every later run —
+    # PRs included — restores it in seconds and finishes in minutes. Do not trim
+    # this back to 60 on the grounds that "the scan only takes 15 minutes"; that
+    # is the WARM figure, and it is only true because a cold run was once
+    # allowed to complete.
+    timeout-minutes: 120
 
     steps:
       - name: Checkout
