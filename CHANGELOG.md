@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.6.21](https://github.com/krt-profit/basetool/releases/tag/v1.6.21) - 2026-09-05
+
 ### Fixed
 
 - **Ein per Tastatur gewähltes Material füllte die abhängigen Felder nicht.** Wer im Raffinerieauftrag „asl" tippte und den einzigen Treffer mit Enter übernahm, bekam das Eingangsmaterial gesetzt, aber kein Ausgangsmaterial — dort blieb „-" stehen. Beim Anklicken derselben Zeile funktionierte es. Die Auswahllisten führten die Zusatzangaben einer Option nur auf dem Mausweg mit; jetzt auf beiden. Betrifft ebenso die Mengeneinheit (SCU/Stück), die bei Tastaturauswahl auf dem Wert des vorherigen Materials stehen blieb (REQ-FE-016).
