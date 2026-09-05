@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Drei me-bezogene Pfade der App waren am API-Zugang nicht freigegeben.** In den App-Einstellungen blieben „Auszahlungspräferenz" und „Blueprints mit Org teilen" dadurch auf jedem Konto ausgegraut, und „als gelesen" am Aushang sprang zurück. Lesen und Schreiben mussten zusammen freigegeben werden — die beiden Einstellungen teilen sich eine Optimistic-Lock-Version, ein Client der schreiben aber nicht lesen kann würde eine `0` zurücksenden. Freigegeben, eingefroren und geprobt (Runbook-Phase Q); erste Ausnahme, die die Read-only-Sperre unter `/users` je bekommen hat.
+
 ## [v1.6.21](https://github.com/krt-profit/basetool/releases/tag/v1.6.21) - 2026-09-05
 
 ### Fixed

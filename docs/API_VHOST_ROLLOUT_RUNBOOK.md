@@ -610,6 +610,20 @@ if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a
 if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/material-collection$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/inventory/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/unlink$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/materials/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+# Phase Q - the member's own two standing choices, and the read marker for the Aushang.
+# EXACT paths, for the reason the /users/me comment in phase 2 already gives: the
+# `/api/v1/users/` prefix reaches every other member's record, so this vhost names the
+# me-scoped leaves one at a time and never the stem. The announcement marker carries an id
+# and is therefore a $-anchored uuid regex rather than an exact path.
+#
+# All three are GET-and-PUT surfaces of the SAME user row, and the two settings rows share
+# one optimistic-lock version. That is why the reads had to come with the writes: the app
+# echoes the version its read returned, so admitting only the PUT would have made both rows
+# operable and every tap a 409 - or, on a row still at version 0, a write that succeeds by
+# accident. Read and write, together, or neither.
+if ($uri = "/api/v1/users/me/payout-preference") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/users/me/blueprint-sharing") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/users/me/read-announcement/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- The missions and operations families are READ-ONLY on this vhost ---------
@@ -695,6 +709,18 @@ if ($uri ~ "^/api/v1/org-units/bank/requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a
 # with the account's whole settings object, which is what lets the section redraw from the
 # answer instead of re-reading.
 if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/approval-limit/(all-members|area-members|role/[A-Za-z0-9_-]{1,64}|user/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$") { set $krt_readonly_family ""; }
+# Phase Q - the FIRST carve-out this guard has ever had under /users, which is why it is
+# worth a line of its own. That prefix carries every other member's record and the whole
+# member-admin surface, so nothing here may be widened: three exact me-scoped leaves, the
+# third $-anchored on its uuid. `/users/<uuid>/memberships` beside them stays IN the family
+# deliberately - the PATCH the backend serves on it is the org-unit admin write and keeps
+# answering 405.
+#
+# Naming a path opens every verb the backend serves on it, which for the first two is the
+# GET the row reads and the PUT it writes, and for the third exactly one PUT.
+if ($uri = "/api/v1/users/me/payout-preference") { set $krt_readonly_family ""; }
+if ($uri = "/api/v1/users/me/blueprint-sharing") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/users/me/read-announcement/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_readonly_family ""; }
 if ($krt_readonly_family = "RW") { return 405; }
 
 # --- Which family gets which shape ---------------------------------------------------------------
@@ -853,6 +879,9 @@ The safe order, and the reason for it:
    | `…/approval-limit/area-members`                               | **401**                                                             | phase P; same                                                                                            |
    | `…/approval-limit/role/<code>`                                | **401**                                                             | phase P; same                                                                                            |
    | `…/approval-limit/user/<uuid>`                                | **401**                                                             | phase P; same                                                                                            |
+   | `/api/v1/users/me/payout-preference`                          | **401**                                                             | phase Q; me-scoped, `isAuthenticated()`; GET and PUT                                                     |
+   | `/api/v1/users/me/blueprint-sharing`                          | **401**                                                             | phase Q; same                                                                                            |
+   | `/api/v1/users/me/read-announcement/<uuid>`                   | **401**                                                             | phase Q; me-scoped write, PUT only                                                                       |
    | anything not on the list                                      | **404**                                                             | default deny                                                                                             |
 
    **Two refusals, two numbers, and the difference is structural rather than a policy gap.** The
@@ -1694,6 +1723,55 @@ DELETE.
 Pinned in `ApiVhostAnonymousSurfaceTest` before this table was written, and frozen in
 `ExternalContractTest`, whose reachability guard cross-checks the rule above.
 `PATCH /api/v1/bank/accounts/<uuid>/approval-tiers` must still answer **404**.
+
+---
+
+## Phase Q — the member's own two settings, and the Aushang's read marker
+
+**Three me-scoped leaves, and the first carve-out `/users` has ever had.** Reported from a device
+on 2026-09-05: in Einstellungen, „Auszahlungspräferenz" and „Blueprints mit Org teilen" are greyed
+out and cannot be tapped — on every account, since the first release.
+
+**The cause is the quietest shape this list produces.** Both rows are drawn `enabled` only once
+their value has arrived, and the `GET` that would deliver it was admitted by no rule. So the read
+answered `404`, the app logged it, and the rows sat in exactly the state a never-set value would
+produce. Nothing looked broken; two settings simply looked like they had no value and could not be
+given one.
+
+|        Screen         |                 Paths                 |  Verbs   |
+|-----------------------|---------------------------------------|----------|
+| Einstellungen → Konto | `/api/v1/users/me/payout-preference`  | GET, PUT |
+| Einstellungen → Konto | `/api/v1/users/me/blueprint-sharing`  | GET, PUT |
+| Übersicht (Aushang)   | `…/users/me/read-announcement/<uuid>` | PUT      |
+
+**The read had to come with the write, and this is the pair that proves the rule.** Both settings
+are columns of one `User` row and share one optimistic-lock version, which the app echoes from
+whatever its read returned. Admitting only the `PUT` would have made both rows operable and every
+tap a `409` — or worse, on a row still at version `0`, a write that succeeds by accident against a
+version nobody read. The audit filed them as a pair for exactly this reason.
+
+**The third path is here because it is the same family and the same `/users/me` carve-out.** The
+Aushang's read marker has its own visible symptom — the „UNGELESEN" band is marked optimistically,
+the `PUT` is refused, and the band springs back on every dashboard load. One rule closes it.
+
+> [!warning] `/users` is not `/users/me`
+> The prefix carries every other member's record and the member-admin surface. Phase 2 already
+> settled that this vhost names me-scoped leaves one at a time and never the stem; phase Q keeps
+> that and extends it to the read-only guard, which until now had no `/users` exception at all.
+> `/users/<uuid>/memberships` stays **in** the family on purpose — the `PATCH` the backend serves
+> on it is the org-unit admin write, and it keeps answering `405`.
+
+### What to expect afterwards
+
+|                   Path                    | Anonymous status |
+|-------------------------------------------|------------------|
+| `GET /api/v1/users/me/payout-preference`  | **401**          |
+| `PUT /api/v1/users/me/blueprint-sharing`  | **401**          |
+| `PUT …/users/me/read-announcement/<uuid>` | **401**          |
+
+Pinned in `ApiVhostAnonymousSurfaceTest` before this table was written, and frozen in
+`ExternalContractTest`, whose reachability guard cross-checks the rules above.
+`PATCH /api/v1/users/<uuid>/memberships` must still answer **405**.
 
 ---
 
