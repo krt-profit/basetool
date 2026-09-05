@@ -65,33 +65,26 @@ jobs:
   owasp:
     name: OWASP Dependency-Check
     runs-on: ubuntu-latest
-    # 120, not 60, because a COLD run has to rebuild the whole NVD dataset and
-    # that does not fit in an hour. Observed on 2026-09-04 (run 33850884642 on
-    # `main`): the task printed "Checking for updates and analyzing dependencies
-    # for vulnerabilities" and then emitted nothing for 59.5 minutes before the
-    # job timeout cancelled it.
+    # Back to 60 on 2026-09-05. This was raised to 120 the day before on a WRONG diagnosis: the
+    # runs that kept dying at the ceiling were read as slow cold starts, so they were given more
+    # room. They were not slow, they were stalled - the extra hour changed nothing except how long
+    # a stuck run burned a runner. A COLD scan finishes in 8-14 minutes (run 31309086034 on `main`,
+    # 8m29s; run 33845554721 on a PR, 13m48s) and a warm one in under a minute, so 60 is ample
+    # headroom and the ceiling is a backstop, not a budget.
     #
-    # A cold run on `main` is not the rare case it looks like, because GitHub
-    # scopes Actions caches BY REF: a cache written on a PR ref
-    # (`refs/pull/N/merge`) is readable from that PR but NOT from
-    # `refs/heads/main`, while a cache written on the default branch is readable
-    # everywhere. On that day the repository held exactly one NVD cache and it
-    # sat on `refs/pull/1780/merge`, so every `main` run reported "Cache not
-    # found for input keys" and started from zero.
+    # The stalls were unbounded outbound HTTP reads inside dependency-check; they are fixed where
+    # they belong, by `setReadTimeout` / `setConnectionTimeout` in the root `build.gradle.kts` (see
+    # the block there for the evidence). If runs start hitting this ceiling again, that is the thing
+    # to re-check - raising the number again would only repeat the mistake.
     #
-    # That closed a loop: `main` missed the cache -> rebuilt NVD -> hit the
-    # 60-minute timeout -> the job was cancelled -> `Post Cache NVD feed` was
-    # skipped -> `main` still had no cache. `main` could never warm its own
-    # cache, and the dependency alerts on the Security tab stayed stale from
-    # 2026-08-31 onwards because no scan ever reached the SARIF upload.
-    #
-    # The headroom breaks the loop: one cold `main` run finishes, its post-step
-    # saves the dataset under the default branch's ref, and every later run —
-    # PRs included — restores it in seconds and finishes in minutes. Do not trim
-    # this back to 60 on the grounds that "the scan only takes 15 minutes"; that
-    # is the WARM figure, and it is only true because a cold run was once
-    # allowed to complete.
-    timeout-minutes: 120
+    # Separately and still true: GitHub scopes Actions caches BY REF, so a cache written on a PR ref
+    # (`refs/pull/N/merge`) is readable from that PR but NOT from `refs/heads/main`, while one
+    # written on the default branch is readable everywhere. On 2026-09-04 the repository's only NVD
+    # cache sat on `refs/pull/1780/merge` and every `main` run reported "Cache not found for input
+    # keys" and rebuilt from zero. That is a real cost - it is the difference between a ~1-minute
+    # and a ~14-minute scan - but it is a nuisance, not the reason runs were dying, and it resolves
+    # itself as soon as one `main` run completes and saves the dataset under the default branch.
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
