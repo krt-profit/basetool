@@ -1417,6 +1417,11 @@ browse-everything mode carries the same hint.
 - [ ] Dynamically added rows (order material lines, refinery goods rows) render a working
   searchable picker, and programmatic fills (SCMDB import, import-review suggestion chips,
   Umbuchen preselect) show the picked label, not a blank box.
+- [ ] A **keyboard** pick mirrors the same metadata a mouse pick does — narrowing the refinery
+  input-material picker by typing and committing the sole match with Enter (no dropdown click)
+  prefills the read-only output material, and the metadata survives the following blur. The
+  component's rendered-row list must therefore hold the whole option model, not a value/label
+  copy: `commit()` mirrors `item.data`, and the committed item is what both restore paths replay.
 
 **Enforced by:** the migrated picker flows in `InventoryOperationsE2eTest`,
 `JobOrderCreateE2eTest`, `OrdersCreateScuHintRevealE2eTest` (quantity-type mirror + stale-key
