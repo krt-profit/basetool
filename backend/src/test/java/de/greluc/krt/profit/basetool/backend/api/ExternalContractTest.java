@@ -1967,7 +1967,44 @@ class ExternalContractTest {
           new ContractOperation(
               "/api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId}",
               "delete",
-              BANK_ACCOUNT_SETTINGS));
+              BANK_ACCOUNT_SETTINGS),
+          // ---- Phase Q: the member's own settings, and the Aushang's read marker --------------
+          //
+          // Reported from a device: both Einstellungen rows greyed out on every account since the
+          // first release. They are drawn `enabled` only once their value has arrived, and the GET
+          // that would deliver it was admitted by no rule -- so it answered 404 and the rows sat in
+          // exactly the state a never-set value produces. The quietest shape this class has: not a
+          // failure a member can report, just two settings that appear to have none.
+          //
+          // GET and PUT are frozen TOGETHER for both, and that is not tidiness. The two rows are
+          // columns of one User row sharing one optimistic-lock version, which the app echoes from
+          // whatever its read returned; a client that could write but not read would send `0` and
+          // be refused -- or succeed by accident against a row still at 0.
+          new ContractOperation(
+              "/api/v1/users/me/payout-preference",
+              "get",
+              Set.of("defaultPayoutPreference", "version")),
+          new ContractOperation(
+              "/api/v1/users/me/payout-preference",
+              "put",
+              Set.of("defaultPayoutPreference", "version"),
+              Set.of("preference", "version")),
+          new ContractOperation(
+              "/api/v1/users/me/blueprint-sharing",
+              "get",
+              Set.of("shareBlueprintsGlobally", "version")),
+          new ContractOperation(
+              "/api/v1/users/me/blueprint-sharing",
+              "put",
+              Set.of("shareBlueprintsGlobally", "version"),
+              Set.of("shareBlueprintsGlobally", "version")),
+          // The marker answers the whole UserDto and the app reads exactly one name out of it --
+          // the id it just wrote -- to confirm the band may stay down. Losing that field would put
+          // the „UNGELESEN" band back on every dashboard load with the write having succeeded.
+          new ContractOperation(
+              "/api/v1/users/me/read-announcement/{announcementId}",
+              "put",
+              Set.of("lastReadAnnouncementId")));
 
   /**
    * Contract operations the app addresses by <strong>no</strong> query parameter, although the
@@ -2124,6 +2161,11 @@ class ExternalContractTest {
           "UpdateJobOrderStatusDto.status",
           Set.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED"),
           "UpdatePayoutPreferenceRequest.preference",
+          Set.of("PAYOUT", "DONATE"),
+          // The me-scoped twin of the line above, frozen with phase Q. Different schema, same two
+          // constants and the same failure: a shipped build sends the literal string, so a rename
+          // turns every save of the Einstellungen row into a 400 while the screen keeps loading.
+          "MyPayoutPreferenceRequest.preference",
           Set.of("PAYOUT", "DONATE"),
           "MissionFinanceEntryCreateDto.type",
           Set.of("INCOME", "EXPENSE"),

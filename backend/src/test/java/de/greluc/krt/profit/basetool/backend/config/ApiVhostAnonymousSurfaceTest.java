@@ -686,6 +686,44 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * The member's own two settings and the Aushang's read marker, refused without a token.
+   *
+   * <p>Phase Q, and the quietest gap this allow-list has produced. Both settings rows are drawn
+   * {@code enabled} only once their value has arrived, and the {@code GET} that would deliver it
+   * was admitted by no rule — so it answered {@code 404}, the app logged it, and the rows sat in
+   * exactly the state a never-set value produces. Nobody could report it as a failure.
+   *
+   * <p>Read and write are pinned together for both, because they were admitted together: the two
+   * rows share one optimistic-lock version, and a client that could write but not read would echo
+   * {@code 0}.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousMemberPreferenceReadsAndWritesWithUnauthorized() throws Exception {
+    mockMvc.perform(get("/api/v1/users/me/payout-preference")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/users/me/payout-preference")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"preference\":\"PAYOUT\",\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/users/me/blueprint-sharing")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/users/me/blueprint-sharing")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"shareBlueprintsGlobally\":true,\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(put("/api/v1/users/me/read-announcement/" + ABSENT_OPERATION).with(csrf()))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
    * The Freigabe-Limits, refused without a token.
    *
    * <p>Four leaves under one allow-list rule (phase P), and the gap they close is the quietest one
