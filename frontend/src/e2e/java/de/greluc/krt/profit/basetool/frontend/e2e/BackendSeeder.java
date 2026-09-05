@@ -481,6 +481,50 @@ public final class BackendSeeder {
   }
 
   /**
+   * Get-or-creates a manual RAW refinery input material that POINTS AT a refined output material,
+   * so the create form's read-only "Ausgangsmaterial" display has a name to show once the input is
+   * picked. {@link #ensureRefineryMaterial(String, String, String)} deliberately creates a material
+   * without a refined counterpart (the backend then stamps the output equal to the input), which
+   * leaves the display at its "-" placeholder and cannot tell a working prefill from a broken one.
+   *
+   * <p>Seeds the refined output first (a plain {@code REFINED} material of the same quantity type),
+   * then the raw input carrying its {@code refinedMaterialId} — the backend honours that FK only on
+   * a raw or manually-raw material.
+   *
+   * @param username admin username
+   * @param password admin password
+   * @param rawName name of the manual RAW input material
+   * @param refinedName name of the REFINED output material the input refines into
+   * @return the existing or freshly created RAW input material's id
+   */
+  public String ensureRefineryMaterialWithRefinedOutput(
+      String username, String password, String rawName, String refinedName) {
+    String existingRaw = findMaterialIdByName(username, password, rawName);
+    if (existingRaw != null) {
+      return existingRaw;
+    }
+    String refinedId = findMaterialIdByName(username, password, refinedName);
+    if (refinedId == null) {
+      refinedId =
+          seedEntity(
+              username,
+              password,
+              "/api/v1/materials",
+              "{\"name\":\"" + refinedName + "\",\"type\":\"REFINED\",\"quantityType\":\"SCU\"}");
+    }
+    return seedEntity(
+        username,
+        password,
+        "/api/v1/materials",
+        "{\"name\":\""
+            + rawName
+            + "\",\"type\":\"RAW\",\"quantityType\":\"SCU\",\"isManualRawMaterial\":true,"
+            + "\"refinedMaterialId\":\""
+            + refinedId
+            + "\"}");
+  }
+
+  /**
    * Creates a refinery order via {@code POST /api/v1/refinery-orders} owned by the caller and
    * returns its id, so the refinery store / lifecycle / tenancy flows have a persisted order to
    * drive against without round-tripping the create UI each time. The order targets the given

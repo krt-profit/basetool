@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Ein per Tastatur gewähltes Material füllte die abhängigen Felder nicht.** Wer im Raffinerieauftrag „asl" tippte und den einzigen Treffer mit Enter übernahm, bekam das Eingangsmaterial gesetzt, aber kein Ausgangsmaterial — dort blieb „-" stehen. Beim Anklicken derselben Zeile funktionierte es. Die Auswahllisten führten die Zusatzangaben einer Option nur auf dem Mausweg mit; jetzt auf beiden. Betrifft ebenso die Mengeneinheit (SCU/Stück), die bei Tastaturauswahl auf dem Wert des vorherigen Materials stehen blieb (REQ-FE-016).
+
 - **Der Reiter „Materialbörse" im Prüfprotokoll konnte weder exportiert noch aufgeräumt werden.** PDF, JSON und die Aufbewahrungs-Bereinigung antworteten dort mit einem Fehler, während jeder andere Reiter funktionierte: der Weiterleitungs-Endpunkt führte eine eigene, veraltete Liste der Reiter. Beide Stellen lesen jetzt dieselbe Liste.
 
 - **Beim Löschen alter Synchronisationsberichte konnte die Auswahl des Katalogs verloren gehen.** Wurde der Reiter in Kleinschreibung übergeben, landete man zwar auf dem richtigen Reiter, gelöscht wurde aber in **beiden** Katalogen. Der Wert wird jetzt einmal vereinheitlicht und für Weiterleitung und Löschung gleich verwendet.

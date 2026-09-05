@@ -54,6 +54,12 @@ class RefineryOrderCreateE2eTest {
   private static final String USERNAME = System.getProperty("e2e.username", "test-admin");
   private static final String PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
 
+  /** Manual RAW input material used by the keyboard-pick test; refines into the material below. */
+  private static final String KEYBOARD_RAW_MATERIAL = "E2E Keyboard Pick Raw";
+
+  /** REFINED output the keyboard-pick test expects the form to derive from the input above. */
+  private static final String KEYBOARD_REFINED_MATERIAL = "E2E Keyboard Pick Refined";
+
   private static Playwright playwright;
   private static Browser browser;
   private static String materialId;
@@ -71,6 +77,11 @@ class RefineryOrderCreateE2eTest {
       // RefineryImportE2eTest pre-seeds this material before it opens the create page, because
       // that first render freezes the frontend's 10-minute materials-lookup cache for the suite.
       materialId = seeder.ensureRefineryMaterial(USERNAME, PASSWORD, "E2E Refinery Material");
+      // A SECOND input material, this one carrying a refined output, for the keyboard-pick test:
+      // the material above has no refined counterpart, so its output display stays at "-" whether
+      // the metadata mirror works or not.
+      seeder.ensureRefineryMaterialWithRefinedOutput(
+          USERNAME, PASSWORD, KEYBOARD_RAW_MATERIAL, KEYBOARD_REFINED_MATERIAL);
       // Mirror-seed the sibling class's material in case THIS class runs first (class order is
       // an implementation detail) — same cache rationale, union of all dropdown materials.
       seeder.ensureRefineryMaterial(USERNAME, PASSWORD, "E2E Import Material");
@@ -144,6 +155,48 @@ class RefineryOrderCreateE2eTest {
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "refinery-create");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * Regression: narrowing the input-material picker by typing and committing the sole match with
+   * ENTER — without clicking the dropdown row — must prefill the read-only output material, exactly
+   * as a mouse pick does.
+   *
+   * <p>The combobox's rendered-row list used to carry only each option's value and label, so the
+   * keyboard commit paths mirrored an option with no metadata onto the hidden input and {@code
+   * updateOutputMaterial} read an empty {@code data-refined-name}, leaving the output display at
+   * its "-" placeholder while the input showed a correctly picked material.
+   */
+  @Test
+  void keyboardPickPrefillsTheOutputMaterial() {
+    String baseUrl = STACK.baseUrl();
+    Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);
+    try (BrowserContext context =
+        browser.newContext(
+            new Browser.NewContextOptions()
+                .setIgnoreHTTPSErrors(true)
+                .setStorageStatePath(storageState))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, baseUrl + "/refinery-orders/create");
+        page.waitForLoadState();
+
+        Locator combo = page.locator(".krt-combobox:has(#inputMaterialId_0) .krt-combobox__input");
+        combo.click();
+        combo.fill(KEYBOARD_RAW_MATERIAL);
+        // Wait for the debounced remote fetch to render the sole match before committing it, so
+        // Enter lands on a populated list rather than on the transient "loading" row.
+        assertThat(combo.locator("xpath=..").locator("li[role='option']:not([data-value=''])"))
+            .hasCount(1);
+        combo.press("Enter");
+
+        assertThat(combo).hasValue(KEYBOARD_RAW_MATERIAL);
+        assertThat(page.locator("#outputMaterialDisplay_0")).hasText(KEYBOARD_REFINED_MATERIAL);
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "refinery-create-keyboard-pick");
         throw failure;
       }
     }
