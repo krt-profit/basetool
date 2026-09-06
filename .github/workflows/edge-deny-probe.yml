@@ -222,6 +222,24 @@ jobs:
           done
           probe PUT "/api/v1/users/me/read-announcement/$nil" 401
 
+          # Phase R - the two 405s, and the assertion that matters is the SECOND pair. Opening the
+          # PUT is one line; keeping the DELETE shut is the reason the carve-out was written
+          # method-scoped, because the backend serves DELETE on both of these paths and the app
+          # sends neither. A 401 on a DELETE here would mean the exception went verb-blind.
+          probe PUT "/api/v1/orders/$nil" 401
+          probe PUT "/api/v1/operations/$nil" 401
+          probe DELETE "/api/v1/orders/$nil" 405
+          probe DELETE "/api/v1/operations/$nil" 405
+
+          # Phase S - the four pickers, and they answer FOUR different ways. Grouping them is what
+          # hid that: /orders/** and /operations/** are authenticated (401), GET /missions/** is
+          # permitAll so the method seam refuses it (403), and /job-types is anonymous by design
+          # (200, REQ-SEC-037 - a role-name catalogue, like /ship-types).
+          probe GET /api/v1/orders/lookup 401
+          probe GET /api/v1/operations/lookup 401
+          probe GET /api/v1/missions/lookup 403
+          probe GET /api/v1/job-types 200
+
           # Phase L - the bank-STAFF surface, admitted for the first time (runbook § Phase L).
           # Every one of these must reach the backend and be refused there.
           for p in /api/v1/bank/dashboard /api/v1/bank/accounts /api/v1/bank/requests \

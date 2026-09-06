@@ -624,6 +624,18 @@ if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-f
 if ($uri = "/api/v1/users/me/payout-preference") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/users/me/blueprint-sharing") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/users/me/read-announcement/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+# Phase S - the four pickers, and the class of defect they belong to. Each is a GET that the
+# app SWALLOWS on failure by design: a picker is one field on a form about something else, so
+# a banner over the whole screen would be about the wrong thing. That is right, and it is why
+# these four were invisible - refused at the edge, they render as „there are none" and a
+# member reads an empty list as an answer rather than as a fault.
+#
+# All four are reads in read-only families and take NO carve-out. `/job-types` is exact even
+# though the app appends a query string: this guard matches on $uri, which stops at the `?`.
+if ($uri = "/api/v1/orders/lookup") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/missions/lookup") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/operations/lookup") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/job-types") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- The missions and operations families are READ-ONLY on this vhost ---------
@@ -721,6 +733,21 @@ if ($uri ~ "^/api/v1/org-units/bank/accounts/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a
 if ($uri = "/api/v1/users/me/payout-preference") { set $krt_readonly_family ""; }
 if ($uri = "/api/v1/users/me/blueprint-sharing") { set $krt_readonly_family ""; }
 if ($uri ~ "^/api/v1/users/me/read-announcement/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_readonly_family ""; }
+# Phase R - the two 405s: the Logistician's `PUT /orders/<uuid>` and a manager's
+# `PUT /operations/<uuid>`. Both paths are ALREADY admitted; only the read-only guard refuses
+# them, which is the case the comment at the top of this guard calls the harder half.
+#
+# METHOD-SCOPED, and that is the whole point of the extra three lines each. A plain carve-out
+# is verb-blind, and the backend serves DELETE on both of these paths - deleting an Auftrag
+# and deleting an Operation. The app sends neither (its deletes are all on sub-paths), so a
+# path-wide exception would open two destructive verbs nothing asks for. The compound-variable
+# idiom below is the one this file already uses for the family flag itself: nginx cannot nest
+# `if`, so a two-term condition is spelled by concatenating into one variable and testing it.
+set $krt_put_only "";
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_put_only "P"; }
+if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_put_only "P"; }
+if ($request_method = PUT) { set $krt_put_only "${krt_put_only}U"; }
+if ($krt_put_only = "PU") { set $krt_readonly_family ""; }
 if ($krt_readonly_family = "RW") { return 405; }
 
 # --- Which family gets which shape ---------------------------------------------------------------
@@ -882,6 +909,12 @@ The safe order, and the reason for it:
    | `/api/v1/users/me/payout-preference`                          | **401**                                                             | phase Q; me-scoped, `isAuthenticated()`; GET and PUT                                                     |
    | `/api/v1/users/me/blueprint-sharing`                          | **401**                                                             | phase Q; same                                                                                            |
    | `/api/v1/users/me/read-announcement/<uuid>`                   | **401**                                                             | phase Q; me-scoped write, PUT only                                                                       |
+   | `/api/v1/orders/<uuid>` with `PUT`                            | **401**                                                             | phase R; the Logistician's edit. `DELETE` on the same path stays **405**                                 |
+   | `/api/v1/operations/<uuid>` with `PUT`                        | **401**                                                             | phase R; a mission manager's edit. `DELETE` likewise stays **405**                                       |
+   | `/api/v1/orders/lookup`                                       | **401**                                                             | phase S; the Auftrag picker in the booking sheet                                                         |
+   | `/api/v1/missions/lookup`                                     | **403**                                                             | phase S; `GET /missions/**` is `permitAll`, so the method guard refuses it at the seam                   |
+   | `/api/v1/operations/lookup`                                   | **401**                                                             | phase S; the Operation picker on the Einsatz's Kern section                                              |
+   | `/api/v1/job-types`                                           | **200**                                                             | phase S; anonymous **by design** — a role-name catalogue, like `/ship-types` (REQ-SEC-037)               |
    | anything not on the list                                      | **404**                                                             | default deny                                                                                             |
 
    **Two refusals, two numbers, and the difference is structural rather than a policy gap.** The
@@ -1772,6 +1805,132 @@ the `PUT` is refused, and the band springs back on every dashboard load. One rul
 Pinned in `ApiVhostAnonymousSurfaceTest` before this table was written, and frozen in
 `ExternalContractTest`, whose reachability guard cross-checks the rules above.
 `PATCH /api/v1/users/<uuid>/memberships` must still answer **405**.
+
+---
+
+## Phase R — the two 405s, and the first method-scoped exception
+
+**No new path is admitted.** Both `/api/v1/orders/<uuid>` and `/api/v1/operations/<uuid>` have been
+on the allow-list since phase 2 and 3; what refuses their edits is the read-only guard, which is
+verb-blind by design. This is the case the comment at the top of that guard already names as *„the
+harder half"*: opening one write means saying so explicitly rather than widening a family.
+
+Two of the 75, and the only two the audit classed as **405** rather than 404 — the path is
+reachable, the verb is not.
+
+|        Screen        |            Path             | Verb |
+|----------------------|-----------------------------|------|
+| Auftrag bearbeiten   | `/api/v1/orders/<uuid>`     | PUT  |
+| Operation bearbeiten | `/api/v1/operations/<uuid>` | PUT  |
+
+> [!warning] A plain carve-out would have opened the two DELETEs with them
+> The backend serves `DELETE` on **both** of these paths — deleting an Auftrag and deleting an
+> Operation — and a carve-out clears the flag for every verb. The app sends neither: its deletes
+> are all on sub-paths (`…/claims/<uuid>`, `…/materials/<uuid>`, `…/inventory/<uuid>/unlink`). So
+> the exception is written **method-scoped**, and `DELETE` on both paths keeps answering `405`.
+>
+> The idiom is the one this guard already uses for its own flag: nginx cannot nest `if`, so a
+> two-term condition is spelled by concatenating into one variable and testing the result.
+
+**The requester's edit is a different path and is not opened here.** `PUT /orders/<uuid>/requested`
+is the narrower form a member of the requesting unit may send; the app learned to send it in
+basetool-android#129, and it needs its own rule. Until then a requester still reaches the
+Logistician's path and is refused by the backend with a `403` — a refusal about *permission*, which
+is the truthful one, rather than the `405` about a verb they were entitled to use.
+
+### What to expect afterwards
+
+|              Path               | Anonymous status |
+|---------------------------------|------------------|
+| `PUT /api/v1/orders/<uuid>`     | **401**          |
+| `PUT /api/v1/operations/<uuid>` | **401**          |
+| `DELETE` on either              | **405**          |
+
+The `405` rows are the assertion that matters here: they prove the exception stayed method-scoped.
+Both are pinned in `ApiVhostAnonymousSurfaceTest` and probed nightly.
+
+---
+
+## Phase S — the four pickers that answered „there are none"
+
+**The class the audit called unreportable.** Four reads, each feeding a picker, each refused at the
+edge — and none of them produced an error a member could describe. A picker is one field on a form
+about something else, so the app swallows its failure on purpose: a banner over the Kern section
+about a lookup would be about the wrong thing. That decision is right. Combined with a `404` it
+means the control renders **empty**, and an empty picker reads as an answer.
+
+|               Screen               |            Path             |
+|------------------------------------|-----------------------------|
+| Lager → Buchung: Auftrag zuordnen  | `/api/v1/orders/lookup`     |
+| Lager → Buchung: Einsatz zuordnen  | `/api/v1/missions/lookup`   |
+| Einsatz → Kern: Operation zuordnen | `/api/v1/operations/lookup` |
+| Einsatz → Teilnehmer / Einheiten   | `/api/v1/job-types`         |
+
+**`job-types` is the worst of the four**, because it does not merely show an empty list: the tab
+says the organisation has defined **no CREW functions**. That is a statement about the
+organisation, produced by a refused request.
+
+**No carve-out for any of them.** All four are `GET`s inside read-only families, so naming the path
+is the whole change — nothing here opens a verb.
+
+**`/job-types` is named exactly, although the app appends a query string.** This guard matches on
+`$uri`, which stops at the `?`; the parameters (`archetype`, `page`, `size`) are frozen in the
+contract instead, where a rename would actually be caught.
+
+> [!warning] The four do not answer alike, and every number here was measured before it was written
+> Grouping them in one assertion is what hid it. `/orders/**` and `/operations/**` are
+> authenticated in the filter chain, so the entry point turns them away before dispatch: **401**.
+> `GET /missions/**` is `permitAll` — the whole Einsatz read surface is, so a guest can see the
+> board — so that one is dispatched and refused at the method seam: **403**.
+>
+> And `/job-types` answers **200**. It is anonymous **by design**: `JobTypeController`'s own Javadoc
+> says „Read is public; mutations are OFFICER/ADMIN", and the list carries role names and nothing
+> else — no member, no org unit, no Einsatz is reachable through it. It sits in the same `permitAll`
+> catalogue block as `/ship-types`, `/materials/search` and `/refining-methods`, every one of which
+> this runbook already records as anonymous. Admitting it publishes a catalogue that was already
+> public; the pin is what keeps that a decision rather than a side effect (REQ-SEC-037).
+>
+> Phase M is the reason this order is fixed: it wrote its table by reasoning about the form around
+> the field instead of the rule that judges the caller, generated the nightly probe from the table,
+> and spent three red nights on it.
+
+### What to expect afterwards
+
+|            Path             | Anonymous status |
+|-----------------------------|------------------|
+| `/api/v1/orders/lookup`     | **401**          |
+| `/api/v1/operations/lookup` | **401**          |
+| `/api/v1/missions/lookup`   | **403**          |
+| `/api/v1/job-types`         | **200**          |
+
+Pinned in `ApiVhostAnonymousSurfaceTest` before this table was written.
+
+### What this makes whole, and what it only makes reportable
+
+A picker is worth filling only if the control it feeds can save. Two of these can, today; three
+fill ahead of their write, and that is stated here rather than discovered on the host.
+
+|                        Picker                         |                                        The write it feeds                                         |                            After phase S                             |
+|-------------------------------------------------------|---------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
+| Auftrag/Einsatz in the **Einbuchung**                 | `POST /api/v1/inventory`, which carries `jobOrderAllocations` and `missionAllocations` **inline** | **Whole.** That path has been admitted and carved out since phase 2. |
+| Funktion on a **Teilnehmer** (`archetype=MISSION`)    | `PUT …/missions/<uuid>/participants/<uuid>/slim`                                                  | **Whole.** Admitted and carved out in phase 2.                       |
+| Auftrag/Einsatz on an **existing Lager row**          | `…/inventory/<uuid>/allocation`                                                                   | Fills, save refused — the Lager write phase.                         |
+| Operation on the Einsatz's **Kern**                   | `PATCH …/missions/<uuid>/core`                                                                    | Fills, save refused — the Einsatz planning set.                      |
+| Funktions-Chips on a **Crew-Slot** (`archetype=CREW`) | `PUT …/missions/<uuid>/units/<uuid>/crew/<uuid>`                                                  | Fills, save refused — the Einsatz planning set.                      |
+
+**The three that fill ahead of their write are still an improvement, and the reason is the audit's
+own.** The class this phase closes is *„falscher Leerzustand"* — a wrong empty state that a member
+cannot report, because nothing about it looks like a fault. A picker that fills and then fails on
+save is an ordinary error message: it names itself, it can be described, and it lands in the same
+bucket as every other refused write on that screen. The Crew chips are the clearest case — every
+write on the Einheiten tab is refused already (adding a unit, editing it, deleting it, putting
+somebody aboard, taking them off), so the chips appear on a surface that was write-dead before they
+did.
+
+> [!note] The audit tracked the Crew-Chip write as a *latent* defect, armed by exactly this change
+> `PUT …/units/<uuid>/crew/<uuid>` was not among the 75: the chips were never drawn, so the call
+> was unreachable. Phase S draws them. It is recorded here because a latent entry that goes live
+> silently is how a ledger stops being trustworthy.
 
 ---
 

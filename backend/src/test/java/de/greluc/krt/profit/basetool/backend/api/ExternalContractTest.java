@@ -2004,7 +2004,66 @@ class ExternalContractTest {
           new ContractOperation(
               "/api/v1/users/me/read-announcement/{announcementId}",
               "put",
-              Set.of("lastReadAnnouncementId")));
+              Set.of("lastReadAnnouncementId")),
+          // ---- Phase R: the two edits that were 405, not 404 ---------------------------------
+          //
+          // Both paths were already admitted; only the read-only guard refused the verb. The
+          // carve-out that opens them is METHOD-SCOPED, because the backend serves DELETE on both
+          // and the app sends neither -- see the runbook's phase R.
+          //
+          // The order edit answers the whole order and the app folds it back through the SAME
+          // mapper as the detail read, so its frozen set is that one. `materials` is the only
+          // required request field: an order without lines is not an order.
+          new ContractOperation(
+              "/api/v1/orders/{id}",
+              "put",
+              Set.of(
+                  "id",
+                  "displayId",
+                  "status",
+                  "priority",
+                  "type",
+                  "comment",
+                  "createdAt",
+                  "materials",
+                  "aggregatedMaterials",
+                  "assignees",
+                  "user",
+                  "effectiveName",
+                  "note",
+                  "version",
+                  "handovers",
+                  "redacted",
+                  "canEdit",
+                  "requestingOrgUnit",
+                  "responsibleOrgUnit"),
+              Set.of("materials")),
+          // The Operation edit DISCARDS its answer -- `updateOperation` maps the result to
+          // `ApiResult.Success(Unit)` -- so there is no response field to freeze and recording one
+          // would promise a shape nothing reads. The request is what matters, and its `status` is
+          // a required enum: a shipped build sends the literal string.
+          new ContractOperation(
+              "/api/v1/operations/{id}", "put", Set.of(), Set.of("name", "status", "version")),
+          // ---- Phase S: the four pickers that answered „there are none" ----------------------
+          //
+          // Each of these is swallowed on failure by design -- a picker is one field on a form
+          // about something else -- so a refused read renders as an EMPTY list, and an empty
+          // picker reads as an answer. That is what made this class unreportable, and it is why
+          // the frozen sets below are derived from what each mapper reads rather than from the
+          // DTO: a name that disappears here empties a control rather than failing anything.
+          new ContractOperation(
+              "/api/v1/orders/lookup",
+              "get",
+              Set.of("id", "displayId", "handle", "requiredMaterialIds", "requiredGameItemIds")),
+          new ContractOperation("/api/v1/missions/lookup", "get", Set.of("id", "name", "status")),
+          new ContractOperation("/api/v1/operations/lookup", "get", Set.of("id", "name")),
+          // `active` is read as a FILTER (`it.active != false`), which is the easiest kind of
+          // field to lose: drop it and every retired Funktion returns to both pickers, with
+          // nothing failing. `content` is the envelope the app reads whole -- it walks no pages
+          // here, it asks for 200 and takes them.
+          new ContractOperation(
+                  "/api/v1/job-types", "get", Set.of("content", "id", "name", "active"))
+              .addressedBy(Set.of("archetype:string", "page:integer", "size:integer")));
 
   /**
    * Contract operations the app addresses by <strong>no</strong> query parameter, although the
@@ -2029,7 +2088,13 @@ class ExternalContractTest {
           // dozen methods, they change on a game patch rather than on a member's action, and a
           // picker that paged would be a picker somebody has to operate. Recorded rather than left
           // blank, because a blank slot cannot be told apart from a forgotten one.
-          "get /api/v1/refining-methods");
+          "get /api/v1/refining-methods",
+          // Phase S. `/orders/lookup` offers `withNeeds`, which decides whether each row carries
+          // its required material and item ids. The app sends none of it and reads both id lists
+          // anyway -- the endpoint's default already includes them -- so the parameter is a
+          // narrowing the app has no use for. Recorded rather than left blank, because a blank
+          // slot cannot be told apart from a forgotten one.
+          "get /api/v1/orders/lookup");
 
   @Test
   @DisplayName("the query parameters a shipped client asks with still exist, with their types")
@@ -2148,34 +2213,32 @@ class ExternalContractTest {
    * the new constant first.
    */
   private static final Map<String, Set<String>> FROZEN_REQUIRED_ENUMS =
-      Map.of(
-          "JobTypeDto.archetype",
-          Set.of("CREW", "MISSION"),
+      // `Map.ofEntries`, not `Map.of`: the latter caps at ten key/value pairs, and phase R's
+      // Operation edit is the eleventh. The overload resolves silently up to that point and
+      // then stops compiling — a good failure, but an opaque one if you have not met it.
+      Map.ofEntries(
+          Map.entry("JobTypeDto.archetype", Set.of("CREW", "MISSION")),
           // Both halves of the personal-inventory editor send this one, and it was invisible until
           // the guard started walking requests: a renamed constant would have turned every save on
           // an installed build into a 400 while the screen kept loading.
-          "PersonalInventoryItemCreateRequest.locationType",
-          Set.of("CITY", "SPACE_STATION"),
-          "PersonalInventoryItemUpdateRequest.locationType",
-          Set.of("CITY", "SPACE_STATION"),
-          "UpdateJobOrderStatusDto.status",
-          Set.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED"),
-          "UpdatePayoutPreferenceRequest.preference",
-          Set.of("PAYOUT", "DONATE"),
+          Map.entry(
+              "PersonalInventoryItemCreateRequest.locationType", Set.of("CITY", "SPACE_STATION")),
+          Map.entry(
+              "PersonalInventoryItemUpdateRequest.locationType", Set.of("CITY", "SPACE_STATION")),
+          Map.entry(
+              "UpdateJobOrderStatusDto.status",
+              Set.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED")),
+          Map.entry("UpdatePayoutPreferenceRequest.preference", Set.of("PAYOUT", "DONATE")),
           // The me-scoped twin of the line above, frozen with phase Q. Different schema, same two
           // constants and the same failure: a shipped build sends the literal string, so a rename
           // turns every save of the Einstellungen row into a 400 while the screen keeps loading.
-          "MyPayoutPreferenceRequest.preference",
-          Set.of("PAYOUT", "DONATE"),
-          "MissionFinanceEntryCreateDto.type",
-          Set.of("INCOME", "EXPENSE"),
-          "MissionFinanceEntryUpdateDto.type",
-          Set.of("INCOME", "EXPENSE"),
+          Map.entry("MyPayoutPreferenceRequest.preference", Set.of("PAYOUT", "DONATE")),
+          Map.entry("MissionFinanceEntryCreateDto.type", Set.of("INCOME", "EXPENSE")),
+          Map.entry("MissionFinanceEntryUpdateDto.type", Set.of("INCOME", "EXPENSE")),
           // The three movements the app's request sheet sends as literals. Renaming one would
           // turn every booking request an installed build raises into a 400 while the sheet still
           // opens and still looks fine.
-          "CreateBankBookingRequest.type",
-          Set.of("DEPOSIT", "WITHDRAWAL", "TRANSFER"),
+          Map.entry("CreateBankBookingRequest.type", Set.of("DEPOSIT", "WITHDRAWAL", "TRANSFER")),
           // Reachable since POST /orders/items joined the set. A material line on an item order is
           // raw or refined, and the app sends the constant as a literal: renaming one turns every
           // item order an installed build raises into a 400 while the form still opens.
@@ -2183,8 +2246,12 @@ class ExternalContractTest {
           // Unlike the response enums above, a NEW constant here is harmless to an old build - it
           // simply never sends it. The direction that hurts is removal, which this guard catches
           // the same way.
-          "CreateJobOrderItemMaterialDto.quality",
-          Set.of("GOOD", "NONE"));
+          Map.entry("CreateJobOrderItemMaterialDto.quality", Set.of("GOOD", "NONE")),
+          // Phase R. The Operation edit the app sends is the eleventh frozen request enum, which
+          // is what forced this map off `Map.of` — that factory caps at ten pairs and then simply
+          // stops resolving.
+          Map.entry(
+              "OperationUpdateDto.status", Set.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELED")));
 
   @Test
   @DisplayName("no enum a shipped client must parse has gained or lost a constant")

@@ -686,6 +686,73 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * The four pickers phase S opens, refused without a token.
+   *
+   * <p>The class the audit called unreportable: each of these is swallowed on failure by design — a
+   * picker is one field on a form about something else — so a refused read renders as an
+   * <em>empty</em> list, and an empty picker reads as an answer rather than as a fault. {@code
+   * /job-types} is the worst of them: the tab does not merely show nothing, it states that the
+   * organisation has defined no CREW functions.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousPickerReadsWithUnauthorized() throws Exception {
+    // Pinned one at a time, because the four do NOT answer alike and grouping them hid that.
+    // `/api/v1/orders/**` and `/api/v1/operations/**` are authenticated in the filter chain, so the
+    // entry point turns them away before dispatch and writes 401.
+    mockMvc.perform(get("/api/v1/orders/lookup")).andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/operations/lookup")).andExpect(status().isUnauthorized());
+    // `GET /api/v1/missions/**` is permitAll — the whole Einsatz read surface is, so a guest can
+    // see the board — so this one is dispatched and refused at the method seam: 403.
+    // 403, not 401, and the difference is structural: `/api/v1/job-types` is `permitAll` in the
+    // filter chain (it sits in the catalogue block beside /locations and /refining-methods), so
+    // the request is DISPATCHED and the method-level guard refuses it — which
+    // GlobalExceptionHandler
+    // renders as 403, with nothing upgrading it to 401 because the MVC advice has already handled
+    // it. Identical in shape to /locations/home-locations, which phase M spent three red probe
+    // nights learning.
+    mockMvc.perform(get("/api/v1/missions/lookup")).andExpect(status().isForbidden());
+    // 200, and DELIBERATELY so (REQ-SEC-037). `JobTypeController`'s own Javadoc states the rule —
+    // "Read is public; mutations are OFFICER/ADMIN" — and the list carries role names and nothing
+    // else: no member, no org unit, no Einsatz is reachable through it. It sits in the same
+    // permitAll catalogue block as /ship-types, /materials/search and /refining-methods, all of
+    // which this class already records as anonymous. Admitting it at the edge therefore publishes
+    // a catalogue that was already public, and this assertion is what keeps that a decision.
+    mockMvc.perform(get("/api/v1/job-types")).andExpect(status().isOk());
+  }
+
+  /**
+   * The two edits phase R opens, refused without a token.
+   *
+   * <p>These are the only two of the audit's 75 that answered {@code 405} rather than {@code 404}:
+   * the path was reachable and the verb was not. What this class can pin is the backend's own
+   * answer; that the exception stayed <em>method-scoped</em> — {@code DELETE} on both paths still
+   * refused by the edge — is a vhost behaviour and is asserted by the nightly probe instead.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousOrderAndOperationEditsWithUnauthorized() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/v1/orders/" + ABSENT_OPERATION)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"materials\":[]}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/operations/" + ABSENT_OPERATION)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"x\",\"status\":\"PLANNED\",\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
    * The member's own two settings and the Aushang's read marker, refused without a token.
    *
    * <p>Phase Q, and the quietest gap this allow-list has produced. Both settings rows are drawn
