@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- **Vier Auswahllisten in der App waren leer, ohne dass etwas nach einem Fehler aussah.** Auftrags- und Einsatz-Picker im Buchungsblatt, der Operations-Picker im Einsatz und der Funktionen-Katalog werden bei einem Fehler bewusst stillschweigend geschluckt; am API-Zugang abgewiesen hieß das leere Liste, und eine leere Liste liest sich als Antwort. Der Funktionen-Katalog behauptete sogar, die Organisation habe keine CREW-Funktionen (Runbook-Phase S).
+
+- **Auftrag und Operation liessen sich in der App nicht bearbeiten.** Beide Pfade waren am API-Zugang längst freigegeben — nur das Verb wurde abgewiesen (405 statt 404). Die Ausnahme ist **methoden-genau** geschrieben: der Server bietet auf beiden Pfaden auch ein Löschen an, die App ruft es nie auf, und es bleibt weiterhin gesperrt (Runbook-Phase R).
+
 - **Drei me-bezogene Pfade der App waren am API-Zugang nicht freigegeben.** In den App-Einstellungen blieben „Auszahlungspräferenz" und „Blueprints mit Org teilen" dadurch auf jedem Konto ausgegraut, und „als gelesen" am Aushang sprang zurück. Lesen und Schreiben mussten zusammen freigegeben werden — die beiden Einstellungen teilen sich eine Optimistic-Lock-Version, ein Client der schreiben aber nicht lesen kann würde eine `0` zurücksenden. Freigegeben, eingefroren und geprobt (Runbook-Phase Q); erste Ausnahme, die die Read-only-Sperre unter `/users` je bekommen hat.
 
 ## [v1.6.21](https://github.com/krt-profit/basetool/releases/tag/v1.6.21) - 2026-09-05
