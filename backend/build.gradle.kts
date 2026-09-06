@@ -209,6 +209,23 @@ tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
 //
 // Declared file by file rather than as whole source trees: this must invalidate on the handful of
 // files the assertions actually read, not on every Java change in two other modules.
+// The six sources `LogSafeTest` compares. The guard exists once per module and asserts that the
+// marked region of all three `LogSafe.java` implementations, and the expectation table in all
+// three test classes, are byte-identical — so a sanitiser fix in one module cannot leave the other
+// two logging what it strips. Every module declares the whole set rather than only the four that
+// live elsewhere: two are already covered here by `classes`/`testClasses`, listing them costs
+// nothing, and the three build files then carry the identical list instead of three different
+// subsets a reader has to reason about.
+val logSafeMirrorSources =
+  listOf(
+    "backend/src/main/java/de/greluc/krt/profit/basetool/backend/support/LogSafe.java",
+    "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/logging/LogSafe.java",
+    "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/logging/LogSafe.java",
+    "backend/src/test/java/de/greluc/krt/profit/basetool/backend/support/LogSafeTest.java",
+    "frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/logging/LogSafeTest.java",
+    "ingest/src/test/java/de/greluc/krt/profit/basetool/ingest/logging/LogSafeTest.java",
+  )
+
 tasks.named<Test>("test") {
   inputs
     .files(
@@ -242,5 +259,31 @@ tasks.named<Test>("test") {
   inputs
     .file(rootProject.file("docs/API_VHOST_ROLLOUT_RUNBOOK.md"))
     .withPropertyName("apiVhostRunbook")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  // The same defect a third time, and here it was never theoretical. `crossModuleParitySources`
+  // covers the `ObservationPrivacyFilter` trio and nothing else, so `LogSafeTest` read four files
+  // outside this module that reached the task through neither the classpath nor a declaration. It
+  // matters more here than in `frontend`: that module runs `bootBuildInfo`, whose fresh
+  // `build.time` lands on the test runtime classpath and re-ran `:frontend:test` unconditionally,
+  // accidentally covering its copy of the same gap. `backend` runs no `bootBuildInfo`, so
+  // `:backend:test` genuinely did report UP-TO-DATE after a cross-module `LogSafe` edit and the
+  // mirror assertion genuinely was skipped — a live false green, not a latent one.
+  inputs
+    .files(logSafeMirrorSources.map { rootProject.file(it) })
+    .withPropertyName("logSafeMirrorSources")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  // `LiveSyncTopicRegistryParityTest` reads the frontend's `LiveSyncTopicClass` enum as source and
+  // asserts that every backend live-sync topic has a frontend constant to route it. Same shape as
+  // the parity sources above, same reason it must be declared: a frontend-only rename would leave
+  // this task UP-TO-DATE and the routing table silently half-updated.
+  inputs
+    .file(
+      rootProject.file(
+        "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/websocket/LiveSyncTopicClass.java"
+      )
+    )
+    .withPropertyName("liveSyncTopicRegistrySource")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 }

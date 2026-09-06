@@ -255,10 +255,67 @@ tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
 // this module's classes, which are already on the test runtime classpath.
 val backendDtoMirrorDir = "backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto"
 
+// The six sources `LogSafeTest` compares: the guard exists once per module and asserts that the
+// marked region of all three `LogSafe.java` implementations, and the expectation table in all
+// three test classes, are byte-identical — so a sanitiser fix in one module cannot leave the other
+// two logging what it strips. The whole set is declared rather than only the four that live
+// elsewhere: two are already covered here by `classes`/`testClasses`, listing them costs nothing,
+// and the three build files then carry the identical list instead of three different subsets a
+// reader has to reason about.
+val logSafeMirrorSources =
+  listOf(
+    "backend/src/main/java/de/greluc/krt/profit/basetool/backend/support/LogSafe.java",
+    "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/logging/LogSafe.java",
+    "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/logging/LogSafe.java",
+    "backend/src/test/java/de/greluc/krt/profit/basetool/backend/support/LogSafeTest.java",
+    "frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/logging/LogSafeTest.java",
+    "ingest/src/test/java/de/greluc/krt/profit/basetool/ingest/logging/LogSafeTest.java",
+  )
+
 tasks.named<Test>("test") {
   inputs
     .files(rootProject.fileTree(backendDtoMirrorDir) { include("*.java") })
     .withPropertyName("backendDtoMirrorSources")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  // Three tests — `DtoOpenApiContractTest`, `FrontendDtoContractTest` and
+  // `AdminAuditLogPageControllerTest` — read the BACKEND's committed OpenAPI document off the
+  // filesystem, walking up to the repository root to find it. The frontend ships no `api/`
+  // resource of its own, so unlike the backend's own generator tests there is no
+  // `processResources` copy to track it: without this the frontend mirrors could drift from the
+  // server contract with the task reporting UP-TO-DATE.
+  inputs
+    .file(rootProject.file("backend/src/main/resources/api/openapi.json"))
+    .withPropertyName("backendOpenApiDocument")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  // `BackendHealthUrlProdParityTest` compares this module's prod config against the backend's, so
+  // the health URL the frontend probes cannot drift from the endpoint the backend actually exposes.
+  // Its frontend half is tracked through `processResources`; the backend half is not tracked at
+  // all.
+  inputs
+    .file(rootProject.file("backend/src/main/resources/application-prod.yml"))
+    .withPropertyName("backendProdConfig")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  inputs
+    .files(logSafeMirrorSources.map { rootProject.file(it) })
+    .withPropertyName("logSafeMirrorSources")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  // In-module but still off this task's classpath: `E2eAudienceEnforcementParityTest` lives in
+  // `src/test` and reads two files from the `e2e` source set, which `test` neither compiles nor
+  // depends on. It asserts that the audience the compose stack hands the backend matches the
+  // Keycloak client in the E2E realm export — exactly the pair whose silent divergence makes every
+  // E2E flow fail authentication for a reason nothing in the suite explains.
+  inputs
+    .files(
+      rootProject.file(
+        "frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/E2eStackExtension.java"
+      ),
+      rootProject.file("frontend/src/e2e/resources/realm-export.e2e.json"),
+    )
+    .withPropertyName("e2eAudienceParitySources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
