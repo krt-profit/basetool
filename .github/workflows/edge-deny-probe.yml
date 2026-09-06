@@ -65,6 +65,37 @@ jobs:
           TARGETS
           exit $fail
 
+      - name: Former public pages must send a browser into the login (REQ-SEC-052)
+        run: |
+          # The members-only contract as a member's browser sees it (ADR-0159). These three pages
+          # rendered without a login until the cut-over; each must now answer a NAVIGATION with a
+          # 302 into the OAuth2 entry point.
+          #
+          # The internal blackbox-members-only job asserts the same thing, and this run is the
+          # cross-check from a vantage point that shares nothing with it: no Docker bridge, no
+          # hairpin, no local resolver. What both are really watching for is a cache rule or a
+          # mis-ordered NPM `location` serving the old page — which republishes the roster and
+          # leaves every in-process test green, because those run against MockMvc.
+          #
+          # Sent as a navigation on purpose. The same paths answer 401 to a background call by
+          # design (REQ-SEC-012), so a bare curl would assert the wrong half of the contract.
+          # -o /dev/null with no -L: the FIRST response is the assertion; following it would land
+          # on Keycloak and report Keycloak's status instead.
+          fail=0
+          for path in /missions /operations /orders; do
+            url="https://profit-base.online$path"
+            read -r code location <<<"$(curl -s -o /dev/null               -w '%{http_code} %{redirect_url}' --max-time 20 --retry 2 --retry-delay 10               -H 'Accept: text/html,application/xhtml+xml'               -H 'Sec-Fetch-Mode: navigate' "$url" || true)"
+            echo "GET $path -> HTTP ${code:-000} ${location:-}"
+            if [ "$code" != "302" ]; then
+              echo "::error::$url answered ${code:-000} instead of 302 — a former public page is being served without a login. REQ-SEC-052 allows exactly /, /impressum, /privacy and /terms. Check the NPM proxy host for a cache or location rule ahead of the app, and confirm the deployed frontend image carries the members-only SecurityConfig."
+              fail=1
+            elif ! printf '%s' "$location" | grep -q '/oauth2/authorization/keycloak'; then
+              echo "::error::$url redirected to '${location:-}' rather than the OAuth2 entry point. A 302 to anywhere else is not a login gate."
+              fail=1
+            fi
+          done
+          exit $fail
+
       - name: API vhost allow-list must answer the statuses REQ-SEC-037 records
         run: |
           # The counterpart to the runbook's manual § D.3a check, run nightly from outside.

@@ -225,6 +225,42 @@ modules:
       tls_config:
         insecure_skip_verify: false
 
+  # Succeeds ONLY when a former public page sends an anonymous visitor into the OAuth2 flow —
+  # REQ-SEC-052 seen from outside, where a member's browser sees it. `/missions` was reachable
+  # without a login until ADR-0159; the redirect is now the whole user-visible contract, and the
+  # failure it guards against is silent in both directions: an edge rule or cache that starts
+  # serving the page from somewhere else reads as 200, and a chain misconfiguration that drops the
+  # entry point reads as 401 on a page a browser navigated to. Either is a regression nothing else
+  # would page on — the app's own sweeps run inside the process, against MockMvc.
+  #
+  # follow_redirects stays false so the FIRST response is asserted; following it would land on
+  # Keycloak and assert Keycloak's status instead. The Location regexp binds only the entry-point
+  # path, not the query, because the first visit carries `?prompt=none` (silent SSO) and a later
+  # one does not.
+  http_members_only_redirect:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: [302]
+      method: GET
+      follow_redirects: false
+      headers:
+        # Asserted as a BROWSER NAVIGATION, which is the only shape that redirects: a background
+        # call answers 401 by design (REQ-SEC-012), and probing without these headers would assert
+        # the wrong half of the contract.
+        Accept: "text/html,application/xhtml+xml"
+        Sec-Fetch-Mode: "navigate"
+      fail_if_header_not_matches:
+        - header: Location
+          regexp: "/oauth2/authorization/keycloak"
+      fail_if_ssl: false
+      fail_if_not_ssl: false
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+      tls_config:
+        insecure_skip_verify: false
+
   # Succeeds ONLY when plain-HTTP port 80 answers with a redirect to https:// — the per-host
   # "Force SSL" toggle in NPM. follow_redirects stays false so the first response is asserted.
   http_force_ssl_redirect:

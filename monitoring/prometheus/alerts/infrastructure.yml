@@ -3,20 +3,21 @@
 groups:
   - name: infrastructure-critical
     rules:
-      # Scoped OFF the 11 blackbox /probe jobs (blackbox-http*, -edge-deny, -force-ssl, -hsts,
-      # -internal-tls*, -dns-*). On a /probe job `up==0` does NOT mean the probed target is down — it
+      # Scoped OFF the 12 blackbox /probe jobs (blackbox-http*, -edge-deny, -force-ssl,
+      # -members-only, -hsts, -internal-tls*, -dns-*). On a /probe job `up==0` does NOT mean the probed target is down — it
       # means the Prometheus->exporter scrape itself timed out, because the blackbox module timeout
       # equalled scrape_timeout (2026-07-12 false-critical: blackbox-internal-tls + blackbox-http-ipv6
       # paged critical for backend/frontend/ingest + all three public hosts at once, while every
       # service was healthy). Those probes now carry scrape_timeout:15s, and a genuine failure surfaces
       # FAST as `probe_success==0` (up stays 1) via the dedicated probe alerts — BlackboxProbeFailed,
-      # EdgeActuatorDenyBroken, EdgeForceSslRedirectBroken, EdgeHstsHeaderMissing, EdgeIpv6Unreachable,
+      # EdgeActuatorDenyBroken, EdgeForceSslRedirectBroken, EdgeMembersOnlyRedirectBroken,
+      # EdgeHstsHeaderMissing, EdgeIpv6Unreachable,
       # DnsResolutionFailed, CertificateExpiringSoon — and app-down liveness for the internal-tls
       # targets is already paged by the basetool-backend/frontend/ingest scrape jobs. The `!~` regex
       # KEEPS the blackbox-exporter self-scrape (the exporter's own /metrics liveness) and every
       # non-probe job in scope. REQ-OBS-008/-012.
       - alert: TargetDown
-        expr: up{job!~"blackbox-(http|edge|force|hsts|internal|dns).*"} == 0
+        expr: up{job!~"blackbox-(http|edge|force|members|hsts|internal|dns).*"} == 0
         for: 3m
         labels:
           severity: critical
@@ -453,6 +454,29 @@ groups:
         annotations:
           summary: "HTTP→HTTPS redirect broken: {{ $labels.instance }}"
           description: "Port 80 on {{ $labels.instance }} no longer answers with a 301/308 to https:// — the Force SSL toggle on the NPM proxy host is off or drifted."
+
+      # REQ-SEC-052 / ADR-0159 seen from outside. The members-only cut-over made three former
+      # public pages redirect an anonymous browser into the OAuth2 flow; this is the only signal
+      # that says so from where a member's browser stands. The app's own sweeps
+      # (AnonymousSurfaceSweepMvcTest) run in-process against MockMvc and would stay green while a
+      # cache rule, a stale upstream or a mis-ordered NPM location served the old page — which is
+      # the failure worth paging on, because it publishes the roster again and nothing else
+      # notices. Same `and on()` outage guard as EdgeActuatorDenyBroken: while the edge itself is
+      # down the probe carries no signal and BlackboxProbeFailed already pages.
+      #
+      # `critical` rather than `warning`, unlike its posture siblings: Force-SSL and HSTS drifting
+      # weaken a transport that still works, this one means member data is being served to the
+      # internet. 5m rather than 15m for the same reason.
+      - alert: EdgeMembersOnlyRedirectBroken
+        expr: >-
+          probe_success{job="blackbox-members-only"} == 0
+          and on() (probe_success{job="blackbox-http", instance="https://profit-base.online"} == 1)
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Members-only redirect broken: {{ $labels.instance }}"
+          description: "{{ $labels.instance }} no longer answers a browser navigation with a 302 into /oauth2/authorization/keycloak. REQ-SEC-052 requires every page except /, /impressum, /privacy and /terms to need a login; a 200 here means the page is being served to anonymous visitors. Check the NPM proxy host for a cache or location rule ahead of the app, and confirm the frontend image carries the members-only SecurityConfig."
 
       # Regex, not the bare job name: blackbox-hsts-auth (the API vhost, whose probeable paths
       # answer 401 and therefore need the http_2xx_or_401_hsts module) is a separate job.
