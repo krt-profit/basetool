@@ -57,8 +57,8 @@ class CsrfTokenControllerMvcTest {
 
   @MockitoBean private WebClient webClient;
 
-  @MockitoBean(name = "publicWebClient")
-  private WebClient publicWebClient;
+  @MockitoBean(name = "termsDocumentClient")
+  private WebClient termsDocumentClient;
 
   @MockitoBean private BackendApiClient backendApiClient;
 

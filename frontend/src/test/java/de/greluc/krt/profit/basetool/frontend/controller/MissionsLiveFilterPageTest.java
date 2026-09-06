@@ -72,7 +72,7 @@ class MissionsLiveFilterPageTest {
 
     PageResponse<MissionListDto> emptyPage =
         new PageResponse<>(List.<MissionListDto>of(), 0, 20, 0L, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef(), anyBoolean())).thenReturn(emptyPage);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(emptyPage);
   }
 
   @Test

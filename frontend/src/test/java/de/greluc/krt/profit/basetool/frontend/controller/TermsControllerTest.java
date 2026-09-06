@@ -61,7 +61,7 @@ class TermsControllerTest {
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     when(backendApiClient.get(
-            eq("/api/v1/terms/document"), eq(TermsDocumentDto.class), anyBoolean()))
+            eq("/api/v1/terms/document"), eq(TermsDocumentDto.class)))
         .thenReturn(document());
   }
 

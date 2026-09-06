@@ -93,13 +93,13 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
     // renders. A redirect, not a 403 — the frontend sends a browser to the OAuth2 login.
     mockMvc.perform(get("/orders/create")).andExpect(status().is3xxRedirection());
 
-    verify(backendApiClient, never()).getCached(any(CachedCatalog.class), anyTypeRef(), eq(true));
+    verify(backendApiClient, never()).getCached(any(CachedCatalog.class), anyTypeRef());
   }
 
   @Test
   @WithMockUser
   void viewCreateForm_ShouldFetchMaterialsThroughPublicWebClient() throws Exception {
-    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -108,7 +108,7 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
         .andExpect(view().name("orders-create"));
 
     verify(backendApiClient)
-        .getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef(), eq(true));
+        .getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef());
     verify(backendApiClient, never())
         .getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef());
   }
@@ -121,7 +121,7 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
   @Test
   @WithMockUser
   void viewCreateForm_blanketInputRuleExcludesRadioAndCheckboxControls() throws Exception {
-    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -143,7 +143,7 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
         new OrgUnitMembershipOptionDto(
             UUID.randomUUID(), "Combat SK", "CSK", "SPECIAL_COMMAND", false);
 
-    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
     when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
         .thenReturn(List.of(profitStaffel, nonProfitSk));
@@ -161,6 +161,6 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
     // there is no anonymous caller left, so there is no second list to fall to except on failure.
     verify(backendApiClient).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef());
     verify(backendApiClient, never())
-        .getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef(), eq(true));
+        .getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef());
   }
 }

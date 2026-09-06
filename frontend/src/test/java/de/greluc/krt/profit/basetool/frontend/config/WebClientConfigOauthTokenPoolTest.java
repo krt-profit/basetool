@@ -25,7 +25,6 @@ import static org.mockito.Mockito.mock;
 
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronRelayFilter;
 import de.greluc.krt.profit.basetool.frontend.logging.ClientIpRelayFilter;
-import de.greluc.krt.profit.basetool.frontend.logging.GuestEditTokenRelayFilter;
 import de.greluc.krt.profit.basetool.frontend.logging.UserLocaleRelayFilter;
 import de.greluc.krt.profit.basetool.frontend.logging.WebClientLoggingFilter;
 import io.micrometer.observation.ObservationRegistry;
@@ -109,7 +108,6 @@ class WebClientConfigOauthTokenPoolTest {
         mock(ActiveSquadronRelayFilter.class),
         mock(UserLocaleRelayFilter.class),
         new ClientIpRelayFilter(),
-        mock(GuestEditTokenRelayFilter.class),
         environment,
         mock(SslBundles.class),
         ObservationRegistry.NOOP);

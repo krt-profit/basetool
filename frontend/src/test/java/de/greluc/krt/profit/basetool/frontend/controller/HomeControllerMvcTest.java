@@ -90,7 +90,7 @@ class HomeControllerMvcTest {
     // Anonymous home() path: backendApiClient.get(searchUri, typeRef, isPublic=true) for the
     // next-7-days upcoming-missions search. Returning null is a valid "no upcoming missions"
     // response and keeps the template's empty-state branch simple.
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(null);
   }
 
@@ -195,7 +195,7 @@ class HomeControllerMvcTest {
             null,
             0L,
             0L);
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
 
     mockMvc
@@ -229,7 +229,7 @@ class HomeControllerMvcTest {
             null,
             0L,
             0L);
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
 
     mockMvc
@@ -288,7 +288,7 @@ class HomeControllerMvcTest {
             null,
             0L,
             0L);
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(ownMission), 0, 50, 1, 1, List.of()));
 
     mockMvc
@@ -346,7 +346,7 @@ class HomeControllerMvcTest {
             null,
             0L,
             0L);
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(foreignMission), 0, 50, 1, 1, List.of()));
 
     mockMvc
@@ -408,7 +408,7 @@ class HomeControllerMvcTest {
             null,
             0L,
             0L);
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(skMission), 0, 50, 1, 1, List.of()));
 
     mockMvc

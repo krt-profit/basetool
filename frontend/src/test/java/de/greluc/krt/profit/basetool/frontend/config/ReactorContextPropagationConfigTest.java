@@ -24,7 +24,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronContext;
 import de.greluc.krt.profit.basetool.frontend.logging.ClientIpContext;
 import de.greluc.krt.profit.basetool.frontend.logging.CorrelationContext;
-import de.greluc.krt.profit.basetool.frontend.logging.GuestEditTokenContext;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -70,7 +69,6 @@ class ReactorContextPropagationConfigTest {
     ActiveSquadronContext.clear();
     CorrelationContext.clear();
     ClientIpContext.clear();
-    GuestEditTokenContext.clear();
     LocaleContextHolder.resetLocaleContext();
   }
 
@@ -121,32 +119,6 @@ class ReactorContextPropagationConfigTest {
         .isEqualTo(correlationId);
   }
 
-  @Test
-  void guestEditTokenContext_isVisibleInsideMonoOnDifferentScheduler() {
-    String guestToken = "guest-edit-token-" + UUID.randomUUID();
-    GuestEditTokenContext.set(guestToken);
-
-    AtomicReference<String> observedOnReactorThread = new AtomicReference<>();
-    AtomicReference<String> observedThreadName = new AtomicReference<>();
-
-    Mono.fromCallable(
-            () -> {
-              observedOnReactorThread.set(GuestEditTokenContext.get());
-              observedThreadName.set(Thread.currentThread().getName());
-              return "done";
-            })
-        .subscribeOn(Schedulers.parallel())
-        .block();
-
-    assertThat(observedOnReactorThread.get())
-        .as("GuestEditTokenContext must be visible on the Reactor parallel-scheduler thread")
-        .isEqualTo(guestToken);
-    assertThat(observedThreadName.get())
-        .as(
-            "sanity: the callable must have run on a Reactor parallel-N worker, not the JUnit"
-                + " thread")
-        .startsWith("parallel-");
-  }
 
   @Test
   void clientIpContext_isVisibleInsideMonoOnDifferentScheduler() {

@@ -112,8 +112,7 @@ class MissionSecurityRenderingTest {
             null,
             null,
             PayoutPreference.PAYOUT,
-            1L,
-            null);
+            1L);
 
     MissionDto mission =
         new MissionDto(
@@ -156,14 +155,12 @@ class MissionSecurityRenderingTest {
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            anyBoolean()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(mission);
     when(backendApiClient.getCached(
             any(CachedCatalog.class),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            anyBoolean()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(Collections.emptyList());
 
     // Anonymously access the mission detail page: a registered participant's payout select must be
@@ -219,8 +216,7 @@ class MissionSecurityRenderingTest {
             null,
             null,
             PayoutPreference.PAYOUT,
-            1L,
-            null);
+            1L);
 
     MissionDto mission =
         new MissionDto(
@@ -263,14 +259,12 @@ class MissionSecurityRenderingTest {
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            anyBoolean()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(mission);
     when(backendApiClient.getCached(
             any(CachedCatalog.class),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            anyBoolean()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(Collections.emptyList());
 
     // Authenticated as Admin
@@ -319,8 +313,7 @@ class MissionSecurityRenderingTest {
             null,
             null,
             PayoutPreference.PAYOUT,
-            1L,
-            null);
+            1L);
 
     MissionDto mission =
         new MissionDto(
@@ -363,14 +356,12 @@ class MissionSecurityRenderingTest {
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            anyBoolean()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(mission);
     when(backendApiClient.getCached(
             any(CachedCatalog.class),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            anyBoolean()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(Collections.emptyList());
 
     // Authenticated as another user. The OIDC subject (the Keycloak sub, which equals app_user.id)
@@ -429,8 +420,7 @@ class MissionSecurityRenderingTest {
             null,
             null,
             PayoutPreference.PAYOUT,
-            1L,
-            null);
+            1L);
 
     MissionDto mission =
         new MissionDto(
@@ -473,14 +463,12 @@ class MissionSecurityRenderingTest {
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            anyBoolean()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(mission);
     when(backendApiClient.getCached(
             any(CachedCatalog.class),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            anyBoolean()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(Collections.emptyList());
 
     // Authenticated as the participant themselves via an OIDC login whose subject (sub) equals the

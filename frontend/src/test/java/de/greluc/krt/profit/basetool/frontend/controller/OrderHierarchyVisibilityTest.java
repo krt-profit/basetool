@@ -124,7 +124,7 @@ class OrderHierarchyVisibilityTest {
             Boolean.TRUE,
             0L);
     when(backendApiClient.getCached(
-            eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef(), anyBoolean()))
+            eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef()))
         .thenReturn(java.util.List.of(distinctMaterial));
 
     java.util.Map<String, Object> claims = new java.util.HashMap<>();

@@ -50,11 +50,11 @@ class CachedCatalogListLoaderTest {
 
   @Test
   void returnsFreshMutableCopyOfPageContent() {
-    when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES), anyTypeRef(), eq(false)))
+    when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of("Aurora", "Cutlass"), 0, 10, 2L, 1, List.of()));
 
     List<String> result =
-        loader.loadPageContent(CachedCatalog.SHIP_TYPES, PAGE_TYPE, false, "ship types");
+        loader.loadPageContent(CachedCatalog.SHIP_TYPES, PAGE_TYPE, "ship types");
 
     assertThat(result).containsExactly("Aurora", "Cutlass");
     // Must be a fresh mutable list the caller can sort/extend in place.
@@ -64,29 +64,29 @@ class CachedCatalogListLoaderTest {
 
   @Test
   void nullPage_returnsEmptyList() {
-    when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS), anyTypeRef(), eq(false)))
+    when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS), anyTypeRef()))
         .thenReturn(null);
 
-    assertThat(loader.loadPageContent(CachedCatalog.LOCATIONS, PAGE_TYPE, false, "locations"))
+    assertThat(loader.loadPageContent(CachedCatalog.LOCATIONS, PAGE_TYPE, "locations"))
         .isEmpty();
   }
 
   @Test
   void nullContent_returnsEmptyList() {
-    when(backendApiClient.getCached(eq(CachedCatalog.MANUFACTURERS), anyTypeRef(), eq(false)))
+    when(backendApiClient.getCached(eq(CachedCatalog.MANUFACTURERS), anyTypeRef()))
         .thenReturn(new PageResponse<>(null, 0, 10, 0L, 0, List.of()));
 
     assertThat(
-            loader.loadPageContent(CachedCatalog.MANUFACTURERS, PAGE_TYPE, false, "manufacturers"))
+            loader.loadPageContent(CachedCatalog.MANUFACTURERS, PAGE_TYPE, "manufacturers"))
         .isEmpty();
   }
 
   @Test
   void backendFailure_degradesToEmptyList_ratherThanPropagating() {
-    when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
 
-    assertThat(loader.loadPageContent(CachedCatalog.SHIP_TYPES, PAGE_TYPE, true, "ship types"))
+    assertThat(loader.loadPageContent(CachedCatalog.SHIP_TYPES, PAGE_TYPE, "ship types"))
         .isEmpty();
   }
 }

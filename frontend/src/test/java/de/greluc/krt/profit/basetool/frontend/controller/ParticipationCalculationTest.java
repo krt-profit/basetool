@@ -68,8 +68,7 @@ class ParticipationCalculationTest {
             missionStart,
             missionEnd,
             PayoutPreference.PAYOUT,
-            1L,
-            null);
+            1L);
 
     MissionDto mission =
         new MissionDto(
@@ -110,7 +109,7 @@ class ParticipationCalculationTest {
             null);
 
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenReturn(mission);
 
     MissionPageController controller =
@@ -163,8 +162,7 @@ class ParticipationCalculationTest {
             missionStart,
             missionStart.plusSeconds(3600),
             PayoutPreference.PAYOUT,
-            1L,
-            null);
+            1L);
 
     // P2 has no startTime (not checked in yet)
     MissionParticipantDto p2 =
@@ -179,8 +177,7 @@ class ParticipationCalculationTest {
             null,
             null,
             PayoutPreference.PAYOUT,
-            1L,
-            null);
+            1L);
 
     MissionDto mission =
         new MissionDto(
@@ -221,7 +218,7 @@ class ParticipationCalculationTest {
             null);
 
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenReturn(mission);
 
     MissionPageController controller =

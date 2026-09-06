@@ -142,7 +142,7 @@ class OfficerRefineryAccessTest {
             false,
             true,
             1L);
-    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(List.of(rawMaterial, secondRawMaterial), 0, 100, 2, 1, List.of()));
     when(backendApiClient.get(

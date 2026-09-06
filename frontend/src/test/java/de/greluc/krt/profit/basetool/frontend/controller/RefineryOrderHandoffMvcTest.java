@@ -110,7 +110,7 @@ class RefineryOrderHandoffMvcTest {
             0L);
     PageResponse<MaterialDto> materials =
         new PageResponse<>(List.of(raw), 0, 1000, 1, 1, Collections.emptyList());
-    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS), anyTypeRef()))
         .thenReturn(materials);
   }
 

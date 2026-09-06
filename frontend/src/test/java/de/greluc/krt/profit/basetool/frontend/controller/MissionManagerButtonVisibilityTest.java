@@ -67,11 +67,11 @@ class MissionManagerButtonVisibilityTest {
   @Test
   @WithMockUser(roles = "MISSION_MANAGER")
   void listMissions_AsMissionManager_ShouldShowCreateButton() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(Collections.emptyList(), 0, 10, 0, 0, Collections.emptyList()));
 
-    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -83,11 +83,11 @@ class MissionManagerButtonVisibilityTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void listMissions_AsMember_ShouldShowCreateButton() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(Collections.emptyList(), 0, 10, 0, 0, Collections.emptyList()));
 
-    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -98,11 +98,11 @@ class MissionManagerButtonVisibilityTest {
 
   @Test
   void listMissions_AsAnonymous_ShouldNotShowCreateButton() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(Collections.emptyList(), 0, 10, 0, 0, Collections.emptyList()));
 
-    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
     mockMvc

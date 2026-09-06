@@ -50,7 +50,9 @@ class HomeControllerTest {
     doReturn(Collections.emptyList()).when(user).getAuthorities();
 
     // Act
-    String view = controller.home(model, user, session);
+    org.springframework.mock.web.MockHttpServletRequest request =
+        new org.springframework.mock.web.MockHttpServletRequest();
+    String view = controller.home(model, user, request);
 
     // Assert
     assertEquals("index", view);

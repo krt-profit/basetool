@@ -57,7 +57,7 @@ class MissionFrontendSecurityTest {
 
   @MockitoBean private WebClient webClient;
 
-  @MockitoBean private WebClient publicWebClient;
+  @MockitoBean private WebClient termsDocumentClient;
 
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 
@@ -77,8 +77,8 @@ class MissionFrontendSecurityTest {
     requestHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
     responseSpec = mock(WebClient.ResponseSpec.class);
 
-    // Standard mocking for publicWebClient used in listMissions
-    when(publicWebClient.get()).thenReturn(requestHeadersUriSpec);
+    // Standard mocking for termsDocumentClient used in listMissions
+    when(termsDocumentClient.get()).thenReturn(requestHeadersUriSpec);
     when(webClient.get()).thenReturn(requestHeadersUriSpec);
     when(requestHeadersUriSpec.uri(any(String.class))).thenReturn(requestHeadersSpec);
     when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);

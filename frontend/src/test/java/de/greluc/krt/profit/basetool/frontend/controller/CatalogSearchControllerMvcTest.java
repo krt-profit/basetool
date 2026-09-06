@@ -112,7 +112,7 @@ class CatalogSearchControllerMvcTest {
     UUID id = UUID.randomUUID();
     PageResponse<MaterialDto> page =
         new PageResponse<>(List.of(material(id, "Quantainium")), 0, 25, 1L, 1, List.of());
-    doReturn(page).when(backendApiClient).getPublic(anyString(), any(), any(Object[].class));
+    doReturn(page).when(backendApiClient).get(anyString(), any(), any(Object[].class));
 
     mockMvc
         .perform(get("/catalog/material-search").param("q", "quant").param("raw", "true"))
@@ -129,7 +129,7 @@ class CatalogSearchControllerMvcTest {
     PageResponse<MaterialDto> page = new PageResponse<>(List.of(), 0, 25, 0L, 0, List.of());
     doReturn(page)
         .when(backendApiClient)
-        .getPublic(contains("jobOrderOnly={jobOrder}&rawOnly={raw}"), any(), any(Object[].class));
+        .get(contains("jobOrderOnly={jobOrder}&rawOnly={raw}"), any(), any(Object[].class));
 
     mockMvc
         .perform(get("/catalog/material-search").param("q", "x").param("jobOrder", "true"))
@@ -141,7 +141,7 @@ class CatalogSearchControllerMvcTest {
   void materialSearch_backendFailure_returnsEmptyList() throws Exception {
     doThrow(new RuntimeException("backend down"))
         .when(backendApiClient)
-        .getPublic(anyString(), any(), any(Object[].class));
+        .get(anyString(), any(), any(Object[].class));
 
     mockMvc
         .perform(get("/catalog/material-search").param("q", "x"))
@@ -155,7 +155,7 @@ class CatalogSearchControllerMvcTest {
     PageResponse<LocationReferenceDto> page =
         new PageResponse<>(
             List.of(new LocationReferenceDto(id, "Port Olisar")), 0, 25, 1L, 1, List.of());
-    doReturn(page).when(backendApiClient).getPublic(anyString(), any(), any(Object[].class));
+    doReturn(page).when(backendApiClient).get(anyString(), any(), any(Object[].class));
 
     mockMvc
         .perform(get("/catalog/location-search").param("q", "port"))
@@ -169,7 +169,7 @@ class CatalogSearchControllerMvcTest {
   void locationSearch_backendFailure_returnsEmptyList() throws Exception {
     doThrow(new RuntimeException("backend down"))
         .when(backendApiClient)
-        .getPublic(anyString(), any(), any(Object[].class));
+        .get(anyString(), any(), any(Object[].class));
 
     mockMvc
         .perform(get("/catalog/location-search").param("q", "x"))
@@ -188,12 +188,12 @@ class CatalogSearchControllerMvcTest {
   @Test
   void locationSearch_requestsMoreRowsThanTheLocationPickerRenders() throws Exception {
     PageResponse<LocationReferenceDto> page = new PageResponse<>(List.of(), 0, 1, 0L, 0, List.of());
-    doReturn(page).when(backendApiClient).getPublic(anyString(), any(), any(Object[].class));
+    doReturn(page).when(backendApiClient).get(anyString(), any(), any(Object[].class));
 
     mockMvc.perform(get("/catalog/location-search").param("q", "x")).andExpect(status().isOk());
 
     ArgumentCaptor<String> uri = ArgumentCaptor.captor();
-    verify(backendApiClient).getPublic(uri.capture(), any(), any(Object[].class));
+    verify(backendApiClient).get(uri.capture(), any(), any(Object[].class));
     assertThat(uri.getValue())
         .as("location relay page size")
         .contains("size=" + PickerSearch.LOCATION_PAGE_SIZE);
@@ -209,12 +209,12 @@ class CatalogSearchControllerMvcTest {
   @Test
   void materialSearch_requestsMoreRowsThanTheComboboxRenders() throws Exception {
     PageResponse<MaterialDto> page = new PageResponse<>(List.of(), 0, 1, 0L, 0, List.of());
-    doReturn(page).when(backendApiClient).getPublic(anyString(), any(), any(Object[].class));
+    doReturn(page).when(backendApiClient).get(anyString(), any(), any(Object[].class));
 
     mockMvc.perform(get("/catalog/material-search").param("q", "x")).andExpect(status().isOk());
 
     ArgumentCaptor<String> uri = ArgumentCaptor.captor();
-    verify(backendApiClient).getPublic(uri.capture(), any(), any(Object[].class));
+    verify(backendApiClient).get(uri.capture(), any(), any(Object[].class));
     assertThat(uri.getValue())
         .as("material relay page size")
         .contains("size=" + PickerSearch.PAGE_SIZE);

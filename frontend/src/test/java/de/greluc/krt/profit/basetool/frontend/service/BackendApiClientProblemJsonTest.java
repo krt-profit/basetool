@@ -149,7 +149,7 @@ class BackendApiClientProblemJsonTest {
     BackendServiceException ex =
         assertThrows(
             BackendServiceException.class,
-            () -> backendApiClient.get("/api/v1/optimistic-lock", String.class, true));
+            () -> backendApiClient.get("/api/v1/optimistic-lock", String.class));
     assertEquals(409, ex.getStatusCode());
     assertEquals("OPTIMISTIC_LOCK", ex.getProblemCode());
     assertEquals("corr-123", ex.getCorrelationId());
@@ -161,7 +161,7 @@ class BackendApiClientProblemJsonTest {
     BackendServiceException ex =
         assertThrows(
             BackendServiceException.class,
-            () -> backendApiClient.get("/api/v1/forbidden", String.class, true));
+            () -> backendApiClient.get("/api/v1/forbidden", String.class));
     assertEquals(403, ex.getStatusCode());
     assertEquals("ACCESS_DENIED", ex.getProblemCode());
     assertEquals("corr-403", ex.getCorrelationId());
@@ -172,7 +172,7 @@ class BackendApiClientProblemJsonTest {
     BackendServiceException ex =
         assertThrows(
             BackendServiceException.class,
-            () -> backendApiClient.get("/api/v1/validation", String.class, true));
+            () -> backendApiClient.get("/api/v1/validation", String.class));
     assertEquals(400, ex.getStatusCode());
     assertEquals("VALIDATION_FAILED", ex.getProblemCode());
     assertEquals(2, ex.getFieldErrors().size());
@@ -205,7 +205,7 @@ class BackendApiClientProblemJsonTest {
       BackendServiceException ex =
           assertThrows(
               BackendServiceException.class,
-              () -> backendApiClient.get("/api/v1/terms-gated", String.class, true));
+              () -> backendApiClient.get("/api/v1/terms-gated", String.class));
       assertEquals("TERMS_NOT_ACCEPTED", ex.getProblemCode());
 
       assertTrue(
@@ -235,7 +235,7 @@ class BackendApiClientProblemJsonTest {
 
     assertThrows(
         BackendServiceException.class,
-        () -> backendApiClient.get("/api/v1/terms-gated", String.class, true));
+        () -> backendApiClient.get("/api/v1/terms-gated", String.class));
 
     assertEquals(before, backendErrorCount(), "a consent-gate refusal is not a call failure");
   }
@@ -247,7 +247,7 @@ class BackendApiClientProblemJsonTest {
 
     assertThrows(
         BackendServiceException.class,
-        () -> backendApiClient.get("/api/v1/forbidden", String.class, true));
+        () -> backendApiClient.get("/api/v1/forbidden", String.class));
 
     assertEquals(before + 1.0, backendErrorCount(), "a real 4xx must still be counted");
   }
@@ -268,7 +268,7 @@ class BackendApiClientProblemJsonTest {
     BackendServiceException ex =
         assertThrows(
             BackendServiceException.class,
-            () -> backendApiClient.get("/api/v1/no-body", String.class, true));
+            () -> backendApiClient.get("/api/v1/no-body", String.class));
     assertEquals(500, ex.getStatusCode());
     assertNotNull(ex.getProblemCode());
     assertFalse(ex.getProblemCode().isBlank());

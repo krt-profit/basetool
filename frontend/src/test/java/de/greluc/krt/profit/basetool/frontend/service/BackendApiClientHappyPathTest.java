@@ -56,7 +56,7 @@ class BackendApiClientHappyPathTest {
 
   private MockWebServer server;
   private WebClient webClient;
-  private WebClient publicWebClient;
+  private WebClient termsDocumentClient;
   private BackendApiClient client;
 
   @BeforeEach
@@ -68,7 +68,7 @@ class BackendApiClientHappyPathTest {
             .baseUrl(server.url("/").toString())
             .defaultHeader("X-Auth", "authenticated")
             .build();
-    publicWebClient =
+    termsDocumentClient =
         WebClient.builder()
             .baseUrl(server.url("/").toString())
             .defaultHeader("X-Auth", "public")
@@ -76,7 +76,7 @@ class BackendApiClientHappyPathTest {
     client =
         new BackendApiClient(
             webClient,
-            publicWebClient,
+            termsDocumentClient,
             new SimpleMeterRegistry(),
             new org.springframework.cache.support.NoOpCacheManager());
   }
@@ -117,7 +117,7 @@ class BackendApiClientHappyPathTest {
   void get_withClassResponseType_andIsPublicTrue_usesPublicClient() throws Exception {
     server.enqueue(jsonOk("ok"));
 
-    client.get("/api/v1/x", String.class, true);
+    client.get("/api/v1/x", String.class);
 
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req);
@@ -140,7 +140,7 @@ class BackendApiClientHappyPathTest {
   void get_withParameterizedType_andIsPublicTrue_usesPublicClient() throws Exception {
     server.enqueue(jsonOk("[]"));
 
-    client.get("/api/v1/list", new ParameterizedTypeReference<List<String>>() {}, true);
+    client.get("/api/v1/list", new ParameterizedTypeReference<List<String>>() {});
 
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("public", req.getHeader("X-Auth"));
@@ -190,7 +190,7 @@ class BackendApiClientHappyPathTest {
   void getCached_withClassResponseType_andIsPublicTrue_usesPublicClient() throws Exception {
     server.enqueue(jsonOk("ok"));
 
-    client.getCached(CachedCatalog.ORG_UNITS_ACTIVE, String.class, true);
+    client.getCached(CachedCatalog.ORG_UNITS_ACTIVE, String.class);
 
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("public", req.getHeader("X-Auth"));
@@ -211,7 +211,7 @@ class BackendApiClientHappyPathTest {
     server.enqueue(jsonOk("[]"));
 
     client.getCached(
-        CachedCatalog.ORG_UNITS_ACTIVE, new ParameterizedTypeReference<List<Integer>>() {}, true);
+        CachedCatalog.ORG_UNITS_ACTIVE, new ParameterizedTypeReference<List<Integer>>() {});
 
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("public", req.getHeader("X-Auth"));
@@ -254,7 +254,7 @@ class BackendApiClientHappyPathTest {
     server.enqueue(jsonOk(pageJson(List.of("x"), 0, 1000, 1, 1)));
 
     client.getCached(
-        CachedCatalog.SQUADRONS, new ParameterizedTypeReference<PageResponse<String>>() {}, true);
+        CachedCatalog.SQUADRONS, new ParameterizedTypeReference<PageResponse<String>>() {});
 
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("public", req.getHeader("X-Auth"));
@@ -371,7 +371,7 @@ class BackendApiClientHappyPathTest {
   void post_withIsPublicTrue_usesPublicClient() throws Exception {
     server.enqueue(jsonOk("ok"));
 
-    client.post("/api/v1/pub", "body", String.class, true);
+    client.post("/api/v1/pub", "body", String.class);
 
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("public", req.getHeader("X-Auth"));
@@ -407,7 +407,7 @@ class BackendApiClientHappyPathTest {
   void put_withIsPublicTrue_usesPublicClient() throws Exception {
     server.enqueue(jsonOk("ok"));
 
-    client.put("/api/v1/things/1", "x", String.class, true);
+    client.put("/api/v1/things/1", "x", String.class);
 
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("public", req.getHeader("X-Auth"));
@@ -442,7 +442,7 @@ class BackendApiClientHappyPathTest {
   void patch_withIsPublicTrue_usesPublicClient() throws Exception {
     server.enqueue(jsonOk("ok"));
 
-    client.patch("/api/v1/things/1", "x", String.class, true);
+    client.patch("/api/v1/things/1", "x", String.class);
 
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("public", req.getHeader("X-Auth"));
@@ -467,7 +467,7 @@ class BackendApiClientHappyPathTest {
   void delete_withIsPublicTrue_usesPublicClient() throws Exception {
     server.enqueue(jsonOk("ok"));
 
-    client.delete("/api/v1/things/1", String.class, true);
+    client.delete("/api/v1/things/1", String.class);
 
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("public", req.getHeader("X-Auth"));

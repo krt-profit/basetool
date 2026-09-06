@@ -69,7 +69,7 @@ class AccessibilityAttributesRenderTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(null);
   }
 

@@ -67,19 +67,19 @@ import reactor.core.publisher.Mono;
 class BackendApiClientResilienceTest {
 
   private WebClient webClient;
-  private WebClient publicWebClient;
+  private WebClient termsDocumentClient;
   private SimpleMeterRegistry meterRegistry;
   private BackendApiClient client;
 
   @BeforeEach
   void setUp() {
     webClient = mock(WebClient.class);
-    publicWebClient = mock(WebClient.class);
+    termsDocumentClient = mock(WebClient.class);
     meterRegistry = new SimpleMeterRegistry();
     client =
         new BackendApiClient(
             webClient,
-            publicWebClient,
+            termsDocumentClient,
             meterRegistry,
             new org.springframework.cache.support.NoOpCacheManager());
   }
@@ -240,20 +240,20 @@ class BackendApiClientResilienceTest {
     }
 
     @Test
-    void publicWebClient_isUsedWhenIsPublicTrue() {
+    void termsDocumentClient_isUsedWhenIsPublicTrue() {
       stubGet(
-          publicWebClient,
+          termsDocumentClient,
           "/api/v1/public-data",
           new RuntimeException("wrap", new TimeoutException("public-3s")));
 
       BackendServiceException ex =
           assertThrows(
               BackendServiceException.class,
-              () -> client.get("/api/v1/public-data", String.class, /* isPublic= */ true));
+              () -> client.get("/api/v1/public-data", String.class));
       assertEquals(
           504,
           ex.getStatusCode(),
-          "stubbing publicWebClient (not webClient) must surface the same exception "
+          "stubbing termsDocumentClient (not webClient) must surface the same exception "
               + "as if isPublic=true routed through it");
     }
   }

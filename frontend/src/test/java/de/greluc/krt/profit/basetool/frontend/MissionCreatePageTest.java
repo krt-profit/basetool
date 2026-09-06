@@ -47,7 +47,7 @@ class MissionCreatePageTest {
 
   @MockitoBean private WebClient webClient;
 
-  @MockitoBean private WebClient publicWebClient;
+  @MockitoBean private WebClient termsDocumentClient;
 
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 

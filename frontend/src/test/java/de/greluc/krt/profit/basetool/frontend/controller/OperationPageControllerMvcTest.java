@@ -117,7 +117,7 @@ class OperationPageControllerMvcTest {
             UUID.randomUUID(), "Op Alpha", "First op", "PLANNED", null, 0L, null, null, null);
     PageResponse<OperationDto> page =
         new PageResponse<>(List.of(op), 0, 20, 1L, 1, List.of("createdAt,desc"));
-    when(backendApiClient.get(startsWith("/api/v1/operations/search?"), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/operations/search?"), anyTypeRef()))
         .thenReturn(page);
 
     mockMvc
@@ -143,7 +143,7 @@ class OperationPageControllerMvcTest {
             UUID.randomUUID(), "Op Alpha", "First op", "ACTIVE", null, 0L, null, null, null);
     PageResponse<OperationDto> page =
         new PageResponse<>(List.of(op), 0, 20, 1L, 1, List.of("createdAt,desc"));
-    when(backendApiClient.get(startsWith("/api/v1/operations/search?"), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/operations/search?"), anyTypeRef()))
         .thenReturn(page);
 
     // English locale resolves to messages_en.properties → "ACTIVE".
@@ -241,20 +241,18 @@ class OperationPageControllerMvcTest {
 
   private void stubDetailEndpoints(UUID opId, OperationDto operation) {
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId), eq(OperationDto.class), anyBoolean()))
+            eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
         .thenReturn(operation);
     when(backendApiClient.get(
-            contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef(), anyBoolean()))
+            contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.<MissionListDto>of(), 0, 10, 0L, 0, List.of()));
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId + "/finance-summary"),
-            eq(OperationFinanceSummaryDto.class),
-            anyBoolean()))
+            eq(OperationFinanceSummaryDto.class)))
         .thenReturn(new OperationFinanceSummaryDto(opId, BigDecimal.ZERO, List.of(), false));
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId + "/payouts"),
-            eq(OperationPayoutSummaryDto.class),
-            anyBoolean()))
+            eq(OperationPayoutSummaryDto.class)))
         .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
   }
 
@@ -267,7 +265,7 @@ class OperationPageControllerMvcTest {
     OperationDto operation =
         new OperationDto(opId, "Completed Op", "", "COMPLETED", null, 0L, null, null, null);
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId), eq(OperationDto.class), anyBoolean()))
+            eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
         .thenReturn(operation);
 
     // Mission inside operation: status CANCELLED (double L on Mission!) →
@@ -295,19 +293,17 @@ class OperationPageControllerMvcTest {
     PageResponse<MissionListDto> missionsPage =
         new PageResponse<>(List.of(mission), 0, 10, 1L, 1, List.of("plannedStartTime,asc"));
     when(backendApiClient.get(
-            contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef(), anyBoolean()))
+            contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef()))
         .thenReturn(missionsPage);
 
     // Empty finance/payout stubs so the page renders without NPE.
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId + "/finance-summary"),
-            eq(OperationFinanceSummaryDto.class),
-            anyBoolean()))
+            eq(OperationFinanceSummaryDto.class)))
         .thenReturn(new OperationFinanceSummaryDto(opId, BigDecimal.ZERO, List.of(), false));
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId + "/payouts"),
-            eq(OperationPayoutSummaryDto.class),
-            anyBoolean()))
+            eq(OperationPayoutSummaryDto.class)))
         .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
 
     mockMvc
@@ -337,7 +333,7 @@ class OperationPageControllerMvcTest {
     OperationDto operation =
         new OperationDto(opId, "Op", "", "PLANNED", null, 0L, null, null, null);
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId), eq(OperationDto.class), anyBoolean()))
+            eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
         .thenReturn(operation);
 
     MissionListDto mission =
@@ -360,7 +356,7 @@ class OperationPageControllerMvcTest {
             0L);
     // Two pages so the embedded pager renders.
     when(backendApiClient.get(
-            contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef(), anyBoolean()))
+            contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(List.of(mission), 0, 10, 15L, 2, List.of("plannedStartTime,asc")));
 
@@ -380,13 +376,11 @@ class OperationPageControllerMvcTest {
     verify(backendApiClient, never())
         .get(
             eq("/api/v1/operations/" + opId + "/finance-summary"),
-            eq(OperationFinanceSummaryDto.class),
-            anyBoolean());
+            eq(OperationFinanceSummaryDto.class));
     verify(backendApiClient, never())
         .get(
             eq("/api/v1/operations/" + opId + "/payouts"),
-            eq(OperationPayoutSummaryDto.class),
-            anyBoolean());
+            eq(OperationPayoutSummaryDto.class));
   }
 
   // ── Live-sync section fragments (REQ-FE-015, ADR-0094) — the peer-refresh swap targets ──────
@@ -417,12 +411,11 @@ class OperationPageControllerMvcTest {
       throws Exception {
     UUID opId = UUID.randomUUID();
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId), eq(OperationDto.class), anyBoolean()))
+            eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
         .thenReturn(new OperationDto(opId, "Op", "", "PLANNED", null, 0L, null, null, null));
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId + "/payouts"),
-            eq(OperationPayoutSummaryDto.class),
-            anyBoolean()))
+            eq(OperationPayoutSummaryDto.class)))
         .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
 
     mockMvc
@@ -436,10 +429,9 @@ class OperationPageControllerMvcTest {
     verify(backendApiClient, never())
         .get(
             eq("/api/v1/operations/" + opId + "/finance-summary"),
-            eq(OperationFinanceSummaryDto.class),
-            anyBoolean());
+            eq(OperationFinanceSummaryDto.class));
     verify(backendApiClient, never())
-        .get(contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef(), anyBoolean());
+        .get(contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef());
   }
 
   @Test
@@ -449,16 +441,14 @@ class OperationPageControllerMvcTest {
     UUID opId = UUID.randomUUID();
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId + "/finance-summary"),
-            eq(OperationFinanceSummaryDto.class),
-            anyBoolean()))
+            eq(OperationFinanceSummaryDto.class)))
         .thenReturn(new OperationFinanceSummaryDto(opId, BigDecimal.ZERO, List.of(), false));
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId + "/payouts"),
-            eq(OperationPayoutSummaryDto.class),
-            anyBoolean()))
+            eq(OperationPayoutSummaryDto.class)))
         .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
     when(backendApiClient.get(
-            contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef(), anyBoolean()))
+            contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.<MissionListDto>of(), 0, 10, 0L, 0, List.of()));
 
     mockMvc
@@ -469,7 +459,7 @@ class OperationPageControllerMvcTest {
 
     // Fragment-gating: the finance fragment does not need the operation-detail read.
     verify(backendApiClient, never())
-        .get(eq("/api/v1/operations/" + opId), eq(OperationDto.class), anyBoolean());
+        .get(eq("/api/v1/operations/" + opId), eq(OperationDto.class));
   }
 
   @Test
@@ -488,7 +478,7 @@ class OperationPageControllerMvcTest {
   void operationDetail_fragmentBackendFailure_rendersFragmentError() throws Exception {
     UUID opId = UUID.randomUUID();
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId), eq(OperationDto.class), anyBoolean()))
+            eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
         .thenThrow(new RuntimeException("backend down"));
 
     mockMvc
@@ -572,8 +562,7 @@ class OperationPageControllerMvcTest {
             0L);
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId + "/finances/" + missionId),
-            eq(MissionFinanceSummaryDto.class),
-            anyBoolean()))
+            eq(MissionFinanceSummaryDto.class)))
         .thenReturn(
             new MissionFinanceSummaryDto(
                 missionId, "Mission A", new BigDecimal("500"), List.of(entry), List.of()));
@@ -593,8 +582,7 @@ class OperationPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId + "/finances/" + missionId),
-            eq(MissionFinanceSummaryDto.class),
-            anyBoolean()))
+            eq(MissionFinanceSummaryDto.class)))
         .thenThrow(new RuntimeException("backend down"));
 
     mockMvc
@@ -626,8 +614,7 @@ class OperationPageControllerMvcTest {
             null);
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId + "/payouts"),
-            eq(OperationPayoutSummaryDto.class),
-            anyBoolean()))
+            eq(OperationPayoutSummaryDto.class)))
         .thenReturn(new OperationPayoutSummaryDto(new BigDecimal("350.00"), List.of(donor)));
 
     mockMvc
@@ -718,8 +705,7 @@ class OperationPageControllerMvcTest {
     when(backendApiClient.put(
             eq("/api/v1/operations/" + opId + "/payouts/paid-out"),
             any(),
-            eq(OperationPayoutStatusDto.class),
-            anyBoolean()))
+            eq(OperationPayoutStatusDto.class)))
         .thenReturn(new OperationPayoutStatusDto(participantId.toString(), false, null, null));
 
     mockMvc
@@ -740,8 +726,7 @@ class OperationPageControllerMvcTest {
     when(backendApiClient.put(
             eq("/api/v1/operations/" + opId + "/payouts/paid-out"),
             any(),
-            eq(OperationPayoutStatusDto.class),
-            anyBoolean()))
+            eq(OperationPayoutStatusDto.class)))
         .thenReturn(new OperationPayoutStatusDto(participantId.toString(), true, null, null));
 
     mockMvc
@@ -763,8 +748,7 @@ class OperationPageControllerMvcTest {
     when(backendApiClient.put(
             eq("/api/v1/operations/" + opId + "/payouts/paid-out"),
             any(),
-            eq(OperationPayoutStatusDto.class),
-            anyBoolean()))
+            eq(OperationPayoutStatusDto.class)))
         .thenThrow(new BackendServiceException("payout toggle race", null, 409));
 
     // The proxy must mirror it as 409, not collapse it into a 500 (#1111).
