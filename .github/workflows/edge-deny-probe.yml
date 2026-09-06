@@ -264,6 +264,35 @@ jobs:
           probe POST "/api/v1/inventory/$nil/allocation" 401
           probe PATCH "/api/v1/inventory/$nil/allocation" 401
           probe DELETE "/api/v1/inventory/$nil/allocation" 401
+
+          # Phase V - the Einsatz planning set. The writes are all 401, and the ONE read is not:
+          # GET /api/v1/missions/** is permitAll, so unit-ship-options is dispatched and refused at
+          # the method seam with a 403 - the same seam /missions/lookup met in phase S.
+          probe GET "/api/v1/missions/$nil/unit-ship-options" 403
+          for leaf in core schedule flags; do
+            probe PATCH "/api/v1/missions/$nil/$leaf" 401
+          done
+          probe PUT "/api/v1/missions/$nil/party-lead" 401
+          probe POST "/api/v1/missions/$nil/participants" 401
+          probe POST "/api/v1/missions/$nil/units/slim" 401
+          probe PUT "/api/v1/missions/$nil/units/$nil/slim" 401
+          probe DELETE "/api/v1/missions/$nil/units/$nil/slim" 401
+          probe POST "/api/v1/missions/$nil/units/$nil/crew/slim" 401
+          probe PUT "/api/v1/missions/$nil/units/$nil/crew/$nil/slim" 401
+          probe POST "/api/v1/missions/$nil/frequencies/custom/slim" 401
+          probe DELETE "/api/v1/missions/$nil/frequencies/$nil/slim" 401
+          probe POST "/api/v1/missions/$nil/managers/$nil/slim" 401
+          probe DELETE "/api/v1/missions/$nil/managers/$nil/slim" 401
+          for section in steps objectives; do
+            probe POST "/api/v1/missions/$nil/$section/slim" 401
+            probe PUT "/api/v1/missions/$nil/$section/$nil/slim" 401
+            probe DELETE "/api/v1/missions/$nil/$section/$nil/slim" 401
+            probe PUT "/api/v1/missions/$nil/$section/reorder/slim" 401
+          done
+          probe PATCH "/api/v1/missions/$nil/steps/$nil/done/slim" 401
+          # And the Einsatz's own DELETE stays shut: every rule this phase adds is a leaf UNDER the
+          # id, none is the id itself.
+          probe DELETE "/api/v1/missions/$nil" 405
           # That the Auftrag's own DELETE stays shut is asserted by phase R above, and phase T must
           # not loosen it: every carve-out here is on a leaf UNDER the id, none on the id itself.
 

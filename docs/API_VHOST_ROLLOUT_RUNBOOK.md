@@ -661,6 +661,33 @@ if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-f
 # line beside it: same shape, same family, same carve-out.
 if ($uri = "/api/v1/inventory/bulk-checkout") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/inventory/bulk-rebook") { set $krt_api_allowed 1; }
+# Phase V - the Einsatz planning set, the audit's largest block. Every rule is a leaf UNDER
+# the Einsatz id and none is the id itself: `DELETE /api/v1/missions/<uuid>` deletes the whole
+# Einsatz, the app never sends it, and it keeps answering 405 because that path has no
+# carve-out and gets none here.
+#
+# The six with no /slim twin. `unit-ship-options` is the only read among them.
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(core|schedule|flags|party-lead|participants|unit-ship-options)$") { set $krt_api_allowed 1; }
+#
+# Einheiten and their crew. SLIM ONLY, and deliberately: the full-DTO twins carry an
+# `@ApiDeprecation` with a sunset of 2026-10-20, so naming them here would be work with an end
+# date. The app was moved onto these in basetool-android#140, in the same week.
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/units/slim$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/units/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/slim$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/units/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/crew/slim$") { set $krt_api_allowed 1; }
+#
+# Frequenzen and Verwalter, same reasoning. `custom` is not a uuid, so the two frequency
+# rules cannot be folded into one alternation without loosening both.
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/frequencies/custom/slim$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/frequencies/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/slim$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/managers/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/slim$") { set $krt_api_allowed 1; }
+#
+# Ablauf and Ziele. These exist ONLY as /slim - there is no plain variant to fall back on -
+# and they are the two sections a Kommandoleiter builds an Einsatz out of.
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(steps|objectives)/slim$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(steps|objectives)/reorder/slim$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/steps/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(done/)?slim$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/objectives/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/slim$") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- The missions and operations families are READ-ONLY on this vhost ---------
@@ -790,6 +817,24 @@ if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-f
 # exactly the verb the app sends. `allocation` is carved out by the leaf group above, which
 # this phase extended - it serves POST, PATCH and DELETE, and the app sends all three.
 if ($uri ~ "^/api/v1/inventory/(bulk-checkout|bulk-rebook)$") { set $krt_readonly_family ""; }
+# Phase V - the Einsatz planning set. `unit-ship-options` is a GET and is deliberately NOT
+# here: it stays in the read-only family, where it belongs. Everything else in the phase is a
+# write and needs its own exception.
+#
+# Each of these serves exactly the verbs the app sends: PATCH on the three section patches,
+# PUT on party-lead and the two reorders, POST on the creates, PUT+DELETE on the leaves that
+# have both. Checked against MissionController rather than assumed.
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(core|schedule|flags|party-lead|participants)$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/units/slim$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/units/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/slim$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/units/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/crew/slim$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/frequencies/custom/slim$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/frequencies/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/slim$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/managers/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/slim$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(steps|objectives)/slim$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(steps|objectives)/reorder/slim$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/steps/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(done/)?slim$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/objectives/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/slim$") { set $krt_readonly_family ""; }
 if ($krt_readonly_family = "RW") { return 405; }
 
 # --- Which family gets which shape ---------------------------------------------------------------
@@ -970,6 +1015,14 @@ The safe order, and the reason for it:
    | `/api/v1/inventory/bulk-checkout` with `POST`                   | **401**                                                             | phase U; Sammel-Ausbuchen                                                                                |
    | `/api/v1/inventory/bulk-rebook` with `POST`                     | **401**                                                             | phase U; Sammel-Umbuchen. The Standort-Picker beside it was already open, only the submit died           |
    | `/api/v1/inventory/<uuid>/allocation` (`POST`,`PATCH`,`DELETE`) | **401**                                                             | phase U; the earmark. Three verbs on one path, and all three were refused                                |
+   | `/api/v1/missions/<uuid>/(core\|schedule\|flags)` with `PATCH`  | **401**                                                             | phase V; the three Einsatz sections, each with its own counter                                           |
+   | `/api/v1/missions/<uuid>/party-lead` with `PUT`                 | **401**                                                             | phase V                                                                                                  |
+   | `/api/v1/missions/<uuid>/participants` with `POST`              | **401**                                                             | phase V; „Teilnehmer hinzufügen“                                                                         |
+   | `/api/v1/missions/<uuid>/unit-ship-options`                     | **403**                                                             | phase V; the only read in it, and `GET /missions/**` is `permitAll` — refused at the method seam         |
+   | `/api/v1/missions/<uuid>/units/…/slim` (all verbs)              | **401**                                                             | phase V; Einheiten and their crew, slim only                                                             |
+   | `/api/v1/missions/<uuid>/frequencies/…/slim`                    | **401**                                                             | phase V                                                                                                  |
+   | `/api/v1/missions/<uuid>/managers/<uuid>/slim`                  | **401**                                                             | phase V                                                                                                  |
+   | `/api/v1/missions/<uuid>/(steps\|objectives)/…/slim`            | **401**                                                             | phase V; Ablauf and Ziele, which exist only as `/slim`                                                   |
    | anything not on the list                                        | **404**                                                             | default deny                                                                                             |
 
    **Two refusals, two numbers, and the difference is structural rather than a policy gap.** The
@@ -2099,6 +2152,69 @@ verb the app sends.
 | both bulk paths                 | **401**          |
 | `…/allocation`, all three verbs | **401**          |
 
+Pinned in `ApiVhostAnonymousSurfaceTest` before this table was written.
+
+---
+
+## Phase V — the Einsatz planning set
+
+**The audit's largest block, and its own recommendation was to do it as one reviewable rule
+section.** Everything a Kommandoleiter builds an Einsatz out of: the three folded sections, the
+party lead, adding a Teilnehmer, the Einheiten and their crew, the Frequenzen, the Verwalter, and
+the Ablauf and Ziele.
+
+|                 Section                 |                          Paths                           |
+|-----------------------------------------|----------------------------------------------------------|
+| Kern, Zeitplan, Flags                   | `…/(core\|schedule\|flags)` — `PATCH`                    |
+| Party-Lead, Teilnehmer, Schiffsoptionen | `…/party-lead`, `…/participants`, `…/unit-ship-options`  |
+| Einheiten und Crew                      | `…/units/slim`, `…/units/<uuid>/slim`, `…/crew/slim`     |
+| Frequenzen                              | `…/frequencies/custom/slim`, `…/frequencies/<uuid>/slim` |
+| Verwalter                               | `…/managers/<uuid>/slim`                                 |
+| Ablauf und Ziele                        | `…/(steps\|objectives)/…/slim`                           |
+
+### Slim only, and that is the decision worth reading
+
+Seven of these paths have a full-DTO twin the app used to send, and **every one of those twins
+carries an `@ApiDeprecation` with a sunset of `2026-10-20`.** Naming them here would have been work
+with an end date six weeks out. The app was moved onto the slim endpoints instead
+(basetool-android#140), in the same week, and only the slim paths are admitted.
+
+> [!success] One of them repaired without any rule at all
+> `PUT …/units/<uuid>/crew/<uuid>/slim` has been admitted since **phase N**, because the crew
+> *removal* needed exactly that path. The audit had filed the Funktions-Chips write as a *latent*
+> defect — the chips were never drawn, since `GET /api/v1/job-types` was refused — and **phase S**
+> admits that catalogue. So the app change alone finished it: catalogue admitted, chips drawn, and
+> the write already pointed at an open path.
+
+`Ablauf` and `Ziele` never had a plain variant — they exist **only** as `/slim` — so nothing there
+changes on the app side.
+
+### Every rule is a leaf under the id, and none is the id
+
+`DELETE /api/v1/missions/<uuid>` deletes the whole Einsatz. The app never sends it, the path has no
+carve-out, and it gets none here: the nightly probe keeps asserting its `405`. The same reading
+applies inside the phase — `…/frequencies/custom/slim` is named separately from
+`…/frequencies/<uuid>/slim` rather than folded into one alternation, because `custom` is not a
+uuid and folding them would loosen both.
+
+> [!note] The two deletes carry their section counter as a **query parameter**
+> `DELETE …/steps/<uuid>/slim?stepsVersion=n` and the objectives twin. It is the one place in this
+> phase where the optimistic version is not in the payload, and losing it would not fail the write
+> — it would make it *unconditional*. Frozen in the contract, where a rename is caught; the vhost
+> guard matches on `$uri` and never sees it.
+
+### What to expect afterwards
+
+|                     Path                     | Anonymous status |
+|----------------------------------------------|------------------|
+| every write in the phase                     | **401**          |
+| `…/unit-ship-options`                        | **403**          |
+| `DELETE /api/v1/missions/<uuid>` (unchanged) | **405**          |
+
+**The `403` is the one that had to be measured.** `GET /api/v1/missions/**` is `permitAll` — the
+whole Einsatz read surface is, so a guest can see the board — which means this read is *dispatched*
+and refused at the method seam rather than turned away at the entry point. Same seam
+`/missions/lookup` met in phase S. A write is not covered by that `permitAll` and answers `401`.
 Pinned in `ApiVhostAnonymousSurfaceTest` before this table was written.
 
 ---

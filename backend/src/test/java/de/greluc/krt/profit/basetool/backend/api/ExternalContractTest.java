@@ -296,6 +296,60 @@ class ExternalContractTest {
           "missionPlannedStartTime",
           "missionRest");
 
+  /**
+   * What a {@code MissionDto} answer promises, for every operation that returns one.
+   *
+   * <p>Named once because they share a mapper: the detail read and the five planning writes that
+   * still answer with the whole Einsatz all fold through the app's single {@code toModel()}.
+   *
+   * <p>Phase 3 widened this set: the app acts on the caller's OWN participant row, and {@code user}
+   * is the only thing that says which row that is. A name cannot decide it — the server sends
+   * {@code displayName} when a member set one and {@code username} otherwise — and {@code
+   * startTime} is what "checked in" means on the wire.
+   */
+  /**
+   * What a step row promises, for all five writes that answer with the Ablauf.
+   *
+   * <p>{@code meta} is the line under the title and {@code done} is the tick; a row without an
+   * {@code id} is dropped, because the id is what the next write addresses.
+   */
+  private static final Set<String> STEP_ROW = Set.of("id", "title", "meta", "done");
+
+  /**
+   * What an objective row promises, for all four writes that answer with the Ziele.
+   *
+   * <p>{@code kind} is what separates a Primärziel from a Nicht-Ziel, which is the whole structure
+   * of that section rather than a label on it.
+   */
+  private static final Set<String> OBJECTIVE_ROW = Set.of("id", "title", "kind");
+
+  private static final Set<String> MISSION_DETAIL =
+      Set.of(
+          "id",
+          "name",
+          "description",
+          "status",
+          "meetingTime",
+          "plannedStartTime",
+          "actualStartTime",
+          "plannedEndTime",
+          "isInternal",
+          "meetingPoint",
+          "operation",
+          "owningSquadron",
+          "partyLeadUser",
+          "partyLeadGuestName",
+          "registeredParticipants",
+          "checkedInParticipants",
+          "participants",
+          "user",
+          "startTime",
+          "payoutPreference",
+          "assignedUnits",
+          "steps",
+          "objectives",
+          "frequencies");
+
   private static final List<ContractOperation> CONTRACT =
       List.of(
           new ContractOperation(
@@ -384,38 +438,7 @@ class ExternalContractTest {
           // the app reads for its seven tabs -- the counters and the four planning collections
           // among them, since a tab whose collection vanished would render as an empty screen with
           // no error anywhere.
-          new ContractOperation(
-              "/api/v1/missions/{id}",
-              "get",
-              Set.of(
-                  "id",
-                  "name",
-                  "description",
-                  "status",
-                  "meetingTime",
-                  "plannedStartTime",
-                  "actualStartTime",
-                  "plannedEndTime",
-                  "isInternal",
-                  "meetingPoint",
-                  "operation",
-                  "owningSquadron",
-                  "partyLeadUser",
-                  "partyLeadGuestName",
-                  "registeredParticipants",
-                  "checkedInParticipants",
-                  "participants",
-                  // Phase 3 widened this: the app now acts on the caller's OWN participant row,
-                  // and `user` is the only thing that says which row that is. A name cannot decide
-                  // it — the server sends `displayName` when a member set one and `username`
-                  // otherwise — and `startTime` is what "checked in" means on the wire.
-                  "user",
-                  "startTime",
-                  "payoutPreference",
-                  "assignedUnits",
-                  "steps",
-                  "objectives",
-                  "frequencies")),
+          new ContractOperation("/api/v1/missions/{id}", "get", MISSION_DETAIL),
           // Phase 3, the four things a member does to their own participation. `join` answers with
           // the whole Einsatz because it creates the row; the three slim ones answer with the row
           // alone, which is the point of them — the detail is large and a check-in changes one
@@ -2245,7 +2268,110 @@ class ExternalContractTest {
               "/api/v1/inventory/{id}/allocation",
               "delete",
               INVENTORY_ROW,
-              Set.of("field", "targetId")));
+              Set.of("field", "targetId")),
+          // ---- Phase V: the Einsatz planning set ---------------------------------------------
+          //
+          // The audit's largest block, and the one where most entries freeze NOTHING on the
+          // response. Every `/slim` write answers with the part it touched, and since
+          // basetool-android#140 the app discards that and re-reads the Einsatz -- so recording a
+          // response field would promise a shape nothing reads. What is left to guard is the
+          // request, and there the `version` fields are the whole game: each section carries its
+          // own counter, and a counter that disappears turns a concurrent edit into a silent
+          // overwrite instead of the 409 it exists to raise.
+          //
+          // The five that still answer with the whole Einsatz do so because their endpoints have
+          // no slim twin.
+          new ContractOperation(
+              "/api/v1/missions/{id}/core", "patch", MISSION_DETAIL, Set.of("name", "version")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/schedule", "patch", MISSION_DETAIL, Set.of("version")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/flags",
+              "patch",
+              MISSION_DETAIL,
+              Set.of("isInternal", "version")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/party-lead", "put", MISSION_DETAIL, Set.of("version")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/participants", "post", MISSION_DETAIL, Set.of("userId")),
+          // The only read in the phase, and the only one that is not 401: `GET /missions/**` is
+          // permitAll, so it is dispatched and refused at the method seam with a 403. A ship
+          // without an id is dropped, and the type is what tells two Carracks apart.
+          new ContractOperation(
+              "/api/v1/missions/{id}/unit-ship-options", "get", Set.of("id", "name", "shipType")),
+          // Einheiten, crew, Frequenz and Verwalter. All answers discarded except the custom
+          // frequency's, which is spliced onto the Einsatz as last read -- it is the one endpoint
+          // in this group with no plain twin, so it never went through the re-read.
+          new ContractOperation(
+              "/api/v1/missions/{id}/units/slim", "post", Set.of(), Set.of("name")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/units/{unitId}/slim", "put", Set.of(), Set.of("name")),
+          new ContractOperation("/api/v1/missions/{id}/units/{unitId}/slim", "delete", Set.of()),
+          new ContractOperation(
+              "/api/v1/missions/{id}/units/{missionUnitId}/crew/slim",
+              "post",
+              Set.of(),
+              Set.of("participantId")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim", "put", Set.of()),
+          new ContractOperation(
+              "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim", "delete", Set.of()),
+          new ContractOperation(
+              "/api/v1/missions/{id}/frequencies/custom/slim",
+              "post",
+              Set.of("id", "frequencyType", "name", "value"),
+              Set.of("name", "value")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/frequencies/{frequencyId}/slim", "delete", Set.of()),
+          new ContractOperation("/api/v1/missions/{id}/managers/{userId}/slim", "post", Set.of()),
+          new ContractOperation("/api/v1/missions/{id}/managers/{userId}/slim", "delete", Set.of()),
+          // Ablauf and Ziele, which exist ONLY as /slim and whose answers ARE read: the section is
+          // spliced onto the Einsatz as last read rather than re-fetched, because the server
+          // decides the order. `stepsVersion` and `objectivesVersion` are the section counters --
+          // the two most load-bearing request fields in this phase.
+          new ContractOperation(
+              "/api/v1/missions/{id}/steps/slim",
+              "post",
+              STEP_ROW,
+              Set.of("stepsVersion", "title")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/steps/{stepId}/slim",
+              "put",
+              STEP_ROW,
+              Set.of("stepsVersion", "title")),
+          // The two deletes carry their section counter as a QUERY parameter rather than a
+          // body, which is the one place in this phase where the version is not in the payload --
+          // and losing it there would not fail the write, it would make it unconditional.
+          new ContractOperation("/api/v1/missions/{id}/steps/{stepId}/slim", "delete", STEP_ROW)
+              .addressedBy(Set.of("stepsVersion:integer")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/steps/{stepId}/done/slim",
+              "patch",
+              STEP_ROW,
+              Set.of("done", "stepsVersion")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/steps/reorder/slim",
+              "put",
+              STEP_ROW,
+              Set.of("stepIds", "stepsVersion")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/objectives/slim",
+              "post",
+              OBJECTIVE_ROW,
+              Set.of("kind", "objectivesVersion", "title")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/objectives/{objectiveId}/slim",
+              "put",
+              OBJECTIVE_ROW,
+              Set.of("kind", "objectivesVersion", "title")),
+          new ContractOperation(
+                  "/api/v1/missions/{id}/objectives/{objectiveId}/slim", "delete", OBJECTIVE_ROW)
+              .addressedBy(Set.of("objectivesVersion:integer")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/objectives/reorder/slim",
+              "put",
+              OBJECTIVE_ROW,
+              Set.of("objectiveIds", "objectivesVersion")));
 
   /**
    * Contract operations the app addresses by <strong>no</strong> query parameter, although the
@@ -2448,6 +2574,11 @@ class ExternalContractTest {
           // simply never sends it. The direction that hurts is removal, which this guard catches
           // the same way.
           Map.entry("CreateJobOrderItemMaterialDto.quality", Set.of("GOOD", "NONE")),
+          // Phase V. The Ziel's kind decides which of the three lists it lands in, and the app
+          // sends the literal on every create and every edit.
+          Map.entry("AddMissionObjectiveRequest.kind", Set.of("PRIMARY", "SECONDARY", "NON_GOAL")),
+          Map.entry(
+              "UpdateMissionObjectiveRequest.kind", Set.of("PRIMARY", "SECONDARY", "NON_GOAL")),
           // Phase U. Two more literals a shipped build sends. `mode` is the sharper of them:
           // the app only ever sends `LOCATION`, so renaming either of the other two constants
           // would look harmless in the document and still be a rename of the one it uses if the
