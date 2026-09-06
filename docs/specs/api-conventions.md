@@ -599,6 +599,14 @@ a subset of this set, and the two move together.
 - [x] Every listed operation exists in the committed `openapi.json` with its recorded verb, and no
   recorded response field has disappeared (`ExternalContractTest`).
 - [x] The set cannot be emptied to make the guard pass — its floor is asserted.
+- [x] **Every frozen operation is reachable through the edge** — the guard parses the API vhost
+  runbook's allow-list and asserts the subset rule above, rather than leaving it to a reader
+  (`theFrozenSetIsReachableThroughTheEdge`). And it **re-runs when the runbook changes**: the
+  runbook is neither a source nor a resource, so until 2026-09-06 Gradle considered `:backend:test`
+  up-to-date after a runbook-only edit and the guard silently did not execute — a false green on
+  precisely the assertion that connects the two halves. It is now a declared task input
+  (`backend/build.gradle.kts`, `apiVhostRunbook`), verified by touching only the runbook and
+  confirming the task executes.
 - [x] An entry freezes every level a client parses: the guard descends **one level** into every
   referenced schema — an array's items and a plain nested object alike. That covers a page's
   `content` rows, an embedded list such as an operation's `payouts`, and a nested object such as a
