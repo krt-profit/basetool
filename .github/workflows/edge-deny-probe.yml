@@ -293,6 +293,25 @@ jobs:
           # And the Einsatz's own DELETE stays shut: every rule this phase adds is a leaf UNDER the
           # id, none is the id itself.
           probe DELETE "/api/v1/missions/$nil" 405
+
+          # Phase W - the Handel family, and the three lines that matter most are the price reads.
+          # They answered 200 (prices-overview, */prices) and 500 (profit-calculation) ANONYMOUSLY
+          # until the REQ-SEC-032 carve-out was widened to cover them; a 200 here again would mean
+          # UEX trade prices are back on the public internet.
+          probe GET /api/v1/materials/prices-overview 401
+          probe GET /api/v1/materials/profit-calculation 401
+          probe GET "/api/v1/materials/$nil/prices" 401
+          probe GET /api/v1/materials/matrix 401
+          # And this one is anonymous BY DECISION: MaterialDto is catalogue only, and
+          # /materials/search has published the same fields since phase 2 (REQ-SEC-037). A 404 is
+          # the absent id; the point of the assertion is that it is dispatched, not refused.
+          probe GET "/api/v1/materials/$nil" 404
+          probe GET /api/v1/terminals 401
+          probe GET /api/v1/material-exchange/released-item-ids 401
+          probe POST /api/v1/material-exchange/item-offers 401
+          probe POST /api/v1/material-requests/item 401
+          probe PUT "/api/v1/material-exchange/offers/$nil/remark" 401
+          probe PUT "/api/v1/material-requests/$nil" 401
           # That the Auftrag's own DELETE stays shut is asserted by phase R above, and phase T must
           # not loosen it: every carve-out here is on a leaf UNDER the id, none on the id itself.
 

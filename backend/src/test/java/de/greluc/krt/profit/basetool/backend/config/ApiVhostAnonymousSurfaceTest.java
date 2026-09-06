@@ -753,6 +753,74 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * The Handel family phase W opens, and the two ways it answers.
+   *
+   * <p>The price screens sit under {@code /api/v1/materials}, which is a {@code permitAll}
+   * catalogue prefix — {@code /materials/search} has been recorded as anonymous since phase 2 — so
+   * these reads are dispatched and refused at the method seam rather than turned away at the entry
+   * point. The Materialbörse and the terminal catalogue are ordinary authenticated surfaces.
+   *
+   * <p>Pinned one at a time rather than in a loop, because that is exactly what phase S's four
+   * pickers proved: a group assertion hides a seam.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousTradeFamily() throws Exception {
+    // The four price reads are authenticated, and three of them only became so with this phase:
+    // measured anonymously first, `prices-overview` answered 200, `*/prices` answered 200 and
+    // `profit-calculation` answered 500 — dispatched and crashing, which is not a gate. They carry
+    // the UEX trade data REQ-SEC-032 exists to keep off the public vhost, so they joined the
+    // `matrix` carve-out rather than being admitted as they stood.
+    mockMvc.perform(get("/api/v1/materials/prices-overview")).andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/materials/matrix")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/materials/profit-calculation"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/materials/" + ABSENT_MISSION + "/prices"))
+        .andExpect(status().isUnauthorized());
+    // `GET /materials/{id}` stays ANONYMOUS by decision (REQ-SEC-037). MaterialDto is catalogue
+    // only — name, quantity type, category, flags, no price — and `/materials/search` has published
+    // those same fields anonymously since phase 2. A 404 here is the absent id, not a refusal: a
+    // real one answers 200, and admitting the path at the edge publishes what search already does.
+    mockMvc.perform(get("/api/v1/materials/" + ABSENT_MISSION)).andExpect(status().isNotFound());
+    mockMvc.perform(get("/api/v1/terminals")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/material-exchange/released-item-ids"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/material-exchange/item-offers")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/material-requests/item")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/material-exchange/offers/" + ABSENT_MISSION + "/remark")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/material-requests/" + ABSENT_MISSION)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
    * The Einsatz planning set phase V opens, refused without a token.
    *
    * <p>The audit's largest block: everything a Kommandoleiter builds an Einsatz out of. The writes

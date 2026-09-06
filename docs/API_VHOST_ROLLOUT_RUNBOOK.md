@@ -688,6 +688,32 @@ if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(steps|objectives)/reorder/slim$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/steps/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(done/)?slim$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/objectives/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/slim$") { set $krt_api_allowed 1; }
+# Phase W - the Handel family. Two halves with two different guards, and the difference is
+# what makes this phase readable.
+#
+# The `materials` half is IN the read-only family, so naming a path admits its GET and
+# nothing else. That matters here more than anywhere: `/api/v1/materials/<uuid>` also serves
+# PUT and DELETE - editing and deleting a material from the catalogue - and neither gets a
+# carve-out, so both keep answering 405.
+if ($uri = "/api/v1/materials/prices-overview") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/materials/matrix") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/materials/profit-calculation") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/materials/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/materials/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/prices$") { set $krt_api_allowed 1; }
+#
+# The `material-exchange` / `material-requests` / `terminals` half is NOT in any read-only
+# family, so admitting a path there opens every verb the backend serves ON THAT PATH. Each
+# of these was checked against its controller: `/terminals` serves only the collection GET
+# (its edits live on `/{id}/...`), `released-item-ids` only a GET, `item-offers` and
+# `/material-requests/item` only a POST, `offers/<uuid>/remark` only a PUT, and
+# `/material-requests/<uuid>` a GET and the PUT the app sends. No DELETE is opened anywhere
+# in this phase.
+if ($uri = "/api/v1/terminals") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/material-exchange/released-item-ids") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/material-exchange/item-offers") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/material-requests/item") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/material-exchange/offers/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/remark$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/material-requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- The missions and operations families are READ-ONLY on this vhost ---------
@@ -1023,6 +1049,16 @@ The safe order, and the reason for it:
    | `/api/v1/missions/<uuid>/frequencies/…/slim`                    | **401**                                                             | phase V                                                                                                  |
    | `/api/v1/missions/<uuid>/managers/<uuid>/slim`                  | **401**                                                             | phase V                                                                                                  |
    | `/api/v1/missions/<uuid>/(steps\|objectives)/…/slim`            | **401**                                                             | phase V; Ablauf and Ziele, which exist only as `/slim`                                                   |
+   | `/api/v1/materials/prices-overview`                             | **401**                                                             | phase W; **was 200** until this phase closed it (REQ-SEC-032)                                            |
+   | `/api/v1/materials/profit-calculation`                          | **401**                                                             | phase W; **was 500** — dispatched anonymously and crashing, which is not a gate either                   |
+   | `/api/v1/materials/<uuid>/prices`                               | **401**                                                             | phase W; **was 200**. Same UEX trade data as `matrix`, through another door                              |
+   | `/api/v1/materials/<uuid>`                                      | **200**                                                             | phase W; anonymous **by decision** — catalogue only, no price, same fields as `/materials/search`        |
+   | `/api/v1/terminals`                                             | **401**                                                             | phase W; the star-system filter page-walks it                                                            |
+   | `/api/v1/material-exchange/released-item-ids`                   | **401**                                                             | phase W                                                                                                  |
+   | `/api/v1/material-exchange/item-offers` with `POST`             | **401**                                                             | phase W; releasing a Gegenstand to the Börse                                                             |
+   | `/api/v1/material-requests/item` with `POST`                    | **401**                                                             | phase W                                                                                                  |
+   | `/api/v1/material-exchange/offers/<uuid>/remark` with `PUT`     | **401**                                                             | phase W                                                                                                  |
+   | `/api/v1/material-requests/<uuid>` with `PUT`                   | **401**                                                             | phase W                                                                                                  |
    | anything not on the list                                        | **404**                                                             | default deny                                                                                             |
 
    **Two refusals, two numbers, and the difference is structural rather than a policy gap.** The
@@ -2216,6 +2252,65 @@ whole Einsatz read surface is, so a guest can see the board — which means this
 and refused at the method seam rather than turned away at the entry point. Same seam
 `/missions/lookup` met in phase S. A write is not covered by that `permitAll` and answers `401`.
 Pinned in `ApiVhostAnonymousSurfaceTest` before this table was written.
+
+---
+
+## Phase W — the Handel family, and three doors REQ-SEC-032 had left open
+
+The price screens and the Materialbörse. **This phase did not start with a rule; it started with a
+measurement that had to be acted on first.**
+
+> [!danger] Three of the four price reads were anonymous, and they carry the data REQ-SEC-032 exists
+> to keep off this vhost
+> Measured before anything was written:
+>
+> |                    Path                    |                   Anonymous, before                    |
+> |--------------------------------------------|--------------------------------------------------------|
+> | `GET /api/v1/materials/prices-overview`    | **200**                                                |
+> | `GET /api/v1/materials/<uuid>/prices`      | **200**                                                |
+> | `GET /api/v1/materials/profit-calculation` | **500** — dispatched and crashing, which is not a gate |
+> | `GET /api/v1/materials/matrix`             | 401 — already closed                                   |
+>
+> `matrix` and `*/terminals` were carved back to `authenticated()` when REQ-SEC-032 was written,
+> and the comment there says why: *leaving it anonymous publishes UEX trade prices per material to
+> the whole internet from the API vhost.* `MaterialPriceOverviewDto` carries `minPriceBuy` and
+> `maxPriceSell`; `MaterialPriceDto` carries `priceBuy`, `priceSell`, `scu*` and `terminalName`;
+> the profit calculation is the route arithmetic over both. **Same data, three more doors.**
+>
+> Admitting them at the edge as they stood would have published trade prices to the internet: the
+> vhost would have let them through and the backend would not have stopped them. They joined the
+> existing all-verb `authenticated()` carve-out **before** these rules were written.
+
+**`GET /api/v1/materials/<uuid>` stays anonymous, and that is a decision rather than an oversight.**
+`MaterialDto` is catalogue only — name, quantity type, category, flags, **no price** — and
+`/api/v1/materials/search` has published those same fields anonymously since phase 2. Closing it
+would be a different change with a different reason, and it is pinned so the decision stays one.
+
+### Two halves, two guards
+
+|                         Half                          | In the read-only family? |                     What that means                     |
+|-------------------------------------------------------|--------------------------|---------------------------------------------------------|
+| `/api/v1/materials/…`                                 | **yes**                  | naming a path admits its `GET` and nothing else         |
+| `material-exchange`, `material-requests`, `terminals` | **no**                   | naming a path opens every verb the backend serves on it |
+
+That difference is the whole reason this phase reads the way it does. `/api/v1/materials/<uuid>`
+also serves `PUT` and `DELETE` — editing and deleting a material from the catalogue — and gets no
+carve-out here, so both keep answering `405`. The other half was checked path by path against its
+controller: `/terminals` serves only the collection `GET` (its edits live on `/{id}/…`),
+`released-item-ids` only a `GET`, `item-offers` and `/material-requests/item` only a `POST`,
+`offers/<uuid>/remark` only a `PUT`, and `/material-requests/<uuid>` a `GET` and the `PUT` the app
+sends. **No `DELETE` is opened anywhere in this phase**, and no carve-out is written at all.
+
+### What to expect afterwards
+
+|             Path             | Anonymous status |
+|------------------------------|------------------|
+| the four price reads         | **401**          |
+| `/api/v1/materials/<uuid>`   | **200**          |
+| everything else in the phase | **401**          |
+
+Pinned in `ApiVhostAnonymousSurfaceTest` before this table was written — and here that order was
+not a formality: the pins are what found the three open doors.
 
 ---
 
