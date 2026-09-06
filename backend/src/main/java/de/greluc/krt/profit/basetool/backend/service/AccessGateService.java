@@ -89,7 +89,7 @@ public class AccessGateService {
    *   <li>Admin or non-admin pinned to one org unit: {@code true} only for that pinned id.
    *   <li>Non-admin without a pin: {@code true} for any org unit they are a member of — the union
    *       of their Staffel <em>and</em> every Spezialkommando they belong to.
- * </ul>
+   * </ul>
    *
    * <p>Before this delegated to {@link RequestScopeResolver#currentScopePredicate()} it consulted
    * only the home Staffel, which denied SK members — and squadron-less SK leads entirely —
@@ -581,8 +581,8 @@ public class AccessGateService {
   /**
    * {@code true} iff the current authenticated principal is the per-user owner of the row carrying
    * {@code owner}. The JWT {@code sub} is the {@code app_user} primary key, so {@link
-   * AuthHelperService#currentUserId()} compares directly against {@code owner.getId()}. An
-   * caller with no resolvable id and a {@code null} / id-less owner never match.
+   * AuthHelperService#currentUserId()} compares directly against {@code owner.getId()}. An caller
+   * with no resolvable id and a {@code null} / id-less owner never match.
    *
    * @param owner the row's per-user owner ({@code inventory_item.user}, {@code ship.owner}, {@code
    *     refinery_order.owner}); may be {@code null}, which never matches.

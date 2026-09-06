@@ -64,11 +64,11 @@ public final class Roles {
   /**
    * The marker authority an approved account holding no application role carries (REQ-SEC-053).
    *
-   * <p>Not a role and not in the hierarchy: nothing grants on it, and the only code that reads it is
-   * {@code PendingApprovalAccessFilter}, which turns it into {@code 403 NO_ROLE} before a handler
-   * runs. It exists so such an account is <em>refused</em> rather than left with an empty authority
-   * set — which would pass every {@code isAuthenticated()} gate and fail only the ones naming a
-   * role, making admission a per-endpoint accident instead of a decision.
+   * <p>Not a role and not in the hierarchy: nothing grants on it, and the only code that reads it
+   * is {@code PendingApprovalAccessFilter}, which turns it into {@code 403 NO_ROLE} before a
+   * handler runs. It exists so such an account is <em>refused</em> rather than left with an empty
+   * authority set — which would pass every {@code isAuthenticated()} gate and fail only the ones
+   * naming a role, making admission a per-endpoint accident instead of a decision.
    *
    * <p>Spelled with the {@code ROLE_} prefix already applied, unlike every constant above: it is
    * never a {@code Role.code} and never a Keycloak realm role, so there is no bare form of it.

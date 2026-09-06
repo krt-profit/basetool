@@ -220,8 +220,8 @@ public class MissionFinanceEntryController {
    * Redacts the nested participant's PII from a finance-entry DTO for every finance-ledger caller
    * (audit H-1) — the redaction is unconditional, a Logistician/Officer is treated no differently
    * from a squadron member here. A {@code null} participant or user passes through unchanged;
-   * otherwise the nested user is stripped via {@link MissionPeerRedactor#cleanupUserForPeer}
-   * while the participant's non-sensitive fields (org units, job types, comment, times, payout
+   * otherwise the nested user is stripped via {@link MissionPeerRedactor#cleanupUserForPeer} while
+   * the participant's non-sensitive fields (org units, job types, comment, times, payout
    * preference) are kept. Mirrors {@link MissionPeerRedactor#cleanupParticipantForPeer} (which
    * additionally forwards the guest edit token; a finance read never mints one, so it is nulled
    * here).

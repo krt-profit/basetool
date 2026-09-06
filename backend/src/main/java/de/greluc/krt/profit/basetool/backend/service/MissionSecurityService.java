@@ -29,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantReposi
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.support.Permissions;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
-import jakarta.servlet.http.HttpServletRequest;
 import java.util.Collection;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -73,9 +72,9 @@ public class MissionSecurityService {
    *
    * <p>Access is granted when the caller has elevated privileges (MISSION_MANAGER / OFFICER / ADMIN
    * / mission owner or manager) OR when the participant belongs to the currently authenticated user
-   * (Self-Edit: {@code participant.user.id == jwt.sub}). An <em>external</em> (unlinked) participant
-   * is editable by an elevated caller only — the row carries no creator to bind a self-edit to
-   * (ADR-0159, decision D4).
+   * (Self-Edit: {@code participant.user.id == jwt.sub}). An <em>external</em> (unlinked)
+   * participant is editable by an elevated caller only — the row carries no creator to bind a
+   * self-edit to (ADR-0159, decision D4).
    *
    * <p>If the participant does not exist (e.g. the frontend holds a stale row whose entry was
    * concurrently deleted in another tab), this method translates the missing row into a {@code 404

@@ -102,8 +102,7 @@ class MissionPeerRedactorTest {
   void cleanupMissionForPeer_clearsOwnerManagersFlagsButKeepsDescriptionAndOrg() {
     List<MissionStepDto> steps = List.of();
     SquadronReferenceDto squadron = new SquadronReferenceDto(UUID.randomUUID(), "Kartell", "KRT");
-    MissionParticipantDto participant =
-        participant(fullUser(), PayoutPreference.PAYOUT, "comment");
+    MissionParticipantDto participant = participant(fullUser(), PayoutPreference.PAYOUT, "comment");
     MissionDto full = mission("secret plan", squadron, participant, steps);
 
     MissionDto redacted = redactor.cleanupMissionForPeer(full);
@@ -123,7 +122,6 @@ class MissionPeerRedactorTest {
     assertThat(cleaned.payoutPreference()).isEqualTo(PayoutPreference.PAYOUT);
     assertThat(cleaned.comment()).isEqualTo("comment");
   }
-
 
   /**
    * REQ-SEC-040: the nested ship owner must be redacted like any other user leaving the API.
@@ -160,7 +158,6 @@ class MissionPeerRedactorTest {
     assertThat(redacted.assignedUnits().getFirst().ship().name()).isEqualTo("Rocinante");
   }
 
-
   /** A unit without an assigned ship must not blow up the redaction pass. */
   @Test
   void cleanupUnitForPeer_toleratesAUnitWithoutAShip() {
@@ -193,8 +190,7 @@ class MissionPeerRedactorTest {
 
   private static MissionDto missionWithUnit(MissionUnitDto unit) {
     SquadronReferenceDto squadron = new SquadronReferenceDto(UUID.randomUUID(), "Kartell", "KRT");
-    MissionParticipantDto participant =
-        participant(fullUser(), PayoutPreference.PAYOUT, "comment");
+    MissionParticipantDto participant = participant(fullUser(), PayoutPreference.PAYOUT, "comment");
     return mission("secret plan", squadron, participant, List.of(), List.of(unit));
   }
 

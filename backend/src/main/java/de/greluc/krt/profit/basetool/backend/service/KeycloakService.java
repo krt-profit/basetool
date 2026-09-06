@@ -482,8 +482,7 @@ public class KeycloakService {
    * as {@code defaultRole.name}. Derived rather than read, because reading it would cost a call to
    * {@code GET /admin/realms/{realm}} on every run for a value that is a documented naming
    * convention; a realm whose default role was renamed simply contributes no members here, which
-   * degrades to the pre-ADR-0159 behaviour for composite-only members rather than to a wrong
-   * grant.
+   * degrades to the pre-ADR-0159 behaviour for composite-only members rather than to a wrong grant.
    *
    * @return the default role's name for the configured realm; never {@code null}.
    */

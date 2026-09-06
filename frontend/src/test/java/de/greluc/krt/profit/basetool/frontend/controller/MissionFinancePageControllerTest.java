@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -129,10 +128,7 @@ class MissionFinancePageControllerTest {
       // POST body shape: missionId + participantId + note + type + amount.
       ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.captor();
       verify(backendApiClient)
-          .post(
-              eq("/api/v1/finance-entries"),
-              bodyCaptor.capture(),
-              eq(Void.class));
+          .post(eq("/api/v1/finance-entries"), bodyCaptor.capture(), eq(Void.class));
       Map<String, Object> body = bodyCaptor.getValue();
       assertEquals(MISSION_ID, body.get("missionId"));
       assertEquals(participantId, body.get("participantId"));
@@ -226,10 +222,7 @@ class MissionFinancePageControllerTest {
       // (immutable after creation).
       ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.captor();
       verify(backendApiClient)
-          .put(
-              eq("/api/v1/finance-entries/" + ENTRY_ID),
-              bodyCaptor.capture(),
-              eq(Void.class));
+          .put(eq("/api/v1/finance-entries/" + ENTRY_ID), bodyCaptor.capture(), eq(Void.class));
       Map<String, Object> body = bodyCaptor.getValue();
       assertEquals("repairs", body.get("note"));
       assertEquals(FinanceType.EXPENSE, body.get("type"));
@@ -248,9 +241,7 @@ class MissionFinancePageControllerTest {
       MissionFinanceEntryForm form = newForm(FinanceType.INCOME, BigDecimal.TEN);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
-      doThrow(new RuntimeException("409"))
-          .when(backendApiClient)
-          .put(anyString(), any(), any());
+      doThrow(new RuntimeException("409")).when(backendApiClient).put(anyString(), any(), any());
 
       String view =
           controller.updateFinanceEntry(
@@ -283,9 +274,7 @@ class MissionFinancePageControllerTest {
 
     @Test
     void backendFailure_addsErrorToast() {
-      doThrow(new RuntimeException("404"))
-          .when(backendApiClient)
-          .delete(anyString(), any());
+      doThrow(new RuntimeException("404")).when(backendApiClient).delete(anyString(), any());
 
       String view =
           controller.deleteFinanceEntry(MISSION_ID, ENTRY_ID, principal, redirectAttributes);
@@ -319,14 +308,12 @@ class MissionFinancePageControllerTest {
       assertEquals(MISSION_ID, body.get("missionId"), "missionId is stamped from the path");
     }
 
-
     @Test
     void updateAjax_putsBodyVerbatim_andReturns200() {
       Map<String, Object> body = new HashMap<>();
       body.put("amount", "99");
       body.put("version", 3);
-      when(backendApiClient.put(
-              eq("/api/v1/finance-entries/" + ENTRY_ID), any(), eq(Object.class)))
+      when(backendApiClient.put(eq("/api/v1/finance-entries/" + ENTRY_ID), any(), eq(Object.class)))
           .thenReturn(Map.of("id", ENTRY_ID.toString()));
 
       ResponseEntity<Object> resp = controller.updateFinanceEntryAjax(MISSION_ID, ENTRY_ID, body);

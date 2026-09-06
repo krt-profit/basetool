@@ -73,15 +73,15 @@ public class UserReconciliationService {
   /**
    * How many accounts may end a single sync run holding NO local role before the run summary
    * escalates from INFO to WARN. A handful is ordinary (a leaver whose realm roles were stripped);
-   * more than this in one run is the fingerprint of a realm-side role rename, which silently
-   * strips every holder of the renamed role at once — the failure this aggregate exists to make
-   * visible. Deliberately low: the run summary is emitted once per sync, so a WARN here is not a
-   * flood vector.
+   * more than this in one run is the fingerprint of a realm-side role rename, which silently strips
+   * every holder of the renamed role at once — the failure this aggregate exists to make visible.
+   * Deliberately low: the run summary is emitted once per sync, so a WARN here is not a flood
+   * vector.
    *
-   * <p>The stakes rose with ADR-0159. Such an account used to land on the authority-less
-   * {@code Guest} role and keep the anonymous read surface; now it is refused with
-   * {@code 403 NO_ROLE} (REQ-SEC-053) until an administrator acts, so this line is the difference
-   * between a rename being noticed and a silent overnight lockout.
+   * <p>The stakes rose with ADR-0159. Such an account used to land on the authority-less {@code
+   * Guest} role and keep the anonymous read surface; now it is refused with {@code 403 NO_ROLE}
+   * (REQ-SEC-053) until an administrator acts, so this line is the difference between a rename
+   * being noticed and a silent overnight lockout.
    */
   private static final int ROLE_LESS_WARN_THRESHOLD = 3;
 
@@ -121,8 +121,8 @@ public class UserReconciliationService {
    * nor unique after a deletion, so matching on it let a callsign decide which account a token
    * acted as. A row holding the same username under a different id is logged and counted; the admin
    * queue shows it as a collision, and merging the two is an explicit admin action. A JWT that
-   * carries no resolvable role leaves the account role-less, which is refused with
-   * {@code 403 NO_ROLE} (REQ-SEC-053) rather than substituted with a catch-all role.
+   * carries no resolvable role leaves the account role-less, which is refused with {@code 403
+   * NO_ROLE} (REQ-SEC-053) rather than substituted with a catch-all role.
    *
    * <p>Roles are the one field this does not always write. A client whose realm-role claim is
    * deliberately incomplete (REQ-SEC-036) leaves the stored set untouched, and the returned {@link
@@ -498,14 +498,14 @@ public class UserReconciliationService {
   /**
    * Writes the per-run role-mapping aggregate and resets the tallies for the next run, so the
    * scheduled reconciliation leaves exactly one line stating how many accounts had their roles
-   * rewritten — the signal that was missing when a realm-side role rename stripped every holder
-   * of a role overnight with no trace at all.
+   * rewritten — the signal that was missing when a realm-side role rename stripped every holder of
+   * a role overnight with no trace at all.
    *
    * <p>Counts only, never handles: REQ-OBS-004 forbids the {@code preferred_username} / callsign /
    * e-mail / Discord snowflake, and the affected subs are already available per account at DEBUG.
-   * The level is INFO for an ordinary run and WARN once more than {@link
-   * #ROLE_LESS_WARN_THRESHOLD} accounts ended the run with no role, which is what a renamed or
-   * deleted realm role looks like from here — and, since REQ-SEC-053, what a lockout looks like.
+   * The level is INFO for an ordinary run and WARN once more than {@link #ROLE_LESS_WARN_THRESHOLD}
+   * accounts ended the run with no role, which is what a renamed or deleted realm role looks like
+   * from here — and, since REQ-SEC-053, what a lockout looks like.
    *
    * <p>Called by {@link UserSyncService} at the end of a run. The tallies are only fed by the
    * Admin-API path ({@link #syncUser(KeycloakUserDto)}), never by the per-login JWT path, so an

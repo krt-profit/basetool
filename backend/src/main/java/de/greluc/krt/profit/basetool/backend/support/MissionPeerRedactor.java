@@ -145,12 +145,11 @@ public class MissionPeerRedactor {
         dto.meetingPoint());
   }
 
-
   /**
    * Redacts one assigned unit for a peer by cleaning the nested {@link ShipDto}.
    *
-   * <p>The unit itself is mission planning data a peer may see (REQ-SEC-007) — name, ship
-   * type, frequency, note, crew and the {@code responsibleUser}, which is a PII-free {@link
+   * <p>The unit itself is mission planning data a peer may see (REQ-SEC-007) — name, ship type,
+   * frequency, note, crew and the {@code responsibleUser}, which is a PII-free {@link
    * de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto} callsign tuple. Its {@code
    * ship}, however, carries a full {@link UserDto} owner, which is why this pass exists at all
    * (REQ-SEC-040).
@@ -175,8 +174,8 @@ public class MissionPeerRedactor {
 
   /**
    * Redacts a ship DTO for a peer: routes the nested {@code owner} through {@link
-   * #cleanupUserForPeer} so it leaves the API as the public callsign tuple instead of a full
-   * member record.
+   * #cleanupUserForPeer} so it leaves the API as the public callsign tuple instead of a full member
+   * record.
    *
    * <p><b>REQ-SEC-040 — why this exists.</b> {@code Ship.owner} is {@code nullable = false}, so an
    * assigned ship <em>always</em> carries an owner, and {@code UserMapper.toDto} nulls only {@code

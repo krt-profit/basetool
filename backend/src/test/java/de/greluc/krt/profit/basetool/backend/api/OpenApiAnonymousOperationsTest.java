@@ -37,11 +37,11 @@ import tools.jackson.databind.ObjectMapper;
  * <p><strong>Two defects this exists for, both of which shipped.</strong>
  *
  * <p>The first: twenty controllers declared {@code @SecurityRequirement(name = "bearerAuth")} while
- * {@code OpenApiConfig} defines the scheme as {@code bearer-jwt}. A name that resolves to nothing is
- * not an error in OpenAPI — it is an operation-level override that replaces the global requirement
- * with a reference to a scheme the document does not describe. 108 operations carried it, and the
- * Android app's generated client froze it. Nothing failed; the document simply stopped saying that
- * those operations need a token.
+ * {@code OpenApiConfig} defines the scheme as {@code bearer-jwt}. A name that resolves to nothing
+ * is not an error in OpenAPI — it is an operation-level override that replaces the global
+ * requirement with a reference to a scheme the document does not describe. 108 operations carried
+ * it, and the Android app's generated client froze it. Nothing failed; the document simply stopped
+ * saying that those operations need a token.
  *
  * <p>The second: <em>zero</em> operations declared {@code security: []}, so the two that genuinely
  * answer without one (REQ-SEC-052) were documented as requiring a bearer. That is the same defect
@@ -77,8 +77,11 @@ class OpenApiAnonymousOperationsTest {
    * @return the parsed document
    */
   private static JsonNode openapi() {
-    try (InputStream in = OpenApiAnonymousOperationsTest.class.getResourceAsStream(OPENAPI_RESOURCE)) {
-      assertThat(in).as("the committed %s must be on the test classpath", OPENAPI_RESOURCE).isNotNull();
+    try (InputStream in =
+        OpenApiAnonymousOperationsTest.class.getResourceAsStream(OPENAPI_RESOURCE)) {
+      assertThat(in)
+          .as("the committed %s must be on the test classpath", OPENAPI_RESOURCE)
+          .isNotNull();
       return new ObjectMapper().readTree(in);
     } catch (Exception e) {
       throw new IllegalStateException("could not read " + OPENAPI_RESOURCE, e);

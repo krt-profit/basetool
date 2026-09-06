@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.when;
@@ -452,5 +451,4 @@ class HomeControllerMvcTest {
         .noneMatch(header -> header.startsWith("SESSION="));
     org.mockito.Mockito.verifyNoInteractions(backendApiClient);
   }
-
 }

@@ -78,11 +78,11 @@ import org.springframework.security.oauth2.jwt.Jwt;
  *
  * <ul>
  *   <li><b>Outsider redaction</b> in {@code getMissionById} / {@code getNextMission} — {@code
- *       MissionController#cleanupOutsiderMissionForPeer} is the only path that controls what
- *       leaves the API for a mission outsider (anonymous OR authenticated role-less GUEST, detected
- *       via {@code AuthHelperService#isMemberOrAbove()}). Pinning the outsider redaction (the
- *       free-text description hidden, participant PII stripped to the public callsign tuple, owner
- *       / managers / internal inventory+refinery cleared, and — per ADR-0034 — each participant's
+ *       MissionController#cleanupOutsiderMissionForPeer} is the only path that controls what leaves
+ *       the API for a mission outsider (anonymous OR authenticated role-less GUEST, detected via
+ *       {@code AuthHelperService#isMemberOrAbove()}). Pinning the outsider redaction (the free-text
+ *       description hidden, participant PII stripped to the public callsign tuple, owner / managers
+ *       / internal inventory+refinery cleared, and — per ADR-0034 — each participant's
  *       payoutPreference + free-text comment stripped, while organisation, the participant roster,
  *       units and frequencies stay visible) protects the multi-user-data-isolation guarantee in
  *       CLAUDE.md.

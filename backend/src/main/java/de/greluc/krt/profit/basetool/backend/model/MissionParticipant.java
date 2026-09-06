@@ -31,7 +31,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Transient;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;

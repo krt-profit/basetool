@@ -975,147 +975,147 @@ The safe order, and the reason for it:
    `200`. Corrected 2026-08-31, after three nights of a red probe against a correctly pasted
    vhost.
 
-   |                              Path                               |                           Without a token                           |                                                   Why                                                    |
-   |-----------------------------------------------------------------|---------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
-   | `/api/v1/terms/document`                                        | **200**                                                             | anonymous by design (ADR-0138): wording that must be read *before* agreeing cannot require having agreed |
-   | `/api/v1/app/version-policy`                                    | **200**                                                             | REQ-API-010 / D2: an app too old to log in must still learn that it is too old                           |
-   | `/api/v1/missions/search`                                       | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
-   | `/api/v1/missions/<uuid>`                                       | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
-   | `/api/v1/missions/<uuid>` with `PUT`/`DELETE`                   | **405**                                                             | the family is read-only on this vhost                                                                    |
-   | `/api/v1/missions/<uuid>/finance-entries`                       | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
-   | `/api/v1/missions/<uuid>/finance-entries/summary`               | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
-   | `/api/v1/operations/search`                                     | **401**                                                             | `isAuthenticated()`, and no chain matcher makes it public                                                |
-   | `/api/v1/operations/<uuid>`                                     | **401**                                                             | `isAuthenticated()` + `canSeeOperation`                                                                  |
-   | `/api/v1/operations/<uuid>/finance-summary`                     | **401**                                                             | `isAuthenticated()` + `canSeeOperation`                                                                  |
-   | `/api/v1/operations/<uuid>/payouts`                             | **401**                                                             | `isAuthenticated()` + `canSeeOperation`                                                                  |
-   | `/api/v1/operations/<uuid>` with `PUT`/`DELETE`                 | **405**                                                             | the family is read-only on this vhost                                                                    |
-   | `/api/v1/terms/status`                                          | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/terms/acceptance` (POST)                               | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/me/active-org-unit`                                    | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/me/capabilities`                                       | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/inventory/aggregated`                                  | **401**                                                             | chain requires a member role                                                                             |
-   | `/api/v1/inventory/all/grouped`                                 | **401**                                                             | same                                                                                                     |
-   | `/api/v1/orders`                                                | **401**                                                             | `isAuthenticated()`; the `POST` on the same path is refused by the read-only guard                       |
-   | `/api/v1/orders/item-catalog`                                   | **401**                                                             | `isAuthenticated()` since ADR-0149; the orderable finished items                                         |
-   | `/api/v1/orders/item-catalog/<uuid>/blueprints`                 | **401**                                                             | same; the blueprints one item may be built from                                                          |
-   | `/api/v1/orders/items` (POST)                                   | **401**                                                             | `isAuthenticated()`; raises an item order                                                                |
-   | `/api/v1/orders/<uuid>`                                         | **401**                                                             | `isAuthenticated()` + scope                                                                              |
-   | `/api/v1/orders/<uuid>/assignees/<uuid>`                        | **401**                                                             | `isAuthenticated()` + scope; self-assignment is open to every member, anyone else needs LOGISTICIAN      |
-   | `/api/v1/orders/<uuid>/assignees/<uuid>/note`                   | **401**                                                             | same, and locked on the assignee edge's own version                                                      |
-   | `/api/v1/orders/<uuid>/status`                                  | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
-   | `/api/v1/missions/<uuid>/join`                                  | **401**                                                             | `isAuthenticated()` + `canSeeMission`                                                                    |
-   | `/api/v1/missions/<uuid>/participants/<uuid>/slim`              | **401**                                                             | `canAccessParticipant` — the caller's own row, or a mission manager's                                    |
-   | `…/participants/<uuid>/check-in/slim`                           | **401**                                                             | same                                                                                                     |
-   | `…/participants/<uuid>/payout-preference/slim`                  | **401**                                                             | same                                                                                                     |
-   | `/api/v1/finance-entries`                                       | **401**                                                             | `isAuthenticated()` + member-or-above + `canSeeMission` on the body's mission                            |
-   | `/api/v1/finance-entries/<uuid>`                                | **401**                                                             | `isAuthenticated()`; owner-vs-admin is decided at the service seam                                       |
-   | `/api/v1/operations/<uuid>/payouts/paid-out`                    | **401**                                                             | `hasRole(MISSION_MANAGER)` + scope; taking a confirmation back additionally needs OFFICER or ADMIN       |
-   | `…/org-units/bank/accounts/<uuid>/settings`                     | **401**                                                             | `isAuthenticated()`; what the caller may change is stated in the answer, not in the chain                |
-   | `…/bank/accounts/<uuid>/balance-target`                         | **401**                                                             | `isAuthenticated()` + the responsible-holder seam                                                        |
-   | `…/bank/accounts/<uuid>/visibility/…`                           | **401**                                                             | same                                                                                                     |
-   | `/api/v1/org-units/bank/balances`                               | **401**                                                             | me-scoped to the accounts the caller may see                                                             |
-   | `/api/v1/org-units/bank/accounts/<uuid>`                        | **401**                                                             | same                                                                                                     |
-   | `/api/v1/personal-inventory`                                    | **401**                                                             | me-scoped; the same path answers POST, which is 401 anonymously too                                      |
-   | `/api/v1/personal-inventory/<uuid>`                             | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
-   | `/api/v1/uex/locations/search`                                  | **401**                                                             | `isAuthenticated()`                                                                                      |
-   | `/api/v1/personal-blueprints`                                   | **401**                                                             | me-scoped; POST likewise                                                                                 |
-   | `/api/v1/personal-blueprints/<uuid>`                            | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
-   | `/api/v1/personal-blueprints/craftability`                      | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/personal-blueprints/<uuid>/recipe`                     | **401**                                                             | me-scoped; GET only, phase 5                                                                             |
-   | `/api/v1/blueprints/products/search`                            | **401**                                                             | `isAuthenticated()`                                                                                      |
-   | `/api/v1/hangar/ships`                                          | **401**                                                             | me-scoped; POST likewise                                                                                 |
-   | `/api/v1/hangar/ships/<uuid>`                                   | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
-   | `/api/v1/ship-types`                                            | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
-   | `/api/v1/locations/home-locations`                              | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
-   | `/api/v1/inventory` (POST)                                      | **401**                                                             | chain requires a member role                                                                             |
-   | `/api/v1/inventory/all/stack/entries`                           | **401**                                                             | chain requires a member role                                                                             |
-   | `/api/v1/inventory/material/<uuid>`                             | **401**                                                             | same; one material's entries, for the app's tablet pane                                                  |
-   | `/api/v1/inventory/<uuid>/book-out`                             | **401**                                                             | same, plus `canEditInventoryItem`                                                                        |
-   | `/api/v1/inventory/<uuid>/personal-rebook`                      | **401**                                                             | same                                                                                                     |
-   | `/api/v1/inventory/<uuid>/note`                                 | **401**                                                             | same                                                                                                     |
-   | `/api/v1/materials/search`                                      | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
-   | `/api/v1/locations/search`                                      | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
-   | `/api/v1/users/search`                                          | **401**                                                             | member records; `isAuthenticated()` and role-gated                                                       |
-   | `/api/v1/materials/<uuid>/terminals`                            | **401**                                                             | carved back **out** of the catalogue family with `/materials/matrix` (REQ-SEC-032) — UEX trade prices    |
-   | `/api/v1/org-units/bank/accounts/<uuid>/transactions`           | **401**                                                             | same                                                                                                     |
-   | `/api/v1/hangar/my-ships`                                       | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/hangar/squadron-overview`                              | **401**                                                             | scoped to the active org unit                                                                            |
-   | `/api/v1/announcement`                                          | **401**                                                             | no chain matcher makes it public                                                                         |
-   | `/api/v1/notifications`                                         | **401**                                                             | me-scoped inbox                                                                                          |
-   | `/api/v1/notifications/unread-count`                            | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/notifications/stream`                                  | **401**                                                             | me-scoped SSE                                                                                            |
-   | `/api/v1/notifications/read-all`                                | **401**                                                             | me-scoped write; POST only, phase 5                                                                      |
-   | `/api/v1/notifications/read`                                    | **401**                                                             | me-scoped write; DELETE only, phase 5                                                                    |
-   | `/api/v1/notifications/<uuid>`                                  | **401**                                                             | me-scoped; GET + DELETE, phase 5                                                                         |
-   | `/api/v1/notifications/<uuid>/read`                             | **401**                                                             | me-scoped write; POST only, phase 5                                                                      |
-   | `/api/v1/notification-rules`                                    | **404**                                                             | admin surface, NOT admitted — the four rows above must not have widened the prefix                       |
-   | `/api/v1/users/me`                                              | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/users/me/registration-status`                          | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/users/me/memberships`                                  | **401**                                                             | me-scoped                                                                                                |
-   | `/api/v1/refinery-orders` (POST)                                | **401**                                                             | phase M; `hasRole(KRT_MEMBER)` — the create form's write                                                 |
-   | `/api/v1/locations/refineries`                                  | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
-   | `/api/v1/refining-methods`                                      | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
-   | `/api/v1/orders/<uuid>/material-collection`                     | **401**                                                             | phase N; `isAuthenticated()` + `canSeeJobOrder`                                                          |
-   | `/api/v1/orders/<uuid>/inventory/<uuid>/unlink`                 | **401**                                                             | phase N; LOGISTICIAN / OFFICER / ADMIN + `canEditJobOrder`                                               |
-   | `/api/v1/orders/<uuid>/materials/<uuid>`                        | **401**                                                             | phase N; same gate                                                                                       |
-   | `/api/v1/inventory/<uuid>/delivered`                            | **401**                                                             | phase N; `isAuthenticated()` + `canEditInventoryItem` — the ROW's gate, not the order's                  |
-   | `/api/v1/missions/<uuid>/units/<uuid>/crew/<uuid>/slim`         | **401**                                                             | phase N; `canManageMission`. The deprecated sibling without `/slim` stays **404**                        |
-   | `/api/v1/bank/deposits` (POST)                                  | **401**                                                             | phase O; `hasRole(BANK_EMPLOYEE)` + per-account `canDeposit`                                             |
-   | `/api/v1/bank/withdrawals` (POST)                               | **401**                                                             | phase O; same, `canWithdraw`                                                                             |
-   | `/api/v1/bank/transfers` (POST)                                 | **401**                                                             | phase O; same, `canTransfer` on the SOURCE account                                                       |
-   | `/api/v1/bank/transfer-fee-rate`                                | **401**                                                             | phase O; `hasRole(BANK_EMPLOYEE)` only — an org-wide rate, no account in it                              |
-   | `…/org-units/bank/accounts/<uuid>/approval-limit/all-members`   | **401**                                                             | phase P; `isAuthenticated()` + `canConfigureApprovalLimits` on the account                               |
-   | `…/approval-limit/area-members`                                 | **401**                                                             | phase P; same                                                                                            |
-   | `…/approval-limit/role/<code>`                                  | **401**                                                             | phase P; same                                                                                            |
-   | `…/approval-limit/user/<uuid>`                                  | **401**                                                             | phase P; same                                                                                            |
-   | `/api/v1/users/me/payout-preference`                            | **401**                                                             | phase Q; me-scoped, `isAuthenticated()`; GET and PUT                                                     |
-   | `/api/v1/users/me/blueprint-sharing`                            | **401**                                                             | phase Q; same                                                                                            |
-   | `/api/v1/users/me/read-announcement/<uuid>`                     | **401**                                                             | phase Q; me-scoped write, PUT only                                                                       |
-   | `/api/v1/orders/<uuid>` with `PUT`                              | **401**                                                             | phase R; the Logistician's edit. `DELETE` on the same path stays **405**                                 |
-   | `/api/v1/operations/<uuid>` with `PUT`                          | **401**                                                             | phase R; a mission manager's edit. `DELETE` likewise stays **405**                                       |
-   | `/api/v1/orders/lookup`                                         | **401**                                                             | phase S; the Auftrag picker in the booking sheet                                                         |
-   | `/api/v1/missions/lookup`                                       | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
-   | `/api/v1/operations/lookup`                                     | **401**                                                             | phase S; the Operation picker on the Einsatz's Kern section                                              |
-   | `/api/v1/job-types`                                             | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
-   | `/api/v1/orders/material-demand`                                | **401**                                                             | phase T; the Materialbedarf screen, which showed a retry button that retried the same refusal            |
-   | `/api/v1/orders/<uuid>/item-stock`                              | **401**                                                             | phase T; the Verfügbarkeits-Chip on a sub-assembly                                                       |
-   | `/api/v1/orders/<uuid>/claims` (`GET`, `POST`)                  | **401**                                                             | phase T; the Zusagen tab and its upsert, on one path                                                     |
-   | `/api/v1/orders/<uuid>/claims/<uuid>` with `DELETE`             | **401**                                                             | phase T; withdrawing a Zusage. The only destructive verb this phase opens, and it is on the leaf         |
-   | `/api/v1/orders/<uuid>/materials/<uuid>/inventory`              | **401**                                                             | phase T; the Bestandszeilen an Übergabe is picked from                                                   |
-   | `/api/v1/orders/<uuid>/handovers` with `POST`                   | **401**                                                             | phase T; the Material-Übergabe                                                                           |
-   | `/api/v1/orders/<uuid>/item-handovers` with `POST`              | **401**                                                             | phase T; the Gegenstands-Übergabe                                                                        |
-   | `/api/v1/orders/<uuid>/items` with `PUT`                        | **401**                                                             | phase T; editing the ordered lines                                                                       |
-   | `/api/v1/orders/<uuid>/items/<uuid>/production` with `POST`     | **401**                                                             | phase T; recording a Herstellung                                                                         |
-   | `/api/v1/orders/<uuid>/priority` with `PUT`                     | **401**                                                             | phase T; „nach vorn/hinten“, the position as a query parameter                                           |
-   | `/api/v1/inventory/bulk-checkout` with `POST`                   | **401**                                                             | phase U; Sammel-Ausbuchen                                                                                |
-   | `/api/v1/inventory/bulk-rebook` with `POST`                     | **401**                                                             | phase U; Sammel-Umbuchen. The Standort-Picker beside it was already open, only the submit died           |
-   | `/api/v1/inventory/<uuid>/allocation` (`POST`,`PATCH`,`DELETE`) | **401**                                                             | phase U; the earmark. Three verbs on one path, and all three were refused                                |
-   | `/api/v1/missions/<uuid>/(core\|schedule\|flags)` with `PATCH`  | **401**                                                             | phase V; the three Einsatz sections, each with its own counter                                           |
-   | `/api/v1/missions/<uuid>/party-lead` with `PUT`                 | **401**                                                             | phase V                                                                                                  |
-   | `/api/v1/missions/<uuid>/participants` with `POST`              | **401**                                                             | phase V; „Teilnehmer hinzufügen“                                                                         |
-   | `/api/v1/missions/<uuid>/unit-ship-options`                     | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
-   | `/api/v1/missions/<uuid>/units/…/slim` (all verbs)              | **401**                                                             | phase V; Einheiten and their crew, slim only                                                             |
-   | `/api/v1/missions/<uuid>/frequencies/…/slim`                    | **401**                                                             | phase V                                                                                                  |
-   | `/api/v1/missions/<uuid>/managers/<uuid>/slim`                  | **401**                                                             | phase V                                                                                                  |
-   | `/api/v1/missions/<uuid>/(steps\|objectives)/…/slim`            | **401**                                                             | phase V; Ablauf and Ziele, which exist only as `/slim`                                                   |
-   | `/api/v1/materials/prices-overview`                             | **401**                                                             | phase W; **was 200** until this phase closed it (REQ-SEC-032)                                            |
-   | `/api/v1/materials/profit-calculation`                          | **401**                                                             | phase W; **was 500** — dispatched anonymously and crashing, which is not a gate either                   |
-   | `/api/v1/materials/<uuid>/prices`                               | **401**                                                             | phase W; **was 200**. Same UEX trade data as `matrix`, through another door                              |
-   | `/api/v1/materials/<uuid>`                                      | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
-   | `/api/v1/terminals`                                             | **401**                                                             | phase W; the star-system filter page-walks it                                                            |
-   | `/api/v1/material-exchange/released-item-ids`                   | **401**                                                             | phase W                                                                                                  |
-   | `/api/v1/material-exchange/item-offers` with `POST`             | **401**                                                             | phase W; releasing a Gegenstand to the Börse                                                             |
-   | `/api/v1/material-requests/item` with `POST`                    | **401**                                                             | phase W                                                                                                  |
-   | `/api/v1/material-exchange/offers/<uuid>/remark` with `PUT`     | **401**                                                             | phase W                                                                                                  |
-   | `/api/v1/material-requests/<uuid>` with `PUT`                   | **401**                                                             | phase W                                                                                                  |
-   | `/api/v1/personal-blueprints/overview` (+ `/owners`)            | **401**                                                             | phase X; the Blaupausen-Übersicht and its owner list                                                     |
-   | `/api/v1/personal-blueprints/batch` with `POST`                 | **401**                                                             | phase X                                                                                                  |
-   | `/api/v1/personal-blueprints/import/preview` with `POST`        | **401**                                                             | phase X; `multipart/form-data`, and the reason the body ceiling moved                                    |
-   | `/api/v1/personal-blueprints/import/apply` with `POST`          | **401**                                                             | phase X; admitted WITH the preview — the pair the audit called latent and then work-destroying           |
-   | `/api/v1/hangar/import/fleetview` with `POST`                   | **401**                                                             | phase X; `multipart/form-data`                                                                           |
-   | `/api/v1/hangar/ships/home-location` with `POST`                | **401**                                                             | phase X                                                                                                  |
-   | `/api/v1/settings/job_order.age_yellow_days` (and `…red_days`)  | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
-   | anything not on the list                                        | **404**                                                             | default deny                                                                                             |
+   |                              Path                               | Without a token |                                                   Why                                                    |
+   |-----------------------------------------------------------------|-----------------|----------------------------------------------------------------------------------------------------------|
+   | `/api/v1/terms/document`                                        | **200**         | anonymous by design (ADR-0138): wording that must be read *before* agreeing cannot require having agreed |
+   | `/api/v1/app/version-policy`                                    | **200**         | REQ-API-010 / D2: an app too old to log in must still learn that it is too old                           |
+   | `/api/v1/missions/search`                                       | **401**         | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/missions/<uuid>`                                       | **401**         | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/missions/<uuid>` with `PUT`/`DELETE`                   | **405**         | the family is read-only on this vhost                                                                    |
+   | `/api/v1/missions/<uuid>/finance-entries`                       | **401**         | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/missions/<uuid>/finance-entries/summary`               | **401**         | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/operations/search`                                     | **401**         | `isAuthenticated()`, and no chain matcher makes it public                                                |
+   | `/api/v1/operations/<uuid>`                                     | **401**         | `isAuthenticated()` + `canSeeOperation`                                                                  |
+   | `/api/v1/operations/<uuid>/finance-summary`                     | **401**         | `isAuthenticated()` + `canSeeOperation`                                                                  |
+   | `/api/v1/operations/<uuid>/payouts`                             | **401**         | `isAuthenticated()` + `canSeeOperation`                                                                  |
+   | `/api/v1/operations/<uuid>` with `PUT`/`DELETE`                 | **405**         | the family is read-only on this vhost                                                                    |
+   | `/api/v1/terms/status`                                          | **401**         | me-scoped                                                                                                |
+   | `/api/v1/terms/acceptance` (POST)                               | **401**         | me-scoped                                                                                                |
+   | `/api/v1/me/active-org-unit`                                    | **401**         | me-scoped                                                                                                |
+   | `/api/v1/me/capabilities`                                       | **401**         | me-scoped                                                                                                |
+   | `/api/v1/inventory/aggregated`                                  | **401**         | chain requires a member role                                                                             |
+   | `/api/v1/inventory/all/grouped`                                 | **401**         | same                                                                                                     |
+   | `/api/v1/orders`                                                | **401**         | `isAuthenticated()`; the `POST` on the same path is refused by the read-only guard                       |
+   | `/api/v1/orders/item-catalog`                                   | **401**         | `isAuthenticated()` since ADR-0149; the orderable finished items                                         |
+   | `/api/v1/orders/item-catalog/<uuid>/blueprints`                 | **401**         | same; the blueprints one item may be built from                                                          |
+   | `/api/v1/orders/items` (POST)                                   | **401**         | `isAuthenticated()`; raises an item order                                                                |
+   | `/api/v1/orders/<uuid>`                                         | **401**         | `isAuthenticated()` + scope                                                                              |
+   | `/api/v1/orders/<uuid>/assignees/<uuid>`                        | **401**         | `isAuthenticated()` + scope; self-assignment is open to every member, anyone else needs LOGISTICIAN      |
+   | `/api/v1/orders/<uuid>/assignees/<uuid>/note`                   | **401**         | same, and locked on the assignee edge's own version                                                      |
+   | `/api/v1/orders/<uuid>/status`                                  | **401**         | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/missions/<uuid>/join`                                  | **401**         | `isAuthenticated()` + `canSeeMission`                                                                    |
+   | `/api/v1/missions/<uuid>/participants/<uuid>/slim`              | **401**         | `canAccessParticipant` — the caller's own row, or a mission manager's                                    |
+   | `…/participants/<uuid>/check-in/slim`                           | **401**         | same                                                                                                     |
+   | `…/participants/<uuid>/payout-preference/slim`                  | **401**         | same                                                                                                     |
+   | `/api/v1/finance-entries`                                       | **401**         | `isAuthenticated()` + member-or-above + `canSeeMission` on the body's mission                            |
+   | `/api/v1/finance-entries/<uuid>`                                | **401**         | `isAuthenticated()`; owner-vs-admin is decided at the service seam                                       |
+   | `/api/v1/operations/<uuid>/payouts/paid-out`                    | **401**         | `hasRole(MISSION_MANAGER)` + scope; taking a confirmation back additionally needs OFFICER or ADMIN       |
+   | `…/org-units/bank/accounts/<uuid>/settings`                     | **401**         | `isAuthenticated()`; what the caller may change is stated in the answer, not in the chain                |
+   | `…/bank/accounts/<uuid>/balance-target`                         | **401**         | `isAuthenticated()` + the responsible-holder seam                                                        |
+   | `…/bank/accounts/<uuid>/visibility/…`                           | **401**         | same                                                                                                     |
+   | `/api/v1/org-units/bank/balances`                               | **401**         | me-scoped to the accounts the caller may see                                                             |
+   | `/api/v1/org-units/bank/accounts/<uuid>`                        | **401**         | same                                                                                                     |
+   | `/api/v1/personal-inventory`                                    | **401**         | me-scoped; the same path answers POST, which is 401 anonymously too                                      |
+   | `/api/v1/personal-inventory/<uuid>`                             | **401**         | me-scoped; PUT and DELETE likewise                                                                       |
+   | `/api/v1/uex/locations/search`                                  | **401**         | `isAuthenticated()`                                                                                      |
+   | `/api/v1/personal-blueprints`                                   | **401**         | me-scoped; POST likewise                                                                                 |
+   | `/api/v1/personal-blueprints/<uuid>`                            | **401**         | me-scoped; PUT and DELETE likewise                                                                       |
+   | `/api/v1/personal-blueprints/craftability`                      | **401**         | me-scoped                                                                                                |
+   | `/api/v1/personal-blueprints/<uuid>/recipe`                     | **401**         | me-scoped; GET only, phase 5                                                                             |
+   | `/api/v1/blueprints/products/search`                            | **401**         | `isAuthenticated()`                                                                                      |
+   | `/api/v1/hangar/ships`                                          | **401**         | me-scoped; POST likewise                                                                                 |
+   | `/api/v1/hangar/ships/<uuid>`                                   | **401**         | me-scoped; PUT and DELETE likewise                                                                       |
+   | `/api/v1/ship-types`                                            | **401**         | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/locations/home-locations`                              | **401**         | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/inventory` (POST)                                      | **401**         | chain requires a member role                                                                             |
+   | `/api/v1/inventory/all/stack/entries`                           | **401**         | chain requires a member role                                                                             |
+   | `/api/v1/inventory/material/<uuid>`                             | **401**         | same; one material's entries, for the app's tablet pane                                                  |
+   | `/api/v1/inventory/<uuid>/book-out`                             | **401**         | same, plus `canEditInventoryItem`                                                                        |
+   | `/api/v1/inventory/<uuid>/personal-rebook`                      | **401**         | same                                                                                                     |
+   | `/api/v1/inventory/<uuid>/note`                                 | **401**         | same                                                                                                     |
+   | `/api/v1/materials/search`                                      | **401**         | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/locations/search`                                      | **401**         | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/users/search`                                          | **401**         | member records; `isAuthenticated()` and role-gated                                                       |
+   | `/api/v1/materials/<uuid>/terminals`                            | **401**         | carved back **out** of the catalogue family with `/materials/matrix` (REQ-SEC-032) — UEX trade prices    |
+   | `/api/v1/org-units/bank/accounts/<uuid>/transactions`           | **401**         | same                                                                                                     |
+   | `/api/v1/hangar/my-ships`                                       | **401**         | me-scoped                                                                                                |
+   | `/api/v1/hangar/squadron-overview`                              | **401**         | scoped to the active org unit                                                                            |
+   | `/api/v1/announcement`                                          | **401**         | no chain matcher makes it public                                                                         |
+   | `/api/v1/notifications`                                         | **401**         | me-scoped inbox                                                                                          |
+   | `/api/v1/notifications/unread-count`                            | **401**         | me-scoped                                                                                                |
+   | `/api/v1/notifications/stream`                                  | **401**         | me-scoped SSE                                                                                            |
+   | `/api/v1/notifications/read-all`                                | **401**         | me-scoped write; POST only, phase 5                                                                      |
+   | `/api/v1/notifications/read`                                    | **401**         | me-scoped write; DELETE only, phase 5                                                                    |
+   | `/api/v1/notifications/<uuid>`                                  | **401**         | me-scoped; GET + DELETE, phase 5                                                                         |
+   | `/api/v1/notifications/<uuid>/read`                             | **401**         | me-scoped write; POST only, phase 5                                                                      |
+   | `/api/v1/notification-rules`                                    | **404**         | admin surface, NOT admitted — the four rows above must not have widened the prefix                       |
+   | `/api/v1/users/me`                                              | **401**         | me-scoped                                                                                                |
+   | `/api/v1/users/me/registration-status`                          | **401**         | me-scoped                                                                                                |
+   | `/api/v1/users/me/memberships`                                  | **401**         | me-scoped                                                                                                |
+   | `/api/v1/refinery-orders` (POST)                                | **401**         | phase M; `hasRole(KRT_MEMBER)` — the create form's write                                                 |
+   | `/api/v1/locations/refineries`                                  | **401**         | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/refining-methods`                                      | **401**         | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/orders/<uuid>/material-collection`                     | **401**         | phase N; `isAuthenticated()` + `canSeeJobOrder`                                                          |
+   | `/api/v1/orders/<uuid>/inventory/<uuid>/unlink`                 | **401**         | phase N; LOGISTICIAN / OFFICER / ADMIN + `canEditJobOrder`                                               |
+   | `/api/v1/orders/<uuid>/materials/<uuid>`                        | **401**         | phase N; same gate                                                                                       |
+   | `/api/v1/inventory/<uuid>/delivered`                            | **401**         | phase N; `isAuthenticated()` + `canEditInventoryItem` — the ROW's gate, not the order's                  |
+   | `/api/v1/missions/<uuid>/units/<uuid>/crew/<uuid>/slim`         | **401**         | phase N; `canManageMission`. The deprecated sibling without `/slim` stays **404**                        |
+   | `/api/v1/bank/deposits` (POST)                                  | **401**         | phase O; `hasRole(BANK_EMPLOYEE)` + per-account `canDeposit`                                             |
+   | `/api/v1/bank/withdrawals` (POST)                               | **401**         | phase O; same, `canWithdraw`                                                                             |
+   | `/api/v1/bank/transfers` (POST)                                 | **401**         | phase O; same, `canTransfer` on the SOURCE account                                                       |
+   | `/api/v1/bank/transfer-fee-rate`                                | **401**         | phase O; `hasRole(BANK_EMPLOYEE)` only — an org-wide rate, no account in it                              |
+   | `…/org-units/bank/accounts/<uuid>/approval-limit/all-members`   | **401**         | phase P; `isAuthenticated()` + `canConfigureApprovalLimits` on the account                               |
+   | `…/approval-limit/area-members`                                 | **401**         | phase P; same                                                                                            |
+   | `…/approval-limit/role/<code>`                                  | **401**         | phase P; same                                                                                            |
+   | `…/approval-limit/user/<uuid>`                                  | **401**         | phase P; same                                                                                            |
+   | `/api/v1/users/me/payout-preference`                            | **401**         | phase Q; me-scoped, `isAuthenticated()`; GET and PUT                                                     |
+   | `/api/v1/users/me/blueprint-sharing`                            | **401**         | phase Q; same                                                                                            |
+   | `/api/v1/users/me/read-announcement/<uuid>`                     | **401**         | phase Q; me-scoped write, PUT only                                                                       |
+   | `/api/v1/orders/<uuid>` with `PUT`                              | **401**         | phase R; the Logistician's edit. `DELETE` on the same path stays **405**                                 |
+   | `/api/v1/operations/<uuid>` with `PUT`                          | **401**         | phase R; a mission manager's edit. `DELETE` likewise stays **405**                                       |
+   | `/api/v1/orders/lookup`                                         | **401**         | phase S; the Auftrag picker in the booking sheet                                                         |
+   | `/api/v1/missions/lookup`                                       | **401**         | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/operations/lookup`                                     | **401**         | phase S; the Operation picker on the Einsatz's Kern section                                              |
+   | `/api/v1/job-types`                                             | **401**         | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/orders/material-demand`                                | **401**         | phase T; the Materialbedarf screen, which showed a retry button that retried the same refusal            |
+   | `/api/v1/orders/<uuid>/item-stock`                              | **401**         | phase T; the Verfügbarkeits-Chip on a sub-assembly                                                       |
+   | `/api/v1/orders/<uuid>/claims` (`GET`, `POST`)                  | **401**         | phase T; the Zusagen tab and its upsert, on one path                                                     |
+   | `/api/v1/orders/<uuid>/claims/<uuid>` with `DELETE`             | **401**         | phase T; withdrawing a Zusage. The only destructive verb this phase opens, and it is on the leaf         |
+   | `/api/v1/orders/<uuid>/materials/<uuid>/inventory`              | **401**         | phase T; the Bestandszeilen an Übergabe is picked from                                                   |
+   | `/api/v1/orders/<uuid>/handovers` with `POST`                   | **401**         | phase T; the Material-Übergabe                                                                           |
+   | `/api/v1/orders/<uuid>/item-handovers` with `POST`              | **401**         | phase T; the Gegenstands-Übergabe                                                                        |
+   | `/api/v1/orders/<uuid>/items` with `PUT`                        | **401**         | phase T; editing the ordered lines                                                                       |
+   | `/api/v1/orders/<uuid>/items/<uuid>/production` with `POST`     | **401**         | phase T; recording a Herstellung                                                                         |
+   | `/api/v1/orders/<uuid>/priority` with `PUT`                     | **401**         | phase T; „nach vorn/hinten“, the position as a query parameter                                           |
+   | `/api/v1/inventory/bulk-checkout` with `POST`                   | **401**         | phase U; Sammel-Ausbuchen                                                                                |
+   | `/api/v1/inventory/bulk-rebook` with `POST`                     | **401**         | phase U; Sammel-Umbuchen. The Standort-Picker beside it was already open, only the submit died           |
+   | `/api/v1/inventory/<uuid>/allocation` (`POST`,`PATCH`,`DELETE`) | **401**         | phase U; the earmark. Three verbs on one path, and all three were refused                                |
+   | `/api/v1/missions/<uuid>/(core\|schedule\|flags)` with `PATCH`  | **401**         | phase V; the three Einsatz sections, each with its own counter                                           |
+   | `/api/v1/missions/<uuid>/party-lead` with `PUT`                 | **401**         | phase V                                                                                                  |
+   | `/api/v1/missions/<uuid>/participants` with `POST`              | **401**         | phase V; „Teilnehmer hinzufügen“                                                                         |
+   | `/api/v1/missions/<uuid>/unit-ship-options`                     | **401**         | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/missions/<uuid>/units/…/slim` (all verbs)              | **401**         | phase V; Einheiten and their crew, slim only                                                             |
+   | `/api/v1/missions/<uuid>/frequencies/…/slim`                    | **401**         | phase V                                                                                                  |
+   | `/api/v1/missions/<uuid>/managers/<uuid>/slim`                  | **401**         | phase V                                                                                                  |
+   | `/api/v1/missions/<uuid>/(steps\|objectives)/…/slim`            | **401**         | phase V; Ablauf and Ziele, which exist only as `/slim`                                                   |
+   | `/api/v1/materials/prices-overview`                             | **401**         | phase W; **was 200** until this phase closed it (REQ-SEC-032)                                            |
+   | `/api/v1/materials/profit-calculation`                          | **401**         | phase W; **was 500** — dispatched anonymously and crashing, which is not a gate either                   |
+   | `/api/v1/materials/<uuid>/prices`                               | **401**         | phase W; **was 200**. Same UEX trade data as `matrix`, through another door                              |
+   | `/api/v1/materials/<uuid>`                                      | **401**         | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/terminals`                                             | **401**         | phase W; the star-system filter page-walks it                                                            |
+   | `/api/v1/material-exchange/released-item-ids`                   | **401**         | phase W                                                                                                  |
+   | `/api/v1/material-exchange/item-offers` with `POST`             | **401**         | phase W; releasing a Gegenstand to the Börse                                                             |
+   | `/api/v1/material-requests/item` with `POST`                    | **401**         | phase W                                                                                                  |
+   | `/api/v1/material-exchange/offers/<uuid>/remark` with `PUT`     | **401**         | phase W                                                                                                  |
+   | `/api/v1/material-requests/<uuid>` with `PUT`                   | **401**         | phase W                                                                                                  |
+   | `/api/v1/personal-blueprints/overview` (+ `/owners`)            | **401**         | phase X; the Blaupausen-Übersicht and its owner list                                                     |
+   | `/api/v1/personal-blueprints/batch` with `POST`                 | **401**         | phase X                                                                                                  |
+   | `/api/v1/personal-blueprints/import/preview` with `POST`        | **401**         | phase X; `multipart/form-data`, and the reason the body ceiling moved                                    |
+   | `/api/v1/personal-blueprints/import/apply` with `POST`          | **401**         | phase X; admitted WITH the preview — the pair the audit called latent and then work-destroying           |
+   | `/api/v1/hangar/import/fleetview` with `POST`                   | **401**         | phase X; `multipart/form-data`                                                                           |
+   | `/api/v1/hangar/ships/home-location` with `POST`                | **401**         | phase X                                                                                                  |
+   | `/api/v1/settings/job_order.age_yellow_days` (and `…red_days`)  | **401**         | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | anything not on the list                                        | **404**         | default deny                                                                                             |
 
 > [!important] ADR-0159 needs no paste at this edge, and that is the point
 > The members-only change (REQ-SEC-052 / REQ-SEC-053) does not add, remove or reorder a
@@ -1134,20 +1134,20 @@ The safe order, and the reason for it:
 > instead, which writes `401`. Same closure, different number — and the number is what the
 > rollout check reads.
 
-   **Two refusals, two numbers, and the difference is structural rather than a policy gap.** The
-   me-scoped paths are `authenticated()` in the filter chain, so Spring Security turns them away
-   before the dispatch and the entry point writes `401`. The Finanzen paths sit under `GET
-   /api/v1/missions/**`, which is `permitAll` in that same chain — the request reaches the
-   controller, `@PreAuthorize` refuses it there, and `GlobalExceptionHandler` renders the refusal as
-   `403`. Nothing upgrades it to `401`, because `ExceptionTranslationFilter` — the one component
-   that would — never sees an exception the MVC advice has already handled. Both callers are
-   refused identically; only the number differs, and it is the number an operator reads off this
-   table. `ApiVhostAnonymousSurfaceTest` pins both statuses so the table cannot drift from the code
-   again.
+**Two refusals, two numbers, and the difference is structural rather than a policy gap.** The
+me-scoped paths are `authenticated()` in the filter chain, so Spring Security turns them away
+before the dispatch and the entry point writes `401`. The Finanzen paths sit under `GET
+/api/v1/missions/**`, which is `permitAll` in that same chain — the request reaches the
+controller, `@PreAuthorize` refuses it there, and `GlobalExceptionHandler` renders the refusal as
+`403`. Nothing upgrades it to `401`, because `ExceptionTranslationFilter` — the one component
+that would — never sees an exception the MVC advice has already handled. Both callers are
+refused identically; only the number differs, and it is the number an operator reads off this
+table. `ApiVhostAnonymousSurfaceTest` pins both statuses so the table cannot drift from the code
+again.
 
-   A **404 where the table names a status** means the paste did not take. A **200 where the table
-   names a refusal** is the serious one — an unauthenticated read of member data. A **refusal where
-   the table says 200** means the backend's rule moved under the vhost, which is worth knowing too.
+A **404 where the table names a status** means the paste did not take. A **200 where the table
+names a refusal** is the serious one — an unauthenticated read of member data. A **refusal where
+the table says 200** means the backend's rule moved under the vhost, which is worth knowing too.
 
 4. Add the new paths to the nightly `edge-deny-probe` workflow's allow-list step **once the paste
    is in**, not before — it asserts this table from outside every night, and an entry added ahead
@@ -1394,7 +1394,7 @@ merge order, so the block can be reviewed against this list rather than diffed b
 Anonymously, from outside the host — the same shape as Phase H's check:
 
 |                     Path                     |                                  Without a token                                  |
-|----------------------------------------------|-----------------------------------------------------------------------------------|
+|----------------------------------------------|-----------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
 | `/api/v1/personal-inventory`                 | **401**                                                                           |
 | `/api/v1/personal-inventory/<uuid>`          | **401**                                                                           |
 | `/api/v1/uex/locations/search`               | **401**                                                                           |
@@ -1404,15 +1404,15 @@ Anonymously, from outside the host — the same shape as Phase H's check:
 | `/api/v1/blueprints/products/search`         | **401**                                                                           |
 | `/api/v1/hangar/ships`                       | **401**                                                                           |
 | `/api/v1/hangar/ships/<uuid>`                | **401**                                                                           |
-| `/api/v1/ship-types`                         | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path
-| `/api/v1/locations/home-locations`           | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path
+| `/api/v1/ship-types`                         | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
+| `/api/v1/locations/home-locations`           | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
 | `/api/v1/inventory/<uuid>/book-out`          | **401**                                                                           |
 | `/api/v1/users/search`                       | **401**                                                                           |
-| `/api/v1/materials/search`                   | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path
-| `/api/v1/locations/search`                   | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path
+| `/api/v1/materials/search`                   | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
+| `/api/v1/locations/search`                   | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
 | `POST /api/v1/inventory/all`                 | **404** — the every-member list is not on the allow-list at all                   |
 | `/api/v1/orders/<uuid>/assignees/<uuid>`     | **401**                                                                           |
-| `/api/v1/orders/<uuid>/status`               | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path
+| `/api/v1/orders/<uuid>/status`               | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
 | `/api/v1/missions/<uuid>/join`               | **401**                                                                           |
 | `…/participants/<uuid>/check-in/slim`        | **404** — the guard resolves the row before it judges the caller, see REQ-SEC-037 |
 | `/api/v1/finance-entries`                    | **401**                                                                           |
@@ -2115,11 +2115,11 @@ contract instead, where a rename would actually be caught.
 ### What to expect afterwards
 
 |            Path             | Anonymous status |
-|-----------------------------|------------------|
+|-----------------------------|------------------|-----------------------------------------------------------------------------|
 | `/api/v1/orders/lookup`     | **401**          |
 | `/api/v1/operations/lookup` | **401**          |
-| `/api/v1/missions/lookup`   | **401**          | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path
-| `/api/v1/job-types`         | **401**          | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path
+| `/api/v1/missions/lookup`   | **401**          | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
+| `/api/v1/job-types`         | **401**          | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
 
 Pinned in `ApiVhostAnonymousSurfaceTest` before this table was written.
 
@@ -2378,9 +2378,9 @@ sends. **No `DELETE` is opened anywhere in this phase**, and no carve-out is wri
 ### What to expect afterwards
 
 |             Path             | Anonymous status |
-|------------------------------|------------------|
+|------------------------------|------------------|-----------------------------------------------------------------------------|
 | the four price reads         | **401**          |
-| `/api/v1/materials/<uuid>`   | **401**          | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path
+| `/api/v1/materials/<uuid>`   | **401**          | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
 | everything else in the phase | **401**          |
 
 Pinned in `ApiVhostAnonymousSurfaceTest` before this table was written — and here that order was

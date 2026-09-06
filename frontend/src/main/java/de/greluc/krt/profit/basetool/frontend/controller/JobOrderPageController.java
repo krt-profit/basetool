@@ -90,8 +90,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  *
  * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
  * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
- * package carried no gate of their own at all — protected by a matcher two folders away rather
- * than by anything next to the code. A method-level gate still wins where one is present.
+ * package carried no gate of their own at all — protected by a matcher two folders away rather than
+ * by anything next to the code. A method-level gate still wins where one is present.
  */
 @Controller
 @RequestMapping("/orders")

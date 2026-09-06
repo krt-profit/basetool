@@ -57,7 +57,6 @@ import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -105,9 +104,9 @@ import org.springframework.web.bind.annotation.RestController;
  * </ul>
  *
  * <p>Guest reads are heavily redacted: internal and past missions are hidden, and {@link
- * MissionPeerRedactor#cleanupMissionForPeer} strips names, emails, internal inventory and
- * refinery orders before the DTO leaves the controller. {@code addParticipantPublic} additionally
- * resolves free-text guest names against registered users to prevent impersonation.
+ * MissionPeerRedactor#cleanupMissionForPeer} strips names, emails, internal inventory and refinery
+ * orders before the DTO leaves the controller. {@code addParticipantPublic} additionally resolves
+ * free-text guest names against registered users to prevent impersonation.
  *
  * <p>Authorisation is delegated to {@link MissionSecurityService} via SpEL ({@code
  * canManageMission}, {@code canAccessParticipant}, {@code canManageManagers}, {@code
@@ -241,8 +240,7 @@ public class MissionController {
   }
 
   /**
-   * Single-mission read. A member below Logistician
-   * {@code GUEST} accounts (see {@link
+   * Single-mission read. A member below Logistician {@code GUEST} accounts (see {@link
    * de.greluc.krt.profit.basetool.backend.service.AuthHelperService#isMemberOrAbove()}) — are
    * blocked from internal and past missions (403) and get the strict redaction via {@link
    * MissionPeerRedactor#cleanupOutsiderMissionForPeer}. Registered members and above see the full
@@ -731,7 +729,8 @@ public class MissionController {
   @Deprecated(forRemoval = true)
   @PutMapping("/{id}/participants/{participantId}")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+          + " authentication)")
   @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/participants/{participantId}/slim")
@@ -782,7 +781,8 @@ public class MissionController {
   @Deprecated(forRemoval = true)
   @PostMapping("/{id}/participants/{participantId}/check-in")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+          + " authentication)")
   @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/participants/{participantId}/check-in/slim")
@@ -817,7 +817,8 @@ public class MissionController {
   @Deprecated(forRemoval = true)
   @PostMapping("/{id}/participants/{participantId}/check-out")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+          + " authentication)")
   @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/participants/{participantId}/check-out/slim")
@@ -856,7 +857,8 @@ public class MissionController {
   @Deprecated(forRemoval = true)
   @PutMapping("/{id}/participants/{participantId}/payout-preference")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+          + " authentication)")
   @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/participants/{participantId}/payout-preference/slim")
@@ -921,7 +923,8 @@ public class MissionController {
   @Deprecated(forRemoval = true)
   @DeleteMapping("/{id}/participants/{participantId}")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+          + " authentication)")
   @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/participants/{participantId}/slim")
@@ -1900,7 +1903,8 @@ public class MissionController {
    */
   @PutMapping("/{id}/participants/{participantId}/slim")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+          + " authentication)")
   @Operation(
       summary = "Update a participant (slim response)",
       description = "Updates a participant and returns only the updated participant as a slim DTO.")
@@ -1948,7 +1952,8 @@ public class MissionController {
    */
   @PostMapping("/{id}/participants/{participantId}/check-in/slim")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+          + " authentication)")
   @Operation(
       summary = "Check in a participant (slim response)",
       description =
@@ -1976,7 +1981,8 @@ public class MissionController {
    */
   @PostMapping("/{id}/participants/{participantId}/check-out/slim")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+          + " authentication)")
   @Operation(
       summary = "Check out a participant (slim response)",
       description =
@@ -2005,7 +2011,8 @@ public class MissionController {
    */
   @PutMapping("/{id}/participants/{participantId}/payout-preference/slim")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+          + " authentication)")
   @Operation(
       summary = "Update payout preference for a participant (slim response)",
       description =
@@ -2129,7 +2136,8 @@ public class MissionController {
    */
   @DeleteMapping("/{id}/participants/{participantId}/slim")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+          + " authentication)")
   @Operation(
       summary = "Remove a participant (slim response)",
       description = "Removes a participant and returns 204 No Content.")

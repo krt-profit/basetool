@@ -587,18 +587,18 @@ public class WebClientConfig {
   /**
    * The one anonymous WebClient left, and it reaches exactly one endpoint.
    *
-   * <p>{@code GET /api/v1/terms/document} is the Terms-of-Use wording, which the public
-   * {@code /terms} page renders (ADR-0138 / REQ-SEC-028, REQ-SEC-052). A document everyone must be
-   * able to read before agreeing to anything cannot be fetched with a token the reader does not
-   * have yet, so this call has no bearer to relay.
+   * <p>{@code GET /api/v1/terms/document} is the Terms-of-Use wording, which the public {@code
+   * /terms} page renders (ADR-0138 / REQ-SEC-028, REQ-SEC-052). A document everyone must be able to
+   * read before agreeing to anything cannot be fetched with a token the reader does not have yet,
+   * so this call has no bearer to relay.
    *
    * <p><strong>Named for its one caller on purpose.</strong> Its predecessor was called {@code
    * publicWebClient} and was handed to roughly forty call sites through an {@code isPublic} boolean
    * — the mission list, the order queue, the catalogue pickers, the home page. Each of those was a
    * decision to send a request without an identity, taken by passing {@code true}, and none of them
-   * needed to be. A boolean parameter is the wrong shape for "this request has no caller":
-   * {@code TermsDocumentClientUsageTest} asserts that nothing but {@code TermsController} injects
-   * this bean, which a boolean could never do.
+   * needed to be. A boolean parameter is the wrong shape for "this request has no caller": {@code
+   * TermsDocumentClientUsageTest} asserts that nothing but {@code TermsController} injects this
+   * bean, which a boolean could never do.
    *
    * <p>Same resilience and logging chain as {@link #webClient}, without the OAuth2 bearer relay.
    */

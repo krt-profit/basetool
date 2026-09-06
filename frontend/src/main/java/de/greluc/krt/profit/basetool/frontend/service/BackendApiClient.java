@@ -76,12 +76,13 @@ import tools.jackson.databind.json.JsonMapper;
 public class BackendApiClient {
 
   private final WebClient webClient;
+
   /**
    * The bearer-less client for the Terms-of-Use wording, and nothing else (REQ-SEC-052).
    *
    * <p>Injected by name so the narrowing is enforced by the object graph rather than by a comment:
-   * a second caller would have to ask for this bean explicitly, which
-   * {@code TermsDocumentClientUsageTest} refuses.
+   * a second caller would have to ask for this bean explicitly, which {@code
+   * TermsDocumentClientUsageTest} refuses.
    */
   private final WebClient termsDocumentClient;
 
@@ -105,6 +106,7 @@ public class BackendApiClient {
   public TermsDocumentDto getTermsDocumentAnonymously() {
     return executeGet(termsDocumentClient, TERMS_DOCUMENT_URI, TermsDocumentDto.class);
   }
+
   private final MeterRegistry meterRegistry;
   private final CacheManager cacheManager;
 

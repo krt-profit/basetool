@@ -57,20 +57,21 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>{@link CustomJwtGrantedAuthoritiesConverter} already short-circuits both to a single marker
  * authority — {@code ROLE_PENDING_APPROVAL} or {@code ROLE_NO_ROLE} — but such a caller is still
- * <em>authenticated</em>, so the many writes gated only on {@code @PreAuthorize("isAuthenticated()")}
- * (e.g. personal-inventory create/delete) would otherwise be reachable by calling the API directly,
- * bypassing the frontend's waiting-page redirect (which is UX, not the access boundary). This
- * filter closes that gap: an authenticated caller carrying either marker is refused with {@code 403}
- * on every {@code /api/**} endpoint, with three deliberate exceptions — the registration-status
- * endpoint the frontend reads to route them to the waiting page, and the two reads REQ-SEC-052
- * serves without any token at all.
+ * <em>authenticated</em>, so the many writes gated only on
+ * {@code @PreAuthorize("isAuthenticated()")} (e.g. personal-inventory create/delete) would
+ * otherwise be reachable by calling the API directly, bypassing the frontend's waiting-page
+ * redirect (which is UX, not the access boundary). This filter closes that gap: an authenticated
+ * caller carrying either marker is refused with {@code 403} on every {@code /api/**} endpoint, with
+ * three deliberate exceptions — the registration-status endpoint the frontend reads to route them
+ * to the waiting page, and the two reads REQ-SEC-052 serves without any token at all.
  *
  * <p><strong>The two refusals carry different codes and different words, on purpose.</strong> Until
- * ADR-0159 a role-less account was mapped onto the authority-less {@code GUEST} role and simply used
- * the anonymous surface; with that surface gone it needed a state of its own rather than an empty
- * authority set that passes every {@code isAuthenticated()} gate and fails only the ones naming a
- * role. Answering it with {@code PENDING_APPROVAL} would have been worse than generic: it tells a
- * member who has already been approved to wait for an approval, which is a wait with no end.
+ * ADR-0159 a role-less account was mapped onto the authority-less {@code GUEST} role and simply
+ * used the anonymous surface; with that surface gone it needed a state of its own rather than an
+ * empty authority set that passes every {@code isAuthenticated()} gate and fails only the ones
+ * naming a role. Answering it with {@code PENDING_APPROVAL} would have been worse than generic: it
+ * tells a member who has already been approved to wait for an approval, which is a wait with no
+ * end.
  *
  * <p>Runs after {@link ActingMemberFilter}, which itself sits after the bearer-token authentication
  * filter — so the authorities are already assembled, and an ingest-gateway request has already had
@@ -212,8 +213,8 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
    * <p>Named rather than expressed as a boolean pair because the two are answered on the same
    * status with different instructions: a pending member is waiting for a decision that has been
    * asked for, a role-less one has already been approved and is waiting for a role nobody has been
-   * asked to grant. Telling the second to wait for approval points them at an administrator who
-   * has already acted.
+   * asked to grant. Telling the second to wait for approval points them at an administrator who has
+   * already acted.
    *
    * @param code the stable machine-readable code on the problem body
    * @param titleKey message key for the localized title
@@ -304,7 +305,8 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
    * @throws IOException if serialization or writing the body fails
    */
   private void writeForbidden(
-      HttpServletRequest request, HttpServletResponse response, Refusal refusal) throws IOException {
+      HttpServletRequest request, HttpServletResponse response, Refusal refusal)
+      throws IOException {
     boolean userIdOwned = stampAuthenticatedSub();
     try {
       writeForbiddenBody(request, response, refusal);
@@ -360,7 +362,8 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
    * @throws IOException if serialization or writing the body fails
    */
   private void writeForbiddenBody(
-      HttpServletRequest request, HttpServletResponse response, Refusal refusal) throws IOException {
+      HttpServletRequest request, HttpServletResponse response, Refusal refusal)
+      throws IOException {
     String correlationId = UUID.randomUUID().toString();
     Locale locale = request.getLocale();
     final String title = messageSource.getMessage(refusal.titleKey(), null, "Forbidden", locale);

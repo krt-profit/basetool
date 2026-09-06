@@ -93,10 +93,10 @@ import tools.jackson.databind.ObjectMapper;
  * <p><strong>Four paths answer without a token, and that list is the requirement</strong>
  * (REQ-SEC-052, ADR-0159): {@code /error}, {@code /actuator/health(/**)}, {@code /internal/**} —
  * machine-to-machine behind a constant-time shared-secret header, not an anonymous data path — and
- * the two {@code GET}-scoped reads {@code /api/v1/terms/document} and
- * {@code /api/v1/app/version-policy}. Everything else requires authentication at this layer
- * <em>and</em> a method gate; a {@code HEAD} on either read falls to the catch-all and answers
- * {@code 401}, because the rules name the verb.
+ * the two {@code GET}-scoped reads {@code /api/v1/terms/document} and {@code
+ * /api/v1/app/version-policy}. Everything else requires authentication at this layer <em>and</em> a
+ * method gate; a {@code HEAD} on either read falls to the catch-all and answers {@code 401},
+ * because the rules name the verb.
  *
  * <p>An authenticated caller is still not admitted by default. A token whose realm roles map to no
  * application role is refused with {@code 403 NO_ROLE} (REQ-SEC-053) before it reaches a handler,
@@ -779,7 +779,7 @@ public class SecurityConfig {
                 meterRegistry,
                 refusedSubjectWindow),
             PendingApprovalAccessFilter.class)
-// A3 / REQ-SEC-033: bound how hard one authenticated ACCOUNT can drive the API. The per-IP
+        // A3 / REQ-SEC-033: bound how hard one authenticated ACCOUNT can drive the API. The per-IP
         // limiter ahead of the chain bounds a network position, which is the wrong unit in both
         // directions — CGNAT puts many members behind one address, and an address pool escapes it
         // entirely. Placed after the gates above so a pending or unconsented caller is refused on

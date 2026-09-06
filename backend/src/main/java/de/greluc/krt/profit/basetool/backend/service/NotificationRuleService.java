@@ -56,6 +56,7 @@ public class NotificationRuleService {
 
   /** Resolves a {@code ROLE} selector's {@code roleCode} against the catalogue (REQ-SEC-053). */
   private final RoleRepository roleRepository;
+
   private final NotificationRuleMapper notificationRuleMapper;
 
   /**
@@ -175,7 +176,8 @@ public class NotificationRuleService {
         // have addressed nobody, for ever, without saying so. A selector nobody can match is a
         // notification silently not sent, which is the hardest kind of defect to notice.
         if (roleRepository.findByCode(roleCode).isEmpty()) {
-          throw new IllegalArgumentException("ROLE selector names an unknown roleCode: " + roleCode);
+          throw new IllegalArgumentException(
+              "ROLE selector names an unknown roleCode: " + roleCode);
         }
       }
       case ORG_RELATIVE_ROLE -> {

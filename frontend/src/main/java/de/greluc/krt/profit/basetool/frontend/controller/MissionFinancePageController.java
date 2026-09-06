@@ -63,8 +63,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  *
  * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
  * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
- * package carried no gate of their own at all — protected by a matcher two folders away rather
- * than by anything next to the code. A method-level gate still wins where one is present.
+ * package carried no gate of their own at all — protected by a matcher two folders away rather than
+ * by anything next to the code. A method-level gate still wins where one is present.
  */
 @Slf4j
 @Controller
@@ -220,9 +220,7 @@ public class MissionFinancePageController {
       @AuthenticationPrincipal OidcUser principal) {
     try {
       body.put("missionId", id);
-      Object result =
-          backendApiClient.post(
-              "/api/v1/finance-entries", body, Object.class);
+      Object result = backendApiClient.post("/api/v1/finance-entries", body, Object.class);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       log.debug("Add finance entry (AJAX) failed: status={}", e.getStatusCode());

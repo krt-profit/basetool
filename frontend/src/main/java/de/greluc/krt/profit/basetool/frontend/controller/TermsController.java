@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.TermsDocumentDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -45,7 +44,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 public class TermsController {
 
   /** Backend endpoint serving the wording in force; anonymous by design (ADR-0138). */
-
   private final BackendApiClient backendApiClient;
 
   /**

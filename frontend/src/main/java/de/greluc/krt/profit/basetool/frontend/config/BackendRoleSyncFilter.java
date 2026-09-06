@@ -119,10 +119,10 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
    * The account is approved but holds no application role (REQ-SEC-053, ADR-0159).
    *
    * <p>Not a registration status: the backend never sends it in {@code approvalStatus}. It is
-   * derived from the refusal — a role-less caller is answered {@code 403 NO_ROLE} on every
-   * {@code /api} path except the three exempt ones, so the role sync's own read of
-   * {@code /api/v1/users/me} is where the frontend meets it. Kept in the same session attribute as
-   * the approval verdict because it routes to the same page and expires the same way.
+   * derived from the refusal — a role-less caller is answered {@code 403 NO_ROLE} on every {@code
+   * /api} path except the three exempt ones, so the role sync's own read of {@code
+   * /api/v1/users/me} is where the frontend meets it. Kept in the same session attribute as the
+   * approval verdict because it routes to the same page and expires the same way.
    */
   static final String STATE_NO_ROLE = "NO_ROLE";
 

@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.model.JobType;
@@ -157,7 +156,6 @@ class MissionAccessControlTest {
   void testGetNextMission_Unauthenticated_Refused() throws Exception {
     mockMvc.perform(get("/api/v1/missions/next")).andExpect(status().isUnauthorized());
   }
-
 
   @Test
   void testUpdateParticipant_Self_Allowed() throws Exception {
@@ -360,10 +358,6 @@ class MissionAccessControlTest {
     org.junit.jupiter.api.Assertions.assertEquals("Full Update", participant.getComment());
   }
 
-
-
-
-
   /**
    * Recording an external participant is a member's action now (ADR-0159, decision D4).
    *
@@ -391,6 +385,4 @@ class MissionAccessControlTest {
                 .content(jsonBody))
         .andExpect(status().isUnauthorized());
   }
-
-
 }

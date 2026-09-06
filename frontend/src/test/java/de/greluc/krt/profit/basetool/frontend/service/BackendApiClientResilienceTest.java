@@ -248,8 +248,7 @@ class BackendApiClientResilienceTest {
 
       BackendServiceException ex =
           assertThrows(
-              BackendServiceException.class,
-              () -> client.get("/api/v1/public-data", String.class));
+              BackendServiceException.class, () -> client.get("/api/v1/public-data", String.class));
       assertEquals(
           504,
           ex.getStatusCode(),

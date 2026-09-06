@@ -26,7 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
@@ -240,8 +239,7 @@ class OperationPageControllerMvcTest {
   }
 
   private void stubDetailEndpoints(UUID opId, OperationDto operation) {
-    when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
+    when(backendApiClient.get(eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
         .thenReturn(operation);
     when(backendApiClient.get(
             contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef()))
@@ -251,8 +249,7 @@ class OperationPageControllerMvcTest {
             eq(OperationFinanceSummaryDto.class)))
         .thenReturn(new OperationFinanceSummaryDto(opId, BigDecimal.ZERO, List.of(), false));
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId + "/payouts"),
-            eq(OperationPayoutSummaryDto.class)))
+            eq("/api/v1/operations/" + opId + "/payouts"), eq(OperationPayoutSummaryDto.class)))
         .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
   }
 
@@ -264,8 +261,7 @@ class OperationPageControllerMvcTest {
     // Operation: status COMPLETED → German "ABGESCHLOSSEN".
     OperationDto operation =
         new OperationDto(opId, "Completed Op", "", "COMPLETED", null, 0L, null, null, null);
-    when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
+    when(backendApiClient.get(eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
         .thenReturn(operation);
 
     // Mission inside operation: status CANCELLED (double L on Mission!) →
@@ -302,8 +298,7 @@ class OperationPageControllerMvcTest {
             eq(OperationFinanceSummaryDto.class)))
         .thenReturn(new OperationFinanceSummaryDto(opId, BigDecimal.ZERO, List.of(), false));
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId + "/payouts"),
-            eq(OperationPayoutSummaryDto.class)))
+            eq("/api/v1/operations/" + opId + "/payouts"), eq(OperationPayoutSummaryDto.class)))
         .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
 
     mockMvc
@@ -332,8 +327,7 @@ class OperationPageControllerMvcTest {
     UUID opId = UUID.randomUUID();
     OperationDto operation =
         new OperationDto(opId, "Op", "", "PLANNED", null, 0L, null, null, null);
-    when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
+    when(backendApiClient.get(eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
         .thenReturn(operation);
 
     MissionListDto mission =
@@ -378,9 +372,7 @@ class OperationPageControllerMvcTest {
             eq("/api/v1/operations/" + opId + "/finance-summary"),
             eq(OperationFinanceSummaryDto.class));
     verify(backendApiClient, never())
-        .get(
-            eq("/api/v1/operations/" + opId + "/payouts"),
-            eq(OperationPayoutSummaryDto.class));
+        .get(eq("/api/v1/operations/" + opId + "/payouts"), eq(OperationPayoutSummaryDto.class));
   }
 
   // ── Live-sync section fragments (REQ-FE-015, ADR-0094) — the peer-refresh swap targets ──────
@@ -410,12 +402,10 @@ class OperationPageControllerMvcTest {
   void operationDetail_fragmentPayout_rendersPayoutSection_andSkipsFinanceAndMissions()
       throws Exception {
     UUID opId = UUID.randomUUID();
-    when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
+    when(backendApiClient.get(eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
         .thenReturn(new OperationDto(opId, "Op", "", "PLANNED", null, 0L, null, null, null));
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId + "/payouts"),
-            eq(OperationPayoutSummaryDto.class)))
+            eq("/api/v1/operations/" + opId + "/payouts"), eq(OperationPayoutSummaryDto.class)))
         .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
 
     mockMvc
@@ -444,8 +434,7 @@ class OperationPageControllerMvcTest {
             eq(OperationFinanceSummaryDto.class)))
         .thenReturn(new OperationFinanceSummaryDto(opId, BigDecimal.ZERO, List.of(), false));
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId + "/payouts"),
-            eq(OperationPayoutSummaryDto.class)))
+            eq("/api/v1/operations/" + opId + "/payouts"), eq(OperationPayoutSummaryDto.class)))
         .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
     when(backendApiClient.get(
             contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef()))
@@ -458,8 +447,7 @@ class OperationPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"pane-op-fin\""))));
 
     // Fragment-gating: the finance fragment does not need the operation-detail read.
-    verify(backendApiClient, never())
-        .get(eq("/api/v1/operations/" + opId), eq(OperationDto.class));
+    verify(backendApiClient, never()).get(eq("/api/v1/operations/" + opId), eq(OperationDto.class));
   }
 
   @Test
@@ -477,8 +465,7 @@ class OperationPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void operationDetail_fragmentBackendFailure_rendersFragmentError() throws Exception {
     UUID opId = UUID.randomUUID();
-    when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
+    when(backendApiClient.get(eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
         .thenThrow(new RuntimeException("backend down"));
 
     mockMvc
@@ -613,8 +600,7 @@ class OperationPageControllerMvcTest {
             null,
             null);
     when(backendApiClient.get(
-            eq("/api/v1/operations/" + opId + "/payouts"),
-            eq(OperationPayoutSummaryDto.class)))
+            eq("/api/v1/operations/" + opId + "/payouts"), eq(OperationPayoutSummaryDto.class)))
         .thenReturn(new OperationPayoutSummaryDto(new BigDecimal("350.00"), List.of(donor)));
 
     mockMvc

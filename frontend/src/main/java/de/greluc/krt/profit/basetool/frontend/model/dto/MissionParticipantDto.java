@@ -31,10 +31,10 @@ import java.util.UUID;
  * mirroring the backend DTO so the roster renders an org-unit badge per affiliation.
  *
  * <p>A row with no {@code user} is an <em>external</em> participant — a named person without an
- * account, recorded by the mission leadership (ADR-0159, decision D4). It used to carry a
- * {@code guestEditToken}: a per-row capability token the anonymous creator kept and replayed to
- * edit their own sign-up without a login. There is no anonymous sign-up left to mint one for, and
- * backend migration V239 dropped the column that stored its hash.
+ * account, recorded by the mission leadership (ADR-0159, decision D4). It used to carry a {@code
+ * guestEditToken}: a per-row capability token the anonymous creator kept and replayed to edit their
+ * own sign-up without a login. There is no anonymous sign-up left to mint one for, and backend
+ * migration V239 dropped the column that stored its hash.
  */
 public record MissionParticipantDto(
     UUID id,

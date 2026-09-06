@@ -31,10 +31,10 @@ import java.util.UUID;
  * both badges rendered on the roster.
  *
  * <p>A row with no {@code user} is an <em>external</em> participant — a named person without an
- * account, recorded by the mission leadership (ADR-0159, decision D4). It used to carry a
- * {@code guestEditToken}: a per-row capability token handed to an anonymous creator so they could
- * edit their own sign-up without a login. There is no anonymous sign-up left to mint one for, and
- * V239 dropped the column that stored its hash.
+ * account, recorded by the mission leadership (ADR-0159, decision D4). It used to carry a {@code
+ * guestEditToken}: a per-row capability token handed to an anonymous creator so they could edit
+ * their own sign-up without a login. There is no anonymous sign-up left to mint one for, and V239
+ * dropped the column that stored its hash.
  */
 public record MissionParticipantDto(
     UUID id,

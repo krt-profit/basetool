@@ -113,7 +113,4 @@ class FrontendAuthHelperServiceTest {
     // When / Then
     assertTrue(service.isMemberOrAbove(), "officer authority on the token counts as member");
   }
-
-
-
 }

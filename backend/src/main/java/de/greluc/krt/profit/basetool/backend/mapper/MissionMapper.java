@@ -203,11 +203,11 @@ public abstract class MissionMapper {
    * that was authenticated yet an outsider — cannot exist any more: such a token is now refused
    * with {@code 403 NO_ROLE} before a handler runs (REQ-SEC-053). What it still guards is the
    * PENDING/REJECTED shape and any future authority set that authenticates without membership. The
-   * defect it was written for is worth remembering: the detail endpoint compensated for an
-   * {@code isAuthenticated()} gate by nulling the description in the redactor, while the
-   * list/search rows ran through no redactor at all — so the same caller read on
-   * {@code /api/v1/missions/search} the free-text planning notes the detail withheld. Gating at the
-   * single source is what made both projections agree.
+   * defect it was written for is worth remembering: the detail endpoint compensated for an {@code
+   * isAuthenticated()} gate by nulling the description in the redactor, while the list/search rows
+   * ran through no redactor at all — so the same caller read on {@code /api/v1/missions/search} the
+   * free-text planning notes the detail withheld. Gating at the single source is what made both
+   * projections agree.
    *
    * @param mission the mission being projected; {@code null} yields {@code null}.
    * @return the description for a member-or-above caller, otherwise {@code null}.

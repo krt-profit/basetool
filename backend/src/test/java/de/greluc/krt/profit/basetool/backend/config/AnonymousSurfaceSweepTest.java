@@ -187,9 +187,7 @@ class AnonymousSurfaceSweepTest {
             .forEach(p -> patterns.add(p.getPatternString()));
       }
       Set<HttpMethod> verbs = new LinkedHashSet<>();
-      info.getMethodsCondition()
-          .getMethods()
-          .forEach(m -> verbs.add(HttpMethod.valueOf(m.name())));
+      info.getMethodsCondition().getMethods().forEach(m -> verbs.add(HttpMethod.valueOf(m.name())));
       if (verbs.isEmpty()) {
         verbs.add(HttpMethod.GET);
       }
@@ -247,8 +245,8 @@ class AnonymousSurfaceSweepTest {
    *
    * <p>{@code .with(csrf())} on every write so the authorisation decision is what is observed
    * rather than the {@code CsrfFilter}'s own refusal — a 403 from CSRF would hide a 2xx from the
-   * gate. An empty JSON object is enough for every write here: validation runs after
-   * authorisation, so a rejected body still proves the gate answered first.
+   * gate. An empty JSON object is enough for every write here: validation runs after authorisation,
+   * so a rejected body still proves the gate answered first.
    *
    * @param call the call to issue
    * @param principal a post-processor installing the caller, or {@code null} for no token
@@ -256,8 +254,7 @@ class AnonymousSurfaceSweepTest {
    * @throws Exception when the request could not be performed
    */
   private MvcResult issue(
-      Call call,
-      org.springframework.test.web.servlet.request.RequestPostProcessor principal)
+      Call call, org.springframework.test.web.servlet.request.RequestPostProcessor principal)
       throws Exception {
     MockHttpServletRequestBuilder request =
         MockMvcRequestBuilders.request(call.method(), call.path())
@@ -312,11 +309,11 @@ class AnonymousSurfaceSweepTest {
   /**
    * Pass 1b: every {@code GET} asked again with {@code HEAD}.
    *
-   * <p>Its own test because its failure mode is specific: the two anonymous reads are
-   * {@code GET}-scoped, so their {@code HEAD} must fall to the authenticated catch-all and answer
-   * {@code 401}. Spring MVC otherwise answers {@code HEAD} from the {@code @GetMapping} handler,
-   * which is how a method-scoped tightening above an all-verb {@code permitAll} once leaked a
-   * response's {@code Content-Length} on the two paths REQ-SEC-032 exists to close.
+   * <p>Its own test because its failure mode is specific: the two anonymous reads are {@code
+   * GET}-scoped, so their {@code HEAD} must fall to the authenticated catch-all and answer {@code
+   * 401}. Spring MVC otherwise answers {@code HEAD} from the {@code @GetMapping} handler, which is
+   * how a method-scoped tightening above an all-verb {@code permitAll} once leaked a response's
+   * {@code Content-Length} on the two paths REQ-SEC-032 exists to close.
    */
   @Test
   @DisplayName("a HEAD is refused wherever the GET is, and on the two GET-scoped reads too")

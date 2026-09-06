@@ -77,8 +77,7 @@ public class HomeController {
   private final FrontendAuthHelperService authHelper;
 
   /**
-   * Renders {@code /} — the landing page for a visitor with no session, the dashboard for a
-   * member.
+   * Renders {@code /} — the landing page for a visitor with no session, the dashboard for a member.
    *
    * <p><strong>The anonymous branch returns before anything happens.</strong> No backend call, no
    * model attribute, no session. Both matter and both used to be violated on every single hit:
@@ -126,7 +125,8 @@ public class HomeController {
               + "&end="
               + horizon
               + "&sort=plannedStartTime,asc&status=PLANNED&status=ACTIVE&size=50";
-      PageResponse<MissionListDto> upcomingPage = backendApiClient.get(searchUri, MISSION_PAGE_TYPE);
+      PageResponse<MissionListDto> upcomingPage =
+          backendApiClient.get(searchUri, MISSION_PAGE_TYPE);
       List<MissionListDto> upcomingMissions =
           (upcomingPage != null && upcomingPage.content() != null)
               ? upcomingPage.content()
@@ -151,7 +151,6 @@ public class HomeController {
 
     model.addAttribute("username", principal.getPreferredUsername());
     {
-
       if (session.getAttribute("welcomeMessageShown") == null) {
         model.addAttribute("showLoginNotification", true);
         model.addAttribute("notificationDuration", notificationDuration);

@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -104,8 +103,7 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
     // with no bound row value neither material name may reach the rendered page.
     MaterialDto agricium = jobOrderMaterial("Agricium");
     MaterialDto quantainium = jobOrderMaterial("Quantainium-Distinct");
-    when(backendApiClient.getCached(
-            eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef()))
         .thenReturn(List.of(agricium, quantainium));
 
     mockMvc
@@ -185,9 +183,7 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
 
     // Authenticated callers source the all-kinds catalog — never the Staffel/SK-only /active.
     verify(backendApiClient).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef());
-    verify(backendApiClient, never())
-        .getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef());
-    verify(backendApiClient, never())
-        .getCached(eq(CachedCatalog.SPECIAL_COMMANDS), anyTypeRef());
+    verify(backendApiClient, never()).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef());
+    verify(backendApiClient, never()).getCached(eq(CachedCatalog.SPECIAL_COMMANDS), anyTypeRef());
   }
 }

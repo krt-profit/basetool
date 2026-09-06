@@ -87,8 +87,8 @@ public class FrontendAuthHelperService {
    * a member check that reads the principal misses every {@code ROLE_*} unless {@code
    * BackendRoleSyncFilter} happened to rebuild the principal that session — which made the
    * member-only mission finance/refinery panel silently collapse whenever that one-shot sync was
-   * skipped (REQ-SEC-013). Anonymous tokens, missing security contexts and role-less
-   * callers all yield {@code false}.
+   * skipped (REQ-SEC-013). Anonymous tokens, missing security contexts and role-less callers all
+   * yield {@code false}.
    *
    * @return whether the current principal is a registered member or above.
    */

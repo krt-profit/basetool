@@ -85,8 +85,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
  *
  * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
  * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
- * package carried no gate of their own at all — protected by a matcher two folders away rather
- * than by anything next to the code. A method-level gate still wins where one is present.
+ * package carried no gate of their own at all — protected by a matcher two folders away rather than
+ * by anything next to the code. A method-level gate still wins where one is present.
  */
 @Controller
 @RequestMapping("/missions")
@@ -367,8 +367,7 @@ public class MissionPageController {
       @AuthenticationPrincipal OidcUser principal,
       @RequestParam(required = false) String fragment) {
     try {
-      MissionDto mission =
-          backendApiClient.get("/api/v1/missions/" + id, MISSION);
+      MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
 
       // Fragment-gated reads (mission-scale hardening, ADR-0078): an in-place section refetch
       // (GET /missions/{id}?fragment=X) must issue ONLY the backend reads its own fragment renders,
@@ -466,14 +465,12 @@ public class MissionPageController {
 
       // roundingMode only feeds the finance/refinery display; skip its backend read for non-finance
       // fragment refetches. The "UP" default matches fetchRoundingMode's own fallback.
-      model.addAttribute(
-          "roundingMode", needFinance ? fetchRoundingMode() : "UP");
+      model.addAttribute("roundingMode", needFinance ? fetchRoundingMode() : "UP");
 
       // Fetch Mission JobTypes
       try {
         PageResponse<Map<String, Object>> jobTypesPage =
-            backendApiClient.getCached(
-                CachedCatalog.JOB_TYPES_MISSION, STRING_OBJECT_MAP_PAGE);
+            backendApiClient.getCached(CachedCatalog.JOB_TYPES_MISSION, STRING_OBJECT_MAP_PAGE);
         model.addAttribute("jobTypes", jobTypesPage.content());
       } catch (Exception e) {
         // Ignore if job types fail
@@ -491,8 +488,7 @@ public class MissionPageController {
       // Fetch Squadrons
       try {
         PageResponse<Map<String, Object>> squadronsPage =
-            backendApiClient.getCached(
-                CachedCatalog.SQUADRONS_UNSORTED, STRING_OBJECT_MAP_PAGE);
+            backendApiClient.getCached(CachedCatalog.SQUADRONS_UNSORTED, STRING_OBJECT_MAP_PAGE);
         model.addAttribute("squadrons", squadronsPage.content());
       } catch (Exception e) {
         // Ignore
@@ -532,8 +528,7 @@ public class MissionPageController {
         if (canEdit != null && canEdit && needCrewBoard) {
           try {
             List<ShipDto> unitShipOptions =
-                backendApiClient.get(
-                    "/api/v1/missions/" + id + "/unit-ship-options", SHIP_LIST);
+                backendApiClient.get("/api/v1/missions/" + id + "/unit-ship-options", SHIP_LIST);
             model.addAttribute("unitShipOptions", unitShipOptions);
           } catch (Exception e) {
             // Ignore, e.g. if the caller cannot manage the mission
@@ -588,8 +583,7 @@ public class MissionPageController {
           CompletableFuture<List<InventoryItemDto>> inventoryFuture =
               parallelPageLoader.loadAsync(
                   () ->
-                      backendApiClient.get(
-                          "/api/v1/inventory/mission/" + id, INVENTORY_ITEM_LIST));
+                      backendApiClient.get("/api/v1/inventory/mission/" + id, INVENTORY_ITEM_LIST));
           CompletableFuture.allOf(totalsFuture, entriesFuture, refineryFuture, inventoryFuture)
               .join();
 
@@ -808,8 +802,7 @@ public class MissionPageController {
       @PathVariable @NotNull UUID id) {
     try {
       Object result =
-          backendApiClient.get(
-              "/api/v1/missions/" + id + "/participants/unassigned", OBJECT);
+          backendApiClient.get("/api/v1/missions/" + id + "/participants/unassigned", OBJECT);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -826,8 +819,7 @@ public class MissionPageController {
   private String fetchRoundingMode() {
     try {
       Map<String, Object> setting =
-          backendApiClient.get(
-              "/api/v1/settings/refinery.rounding.mode", STRING_OBJECT_MAP);
+          backendApiClient.get("/api/v1/settings/refinery.rounding.mode", STRING_OBJECT_MAP);
       if (setting != null && setting.get("value") != null) {
         return String.valueOf(setting.get("value"));
       }

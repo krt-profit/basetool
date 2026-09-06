@@ -164,8 +164,8 @@ class SecurityTest {
    * (A6, REQ-SEC-032).
    *
    * <p>Kept after REQ-SEC-052 closed the whole catalogue, which makes the explicit carve-out
-   * redundant — and that is exactly why the assertion stays: the rule it pinned is gone from
-   * {@code SecurityConfig}, so nothing but this test now says the path must not answer anonymously.
+   * redundant — and that is exactly why the assertion stays: the rule it pinned is gone from {@code
+   * SecurityConfig}, so nothing but this test now says the path must not answer anonymously.
    */
   @Test
   void materialsMatrixIsNotAnonymouslyReachable() throws Exception {
@@ -193,11 +193,11 @@ class SecurityTest {
    *
    * <p>The carve-out that used to sit above was registered with {@code HttpMethod.GET}, and Spring
    * Security compares the verb with {@code String.equals} - so a {@code HEAD} missed it and fell
-   * through to the all-verb catalogue {@code permitAll} underneath. Spring MVC then answers
-   * {@code HEAD} from the {@code @GetMapping} handler, so the query ran anonymously and the
-   * {@code Content-Length} came back. The lesson outlived the rule: the two remaining anonymous
-   * reads are {@code GET}-scoped on purpose, and {@code AnonymousSurfaceSweepTest} asks {@code HEAD}
-   * of every {@code GET} mapping for exactly this reason.
+   * through to the all-verb catalogue {@code permitAll} underneath. Spring MVC then answers {@code
+   * HEAD} from the {@code @GetMapping} handler, so the query ran anonymously and the {@code
+   * Content-Length} came back. The lesson outlived the rule: the two remaining anonymous reads are
+   * {@code GET}-scoped on purpose, and {@code AnonymousSurfaceSweepTest} asks {@code HEAD} of every
+   * {@code GET} mapping for exactly this reason.
    */
   @Test
   void materialsMatrixIsNotAnonymouslyReachableWithHead() throws Exception {

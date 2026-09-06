@@ -192,14 +192,14 @@ public class RequestScopeResolver {
    *       User.squadron + SK memberships}, {@code adminAllScope=false}, {@code activeOrgUnitId=
    *       null}. The R5.e pinning will switch this branch to populate {@code activeOrgUnitId} from
    *       the same X-Active-Org-Unit-Id header that admins use today.
- * </ul>
+   * </ul>
    *
    * <p><strong>An unauthenticated caller is a defect, not a case.</strong> It used to resolve to an
-   * all-empty predicate, which the repository fragment read as "no rows except the organisation-wide
-   * escape" — a silent, plausible answer for a request that should never have reached a scoped
-   * query. Since ADR-0159 nothing anonymous gets past the security matrix, so an empty predicate
-   * built here could only come from a gate that was forgotten; it throws instead, because a scope
-   * question asked by a caller with no identity has no honest answer.
+   * all-empty predicate, which the repository fragment read as "no rows except the
+   * organisation-wide escape" — a silent, plausible answer for a request that should never have
+   * reached a scoped query. Since ADR-0159 nothing anonymous gets past the security matrix, so an
+   * empty predicate built here could only come from a gate that was forgotten; it throws instead,
+   * because a scope question asked by a caller with no identity has no honest answer.
    *
    * <p>The membership union read is hybrid pre-D3: {@link
    * de.greluc.krt.profit.basetool.backend.model.User#getSquadron()} for the Staffel link (still

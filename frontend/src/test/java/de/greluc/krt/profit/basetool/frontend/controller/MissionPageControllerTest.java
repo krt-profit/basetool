@@ -320,9 +320,7 @@ class MissionPageControllerTest {
     // Assert
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
-        .delete(
-            eq("/api/v1/missions/" + id + "/participants/" + participantId),
-            eq(Void.class));
+        .delete(eq("/api/v1/missions/" + id + "/participants/" + participantId), eq(Void.class));
   }
 
   @Test
@@ -349,9 +347,7 @@ class MissionPageControllerTest {
     // Assert
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
-        .delete(
-            eq("/api/v1/missions/" + id + "/participants/" + participantId),
-            eq(Void.class));
+        .delete(eq("/api/v1/missions/" + id + "/participants/" + participantId), eq(Void.class));
   }
 
   @Test
@@ -388,9 +384,7 @@ class MissionPageControllerTest {
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .put(
-            eq("/api/v1/missions/" + id + "/participants/" + participantId),
-            any(),
-            eq(Void.class));
+            eq("/api/v1/missions/" + id + "/participants/" + participantId), any(), eq(Void.class));
   }
 
   @Test
@@ -426,9 +420,7 @@ class MissionPageControllerTest {
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .put(
-            eq("/api/v1/missions/" + id + "/participants/" + participantId),
-            any(),
-            eq(Void.class));
+            eq("/api/v1/missions/" + id + "/participants/" + participantId), any(), eq(Void.class));
   }
 
   @Test
@@ -544,8 +536,7 @@ class MissionPageControllerTest {
             0L,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef()))
-        .thenReturn(mission);
+    when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef())).thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -557,8 +548,7 @@ class MissionPageControllerTest {
     verify(backendApiClient).get(eq("/api/v1/missions/" + id), anyTypeRef());
     verify(backendApiClient).getCached(eq(CachedCatalog.JOB_TYPES_MISSION), anyTypeRef());
     verify(backendApiClient).getCached(eq(CachedCatalog.JOB_TYPES_CREW), anyTypeRef());
-    verify(backendApiClient)
-        .getCached(eq(CachedCatalog.SQUADRONS_UNSORTED), anyTypeRef());
+    verify(backendApiClient).getCached(eq(CachedCatalog.SQUADRONS_UNSORTED), anyTypeRef());
   }
 
   @Test
@@ -609,10 +599,8 @@ class MissionPageControllerTest {
             0L,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef()))
-        .thenReturn(mission);
-    when(backendApiClient.get(
-            eq("/api/v1/missions/" + id + "/units?size=1000"), anyTypeRef()))
+    when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef())).thenReturn(mission);
+    when(backendApiClient.get(eq("/api/v1/missions/" + id + "/units?size=1000"), anyTypeRef()))
         .thenReturn(
             new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
                 Collections.emptyList(), 0, 10, 0, 0, Collections.emptyList()));
@@ -691,8 +679,7 @@ class MissionPageControllerTest {
             0L,
             null);
 
-    when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef()))
-        .thenReturn(mission);
+    when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef())).thenReturn(mission);
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
     when(backendApiClient.get(
@@ -721,7 +708,6 @@ class MissionPageControllerTest {
             eq(de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceTotalsDto.class));
     verify(backendApiClient)
         .get(eq("/api/v1/missions/" + id + "/finance-entries?size=200"), anyTypeRef());
-    verify(backendApiClient)
-        .get(eq("/api/v1/refinery-orders/mission/" + id), anyTypeRef());
+    verify(backendApiClient).get(eq("/api/v1/refinery-orders/mission/" + id), anyTypeRef());
   }
 }

@@ -45,8 +45,8 @@ import org.jetbrains.annotations.Nullable;
  * </ul>
  *
  * <p>There used to be a fourth case here: an anonymous caller, all fields empty, seeing nothing
- * through the scoped clause and reaching data only through Mission's organisation-wide escape.
- * That case is gone with the anonymous surface (ADR-0159), and {@code
+ * through the scoped clause and reaching data only through Mission's organisation-wide escape. That
+ * case is gone with the anonymous surface (ADR-0159), and {@code
  * RequestScopeResolver#currentScopePredicate()} now throws rather than building it — an all-empty
  * predicate is indistinguishable from a legitimate one and would answer a question nobody was
  * entitled to ask.
@@ -61,8 +61,9 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>Mission (cross-staffel aggregate) adds {@code OR x.isInternal = false} as the
  * organisation-wide escape clause — {@code isInternal = false} means "every member of the
- * organisation", never "everyone" (REQ-ORG-009, D8). The empty-collection case for {@link #memberOrgUnitIds()} returns no rows from the {@code
- * IN} clause (Hibernate 6 handles {@code IN ()} as a constant {@code false}).
+ * organisation", never "everyone" (REQ-ORG-009, D8). The empty-collection case for {@link
+ * #memberOrgUnitIds()} returns no rows from the {@code IN} clause (Hibernate 6 handles {@code IN
+ * ()} as a constant {@code false}).
  *
  * @param adminAllScope {@code true} iff the caller is an admin with no active selection — the
  *     filter clauses are short-circuited to "all rows visible".

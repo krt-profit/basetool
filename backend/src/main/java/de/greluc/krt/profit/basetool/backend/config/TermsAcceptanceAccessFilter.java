@@ -64,12 +64,12 @@ import tools.jackson.databind.ObjectMapper;
  * minted correlation id, {@code basetool_http_error_total} increment, and the JWT {@code sub}
  * stamped into the MDC only for the duration of the rejection write.
  *
- * <p>Three exemptions and no more. The consent endpoints themselves, or there is no way through
- * the gate — refusing those would make the block permanent for everyone. The registration-status
+ * <p>Three exemptions and no more. The consent endpoints themselves, or there is no way through the
+ * gate — refusing those would make the block permanent for everyone. The registration-status
  * endpoint, so a user who is <em>also</em> pending approval still gets routed to the waiting page
  * rather than to a consent page for a tool they cannot enter yet. And the served-version floor
- * ({@code /api/v1/app/version-policy}, REQ-SEC-052): it answers without a token at all, and the
- * app sends its bearer on every call once a session exists, so gating it here would refuse the
+ * ({@code /api/v1/app/version-policy}, REQ-SEC-052): it answers without a token at all, and the app
+ * sends its bearer on every call once a session exists, so gating it here would refuse the
  * forced-update check to exactly the callers who cannot complete the consent flow.
  */
 @Slf4j

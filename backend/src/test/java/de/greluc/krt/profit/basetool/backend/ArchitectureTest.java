@@ -1300,7 +1300,9 @@ class ArchitectureTest {
         CLASSES.stream()
             .filter(c -> c.getPackageName().contains(".backend.controller"))
             .flatMap(c -> c.getMethods().stream())
-            .filter(m -> m.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.PUBLIC))
+            .filter(
+                m ->
+                    m.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.PUBLIC))
             .filter(m -> hasPeerReachableMissionGate().test(m))
             .filter(m -> returnsMissionDtoOrMissionParticipantDtoOrCollection().test(m))
             .count();
@@ -1331,9 +1333,9 @@ class ArchitectureTest {
 
   /**
    * Mission DTOs whose participant nesting carries PII (email, first/last name, roles). Used by
-   * {@link #peerReadableMissionEndpointsMustRedactPii} to recognise return shapes that
-   * must go through guest-redaction before reaching an anonymous caller. {@code
-   * MissionFinanceEntryDto} is included because it embeds {@link
+   * {@link #peerReadableMissionEndpointsMustRedactPii} to recognise return shapes that must go
+   * through guest-redaction before reaching an anonymous caller. {@code MissionFinanceEntryDto} is
+   * included because it embeds {@link
    * de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto} directly — the audit
    * found this transitive leak (C-2) in {@code MissionFinanceEntryController.createFinanceEntry}.
    */

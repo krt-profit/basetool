@@ -1113,8 +1113,7 @@ class JobOrderItemDetailRenderTest {
     verify(backendApiClient, never()).get(eq("/api/v1/users?size=1000"), anyTypeRef());
     verify(backendApiClient, times(1))
         .getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef());
-    verify(backendApiClient, times(1))
-        .getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef());
+    verify(backendApiClient, times(1)).getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef());
   }
 
   // ---- Earmarked item stock, rendered inline in the item expand row (REQ-ORDERS-028) ----

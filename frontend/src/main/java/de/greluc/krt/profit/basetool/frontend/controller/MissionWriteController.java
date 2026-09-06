@@ -89,8 +89,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  *
  * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
  * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
- * package carried no gate of their own at all — protected by a matcher two folders away rather
- * than by anything next to the code. A method-level gate still wins where one is present.
+ * package carried no gate of their own at all — protected by a matcher two folders away rather than
+ * by anything next to the code. A method-level gate still wins where one is present.
  */
 @Controller
 @RequestMapping("/missions")
@@ -221,8 +221,7 @@ public class MissionWriteController {
       }
       body.put("comment", form.comment());
 
-      backendApiClient.post(
-          "/api/v1/missions/" + id + "/participants/add", body, Void.class);
+      backendApiClient.post("/api/v1/missions/" + id + "/participants/add", body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Add participant failed with status {}: {}", e.getStatusCode(), e.getMessage());
@@ -1059,8 +1058,7 @@ public class MissionWriteController {
       applyMissionUpdate(id, form);
       // #1235: mirrors the classic twin above — a core edit changes the /missions list row.
       liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
-      MissionDto refreshed =
-          backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
+      MissionDto refreshed = backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
       Map<String, Object> versions = new java.util.LinkedHashMap<>();
       versions.put("version", refreshed.version());
       versions.put("coreVersion", refreshed.coreVersion());
@@ -1198,8 +1196,7 @@ public class MissionWriteController {
 
       log.debug("CALLING BACKEND DELETE - Mission: {}, User: {}", missionUuid, userUuid);
       backendApiClient.delete(
-          "/api/v1/missions/" + missionUuid + "/managers/" + userUuid + "/slim",
-          Object.class);
+          "/api/v1/missions/" + missionUuid + "/managers/" + userUuid + "/slim", Object.class);
       log.debug("SUCCESS DELETE - Manager {} removed from mission {}", userUuid, missionUuid);
       return org.springframework.http.ResponseEntity.ok().build();
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
@@ -1389,8 +1386,7 @@ public class MissionWriteController {
       @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
     try {
       Object result =
-          backendApiClient.post(
-              "/api/v1/missions/" + id + "/frequencies/slim", body, Object.class);
+          backendApiClient.post("/api/v1/missions/" + id + "/frequencies/slim", body, Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -1418,8 +1414,7 @@ public class MissionWriteController {
     try {
       Object result =
           backendApiClient.delete(
-              "/api/v1/missions/" + id + "/frequencies/" + frequencyId + "/slim",
-              Object.class);
+              "/api/v1/missions/" + id + "/frequencies/" + frequencyId + "/slim", Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -1523,8 +1518,7 @@ public class MissionWriteController {
       @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
     try {
       Object result =
-          backendApiClient.post(
-              "/api/v1/missions/" + id + "/units/slim", body, Object.class);
+          backendApiClient.post("/api/v1/missions/" + id + "/units/slim", body, Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Add unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
@@ -1571,8 +1565,7 @@ public class MissionWriteController {
   public org.springframework.http.ResponseEntity<Object> deleteUnitAjax(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID unitId) {
     try {
-      backendApiClient.delete(
-          "/api/v1/missions/" + id + "/units/" + unitId + "/slim", Void.class);
+      backendApiClient.delete("/api/v1/missions/" + id + "/units/" + unitId + "/slim", Void.class);
       return org.springframework.http.ResponseEntity.noContent().build();
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Delete unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
@@ -1604,8 +1597,7 @@ public class MissionWriteController {
       @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
     try {
       Object result =
-          backendApiClient.post(
-              "/api/v1/missions/" + id + "/steps/slim", body, Object.class);
+          backendApiClient.post("/api/v1/missions/" + id + "/steps/slim", body, Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Add step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
@@ -1764,8 +1756,7 @@ public class MissionWriteController {
       @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
     try {
       Object result =
-          backendApiClient.post(
-              "/api/v1/missions/" + id + "/objectives/slim", body, Object.class);
+          backendApiClient.post("/api/v1/missions/" + id + "/objectives/slim", body, Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -1975,8 +1966,7 @@ public class MissionWriteController {
       @AuthenticationPrincipal OidcUser principal) {
     try {
       backendApiClient.delete(
-          "/api/v1/missions/" + id + "/participants/" + participantId + "/slim",
-          Void.class);
+          "/api/v1/missions/" + id + "/participants/" + participantId + "/slim", Void.class);
       return org.springframework.http.ResponseEntity.noContent().build();
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -2078,9 +2068,7 @@ public class MissionWriteController {
     try {
       Object result =
           backendApiClient.post(
-              "/api/v1/missions/" + id + "/units/" + unitId + "/crew/slim",
-              body,
-              Object.class);
+              "/api/v1/missions/" + id + "/units/" + unitId + "/crew/slim", body, Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Add crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
@@ -2141,8 +2129,7 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID crewId) {
     try {
       backendApiClient.delete(
-          "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim",
-          Void.class);
+          "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim", Void.class);
       return org.springframework.http.ResponseEntity.noContent().build();
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Delete crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());

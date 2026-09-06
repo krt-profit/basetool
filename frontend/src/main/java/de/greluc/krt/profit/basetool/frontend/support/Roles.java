@@ -81,8 +81,8 @@ public final class Roles {
    * both into every member-or-above check.
    *
    * <p>{@code GUEST} was a third exclusion until ADR-0159 removed the role. Nothing holds an empty
-   * authority set any more: such a token is refused with {@code 403 NO_ROLE} (REQ-SEC-053) before
-   * a request reaches a handler.
+   * authority set any more: such a token is refused with {@code 403 NO_ROLE} (REQ-SEC-053) before a
+   * request reaches a handler.
    */
   public static final Set<String> MEMBER_AUTHORITIES =
       Set.of(

@@ -163,7 +163,6 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
     // #692). Before ADR-0149 an anonymous caller got the narrower Staffel/SK-only list instead;
     // there is no anonymous caller left, so there is no second list to fall to except on failure.
     verify(backendApiClient).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef());
-    verify(backendApiClient, never())
-        .getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef());
+    verify(backendApiClient, never()).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef());
   }
 }

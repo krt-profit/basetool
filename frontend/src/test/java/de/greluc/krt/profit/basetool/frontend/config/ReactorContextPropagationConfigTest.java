@@ -119,7 +119,6 @@ class ReactorContextPropagationConfigTest {
         .isEqualTo(correlationId);
   }
 
-
   @Test
   void clientIpContext_isVisibleInsideMonoOnDifferentScheduler() {
     // TEST-NET-3 documentation range (RFC 5737) — synthetic, never a real client address.

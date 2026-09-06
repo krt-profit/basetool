@@ -128,3 +128,4 @@ leadership's, because the row carries no creator to bind a self-edit to.
   Ablauf, Ziele, Funk and the finance ledger are unchanged; only the caller set shrinks. The
   `isInternal = false` escape keeps cross-Staffel visibility, and its wording changes from
   „öffentlich" to „organisationsweit" because that is what it always meant.
+

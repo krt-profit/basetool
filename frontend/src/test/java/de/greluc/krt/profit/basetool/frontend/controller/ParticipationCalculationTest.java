@@ -167,17 +167,7 @@ class ParticipationCalculationTest {
     // P2 has no startTime (not checked in yet)
     MissionParticipantDto p2 =
         new MissionParticipantDto(
-            p2Id,
-            null,
-            "P2",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            PayoutPreference.PAYOUT,
-            1L);
+            p2Id, null, "P2", null, null, null, null, null, null, PayoutPreference.PAYOUT, 1L);
 
     MissionDto mission =
         new MissionDto(

@@ -43,8 +43,7 @@ import org.springframework.stereotype.Component;
  * human decides, field by field, whether a requesting-side viewer may see it. That
  * compiler-enforced exhaustiveness is the load-bearing safety net that keeps a newly added identity
  * field from silently leaking; a wither ({@code dto.withOwner(null)}) would default a new field to
- * <em>pass-through</em>, the dangerous default for a redactor. Mirrors {@code
- * MissionPeerRedactor}.
+ * <em>pass-through</em>, the dangerous default for a redactor. Mirrors {@code MissionPeerRedactor}.
  */
 @Component
 public class JobOrderInventoryOwnerRedactor {

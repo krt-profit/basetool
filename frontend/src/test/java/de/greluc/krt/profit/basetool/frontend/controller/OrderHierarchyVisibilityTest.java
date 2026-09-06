@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -123,8 +122,7 @@ class OrderHierarchyVisibilityTest {
             null,
             Boolean.TRUE,
             0L);
-    when(backendApiClient.getCached(
-            eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef()))
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef()))
         .thenReturn(java.util.List.of(distinctMaterial));
 
     java.util.Map<String, Object> claims = new java.util.HashMap<>();

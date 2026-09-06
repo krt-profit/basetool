@@ -50,10 +50,10 @@ Whoever judges a permission must therefore read **both** layers.
 **There is no anonymous access to the tool** (ADR-0159, REQ-SEC-052). What answers without a login
 is a list, and the list is the requirement:
 
-| Where        | What                                                                                                   |
-|--------------|--------------------------------------------------------------------------------------------------------|
+|    Where     |                                                                                                                                                                                 What                                                                                                                                                                                 |
+|--------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Frontend** | `/` (the landing page — name, one paragraph, the two login entries, the legal links, the Fan Kit band; **no data, no session**), `/impressum`, `/privacy`, `/terms`, `/error(/**)`, the asset trees, `/favicon.ico`, `/robots.txt`, `/sm/**`, `/**/*.map`, `/.well-known/assetlinks.json`, `/actuator/health(/**)`, and Spring Security's own login/logout endpoints |
-| **Backend**  | `GET /api/v1/app/version-policy`, `GET /api/v1/terms/document`, `/internal/**` (machine-to-machine behind a shared-secret header), `/actuator/health(/**)`, `/error` |
+| **Backend**  | `GET /api/v1/app/version-policy`, `GET /api/v1/terms/document`, `/internal/**` (machine-to-machine behind a shared-secret header), `/actuator/health(/**)`, `/error`                                                                                                                                                                                                 |
 
 Everything else requires authentication **and** a method gate. Both backend reads are `GET`-scoped,
 so a `HEAD` on either answers `401`.
@@ -68,7 +68,8 @@ themselves up.
 > than silently rewriting: until 2026-09-06 the mission board, the operations, the order queue and
 > the whole game-data catalogue answered without a login, and a role-less token was mapped onto the
 > authority-less `GUEST` role — so "we could not resolve this account's roles" and "this person is a
-> guest" were one state.
+>
+>> guest" were one state.
 
 ### 1.1 What anonymous users may do
 
