@@ -29,9 +29,15 @@
 --
 -- ROLLBACK IS FORWARD, NOT BACKWARD. A reverted image validates its
 -- schema with `ddl-auto = validate` and would fail to boot against the
--- missing column. The prepared fix re-adds `guest_edit_token_hash` as
--- nullable and lets `DataInitializer` re-seed the role; the assignments
--- come from the log line below.
+-- missing column. The forward fix re-adds `guest_edit_token_hash` as a
+-- nullable column and restores the `Guest` seed in DataInitializer; the
+-- assignments come from the INFO line below, by hand.
+--
+-- THE EXACT TWO FILES, with their content, are in the Rollback section
+-- of `docs/MEMBERS_ONLY_PLAN.md` (§8). Written out there rather than
+-- prepared as a branch, because a branch would claim the next Flyway
+-- number months before it is needed and break the day another PR takes
+-- it first.
 -- =====================================================================
 
 DO $$

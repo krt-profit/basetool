@@ -680,10 +680,42 @@ outside, `curl -I https://profit-base.online/missions` → `302` into the OAuth2
 **Rollback.** Before promotion a revert of the PR is enough. After promotion it is not: `V239` has
 dropped `guest_edit_token_hash` and deleted the `GUEST` role and its `user_roles` rows, so a
 reverted image would validate its schema against a missing column and fail to boot. The rollback is
-a **forward fix** — a migration re-adding the column as nullable and `DataInitializer` re-seeding
-the role — prepared as a ready-to-merge branch before the promotion, so it costs minutes, not a
-diagnosis. The migration logs the affected user ids at INFO before deleting (identifiers, not
-identities) so the role assignments can be restored by hand.
+a **forward fix**. The migration logs the affected user ids at INFO before deleting (identifiers,
+not identities) so the role assignments can be restored by hand.
+
+> [!important] Prepared as a recipe, not as a branch — decided 2026-09-06
+> The plan said "a ready-to-merge branch before the promotion". A branch would claim the next
+> Flyway number months before it is needed and break silently the day another PR takes it first,
+> which is the failure mode the number-claiming rule exists for. The owner chose the recipe. It is
+> two files, and both are named here so the fix is typing rather than diagnosis:
+>
+> 1. **`V240__restore_guest_edit_token_column.sql`** — claim the number against `origin/main` **and**
+>    the open PRs at the moment you write it, then:
+>
+>    ```sql
+>    ALTER TABLE mission_participant
+>        ADD COLUMN IF NOT EXISTS guest_edit_token_hash VARCHAR(64);
+>    ```
+>
+>    Nullable, no backfill: the hashes are gone and no code mints one. The column exists again only
+>    so `ddl-auto = validate` passes for the reverted image, whose entity still maps it.
+>
+> 2. **`DataInitializer.initRoles()`** — re-add the `GUEST` seed next to the others:
+>
+>    ```java
+>    createRoleIfNotFound(Roles.GUEST, "Guest", Set.of());
+>    ```
+>
+>    with `Roles.GUEST` restored in `backend/…/support/Roles.java`. The empty permission set is the
+>    point: it is what the role always had.
+>
+> **The assignments are not restored by either.** They come from the `V239` INFO line
+> (`V239: dropping GUEST assignments for user ids: …`), by hand, and only if anyone still needs
+> them — which after ADR-0159 is a question for the owner, not a mechanical step: those accounts
+> are better served by an administrator assigning `KRT Member`.
+>
+> Reverting the *frontend* image alone needs none of this; only the backend's schema validation
+> does.
 
 ## 9. Sizing
 
