@@ -115,6 +115,20 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   /** Registration declined by an admin. */
   private static final String STATE_REJECTED = "REJECTED";
 
+  /**
+   * The account is approved but holds no application role (REQ-SEC-053, ADR-0159).
+   *
+   * <p>Not a registration status: the backend never sends it in {@code approvalStatus}. It is
+   * derived from the refusal — a role-less caller is answered {@code 403 NO_ROLE} on every
+   * {@code /api} path except the three exempt ones, so the role sync's own read of
+   * {@code /api/v1/users/me} is where the frontend meets it. Kept in the same session attribute as
+   * the approval verdict because it routes to the same page and expires the same way.
+   */
+  static final String STATE_NO_ROLE = "NO_ROLE";
+
+  /** The stable problem code the backend answers a role-less caller with (REQ-SEC-053). */
+  private static final String NO_ROLE_CODE = "NO_ROLE";
+
   /** Path of the waiting page a non-approved registration is routed to. */
   private static final String PENDING_APPROVAL_PATH = "/pending-approval";
 
@@ -165,11 +179,15 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
       HttpSession session = request.getSession(false);
       if (session != null) {
         // Epic #720, Track 1: a PENDING/REJECTED Discord registration is routed to the
-        // waiting-for-approval page instead of the (role-less) guest surface — never a 403 storm.
-        // The backend is the source of truth (it also withholds every authority from a pending
-        // account, so this redirect is UX, not the access control).
+        // account-status page rather than left to collect 403s. REQ-SEC-053 adds a third state to
+        // the same routing: an approved account holding no role, which reaches the identical dead
+        // end for a different reason and needs different words for it. The backend is the source of
+        // truth for all three (it withholds every authority in each case), so this redirect is UX,
+        // not the access control.
         String approval = resolveApprovalState(session);
-        if (STATE_PENDING.equals(approval) || STATE_REJECTED.equals(approval)) {
+        if (STATE_PENDING.equals(approval)
+            || STATE_REJECTED.equals(approval)
+            || STATE_NO_ROLE.equals(approval)) {
           if (isApprovalExempt(request)) {
             filterChain.doFilter(request, response);
           } else {
@@ -509,6 +527,18 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
 
       return true;
     } catch (BackendServiceException | ReauthenticationRequiredException e) {
+      // REQ-SEC-053: the role read is the frontend's first meeting with a role-less account — the
+      // backend refuses it with 403 NO_ROLE like every other /api call. Cached as the session's
+      // verdict so the next request routes to the account-status page instead of repeating the
+      // same refusal on every navigation, and expiring on the same interval as the approval verdict
+      // so an administrator granting a role reaches the member without a re-login.
+      if (e instanceof BackendServiceException backendFailure
+          && NO_ROLE_CODE.equals(backendFailure.getProblemCode())) {
+        session.setAttribute(APPROVAL_STATE_FLAG, STATE_NO_ROLE);
+        session.setAttribute(APPROVAL_CHECKED_AT_FLAG, System.currentTimeMillis());
+        log.info("Backend refused the role sync with NO_ROLE; routing to the account-status page.");
+        return false;
+      }
       // REQ-OBS-001: the BackendApiClient boundary already logged this once (5xx=ERROR, 4xx=WARN,
       // circuit-open=DEBUG). syncRoles re-runs on EVERY request until it succeeds
       // (SYNC_COMPLETE_FLAG

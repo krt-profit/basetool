@@ -92,10 +92,6 @@ public class ProfileController {
    */
   @GetMapping("/profile")
   public String profile(Model model, @AuthenticationPrincipal OidcUser principal) {
-    if (authHelper.isAnonymous()) {
-      return "redirect:/";
-    }
-
     model.addAttribute("username", principal.getPreferredUsername());
     model.addAttribute("email", principal.getEmail());
 
@@ -309,10 +305,6 @@ public class ProfileController {
       @Valid @RequestBody ProfileDescriptionForm form,
       BindingResult bindingResult,
       @AuthenticationPrincipal OidcUser principal) {
-    if (authHelper.isAnonymous()) {
-      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-          .body(Map.of("detail", msg("error.profile.update.failed")));
-    }
     if (bindingResult.hasErrors()) {
       return ResponseEntity.badRequest().body(Map.of("detail", firstFieldError(bindingResult)));
     }
@@ -428,10 +420,6 @@ public class ProfileController {
       @Valid @RequestBody ProfilePayoutPreferenceForm form,
       BindingResult bindingResult,
       @AuthenticationPrincipal OidcUser principal) {
-    if (authHelper.isAnonymous()) {
-      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-          .body(Map.of("detail", msg("error.profile.update.failed")));
-    }
     if (bindingResult.hasErrors()) {
       return ResponseEntity.badRequest().body(Map.of("detail", firstFieldError(bindingResult)));
     }
@@ -543,10 +531,6 @@ public class ProfileController {
       @Valid @RequestBody ProfileBlueprintSharingForm form,
       BindingResult bindingResult,
       @AuthenticationPrincipal OidcUser principal) {
-    if (authHelper.isAnonymous()) {
-      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-          .body(Map.of("detail", msg("error.profile.update.failed")));
-    }
     if (bindingResult.hasErrors()) {
       return ResponseEntity.badRequest().body(Map.of("detail", firstFieldError(bindingResult)));
     }

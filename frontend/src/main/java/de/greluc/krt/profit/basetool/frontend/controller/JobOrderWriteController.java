@@ -93,11 +93,17 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * leaf helpers shared with the read side ({@code fetchUsers}, {@code getCurrentUserId}, {@code
  * isLogistician} and the {@code PAGE_OF_USER} response type) are duplicated verbatim per the
  * campaign precedent instead of introducing a new shared type.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
+ * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
+ * package carried no gate of their own at all — protected by a matcher two folders away rather
+ * than by anything next to the code. A method-level gate still wins where one is present.
  */
 @Controller
 @RequestMapping("/orders")
 @RequiredArgsConstructor
 @Slf4j
+@PreAuthorize("isAuthenticated()")
 public class JobOrderWriteController {
 
   /** Typed WebClient wrapper relaying every job-order mutation to the backend REST API. */
@@ -182,9 +188,10 @@ public class JobOrderWriteController {
       liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
-      // Anonymous guests and non-profit members cannot browse the queue, so keep them on the create
-      // form (with the success toast) instead of bouncing them to a list they may not see.
-      if (authHelper.isAnonymous() || !canViewJobOrders) {
+      // A member of a non-profit unit cannot browse the queue, so keep them on the create form
+      // (with the success toast) instead of bouncing them to a list they may not see. The
+      // anonymous half of this condition went with the caller (ADR-0159).
+      if (!canViewJobOrders) {
         return "redirect:/orders/create"
             + (form.getSource() != null ? "?source=" + form.getSource() : "");
       }
@@ -401,9 +408,10 @@ public class JobOrderWriteController {
       liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
-      // Anonymous guests and non-profit members cannot browse the queue, so keep them on the create
-      // form (with the success toast) instead of bouncing them to a list they may not see.
-      if (authHelper.isAnonymous() || !canViewJobOrders) {
+      // A member of a non-profit unit cannot browse the queue, so keep them on the create form
+      // (with the success toast) instead of bouncing them to a list they may not see. The
+      // anonymous half of this condition went with the caller (ADR-0159).
+      if (!canViewJobOrders) {
         return "redirect:/orders/create"
             + (form.getSource() != null ? "?source=" + form.getSource() : "");
       }

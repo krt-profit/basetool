@@ -60,11 +60,17 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * the Redis-FlashMap self-reference crash) and preserves the modal-open flag so the user sees the
  * form with errors instead of an empty page. The injected {@link MissionPageController} is a Spring
  * proxy, so its method-level {@code @PreAuthorize} still fires when called via this delegation.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
+ * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
+ * package carried no gate of their own at all — protected by a matcher two folders away rather
+ * than by anything next to the code. A method-level gate still wins where one is present.
  */
 @Slf4j
 @Controller
 @RequestMapping("/missions/{id}/finance-entries")
 @RequiredArgsConstructor
+@PreAuthorize("isAuthenticated()")
 public class MissionFinancePageController {
 
   private final BackendApiClient backendApiClient;

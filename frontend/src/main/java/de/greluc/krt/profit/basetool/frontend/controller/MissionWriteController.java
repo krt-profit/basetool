@@ -86,11 +86,17 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * check-in/check-out, payout preference and the participant slim-AJAX family) deliberately carry no
  * {@code @PreAuthorize} so anonymous guests can join missions and manage their own entries; adding
  * security there is a known live-bug regression.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
+ * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
+ * package carried no gate of their own at all — protected by a matcher two folders away rather
+ * than by anything next to the code. A method-level gate still wins where one is present.
  */
 @Controller
 @RequestMapping("/missions")
 @RequiredArgsConstructor
 @Slf4j
+@PreAuthorize("isAuthenticated()")
 public class MissionWriteController {
 
   /**

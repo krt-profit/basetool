@@ -79,11 +79,17 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * {@code @PreAuthorize("hasRole('MISSION_MANAGER')")} so the template can disable inputs for users
  * who would just bounce off a 403 on submit — without leaking any role logic into the service
  * layer.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
+ * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
+ * package carried no gate of their own at all — protected by a matcher two folders away rather
+ * than by anything next to the code. A method-level gate still wins where one is present.
  */
 @Controller
 @RequestMapping("/operations")
 @RequiredArgsConstructor
 @Slf4j
+@PreAuthorize("isAuthenticated()")
 public class OperationPageController {
 
   private final BackendApiClient backendApiClient;
@@ -160,7 +166,9 @@ public class OperationPageController {
     uri.append("size=").append(size).append("&");
     uri.append("sort=createdAt,desc&");
 
-    boolean effectiveShowPast = showPast && !authHelper.isAnonymous();
+    // The "and not anonymous" half is gone with the caller (ADR-0159): every caller here holds
+    // a session, so the archive toggle means what it says.
+    boolean effectiveShowPast = showPast;
     if (effectiveShowPast) {
       uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELED&");
     } else {
@@ -199,9 +207,6 @@ public class OperationPageController {
    * @return picker options or empty list; never {@code null}.
    */
   private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions() {
-    if (authHelper.isAnonymous()) {
-      return List.of();
-    }
     try {
       // Epic #692 Phase 5: drill-down owner picker — the caller's direct memberships plus their
       // cascading leadership reach (own Bereich/OL + overseen subordinate Staffeln/SKs). Unchanged

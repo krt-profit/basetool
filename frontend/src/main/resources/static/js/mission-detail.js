@@ -296,7 +296,7 @@ document.addEventListener('krt:swapped', function (ev) {
 // missed while offline). We re-fetch the affected section fragments via
 // krtRefreshMissionSection(..., {broadcast:false}) — broadcast:false stops the applied change
 // from echoing back into a loop. The data never travels over the socket: every peer re-pulls
-// through its own authenticated, authorization-checked fragment endpoint, so guest redaction and
+// through its own authenticated, authorization-checked fragment endpoint, so peer redaction and
 // the member-only finance gate still apply per viewer.
 // The coalescing / busy-guard / deferred-pill receiver now lives in the shared krt-live-sync.js
 // module (REQ-FE-015); mission uses events-source mode because mission-presence.js owns the socket
@@ -1134,21 +1134,22 @@ document.addEventListener('DOMContentLoaded', function () {
                             opt.selected = selected.includes(opt.value);
                         });
                     }
-                    // A registered member's org units come from their account and are never selected:
-                    // show them read-only and hide the picker; for a guest, keep the picker instead.
-                    const isGuest = this.getAttribute('data-guest') === 'true';
+                    // A registered member's org units come from their account and are never
+                    // selected: show them read-only and hide the picker. An EXTERNAL row has no
+                    // account to derive them from, so it keeps the picker (ADR-0159, decision D4).
+                    const isExternal = this.getAttribute('data-external') === 'true';
                     const eOrgUnitsGroup = document.getElementById('edit-org-units-group');
                     const eOrgUnitsReadonlyGroup = document.getElementById(
                         'edit-org-units-readonly-group',
                     );
                     const eOrgUnitsReadonly = document.getElementById('edit-org-units-readonly');
                     if (eOrgUnitsGroup && eOrgUnitsReadonlyGroup) {
-                        eOrgUnitsGroup.style.display = isGuest ? '' : 'none';
+                        eOrgUnitsGroup.style.display = isExternal ? '' : 'none';
                         // The read-only group's hidden default is the krtm-display-none-5790 class
                         // (ADR-0093), which a `style.display = ''` reveal cannot override — toggle the
                         // class so registered members actually see the org-units read-out.
-                        eOrgUnitsReadonlyGroup.classList.toggle('krtm-display-none-5790', isGuest);
-                        if (!isGuest && eOrgUnitsReadonly) {
+                        eOrgUnitsReadonlyGroup.classList.toggle('krtm-display-none-5790', isExternal);
+                        if (!isExternal && eOrgUnitsReadonly) {
                             eOrgUnitsReadonly.textContent = '';
                             const unitNames = (this.getAttribute('data-org-unit-names') || '')
                                 .split(',')
@@ -1800,7 +1801,7 @@ document.addEventListener('DOMContentLoaded', function () {
             addForm.addEventListener('submit', async function (ev) {
                 ev.preventDefault();
                 const fd = new FormData(addForm);
-                // Org units only matter for guest entries; when a registered user is selected
+                // Org units only matter for external entries; when a registered user is selected
                 // the backend derives the affiliations and ignores the submitted list. Send the
                 // multi-select values regardless — the backend ignores them for registered users.
                 const addOrgUnitIds =
@@ -2097,7 +2098,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // Reset ID on any input change
             userIdInput.value = '';
 
-            // No registered user selected anymore -> reveal the guest org-unit picker again.
+            // No registered user selected anymore -> reveal the external org-unit picker again.
             const orgUnitsGroup = document.getElementById('participant-org-units-group');
             if (orgUnitsGroup) {
                 orgUnitsGroup.style.display = '';
@@ -2142,7 +2143,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 searchInput.value = displayName;
                                 userIdInput.value = user.id;
                                 // A registered user's org units are derived server-side, so hide
-                                // the guest-only picker once a user is matched.
+                                // the external-only picker once a user is matched.
                                 const orgUnitsGroup = document.getElementById(
                                     'participant-org-units-group',
                                 );
@@ -2173,7 +2174,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Party Lead autocomplete — same /users/search mechanic as the participant add: picking a
     // member fills the hidden userId, typing a free-text name clears it so the backend resolves
-    // the name (unique member -> linked, unknown -> kept as a guest handle).
+    // the name (unique member -> linked, unknown -> kept as an external name).
     //
     // #1120: every handler here is document-delegated (not bound to the elements at load) so the
     // party-lead form + clear button survive a live-sync swap of the #mission-organisation-results

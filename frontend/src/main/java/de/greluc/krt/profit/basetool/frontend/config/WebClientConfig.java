@@ -129,8 +129,6 @@ public class WebClientConfig {
   private final UserLocaleRelayFilter userLocaleRelayFilter;
   private final de.greluc.krt.profit.basetool.frontend.logging.ClientIpRelayFilter
       clientIpRelayFilter;
-  private final de.greluc.krt.profit.basetool.frontend.logging.GuestEditTokenRelayFilter
-      guestEditTokenRelayFilter;
   private final org.springframework.core.env.Environment environment;
   private final SslBundles sslBundles;
 
@@ -577,7 +575,6 @@ public class WebClientConfig {
         .filter(activeSquadronRelayFilter.relayActiveSquadron())
         .filter(userLocaleRelayFilter.relayUserLocale())
         .filter(clientIpRelayFilter.relayClientIp())
-        .filter(guestEditTokenRelayFilter.relayGuestEditToken())
         .filter(webClientLoggingFilter.callLogging())
         .filter(
             resilienceFilter(

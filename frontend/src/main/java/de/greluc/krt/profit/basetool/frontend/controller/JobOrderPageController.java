@@ -87,11 +87,17 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * and fragment renders plus the read-only JSON proxies; every state-mutating {@code /orders}
  * endpoint (create/update/delete, priority, status, claims, assignees, handovers, unlinks) lives
  * unchanged in {@link JobOrderWriteController}.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
+ * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
+ * package carried no gate of their own at all — protected by a matcher two folders away rather
+ * than by anything next to the code. A method-level gate still wins where one is present.
  */
 @Controller
 @RequestMapping("/orders")
 @RequiredArgsConstructor
 @Slf4j
+@PreAuthorize("isAuthenticated()")
 public class JobOrderPageController {
 
   private final BackendApiClient backendApiClient;

@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.config;
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronContext;
 import de.greluc.krt.profit.basetool.frontend.logging.ClientIpContext;
 import de.greluc.krt.profit.basetool.frontend.logging.CorrelationContext;
-import de.greluc.krt.profit.basetool.frontend.logging.GuestEditTokenContext;
 import io.micrometer.context.ContextRegistry;
 import jakarta.annotation.PostConstruct;
 import java.util.Locale;
@@ -103,14 +102,6 @@ public class ReactorContextPropagationConfig {
   public static final String CLIENT_IP_CONTEXT_KEY = "iridium.clientIp";
 
   /**
-   * Context-registry key under which the per-row guest edit token ({@link GuestEditTokenContext})
-   * is propagated through Reactor pipelines, feeding the {@code X-Guest-Edit-Token} relay of {@link
-   * de.greluc.krt.profit.basetool.frontend.logging.GuestEditTokenRelayFilter} so an anonymous guest
-   * can edit/withdraw their own mission sign-up (security audit M1 / REQ-SEC-018).
-   */
-  public static final String GUEST_EDIT_TOKEN_CONTEXT_KEY = "iridium.guestEditToken";
-
-  /**
    * Activates {@link Hooks#enableAutomaticContextPropagation()} and registers {@code
    * ThreadLocalAccessor}s for {@link ActiveSquadronContext} and {@link CorrelationContext} on the
    * global {@link ContextRegistry}. Runs once at bean-init time; the registry is a process-wide
@@ -178,26 +169,13 @@ public class ReactorContextPropagationConfig {
         },
         ClientIpContext::clear);
 
-    registry.registerThreadLocalAccessor(
-        GUEST_EDIT_TOKEN_CONTEXT_KEY,
-        GuestEditTokenContext::get,
-        (String value) -> {
-          if (value == null || value.isBlank()) {
-            GuestEditTokenContext.clear();
-          } else {
-            GuestEditTokenContext.set(value);
-          }
-        },
-        GuestEditTokenContext::clear);
-
     log.info(
         "Reactor automatic context propagation enabled; registered ThreadLocalAccessors for "
             + "ActiveSquadronContext ({}), CorrelationContext ({}), the user locale ({}), the "
-            + "client IP ({}) and the guest edit token ({}).",
+            + "client IP ({}).",
         ACTIVE_ORG_UNIT_CONTEXT_KEY,
         CORRELATION_CONTEXT_KEY,
         USER_LOCALE_CONTEXT_KEY,
-        CLIENT_IP_CONTEXT_KEY,
-        GUEST_EDIT_TOKEN_CONTEXT_KEY);
+        CLIENT_IP_CONTEXT_KEY);
   }
 }

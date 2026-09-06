@@ -82,11 +82,17 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * addParticipant}/{@code checkIn}/{@code checkOut}/{@code updatePayoutPreference}) — moved verbatim
  * to {@link MissionWriteController}, which delegates its validation-failure re-renders back to this
  * class.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
+ * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
+ * package carried no gate of their own at all — protected by a matcher two folders away rather
+ * than by anything next to the code. A method-level gate still wins where one is present.
  */
 @Controller
 @RequestMapping("/missions")
 @RequiredArgsConstructor
 @Slf4j
+@PreAuthorize("isAuthenticated()")
 public class MissionPageController {
 
   /** Response type for the {@code /api/v1/operations/lookup} reference-list read. */
@@ -178,11 +184,7 @@ public class MissionPageController {
    */
   private final ParallelPageLoader parallelPageLoader;
 
-  private void addOperationsToModel(Model model, boolean isPublic) {
-    if (isPublic) {
-      model.addAttribute("operationsList", List.of());
-      return;
-    }
+  private void addOperationsToModel(Model model) {
     try {
       List<OperationReferenceDto> operations =
           backendApiClient.get("/api/v1/operations/lookup", OPERATION_REFERENCE_LIST);
@@ -304,8 +306,9 @@ public class MissionPageController {
     uri.append("sort=plannedStartTime,desc&");
 
     if ((status == null || status.isEmpty())) {
-      if (showPast && !authHelperService.isAnonymous()) {
-        // Explicitly request all statuses ONLY if authenticated
+      if (showPast) {
+        // The "only if authenticated" half of this condition is gone with the anonymous caller
+        // (ADR-0159): every caller here holds a session, so the archive toggle means what it says.
         uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELLED&");
       } else {
         uri.append("status=PLANNED&status=ACTIVE&");
@@ -317,16 +320,14 @@ public class MissionPageController {
     }
 
     try {
-      boolean isPublic = authHelperService.isAnonymous();
-
       PageResponse<MissionListDto> missionsPage =
-          backendApiClient.get(uri.toString(), MISSION_LIST_PAGE, isPublic);
+          backendApiClient.get(uri.toString(), MISSION_LIST_PAGE);
       model.addAttribute("missions", missionsPage.content());
       model.addAttribute("missionsPage", missionsPage);
       model.addAttribute("search", search);
       model.addAttribute("start", start);
       model.addAttribute("end", end);
-      model.addAttribute("showPast", showPast && !authHelperService.isAnonymous());
+      model.addAttribute("showPast", showPast);
     } catch (Exception e) {
       log.error("Error loading missions", e);
       model.addAttribute("error", "error.missions.load");
@@ -411,7 +412,7 @@ public class MissionPageController {
       // list when skipped so a stray reference never NPEs. The owner/manager USER pickers are now
       // server-side searchable comboboxes (remote-users, #1193) that fetch matches from
       // /users/search on demand, so the full roster is no longer preloaded here.
-      if (!authHelperService.isAnonymous() && needMgmt) {
+      if (needMgmt) {
         // Owning-org-unit reassignment picker (REQ-ORG-018): the caller's assignable org units feed
         // the Verwaltung "Verantwortliche Einheit" control, mirroring the create-form owner-picker.
         model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
@@ -460,13 +461,13 @@ public class MissionPageController {
       // never inside a swapped fragment). Skip the uncapped /operations/lookup read on fragment
       // refetches that never repaint the picker (#1124, mirrors the #1142 users/me gate above).
       if (fullRender) {
-        addOperationsToModel(model, authHelperService.isAnonymous());
+        addOperationsToModel(model);
       }
 
       // roundingMode only feeds the finance/refinery display; skip its backend read for non-finance
       // fragment refetches. The "UP" default matches fetchRoundingMode's own fallback.
       model.addAttribute(
-          "roundingMode", needFinance ? fetchRoundingMode(authHelperService.isAnonymous()) : "UP");
+          "roundingMode", needFinance ? fetchRoundingMode() : "UP");
 
       // Fetch Mission JobTypes
       try {
@@ -497,20 +498,15 @@ public class MissionPageController {
         // Ignore
       }
 
-      // Fetch all active org units (Staffel + Spezialkommandos) for the guest org-unit picker in
-      // the participant add/edit modals. The backend endpoint requires a role, and an anonymous
-      // guest's submitted org units are dropped server-side (H-3) anyway, so the picker is only
-      // populated for authenticated callers labeling a guest.
-      if (!authHelperService.isAnonymous()) {
-        try {
-          List<OrgUnitMembershipOptionDto> orgUnits =
-              backendApiClient.getCached(
-                  CachedCatalog.ORG_UNITS_ACTIVE, ORG_UNIT_MEMBERSHIP_OPTION_LIST);
-          model.addAttribute("orgUnits", orgUnits != null ? orgUnits : List.of());
-        } catch (Exception e) {
-          model.addAttribute("orgUnits", List.of());
-        }
-      } else {
+      // Active org units (Staffel + Spezialkommandos) for the org-unit picker in the
+      // participant add/edit modals — the control a member uses when recording an external
+      // participant (ADR-0159, decision D4).
+      try {
+        List<OrgUnitMembershipOptionDto> orgUnits =
+            backendApiClient.getCached(
+                CachedCatalog.ORG_UNITS_ACTIVE, ORG_UNIT_MEMBERSHIP_OPTION_LIST);
+        model.addAttribute("orgUnits", orgUnits != null ? orgUnits : List.of());
+      } catch (Exception e) {
         model.addAttribute("orgUnits", List.of());
       }
 
@@ -524,8 +520,8 @@ public class MissionPageController {
         // Ignore
       }
 
-      // Fetch Ships (Only if authenticated)
-      if (!authHelperService.isAnonymous()) {
+      // Fetch Ships
+      {
         // Unit ship pickers are populated from the mission-scoped endpoint, not the caller's
         // OrgUnit-scoped hangar: it returns ships of registered participants (any OrgUnit) plus
         // ships already assigned to a unit. Only fetched when the caller may edit the mission —
@@ -765,7 +761,7 @@ public class MissionPageController {
             null));
     // Create page: always a full-page render, so prefill the "join as me" participant form.
     addFormsToModel(model, principal, true);
-    addOperationsToModel(model, false);
+    addOperationsToModel(model);
     model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
     return "mission-detail";
   }
@@ -827,11 +823,11 @@ public class MissionPageController {
     }
   }
 
-  private String fetchRoundingMode(boolean isPublic) {
+  private String fetchRoundingMode() {
     try {
       Map<String, Object> setting =
           backendApiClient.get(
-              "/api/v1/settings/refinery.rounding.mode", STRING_OBJECT_MAP, isPublic);
+              "/api/v1/settings/refinery.rounding.mode", STRING_OBJECT_MAP);
       if (setting != null && setting.get("value") != null) {
         return String.valueOf(setting.get("value"));
       }

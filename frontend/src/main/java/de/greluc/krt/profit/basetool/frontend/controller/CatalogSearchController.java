@@ -28,6 +28,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -44,11 +45,17 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * to an empty list on backend failure so the picker shows "no matches" instead of an error page.
  * Public ({@code /catalog/**} is {@code permitAll}) because the anonymous order form carries a
  * material picker; the backend endpoints are public catalog data themselves.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
+ * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
+ * package carried no gate of their own at all — protected by a matcher two folders away rather
+ * than by anything next to the code. A method-level gate still wins where one is present.
  */
 @Controller
 @RequestMapping("/catalog")
 @RequiredArgsConstructor
 @Slf4j
+@PreAuthorize("isAuthenticated()")
 public class CatalogSearchController {
 
   /** Response type of the backend material picker search ({@code GET /api/v1/materials/search}). */

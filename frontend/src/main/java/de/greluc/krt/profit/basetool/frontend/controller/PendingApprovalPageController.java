@@ -57,6 +57,18 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @PreAuthorize("isAuthenticated()")
 public class PendingApprovalPageController {
 
+  /**
+   * Reads the session's cached gate verdict without creating a session.
+   *
+   * @param session the current session, or {@code null} when there is none
+   * @return the cached verdict, or {@code null}
+   */
+  private static String sessionApprovalState(jakarta.servlet.http.HttpSession session) {
+    return session == null
+        ? null
+        : (String) session.getAttribute(BackendRoleSyncFilter.APPROVAL_STATE_FLAG);
+  }
+
   /** Backend endpoint returning the caller's own approval status. */
   private static final String REGISTRATION_STATUS_URI = "/api/v1/users/me/registration-status";
 
@@ -73,6 +85,17 @@ public class PendingApprovalPageController {
    * poll. Always set (never {@code null}), so the template may negate it.
    */
   static final String MODEL_REJECTED = "registrationRejected";
+
+  /**
+   * Model attribute selecting the role-less copy (REQ-SEC-053) and suppressing the status poll.
+   *
+   * <p>Its own attribute rather than a third value of {@link #MODEL_REJECTED}, because the three
+   * states are not degrees of the same thing: a pending member waits for a decision that has been
+   * asked for, a rejected one has been answered, and a role-less one has already been approved and
+   * is waiting for a role nobody has been asked to grant. Telling the third to wait for approval
+   * points them at an administrator who has already acted.
+   */
+  static final String MODEL_NO_ROLE = "registrationNoRole";
 
   private final BackendApiClient backendApiClient;
 
@@ -108,7 +131,15 @@ public class PendingApprovalPageController {
       BackendRoleSyncFilter.forgetApprovalVerdict(request.getSession(false));
       return "redirect:/";
     }
+    // The role-less verdict never comes from approvalStatus — the backend does not send it there
+    // (REQ-SEC-053). It is derived from the 403 the role sync met, and BackendRoleSyncFilter caches
+    // it in the same session attribute the approval verdict uses, which is what routed the caller
+    // here in the first place.
+    boolean noRole =
+        BackendRoleSyncFilter.STATE_NO_ROLE.equals(
+            sessionApprovalState(request.getSession(false)));
     model.addAttribute(MODEL_REJECTED, STATE_REJECTED.equals(approvalStatus));
+    model.addAttribute(MODEL_NO_ROLE, noRole && !STATE_REJECTED.equals(approvalStatus));
     return "pending-approval";
   }
 
