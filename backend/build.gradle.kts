@@ -224,4 +224,23 @@ tasks.named<Test>("test") {
     )
     .withPropertyName("crossModuleParitySources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  // Same defect, one directory further out. `ExternalContractTest` parses the API vhost runbook at
+  // runtime (`findRepoRoot().resolve("docs/API_VHOST_ROLLOUT_RUNBOOK.md")`) to assert that every
+  // frozen REQ-API-009 operation is admitted by the nginx allow-list. That file is not a source,
+  // not
+  // a resource and not on any classpath, so an edit that touches ONLY the runbook left this task
+  // UP-TO-DATE: the run printed BUILD SUCCESSFUL in seconds and the guard never executed.
+  //
+  // That is the worst shape a false green can take here, because the assertion it silences is the
+  // one connecting the allow-list to the frozen contract set — a rule deleted from the runbook
+  // would
+  // pass locally and only fail on a fresh CI checkout, which has no cached output to trust.
+  //
+  // The document itself needs no declaration: the test reads `/api/openapi.json` off the CLASSPATH,
+  // so `processResources` already tracks it.
+  inputs
+    .file(rootProject.file("docs/API_VHOST_ROLLOUT_RUNBOOK.md"))
+    .withPropertyName("apiVhostRunbook")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
 }
