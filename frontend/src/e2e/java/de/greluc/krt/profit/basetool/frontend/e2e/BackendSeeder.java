@@ -1970,7 +1970,8 @@ public final class BackendSeeder {
               "/api/v1/squadrons/" + squadronId + "/profit-eligible",
               "{\"eligible\":" + eligible + "}");
       if (status < 200 || status >= 300) {
-        throw new IllegalStateException("Profit-eligibility PATCH failed: HTTP " + status);
+        throw new IllegalStateException(
+            "Profit-eligibility PATCH failed: HTTP " + status + " body=" + lastBodyForMessage());
       }
     } catch (IllegalStateException e) {
       throw e;
@@ -2495,7 +2496,34 @@ public final class BackendSeeder {
             .header("Content-Type", "application/json")
             .method("PATCH", HttpRequest.BodyPublishers.ofString(jsonBody))
             .build();
-    return http.send(request, BodyHandlers.ofString()).statusCode();
+    java.net.http.HttpResponse<String> response = http.send(request, BodyHandlers.ofString());
+    lastResponseBody = response.body();
+    return response.statusCode();
+  }
+
+  /**
+   * The body of the most recent {@link #patch} response, for failure messages.
+   *
+   * <p>A seeding step that fails during {@code beforeAll} takes the whole suite's bring-up with it,
+   * and the artifact a bring-up failure leaves behind carries no backend log — the extension never
+   * gets far enough to dump one. "HTTP 403" then costs a full CI cycle to turn into a cause, twice
+   * on 2026-09-06. The RFC 7807 body names it: {@code NO_ROLE}, {@code PENDING_APPROVAL}, {@code
+   * ACCESS_DENIED} and an unexpected 500 are four different problems behind two status codes.
+   */
+  private String lastResponseBody = "";
+
+  /**
+   * The last response body, trimmed to something a failure message can carry.
+   *
+   * @return at most 400 characters of the body, or a marker when there was none
+   */
+  private String lastBodyForMessage() {
+    if (lastResponseBody == null || lastResponseBody.isBlank()) {
+      return "<empty body>";
+    }
+    return lastResponseBody.length() > 400
+        ? lastResponseBody.substring(0, 400) + "…"
+        : lastResponseBody;
   }
 
   /**

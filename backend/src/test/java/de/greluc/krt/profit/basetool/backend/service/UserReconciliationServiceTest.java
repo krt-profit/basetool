@@ -343,7 +343,8 @@ class UserReconciliationServiceTest {
       existing.setRoles(new HashSet<>());
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findAll()).thenReturn(java.util.List.of(role(1L, "ADMIN")));
+      when(roleRepository.findAllWithPermissions())
+          .thenReturn(java.util.List.of(role(1L, "ADMIN")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       userReconciliationService.syncUser(jwt);
@@ -431,7 +432,8 @@ class UserReconciliationServiceTest {
     @Test
     void newDiscordAdmin_landsActive_noNotification() {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findAll()).thenReturn(java.util.List.of(codeRole("ADMIN", "Admin")));
+      when(roleRepository.findAllWithPermissions())
+          .thenReturn(java.util.List.of(codeRole("ADMIN", "Admin")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       User result = userReconciliationService.syncUser(discordJwt(true, List.of("Admin"))).user();
@@ -490,7 +492,8 @@ class UserReconciliationServiceTest {
       // without Discord, so the first admin can never be locked out by the fail-safe default.
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
       when(userRepository.findIdsByUsername("discorduser")).thenReturn(List.of());
-      when(roleRepository.findAll()).thenReturn(java.util.List.of(codeRole("ADMIN", "Admin")));
+      when(roleRepository.findAllWithPermissions())
+          .thenReturn(java.util.List.of(codeRole("ADMIN", "Admin")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       User result = userReconciliationService.syncUser(discordJwt(false, List.of("Admin"))).user();
@@ -507,7 +510,8 @@ class UserReconciliationServiceTest {
       existing.setApprovalStatus(ApprovalStatus.PENDING);
       existing.setVersion(1L);
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findAll()).thenReturn(java.util.List.of(codeRole("ADMIN", "Admin")));
+      when(roleRepository.findAllWithPermissions())
+          .thenReturn(java.util.List.of(codeRole("ADMIN", "Admin")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       User result = userReconciliationService.syncUser(discordJwt(false, List.of("Admin"))).user();
@@ -648,7 +652,7 @@ class UserReconciliationServiceTest {
       existing.setRoles(new HashSet<>(Set.of(admin, member)));
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findAll()).thenReturn(java.util.List.of(member));
+      when(roleRepository.findAllWithPermissions()).thenReturn(java.util.List.of(member));
 
       userReconciliationService.syncUser(tokenFrom(MOBILE_CLIENT, List.of("KRT Member")));
 
@@ -672,7 +676,8 @@ class UserReconciliationServiceTest {
       existing.setRoles(new HashSet<>(Set.of(role(1L, "Admin"), role(2L, "KRT Member"))));
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findAll()).thenReturn(java.util.List.of(role(2L, "KRT Member")));
+      when(roleRepository.findAllWithPermissions())
+          .thenReturn(java.util.List.of(role(2L, "KRT Member")));
 
       UserReconciliationService.ReconciledUser reconciled =
           userReconciliationService.syncUser(tokenFrom(MOBILE_CLIENT, List.of("KRT Member")));
@@ -696,7 +701,8 @@ class UserReconciliationServiceTest {
       existing.setRoles(new HashSet<>(Set.of(role(1L, "Admin"), role(2L, "KRT Member"))));
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findAll()).thenReturn(java.util.List.of(role(2L, "KRT Member")));
+      when(roleRepository.findAllWithPermissions())
+          .thenReturn(java.util.List.of(role(2L, "KRT Member")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       userReconciliationService.syncUser(tokenFrom("basetool-frontend", List.of("KRT Member")));
@@ -718,7 +724,8 @@ class UserReconciliationServiceTest {
     void persistsTheRoles_whenThePartialClaimCreatesTheRow() {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
       when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
-      when(roleRepository.findAll()).thenReturn(java.util.List.of(role(2L, "KRT Member")));
+      when(roleRepository.findAllWithPermissions())
+          .thenReturn(java.util.List.of(role(2L, "KRT Member")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       UserReconciliationService.ReconciledUser reconciled =
@@ -744,7 +751,8 @@ class UserReconciliationServiceTest {
       existing.setRoles(new HashSet<>(Set.of(role(1L, "Admin"))));
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findAll()).thenReturn(java.util.List.of(role(2L, "KRT Member")));
+      when(roleRepository.findAllWithPermissions())
+          .thenReturn(java.util.List.of(role(2L, "KRT Member")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       Jwt noAzp =
@@ -836,7 +844,7 @@ class UserReconciliationServiceTest {
       Role adminRole = role(1L, "ADMIN");
       adminRole.setCode("ADMIN");
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findAll()).thenReturn(java.util.List.of(adminRole));
+      when(roleRepository.findAllWithPermissions()).thenReturn(java.util.List.of(adminRole));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       userReconciliationService.syncUser(
@@ -865,7 +873,7 @@ class UserReconciliationServiceTest {
       Role adminRole = role(1L, "ADMIN");
       adminRole.setCode("ADMIN");
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findAll()).thenReturn(java.util.List.of(adminRole));
+      when(roleRepository.findAllWithPermissions()).thenReturn(java.util.List.of(adminRole));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       userReconciliationService.syncUser(
@@ -1035,7 +1043,7 @@ class UserReconciliationServiceTest {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
     when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
     // The catalogue simply does not contain it — which is what "matched no local role" is.
-    when(roleRepository.findAll()).thenReturn(List.of());
+    when(roleRepository.findAllWithPermissions()).thenReturn(List.of());
     when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
     User result = userReconciliationService.syncUser(jwt).user();
@@ -1057,7 +1065,7 @@ class UserReconciliationServiceTest {
     org.mockito.ArgumentCaptor<User> saved = org.mockito.ArgumentCaptor.forClass(User.class);
     verify(userRepository).save(saved.capture());
     assertTrue(saved.getValue().getRoles().isEmpty(), "a null role list grants nothing");
-    verify(roleRepository, never()).findAll();
+    verify(roleRepository, never()).findAllWithPermissions();
   }
 
   // ---------------------------------------------------------------
@@ -1138,7 +1146,7 @@ class UserReconciliationServiceTest {
       // A realm-side role rename: every holder's role name stops resolving, so each account is
       // left with no role at all — which since REQ-SEC-053 means refused, not reduced. Four
       // accounts is one past the threshold.
-      when(roleRepository.findAll()).thenReturn(List.of());
+      when(roleRepository.findAllWithPermissions()).thenReturn(List.of());
       for (int i = 0; i < 4; i++) {
         syncDemotedAccount();
       }
@@ -1162,7 +1170,7 @@ class UserReconciliationServiceTest {
 
     @Test
     void aSingleRoleStrip_staysAtInfo_andTheTalliesResetForTheNextRun() {
-      when(roleRepository.findAll()).thenReturn(List.of());
+      when(roleRepository.findAllWithPermissions()).thenReturn(List.of());
       syncDemotedAccount();
 
       userReconciliationService.logRoleSyncSummary();
@@ -1184,7 +1192,7 @@ class UserReconciliationServiceTest {
       // set is already empty and their realm roles still resolve to nothing — so the WARN that
       // exists to surface exactly that population saw zero, on the first run and on every run
       // after it.
-      when(roleRepository.findAll()).thenReturn(List.of());
+      when(roleRepository.findAllWithPermissions()).thenReturn(List.of());
       for (int i = 0; i < 4; i++) {
         UUID id = UUID.randomUUID();
         User existing = newUser(id, "already-role-less");

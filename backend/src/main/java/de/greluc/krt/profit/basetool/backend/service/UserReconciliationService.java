@@ -562,6 +562,11 @@ public class UserReconciliationService {
    * composite fold-in adds a name to essentially every member, roughly doubling that count against
    * the largest loop in the nightly run.
    *
+   * <p><b>The permissions are fetched with the roles</b>, not left lazy. These entities outlive the
+   * transaction that read them - {@code assembleFor} iterates {@code getPermissions()} after {@code
+   * syncUser} has returned - so a lazy collection there is a {@code LazyInitializationException} on
+   * the authentication path, i.e. a {@code 500} on every login.
+   *
    * <p><b>Deliberately not cached across calls, and this is the whole point of the method.</b> The
    * first version of this fix held the map in a {@code volatile} field for the length of a sync
    * run. That handed out {@link Role} entities loaded in an earlier transaction and assigned them
@@ -575,7 +580,7 @@ public class UserReconciliationService {
    */
   @NotNull
   private Map<String, Role> roleCatalogue() {
-    return roleRepository.findAll().stream()
+    return roleRepository.findAllWithPermissions().stream()
         .collect(
             java.util.stream.Collectors.toUnmodifiableMap(
                 role -> role.getName().toLowerCase(Locale.ROOT), role -> role, (a, b) -> a));

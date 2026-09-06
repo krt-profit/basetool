@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.Role;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.jetbrains.annotations.NotNull;
@@ -67,6 +68,26 @@ public interface RoleRepository extends JpaRepository<Role, Long> {
    * @return the role, or empty when the catalogue knows no such code
    */
   Optional<Role> findByCodeIgnoreCase(String code);
+
+  /**
+   * The whole role catalogue with each role's {@code permissions} already loaded.
+   *
+   * <p>{@code Role.permissions} is a {@code LAZY @ElementCollection}, and the roles this returns
+   * outlive the transaction that read them: {@code UserReconciliationService.syncUser} maps them
+   * inside its own transaction and hands them to {@code
+   * CustomJwtGrantedAuthoritiesConverter.assembleFor}, which iterates {@code getPermissions()}
+   * afterwards. Touching the collection there is a {@code LazyInitializationException} - "no
+   * session" - and because that runs on the authentication path, it is a {@code 500} on <b>every
+   * login</b>. Fetching the collection with the roles is what makes the hand-off legal; it also
+   * removes a second N+1, since assembling a member's authorities reads every role's permissions
+   * anyway.
+   *
+   * <p>{@code DISTINCT} because the join multiplies each role by its permission rows.
+   *
+   * @return every role, with its permission set initialised
+   */
+  @Query("SELECT DISTINCT r FROM Role r LEFT JOIN FETCH r.permissions")
+  List<Role> findAllWithPermissions();
 
   /**
    * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
