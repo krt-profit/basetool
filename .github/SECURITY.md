@@ -113,9 +113,12 @@ Particularly interesting classes of issue, given the project's architecture:
 
 - Cross-tenant data access — any read or write that bypasses the JWT `sub`
   filter or the elevated-role check in the service layer.
-- Information disclosure to unauthenticated guests (see the
-  `cleanupForGuest`-style helpers — anything leaking email, real name or
-  internal orders/items is in scope).
+- Information disclosure to a caller below the peer redaction tier (see the
+  `cleanup…ForPeer` helpers — anything leaking e-mail, real name or internal
+  orders/items to a member who may not see it is in scope).
+- Anything reachable without a login beyond the surface REQ-SEC-052 enumerates:
+  the landing page, the legal pages, the assets, `/error`, `/actuator/health`
+  and two documented `GET` reads.
 - Authentication or authorisation bypass against any `@RestController` or
   Thymeleaf view, including missing `@PreAuthorize` annotations.
 - Optimistic-locking bypass leading to lost writes or privilege escalation.

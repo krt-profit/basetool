@@ -127,7 +127,6 @@ body:
     attributes:
       label: Role of the Affected User
       options:
-        - GUEST
         - KRT_MEMBER
         - LOGISTICIAN
         - MISSION_MANAGER
